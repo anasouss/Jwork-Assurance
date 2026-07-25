@@ -91,6 +91,13 @@ export function GrilleTarifaireConfigurator({
     () => new Map(garanties.map((garantie) => [garantie.id, garantie])),
     [garanties]
   );
+  const draftGroups = useMemo(
+    () => vehicleGaranties.map((garantie) => ({
+      garantie,
+      drafts: drafts.filter((draft) => draft.garantieId === garantie.id),
+    })),
+    [drafts, vehicleGaranties]
+  );
   const visibleFormules = (formules.data ?? []).filter(
     (formule) => String(formule.usageId ?? "") === activeUsageId
   );
@@ -152,14 +159,7 @@ export function GrilleTarifaireConfigurator({
       updateDraft(draft.localKey, { checked: false });
       return;
     }
-    setDrafts((current) => {
-      const next = current.filter((item) => item.localKey !== draft.localKey);
-      if (next.some((item) => item.garantieId === draft.garantieId)) {
-        return next;
-      }
-      const garantie = garantieById.get(draft.garantieId);
-      return garantie ? [...next, emptyDraft(garantie)] : next;
-    });
+    setDrafts((current) => current.filter((item) => item.localKey !== draft.localKey));
   };
 
   const submitMatrix = () => {
@@ -232,45 +232,99 @@ export function GrilleTarifaireConfigurator({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {drafts.map((draft) => {
-              const garantie = garantieById.get(draft.garantieId);
-              const mode = draft.modeTarification || defaultMode(garantie);
-              const enabled = draft.checked;
+            {draftGroups.map(({ garantie, drafts: groupDrafts }) => {
+              const baseDraft = groupDrafts.find((draft) => draft.baseRow) ?? emptyDraft(garantie);
+              const extraDrafts = groupDrafts.filter((draft) => !draft.baseRow);
+              const mode = baseDraft.modeTarification || defaultMode(garantie);
+              const enabled = baseDraft.checked;
               const multiEntry = canAddMultipleRows(garantie);
               return (
-                <TableRow key={draft.localKey}>
+                <TableRow key={garantie.id}>
                   <TableCell>
-                    <Checkbox checked={enabled} onCheckedChange={(checked) => updateDraft(draft.localKey, { checked: checked === true })} />
+                    <Checkbox checked={enabled} onCheckedChange={(checked) => updateDraft(baseDraft.localKey, { checked: checked === true })} />
                   </TableCell>
-                  <TableCell className="font-semibold">
-                    <div>{garantieLabel(garantie)}</div>
-                    {draft.libelleOption ? <div className="text-xs font-normal text-muted-foreground">{draft.libelleOption}</div> : null}
+                  <TableCell className="align-top font-semibold">
+                    <div className="pt-2">{garantieLabel(garantie)}</div>
                   </TableCell>
-                  <TableCell>
-                    <ModeCell
-                      garantie={garantie}
-                      value={mode}
-                      disabled={!enabled}
-                      onChange={(value) => updateDraft(draft.localKey, normalizeModePatch(value))}
+                  <TableCell className="align-top">
+                    <div className="grid gap-2">
+                      <ModeCell
+                        garantie={garantie}
+                        value={mode}
+                        disabled={!enabled}
+                        onChange={(value) => updateDraft(baseDraft.localKey, normalizeModePatch(value))}
+                      />
+                      {extraDrafts.map((draft) => (
+                        <ModeCell
+                          key={draft.localKey}
+                          garantie={garantie}
+                          value={draft.modeTarification || defaultMode(garantie)}
+                          disabled={!enabled}
+                          onChange={(value) => updateDraft(draft.localKey, normalizeModePatch(value))}
+                        />
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DraftNumberStack
+                      drafts={[baseDraft, ...extraDrafts]}
+                      enabled={enabled}
+                      field="taux"
+                      disabledFor={(draft) => (draft.modeTarification || defaultMode(garantie)) !== "TAUX"}
+                      updateDraft={updateDraft}
                     />
                   </TableCell>
-                  <TableCell><NumberCell disabled={!enabled || mode !== "TAUX"} value={draft.taux} onChange={(value) => updateDraft(draft.localKey, { taux: value })} /></TableCell>
-                  <TableCell><NumberCell disabled={!enabled || !hasFranchise(garantie)} value={draft.tauxFranchise} onChange={(value) => updateDraft(draft.localKey, { tauxFranchise: value })} /></TableCell>
-                  <TableCell><NumberCell disabled={!enabled || !hasFranchise(garantie)} value={draft.franchiseMinimale} onChange={(value) => updateDraft(draft.localKey, { franchiseMinimale: value })} /></TableCell>
-                  <TableCell><NumberCell disabled={!enabled || mode !== "CAPITAL"} value={draft.capital} onChange={(value) => updateDraft(draft.localKey, { capital: value })} /></TableCell>
-                  <TableCell><NumberCell disabled={!enabled || (mode !== "CAPITAL" && mode !== "PRIME_FIXE")} value={draft.prime} onChange={(value) => updateDraft(draft.localKey, { prime: value })} /></TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      {draft.baseRow && multiEntry ? (
-                        <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => garantie && addDraft(garantie)}>
+                  <TableCell className="align-top">
+                    <DraftNumberStack
+                      drafts={[baseDraft, ...extraDrafts]}
+                      enabled={enabled}
+                      field="tauxFranchise"
+                      disabledFor={() => !hasFranchise(garantie)}
+                      updateDraft={updateDraft}
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DraftNumberStack
+                      drafts={[baseDraft, ...extraDrafts]}
+                      enabled={enabled}
+                      field="franchiseMinimale"
+                      disabledFor={() => !hasFranchise(garantie)}
+                      updateDraft={updateDraft}
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DraftNumberStack
+                      drafts={[baseDraft, ...extraDrafts]}
+                      enabled={enabled}
+                      field="capital"
+                      disabledFor={(draft) => (draft.modeTarification || defaultMode(garantie)) !== "CAPITAL"}
+                      updateDraft={updateDraft}
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DraftNumberStack
+                      drafts={[baseDraft, ...extraDrafts]}
+                      enabled={enabled}
+                      field="prime"
+                      disabledFor={(draft) => {
+                        const rowMode = draft.modeTarification || defaultMode(garantie);
+                        return rowMode !== "CAPITAL" && rowMode !== "PRIME_FIXE";
+                      }}
+                      updateDraft={updateDraft}
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="grid gap-2 pt-1">
+                      {multiEntry ? (
+                        <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => addDraft(garantie)}>
                           <Plus className="size-4" />
                         </Button>
                       ) : null}
-                      {!draft.baseRow ? (
+                      {extraDrafts.map((draft) => (
                         <Button type="button" variant="ghost" size="icon" onClick={() => removeDraft(draft)}>
                           <Trash2 className="size-4" />
                         </Button>
-                      ) : null}
+                      ))}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -429,6 +483,33 @@ function NumberCell({
       value={value ?? ""}
       onChange={(event) => onChange(numberValue(event.target.value))}
     />
+  );
+}
+
+function DraftNumberStack({
+  drafts,
+  enabled,
+  field,
+  disabledFor,
+  updateDraft,
+}: {
+  drafts: MatrixLine[];
+  enabled: boolean;
+  field: "taux" | "tauxFranchise" | "franchiseMinimale" | "capital" | "prime";
+  disabledFor: (draft: MatrixLine) => boolean;
+  updateDraft: (localKey: string, patch: Partial<MatrixLine>) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      {drafts.map((draft) => (
+        <NumberCell
+          key={`${draft.localKey}-${field}`}
+          disabled={!enabled || disabledFor(draft)}
+          value={draft[field]}
+          onChange={(value) => updateDraft(draft.localKey, { [field]: value })}
+        />
+      ))}
+    </div>
   );
 }
 

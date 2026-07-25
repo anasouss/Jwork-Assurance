@@ -43,19 +43,16 @@ public class DataSeeder implements CommandLineRunner {
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
     private final TypeMouvementContratRepository typeMouvementContratRepository;
 
-    @Value("${app.seed.enabled:true}")
-    private boolean enabled;
-
-    @Value("${app.seed.admin-email:admin@assurance.local}")
+    @Value("${app.seed.admin-email:admin@jway.ma}")
     private String adminEmail;
 
-    @Value("${app.seed.admin-password:Admin123!}")
+    @Value("${app.seed.admin-password:password}")
     private String adminPassword;
 
     @Override
     @Transactional
     public void run(String... args) {
-        if (!enabled) {
+        if (hasBootstrapData()) {
             return;
         }
 
@@ -285,6 +282,16 @@ public class DataSeeder implements CommandLineRunner {
                         .actif(true)
                         .build()
         ));
+    }
+
+    private boolean hasBootstrapData() {
+        return permissionRepository.count() > 0
+                && roleRepository.count() > 0
+                && agenceRepository.count() > 0
+                && compagnieAssuranceRepository.count() > 0
+                && userRepository.count() > 0
+                && usageRepository.count() > 0
+                && garantieRepository.count() > 0;
     }
 
     private Permission seedPermission(String code, String nom, String module) {

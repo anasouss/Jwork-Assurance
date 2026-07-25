@@ -5,7 +5,6 @@ import com.assurance.entity.Marque;
 import com.assurance.repository.CarrosserieRepository;
 import com.assurance.repository.MarqueRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
@@ -28,17 +27,15 @@ public class VehiculeReferentielSeeder implements CommandLineRunner {
     private final MarqueRepository marqueRepository;
     private final CarrosserieRepository carrosserieRepository;
 
-    @Value("${app.seed.enabled:true}")
-    private boolean enabled;
-
     @Override
     @Transactional
     public void run(String... args) {
-        if (!enabled) {
-            return;
+        if (marqueRepository.count() == 0) {
+            seedMarques();
         }
-        seedMarques();
-        seedCarrosseries();
+        if (carrosserieRepository.count() == 0) {
+            seedCarrosseries();
+        }
     }
 
     private void seedMarques() {

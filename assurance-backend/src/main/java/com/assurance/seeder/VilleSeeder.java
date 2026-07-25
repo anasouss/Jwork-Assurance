@@ -39,16 +39,13 @@ public class VilleSeeder implements CommandLineRunner {
 
     private final VilleRepository villeRepository;
 
-    @Value("${app.seed.enabled:true}")
-    private boolean enabled;
-
     @Value("${app.seed.villes-sql:}")
     private String villesSqlPath;
 
     @Override
     @Transactional
     public void run(String... args) {
-        if (!enabled) {
+        if (villeRepository.count() > 0) {
             return;
         }
         if (!seedFromSql()) {

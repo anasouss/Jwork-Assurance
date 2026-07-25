@@ -69,7 +69,7 @@ export function GrilleTarifaireConfigurator({
     for (const formule of formules.data ?? []) {
       if (formule.usageId) usageIds.add(String(formule.usageId));
     }
-    return usages.filter((usage) => usageIds.has(usage.id));
+    return usageIds.size ? usages.filter((usage) => usageIds.has(usage.id)) : usages;
   }, [allowedUsageSet, formules.data, lignes.data, usages]);
 
   const activeUsageId = selectedUsageId || usageTabs[0]?.id || "";

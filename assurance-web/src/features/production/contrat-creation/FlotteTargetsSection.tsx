@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { ChevronDown, Plus, Save, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
@@ -87,7 +89,7 @@ export function FlotteTargetsSection({
     [remorques, vehicules]
   );
   const [activeKey, setActiveKey] = useState(targetKey(targets[0]));
-  const activeTarget = targets.find((target) => targetKey(target) === activeKey) ?? targets[0];
+  const [savedKeys, setSavedKeys] = useState<string[]>([]);
   const vehiculeGaranties = useMemo(
     () => garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE"),
     [garanties]
@@ -174,6 +176,12 @@ export function FlotteTargetsSection({
     }
   };
 
+  const saveTargetSection = (target: Target, label: string) => {
+    const key = targetKey(target);
+    setSavedKeys((current) => (current.includes(key) ? current : [...current, key]));
+    toast.success(`${label} enregistré`);
+  };
+
   return (
     <>
       <SectionCard title="Véhicules" badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`} tone="production">
@@ -181,10 +189,12 @@ export function FlotteTargetsSection({
           <div className="grid content-start gap-3">
             <div className="grid gap-2">
               {vehiculeTargets.map((target) => {
-                const active = targetKey(target) === targetKey(activeVehiculeTarget);
+                const key = targetKey(target);
+                const active = key === targetKey(activeVehiculeTarget);
+                const saved = savedKeys.includes(key);
                 return (
                   <button
-                    key={targetKey(target)}
+                    key={key}
                     type="button"
                     className={cn(
                       "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
@@ -193,8 +203,8 @@ export function FlotteTargetsSection({
                     onClick={() => setActiveKey(targetKey(target))}
                   >
                     <span className="font-medium">{target.label}</span>
-                    <Badge variant="secondary">
-                      {selectedGaranties.filter((item) => sameTarget(item, target)).length}
+                    <Badge variant={saved ? "outline" : "secondary"}>
+                      {saved ? "Validé" : selectedGaranties.filter((item) => sameTarget(item, target)).length}
                     </Badge>
                   </button>
                 );
@@ -219,16 +229,42 @@ export function FlotteTargetsSection({
           </div>
 
           {activeVehiculeTarget ? (
-            <VehicleForm
-              index={activeVehiculeTarget.index}
-              vehicule={vehicules[activeVehiculeTarget.index]}
-              setVehicules={setVehicules}
-              usages={usages}
-              marques={marques}
-              carrosseries={carrosseries}
-              categoriesTransport={categoriesTransport}
-              errors={errors}
-            />
+            <div className="grid gap-4">
+              <TargetSubsection title="Informations véhicule">
+                <VehicleForm
+                  index={activeVehiculeTarget.index}
+                  vehicule={vehicules[activeVehiculeTarget.index]}
+                  setVehicules={setVehicules}
+                  usages={usages}
+                  marques={marques}
+                  carrosseries={carrosseries}
+                  categoriesTransport={categoriesTransport}
+                  errors={errors}
+                />
+              </TargetSubsection>
+              <TargetSubsection
+                title="Garanties"
+                badge={`${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length > 1 ? "s" : ""}`}
+              >
+                <TargetGuaranteesTable
+                  target={activeVehiculeTarget}
+                  garanties={vehiculeGaranties}
+                  personneGaranties={personneGaranties}
+                  selected={selectedGaranties}
+                  setSelected={setSelectedGaranties}
+                  lignes={lignes}
+                  formulesPersonne={formulesPersonne}
+                  usages={usages}
+                  grilleSelected={grilleSelected}
+                />
+              </TargetSubsection>
+              <div className="flex justify-end border-t pt-3">
+                <Button type="button" onClick={() => saveTargetSection(activeVehiculeTarget, activeVehiculeTarget.label)}>
+                  <Save className="size-4" />
+                  Enregistrer véhicule
+                </Button>
+              </div>
+            </div>
           ) : null}
         </div>
       </SectionCard>
@@ -239,10 +275,12 @@ export function FlotteTargetsSection({
             {remorqueTargets.length > 0 ? (
               <div className="grid gap-2">
                 {remorqueTargets.map((target) => {
-                  const active = targetKey(target) === targetKey(activeRemorqueTarget);
+                  const key = targetKey(target);
+                  const active = key === targetKey(activeRemorqueTarget);
+                  const saved = savedKeys.includes(key);
                   return (
                     <button
-                      key={targetKey(target)}
+                      key={key}
                       type="button"
                       className={cn(
                         "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
@@ -251,8 +289,8 @@ export function FlotteTargetsSection({
                       onClick={() => setActiveKey(targetKey(target))}
                     >
                       <span className="font-medium">{target.label}</span>
-                      <Badge variant="secondary">
-                        {selectedGaranties.filter((item) => sameTarget(item, target)).length}
+                      <Badge variant={saved ? "outline" : "secondary"}>
+                        {saved ? "Validé" : selectedGaranties.filter((item) => sameTarget(item, target)).length}
                       </Badge>
                     </button>
                   );
@@ -282,13 +320,39 @@ export function FlotteTargetsSection({
           </div>
 
           {activeRemorqueTarget ? (
-            <RemorqueForm
-              index={activeRemorqueTarget.index}
-              remorque={remorques[activeRemorqueTarget.index]}
-              setRemorques={setRemorques}
-              usages={usages}
-              marques={marques}
-            />
+            <div className="grid gap-4">
+              <TargetSubsection title="Informations remorque">
+                <RemorqueForm
+                  index={activeRemorqueTarget.index}
+                  remorque={remorques[activeRemorqueTarget.index]}
+                  setRemorques={setRemorques}
+                  usages={usages}
+                  marques={marques}
+                />
+              </TargetSubsection>
+              <TargetSubsection
+                title="Garanties"
+                badge={`${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length > 1 ? "s" : ""}`}
+              >
+                <TargetGuaranteesTable
+                  target={activeRemorqueTarget}
+                  garanties={vehiculeGaranties}
+                  personneGaranties={personneGaranties}
+                  selected={selectedGaranties}
+                  setSelected={setSelectedGaranties}
+                  lignes={lignes}
+                  formulesPersonne={formulesPersonne}
+                  usages={usages}
+                  grilleSelected={grilleSelected}
+                />
+              </TargetSubsection>
+              <div className="flex justify-end border-t pt-3">
+                <Button type="button" onClick={() => saveTargetSection(activeRemorqueTarget, activeRemorqueTarget.label)}>
+                  <Save className="size-4" />
+                  Enregistrer remorque
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
               Ajoutez une remorque pour renseigner ses informations.
@@ -296,50 +360,38 @@ export function FlotteTargetsSection({
           )}
         </div>
       </SectionCard>
-
-      <SectionCard title="Garanties" badge={`${selectedGaranties.length} sélectionnée${selectedGaranties.length > 1 ? "s" : ""}`} tone="production">
-        <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
-          <div className="grid content-start gap-3">
-          <div className="grid gap-2">
-            {targets.map((target) => {
-              const active = targetKey(target) === targetKey(activeTarget);
-              const count = selectedGaranties.filter((item) => sameTarget(item, target)).length;
-              return (
-                <button
-                  key={targetKey(target)}
-                  type="button"
-                  className={cn(
-                    "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
-                    active ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100" : "hover:bg-muted/60"
-                  )}
-                  onClick={() => setActiveKey(targetKey(target))}
-                >
-                  <span className="font-medium">{target.label}</span>
-                  <Badge variant="secondary">{count}</Badge>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="grid gap-4">
-          {activeTarget ? (
-            <TargetGuaranteesTable
-              target={activeTarget}
-              garanties={vehiculeGaranties}
-              personneGaranties={personneGaranties}
-              selected={selectedGaranties}
-              setSelected={setSelectedGaranties}
-              lignes={lignes}
-              formulesPersonne={formulesPersonne}
-              usages={usages}
-              grilleSelected={grilleSelected}
-            />
-          ) : null}
-        </div>
-      </div>
-      </SectionCard>
     </>
+  );
+}
+
+function TargetSubsection({
+  title,
+  badge,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  badge?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border bg-card">
+      <CollapsibleTrigger asChild>
+        <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+          <span className="flex min-w-0 items-center gap-2">
+            <ChevronDown className={cn("size-4 shrink-0 transition-transform", !open && "-rotate-90")} />
+            <span className="truncate text-sm font-semibold">{title}</span>
+            {badge ? <Badge variant="secondary">{badge}</Badge> : null}
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="border-t p-4">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -372,8 +424,7 @@ function VehicleForm({
   };
 
   return (
-    <div className="rounded-md border p-4">
-      <div className="mb-3 text-sm font-semibold">Informations véhicule</div>
+    <div className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Field label="Usage" required>
           <AutocompleteSelect
@@ -525,8 +576,7 @@ function RemorqueForm({
   };
 
   return (
-    <div className="rounded-md border p-4">
-      <div className="mb-3 text-sm font-semibold">Informations remorque</div>
+    <div className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Field label="Usage" required>
           <AutocompleteSelect

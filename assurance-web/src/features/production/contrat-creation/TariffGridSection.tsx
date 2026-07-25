@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Edit, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
   const [editingLigne, setEditingLigne] = useState<ReferenceOption | null>(null);
   const [formuleDialogOpen, setFormuleDialogOpen] = useState(false);
   const [editingFormule, setEditingFormule] = useState<ReferenceOption | null>(null);
+  const [selectedUsageId, setSelectedUsageId] = useState("");
 
   const filteredGrilles = (form.refs.grilles.data ?? []).filter(
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
@@ -46,6 +47,35 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
     queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: form.grilleTarifaireId }),
     enabled: Boolean(form.grilleTarifaireId),
   });
+  const usageTabs = useMemo(() => {
+    const usageIds = new Set<string>();
+    for (const ligne of lignes.data ?? []) {
+      if (ligne.usageId) usageIds.add(String(ligne.usageId));
+    }
+    for (const formule of formules.data ?? []) {
+      if (formule.usageId) usageIds.add(String(formule.usageId));
+    }
+    const usages = form.refs.usages.data ?? [];
+    const filtered = usageIds.size > 0 ? usages.filter((usage) => usageIds.has(usage.id)) : usages;
+    return filtered;
+  }, [form.refs.usages.data, formules.data, lignes.data]);
+  const activeUsageId = selectedUsageId || usageTabs[0]?.id || "";
+  const activeUsage = usageTabs.find((usage) => usage.id === activeUsageId) ?? null;
+  const visibleLignes = (lignes.data ?? []).filter(
+    (ligne) => !activeUsageId || !ligne.usageId || String(ligne.usageId) === activeUsageId
+  );
+  const tauxLignes = visibleLignes.filter(isTauxLine);
+  const capitalLignes = visibleLignes.filter((ligne) => !isTauxLine(ligne));
+  const visibleFormules = (formules.data ?? []).filter(
+    (formule) => !activeUsageId || !formule.usageId || String(formule.usageId) === activeUsageId
+  );
+
+  useEffect(() => {
+    if (selectedUsageId && usageTabs.some((usage) => usage.id === selectedUsageId)) {
+      return;
+    }
+    setSelectedUsageId(usageTabs[0]?.id ?? "");
+  }, [selectedUsageId, usageTabs]);
 
   const saveGrille = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: UpsertGrilleTarifaireRequest }) =>
@@ -126,19 +156,6 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
             <Plus className="size-4" />
             Ligne
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={!form.grilleTarifaireId}
-            onClick={() => {
-              setEditingFormule(null);
-              setFormuleDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            Formule personne
-          </Button>
         </div>
       }
     >
@@ -170,123 +187,74 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-md border">
-          <div className="border-b px-3 py-2 text-sm font-semibold">Garanties véhicule</div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Garantie</TableHead>
-                <TableHead>Usage</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Mode</TableHead>
-                <TableHead>Prime</TableHead>
-                <TableHead>Capital</TableHead>
-                <TableHead>Taux</TableHead>
-                <TableHead>Franchise</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!form.grilleTarifaireId ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                    Aucune grille sélectionnée.
-                  </TableCell>
-                </TableRow>
-              ) : (lignes.data ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                    Cette grille ne contient pas encore de lignes tarifaires.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                (lignes.data ?? []).map((ligne) => (
-                  <TableRow key={ligne.id}>
-                    <TableCell className="font-medium">{labelFromRefs(ligne, form.refs.garanties.data ?? [], "garantie")}</TableCell>
-                    <TableCell>{labelFromRefs(ligne, form.refs.usages.data ?? [], "usage")}</TableCell>
-                    <TableCell>{labelFromRefs(ligne, form.refs.categoriesTransport.data ?? [], "categorieTransport")}</TableCell>
-                    <TableCell>{modeLabel(text(ligne.modeTarification))}</TableCell>
-                    <TableCell>{money(ligne.prime)}</TableCell>
-                    <TableCell>{money(ligne.capital)}</TableCell>
-                    <TableCell>{money(ligne.taux)}</TableCell>
-                    <TableCell>{franchise(ligne)}</TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingLigne(ligne);
-                          setLigneDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+        <div className="flex flex-wrap items-center gap-2">
+          {usageTabs.map((usage) => {
+            const active = usage.id === activeUsageId;
+            return (
+              <Button
+                key={usage.id}
+                type="button"
+                variant={active ? "default" : "outline"}
+                className={active ? "bg-emerald-600 text-white hover:bg-emerald-700" : ""}
+                onClick={() => setSelectedUsageId(usage.id)}
+              >
+                {usage.code ? `Usage ${usage.code}` : usage.libelle}
+              </Button>
+            );
+          })}
+          {form.grilleTarifaireId ? (
+            <Button
+              type="button"
+              size="icon"
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => {
+                setEditingLigne(null);
+                setLigneDialogOpen(true);
+              }}
+            >
+              <Plus className="size-4" />
+            </Button>
+          ) : null}
         </div>
 
-        <div className="overflow-x-auto rounded-md border">
-          <div className="border-b px-3 py-2 text-sm font-semibold">Garanties personne</div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Garantie</TableHead>
-                <TableHead>Usage</TableHead>
-                <TableHead>Formule</TableHead>
-                <TableHead>Décès</TableHead>
-                <TableHead>Invalidité</TableHead>
-                <TableHead>Frais médicaux</TableHead>
-                <TableHead>Prime nette</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!form.grilleTarifaireId ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                    Aucune grille sélectionnée.
-                  </TableCell>
-                </TableRow>
-              ) : (formules.data ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                    Aucune formule personne. Activez "garanties personne" sur les usages concernés puis ajoutez PP/PC.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                (formules.data ?? []).map((formule) => (
-                  <TableRow key={formule.id}>
-                    <TableCell className="font-medium">{text(formule.garantieCode)} - {text(formule.garantieLibelle)}</TableCell>
-                    <TableCell>{text(formule.usageCode) !== "-" ? `${text(formule.usageCode)} - ${text(formule.usageLibelle)}` : "Tous usages autorisés"}</TableCell>
-                    <TableCell>{formule.libelle}</TableCell>
-                    <TableCell>{money(formule.montantDeces)}</TableCell>
-                    <TableCell>{money(formule.montantInvalidite)}</TableCell>
-                    <TableCell>{money(formule.montantFraisMedicaux)}</TableCell>
-                    <TableCell>{money(formule.primeNette)}</TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingFormule(formule);
-                          setFormuleDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+        <div className="rounded-md border">
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <div className="text-sm font-semibold text-blue-600">Garanties véhicule</div>
+            {activeUsage ? <Badge variant="outline">{activeUsage.code ? `Usage ${activeUsage.code}` : activeUsage.libelle}</Badge> : null}
+          </div>
+          <div className="grid gap-4 p-3 xl:grid-cols-[minmax(420px,1fr)_minmax(520px,1fr)]">
+            <TauxLinesTable
+              lines={tauxLignes}
+              emptyText={!form.grilleTarifaireId ? "Aucune grille sélectionnée." : "Aucune garantie par taux pour cet usage."}
+              onEdit={(ligne) => {
+                setEditingLigne(ligne);
+                setLigneDialogOpen(true);
+              }}
+            />
+            <CapitalLinesTable
+              lines={capitalLignes}
+              emptyText={!form.grilleTarifaireId ? "Aucune grille sélectionnée." : "Aucune garantie par capital ou prime pour cet usage."}
+              onEdit={(ligne) => {
+                setEditingLigne(ligne);
+                setLigneDialogOpen(true);
+              }}
+            />
+          </div>
         </div>
+
+        <PersonnesLinesTable
+          formules={visibleFormules}
+          emptyText={!form.grilleTarifaireId ? "Aucune grille sélectionnée." : "Aucune formule personne pour cet usage."}
+          canAdd={Boolean(form.grilleTarifaireId)}
+          onAdd={() => {
+            setEditingFormule(null);
+            setFormuleDialogOpen(true);
+          }}
+          onEdit={(formule) => {
+            setEditingFormule(formule);
+            setFormuleDialogOpen(true);
+          }}
+        />
       </div>
 
       <GrilleTarifaireDialog
@@ -345,32 +313,194 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
   );
 }
 
-function labelFromRefs(ligne: ReferenceOption, refs: ReferenceOption[], key: "garantie" | "usage" | "categorieTransport") {
-  const direct = text(ligne[`${key}Libelle`]);
-  if (direct !== "-") {
-    return direct;
-  }
-  const id = text(ligne[`${key}Id`]);
-  return refs.find((item) => item.id === id)?.libelle ?? "-";
+function TauxLinesTable({
+  lines,
+  emptyText,
+  onEdit,
+}: {
+  lines: ReferenceOption[];
+  emptyText: string;
+  onEdit: (ligne: ReferenceOption) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Garantie</TableHead>
+            <TableHead className="text-right">Taux de valeur</TableHead>
+            <TableHead className="text-right">Franchise taux</TableHead>
+            <TableHead className="text-right">Franchise minimum</TableHead>
+            <TableHead className="w-12 text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lines.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                {emptyText}
+              </TableCell>
+            </TableRow>
+          ) : (
+            lines.map((ligne) => (
+              <TableRow key={ligne.id}>
+                <TableCell className="font-semibold">{lineLabel(ligne)}</TableCell>
+                <TableCell className="text-right">{percentValue(ligne.taux)}</TableCell>
+                <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
+                <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
+                <TableCell className="text-right">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(ligne)}>
+                    <Edit className="size-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 }
 
-function franchise(ligne: ReferenceOption) {
-  const taux = text(ligne.tauxFranchise);
-  const min = text(ligne.franchiseMinimale);
-  if (taux === "-" && min === "-") {
-    return "-";
-  }
-  return `${taux !== "-" ? `${taux}%` : "-"} / ${min}`;
+function CapitalLinesTable({
+  lines,
+  emptyText,
+  onEdit,
+}: {
+  lines: ReferenceOption[];
+  emptyText: string;
+  onEdit: (ligne: ReferenceOption) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Garantie</TableHead>
+            <TableHead className="text-right">Capital</TableHead>
+            <TableHead className="text-right">Prime</TableHead>
+            <TableHead className="text-right">Franchise taux</TableHead>
+            <TableHead className="text-right">Franchise minimum</TableHead>
+            <TableHead className="w-12 text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lines.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                {emptyText}
+              </TableCell>
+            </TableRow>
+          ) : (
+            lines.map((ligne) => (
+              <TableRow key={ligne.id}>
+                <TableCell className="font-semibold">{lineLabel(ligne)}</TableCell>
+                <TableCell className="text-right">{money(ligne.capital)}</TableCell>
+                <TableCell className="text-right">{money(ligne.prime)}</TableCell>
+                <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
+                <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
+                <TableCell className="text-right">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(ligne)}>
+                    <Edit className="size-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 }
 
-function modeLabel(mode: string) {
-  const labels: Record<string, string> = {
-    TAUX: "Taux",
-    CAPITAL: "Capital",
-    PRIME_FIXE: "Prime fixe",
-    PROTECTION: "Protection",
-  };
-  return labels[mode] ?? mode;
+function PersonnesLinesTable({
+  formules,
+  emptyText,
+  canAdd,
+  onAdd,
+  onEdit,
+}: {
+  formules: ReferenceOption[];
+  emptyText: string;
+  canAdd: boolean;
+  onAdd: () => void;
+  onEdit: (formule: ReferenceOption) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
+        <div className="text-sm font-semibold text-blue-600">Garanties personnes</div>
+        <Button type="button" size="sm" variant="outline" disabled={!canAdd} onClick={onAdd}>
+          <Plus className="size-4" />
+          Ajouter formule
+        </Button>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Garantie</TableHead>
+            <TableHead>Formule</TableHead>
+            <TableHead className="text-right">Décès</TableHead>
+            <TableHead className="text-right">Invalidité</TableHead>
+            <TableHead className="text-right">Frais médicaux</TableHead>
+            <TableHead className="text-right">Frais hospitalisation</TableHead>
+            <TableHead className="text-right">Frais funéraires</TableHead>
+            <TableHead className="text-right">Frais chirurgie</TableHead>
+            <TableHead className="text-right">Prime</TableHead>
+            <TableHead className="text-right">Accessoire</TableHead>
+            <TableHead className="w-12 text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {formules.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                {emptyText}
+              </TableCell>
+            </TableRow>
+          ) : (
+            formules.map((formule) => (
+              <TableRow key={formule.id}>
+                <TableCell className="font-semibold">{text(formule.garantieCode)}</TableCell>
+                <TableCell>{formule.libelle}</TableCell>
+                <TableCell className="text-right">{money(formule.montantDeces)}</TableCell>
+                <TableCell className="text-right">{money(formule.montantInvalidite)}</TableCell>
+                <TableCell className="text-right">{money(formule.montantFraisMedicaux)}</TableCell>
+                <TableCell className="text-right">{money(formule.montantFraisHospitalisation)}</TableCell>
+                <TableCell className="text-right">{money(formule.montantFraisFuneraires)}</TableCell>
+                <TableCell className="text-right">{money(formule.montantFraisChirurgie)}</TableCell>
+                <TableCell className="text-right">{money(formule.primeNette)}</TableCell>
+                <TableCell className="text-right">{money(formule.accessoire)}</TableCell>
+                <TableCell className="text-right">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(formule)}>
+                    <Edit className="size-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function isTauxLine(ligne: ReferenceOption) {
+  const mode = text(ligne.modeTarification);
+  return mode === "TAUX" || (mode === "-" && text(ligne.taux) !== "-");
+}
+
+function lineLabel(ligne: ReferenceOption) {
+  const code = text(ligne.garantieCode);
+  if (code !== "-") {
+    return code;
+  }
+  return text(ligne.libelle);
+}
+
+function percentValue(value: unknown) {
+  const rendered = money(value);
+  return rendered === "-" ? "-" : rendered;
 }
 
 function showError(error: unknown) {

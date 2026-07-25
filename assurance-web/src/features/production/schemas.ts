@@ -41,6 +41,14 @@ export const ligneGrilleTarifaireSchema = z.object({
   garantieId: z.string().min(1, "Garantie obligatoire"),
   usageId: z.string().optional(),
   categorieTransportId: z.string().optional(),
+  puissanceFiscaleMin: z.number().optional(),
+  puissanceFiscaleMax: z.number().optional(),
+  nombrePlacesMin: z.number().optional(),
+  nombrePlacesMax: z.number().optional(),
+  ptcMin: z.number().optional(),
+  ptcMax: z.number().optional(),
+  sousClasse: z.string().optional(),
+  carburant: z.string().optional(),
   modeTarification: z.string().optional(),
   libelleOption: z.string().optional(),
   prime: z.number().optional(),
@@ -48,6 +56,10 @@ export const ligneGrilleTarifaireSchema = z.object({
   taux: z.number().optional(),
   tauxFranchise: z.number().optional(),
   franchiseMinimale: z.number().optional(),
+  tauxRemorque: z.number().optional(),
+  tauxFranchiseRemorque: z.number().optional(),
+  franchiseMinimaleRemorque: z.number().optional(),
+  ordreAffichage: z.number().optional(),
 });
 
 export const formuleGarantiePersonneSchema = z.object({

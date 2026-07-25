@@ -357,6 +357,14 @@ export type UpsertLigneGrilleTarifaireRequest = {
   garantieId: string;
   usageId?: string;
   categorieTransportId?: string;
+  puissanceFiscaleMin?: number;
+  puissanceFiscaleMax?: number;
+  nombrePlacesMin?: number;
+  nombrePlacesMax?: number;
+  ptcMin?: number;
+  ptcMax?: number;
+  sousClasse?: string;
+  carburant?: string;
   modeTarification?: string;
   libelleOption?: string;
   prime?: number;
@@ -364,6 +372,10 @@ export type UpsertLigneGrilleTarifaireRequest = {
   taux?: number;
   tauxFranchise?: number;
   franchiseMinimale?: number;
+  tauxRemorque?: number;
+  tauxFranchiseRemorque?: number;
+  franchiseMinimaleRemorque?: number;
+  ordreAffichage?: number;
   actif?: boolean;
 };
 

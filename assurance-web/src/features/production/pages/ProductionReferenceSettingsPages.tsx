@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Edit, Plus } from "lucide-react";
+import { Edit, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -288,6 +288,7 @@ export function UsagesSettingsPage() {
 
 const GARANTIE_TYPES = ["VEHICULE", "PERSONNE"] as const;
 const MODES_TARIFICATION = ["TAUX", "CAPITAL", "PRIME_FIXE", "PROTECTION"] as const;
+const VEHICULE_MODES_TARIFICATION = MODES_TARIFICATION.filter((mode) => mode !== "PROTECTION");
 const SOURCES_VALEUR = ["VENALE", "NEUF", "GLACE", "MANUEL"] as const;
 const SOURCES_VALEUR_WITH_NONE = ["AUCUNE", ...SOURCES_VALEUR] as const;
 
@@ -303,7 +304,7 @@ export function GarantiesSettingsPage() {
   const [payload, setPayload] = useState<UpsertGarantieRequest>(emptyGarantie());
 
   useEffect(() => {
-    setPayload(editing ? garantiePayloadFromReference(editing) : emptyGarantie());
+    setPayload(editing ? normalizeGarantiePayload(garantiePayloadFromReference(editing)) : emptyGarantie());
   }, [editing]);
 
   const save = useMutation({
@@ -325,7 +326,14 @@ export function GarantiesSettingsPage() {
 
   const setModeAllowed = (mode: string, checked: boolean) => {
     setPayload((current) => {
-      const modes = toggleArray(current.modesAutorises ?? [], mode, checked);
+      const allowed = availableModesForType(current.typeGarantie);
+      if (!allowed.includes(mode)) {
+        return current;
+      }
+      const modes = toggleArray(current.modesAutorises ?? [], mode, checked).filter((item) => allowed.includes(item));
+      if (!modes.length) {
+        return current;
+      }
       const modeParDefaut = modes.includes(current.modeParDefaut ?? "") ? current.modeParDefaut : modes[0];
       return { ...current, modesAutorises: modes, modeParDefaut };
     });
@@ -422,7 +430,7 @@ export function GarantiesSettingsPage() {
               <div className="grid gap-3 rounded-md border p-3">
                 <div className="text-sm font-semibold">Modes de tarification</div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {MODES_TARIFICATION.map((mode) => (
+                  {availableModesForType(payload.typeGarantie).map((mode) => (
                     <Flag
                       key={mode}
                       label={modeLabel(mode)}
@@ -435,7 +443,7 @@ export function GarantiesSettingsPage() {
                   <Select value={payload.modeParDefaut ?? ""} onValueChange={(value) => update({ modeParDefaut: value })}>
                     <SelectTrigger><SelectValue placeholder="Mode" /></SelectTrigger>
                     <SelectContent>
-                      {(payload.modesAutorises ?? []).map((mode) => <SelectItem key={mode} value={mode}>{modeLabel(mode)}</SelectItem>)}
+                      {(payload.modesAutorises ?? []).filter((mode) => availableModesForType(payload.typeGarantie).includes(mode)).map((mode) => <SelectItem key={mode} value={mode}>{modeLabel(mode)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
@@ -443,16 +451,18 @@ export function GarantiesSettingsPage() {
 
               <div className="grid gap-3 rounded-md border p-3">
                 <div className="text-sm font-semibold">Valeur assurée</div>
+                <div className="text-xs font-medium text-muted-foreground">Champs obligatoires sur le véhicule</div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Flag label="Valeur vénale" checked={payload.requiertValeurVenale} onChange={(value) => update({ requiertValeurVenale: value })} />
                   <Flag label="Valeur à neuf" checked={payload.requiertValeurNeuf} onChange={(value) => update({ requiertValeurNeuf: value })} />
                   <Flag label="Valeur glace" checked={payload.requiertValeurGlace} onChange={(value) => update({ requiertValeurGlace: value })} />
                 </div>
+                <div className="text-xs font-medium text-muted-foreground">Sources autorisées pour calculer le capital</div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {SOURCES_VALEUR.map((source) => (
                     <Flag
                       key={source}
-                      label={sourceLabel(source)}
+                      label={sourceChoiceLabel(source)}
                       checked={(payload.sourcesValeurAutorisees ?? []).includes(source)}
                       onChange={(checked) => setSourceAllowed(source, checked)}
                     />
@@ -475,7 +485,7 @@ export function GarantiesSettingsPage() {
 
             <div className="flex gap-2">
               <Button disabled={save.isPending} onClick={() => {
-                const parsed = garantieSchema.safeParse(cleanTextPayload(payload));
+                const parsed = garantieSchema.safeParse(cleanTextPayload(normalizeGarantiePayload(payload)));
                 if (!parsed.success) {
                   toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
                   return;
@@ -545,9 +555,28 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
   const code = payload.code?.trim() || "CODE";
   const libelle = payload.libelle?.trim() || "Libellé";
   const isPersonne = payload.typeGarantie === "PERSONNE";
-  const mode = payload.modeParDefaut || (isPersonne ? "PROTECTION" : "TAUX");
-  const modes = payload.modesAutorises?.length ? payload.modesAutorises : [mode];
+  const allowed = availableModesForType(payload.typeGarantie);
+  const modes = (payload.modesAutorises?.length ? payload.modesAutorises : [payload.modeParDefaut || allowed[0]])
+    .filter((mode) => allowed.includes(mode));
+  const mode = modes.includes(payload.modeParDefaut ?? "") ? payload.modeParDefaut! : modes[0] ?? allowed[0] ?? "TAUX";
   const multiple = Boolean(payload.tarificationMultiple);
+  const [enabled, setEnabled] = useState(true);
+  const [vehicleRows, setVehicleRows] = useState<PreviewVehicleRow[]>(() => [emptyPreviewVehicleRow(mode)]);
+  const [personneRows, setPersonneRows] = useState<PreviewPersonneRow[]>(() => [emptyPreviewPersonneRow()]);
+
+  useEffect(() => {
+    setEnabled(true);
+    setVehicleRows([emptyPreviewVehicleRow(mode)]);
+    setPersonneRows([emptyPreviewPersonneRow()]);
+  }, [code, isPersonne, mode, multiple, modes.join("|")]);
+
+  const updateVehicleRow = (id: string, patch: Partial<PreviewVehicleRow>) => {
+    setVehicleRows((rows) => rows.map((row) => row.id === id ? { ...row, ...patch } : row));
+  };
+
+  const updatePersonneRow = (id: string, patch: Partial<PreviewPersonneRow>) => {
+    setPersonneRows((rows) => rows.map((row) => row.id === id ? { ...row, ...patch } : row));
+  };
 
   if (!isPersonne && payload.responsabiliteCivile) {
     return (
@@ -590,22 +619,31 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell><Checkbox checked disabled /></TableCell>
+                <TableCell>
+                  <Checkbox checked={enabled} onCheckedChange={(value) => setEnabled(value === true)} />
+                </TableCell>
                 <TableCell className="align-top font-semibold"><div className="pt-2">{code} - {libelle}</div></TableCell>
-                <TableCell className="align-top"><PreviewInput active placeholder="Formule 1" align="left" /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
-                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="formule" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="deces" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="invalidite" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="fraisMedicaux" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="fraisHospitalisation" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="fraisFuneraires" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="fraisChirurgie" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="prime" updateRow={updatePersonneRow} /></TableCell>
+                <TableCell className="align-top"><PreviewPersonneStack rows={personneRows} enabled={enabled} field="accessoire" updateRow={updatePersonneRow} /></TableCell>
                 <TableCell className="align-top">
                   {multiple ? (
-                    <Button type="button" variant="ghost" size="icon" disabled>
-                      <Plus className="size-4" />
-                    </Button>
+                    <div className="grid gap-2 pt-1">
+                      <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => setPersonneRows((rows) => [...rows, emptyPreviewPersonneRow(rows.length)])}>
+                        <Plus className="size-4" />
+                      </Button>
+                      {personneRows.slice(1).map((row) => (
+                        <Button key={row.id} type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => setPersonneRows((rows) => rows.filter((item) => item.id !== row.id))}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      ))}
+                    </div>
                   ) : null}
                 </TableCell>
               </TableRow>
@@ -639,31 +677,30 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
           </TableHeader>
           <TableBody>
             <TableRow>
-              <TableCell><Checkbox checked disabled /></TableCell>
+              <TableCell>
+                <Checkbox checked={enabled} onCheckedChange={(value) => setEnabled(value === true)} />
+              </TableCell>
               <TableCell className="align-top font-semibold"><div className="pt-2">{code} - {libelle}</div></TableCell>
               <TableCell className="align-top">
-                {modes.length > 1 ? (
-                  <select
-                    className="h-9 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm disabled:opacity-100 dark:border-slate-600 dark:bg-slate-900"
-                    value={mode}
-                    disabled
-                  >
-                    {modes.map((allowedMode) => <option key={allowedMode} value={allowedMode}>{modeLabel(allowedMode)}</option>)}
-                  </select>
-                ) : (
-                  <span className="inline-flex h-9 items-center rounded-md border px-3 text-sm">{modeLabel(mode)}</span>
-                )}
+                <PreviewVehicleModeStack rows={vehicleRows} modes={modes} enabled={enabled} updateRow={updateVehicleRow} />
               </TableCell>
-              <TableCell className="align-top"><PreviewInput active={mode === "TAUX"} /></TableCell>
-              <TableCell className="align-top"><PreviewInput active={Boolean(payload.avecFranchise)} /></TableCell>
-              <TableCell className="align-top"><PreviewInput active={Boolean(payload.avecFranchise)} /></TableCell>
-              <TableCell className="align-top"><PreviewInput active={mode === "CAPITAL" || Boolean(payload.avecCapital)} /></TableCell>
-              <TableCell className="align-top"><PreviewInput active={mode === "CAPITAL" || mode === "PRIME_FIXE"} /></TableCell>
+              <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="taux" disabledFor={(row) => row.mode !== "TAUX"} updateRow={updateVehicleRow} /></TableCell>
+              <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="tauxFranchise" disabledFor={() => !payload.avecFranchise} updateRow={updateVehicleRow} /></TableCell>
+              <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="franchiseMinimale" disabledFor={() => !payload.avecFranchise} updateRow={updateVehicleRow} /></TableCell>
+              <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="capital" disabledFor={(row) => row.mode !== "CAPITAL"} updateRow={updateVehicleRow} /></TableCell>
+              <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="prime" disabledFor={(row) => row.mode !== "CAPITAL" && row.mode !== "PRIME_FIXE"} updateRow={updateVehicleRow} /></TableCell>
               <TableCell className="align-top">
                 {multiple ? (
-                  <Button type="button" variant="ghost" size="icon" disabled>
-                    <Plus className="size-4" />
-                  </Button>
+                  <div className="grid gap-2 pt-1">
+                    <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => setVehicleRows((rows) => [...rows, emptyPreviewVehicleRow(mode)])}>
+                      <Plus className="size-4" />
+                    </Button>
+                    {vehicleRows.slice(1).map((row) => (
+                      <Button key={row.id} type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => setVehicleRows((rows) => rows.filter((item) => item.id !== row.id))}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ))}
+                  </div>
                 ) : null}
               </TableCell>
             </TableRow>
@@ -674,15 +711,128 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
   );
 }
 
-function PreviewInput({ active, placeholder, align = "right" }: { active: boolean; placeholder?: string; align?: "left" | "right" }) {
+type PreviewVehicleRow = {
+  id: string;
+  mode: string;
+  taux?: string;
+  tauxFranchise?: string;
+  franchiseMinimale?: string;
+  capital?: string;
+  prime?: string;
+};
+
+type PreviewPersonneRow = {
+  id: string;
+  formule?: string;
+  deces?: string;
+  invalidite?: string;
+  fraisMedicaux?: string;
+  fraisHospitalisation?: string;
+  fraisFuneraires?: string;
+  fraisChirurgie?: string;
+  prime?: string;
+  accessoire?: string;
+};
+
+function PreviewVehicleModeStack({
+  rows,
+  modes,
+  enabled,
+  updateRow,
+}: {
+  rows: PreviewVehicleRow[];
+  modes: string[];
+  enabled: boolean;
+  updateRow: (id: string, patch: Partial<PreviewVehicleRow>) => void;
+}) {
   return (
-    <Input
-      className={`h-8 min-w-28 ${align === "right" ? "text-right" : ""}`}
-      disabled={!active}
-      readOnly
-      placeholder={active ? placeholder : ""}
-    />
+    <div className="grid gap-2">
+      {rows.map((row) => (
+        modes.length > 1 ? (
+          <Select key={row.id} value={row.mode} disabled={!enabled} onValueChange={(value) => updateRow(row.id, { mode: value, taux: undefined, capital: undefined, prime: undefined })}>
+            <SelectTrigger className="h-8"><SelectValue placeholder="Mode" /></SelectTrigger>
+            <SelectContent>
+              {modes.map((mode) => <SelectItem key={mode} value={mode}>{modeLabel(mode)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span key={row.id} className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900">
+            {modeLabel(row.mode)}
+          </span>
+        )
+      ))}
+    </div>
   );
+}
+
+function PreviewVehicleNumberStack({
+  rows,
+  enabled,
+  field,
+  disabledFor,
+  updateRow,
+}: {
+  rows: PreviewVehicleRow[];
+  enabled: boolean;
+  field: "taux" | "tauxFranchise" | "franchiseMinimale" | "capital" | "prime";
+  disabledFor: (row: PreviewVehicleRow) => boolean;
+  updateRow: (id: string, patch: Partial<PreviewVehicleRow>) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      {rows.map((row) => (
+        <Input
+          key={`${row.id}-${field}`}
+          className="h-8 min-w-28 text-right"
+          type="number"
+          disabled={!enabled || disabledFor(row)}
+          value={row[field] ?? ""}
+          onChange={(event) => updateRow(row.id, { [field]: event.target.value })}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PreviewPersonneStack({
+  rows,
+  enabled,
+  field,
+  updateRow,
+}: {
+  rows: PreviewPersonneRow[];
+  enabled: boolean;
+  field: keyof Omit<PreviewPersonneRow, "id">;
+  updateRow: (id: string, patch: Partial<PreviewPersonneRow>) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      {rows.map((row) => (
+        <Input
+          key={`${row.id}-${field}`}
+          className={`h-8 min-w-28 ${field === "formule" ? "" : "text-right"}`}
+          type={field === "formule" ? "text" : "number"}
+          disabled={!enabled}
+          value={row[field] ?? ""}
+          onChange={(event) => updateRow(row.id, { [field]: event.target.value })}
+        />
+      ))}
+    </div>
+  );
+}
+
+function emptyPreviewVehicleRow(mode: string): PreviewVehicleRow {
+  return {
+    id: `${Date.now()}-${Math.random()}`,
+    mode,
+  };
+}
+
+function emptyPreviewPersonneRow(index = 0): PreviewPersonneRow {
+  return {
+    id: `${Date.now()}-${Math.random()}`,
+    formule: `Formule ${index + 1}`,
+  };
 }
 
 function SimpleReferencePage({
@@ -987,6 +1137,49 @@ function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantie
   };
 }
 
+function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGarantieRequest {
+  const typeGarantie = payload.typeGarantie === "PERSONNE" ? "PERSONNE" : "VEHICULE";
+  const allowedModes = availableModesForType(typeGarantie);
+  const modesAutorises = (payload.modesAutorises?.length ? payload.modesAutorises : [payload.modeParDefaut ?? allowedModes[0]])
+    .filter((mode) => allowedModes.includes(mode));
+  const normalizedModes = modesAutorises.length ? modesAutorises : [allowedModes[0]];
+  const modeParDefaut = normalizedModes.includes(payload.modeParDefaut ?? "") ? payload.modeParDefaut : normalizedModes[0];
+
+  if (typeGarantie === "PERSONNE") {
+    return {
+      ...payload,
+      typeGarantie,
+      modesAutorises: ["PROTECTION"],
+      modeParDefaut: "PROTECTION",
+      sourcesValeurAutorisees: [],
+      sourceValeurParDefaut: "AUCUNE",
+      requiertValeurVenale: false,
+      requiertValeurNeuf: false,
+      requiertValeurGlace: false,
+      avecFranchise: false,
+      avecCapital: true,
+    };
+  }
+
+  const sourcesValeurAutorisees = (payload.sourcesValeurAutorisees ?? []).filter((source) => SOURCES_VALEUR.includes(source as typeof SOURCES_VALEUR[number]));
+  const sourceValeurParDefaut = payload.sourceValeurParDefaut && (payload.sourceValeurParDefaut === "AUCUNE" || sourcesValeurAutorisees.includes(payload.sourceValeurParDefaut))
+    ? payload.sourceValeurParDefaut
+    : "AUCUNE";
+
+  return {
+    ...payload,
+    typeGarantie,
+    modesAutorises: normalizedModes,
+    modeParDefaut,
+    sourcesValeurAutorisees,
+    sourceValeurParDefaut,
+  };
+}
+
+function availableModesForType(typeGarantie?: string) {
+  return typeGarantie === "PERSONNE" ? ["PROTECTION"] : VEHICULE_MODES_TARIFICATION;
+}
+
 function stringArray(value: unknown, fallback?: string) {
   if (Array.isArray(value)) {
     return value.map((item) => String(item)).filter(Boolean);
@@ -1042,6 +1235,16 @@ function sourceLabel(source: string) {
     MANUEL: "Manuelle",
   };
   return labels[source] ?? source;
+}
+
+function sourceChoiceLabel(source: string) {
+  const labels: Record<string, string> = {
+    VENALE: "Depuis valeur vénale",
+    NEUF: "Depuis valeur à neuf",
+    GLACE: "Depuis valeur glace",
+    MANUEL: "Saisie manuelle",
+  };
+  return labels[source] ?? sourceLabel(source);
 }
 
 function usageCriteria(usage: ReferenceOption) {

@@ -118,6 +118,9 @@ export const garantieSchema = z.object({
   if (value.typeGarantie === "PERSONNE" && (value.modeParDefaut !== "PROTECTION" || !value.modesAutorises.includes("PROTECTION"))) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Une garantie personne doit utiliser le mode PROTECTION" });
   }
+  if (value.typeGarantie === "VEHICULE" && (value.modeParDefaut === "PROTECTION" || value.modesAutorises.includes("PROTECTION"))) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Le mode PROTECTION est réservé aux garanties personne" });
+  }
   if (value.sourceValeurParDefaut !== "AUCUNE" && !(value.sourcesValeurAutorisees ?? []).includes(value.sourceValeurParDefaut)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["sourceValeurParDefaut"], message: "La source par défaut doit être autorisée" });
   }

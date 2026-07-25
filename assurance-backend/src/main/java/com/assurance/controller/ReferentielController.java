@@ -989,6 +989,9 @@ public class ReferentielController {
         if (typeGarantie == TypeGarantie.PERSONNE && (modeParDefaut != ModeTarificationGarantie.PROTECTION || !modes.contains(ModeTarificationGarantie.PROTECTION))) {
             throw new BadRequestException("Une garantie personne doit utiliser le mode PROTECTION");
         }
+        if (typeGarantie == TypeGarantie.VEHICULE && (modeParDefaut == ModeTarificationGarantie.PROTECTION || modes.contains(ModeTarificationGarantie.PROTECTION))) {
+            throw new BadRequestException("Le mode PROTECTION est reserve aux garanties personne");
+        }
 
         LinkedHashSet<SourceValeurGarantie> sources = new LinkedHashSet<>(
                 request.getSourcesValeurAutorisees() == null ? Set.of() : request.getSourcesValeurAutorisees()

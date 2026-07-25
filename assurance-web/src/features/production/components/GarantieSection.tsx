@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
-import { numberValue } from "../utils/format";
+import { money, numberValue } from "../utils/format";
 import type { GarantieInput, ReferenceOption } from "../types";
 
 export function GarantieSection({
@@ -35,7 +35,9 @@ export function GarantieSection({
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE");
-  const personneGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE");
+  const personneGaranties = garanties
+    .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE")
+    .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
   };
@@ -47,6 +49,8 @@ export function GarantieSection({
       return;
     }
     if (checked) {
+      const formules = type === "PERSONNE" ? formulesForGuarantee(formulesPersonne, garantie) : [];
+      const formule = formules[0];
       setSelected([
         ...selected,
         {
@@ -54,6 +58,9 @@ export function GarantieSection({
           vehiculeIndex: type === "VEHICULE" && vehiculeCount > 0 ? 0 : undefined,
           modeSelectionne: String(garantie.modeParDefaut ?? (type === "PERSONNE" ? "PROTECTION" : "TAUX")),
           sourceValeurSelectionnee: defaultSource(garantie),
+          formuleGarantiePersonneId: formule?.id,
+          formule: formule ? String(formule.libelle ?? garantie.code ?? garantie.libelle) : undefined,
+          prime: formule ? numberValue(String(formule.primeNette ?? "")) : undefined,
         },
       ]);
       return;
@@ -186,12 +193,13 @@ export function GarantieSection({
                 <tr>
                   <th className="w-12 px-3 py-3 text-left"></th>
                   <th className="px-3 py-3 text-left">Garantie</th>
-                  <th className="w-40 px-3 py-3 text-left">Décès</th>
-                  <th className="w-40 px-3 py-3 text-left">Invalidité</th>
-                  <th className="w-44 px-3 py-3 text-left">Frais médicaux</th>
-                  <th className="w-48 px-3 py-3 text-left">Hospitalisation</th>
-                  <th className="w-44 px-3 py-3 text-left">Frais funéraires</th>
-                  <th className="w-56 px-3 py-3 text-left">Chirurgie réparatrice</th>
+                  {automaticPricing ? <th className="w-56 px-3 py-3 text-left">Formule</th> : null}
+                  <th className="w-40 px-3 py-3 text-right">Décès</th>
+                  <th className="w-40 px-3 py-3 text-right">Invalidité</th>
+                  <th className="w-44 px-3 py-3 text-right">Frais médicaux</th>
+                  <th className="w-48 px-3 py-3 text-right">Hospitalisation</th>
+                  <th className="w-44 px-3 py-3 text-right">Frais funéraires</th>
+                  <th className="w-56 px-3 py-3 text-right">Chirurgie réparatrice</th>
                   {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
                 </tr>
               </thead>
@@ -201,6 +209,8 @@ export function GarantieSection({
                   const checked = Boolean(item);
                   const rowDisabled = !checked;
                   const hasFormula = !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0;
+                  const formules = formulesForGuarantee(formulesPersonne, garantie);
+                  const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
 
                   return (
                     <tr key={garantie.id} className={cn("border-t align-middle transition-colors", rowDisabled || !hasFormula ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
@@ -211,26 +221,39 @@ export function GarantieSection({
                         <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                         {automaticPricing && !hasFormula ? <Badge variant="outline">Formule manquante</Badge> : null}
                       </td>
-                      <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces ?? ""} onChange={(event) => update(garantie.id, { montantDeces: numberValue(event.target.value) })} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantInvalidite ?? ""} onChange={(event) => update(garantie.id, { montantInvalidite: numberValue(event.target.value) })} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisMedicaux ?? ""} onChange={(event) => update(garantie.id, { montantFraisMedicaux: numberValue(event.target.value) })} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisHospitalisation ?? ""} onChange={(event) => update(garantie.id, { montantFraisHospitalisation: numberValue(event.target.value) })} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisFuneraires ?? ""} onChange={(event) => update(garantie.id, { montantFraisFuneraires: numberValue(event.target.value) })} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie ?? ""} onChange={(event) => update(garantie.id, { montantFraisChirurgie: numberValue(event.target.value) })} />
-                      </td>
                       {automaticPricing ? (
-                        <td className="px-3 py-2 text-muted-foreground">{checked ? "Calcul auto" : "-"}</td>
+                        <td className="px-3 py-2">
+                          <Select
+                            value={item?.formuleGarantiePersonneId ?? selectedFormule?.id ?? ""}
+                            disabled={!checked || formules.length <= 1}
+                            onValueChange={(value) => {
+                              const formule = formules.find((option) => option.id === value);
+                              update(garantie.id, {
+                                formuleGarantiePersonneId: value,
+                                formule: String(formule?.libelle ?? ""),
+                                prime: numberValue(String(formule?.primeNette ?? "")),
+                              });
+                            }}
+                          >
+                            <SelectTrigger className={controlClass(checked)}>
+                              <SelectValue placeholder="Formule" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {formules.map((formule) => (
+                                <SelectItem key={formule.id} value={formule.id}>{formule.libelle}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                      ) : null}
+                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantDeces) : <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces ?? ""} onChange={(event) => update(garantie.id, { montantDeces: numberValue(event.target.value) })} />}</td>
+                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantInvalidite ?? ""} onChange={(event) => update(garantie.id, { montantInvalidite: numberValue(event.target.value) })} />}</td>
+                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisMedicaux ?? ""} onChange={(event) => update(garantie.id, { montantFraisMedicaux: numberValue(event.target.value) })} />}</td>
+                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisHospitalisation ?? ""} onChange={(event) => update(garantie.id, { montantFraisHospitalisation: numberValue(event.target.value) })} />}</td>
+                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisFuneraires ?? ""} onChange={(event) => update(garantie.id, { montantFraisFuneraires: numberValue(event.target.value) })} />}</td>
+                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie ?? ""} onChange={(event) => update(garantie.id, { montantFraisChirurgie: numberValue(event.target.value) })} />}</td>
+                      {automaticPricing ? (
+                        <td className="px-3 py-2 text-right text-muted-foreground">{checked ? money(selectedFormule?.primeNette) : "-"}</td>
                       ) : primeColumnEnabled ? (
                         <td className="px-3 py-2">
                           <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />

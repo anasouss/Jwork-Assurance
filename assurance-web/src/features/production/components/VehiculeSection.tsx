@@ -76,7 +76,7 @@ export function VehiculeSection({
                 ) : null}
               </div>
               <div className="grid gap-3 md:grid-cols-4">
-                <Field label="Usage">
+                <Field label="Usage" required>
                   <Select
                     value={vehicule.usageId ?? ""}
                     onValueChange={(value) =>
@@ -96,10 +96,10 @@ export function VehiculeSection({
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Immatriculation">
+                <Field label="Immatriculation" required>
                   <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
                 </Field>
-                <Field label="Marque">
+                <Field label="Marque" required>
                   <Select value={vehicule.marqueId ?? ""} onValueChange={(value) => update(index, { marqueId: value })}>
                     <SelectTrigger><SelectValue placeholder="Marque" /></SelectTrigger>
                     <SelectContent>
@@ -107,7 +107,7 @@ export function VehiculeSection({
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Carrosserie">
+                <Field label="Carrosserie" required>
                   <Select value={vehicule.carrosserieId ?? ""} onValueChange={(value) => update(index, { carrosserieId: value })}>
                     <SelectTrigger><SelectValue placeholder="Carrosserie" /></SelectTrigger>
                     <SelectContent>
@@ -116,7 +116,7 @@ export function VehiculeSection({
                   </Select>
                 </Field>
                 {needsCarburantAndPf ? (
-                  <Field label="Carburant">
+                  <Field label="Carburant" required>
                     <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update(index, { carburant: value })}>
                       <SelectTrigger><SelectValue placeholder="Carburant" /></SelectTrigger>
                       <SelectContent>
@@ -132,22 +132,22 @@ export function VehiculeSection({
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-4">
                 {needsCarburantAndPf ? (
-                  <Field label="Puissance fiscale / cylindrée">
+                  <Field label="Puissance fiscale / cylindrée" required>
                     <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
                   </Field>
                 ) : null}
                 {needsSousClasse ? (
-                  <Field label="Sous-classe">
+                  <Field label="Sous-classe" required>
                     <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update(index, { sousClasse: event.target.value })} />
                   </Field>
                 ) : null}
                 {needsPtc ? (
-                  <Field label="PTC">
+                  <Field label="PTC" required>
                     <Input value={vehicule.ptc ?? ""} onChange={(event) => update(index, { ptc: event.target.value })} />
                   </Field>
                 ) : null}
                 {needsCategorieTransport ? (
-                  <Field label="Catégorie transport">
+                  <Field label="Catégorie transport" required>
                     <Select value={vehicule.categorieTransportId ?? ""} onValueChange={(value) => update(index, { categorieTransportId: value })}>
                       <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
                       <SelectContent>
@@ -167,7 +167,7 @@ export function VehiculeSection({
                 <Field label="Date mise en circulation">
                   <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toIso(date) })} />
                 </Field>
-                <Field label="Date validité CG">
+                <Field label="Date validité CG" required>
                   <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toIso(date) })} />
                 </Field>
                 <Field label="N° attestation">

@@ -183,7 +183,6 @@ export type ClientInput = {
     categorieClientId?: string;
     telephone?: string;
     email?: string;
-    profession?: string;
     activite?: string;
     conducteurHabituel?: boolean;
     sahara?: boolean;
@@ -227,6 +226,12 @@ export type RemorqueInput = {
   immatriculation?: string;
   modele?: string;
   ptc?: string;
+  dateMiseEnCirculation?: string;
+  dateEffet?: string;
+  dateEcheance?: string;
+  crm?: string;
+  numeroAttestation?: string;
+  coefficientProrata?: number;
   valeurAssuree?: number;
 };
 

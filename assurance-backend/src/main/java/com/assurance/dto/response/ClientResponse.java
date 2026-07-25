@@ -43,7 +43,6 @@ public class ClientResponse {
     private String iff;
     private String patente;
     private String cnss;
-    private String profession;
     private String activite;
     private Boolean conducteurHabituel;
     private Boolean sahara;

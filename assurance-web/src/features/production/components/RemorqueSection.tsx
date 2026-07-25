@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
@@ -10,11 +11,13 @@ export function RemorqueSection({
   remorques,
   setRemorques,
   usages,
+  marques,
   maxRemorques,
 }: {
   remorques: RemorqueInput[];
   setRemorques: (remorques: RemorqueInput[]) => void;
   usages: ReferenceOption[];
+  marques: ReferenceOption[];
   maxRemorques?: number | null;
 }) {
   const update = (index: number, patch: Partial<RemorqueInput>) => {
@@ -57,7 +60,7 @@ export function RemorqueSection({
               </Button>
             </div>
             <div className="grid gap-3 md:grid-cols-4">
-              <Field label="Usage">
+              <Field label="Usage" required>
                 <Select value={remorque.usageId ?? ""} onValueChange={(value) => update(index, { usageId: value })}>
                   <SelectTrigger><SelectValue placeholder="Usage remorque" /></SelectTrigger>
                   <SelectContent>
@@ -68,8 +71,34 @@ export function RemorqueSection({
               <Field label="Immatriculation">
                 <Input value={remorque.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
               </Field>
+              <Field label="Marque">
+                <Select value={remorque.marqueId ?? ""} onValueChange={(value) => update(index, { marqueId: value })}>
+                  <SelectTrigger><SelectValue placeholder="Marque" /></SelectTrigger>
+                  <SelectContent>
+                    {marques.map((marque) => <SelectItem key={marque.id} value={marque.id}>{marque.libelle}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Modèle">
+                <Input value={remorque.modele ?? ""} onChange={(event) => update(index, { modele: event.target.value })} />
+              </Field>
               <Field label="PTC">
                 <Input value={remorque.ptc ?? ""} onChange={(event) => update(index, { ptc: event.target.value })} />
+              </Field>
+              <Field label="Date mise en circulation">
+                <DatePicker date={remorque.dateMiseEnCirculation} onSelect={(date) => update(index, { dateMiseEnCirculation: toIso(date) })} />
+              </Field>
+              <Field label="Date d'effet">
+                <DatePicker date={remorque.dateEffet} onSelect={(date) => update(index, { dateEffet: toIso(date) })} />
+              </Field>
+              <Field label="Date d'échéance">
+                <DatePicker date={remorque.dateEcheance} onSelect={(date) => update(index, { dateEcheance: toIso(date) })} />
+              </Field>
+              <Field label="CRM">
+                <Input value={remorque.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />
+              </Field>
+              <Field label="N° attestation">
+                <Input value={remorque.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
               </Field>
               <Field label="Valeur assurée">
                 <Input type="number" value={remorque.valeurAssuree ?? ""} onChange={(event) => update(index, { valeurAssuree: numberValue(event.target.value) })} />
@@ -80,6 +109,10 @@ export function RemorqueSection({
       </div>
     </SectionCard>
   );
+}
+
+function toIso(date?: Date) {
+  return date ? date.toISOString().slice(0, 10) : undefined;
 }
 
 function numberValue(value: string) {

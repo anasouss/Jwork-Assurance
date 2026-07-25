@@ -84,6 +84,7 @@ export function ContratFormLayout({
       remorques={form.remorques}
       setRemorques={form.setRemorques}
       usages={form.refs.usages.data ?? []}
+      marques={form.refs.marques.data ?? []}
       maxRemorques={maxRemorques}
     />
   );
@@ -95,16 +96,6 @@ export function ContratFormLayout({
           <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</div>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">Ajouter dossier</h1>
           <p className="text-sm text-muted-foreground">{description}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={form.handlePreview} disabled={form.previewMutation.isPending}>
-            <Wand2 className="size-4" />
-            Prévisualiser
-          </Button>
-          <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
-            <Save className="size-4" />
-            Créer contrat
-          </Button>
         </div>
       </div>
 
@@ -131,6 +122,19 @@ export function ContratFormLayout({
           <QuittancePreviewCard preview={form.preview} />
         </SectionCard>
       )}
+
+      <div className="flex justify-end gap-2 border-t pt-4">
+        {form.typeContrat !== "PARTICULIER" ? (
+          <Button variant="outline" onClick={form.handlePreview} disabled={form.previewMutation.isPending}>
+            <Wand2 className="size-4" />
+            Prévisualiser
+          </Button>
+        ) : null}
+        <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
+          <Save className="size-4" />
+          Créer contrat
+        </Button>
+      </div>
     </div>
   );
 }

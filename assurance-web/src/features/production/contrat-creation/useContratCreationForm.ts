@@ -110,9 +110,8 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
       client: {
         ...client.client,
         agenceId: user?.agenceId ?? "",
-        telephones: client.client.telephone
-          ? [{ numero: client.client.telephone, principal: true, whatsapp: false }]
-          : client.client.telephones ?? [],
+        telephone: principalTelephone(client.client.telephones),
+        telephones: (client.client.telephones ?? []).filter((telephone) => telephone.numero.trim()),
       },
     })),
     vehicules: vehicules.map((vehicule) => ({
@@ -263,6 +262,11 @@ function useReference(path: string) {
 
 function emptyToUndefined(value: string) {
   return value.trim() ? value : undefined;
+}
+
+function principalTelephone(telephones?: { numero: string; principal?: boolean }[]) {
+  const valid = (telephones ?? []).filter((telephone) => telephone.numero.trim());
+  return valid.find((telephone) => telephone.principal)?.numero ?? valid[0]?.numero;
 }
 
 function defaultQuittanceLines(): QuittanceInput[] {

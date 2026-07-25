@@ -64,6 +64,7 @@ export function GarantieSection({
           <span>Saisie avec primes</span>
         </div>
       ) : null}
+      <div className="mb-2 text-sm font-semibold">Garanties véhicule</div>
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full min-w-[980px] border-collapse text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
@@ -84,10 +85,10 @@ export function GarantieSection({
               const item = byId.get(garantie.id);
               const checked = Boolean(item);
               const isRc = Boolean(garantie.responsabiliteCivile);
-              const type = String(garantie.typeGarantie ?? "VEHICULE");
               const rowDisabled = !checked;
               const locked = isRc;
               const editable = checked && !locked;
+              const isVehicleGuarantee = String(garantie.typeGarantie ?? "VEHICULE") === "VEHICULE";
 
               return (
                 <tr
@@ -105,13 +106,12 @@ export function GarantieSection({
                   <td className="px-3 py-2">
                     <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                     <div className="mt-1 flex gap-1">
-                      <Badge variant="outline">{type}</Badge>
                       {isRc ? <Badge>RC obligatoire</Badge> : null}
                     </div>
                   </td>
                   {vehiculeCount > 1 ? (
                     <td className="px-3 py-2">
-                      {type === "VEHICULE" && !isRc ? (
+                      {isVehicleGuarantee && !isRc ? (
                         <Select value={String(item?.vehiculeIndex ?? 0)} disabled={rowDisabled} onValueChange={(value) => update(garantie.id, { vehiculeIndex: Number(value) })}>
                           <SelectTrigger className={controlClass(editable)}><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -169,64 +169,66 @@ export function GarantieSection({
         </table>
       </div>
       {personneGaranties.length > 0 ? (
-        <div className="mt-4 overflow-x-auto rounded-md border">
-          <table className="w-full min-w-[1120px] border-collapse text-sm">
-            <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="w-12 px-3 py-3 text-left"></th>
-                <th className="px-3 py-3 text-left">Garantie</th>
-                <th className="w-40 px-3 py-3 text-left">Décès</th>
-                <th className="w-40 px-3 py-3 text-left">Invalidité</th>
-                <th className="w-44 px-3 py-3 text-left">Frais médicaux</th>
-                <th className="w-48 px-3 py-3 text-left">Hospitalisation</th>
-                <th className="w-44 px-3 py-3 text-left">Frais funéraires</th>
-                <th className="w-56 px-3 py-3 text-left">Chirurgie réparatrice</th>
-                {primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {personneGaranties.map((garantie) => {
-                const item = byId.get(garantie.id);
-                const checked = Boolean(item);
-                const rowDisabled = !checked;
+        <div className="mt-4">
+          <div className="mb-2 text-sm font-semibold">Garanties personne</div>
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full min-w-[1120px] border-collapse text-sm">
+              <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="w-12 px-3 py-3 text-left"></th>
+                  <th className="px-3 py-3 text-left">Garantie</th>
+                  <th className="w-40 px-3 py-3 text-left">Décès</th>
+                  <th className="w-40 px-3 py-3 text-left">Invalidité</th>
+                  <th className="w-44 px-3 py-3 text-left">Frais médicaux</th>
+                  <th className="w-48 px-3 py-3 text-left">Hospitalisation</th>
+                  <th className="w-44 px-3 py-3 text-left">Frais funéraires</th>
+                  <th className="w-56 px-3 py-3 text-left">Chirurgie réparatrice</th>
+                  {primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {personneGaranties.map((garantie) => {
+                  const item = byId.get(garantie.id);
+                  const checked = Boolean(item);
+                  const rowDisabled = !checked;
 
-                return (
-                  <tr key={garantie.id} className={cn("border-t align-middle transition-colors", rowDisabled ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
-                    <td className="px-3 py-2">
-                      <Checkbox checked={checked} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
-                      <Badge variant="outline" className="mt-1">PERSONNE</Badge>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces ?? ""} onChange={(event) => update(garantie.id, { montantDeces: numberValue(event.target.value) })} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantInvalidite ?? ""} onChange={(event) => update(garantie.id, { montantInvalidite: numberValue(event.target.value) })} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisMedicaux ?? ""} onChange={(event) => update(garantie.id, { montantFraisMedicaux: numberValue(event.target.value) })} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisHospitalisation ?? ""} onChange={(event) => update(garantie.id, { montantFraisHospitalisation: numberValue(event.target.value) })} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisFuneraires ?? ""} onChange={(event) => update(garantie.id, { montantFraisFuneraires: numberValue(event.target.value) })} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie ?? ""} onChange={(event) => update(garantie.id, { montantFraisChirurgie: numberValue(event.target.value) })} />
-                    </td>
-                    {primeColumnEnabled ? (
+                  return (
+                    <tr key={garantie.id} className={cn("border-t align-middle transition-colors", rowDisabled ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
                       <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
+                        <Checkbox checked={checked} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                       </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <td className="px-3 py-2">
+                        <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces ?? ""} onChange={(event) => update(garantie.id, { montantDeces: numberValue(event.target.value) })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantInvalidite ?? ""} onChange={(event) => update(garantie.id, { montantInvalidite: numberValue(event.target.value) })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisMedicaux ?? ""} onChange={(event) => update(garantie.id, { montantFraisMedicaux: numberValue(event.target.value) })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisHospitalisation ?? ""} onChange={(event) => update(garantie.id, { montantFraisHospitalisation: numberValue(event.target.value) })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisFuneraires ?? ""} onChange={(event) => update(garantie.id, { montantFraisFuneraires: numberValue(event.target.value) })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie ?? ""} onChange={(event) => update(garantie.id, { montantFraisChirurgie: numberValue(event.target.value) })} />
+                      </td>
+                      {primeColumnEnabled ? (
+                        <td className="px-3 py-2">
+                          <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
     </SectionCard>

@@ -6,6 +6,7 @@ import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
@@ -31,7 +32,6 @@ interface DatePickerProps {
 export function DatePicker({
   date,
   onSelect,
-  placeholder = "Sélectionner une date",
   disabled = false,
   className,
   minDate,
@@ -39,6 +39,7 @@ export function DatePicker({
   occupiedDateRanges,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
+  const [textValue, setTextValue] = React.useState("")
 
   const dateValue = React.useMemo(() => {
     if (!date) return undefined
@@ -46,9 +47,27 @@ export function DatePicker({
     return new Date(date)
   }, [date])
 
+  React.useEffect(() => {
+    setTextValue(dateValue ? format(dateValue, "dd/MM/yyyy") : "")
+  }, [dateValue])
+
   const handleSelect = (selectedDate: Date | undefined) => {
     onSelect?.(selectedDate)
     setOpen(false)
+  }
+
+  const commitTypedDate = () => {
+    if (!textValue.trim()) {
+      onSelect?.(undefined)
+      return
+    }
+    const parsed = parseTypedDate(textValue)
+    if (parsed) {
+      onSelect?.(parsed)
+      setTextValue(format(parsed, "dd/MM/yyyy"))
+      return
+    }
+    setTextValue(dateValue ? format(dateValue, "dd/MM/yyyy") : "")
   }
 
   const isDateOccupied = React.useCallback(
@@ -73,20 +92,32 @@ export function DatePicker({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "w-full justify-start text-left font-normal bg-transparent hover:bg-transparent hover:text-foreground",
-            !dateValue && "text-muted-foreground",
-            className
-          )}
+      <div className={cn("flex w-full overflow-hidden rounded-md shadow-sm", className)}>
+        <Input
+          value={textValue}
           disabled={disabled}
-        >
-          <CalendarIcon className="me-2 h-4 w-4" />
-          {dateValue ? format(dateValue, "PPP", { locale: fr }) : placeholder}
-        </Button>
-      </PopoverTrigger>
+          placeholder="JJ/MM/AAAA"
+          onChange={(event) => setTextValue(event.target.value)}
+          onBlur={commitTypedDate}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur()
+            }
+          }}
+          className="rounded-r-none border-r-0 shadow-none"
+        />
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 rounded-l-none border-slate-300 bg-slate-50/70 px-3 shadow-none hover:bg-slate-50 hover:text-foreground disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 dark:border-slate-700 dark:bg-input/30 dark:disabled:bg-slate-900/60"
+            disabled={disabled}
+            aria-label="Choisir une date"
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+      </div>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
@@ -117,4 +148,20 @@ export function DatePicker({
       </PopoverContent>
     </Popover>
   )
+}
+
+function parseTypedDate(value: string) {
+  const normalized = value.trim()
+  const slash = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  const parts = slash ? { day: Number(slash[1]), month: Number(slash[2]), year: Number(slash[3]) } : null
+  if (!parts) return undefined
+  const parsed = new Date(parts.year, parts.month - 1, parts.day)
+  if (
+    parsed.getFullYear() !== parts.year ||
+    parsed.getMonth() !== parts.month - 1 ||
+    parsed.getDate() !== parts.day
+  ) {
+    return undefined
+  }
+  return parsed
 }

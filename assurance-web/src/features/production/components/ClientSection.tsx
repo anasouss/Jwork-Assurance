@@ -64,7 +64,6 @@ export function ClientSection({
                 telephone: client.client.telephone,
                 telephones: client.client.telephones,
                 email: client.client.email,
-                profession: client.client.profession,
                 conducteurHabituel: client.client.conducteurHabituel,
                 sahara: client.client.sahara,
                 justificatifSahara: client.client.justificatifSahara,
@@ -88,10 +87,11 @@ export function ClientSection({
           const selectedVille = villes.find((ville) => ville.id === item.client.villeId);
           const saharaAllowed = Boolean(selectedVille?.saharienne);
           const disabledByCopy = isProprietaire && sameAsSouscripteur;
+          const proprietorIsDriver = item.client.conducteurHabituel !== false;
           return (
             <div key={index} className="rounded-lg border p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-sm font-medium">{item.role === "SOUSCRIPTEUR" ? "Souscripteur" : item.role === "PROPRIETAIRE" ? "Propriétaire" : item.role}</div>
+                <div className="text-sm font-medium">{item.role === "SOUSCRIPTEUR" ? "Identité souscripteur" : item.role === "PROPRIETAIRE" ? "Identité propriétaire" : item.role}</div>
                 {clients.length > 1 && item.role !== "SOUSCRIPTEUR" && item.role !== "PROPRIETAIRE" ? (
                   <Button
                     type="button"
@@ -110,7 +110,7 @@ export function ClientSection({
                 </label>
               ) : null}
               <div className="grid gap-3 md:grid-cols-4">
-                <Field label="Type">
+                <Field label="Type" required>
                   <Select
                     value={item.client.typeClient}
                     disabled={disabledByCopy}
@@ -125,10 +125,10 @@ export function ClientSection({
                 </Field>
                 {morale ? (
                   <>
-                    <Field label="Raison sociale">
+                    <Field label="Raison sociale" required>
                       <Input disabled={disabledByCopy} value={item.client.raisonSociale ?? ""} onChange={(event) => updateClient(index, { raisonSociale: event.target.value })} />
                     </Field>
-                    <Field label="RC">
+                    <Field label="RC" required>
                       <Input disabled={disabledByCopy} value={item.client.rc ?? ""} onChange={(event) => updateClient(index, { rc: event.target.value })} />
                     </Field>
                     <Field label="ICE">
@@ -137,13 +137,7 @@ export function ClientSection({
                   </>
                 ) : (
                   <>
-                    <Field label="CIN">
-                      <Input disabled={disabledByCopy} value={item.client.cin ?? ""} onChange={(event) => updateClient(index, { cin: event.target.value })} />
-                    </Field>
-                    <Field label="Validité CIN">
-                      <DatePicker date={item.client.cinValidite} disabled={disabledByCopy} onSelect={(date) => updateClient(index, { cinValidite: toIso(date) })} />
-                    </Field>
-                    <Field label="Intitulé">
+                    <Field label="Intitulé" required>
                       <Select value={item.client.civilite ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { civilite: value })}>
                         <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                         <SelectContent>
@@ -151,6 +145,12 @@ export function ClientSection({
                           <SelectItem value="madame">Madame</SelectItem>
                         </SelectContent>
                       </Select>
+                    </Field>
+                    <Field label="CIN" required>
+                      <Input disabled={disabledByCopy} value={item.client.cin ?? ""} onChange={(event) => updateClient(index, { cin: event.target.value })} />
+                    </Field>
+                    <Field label="Validité CIN" required>
+                      <DatePicker date={item.client.cinValidite} disabled={disabledByCopy} onSelect={(date) => updateClient(index, { cinValidite: toIso(date) })} />
                     </Field>
                   </>
                 )}
@@ -162,20 +162,15 @@ export function ClientSection({
                   </Field>
                 ) : (
                   <>
-                    <Field label="Nom">
+                    <Field label="Nom" required>
                       <Input disabled={disabledByCopy} value={item.client.nom ?? ""} onChange={(event) => updateClient(index, { nom: event.target.value })} />
                     </Field>
-                    <Field label="Prénom">
+                    <Field label="Prénom" required>
                       <Input disabled={disabledByCopy} value={item.client.prenom ?? ""} onChange={(event) => updateClient(index, { prenom: event.target.value })} />
                     </Field>
-                    {isProprietaire ? (
-                      <Field label="Profession">
-                        <Input value={item.client.profession ?? ""} onChange={(event) => updateClient(index, { profession: event.target.value })} />
-                      </Field>
-                    ) : null}
                   </>
                 )}
-                <Field label="Ville">
+                <Field label="Ville" required>
                   <Select value={item.client.villeId ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { villeId: value, sahara: false, justificatifSahara: undefined })}>
                     <SelectTrigger><SelectValue placeholder="Ville" /></SelectTrigger>
                     <SelectContent>
@@ -185,7 +180,7 @@ export function ClientSection({
                 </Field>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-4">
-                <Field label="Adresse" className="md:col-span-2">
+                <Field label="Adresse" required className="md:col-span-2">
                   <Input disabled={disabledByCopy} value={item.client.adresse ?? ""} onChange={(event) => updateClient(index, { adresse: event.target.value })} />
                 </Field>
               </div>
@@ -217,31 +212,37 @@ export function ClientSection({
                     <Field label="Email">
                       <Input type="email" value={item.client.email ?? ""} onChange={(event) => updateClient(index, { email: event.target.value })} />
                     </Field>
-                    <Field label="Téléphone">
-                      <Input value={item.client.telephone ?? ""} onChange={(event) => updateClient(index, { telephone: event.target.value })} />
-                    </Field>
+                    <TelephoneList client={item} updateClient={(patch) => updateClient(index, patch)} />
                   </div>
                   {!morale ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-4">
-                      <div className="flex items-end gap-3 pb-2 text-sm">
+                      <div className="flex items-end gap-3 pb-2 text-sm md:col-span-2">
                         <span>Le propriétaire est-il lui-même le conducteur ?</span>
                         <label className="flex items-center gap-1">
                           <Checkbox checked={item.client.conducteurHabituel !== false} onCheckedChange={(checked) => updateClient(index, { conducteurHabituel: Boolean(checked) })} />
                           Oui
                         </label>
+                        <label className="flex items-center gap-1">
+                          <Checkbox checked={item.client.conducteurHabituel === false} onCheckedChange={(checked) => updateClient(index, { conducteurHabituel: Boolean(checked) ? false : true })} />
+                          Non
+                        </label>
                       </div>
-                      <Field label="Date de naissance">
-                        <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toIso(date) })} />
-                      </Field>
-                      <Field label="Délivrance permis">
-                        <DatePicker date={item.client.dateDelivrancePermis} onSelect={(date) => updateClient(index, { dateDelivrancePermis: toIso(date) })} />
-                      </Field>
-                      <Field label="N° permis">
-                        <Input value={item.client.numeroPermis ?? ""} onChange={(event) => updateClient(index, { numeroPermis: event.target.value })} />
-                      </Field>
-                      <Field label="Validité permis">
-                        <DatePicker date={item.client.dateValiditePermis} onSelect={(date) => updateClient(index, { dateValiditePermis: toIso(date) })} />
-                      </Field>
+                      {proprietorIsDriver ? null : (
+                        <>
+                          <Field label="Date de naissance">
+                            <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toIso(date) })} />
+                          </Field>
+                          <Field label="Délivrance permis">
+                            <DatePicker date={item.client.dateDelivrancePermis} onSelect={(date) => updateClient(index, { dateDelivrancePermis: toIso(date) })} />
+                          </Field>
+                          <Field label="N° permis">
+                            <Input value={item.client.numeroPermis ?? ""} onChange={(event) => updateClient(index, { numeroPermis: event.target.value })} />
+                          </Field>
+                          <Field label="Validité permis">
+                            <DatePicker date={item.client.dateValiditePermis} onSelect={(date) => updateClient(index, { dateValiditePermis: toIso(date) })} />
+                          </Field>
+                        </>
+                      )}
                     </div>
                   ) : null}
                 </>
@@ -250,9 +251,6 @@ export function ClientSection({
                 <div className="mt-3 grid gap-3 md:grid-cols-4">
                   <Field label="Date de naissance">
                     <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toIso(date) })} />
-                  </Field>
-                  <Field label="Profession">
-                    <Input value={item.client.profession ?? ""} onChange={(event) => updateClient(index, { profession: event.target.value })} />
                   </Field>
                 </div>
               ) : null}
@@ -290,6 +288,72 @@ export function ClientSection({
         </SectionCard>
       ) : null}
     </>
+  );
+}
+
+function TelephoneList({
+  client,
+  updateClient,
+}: {
+  client: ClientInput;
+  updateClient: (patch: Partial<ClientInput["client"]>) => void;
+}) {
+  const telephones = client.client.telephones && client.client.telephones.length > 0
+    ? client.client.telephones
+    : [{ numero: "", principal: true, whatsapp: false }];
+
+  const updateTelephone = (index: number, patch: Partial<NonNullable<ClientInput["client"]["telephones"]>[number]>) => {
+    updateClient({
+      telephones: telephones.map((telephone, idx) => {
+        if (idx !== index) {
+          return patch.principal ? { ...telephone, principal: false } : telephone;
+        }
+        return { ...telephone, ...patch };
+      }),
+    });
+  };
+
+  const addTelephone = () => {
+    updateClient({ telephones: [...telephones, { numero: "", principal: false, whatsapp: false }] });
+  };
+
+  const removeTelephone = (index: number) => {
+    const next = telephones.filter((_, idx) => idx !== index);
+    updateClient({
+      telephones: next.length > 0
+        ? next.map((telephone, idx) => ({ ...telephone, principal: idx === 0 ? true : telephone.principal }))
+        : [{ numero: "", principal: true, whatsapp: false }],
+    });
+  };
+
+  return (
+    <div className="grid gap-2 md:col-span-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">Téléphones</span>
+        <Button type="button" variant="outline" size="sm" onClick={addTelephone}>
+          <Plus className="size-4" />
+          Téléphone
+        </Button>
+      </div>
+      <div className="grid gap-2">
+        {telephones.map((telephone, index) => (
+          <div key={index} className="grid gap-2 rounded-md border bg-muted/20 p-2 md:grid-cols-[1fr_auto_auto_auto]">
+            <Input value={telephone.numero} onChange={(event) => updateTelephone(index, { numero: event.target.value })} placeholder="Numéro" />
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={Boolean(telephone.principal)} onCheckedChange={(checked) => updateTelephone(index, { principal: Boolean(checked) })} />
+              Principal
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={Boolean(telephone.whatsapp)} onCheckedChange={(checked) => updateTelephone(index, { whatsapp: Boolean(checked) })} />
+              WhatsApp
+            </label>
+            <Button type="button" variant="ghost" size="icon" disabled={telephones.length === 1} onClick={() => removeTelephone(index)}>
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

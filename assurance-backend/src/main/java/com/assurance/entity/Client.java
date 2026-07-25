@@ -128,9 +128,6 @@ public class Client extends BaseEntity {
     private String cnss;
 
     @Column(length = 120)
-    private String profession;
-
-    @Column(length = 120)
     private String activite;
 
     @Builder.Default

@@ -246,29 +246,29 @@ public class DataSeeder implements CommandLineRunner {
         ));
 
         List<Garantie> garanties = List.of(
-                seedGarantie("RC", "Responsabilite Civile", TypeGarantie.VEHICULE, true, true, false, false, false, false, false, false, 10,
+                seedGarantie("RC", "Responsabilite Civile", TypeGarantie.VEHICULE, true, true, false, false, false, false, false, false, false, 10,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, true),
-                seedGarantie("DR", "Defense et Recours", TypeGarantie.VEHICULE, false, false, true, false, false, false, false, false, 20,
+                seedGarantie("DR", "Defense et Recours", TypeGarantie.VEHICULE, false, false, true, false, false, false, false, false, true, 20,
                         ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.AUCUNE, List.of(), false, false),
-                seedGarantie("DC", "Dommages Collision", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, 30,
+                seedGarantie("DC", "Dommages Collision", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, true, 30,
                         ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false),
-                seedGarantie("DV", "Dommages au Vehicule", TypeGarantie.VEHICULE, false, false, false, true, true, false, true, true, 40,
+                seedGarantie("DV", "Dommages au Vehicule", TypeGarantie.VEHICULE, false, false, false, true, true, false, true, true, true, 40,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.NEUF, SourceValeurGarantie.MANUEL), true, false),
-                seedGarantie("V", "Vol", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, 50,
+                seedGarantie("V", "Vol", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, false, 50,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false),
-                seedGarantie("I", "Incendie", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, 60,
+                seedGarantie("I", "Incendie", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, false, 60,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false),
-                seedGarantie("BG", "Bris de Glace", TypeGarantie.VEHICULE, false, false, false, false, false, true, false, true, 70,
+                seedGarantie("BG", "Bris de Glace", TypeGarantie.VEHICULE, false, false, false, false, false, true, false, true, false, 70,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.GLACE, List.of(SourceValeurGarantie.GLACE, SourceValeurGarantie.MANUEL), true, false),
-                seedGarantie("RVE", "Rachat Vetuste", TypeGarantie.VEHICULE, false, false, false, false, false, false, false, false, 80,
+                seedGarantie("RVE", "Rachat Vetuste", TypeGarantie.VEHICULE, false, false, false, false, false, false, false, false, false, 80,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, false),
-                seedGarantie("RF", "Risque Financier", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, 90,
+                seedGarantie("RF", "Risque Financier", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, true, 90,
                         ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false),
-                seedGarantie("PF", "Perte Financiere", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, 100,
+                seedGarantie("PF", "Perte Financiere", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, false, 100,
                         ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false),
-                seedGarantie("PP", "Protection Passagers", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, 110,
+                seedGarantie("PP", "Protection Passagers", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, false, 110,
                         ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false),
-                seedGarantie("PC", "Protection Conducteur", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, 120,
+                seedGarantie("PC", "Protection Conducteur", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, false, 120,
                         ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false)
         );
         compagniesAssurance.forEach(compagnieAssurance ->
@@ -524,6 +524,7 @@ public class DataSeeder implements CommandLineRunner {
             boolean requiertValeurGlace,
             boolean avecCapital,
             boolean avecFranchise,
+            boolean tarificationMultiple,
             int ordreAffichage,
             ModeTarificationGarantie modeParDefaut,
             List<ModeTarificationGarantie> modesAutorises,
@@ -546,6 +547,7 @@ public class DataSeeder implements CommandLineRunner {
                         .requiertValeurGlace(requiertValeurGlace)
                         .avecCapital(avecCapital)
                         .avecFranchise(avecFranchise)
+                        .tarificationMultiple(tarificationMultiple)
                         .ordreAffichage(ordreAffichage)
                         .actif(true)
                         .build()
@@ -561,6 +563,7 @@ public class DataSeeder implements CommandLineRunner {
         garantie.setRequiertValeurGlace(requiertValeurGlace);
         garantie.setAvecCapital(avecCapital);
         garantie.setAvecFranchise(avecFranchise);
+        garantie.setTarificationMultiple(tarificationMultiple);
         garantie.setOrdreAffichage(ordreAffichage);
         garantie.setModeParDefaut(modeParDefaut);
         if (garantie.getModesAutorises() == null) {

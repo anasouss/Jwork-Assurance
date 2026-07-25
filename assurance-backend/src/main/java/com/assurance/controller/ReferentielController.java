@@ -517,6 +517,7 @@ public class ReferentielController {
                         .putValue("requiertValeurGlace", garantie.getRequiertValeurGlace())
                         .putValue("avecFranchise", garantie.getAvecFranchise())
                         .putValue("avecCapital", garantie.getAvecCapital())
+                        .putValue("tarificationMultiple", garantie.getTarificationMultiple())
                         .putValue("modeParDefaut", garantie.getModeParDefaut())
                         .putValue("modesAutorises", garantie.getModesAutorises())
                         .putValue("sourceValeurParDefaut", garantie.getSourceValeurParDefaut())

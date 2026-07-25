@@ -26,6 +26,7 @@ type Props = {
 type MatrixLine = UpsertLigneGrilleTarifaireRequest & {
   localKey: string;
   checked: boolean;
+  baseRow: boolean;
 };
 
 export function GrilleTarifaireConfigurator({
@@ -76,7 +77,7 @@ export function GrilleTarifaireConfigurator({
   const activeUsage = usageTabs.find((usage) => usage.id === activeUsageId) ?? null;
   const vehicleGaranties = useMemo(
     () => garanties
-      .filter((garantie) => text(garantie.typeGarantie) !== "PERSONNE")
+      .filter(isConfigurableVehicleGarantie)
       .sort((left, right) => (toNumber(left.ordreAffichage) ?? 9999) - (toNumber(right.ordreAffichage) ?? 9999)),
     [garanties]
   );
@@ -137,6 +138,7 @@ export function GrilleTarifaireConfigurator({
       {
         localKey: newLocalKey(),
         checked: true,
+        baseRow: false,
         garantieId: garantie.id,
         usageId: activeUsageId,
         modeTarification: defaultMode(garantie),
@@ -146,6 +148,10 @@ export function GrilleTarifaireConfigurator({
   };
 
   const removeDraft = (draft: MatrixLine) => {
+    if (draft.baseRow) {
+      updateDraft(draft.localKey, { checked: false });
+      return;
+    }
     setDrafts((current) => {
       const next = current.filter((item) => item.localKey !== draft.localKey);
       if (next.some((item) => item.garantieId === draft.garantieId)) {
@@ -222,7 +228,7 @@ export function GrilleTarifaireConfigurator({
               <TableHead className="min-w-32 text-right">Franchise minimale</TableHead>
               <TableHead className="min-w-32 text-right">Capital</TableHead>
               <TableHead className="min-w-32 text-right">Prime</TableHead>
-              <TableHead className="w-24 text-right">Actions</TableHead>
+              <TableHead className="w-16 text-right"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -230,6 +236,7 @@ export function GrilleTarifaireConfigurator({
               const garantie = garantieById.get(draft.garantieId);
               const mode = draft.modeTarification || defaultMode(garantie);
               const enabled = draft.checked;
+              const multiEntry = canAddMultipleRows(garantie);
               return (
                 <TableRow key={draft.localKey}>
                   <TableCell>
@@ -254,12 +261,16 @@ export function GrilleTarifaireConfigurator({
                   <TableCell><NumberCell disabled={!enabled || (mode !== "CAPITAL" && mode !== "PRIME_FIXE")} value={draft.prime} onChange={(value) => updateDraft(draft.localKey, { prime: value })} /></TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => garantie && addDraft(garantie)}>
-                        <Plus className="size-4" />
-                      </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDraft(draft)}>
-                        <Trash2 className="size-4" />
-                      </Button>
+                      {draft.baseRow && multiEntry ? (
+                        <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => garantie && addDraft(garantie)}>
+                          <Plus className="size-4" />
+                        </Button>
+                      ) : null}
+                      {!draft.baseRow ? (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeDraft(draft)}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -436,9 +447,11 @@ function buildDrafts(garanties: ReferenceOption[], lignes: ReferenceOption[]): M
       continue;
     }
     for (const ligne of existing) {
+      const index = existing.indexOf(ligne);
       result.push({
         localKey: newLocalKey(),
         checked: true,
+        baseRow: index === 0,
         id: ligne.id,
         garantieId: garantie.id,
         usageId: String(ligne.usageId ?? ""),
@@ -469,6 +482,7 @@ function emptyDraft(garantie: ReferenceOption): MatrixLine {
   return {
     localKey: newLocalKey(),
     checked: false,
+    baseRow: true,
     garantieId: garantie.id,
     modeTarification: defaultMode(garantie),
     ordreAffichage: toNumber(garantie.ordreAffichage),
@@ -518,6 +532,15 @@ function hasRequiredPricing(draft: MatrixLine, garantie?: ReferenceOption) {
   if (mode === "CAPITAL") return draft.capital !== undefined && draft.prime !== undefined;
   if (mode === "PRIME_FIXE") return draft.prime !== undefined;
   return true;
+}
+
+function isConfigurableVehicleGarantie(garantie: ReferenceOption) {
+  return text(garantie.typeGarantie) !== "PERSONNE"
+    && !Boolean(garantie.responsabiliteCivile);
+}
+
+function canAddMultipleRows(garantie?: ReferenceOption) {
+  return Boolean(garantie?.tarificationMultiple);
 }
 
 function allowedModes(garantie?: ReferenceOption) {

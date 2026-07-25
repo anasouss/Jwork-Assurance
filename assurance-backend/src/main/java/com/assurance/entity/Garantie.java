@@ -83,6 +83,10 @@ public class Garantie extends BaseEntity {
     private Boolean avecCapital = false;
 
     @Builder.Default
+    @Column(name = "tarification_multiple", nullable = false)
+    private Boolean tarificationMultiple = false;
+
+    @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "garantie_modes_tarification", joinColumns = @JoinColumn(name = "garantie_id"))
     @Enumerated(EnumType.STRING)

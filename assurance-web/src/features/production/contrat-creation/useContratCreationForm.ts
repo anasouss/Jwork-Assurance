@@ -94,15 +94,17 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
   }, [conventionUsageIds, selectedConvention, typeContrat, usageId]);
 
+  const grilleUsageFilter = typeContrat === "CONVENTION" ? usageId : undefined;
+
   const lignesGrille = useQuery({
-    queryKey: ["lignes-grille", grilleTarifaireId],
-    queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId }),
+    queryKey: ["lignes-grille", grilleTarifaireId, grilleUsageFilter],
+    queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId, usageId: grilleUsageFilter }),
     enabled: Boolean(grilleTarifaireId),
   });
 
   const formulesPersonne = useQuery({
-    queryKey: ["formules-garantie-personne", grilleTarifaireId],
-    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: grilleTarifaireId }),
+    queryKey: ["formules-garantie-personne", grilleTarifaireId, grilleUsageFilter],
+    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: grilleTarifaireId, usageId: grilleUsageFilter }),
     enabled: Boolean(grilleTarifaireId),
   });
 

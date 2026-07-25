@@ -82,6 +82,7 @@ export function ContratFormLayout({
       selected={form.garanties}
       setSelected={form.setGaranties}
       lignes={showGrille ? form.lignesGrille.data ?? [] : []}
+      formulesPersonne={showGrille ? form.formulesPersonne.data ?? [] : []}
       vehiculeCount={form.vehicules.length}
       showLigneGrille={false}
       automaticPricing={showGrille}

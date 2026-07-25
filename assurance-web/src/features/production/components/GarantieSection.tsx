@@ -13,6 +13,7 @@ export function GarantieSection({
   selected,
   setSelected,
   lignes,
+  formulesPersonne = [],
   vehiculeCount,
   showLigneGrille = true,
   automaticPricing = false,
@@ -24,6 +25,7 @@ export function GarantieSection({
   selected: GarantieInput[];
   setSelected: (value: GarantieInput[]) => void;
   lignes: ReferenceOption[];
+  formulesPersonne?: ReferenceOption[];
   vehiculeCount: number;
   showLigneGrille?: boolean;
   automaticPricing?: boolean;
@@ -198,14 +200,16 @@ export function GarantieSection({
                   const item = byId.get(garantie.id);
                   const checked = Boolean(item);
                   const rowDisabled = !checked;
+                  const hasFormula = !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0;
 
                   return (
-                    <tr key={garantie.id} className={cn("border-t align-middle transition-colors", rowDisabled ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
+                    <tr key={garantie.id} className={cn("border-t align-middle transition-colors", rowDisabled || !hasFormula ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
                       <td className="px-3 py-2">
-                        <Checkbox checked={checked} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
+                        <Checkbox checked={checked} disabled={!hasFormula} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                       </td>
                       <td className="px-3 py-2">
                         <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
+                        {automaticPricing && !hasFormula ? <Badge variant="outline">Formule manquante</Badge> : null}
                       </td>
                       <td className="px-3 py-2">
                         <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces ?? ""} onChange={(event) => update(garantie.id, { montantDeces: numberValue(event.target.value) })} />
@@ -262,6 +266,10 @@ function defaultSource(garantie: ReferenceOption) {
 
 function linesForGuarantee(lignes: ReferenceOption[], garantie: ReferenceOption) {
   return lignes.filter((ligne) => !ligne.garantieId || ligne.garantieId === garantie.id);
+}
+
+function formulesForGuarantee(formules: ReferenceOption[], garantie: ReferenceOption) {
+  return formules.filter((formule) => !formule.garantieId || formule.garantieId === garantie.id);
 }
 
 function controlClass(active: boolean) {

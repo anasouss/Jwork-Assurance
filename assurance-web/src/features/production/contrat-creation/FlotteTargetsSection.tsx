@@ -266,15 +266,7 @@ export function FlotteTargetsSection({
 
           {activeVehiculeTarget ? (
             <div className="grid gap-4">
-              <TargetSubsection
-                title="Informations véhicule"
-                action={
-                  <Button type="button" onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule")}>
-                    <Save className="size-4" />
-                    Enregistrer informations
-                  </Button>
-                }
-              >
+              <TargetSubsection title="Informations véhicule">
                 <VehicleForm
                   index={activeVehiculeTarget.index}
                   vehicule={vehicules[activeVehiculeTarget.index]}
@@ -285,6 +277,9 @@ export function FlotteTargetsSection({
                   categoriesTransport={categoriesTransport}
                   errors={errors}
                 />
+                <SectionSubmitButton onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule")}>
+                  Enregistrer informations
+                </SectionSubmitButton>
               </TargetSubsection>
               <TargetSubsection
                 title="Garanties"
@@ -382,15 +377,7 @@ export function FlotteTargetsSection({
 
           {activeRemorqueTarget ? (
             <div className="grid gap-4">
-              <TargetSubsection
-                title="Informations remorque"
-                action={
-                  <Button type="button" onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque")}>
-                    <Save className="size-4" />
-                    Enregistrer informations
-                  </Button>
-                }
-              >
+              <TargetSubsection title="Informations remorque">
                 <RemorqueForm
                   index={activeRemorqueTarget.index}
                   remorque={remorques[activeRemorqueTarget.index]}
@@ -398,6 +385,9 @@ export function FlotteTargetsSection({
                   usages={usages}
                   marques={marques}
                 />
+                <SectionSubmitButton onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque")}>
+                  Enregistrer informations
+                </SectionSubmitButton>
               </TargetSubsection>
               <TargetSubsection
                 title="Garanties"
@@ -447,6 +437,25 @@ export function FlotteTargetsSection({
         </div>
       </SectionCard>
     </>
+  );
+}
+
+function SectionSubmitButton({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className="mt-5 flex justify-end border-t pt-4">
+      <Button type="button" disabled={disabled} onClick={onClick}>
+        <Save className="size-4" />
+        {children}
+      </Button>
+    </div>
   );
 }
 

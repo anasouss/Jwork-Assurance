@@ -6,6 +6,7 @@ import { Building2, Edit, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EcheanceInput, isValidEcheance } from "@/components/ui/echeance-input";
 import {
   Dialog,
   DialogContent,
@@ -261,7 +262,10 @@ export default function CompaniesConventionsPage() {
             </Field>
             {payload.typeEcheance === "A_ECHEANCE" ? (
               <Field label="Échéance (jj/mm)" required>
-                <Input maxLength={5} placeholder="JJ/MM" value={payload.echeance ?? ""} onChange={(event) => updatePayload(setPayload, { echeance: event.target.value })} />
+                <EcheanceInput
+                  value={payload.echeance}
+                  onValueChange={(value) => updatePayload(setPayload, { echeance: value })}
+                />
               </Field>
             ) : null}
             <Field label="Catégorie" required>
@@ -373,7 +377,7 @@ function submitConvention(
     toast.error("Convention incomplète");
     return;
   }
-  if (payload.typeEcheance === "A_ECHEANCE" && !/^\d{2}\/\d{2}$/.test(payload.echeance ?? "")) {
+  if (payload.typeEcheance === "A_ECHEANCE" && !isValidEcheance(payload.echeance)) {
     toast.error("Échéance invalide. Format attendu: JJ/MM");
     return;
   }

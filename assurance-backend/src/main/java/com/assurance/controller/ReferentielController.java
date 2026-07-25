@@ -351,11 +351,12 @@ public class ReferentielController {
     }
 
     @GetMapping("/grilles-tarifaires")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> grillesTarifaires(
             @RequestParam(required = false) String compagnieAssuranceId
     ) {
         List<GrilleTarifaire> grilles = compagnieAssuranceId == null || compagnieAssuranceId.isBlank()
-                ? grilleTarifaireRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
+                ? grilleTarifaireRepository.findAllByOrderByCreatedAtDesc()
                 : grilleTarifaireRepository.findByCompagnieAssuranceIdAndActifTrueOrderByLibelleAsc(compagnieAssuranceId);
         return ResponseEntity.ok(ApiResponse.success(grilles.stream()
                 .filter(grille -> Boolean.TRUE.equals(grille.getActif()))

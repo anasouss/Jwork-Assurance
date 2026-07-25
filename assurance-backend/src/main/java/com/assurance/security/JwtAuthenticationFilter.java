@@ -28,24 +28,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = resolveToken(request);
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                String userId = tokenProvider.getUserIdFromToken(jwt);
-                UserDetails userDetails = userDetailsService.loadUserById(userId);
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                try {
+                    String userId = tokenProvider.getUserIdFromToken(jwt);
+                    UserDetails userDetails = userDetailsService.loadUserById(userId);
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                if (userDetails instanceof UserPrincipal principal) {
-                    TenantContext.setCurrentUser(principal.getId());
-                    TenantContext.setCurrentAgence(principal.getAgenceId());
+                    if (userDetails instanceof UserPrincipal principal) {
+                        TenantContext.setCurrentUser(principal.getId());
+                        TenantContext.setCurrentAgence(principal.getAgenceId());
+                    }
+                } catch (RuntimeException ex) {
+                    SecurityContextHolder.clearContext();
+                    TenantContext.clear();
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid authentication token");
+                    return;
                 }
             }
+            filterChain.doFilter(request, response);
         } finally {
-            try {
-                filterChain.doFilter(request, response);
-            } finally {
-                TenantContext.clear();
-            }
+            TenantContext.clear();
         }
     }
 

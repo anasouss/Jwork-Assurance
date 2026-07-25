@@ -154,7 +154,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     nombreVehicules: vehicules.length,
     nombreRemorques: remorques.length,
     prospection: false,
-    assistance: typeContrat === "FLOTTE" ? assistanceEnabled : false,
+    assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled : false,
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     clients: clients.map((client) => ({

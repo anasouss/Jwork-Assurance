@@ -93,6 +93,9 @@ export function ContratFormLayout({
       preview={form.preview}
       previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
       showTotalsSummary={showConvention}
+      assistanceEnabled={form.assistanceEnabled}
+      setAssistanceEnabled={form.setAssistanceEnabled}
+      showAssistanceRow={showConvention}
     />
   );
 

@@ -24,6 +24,9 @@ export function GarantieSection({
   preview,
   previewing = false,
   showTotalsSummary = false,
+  assistanceEnabled = false,
+  setAssistanceEnabled,
+  showAssistanceRow = false,
 }: {
   garanties: ReferenceOption[];
   selected: GarantieInput[];
@@ -40,6 +43,9 @@ export function GarantieSection({
   preview?: QuittancePreview | null;
   previewing?: boolean;
   showTotalsSummary?: boolean;
+  assistanceEnabled?: boolean;
+  setAssistanceEnabled?: (value: boolean) => void;
+  showAssistanceRow?: boolean;
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
   const vehiculeGaranties = garanties
@@ -48,6 +54,11 @@ export function GarantieSection({
   const personneGaranties = garanties
     .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE")
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
+  const personneIds = new Set(personneGaranties.map((garantie) => garantie.id));
+  const showPersonneTotals = selected.some((item) => personneIds.has(item.garantieId))
+    || linePrimeNette(preview, "CORPOREL") != null
+    || (preview?.accessoire ?? 0) > 0;
+  const showAssistanceTotal = assistanceEnabled || linePrimeNette(preview, "ASSISTANCE") != null;
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
   };
@@ -272,6 +283,12 @@ export function GarantieSection({
           </tbody>
         </table>
       </div>
+      {showAssistanceRow ? (
+        <div className={cn("mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold", !assistanceEnabled && "bg-muted/20 text-muted-foreground")}>
+          <Checkbox checked={assistanceEnabled} onCheckedChange={(checked) => setAssistanceEnabled?.(Boolean(checked))} />
+          <span>ASSISTANCE</span>
+        </div>
+      ) : null}
       {personneGaranties.length > 0 ? (
         <div className="mt-4">
           <div className="mb-2 text-sm font-semibold">Garanties personne</div>
@@ -355,7 +372,14 @@ export function GarantieSection({
           </div>
         </div>
       ) : null}
-      {showTotalsSummary ? <GuaranteeTotalsSummary preview={preview} loading={previewing} /> : null}
+      {showTotalsSummary ? (
+        <GuaranteeTotalsSummary
+          preview={preview}
+          loading={previewing}
+          showPersonneTotals={showPersonneTotals}
+          showAssistanceTotal={showAssistanceTotal}
+        />
+      ) : null}
     </SectionCard>
   );
 }
@@ -363,20 +387,27 @@ export function GarantieSection({
 function GuaranteeTotalsSummary({
   preview,
   loading,
+  showPersonneTotals,
+  showAssistanceTotal,
 }: {
   preview?: QuittancePreview | null;
   loading?: boolean;
+  showPersonneTotals?: boolean;
+  showAssistanceTotal?: boolean;
 }) {
   const rows: [string, number | undefined][] = [
     ["TOTAL NET", preview?.primeNette],
     ["EVCAT", linePrimeNette(preview, "EVCAT")],
-    ["PTA (Prime Personne)", linePrimeNette(preview, "CORPOREL")],
-    ["ACCESSOIRE", preview?.accessoire],
     ["TAXE", preview?.taxe],
     ["CNPAC", preview?.cnpac],
     ["TOTAL À PAYER", preview?.primeTotale],
-    ["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")],
   ];
+  if (showPersonneTotals) {
+    rows.splice(2, 0, ["PTA (Prime Personne)", linePrimeNette(preview, "CORPOREL")], ["ACCESSOIRE", preview?.accessoire]);
+  }
+  if (showAssistanceTotal) {
+    rows.push(["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")]);
+  }
 
   return (
     <div className="mt-4 overflow-hidden rounded-md border">

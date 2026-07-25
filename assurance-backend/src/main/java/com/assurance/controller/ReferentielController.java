@@ -436,6 +436,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/conventions")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> conventions(
             @RequestParam(required = false) String compagnieAssuranceId
     ) {
@@ -643,8 +644,9 @@ public class ReferentielController {
     }
 
     @GetMapping("/categories-client")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> categoriesClient() {
-        return ResponseEntity.ok(ApiResponse.success(categorieClientRepository.findAll(Sort.by("libelle")).stream()
+        return ResponseEntity.ok(ApiResponse.success(categorieClientRepository.findAllByOrderByLibelleAsc().stream()
                 .map(categorie -> option(categorie.getId(), categorie.getCode(), categorie.getLibelle())
                         .putValue("usageIds", categorie.getUsages().stream()
                                 .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
@@ -801,6 +803,11 @@ public class ReferentielController {
         TypeEcheanceConvention typeEcheance = request.getTypeEcheance() == null
                 ? TypeEcheanceConvention.DATE_A_DATE
                 : request.getTypeEcheance();
+        String echeance = blankToNull(request.getEcheance());
+        if (typeEcheance == TypeEcheanceConvention.A_ECHEANCE
+                && (echeance == null || !echeance.matches("\\d{2}/\\d{2}"))) {
+            throw new BadRequestException("Echeance convention invalide. Format attendu: JJ/MM");
+        }
         convention.setAgence(agence);
         convention.setCompagnieAssurance(compagnie);
         convention.setCode(request.getCode());
@@ -812,7 +819,7 @@ public class ReferentielController {
         convention.setDateEffet(request.getDateEffet());
         convention.setDateEcheance(request.getDateEcheance());
         convention.setTypeEcheance(typeEcheance);
-        convention.setEcheance(typeEcheance == TypeEcheanceConvention.A_ECHEANCE ? blankToNull(request.getEcheance()) : null);
+        convention.setEcheance(typeEcheance == TypeEcheanceConvention.A_ECHEANCE ? echeance : null);
         convention.setFractionnement(request.getFractionnement());
         convention.setActif(request.getActif() == null ? true : request.getActif());
         convention.getUsages().clear();

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
+import { toDateOnly } from "../date";
 import type { ReferenceOption, VehiculeInput } from "../types";
 
 export function emptyVehicule(usageId?: string): VehiculeInput {
@@ -165,10 +166,10 @@ export function VehiculeSection({
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-4">
                 <Field label="Date mise en circulation">
-                  <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toIso(date) })} />
+                  <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toDateOnly(date) })} />
                 </Field>
                 <Field label="Date validité CG" required>
-                  <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toIso(date) })} />
+                  <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toDateOnly(date) })} />
                 </Field>
                 <Field label="N° attestation">
                   <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
@@ -195,7 +196,7 @@ export function VehiculeSection({
                     <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update(index, { nomOrganismeCredit: event.target.value })} />
                   </Field>
                   <Field label="Date fin crédit">
-                    <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update(index, { dateFinCredit: toIso(date) })} />
+                    <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update(index, { dateFinCredit: toDateOnly(date) })} />
                   </Field>
                 </div>
               ) : null}
@@ -205,10 +206,6 @@ export function VehiculeSection({
       </div>
     </SectionCard>
   );
-}
-
-function toIso(date?: Date) {
-  return date ? date.toISOString().slice(0, 10) : undefined;
 }
 
 function numberValue(value: string) {

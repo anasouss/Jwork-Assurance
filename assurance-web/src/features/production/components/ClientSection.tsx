@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SectionCard } from "./SectionCard";
 import { Field } from "./Field";
+import { toDateOnly } from "../date";
 import type { ClientInput, ReferenceOption } from "../types";
 
 export function emptyClient(role: ClientInput["role"] = "SOUSCRIPTEUR"): ClientInput {
@@ -34,6 +35,21 @@ export function ClientSection({
 }) {
   const [sameAsSouscripteur, setSameAsSouscripteur] = useState(false);
 
+  useEffect(() => {
+    const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
+    const needsConducteur = Boolean(
+      proprietaire && (proprietaire.client.typeClient === "PERSONNE_MORALE" || proprietaire.client.conducteurHabituel === false)
+    );
+    const hasConducteur = clients.some((client) => client.role === "CONDUCTEUR");
+    if (needsConducteur && !hasConducteur) {
+      setClients([...clients, emptyClient("CONDUCTEUR")]);
+      return;
+    }
+    if (!needsConducteur && hasConducteur && !showOptionalRoles) {
+      setClients(clients.filter((client) => client.role !== "CONDUCTEUR"));
+    }
+  }, [clients, setClients, showOptionalRoles]);
+
   const updateClient = (index: number, patch: Partial<ClientInput["client"]>) => {
     setClients(
       clients.map((client, idx) =>
@@ -41,6 +57,18 @@ export function ClientSection({
           ? { ...client, client: { ...client.client, ...patch } }
           : client
       )
+    );
+  };
+
+  const setProprietaireConducteur = (index: number, value: boolean) => {
+    setClients(
+      clients
+        .filter((client) => value || client.role !== "CONDUCTEUR" || showOptionalRoles)
+        .map((client, idx) =>
+          idx === index
+            ? { ...client, client: { ...client.client, conducteurHabituel: value } }
+            : client
+        )
     );
   };
 
@@ -87,7 +115,10 @@ export function ClientSection({
           const selectedVille = villes.find((ville) => ville.id === item.client.villeId);
           const saharaAllowed = Boolean(selectedVille?.saharienne);
           const disabledByCopy = isProprietaire && sameAsSouscripteur;
-          const proprietorIsDriver = item.client.conducteurHabituel !== false;
+          const proprietorIsDriver = isProprietaire && !morale && item.client.conducteurHabituel !== false;
+          const conducteur = clients
+            .map((client, clientIndex) => ({ client, clientIndex }))
+            .find(({ client }) => client.role === "CONDUCTEUR");
           return (
             <div key={index} className="rounded-lg border p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
@@ -150,7 +181,7 @@ export function ClientSection({
                       <Input disabled={disabledByCopy} value={item.client.cin ?? ""} onChange={(event) => updateClient(index, { cin: event.target.value })} />
                     </Field>
                     <Field label="Validité CIN" required>
-                      <DatePicker date={item.client.cinValidite} disabled={disabledByCopy} onSelect={(date) => updateClient(index, { cinValidite: toIso(date) })} />
+                      <DatePicker date={item.client.cinValidite} disabled={disabledByCopy} onSelect={(date) => updateClient(index, { cinValidite: toDateOnly(date) })} />
                     </Field>
                   </>
                 )}
@@ -214,35 +245,75 @@ export function ClientSection({
                     </Field>
                     <TelephoneList client={item} updateClient={(patch) => updateClient(index, patch)} />
                   </div>
-                  {!morale ? (
-                    <div className="mt-3 grid gap-3 md:grid-cols-4">
-                      <div className="flex items-end gap-3 pb-2 text-sm md:col-span-2">
-                        <span>Le propriétaire est-il lui-même le conducteur ?</span>
-                        <label className="flex items-center gap-1">
-                          <Checkbox checked={item.client.conducteurHabituel !== false} onCheckedChange={(checked) => updateClient(index, { conducteurHabituel: Boolean(checked) })} />
-                          Oui
-                        </label>
-                        <label className="flex items-center gap-1">
-                          <Checkbox checked={item.client.conducteurHabituel === false} onCheckedChange={(checked) => updateClient(index, { conducteurHabituel: Boolean(checked) ? false : true })} />
-                          Non
-                        </label>
+                  <div className="mt-3 grid gap-3 md:grid-cols-4">
+                    <div className="flex items-end gap-3 pb-2 text-sm md:col-span-2">
+                      <span>Le propriétaire est-il lui-même le conducteur ?</span>
+                      <label className="flex items-center gap-1">
+                        <Checkbox
+                          checked={proprietorIsDriver}
+                          disabled={morale}
+                          onCheckedChange={(checked) => setProprietaireConducteur(index, Boolean(checked))}
+                        />
+                        Oui
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <Checkbox
+                          checked={!proprietorIsDriver}
+                          onCheckedChange={(checked) => setProprietaireConducteur(index, !Boolean(checked))}
+                        />
+                        Non
+                      </label>
+                    </div>
+                  </div>
+                  {!proprietorIsDriver && conducteur ? (
+                    <div className="mt-3 rounded-lg border bg-muted/20 p-3">
+                      <div className="mb-3 text-sm font-medium">Conducteur habituel</div>
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <Field label="Intitulé" required>
+                          <Select value={conducteur.client.client.civilite ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { civilite: value })}>
+                            <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monsieur">Monsieur</SelectItem>
+                              <SelectItem value="madame">Madame</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field label="CIN" required>
+                          <Input value={conducteur.client.client.cin ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { cin: event.target.value })} />
+                        </Field>
+                        <Field label="Validité CIN">
+                          <DatePicker date={conducteur.client.client.cinValidite} onSelect={(date) => updateClient(conducteur.clientIndex, { cinValidite: toDateOnly(date) })} />
+                        </Field>
+                        <Field label="Ville">
+                          <Select value={conducteur.client.client.villeId ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { villeId: value })}>
+                            <SelectTrigger><SelectValue placeholder="Ville" /></SelectTrigger>
+                            <SelectContent>
+                              {villes.map((ville) => <SelectItem key={ville.id} value={ville.id}>{ville.libelle}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field label="Nom" required>
+                          <Input value={conducteur.client.client.nom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { nom: event.target.value })} />
+                        </Field>
+                        <Field label="Prénom" required>
+                          <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
+                        </Field>
+                        <Field label="Adresse" className="md:col-span-2">
+                          <Input value={conducteur.client.client.adresse ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { adresse: event.target.value })} />
+                        </Field>
+                        <Field label="Date de naissance">
+                          <DatePicker date={conducteur.client.client.dateNaissance} onSelect={(date) => updateClient(conducteur.clientIndex, { dateNaissance: toDateOnly(date) })} />
+                        </Field>
+                        <Field label="Délivrance permis">
+                          <DatePicker date={conducteur.client.client.dateDelivrancePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateDelivrancePermis: toDateOnly(date) })} />
+                        </Field>
+                        <Field label="N° permis">
+                          <Input value={conducteur.client.client.numeroPermis ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { numeroPermis: event.target.value })} />
+                        </Field>
+                        <Field label="Validité permis" required>
+                          <DatePicker date={conducteur.client.client.dateValiditePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateValiditePermis: toDateOnly(date) })} />
+                        </Field>
                       </div>
-                      {proprietorIsDriver ? null : (
-                        <>
-                          <Field label="Date de naissance">
-                            <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toIso(date) })} />
-                          </Field>
-                          <Field label="Délivrance permis">
-                            <DatePicker date={item.client.dateDelivrancePermis} onSelect={(date) => updateClient(index, { dateDelivrancePermis: toIso(date) })} />
-                          </Field>
-                          <Field label="N° permis">
-                            <Input value={item.client.numeroPermis ?? ""} onChange={(event) => updateClient(index, { numeroPermis: event.target.value })} />
-                          </Field>
-                          <Field label="Validité permis">
-                            <DatePicker date={item.client.dateValiditePermis} onSelect={(date) => updateClient(index, { dateValiditePermis: toIso(date) })} />
-                          </Field>
-                        </>
-                      )}
                     </div>
                   ) : null}
                 </>
@@ -250,7 +321,7 @@ export function ClientSection({
               {!isProprietaire && !morale ? (
                 <div className="mt-3 grid gap-3 md:grid-cols-4">
                   <Field label="Date de naissance">
-                    <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toIso(date) })} />
+                    <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })} />
                   </Field>
                 </div>
               ) : null}
@@ -355,8 +426,4 @@ function TelephoneList({
       </div>
     </div>
   );
-}
-
-function toIso(date?: Date) {
-  return date ? date.toISOString().slice(0, 10) : undefined;
 }

@@ -44,7 +44,7 @@ export function DatePicker({
   const dateValue = React.useMemo(() => {
     if (!date) return undefined
     if (date instanceof Date) return date
-    return new Date(date)
+    return parseIsoDate(date)
   }, [date])
 
   React.useEffect(() => {
@@ -92,12 +92,14 @@ export function DatePicker({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className={cn("flex w-full overflow-hidden rounded-md shadow-sm", className)}>
+      <div className={cn("flex w-full overflow-hidden rounded-md", className)}>
         <Input
           value={textValue}
           disabled={disabled}
           placeholder="JJ/MM/AAAA"
-          onChange={(event) => setTextValue(event.target.value)}
+          inputMode="numeric"
+          maxLength={10}
+          onChange={(event) => setTextValue(formatDateInput(event.target.value))}
           onBlur={commitTypedDate}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -152,7 +154,7 @@ export function DatePicker({
 
 function parseTypedDate(value: string) {
   const normalized = value.trim()
-  const slash = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  const slash = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
   const parts = slash ? { day: Number(slash[1]), month: Number(slash[2]), year: Number(slash[3]) } : null
   if (!parts) return undefined
   const parsed = new Date(parts.year, parts.month - 1, parts.day)
@@ -164,4 +166,17 @@ function parseTypedDate(value: string) {
     return undefined
   }
   return parsed
+}
+
+function formatDateInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+}
+
+function parseIsoDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return new Date(value)
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
 }

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
+import { toDateOnly } from "../date";
 import type { ReferenceOption, RemorqueInput } from "../types";
 
 export function RemorqueSection({
@@ -86,13 +87,13 @@ export function RemorqueSection({
                 <Input value={remorque.ptc ?? ""} onChange={(event) => update(index, { ptc: event.target.value })} />
               </Field>
               <Field label="Date mise en circulation">
-                <DatePicker date={remorque.dateMiseEnCirculation} onSelect={(date) => update(index, { dateMiseEnCirculation: toIso(date) })} />
+                <DatePicker date={remorque.dateMiseEnCirculation} onSelect={(date) => update(index, { dateMiseEnCirculation: toDateOnly(date) })} />
               </Field>
               <Field label="Date d'effet">
-                <DatePicker date={remorque.dateEffet} onSelect={(date) => update(index, { dateEffet: toIso(date) })} />
+                <DatePicker date={remorque.dateEffet} onSelect={(date) => update(index, { dateEffet: toDateOnly(date) })} />
               </Field>
               <Field label="Date d'échéance">
-                <DatePicker date={remorque.dateEcheance} onSelect={(date) => update(index, { dateEcheance: toIso(date) })} />
+                <DatePicker date={remorque.dateEcheance} onSelect={(date) => update(index, { dateEcheance: toDateOnly(date) })} />
               </Field>
               <Field label="CRM">
                 <Input value={remorque.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />
@@ -109,10 +110,6 @@ export function RemorqueSection({
       </div>
     </SectionCard>
   );
-}
-
-function toIso(date?: Date) {
-  return date ? date.toISOString().slice(0, 10) : undefined;
 }
 
 function numberValue(value: string) {

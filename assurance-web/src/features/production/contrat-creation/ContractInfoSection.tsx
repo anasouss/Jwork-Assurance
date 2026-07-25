@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
+import { toDateOnly } from "../date";
 import type { CreateContratRequest } from "../types";
 import type { ContratCreationFormState } from "./useContratCreationForm";
 
@@ -105,10 +106,10 @@ export function ContractInfoSection({
           <Input value={form.numeroAttestation} onChange={(event) => form.setNumeroAttestation(event.target.value)} />
         </Field>
         <Field label="Date effet">
-          <DatePicker date={form.dateEffet} onSelect={(date) => form.setDateEffet(toIso(date))} />
+          <DatePicker date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
         </Field>
         <Field label="Date échéance">
-          <DatePicker date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toIso(date))} />
+          <DatePicker date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
         </Field>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-4">
@@ -126,8 +127,4 @@ export function ContractInfoSection({
       </div>
     </SectionCard>
   );
-}
-
-function toIso(date?: Date) {
-  return date ? date.toISOString().slice(0, 10) : undefined;
 }

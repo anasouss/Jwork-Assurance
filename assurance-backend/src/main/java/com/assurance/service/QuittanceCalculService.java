@@ -1,0 +1,216 @@
+package com.assurance.service;
+
+import com.assurance.entity.Contrat;
+import com.assurance.entity.ContratGarantie;
+import com.assurance.entity.TypeMouvementContrat;
+import com.assurance.entity.Usage;
+import com.assurance.enums.CategorieQuittance;
+import com.assurance.enums.TypeGarantie;
+import com.assurance.enums.TypeImpactMouvement;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+@Service
+@RequiredArgsConstructor
+public class QuittanceCalculService {
+
+    private final ParametreApplicationService parametreApplicationService;
+
+    public Resultat calculer(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<ContratGarantie> garanties,
+            int nombreUnitesCnpac
+    ) {
+        String agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
+        TypeImpactMouvement impact = typeMouvement == null || typeMouvement.getTypeImpact() == null ? TypeImpactMouvement.NORMAL : typeMouvement.getTypeImpact();
+        if (impact == TypeImpactMouvement.ZERO) {
+            return totalOnly(BigDecimal.ZERO);
+        }
+        if (impact == TypeImpactMouvement.CNPAC_SEUL || Boolean.TRUE.equals(typeMouvement != null ? typeMouvement.getCnpacSeul() : null)) {
+            BigDecimal cnpac = param(agenceId, "CNPAC").multiply(BigDecimal.valueOf(Math.max(1, nombreUnitesCnpac)));
+            Ligne ligne = new Ligne(CategorieQuittance.AUTOMOBILE, 10, false, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, cnpac, cnpac);
+            return withTotal(List.of(ligne), BigDecimal.ONE);
+        }
+
+        BigDecimal tauxTaxeRc = param(agenceId, "TAUX_TAXE_1");
+        BigDecimal tauxTaxeGarantie = param(agenceId, "TAUX_TAXE_2");
+        BigDecimal tauxTaxePf = param(agenceId, "TAUX_TAXE_PF");
+        BigDecimal tauxEvcatAutres = param(agenceId, "TAUX_EVCAT_2");
+        BigDecimal tauxEvcatPersonne = param(agenceId, "TAUX_EVCAT_3");
+        BigDecimal cnpacUnitaire = param(agenceId, "CNPAC");
+
+        BigDecimal netAuto = BigDecimal.ZERO;
+        BigDecimal taxeAuto = BigDecimal.ZERO;
+        BigDecimal accessoireAuto = BigDecimal.ZERO;
+        BigDecimal netCorporel = BigDecimal.ZERO;
+        BigDecimal taxeCorporel = BigDecimal.ZERO;
+        BigDecimal accessoireCorporel = BigDecimal.ZERO;
+        BigDecimal netEvcat = BigDecimal.ZERO;
+        BigDecimal accessoireEvcat = BigDecimal.ZERO;
+
+        for (ContratGarantie contratGarantie : garanties == null ? List.<ContratGarantie>of() : garanties) {
+            if (contratGarantie == null || contratGarantie.getGarantie() == null) {
+                continue;
+            }
+            BigDecimal prime = zeroIfNull(contratGarantie.getPrime());
+            BigDecimal accessoire = zeroIfNull(contratGarantie.getAccessoire());
+            String codeGarantie = contratGarantie.getGarantie().getCode() == null ? "" : contratGarantie.getGarantie().getCode().trim().toUpperCase(Locale.ROOT);
+
+            if (contratGarantie.getGarantie().getTypeGarantie() == TypeGarantie.PERSONNE || "PC".equals(codeGarantie) || "PP".equals(codeGarantie)) {
+                BigDecimal baseCorporel = prime.multiply(tauxEvcatPersonne);
+                netCorporel = netCorporel.add(baseCorporel);
+                taxeCorporel = taxeCorporel.add(baseCorporel.multiply(tauxTaxeGarantie));
+                accessoireCorporel = accessoireCorporel.add(accessoire);
+                continue;
+            }
+
+            if (Boolean.TRUE.equals(contratGarantie.getGarantie().getResponsabiliteCivile()) || "RC".equals(codeGarantie)) {
+                netAuto = netAuto.add(prime);
+                taxeAuto = taxeAuto.add(prime.multiply(tauxTaxeRc));
+                netEvcat = netEvcat.add(prime.multiply(resolveTauxEvcatRc(agenceId, contrat, contratGarantie)));
+            } else {
+                netAuto = netAuto.add(prime);
+                taxeAuto = taxeAuto.add(prime.multiply(tauxTaxeGarantie));
+                netEvcat = netEvcat.add(prime.multiply(tauxEvcatAutres));
+            }
+            accessoireAuto = accessoireAuto.add(accessoire);
+        }
+
+        BigDecimal taxePfAuto = netAuto.multiply(tauxTaxePf);
+        BigDecimal taxeEvcat = netEvcat.multiply(tauxTaxeGarantie);
+        BigDecimal taxePfEvcat = netEvcat.multiply(tauxTaxePf);
+        BigDecimal cnpac = cnpacUnitaire.multiply(BigDecimal.valueOf(Math.max(1, nombreUnitesCnpac)));
+
+        BigDecimal signe = impact == TypeImpactMouvement.RETOUR_PRIME ? BigDecimal.valueOf(-1) : BigDecimal.ONE;
+        List<Ligne> lignes = new ArrayList<>();
+        lignes.add(new Ligne(CategorieQuittance.AUTOMOBILE, 10, false, netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac, total(netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac)));
+        lignes.add(new Ligne(CategorieQuittance.CORPOREL, 20, false, netCorporel, taxeCorporel, BigDecimal.ZERO, accessoireCorporel, BigDecimal.ZERO, total(netCorporel, taxeCorporel, BigDecimal.ZERO, accessoireCorporel, BigDecimal.ZERO)));
+        lignes.add(new Ligne(CategorieQuittance.EVCAT, 30, false, netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO, total(netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO)));
+        return withTotal(lignes, signe);
+    }
+
+    public int compterUnitesCnpac(List<ContratGarantie> garanties, int fallback) {
+        Set<String> cibles = new LinkedHashSet<>();
+        for (ContratGarantie contratGarantie : garanties == null ? List.<ContratGarantie>of() : garanties) {
+            if (contratGarantie == null || contratGarantie.getGarantie() == null) {
+                continue;
+            }
+            String codeGarantie = contratGarantie.getGarantie().getCode() == null ? "" : contratGarantie.getGarantie().getCode().trim().toUpperCase(Locale.ROOT);
+            if (!Boolean.TRUE.equals(contratGarantie.getGarantie().getResponsabiliteCivile()) && !"RC".equals(codeGarantie)) {
+                continue;
+            }
+            if (contratGarantie.getVehicule() != null) {
+                cibles.add("V:" + contratGarantie.getVehicule().getId());
+            } else if (contratGarantie.getRemorque() != null) {
+                cibles.add("R:" + contratGarantie.getRemorque().getId());
+            }
+        }
+        if (!cibles.isEmpty()) {
+            return cibles.size();
+        }
+        return Math.max(1, fallback);
+    }
+
+    private Resultat totalOnly(BigDecimal montant) {
+        Ligne total = new Ligne(CategorieQuittance.TOTAL, 99, true, montant, montant, montant, montant, montant, montant);
+        return new Resultat(List.of(total), montant, montant, montant, montant, montant, montant);
+    }
+
+    private Resultat withTotal(List<Ligne> source, BigDecimal signe) {
+        List<Ligne> lignes = source.stream()
+                .map(ligne -> ligne.multiplier(signe))
+                .toList();
+        BigDecimal primeNette = lignes.stream().map(Ligne::primeNette).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal taxe = lignes.stream().map(Ligne::taxe).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal taxeParafiscale = lignes.stream().map(Ligne::taxeParafiscale).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal accessoire = lignes.stream().map(Ligne::accessoire).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal cnpac = lignes.stream().map(Ligne::cnpac).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal primeTotale = lignes.stream().map(Ligne::primeTotale).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<Ligne> toutesLignes = new ArrayList<>(lignes);
+        toutesLignes.add(new Ligne(CategorieQuittance.TOTAL, 99, true, primeNette, taxe, taxeParafiscale, accessoire, cnpac, primeTotale));
+        return new Resultat(
+                toutesLignes,
+                scale(primeNette),
+                scale(taxe),
+                scale(taxeParafiscale),
+                scale(accessoire),
+                scale(cnpac),
+                scale(primeTotale)
+        );
+    }
+
+    private BigDecimal resolveTauxEvcatRc(String agenceId, Contrat contrat, ContratGarantie contratGarantie) {
+        Usage usage = contratGarantie.getVehicule() != null ? contratGarantie.getVehicule().getUsage()
+                : contratGarantie.getRemorque() != null ? contratGarantie.getRemorque().getUsage()
+                : contrat.getUsage();
+        String usageCode = usage == null || usage.getCode() == null ? "" : usage.getCode().trim().toUpperCase(Locale.ROOT);
+        String usageLibelle = usage == null || usage.getLibelle() == null ? "" : usage.getLibelle().trim().toUpperCase(Locale.ROOT);
+        if (usageCode.startsWith("B") || usageLibelle.contains("TAXI") || usageLibelle.contains("BUS") || usageLibelle.contains("TPV")) {
+            return param(agenceId, "TAUX_EVCAT_TPV_RC");
+        }
+        return param(agenceId, "TAUX_EVCAT_1");
+    }
+
+    private BigDecimal total(BigDecimal primeNette, BigDecimal taxe, BigDecimal taxeParafiscale, BigDecimal accessoire, BigDecimal cnpac) {
+        return primeNette.add(taxe).add(taxeParafiscale).add(accessoire).add(cnpac);
+    }
+
+    private BigDecimal param(String agenceId, String code) {
+        return parametreApplicationService.getDecimal(agenceId, code, BigDecimal.ZERO);
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private static BigDecimal scale(BigDecimal value) {
+        return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public record Resultat(
+            List<Ligne> lignes,
+            BigDecimal primeNette,
+            BigDecimal taxe,
+            BigDecimal taxeParafiscale,
+            BigDecimal accessoire,
+            BigDecimal cnpac,
+            BigDecimal primeTotale
+    ) {
+    }
+
+    public record Ligne(
+            CategorieQuittance categorie,
+            int ordre,
+            boolean globale,
+            BigDecimal primeNette,
+            BigDecimal taxe,
+            BigDecimal taxeParafiscale,
+            BigDecimal accessoire,
+            BigDecimal cnpac,
+            BigDecimal primeTotale
+    ) {
+        private Ligne multiplier(BigDecimal signe) {
+            return new Ligne(
+                    categorie,
+                    ordre,
+                    globale,
+                    scale(primeNette.multiply(signe)),
+                    scale(taxe.multiply(signe)),
+                    scale(taxeParafiscale.multiply(signe)),
+                    scale(accessoire.multiply(signe)),
+                    scale(cnpac.multiply(signe)),
+                    scale(primeTotale.multiply(signe))
+            );
+        }
+    }
+}

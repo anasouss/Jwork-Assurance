@@ -1,0 +1,17 @@
+.git
+.gitignore
+.idea
+.vscode
+*.iml
+
+target
+build
+out
+
+.env
+.env.*
+
+*.log
+
+Notaflow
+skay_assurance

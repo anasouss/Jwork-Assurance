@@ -1,0 +1,143 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.3
+-- https://www.phpmyadmin.net/
+--
+-- Host: lnn2a41j2fovjom6tj44zq3x:3306
+-- Generation Time: Jul 25, 2026 at 02:54 AM
+-- Server version: 8.4.9
+-- PHP Version: 8.5.6
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `assurance_jwork`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `carrosserie`
+--
+
+CREATE TABLE `carrosserie` (
+  `id` bigint NOT NULL,
+  `etat_supp` tinyint(1) NOT NULL DEFAULT '0',
+  `libelle` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `carrosserie`
+--
+
+INSERT INTO `carrosserie` (`id`, `etat_supp`, `libelle`) VALUES
+(1, 0, 'BREAK'),
+(2, 0, 'AMBULANCE'),
+(3, 0, 'ARROSEUSE'),
+(4, 0, 'AUTO ECOLE'),
+(5, 0, 'AUTOBUS'),
+(6, 0, 'BALAYEUSE'),
+(7, 0, 'CABINET CHASSE'),
+(8, 0, 'CABRIOLET'),
+(9, 0, 'CAMIO PLATEAU'),
+(10, 0, 'CAMION A BENNE'),
+(11, 0, 'CAMION A ORDURES'),
+(12, 0, 'CAMION AVEC GRUE'),
+(13, 0, 'CAMION BENNE TASSEUSE'),
+(14, 0, 'CAMION BENNE'),
+(15, 0, 'CAMION BETONNIERE'),
+(16, 0, 'CAMION CITERNE '),
+(18, 0, 'CAMION DEPANNAGE AVEC GRUE'),
+(19, 0, 'CAMION EMPLIROLL'),
+(20, 0, 'CAMION FOURGON'),
+(21, 0, 'CAMION FRIGORIFIQUE'),
+(22, 0, 'CAMION HYDRAUCUREUSE'),
+(23, 0, 'CAMION PLATEAU AVEC GRUE'),
+(24, 0, 'CAMION PLATEAU'),
+(25, 0, 'CAMION SONDEUSE'),
+(26, 0, 'CAMION'),
+(27, 0, 'CAMIONETTE FOURGON BACHE'),
+(28, 0, 'CAMIONETTE PLATEAU FRIGORIFIQUE'),
+(29, 0, 'CAMIONETTE PLATEAU'),
+(30, 0, 'CAMIONETTE'),
+(31, 0, 'CAMIONNETE FOURGON ISOTHERME'),
+(32, 0, 'CAMON REDONDEUSE DE BITUME'),
+(33, 0, 'CAMPING-CAR'),
+(34, 0, 'CHASSE-NEIGE'),
+(35, 0, 'CHASSIC CABINE'),
+(36, 0, 'CHASSIS CABINE'),
+(37, 0, 'CI'),
+(38, 0, 'CONDUITE INTERIEURE'),
+(39, 0, 'COUPE'),
+(40, 0, 'ENGIN DE CHANTIER'),
+(41, 0, 'ESTAFETTE'),
+(42, 0, 'F.V.S'),
+(43, 0, 'FAMILIALE'),
+(44, 0, 'FOURGON AVEC SIEGE'),
+(45, 0, 'FOURGON FUNERAIRE'),
+(46, 0, 'FOURGON SIEGE AVEC BANQUETTE'),
+(47, 0, 'FOURGON TOLE'),
+(48, 0, 'FOURGON VITRE AVEC BANQUETTE'),
+(49, 0, 'FOURGON'),
+(50, 0, 'FOURGONETTE FRIGORIFIQUE'),
+(51, 0, 'FOURGONNETTE VITREE AVEC BANQUETTE'),
+(52, 0, 'FOURGONNETTE'),
+(53, 0, 'FVB'),
+(54, 0, 'HYDRAUCUREUSE'),
+(55, 0, 'MOISSONNEUSES-BATTEUSES'),
+(56, 0, 'MOTOCYLE'),
+(57, 0, 'PICK-UP DOUBLE CABINE'),
+(58, 0, 'PICK-UP'),
+(59, 0, 'QUAD'),
+(60, 0, 'QUADRICYCLE'),
+(61, 0, 'SERVICE INCENDIE'),
+(62, 0, 'SIDE-CAR'),
+(63, 0, 'SONDEUSE'),
+(64, 0, 'STATION WAGON'),
+(65, 0, 'TRACTEUR AGRICOLES ET FORESTIER'),
+(66, 0, 'TRACTEUR ROUTIER'),
+(67, 0, 'TRICYCLE'),
+(68, 0, 'TRIPLETTE'),
+(69, 0, 'TRIPORTEUR'),
+(70, 0, 'VEH TOUT TERRAIN'),
+(71, 0, 'VELOMOTEUR'),
+(72, 0, 'VOITURE 3 ROUES'),
+(73, 0, 'VOITURE DE VIDANGE'),
+(74, 0, 'TR'),
+(75, 0, 'FVS'),
+(76, 0, 'SW'),
+(77, 0, 'CAMIONNETTE'),
+(78, 0, 'CPR'),
+(79, 0, 'CONVERTIBLE');
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `carrosserie`
+--
+ALTER TABLE `carrosserie`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `carrosserie`
+--
+ALTER TABLE `carrosserie`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

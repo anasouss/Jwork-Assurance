@@ -15,6 +15,7 @@ export function FormuleGarantiePersonneDialog({
   usages,
   onSubmit,
   submitting,
+  defaultUsageId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,6 +24,7 @@ export function FormuleGarantiePersonneDialog({
   usages: ReferenceOption[];
   onSubmit: (payload: UpsertFormuleGarantiePersonneRequest) => void;
   submitting?: boolean;
+  defaultUsageId?: string;
 }) {
   const personneGaranties = useMemo(
     () => garanties.filter((garantie) => String(garantie.typeGarantie ?? "") === "PERSONNE"),
@@ -34,7 +36,7 @@ export function FormuleGarantiePersonneDialog({
     if (!open) return;
     setPayload({
       garantieId: String(formule?.garantieId ?? ""),
-      usageId: String(formule?.usageId ?? ""),
+      usageId: String(formule?.usageId ?? defaultUsageId ?? ""),
       formule: formule?.libelle ?? "",
       montantDeces: toNumber(formule?.montantDeces),
       montantInvalidite: toNumber(formule?.montantInvalidite),
@@ -46,7 +48,7 @@ export function FormuleGarantiePersonneDialog({
       accessoire: toNumber(formule?.accessoire),
       actif: true,
     });
-  }, [formule, open]);
+  }, [defaultUsageId, formule, open]);
 
   const update = (patch: Partial<UpsertFormuleGarantiePersonneRequest>) => {
     setPayload((current) => ({ ...current, ...patch }));

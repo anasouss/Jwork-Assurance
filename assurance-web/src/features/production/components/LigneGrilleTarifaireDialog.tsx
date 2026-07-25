@@ -17,6 +17,7 @@ export function LigneGrilleTarifaireDialog({
   categoriesTransport,
   onSubmit,
   submitting,
+  defaultUsageId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,6 +27,7 @@ export function LigneGrilleTarifaireDialog({
   categoriesTransport: ReferenceOption[];
   onSubmit: (payload: UpsertLigneGrilleTarifaireRequest) => void;
   submitting?: boolean;
+  defaultUsageId?: string;
 }) {
   const [payload, setPayload] = useState<UpsertLigneGrilleTarifaireRequest>({ garantieId: "" });
   const vehiculeGaranties = useMemo(
@@ -40,7 +42,7 @@ export function LigneGrilleTarifaireDialog({
     if (!open) return;
     setPayload({
       garantieId: String(ligne?.garantieId ?? ""),
-      usageId: String(ligne?.usageId ?? ""),
+      usageId: String(ligne?.usageId ?? defaultUsageId ?? ""),
       categorieTransportId: String(ligne?.categorieTransportId ?? ""),
       modeTarification: String(ligne?.modeTarification ?? ""),
       puissanceFiscaleMin: toNumber(ligne?.puissanceFiscaleMin),
@@ -63,7 +65,7 @@ export function LigneGrilleTarifaireDialog({
       ordreAffichage: toNumber(ligne?.ordreAffichage),
       actif: true,
     });
-  }, [ligne, open]);
+  }, [defaultUsageId, ligne, open]);
 
   const update = (patch: Partial<UpsertLigneGrilleTarifaireRequest>) => {
     setPayload((current) => ({ ...current, ...patch }));

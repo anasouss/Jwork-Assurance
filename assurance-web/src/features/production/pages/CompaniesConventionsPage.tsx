@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Edit, Plus, Search } from "lucide-react";
+import { Building2, Edit, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,9 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
 import { Field } from "../components/Field";
+import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { GrilleTarifaireDialog } from "../components/GrilleTarifaireDialog";
 import type { ReferenceOption, UpsertConventionRequest, UpsertGrilleTarifaireRequest } from "../types";
 
@@ -32,6 +34,7 @@ export default function CompaniesConventionsPage() {
   const [search, setSearch] = useState("");
   const [compagnieId, setCompagnieIdState] = useState(searchParams.get("compagnieId") || ALL_COMPANIES);
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [configuring, setConfiguring] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [grilleDialogOpen, setGrilleDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertConventionRequest>(emptyConvention(""));
@@ -51,6 +54,18 @@ export default function CompaniesConventionsPage() {
   const usages = useQuery({
     queryKey: ["referentiel", "usages"],
     queryFn: () => productionApi.referentiel("usages"),
+    staleTime: 60_000,
+  });
+
+  const garanties = useQuery({
+    queryKey: ["referentiel", "garanties"],
+    queryFn: () => productionApi.referentiel("garanties"),
+    staleTime: 60_000,
+  });
+
+  const categoriesTransport = useQuery({
+    queryKey: ["referentiel", "categories-transport"],
+    queryFn: () => productionApi.referentiel("categories-transport"),
     staleTime: 60_000,
   });
 
@@ -102,6 +117,8 @@ export default function CompaniesConventionsPage() {
       ].some((value) => String(value ?? "").toLowerCase().includes(term));
     });
   }, [compagnieId, conventions.data, search]);
+
+  const configuredGrille = configuring ? conventionGrille(configuring) : null;
 
   const saveConvention = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertConventionRequest }) =>
@@ -181,7 +198,7 @@ export default function CompaniesConventionsPage() {
                 <TableHead>Usages</TableHead>
                 <TableHead>Échéance</TableHead>
                 <TableHead>Fractionnement</TableHead>
-                <TableHead className="w-14" />
+                <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -208,6 +225,14 @@ export default function CompaniesConventionsPage() {
                   <TableCell>{formatEcheance(convention)}</TableCell>
                   <TableCell>{conventionField(convention, "fractionnement") || "-"}</TableCell>
                   <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={!conventionField(convention, "grilleTarifaireId")}
+                      onClick={() => setConfiguring(convention)}
+                    >
+                      <SlidersHorizontal className="size-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => { setEditing(convention); setDialogOpen(true); }}>
                       <Edit className="size-4" />
                     </Button>
@@ -355,6 +380,33 @@ export default function CompaniesConventionsPage() {
         </DialogContent>
       </Dialog>
 
+      <Sheet open={Boolean(configuring)} onOpenChange={(open) => { if (!open) setConfiguring(null); }}>
+        <SheetContent side="right" className="w-[min(96vw,1180px)] overflow-y-auto sm:max-w-none">
+          <SheetHeader>
+            <SheetTitle>Configurer la grille convention</SheetTitle>
+            <SheetDescription>
+              {configuring?.libelle ?? "Convention"} · {configuredGrille?.libelle ?? "Grille tarifaire"}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-4">
+            {configuredGrille ? (
+              <GrilleTarifaireConfigurator
+                grille={configuredGrille}
+                garanties={garanties.data ?? []}
+                usages={usages.data ?? []}
+                categoriesTransport={categoriesTransport.data ?? []}
+                allowedUsageIds={referenceStringArray(configuring ?? undefined, "usageIds")}
+                queryScope={`convention-${configuring?.id ?? configuredGrille.id}`}
+              />
+            ) : (
+              <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                Cette convention n'a pas encore de grille tarifaire assignée.
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <GrilleTarifaireDialog
         open={grilleDialogOpen}
         onOpenChange={setGrilleDialogOpen}
@@ -425,6 +477,21 @@ function conventionPayload(convention: ReferenceOption): UpsertConventionRequest
     grilleTarifaireId: conventionField(convention, "grilleTarifaireId"),
     usageIds: referenceStringArray(convention, "usageIds"),
     actif: convention.actif !== false,
+  };
+}
+
+function conventionGrille(convention: ReferenceOption): ReferenceOption | null {
+  const grilleId = conventionField(convention, "grilleTarifaireId");
+  if (!grilleId) {
+    return null;
+  }
+  return {
+    id: grilleId,
+    libelle: conventionField(convention, "grilleTarifaireLibelle") || "Grille tarifaire",
+    compagnieAssuranceId: conventionField(convention, "compagnieAssuranceId"),
+    compagnieAssuranceLibelle: conventionField(convention, "compagnieAssuranceLibelle"),
+    description: convention.libelle,
+    actif: true,
   };
 }
 

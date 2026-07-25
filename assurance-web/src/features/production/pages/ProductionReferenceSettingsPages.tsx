@@ -208,14 +208,16 @@ export function UsagesSettingsPage() {
               <Input value={payload.criteria ?? ""} onChange={(event) => setPayload((current) => ({ ...current, criteria: event.target.value }))} />
             </Field>
             <Field label="Groupe attestation">
-              <select
-                className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
-                value={payload.groupeUsageAttestationId ?? ""}
-                onChange={(event) => setPayload((current) => ({ ...current, groupeUsageAttestationId: event.target.value || undefined }))}
+              <Select
+                value={payload.groupeUsageAttestationId || "__none"}
+                onValueChange={(value) => setPayload((current) => ({ ...current, groupeUsageAttestationId: value === "__none" ? undefined : value }))}
               >
-                <option value="">Aucun</option>
-                {(groupes.data ?? []).map((groupe) => <option key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</option>)}
-              </select>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">Aucun</SelectItem>
+                  {(groupes.data ?? []).map((groupe) => <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">

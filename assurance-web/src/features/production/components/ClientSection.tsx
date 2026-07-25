@@ -463,9 +463,13 @@ export function ClientSection({
         title="Souscripteur"
         badge={savedSections.souscripteur ? "Validé" : "Obligatoire"}
         tone="production"
-        action={onSaveSection ? <SaveSectionButton onClick={() => onSaveSection("souscripteur")} /> : undefined}
       >
         {renderClients(["SOUSCRIPTEUR"])}
+        {onSaveSection ? (
+          <div className="mt-4 flex justify-end border-t pt-3">
+            <SaveSectionButton onClick={() => onSaveSection("souscripteur")} />
+          </div>
+        ) : null}
       </SectionCard>
 
       <SectionCard
@@ -473,9 +477,13 @@ export function ClientSection({
         badge={savedSections.proprietaire ? "Validé" : "Obligatoire"}
         tone="production"
         defaultOpen={false}
-        action={onSaveSection ? <SaveSectionButton onClick={() => onSaveSection("proprietaire")} /> : undefined}
       >
         {renderClients(["PROPRIETAIRE"])}
+        {onSaveSection ? (
+          <div className="mt-4 flex justify-end border-t pt-3">
+            <SaveSectionButton onClick={() => onSaveSection("proprietaire")} />
+          </div>
+        ) : null}
       </SectionCard>
 
       {showOptionalRoles ? (

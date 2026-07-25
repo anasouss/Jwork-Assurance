@@ -127,11 +127,10 @@ export default function TarifUsageSettingsPage() {
           </DialogHeader>
           <div className="grid gap-3 lg:grid-cols-4">
             <Field label="Usage" required>
-              <select
-                className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
-                value={payload.usageId}
-                onChange={(event) => {
-                  const usageId = event.target.value;
+              <Select
+                value={payload.usageId || "__none"}
+                onValueChange={(value) => {
+                  const usageId = value === "__none" ? "" : value;
                   update({
                     usageId,
                     categorieTransportId: undefined,
@@ -146,38 +145,45 @@ export default function TarifUsageSettingsPage() {
                   });
                 }}
               >
-                <option value="">Choisir</option>
+                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                <SelectContent>
+                <SelectItem value="__none">Choisir</SelectItem>
                 {(usages.data ?? []).map((usage) => (
-                  <option key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</option>
+                  <SelectItem key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</SelectItem>
                 ))}
-              </select>
+                </SelectContent>
+              </Select>
             </Field>
             {selectedUsage?.byCategorieTransport ? (
               <Field label="Catégorie transport">
-                <select
-                  className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
-                  value={payload.categorieTransportId ?? ""}
-                  onChange={(event) => update({ categorieTransportId: event.target.value || undefined })}
+                <Select
+                  value={payload.categorieTransportId || "__none"}
+                  onValueChange={(value) => update({ categorieTransportId: value === "__none" ? undefined : value })}
                 >
-                  <option value="">Aucune</option>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                  <SelectItem value="__none">Aucune</SelectItem>
                   {(categoriesTransport.data ?? []).map((categorie) => (
-                    <option key={categorie.id} value={categorie.id}>{categorie.libelle}</option>
+                    <SelectItem key={categorie.id} value={categorie.id}>{categorie.libelle}</SelectItem>
                   ))}
-                </select>
+                  </SelectContent>
+                </Select>
               </Field>
             ) : null}
             {selectedUsage?.byCarburantAndPf || selectedUsage?.bySousClasse ? (
               <Field label="Carburant">
-                <select
-                  className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
-                  value={payload.carburant ?? ""}
-                  onChange={(event) => update({ carburant: event.target.value || undefined })}
+                <Select
+                  value={payload.carburant || "__none"}
+                  onValueChange={(value) => update({ carburant: value === "__none" ? undefined : value })}
                 >
-                  <option value="">Aucun</option>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                  <SelectItem value="__none">Aucun</SelectItem>
                   {(carburants.data ?? []).map((carburant) => (
-                    <option key={carburant.id} value={carburant.code ?? carburant.libelle}>{carburant.libelle}</option>
+                    <SelectItem key={carburant.id} value={carburant.code ?? carburant.libelle}>{carburant.libelle}</SelectItem>
                   ))}
-                </select>
+                  </SelectContent>
+                </Select>
               </Field>
             ) : null}
             {selectedUsage?.byCarburantAndPf ? (
@@ -200,16 +206,18 @@ export default function TarifUsageSettingsPage() {
             ) : null}
             {selectedUsage?.bySousClasse ? (
               <Field label="Sous-classe">
-                <select
-                  className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
-                  value={payload.sousClasse ?? ""}
-                  onChange={(event) => update({ sousClasse: event.target.value || undefined })}
+                <Select
+                  value={payload.sousClasse || "__none"}
+                  onValueChange={(value) => update({ sousClasse: value === "__none" ? undefined : value })}
                 >
-                  <option value="">Choisir</option>
+                  <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                  <SelectContent>
+                  <SelectItem value="__none">Choisir</SelectItem>
                   {(sousClasses.data ?? []).map((sousClasse) => (
-                    <option key={sousClasse.id} value={sousClasse.code ?? sousClasse.libelle}>{sousClasse.libelle}</option>
+                    <SelectItem key={sousClasse.id} value={sousClasse.code ?? sousClasse.libelle}>{sousClasse.libelle}</SelectItem>
                   ))}
-                </select>
+                  </SelectContent>
+                </Select>
               </Field>
             ) : null}
             <NumberField label="Prime nette" required value={payload.primeNette} onChange={(value) => update({ primeNette: value })} />
@@ -234,24 +242,28 @@ export default function TarifUsageSettingsPage() {
           </DialogHeader>
           <div className="grid gap-3 lg:grid-cols-4">
           <Field label="Type">
-            <select
-              className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
+            <Select
               value={bulkPayload.adjustmentType}
-              onChange={(event) => setBulkPayload((current) => ({ ...current, adjustmentType: event.target.value as "PERCENT" | "FIXED" }))}
+              onValueChange={(value) => setBulkPayload((current) => ({ ...current, adjustmentType: value as "PERCENT" | "FIXED" }))}
             >
-              <option value="PERCENT">Pourcentage (%)</option>
-              <option value="FIXED">Montant fixe (DH)</option>
-            </select>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PERCENT">Pourcentage (%)</SelectItem>
+                <SelectItem value="FIXED">Montant fixe (DH)</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Sens">
-            <select
-              className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
+            <Select
               value={bulkPayload.direction}
-              onChange={(event) => setBulkPayload((current) => ({ ...current, direction: event.target.value as "INCREASE" | "DECREASE" }))}
+              onValueChange={(value) => setBulkPayload((current) => ({ ...current, direction: value as "INCREASE" | "DECREASE" }))}
             >
-              <option value="INCREASE">Augmenter</option>
-              <option value="DECREASE">Diminuer</option>
-            </select>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="INCREASE">Augmenter</SelectItem>
+                <SelectItem value="DECREASE">Diminuer</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
           <NumberField
             label={bulkPayload.adjustmentType === "PERCENT" ? "Valeur (%)" : "Valeur (DH)"}

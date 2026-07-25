@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { productionApi } from "../api";
+import { toDateOnly } from "../date";
 import type { LivraisonAttestation, ReferenceOption } from "../types";
 
 type LivraisonSource = "COMMANDE" | "RECEPTION_DIRECTE";
@@ -309,18 +311,16 @@ export default function AttestationStockPage() {
                   </Field>
                   {createForm.source === "COMMANDE" ? (
                     <Field label="Date demande">
-                      <Input
-                        type="date"
-                        value={createForm.dateDemande}
-                        onChange={(event) => setCreateForm((current) => ({ ...current, dateDemande: event.target.value }))}
+                      <DatePicker
+                        date={createForm.dateDemande}
+                        onSelect={(date) => setCreateForm((current) => ({ ...current, dateDemande: toDateOnly(date) ?? "" }))}
                       />
                     </Field>
                   ) : (
                     <Field label="Date réception">
-                      <Input
-                        type="date"
-                        value={createForm.dateReception}
-                        onChange={(event) => setCreateForm((current) => ({ ...current, dateReception: event.target.value }))}
+                      <DatePicker
+                        date={createForm.dateReception}
+                        onSelect={(date) => setCreateForm((current) => ({ ...current, dateReception: toDateOnly(date) ?? "" }))}
                       />
                     </Field>
                   )}

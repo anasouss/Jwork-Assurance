@@ -43,12 +43,6 @@ export function ContractInfoSection({
       badge={form.savedSections.contrat ? "Validé" : badge}
       tone="production"
       defaultOpen={false}
-      action={
-        <Button type="button" size="sm" variant="secondary" onClick={() => form.handleSaveSection("contrat")}>
-          <Save className="size-4" />
-          Enregistrer
-        </Button>
-      }
     >
       <div className="grid gap-3 md:grid-cols-4">
         {showCategorieClient ? (
@@ -164,6 +158,12 @@ export function ContractInfoSection({
             </Field>
           </>
         ) : null}
+      </div>
+      <div className="mt-4 flex justify-end border-t pt-3">
+        <Button type="button" size="sm" onClick={() => form.handleSaveSection("contrat")}>
+          <Save className="size-4" />
+          Enregistrer
+        </Button>
       </div>
     </SectionCard>
   );

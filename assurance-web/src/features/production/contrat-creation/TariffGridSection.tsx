@@ -124,30 +124,6 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
       title="Grille tarifaire"
       badge={form.savedSections.grille ? "Validé" : selectedGrille ? selectedGrille.libelle : "Obligatoire"}
       tone="production"
-      action={
-        <div className="flex gap-2">
-          <Button type="button" size="sm" variant="secondary" onClick={() => form.handleSaveSection("grille")}>
-            <Save className="size-4" />
-            Enregistrer
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              if (!form.compagnieAssuranceId) {
-                toast.error("Choisissez une compagnie dans la section contrat avant de créer une grille");
-                return;
-              }
-              setEditingGrille(selectedGrille);
-              setGrilleDialogOpen(true);
-            }}
-          >
-            {selectedGrille ? <Edit className="size-4" /> : <Plus className="size-4" />}
-            {selectedGrille ? "Modifier grille" : "Créer grille"}
-          </Button>
-        </div>
-      }
     >
       <div className="grid gap-4">
         <div className="grid gap-3 md:grid-cols-[minmax(260px,420px)_1fr]">
@@ -176,6 +152,28 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
               <span>Choisissez une grille existante ou créez une grille avant de renseigner les garanties.</span>
             )}
           </div>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
+          <Button type="button" size="sm" onClick={() => form.handleSaveSection("grille")}>
+            <Save className="size-4" />
+            Enregistrer
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (!form.compagnieAssuranceId) {
+                toast.error("Choisissez une compagnie dans la section contrat avant de créer une grille");
+                return;
+              }
+              setEditingGrille(selectedGrille);
+              setGrilleDialogOpen(true);
+            }}
+          >
+            {selectedGrille ? <Edit className="size-4" /> : <Plus className="size-4" />}
+            {selectedGrille ? "Modifier grille" : "Créer grille"}
+          </Button>
         </div>
 
         {form.grilleTarifaireId ? (

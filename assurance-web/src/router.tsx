@@ -77,6 +77,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/UsagesSettingsPage")),
       },
       {
+        path: "production/parametres/garanties",
+        lazy: lazyRoute(() => import("@/features/production/pages/GarantiesSettingsPage")),
+      },
+      {
         path: "production/parametres/marques",
         lazy: lazyRoute(() => import("@/features/production/pages/MarquesSettingsPage")),
       },

@@ -88,6 +88,41 @@ export const usageSchema = z.object({
   actif: z.boolean().optional(),
 });
 
+export const garantieSchema = z.object({
+  code: z.string().min(1, "Code obligatoire"),
+  libelle: z.string().min(2, "Libelle obligatoire"),
+  description: z.string().optional(),
+  branche: z.string().optional(),
+  typeGarantie: z.enum(["VEHICULE", "PERSONNE"]),
+  obligatoire: z.boolean().optional(),
+  responsabiliteCivile: z.boolean().optional(),
+  defenseRecours: z.boolean().optional(),
+  requiertValeurVenale: z.boolean().optional(),
+  requiertValeurNeuf: z.boolean().optional(),
+  requiertValeurGlace: z.boolean().optional(),
+  avecFranchise: z.boolean().optional(),
+  avecCapital: z.boolean().optional(),
+  tarificationMultiple: z.boolean().optional(),
+  modesAutorises: z.array(z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"])).min(1, "Au moins un mode est obligatoire"),
+  modeParDefaut: z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"]),
+  sourcesValeurAutorisees: z.array(z.enum(["VENALE", "NEUF", "GLACE", "MANUEL"])).optional(),
+  sourceValeurParDefaut: z.enum(["AUCUNE", "VENALE", "NEUF", "GLACE", "MANUEL"]),
+  saisieManuelleAutorisee: z.boolean().optional(),
+  verrouillee: z.boolean().optional(),
+  ordreAffichage: z.number().int().min(0).optional(),
+  actif: z.boolean().optional(),
+}).superRefine((value, context) => {
+  if (!value.modesAutorises.includes(value.modeParDefaut)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Le mode par défaut doit être autorisé" });
+  }
+  if (value.typeGarantie === "PERSONNE" && (value.modeParDefaut !== "PROTECTION" || !value.modesAutorises.includes("PROTECTION"))) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Une garantie personne doit utiliser le mode PROTECTION" });
+  }
+  if (value.sourceValeurParDefaut !== "AUCUNE" && !(value.sourcesValeurAutorisees ?? []).includes(value.sourceValeurParDefaut)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["sourceValeurParDefaut"], message: "La source par défaut doit être autorisée" });
+  }
+});
+
 export const tarifUsageSchema = z.object({
   usageId: z.string().min(1, "Usage obligatoire"),
   categorieTransportId: z.string().optional(),

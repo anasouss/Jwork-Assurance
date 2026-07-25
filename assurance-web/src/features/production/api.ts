@@ -16,6 +16,7 @@ import type {
   UpsertCompagnieAssuranceRequest,
   UpsertConventionRequest,
   UpsertFormuleGarantiePersonneRequest,
+  UpsertGarantieRequest,
   UpsertLigneGrilleTarifaireRequest,
   UpsertCodeReferenceRequest,
   UpsertReferenceRequest,
@@ -44,6 +45,10 @@ export const productionApi = {
         `/api/v1/referentiel/formules-garantie-personne${buildQueryString(params)}`
       )
     );
+  },
+
+  async garantiesParametrage() {
+    return unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/garanties/parametrage"));
   },
 
   async listContrats() {
@@ -217,6 +222,24 @@ export const productionApi = {
   async updateUsage(id: string, payload: UpsertUsageRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/usages/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createGarantie(payload: UpsertGarantieRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/garanties", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateGarantie(id: string, payload: UpsertGarantieRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/garanties/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       })

@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
-import { codeReferenceSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
+import { codeReferenceSchema, garantieSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
 import { Field } from "../components/Field";
-import type { ReferenceOption, UpsertCodeReferenceRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
+import { numberValue, toNumber } from "../utils/format";
+import type { ReferenceOption, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
 
 export function MarquesSettingsPage() {
   return (
@@ -284,6 +286,405 @@ export function UsagesSettingsPage() {
   );
 }
 
+const GARANTIE_TYPES = ["VEHICULE", "PERSONNE"] as const;
+const MODES_TARIFICATION = ["TAUX", "CAPITAL", "PRIME_FIXE", "PROTECTION"] as const;
+const SOURCES_VALEUR = ["VENALE", "NEUF", "GLACE", "MANUEL"] as const;
+const SOURCES_VALEUR_WITH_NONE = ["AUCUNE", ...SOURCES_VALEUR] as const;
+
+export function GarantiesSettingsPage() {
+  const queryClient = useQueryClient();
+  const garanties = useQuery({
+    queryKey: ["referentiel", "garanties-parametrage"],
+    queryFn: productionApi.garantiesParametrage,
+    staleTime: 60_000,
+  });
+  const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [payload, setPayload] = useState<UpsertGarantieRequest>(emptyGarantie());
+
+  useEffect(() => {
+    setPayload(editing ? garantiePayloadFromReference(editing) : emptyGarantie());
+  }, [editing]);
+
+  const save = useMutation({
+    mutationFn: ({ id, value }: { id?: string; value: UpsertGarantieRequest }) =>
+      id ? productionApi.updateGarantie(id, value) : productionApi.createGarantie(value),
+    onSuccess: async () => {
+      setEditing(null);
+      setDialogOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "garanties"] });
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "garanties-parametrage"] });
+      toast.success("Garantie enregistrée");
+    },
+    onError: showError,
+  });
+
+  const update = (patch: Partial<UpsertGarantieRequest>) => {
+    setPayload((current) => ({ ...current, ...patch }));
+  };
+
+  const setModeAllowed = (mode: string, checked: boolean) => {
+    setPayload((current) => {
+      const modes = toggleArray(current.modesAutorises ?? [], mode, checked);
+      const modeParDefaut = modes.includes(current.modeParDefaut ?? "") ? current.modeParDefaut : modes[0];
+      return { ...current, modesAutorises: modes, modeParDefaut };
+    });
+  };
+
+  const setSourceAllowed = (source: string, checked: boolean) => {
+    setPayload((current) => {
+      const sources = toggleArray(current.sourcesValeurAutorisees ?? [], source, checked);
+      const sourceValeurParDefaut = current.sourceValeurParDefaut && (current.sourceValeurParDefaut === "AUCUNE" || sources.includes(current.sourceValeurParDefaut))
+        ? current.sourceValeurParDefaut
+        : "AUCUNE";
+      return { ...current, sourcesValeurAutorisees: sources, sourceValeurParDefaut };
+    });
+  };
+
+  const applyType = (typeGarantie: string) => {
+    if (typeGarantie === "PERSONNE") {
+      update({
+        typeGarantie,
+        modesAutorises: ["PROTECTION"],
+        modeParDefaut: "PROTECTION",
+        sourcesValeurAutorisees: [],
+        sourceValeurParDefaut: "AUCUNE",
+        requiertValeurVenale: false,
+        requiertValeurNeuf: false,
+        requiertValeurGlace: false,
+        avecFranchise: false,
+        avecCapital: true,
+      });
+      return;
+    }
+    update({
+      typeGarantie,
+      modesAutorises: ["TAUX"],
+      modeParDefaut: "TAUX",
+    });
+  };
+
+  return (
+    <ReferenceShell title="Garanties" description="Paramétrage central des garanties, modes de tarification, sources de valeur et comportement des grilles.">
+      <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setPayload(emptyGarantie()); setDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Ajouter garantie
+        </Button>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent className="sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier garantie" : "Ajouter garantie"}</DialogTitle>
+            <DialogDescription>Ces champs pilotent les grilles tarifaires, la création flotte/convention et les formules personnes.</DialogDescription>
+          </DialogHeader>
+          <div className="grid max-h-[75vh] gap-4 overflow-y-auto pr-1">
+            <div className="grid gap-3 lg:grid-cols-5">
+              <Field label="Code" required>
+                <Input value={payload.code} onChange={(event) => update({ code: event.target.value })} />
+              </Field>
+              <Field label="Libellé" required>
+                <Input value={payload.libelle} onChange={(event) => update({ libelle: event.target.value })} />
+              </Field>
+              <Field label="Branche">
+                <Input value={payload.branche ?? ""} onChange={(event) => update({ branche: event.target.value })} />
+              </Field>
+              <Field label="Type">
+                <Select value={payload.typeGarantie ?? "VEHICULE"} onValueChange={applyType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {GARANTIE_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Ordre">
+                <Input type="number" value={payload.ordreAffichage ?? ""} onChange={(event) => update({ ordreAffichage: numberValue(event.target.value) })} />
+              </Field>
+              <Field label="Description">
+                <Input value={payload.description ?? ""} onChange={(event) => update({ description: event.target.value })} />
+              </Field>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <Flag label="Obligatoire" checked={payload.obligatoire} onChange={(value) => update({ obligatoire: value })} />
+              <Flag label="Responsabilité civile" checked={payload.responsabiliteCivile} onChange={(value) => update({ responsabiliteCivile: value })} />
+              <Flag label="Défense et recours" checked={payload.defenseRecours} onChange={(value) => update({ defenseRecours: value })} />
+              <Flag label="Avec capital" checked={payload.avecCapital} onChange={(value) => update({ avecCapital: value })} />
+              <Flag label="Avec franchise" checked={payload.avecFranchise} onChange={(value) => update({ avecFranchise: value })} />
+              <Flag label="Tarification multiple" checked={payload.tarificationMultiple} onChange={(value) => update({ tarificationMultiple: value })} />
+              <Flag label="Saisie manuelle" checked={payload.saisieManuelleAutorisee} onChange={(value) => update({ saisieManuelleAutorisee: value })} />
+              <Flag label="Verrouillée" checked={payload.verrouillee} onChange={(value) => update({ verrouillee: value })} />
+              <Flag label="Active" checked={payload.actif} onChange={(value) => update({ actif: value })} />
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="grid gap-3 rounded-md border p-3">
+                <div className="text-sm font-semibold">Modes de tarification</div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {MODES_TARIFICATION.map((mode) => (
+                    <Flag
+                      key={mode}
+                      label={modeLabel(mode)}
+                      checked={(payload.modesAutorises ?? []).includes(mode)}
+                      onChange={(checked) => setModeAllowed(mode, checked)}
+                    />
+                  ))}
+                </div>
+                <Field label="Mode par défaut">
+                  <Select value={payload.modeParDefaut ?? ""} onValueChange={(value) => update({ modeParDefaut: value })}>
+                    <SelectTrigger><SelectValue placeholder="Mode" /></SelectTrigger>
+                    <SelectContent>
+                      {(payload.modesAutorises ?? []).map((mode) => <SelectItem key={mode} value={mode}>{modeLabel(mode)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+
+              <div className="grid gap-3 rounded-md border p-3">
+                <div className="text-sm font-semibold">Valeur assurée</div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Flag label="Valeur vénale" checked={payload.requiertValeurVenale} onChange={(value) => update({ requiertValeurVenale: value })} />
+                  <Flag label="Valeur à neuf" checked={payload.requiertValeurNeuf} onChange={(value) => update({ requiertValeurNeuf: value })} />
+                  <Flag label="Valeur glace" checked={payload.requiertValeurGlace} onChange={(value) => update({ requiertValeurGlace: value })} />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {SOURCES_VALEUR.map((source) => (
+                    <Flag
+                      key={source}
+                      label={sourceLabel(source)}
+                      checked={(payload.sourcesValeurAutorisees ?? []).includes(source)}
+                      onChange={(checked) => setSourceAllowed(source, checked)}
+                    />
+                  ))}
+                </div>
+                <Field label="Source par défaut">
+                  <Select value={payload.sourceValeurParDefaut ?? "AUCUNE"} onValueChange={(value) => update({ sourceValeurParDefaut: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SOURCES_VALEUR_WITH_NONE
+                        .filter((source) => source === "AUCUNE" || (payload.sourcesValeurAutorisees ?? []).includes(source))
+                        .map((source) => <SelectItem key={source} value={source}>{sourceLabel(source)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            </div>
+
+            <GarantieGrillePreview payload={payload} />
+
+            <div className="flex gap-2">
+              <Button disabled={save.isPending} onClick={() => {
+                const parsed = garantieSchema.safeParse(cleanTextPayload(payload));
+                if (!parsed.success) {
+                  toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
+                  return;
+                }
+                save.mutate({ id: editing?.id, value: parsed.data });
+              }}>
+                <Plus className="size-4" />
+                {editing ? "Modifier" : "Ajouter"}
+              </Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Card className="border-border/70 shadow-none">
+        <CardHeader><CardTitle className="text-base">Liste des garanties</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ordre</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Mode</TableHead>
+                  <TableHead>Grille</TableHead>
+                  <TableHead>Valeurs</TableHead>
+                  <TableHead>Actif</TableHead>
+                  <TableHead className="w-14" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(garanties.data ?? []).map((garantie) => (
+                  <TableRow key={garantie.id}>
+                    <TableCell>{toNumber(garantie.ordreAffichage) ?? "-"}</TableCell>
+                    <TableCell className="font-medium">{garantie.code ?? "-"}</TableCell>
+                    <TableCell>{garantie.libelle}</TableCell>
+                    <TableCell>{String(garantie.typeGarantie ?? "VEHICULE")}</TableCell>
+                    <TableCell>{String(garantie.modeParDefaut ?? "-")}</TableCell>
+                    <TableCell>{garantieTags(garantie).join(", ") || "-"}</TableCell>
+                    <TableCell>{valueTags(garantie).join(", ") || "-"}</TableCell>
+                    <TableCell>{garantie.actif === false ? "Non" : "Oui"}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => { setEditing(garantie); setDialogOpen(true); }}>
+                        <Edit className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!garanties.isLoading && (garanties.data ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Aucune garantie.</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </ReferenceShell>
+  );
+}
+
+function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) {
+  const code = payload.code?.trim() || "CODE";
+  const libelle = payload.libelle?.trim() || "Libellé";
+  const isPersonne = payload.typeGarantie === "PERSONNE";
+  const mode = payload.modeParDefaut || (isPersonne ? "PROTECTION" : "TAUX");
+  const modes = payload.modesAutorises?.length ? payload.modesAutorises : [mode];
+  const multiple = Boolean(payload.tarificationMultiple);
+
+  if (!isPersonne && payload.responsabiliteCivile) {
+    return (
+      <div className="grid gap-3 rounded-md border border-dashed p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-blue-600">Aperçu grille tarifaire</div>
+          <span className="rounded-md border px-2 py-1 text-xs font-medium">RC</span>
+        </div>
+        <div className="rounded-md border bg-slate-50 px-3 py-4 text-sm text-muted-foreground dark:bg-slate-900">
+          {code} - {libelle} ne sera pas affichée dans la grille configurable.
+        </div>
+      </div>
+    );
+  }
+
+  if (isPersonne) {
+    return (
+      <div className="grid gap-3 rounded-md border p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-blue-600">Aperçu grille tarifaire</div>
+          <span className="rounded-md border px-2 py-1 text-xs font-medium">Garanties personnes</span>
+        </div>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">#</TableHead>
+                <TableHead>Garantie</TableHead>
+                <TableHead className="min-w-32">Formule</TableHead>
+                <TableHead className="text-right">Décès</TableHead>
+                <TableHead className="text-right">Invalidité</TableHead>
+                <TableHead className="text-right">Frais médicaux</TableHead>
+                <TableHead className="text-right">Frais hospitalisation</TableHead>
+                <TableHead className="text-right">Frais funéraires</TableHead>
+                <TableHead className="text-right">Frais chirurgie</TableHead>
+                <TableHead className="text-right">Prime</TableHead>
+                <TableHead className="text-right">Accessoire</TableHead>
+                <TableHead className="w-16 text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell><Checkbox checked disabled /></TableCell>
+                <TableCell className="align-top font-semibold"><div className="pt-2">{code} - {libelle}</div></TableCell>
+                <TableCell className="align-top"><PreviewInput active placeholder="Formule 1" align="left" /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top"><PreviewInput active /></TableCell>
+                <TableCell className="align-top">
+                  {multiple ? (
+                    <Button type="button" variant="ghost" size="icon" disabled>
+                      <Plus className="size-4" />
+                    </Button>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 rounded-md border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold text-blue-600">Aperçu grille tarifaire</div>
+        <span className="rounded-md border px-2 py-1 text-xs font-medium">Garanties véhicule</span>
+      </div>
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">#</TableHead>
+              <TableHead>Garantie</TableHead>
+              <TableHead className="min-w-32">Mode</TableHead>
+              <TableHead className="min-w-32 text-right">Taux de valeur</TableHead>
+              <TableHead className="min-w-32 text-right">Taux franchise</TableHead>
+              <TableHead className="min-w-32 text-right">Franchise minimale</TableHead>
+              <TableHead className="min-w-32 text-right">Capital</TableHead>
+              <TableHead className="min-w-32 text-right">Prime</TableHead>
+              <TableHead className="w-16 text-right" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell><Checkbox checked disabled /></TableCell>
+              <TableCell className="align-top font-semibold"><div className="pt-2">{code} - {libelle}</div></TableCell>
+              <TableCell className="align-top">
+                {modes.length > 1 ? (
+                  <select
+                    className="h-9 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm disabled:opacity-100 dark:border-slate-600 dark:bg-slate-900"
+                    value={mode}
+                    disabled
+                  >
+                    {modes.map((allowedMode) => <option key={allowedMode} value={allowedMode}>{modeLabel(allowedMode)}</option>)}
+                  </select>
+                ) : (
+                  <span className="inline-flex h-9 items-center rounded-md border px-3 text-sm">{modeLabel(mode)}</span>
+                )}
+              </TableCell>
+              <TableCell className="align-top"><PreviewInput active={mode === "TAUX"} /></TableCell>
+              <TableCell className="align-top"><PreviewInput active={Boolean(payload.avecFranchise)} /></TableCell>
+              <TableCell className="align-top"><PreviewInput active={Boolean(payload.avecFranchise)} /></TableCell>
+              <TableCell className="align-top"><PreviewInput active={mode === "CAPITAL" || Boolean(payload.avecCapital)} /></TableCell>
+              <TableCell className="align-top"><PreviewInput active={mode === "CAPITAL" || mode === "PRIME_FIXE"} /></TableCell>
+              <TableCell className="align-top">
+                {multiple ? (
+                  <Button type="button" variant="ghost" size="icon" disabled>
+                    <Plus className="size-4" />
+                  </Button>
+                ) : null}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function PreviewInput({ active, placeholder, align = "right" }: { active: boolean; placeholder?: string; align?: "left" | "right" }) {
+  return (
+    <Input
+      className={`h-8 min-w-28 ${align === "right" ? "text-right" : ""}`}
+      disabled={!active}
+      readOnly
+      placeholder={active ? placeholder : ""}
+    />
+  );
+}
+
 function SimpleReferencePage({
   title,
   description,
@@ -530,6 +931,117 @@ function emptyUsage(): UpsertUsageRequest {
     garantiesPersonne: false,
     actif: true,
   };
+}
+
+function emptyGarantie(): UpsertGarantieRequest {
+  return {
+    code: "",
+    libelle: "",
+    description: "",
+    branche: "Automobile",
+    typeGarantie: "VEHICULE",
+    obligatoire: false,
+    responsabiliteCivile: false,
+    defenseRecours: false,
+    requiertValeurVenale: false,
+    requiertValeurNeuf: false,
+    requiertValeurGlace: false,
+    avecFranchise: false,
+    avecCapital: false,
+    tarificationMultiple: false,
+    modesAutorises: ["TAUX"],
+    modeParDefaut: "TAUX",
+    sourcesValeurAutorisees: [],
+    sourceValeurParDefaut: "AUCUNE",
+    saisieManuelleAutorisee: false,
+    verrouillee: false,
+    ordreAffichage: 100,
+    actif: true,
+  };
+}
+
+function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantieRequest {
+  return {
+    code: garantie.code ?? "",
+    libelle: garantie.libelle,
+    description: String(garantie.description ?? ""),
+    branche: String(garantie.branche ?? "Automobile"),
+    typeGarantie: String(garantie.typeGarantie ?? "VEHICULE"),
+    obligatoire: Boolean(garantie.obligatoire),
+    responsabiliteCivile: Boolean(garantie.responsabiliteCivile),
+    defenseRecours: Boolean(garantie.defenseRecours),
+    requiertValeurVenale: Boolean(garantie.requiertValeurVenale),
+    requiertValeurNeuf: Boolean(garantie.requiertValeurNeuf),
+    requiertValeurGlace: Boolean(garantie.requiertValeurGlace),
+    avecFranchise: Boolean(garantie.avecFranchise),
+    avecCapital: Boolean(garantie.avecCapital),
+    tarificationMultiple: Boolean(garantie.tarificationMultiple),
+    modesAutorises: stringArray(garantie.modesAutorises, String(garantie.modeParDefaut ?? "TAUX")),
+    modeParDefaut: String(garantie.modeParDefaut ?? "TAUX"),
+    sourcesValeurAutorisees: stringArray(garantie.sourcesValeurAutorisees),
+    sourceValeurParDefaut: String(garantie.sourceValeurParDefaut ?? "AUCUNE"),
+    saisieManuelleAutorisee: Boolean(garantie.saisieManuelleAutorisee),
+    verrouillee: Boolean(garantie.verrouillee),
+    ordreAffichage: toNumber(garantie.ordreAffichage),
+    actif: garantie.actif !== false,
+  };
+}
+
+function stringArray(value: unknown, fallback?: string) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean);
+  }
+  return fallback ? [fallback] : [];
+}
+
+function toggleArray(values: string[], value: string, checked: boolean) {
+  const set = new Set(values);
+  if (checked) {
+    set.add(value);
+  } else {
+    set.delete(value);
+  }
+  return Array.from(set);
+}
+
+function garantieTags(garantie: ReferenceOption) {
+  return [
+    garantie.obligatoire ? "Obligatoire" : null,
+    garantie.responsabiliteCivile ? "RC" : null,
+    garantie.avecCapital ? "Capital" : null,
+    garantie.avecFranchise ? "Franchise" : null,
+    garantie.tarificationMultiple ? "Multiple" : null,
+  ].filter(Boolean) as string[];
+}
+
+function valueTags(garantie: ReferenceOption) {
+  return [
+    garantie.requiertValeurVenale ? "Vénale" : null,
+    garantie.requiertValeurNeuf ? "Neuf" : null,
+    garantie.requiertValeurGlace ? "Glace" : null,
+    garantie.saisieManuelleAutorisee ? "Manuelle" : null,
+  ].filter(Boolean) as string[];
+}
+
+function modeLabel(mode: string) {
+  const labels: Record<string, string> = {
+    TAUX: "Taux",
+    CAPITAL: "Capital",
+    PRIME_FIXE: "Prime fixe",
+    PROTECTION: "Protection",
+  };
+  return labels[mode] ?? mode;
+}
+
+function sourceLabel(source: string) {
+  const labels: Record<string, string> = {
+    AUCUNE: "Aucune",
+    VENALE: "Valeur vénale",
+    NEUF: "Valeur à neuf",
+    GLACE: "Valeur glace",
+    MANUEL: "Manuelle",
+  };
+  return labels[source] ?? source;
 }
 
 function usageCriteria(usage: ReferenceOption) {

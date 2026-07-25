@@ -6,6 +6,7 @@ import com.assurance.dto.request.UpsertCodeReferenceRequest;
 import com.assurance.dto.request.UpsertCompagnieAssuranceRequest;
 import com.assurance.dto.request.UpsertConventionRequest;
 import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
+import com.assurance.dto.request.UpsertGarantieRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertGrilleUsageConfigurationRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
@@ -33,6 +34,8 @@ import com.assurance.entity.SousClasse;
 import com.assurance.entity.TarifProduitAssistance;
 import com.assurance.entity.TarifUsage;
 import com.assurance.entity.Usage;
+import com.assurance.enums.ModeTarificationGarantie;
+import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeEcheanceConvention;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.exception.BadRequestException;
@@ -508,23 +511,41 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> garanties() {
         return ResponseEntity.ok(ApiResponse.success(garantieRepository.findAll(Sort.by("ordreAffichage", "code")).stream()
                 .filter(garantie -> Boolean.TRUE.equals(garantie.getActif()))
-                .map(garantie -> option(garantie.getId(), garantie.getCode(), garantie.getLibelle())
-                        .putValue("typeGarantie", garantie.getTypeGarantie())
-                        .putValue("obligatoire", garantie.getObligatoire())
-                        .putValue("responsabiliteCivile", garantie.getResponsabiliteCivile())
-                        .putValue("requiertValeurVenale", garantie.getRequiertValeurVenale())
-                        .putValue("requiertValeurNeuf", garantie.getRequiertValeurNeuf())
-                        .putValue("requiertValeurGlace", garantie.getRequiertValeurGlace())
-                        .putValue("avecFranchise", garantie.getAvecFranchise())
-                        .putValue("avecCapital", garantie.getAvecCapital())
-                        .putValue("tarificationMultiple", garantie.getTarificationMultiple())
-                        .putValue("modeParDefaut", garantie.getModeParDefaut())
-                        .putValue("modesAutorises", garantie.getModesAutorises())
-                        .putValue("sourceValeurParDefaut", garantie.getSourceValeurParDefaut())
-                        .putValue("sourcesValeurAutorisees", garantie.getSourcesValeurAutorisees())
-                        .putValue("saisieManuelleAutorisee", garantie.getSaisieManuelleAutorisee())
-                        .map())
+                .map(this::toGarantieResponse)
                 .toList()));
+    }
+
+    @GetMapping("/garanties/parametrage")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> garantiesParametrage() {
+        return ResponseEntity.ok(ApiResponse.success(garantieRepository.findAll(Sort.by("ordreAffichage", "code")).stream()
+                .map(this::toGarantieResponse)
+                .toList()));
+    }
+
+    @PostMapping("/garanties")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createGarantie(@Valid @RequestBody UpsertGarantieRequest request) {
+        garantieRepository.findByCode(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code garantie deja utilise");
+        });
+        Garantie garantie = new Garantie();
+        applyGarantieRequest(garantie, request);
+        return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantieRepository.save(garantie)), "Garantie creee"));
+    }
+
+    @PutMapping("/garanties/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateGarantie(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertGarantieRequest request
+    ) {
+        Garantie garantie = garantieRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Garantie", id));
+        garantieRepository.findByCode(request.getCode()).ifPresent(existing -> {
+            if (!existing.getId().equals(id)) {
+                throw new BadRequestException("Code garantie deja utilise");
+            }
+        });
+        applyGarantieRequest(garantie, request);
+        return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantieRepository.save(garantie)), "Garantie modifiee"));
     }
 
     @GetMapping("/lignes-grille-tarifaire")
@@ -951,6 +972,86 @@ public class ReferentielController {
                 .putValue("prefixeAttestation", compagnie.getPrefixeAttestation())
                 .putValue("ordreAffichage", compagnie.getOrdreAffichage())
                 .putValue("actif", compagnie.getActif())
+                .map();
+    }
+
+    private void applyGarantieRequest(Garantie garantie, UpsertGarantieRequest request) {
+        TypeGarantie typeGarantie = request.getTypeGarantie() == null ? TypeGarantie.VEHICULE : request.getTypeGarantie();
+        LinkedHashSet<ModeTarificationGarantie> modes = new LinkedHashSet<>(
+                request.getModesAutorises() == null || request.getModesAutorises().isEmpty()
+                        ? defaultModesFor(typeGarantie)
+                        : request.getModesAutorises()
+        );
+        ModeTarificationGarantie modeParDefaut = request.getModeParDefaut() == null ? modes.iterator().next() : request.getModeParDefaut();
+        if (!modes.contains(modeParDefaut)) {
+            throw new BadRequestException("Le mode par defaut doit faire partie des modes autorises");
+        }
+        if (typeGarantie == TypeGarantie.PERSONNE && (modeParDefaut != ModeTarificationGarantie.PROTECTION || !modes.contains(ModeTarificationGarantie.PROTECTION))) {
+            throw new BadRequestException("Une garantie personne doit utiliser le mode PROTECTION");
+        }
+
+        LinkedHashSet<SourceValeurGarantie> sources = new LinkedHashSet<>(
+                request.getSourcesValeurAutorisees() == null ? Set.of() : request.getSourcesValeurAutorisees()
+        );
+        SourceValeurGarantie sourceParDefaut = request.getSourceValeurParDefaut() == null ? SourceValeurGarantie.AUCUNE : request.getSourceValeurParDefaut();
+        if (sourceParDefaut != SourceValeurGarantie.AUCUNE && !sources.contains(sourceParDefaut)) {
+            throw new BadRequestException("La source de valeur par defaut doit faire partie des sources autorisees");
+        }
+
+        garantie.setCode(request.getCode());
+        garantie.setLibelle(request.getLibelle());
+        garantie.setDescription(blankToNull(request.getDescription()));
+        garantie.setBranche(blankToNull(request.getBranche()) == null ? "Automobile" : blankToNull(request.getBranche()));
+        garantie.setTypeGarantie(typeGarantie);
+        garantie.setObligatoire(Boolean.TRUE.equals(request.getObligatoire()));
+        garantie.setResponsabiliteCivile(Boolean.TRUE.equals(request.getResponsabiliteCivile()));
+        garantie.setDefenseRecours(Boolean.TRUE.equals(request.getDefenseRecours()));
+        garantie.setRequiertValeurVenale(Boolean.TRUE.equals(request.getRequiertValeurVenale()));
+        garantie.setRequiertValeurNeuf(Boolean.TRUE.equals(request.getRequiertValeurNeuf()));
+        garantie.setRequiertValeurGlace(Boolean.TRUE.equals(request.getRequiertValeurGlace()));
+        garantie.setAvecFranchise(Boolean.TRUE.equals(request.getAvecFranchise()));
+        garantie.setAvecCapital(Boolean.TRUE.equals(request.getAvecCapital()));
+        garantie.setTarificationMultiple(Boolean.TRUE.equals(request.getTarificationMultiple()));
+        garantie.setModeParDefaut(modeParDefaut);
+        garantie.getModesAutorises().clear();
+        garantie.getModesAutorises().addAll(modes);
+        garantie.setSourceValeurParDefaut(sourceParDefaut);
+        garantie.getSourcesValeurAutorisees().clear();
+        garantie.getSourcesValeurAutorisees().addAll(sources);
+        garantie.setSaisieManuelleAutorisee(Boolean.TRUE.equals(request.getSaisieManuelleAutorisee()));
+        garantie.setVerrouillee(Boolean.TRUE.equals(request.getVerrouillee()));
+        garantie.setOrdreAffichage(request.getOrdreAffichage());
+        garantie.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private Set<ModeTarificationGarantie> defaultModesFor(TypeGarantie typeGarantie) {
+        return typeGarantie == TypeGarantie.PERSONNE
+                ? Set.of(ModeTarificationGarantie.PROTECTION)
+                : Set.of(ModeTarificationGarantie.TAUX);
+    }
+
+    private Map<String, Object> toGarantieResponse(Garantie garantie) {
+        return option(garantie.getId(), garantie.getCode(), garantie.getLibelle())
+                .putValue("description", garantie.getDescription())
+                .putValue("branche", garantie.getBranche())
+                .putValue("typeGarantie", garantie.getTypeGarantie())
+                .putValue("obligatoire", garantie.getObligatoire())
+                .putValue("responsabiliteCivile", garantie.getResponsabiliteCivile())
+                .putValue("defenseRecours", garantie.getDefenseRecours())
+                .putValue("requiertValeurVenale", garantie.getRequiertValeurVenale())
+                .putValue("requiertValeurNeuf", garantie.getRequiertValeurNeuf())
+                .putValue("requiertValeurGlace", garantie.getRequiertValeurGlace())
+                .putValue("avecFranchise", garantie.getAvecFranchise())
+                .putValue("avecCapital", garantie.getAvecCapital())
+                .putValue("tarificationMultiple", garantie.getTarificationMultiple())
+                .putValue("modeParDefaut", garantie.getModeParDefaut())
+                .putValue("modesAutorises", garantie.getModesAutorises())
+                .putValue("sourceValeurParDefaut", garantie.getSourceValeurParDefaut())
+                .putValue("sourcesValeurAutorisees", garantie.getSourcesValeurAutorisees())
+                .putValue("saisieManuelleAutorisee", garantie.getSaisieManuelleAutorisee())
+                .putValue("verrouillee", garantie.getVerrouillee())
+                .putValue("ordreAffichage", garantie.getOrdreAffichage())
+                .putValue("actif", garantie.getActif())
                 .map();
     }
 

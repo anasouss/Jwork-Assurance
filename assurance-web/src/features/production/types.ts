@@ -430,6 +430,31 @@ export type UpsertTarifUsageRequest = {
   actif?: boolean;
 };
 
+export type UpsertGarantieRequest = {
+  code: string;
+  libelle: string;
+  description?: string;
+  branche?: string;
+  typeGarantie?: string;
+  obligatoire?: boolean;
+  responsabiliteCivile?: boolean;
+  defenseRecours?: boolean;
+  requiertValeurVenale?: boolean;
+  requiertValeurNeuf?: boolean;
+  requiertValeurGlace?: boolean;
+  avecFranchise?: boolean;
+  avecCapital?: boolean;
+  tarificationMultiple?: boolean;
+  modesAutorises?: string[];
+  modeParDefaut?: string;
+  sourcesValeurAutorisees?: string[];
+  sourceValeurParDefaut?: string;
+  saisieManuelleAutorisee?: boolean;
+  verrouillee?: boolean;
+  ordreAffichage?: number;
+  actif?: boolean;
+};
+
 export type BulkUpdateTarifUsageRequest = {
   tarifIds?: string[];
   usageIds?: string[];

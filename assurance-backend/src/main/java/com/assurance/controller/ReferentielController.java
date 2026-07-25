@@ -277,7 +277,7 @@ public class ReferentielController {
 
     @GetMapping("/compagnies-assurance")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> compagniesAssurance() {
-        return ResponseEntity.ok(ApiResponse.success(compagnieAssuranceRepository.findAll(Sort.by("nom")).stream()
+        return ResponseEntity.ok(ApiResponse.success(compagnieAssuranceRepository.findAll(Sort.by("ordreAffichage").ascending().and(Sort.by("nom").ascending())).stream()
                 .map(this::toCompagnieAssuranceResponse)
                 .toList()));
     }
@@ -747,6 +747,7 @@ public class ReferentielController {
         compagnie.setRc(blankToNull(request.getRc()));
         compagnie.setIce(blankToNull(request.getIce()));
         compagnie.setPrefixeAttestation(blankToNull(request.getPrefixeAttestation()));
+        compagnie.setOrdreAffichage(request.getOrdreAffichage() == null ? 100 : request.getOrdreAffichage());
         compagnie.setActif(request.getActif() == null ? true : request.getActif());
     }
 
@@ -760,6 +761,7 @@ public class ReferentielController {
                 .putValue("rc", compagnie.getRc())
                 .putValue("ice", compagnie.getIce())
                 .putValue("prefixeAttestation", compagnie.getPrefixeAttestation())
+                .putValue("ordreAffichage", compagnie.getOrdreAffichage())
                 .putValue("actif", compagnie.getActif())
                 .map();
     }

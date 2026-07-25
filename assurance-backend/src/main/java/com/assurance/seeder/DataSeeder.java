@@ -314,7 +314,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private List<CompagnieAssurance> seedCompagniesAssurance() {
-        return List.of(
+        List<CompagnieAssurance> compagnies = List.of(
                 seedCompagnieAssurance(
                         "WAFA",
                         "WAFA ASSURANCE",
@@ -448,6 +448,12 @@ public class DataSeeder implements CommandLineRunner {
                         "ATC"
                 )
         );
+        for (int index = 0; index < compagnies.size(); index++) {
+            CompagnieAssurance compagnie = compagnies.get(index);
+            compagnie.setOrdreAffichage((index + 1) * 10);
+            compagnieAssuranceRepository.save(compagnie);
+        }
+        return compagnies;
     }
 
     private CompagnieAssurance seedCompagnieAssurance(
@@ -476,6 +482,9 @@ public class DataSeeder implements CommandLineRunner {
         compagnie.setRc(rc);
         compagnie.setIce(ice);
         compagnie.setPrefixeAttestation(prefixeAttestation);
+        if (compagnie.getOrdreAffichage() == null) {
+            compagnie.setOrdreAffichage(100);
+        }
         compagnie.setActif(true);
         return compagnieAssuranceRepository.save(compagnie);
     }

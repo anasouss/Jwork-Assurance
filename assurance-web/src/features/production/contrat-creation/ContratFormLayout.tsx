@@ -46,6 +46,8 @@ export function ContratFormLayout({
       villes={form.refs.villes.data ?? []}
       showOptionalRoles={false}
       errors={form.validationErrors}
+      onSaveSection={form.handleSaveSection}
+      savedSections={form.savedSections}
     />
   );
 
@@ -150,12 +152,17 @@ export function ContratFormLayout({
       )}
 
       {form.typeContrat === "PARTICULIER" ? (
-        <ManualQuittanceSection lignes={form.quittances} setLignes={form.setQuittances} />
-      ) : (
-        <SectionCard title="Quittances" badge={form.preview ? "Calculée" : "Non calculée"} tone="production" defaultOpen={false}>
-          <QuittancePreviewCard preview={form.preview} />
-        </SectionCard>
-      )}
+      <ManualQuittanceSection lignes={form.quittances} setLignes={form.setQuittances} />
+    ) : (
+      <SectionCard
+        title="Quittances"
+        badge={form.preview ? "Calculée" : "Non calculée"}
+        tone="production"
+        defaultOpen={false}
+      >
+        <QuittancePreviewCard preview={form.preview} />
+      </SectionCard>
+    )}
 
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>

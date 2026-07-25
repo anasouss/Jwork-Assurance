@@ -125,6 +125,7 @@ export const compagnieAssuranceSchema = z.object({
   rc: z.string().optional(),
   ice: z.string().optional(),
   prefixeAttestation: z.string().optional(),
+  ordreAffichage: z.number().int().min(0).optional(),
   actif: z.boolean().optional(),
 });
 

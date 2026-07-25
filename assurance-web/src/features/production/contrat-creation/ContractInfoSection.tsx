@@ -1,3 +1,5 @@
+import { Save } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -36,7 +38,18 @@ export function ContractInfoSection({
   const showCrmPartage = form.typeContrat === "FLOTTE";
 
   return (
-    <SectionCard title="Contrat" badge={badge} tone="production" defaultOpen={false}>
+    <SectionCard
+      title="Contrat"
+      badge={form.savedSections.contrat ? "Validé" : badge}
+      tone="production"
+      defaultOpen={false}
+      action={
+        <Button type="button" size="sm" variant="secondary" onClick={() => form.handleSaveSection("contrat")}>
+          <Save className="size-4" />
+          Enregistrer
+        </Button>
+      }
+    >
       <div className="grid gap-3 md:grid-cols-4">
         {showCategorieClient ? (
           <Field label="Catégorie">
@@ -63,7 +76,7 @@ export function ContractInfoSection({
             )}
           </Field>
         ) : null}
-        <Field label="Compagnie">
+        <Field label="Compagnie" required error={form.validationErrors.compagnieAssuranceId}>
           <Select value={form.compagnieAssuranceId} onValueChange={form.setCompagnieAssuranceId}>
             <SelectTrigger><SelectValue placeholder="Compagnie" /></SelectTrigger>
             <SelectContent>
@@ -72,7 +85,7 @@ export function ContractInfoSection({
           </Select>
         </Field>
         {showConvention ? (
-          <Field label="Convention / produit">
+          <Field label="Convention / produit" required error={form.validationErrors.conventionId}>
             <Select value={form.conventionId} onValueChange={form.setConventionId}>
               <SelectTrigger><SelectValue placeholder="Convention" /></SelectTrigger>
               <SelectContent>
@@ -101,7 +114,7 @@ export function ContractInfoSection({
             </Select>
           </Field>
         ) : null}
-        <Field label="N° contrat">
+        <Field label="N° contrat" required error={form.validationErrors.numeroContrat}>
           <Input value={form.numeroContrat} onChange={(event) => form.setNumeroContrat(event.target.value)} />
         </Field>
       </div>
@@ -112,10 +125,10 @@ export function ContractInfoSection({
         <Field label="N° attestation">
           <Input value={form.numeroAttestation} onChange={(event) => form.setNumeroAttestation(event.target.value)} />
         </Field>
-        <Field label="Date effet">
+        <Field label="Date effet" required error={form.validationErrors.dateEffet}>
           <DatePicker date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
         </Field>
-        <Field label="Date échéance">
+        <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
           <DatePicker date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
         </Field>
       </div>

@@ -18,6 +18,8 @@ import type {
   VehiculeInput,
 } from "../types";
 
+export type ContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille";
+
 export function useContratCreationForm(typeContrat: TypeContrat) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
@@ -42,6 +44,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [quittances, setQuittances] = useState<QuittanceInput[]>(defaultQuittanceLines());
   const [preview, setPreview] = useState<QuittancePreview | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [savedSections, setSavedSections] = useState<Partial<Record<ContratSectionKey, boolean>>>({});
 
   const refs = {
     usages: useReference("usages"),
@@ -254,6 +257,91 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     }
   };
 
+  const validateSection = (section: ContratSectionKey) => {
+    const nextErrors: Record<string, string> = {};
+    const today = dateOnly(new Date());
+    const requireField = (key: string, value: unknown, message: string) => {
+      if (value == null || (typeof value === "string" && value.trim() === "")) {
+        nextErrors[key] = message;
+      }
+    };
+    const validateClient = (role: ClientInput["role"]) => {
+      request.clients.forEach((item, index) => {
+        if (item.role !== role) {
+          return;
+        }
+        const client = item.client;
+        requireField(`clients.${index}.client.typeClient`, client.typeClient, "Type obligatoire.");
+        requireField(`clients.${index}.client.villeId`, client.villeId, "Ville obligatoire.");
+        requireField(`clients.${index}.client.adresse`, client.adresse, "Adresse obligatoire.");
+        if (client.typeClient === "PERSONNE_MORALE") {
+          requireField(`clients.${index}.client.rc`, client.rc, "RC obligatoire.");
+          requireField(`clients.${index}.client.raisonSociale`, client.raisonSociale, "Raison sociale obligatoire.");
+        } else {
+          requireField(`clients.${index}.client.civilite`, client.civilite, "Intitulé obligatoire.");
+          requireField(`clients.${index}.client.cin`, client.cin, "CIN obligatoire.");
+          requireField(`clients.${index}.client.cinValidite`, client.cinValidite, "Validité CIN obligatoire.");
+          requireField(`clients.${index}.client.nom`, client.nom, "Nom obligatoire.");
+          requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom obligatoire.");
+          if (isBeforeToday(client.cinValidite, today)) {
+            nextErrors[`clients.${index}.client.cinValidite`] = "La validité CIN ne doit pas être expirée.";
+          }
+        }
+        if (isBeforeToday(client.dateValiditePermis, today)) {
+          nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
+        }
+      });
+    };
+
+    if (section === "souscripteur") {
+      validateClient("SOUSCRIPTEUR");
+    }
+    if (section === "proprietaire") {
+      validateClient("PROPRIETAIRE");
+      request.clients
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item.role === "CONDUCTEUR")
+        .forEach(({ item, index }) => {
+          const client = item.client;
+          requireField(`clients.${index}.client.civilite`, client.civilite, "Intitulé conducteur obligatoire.");
+          requireField(`clients.${index}.client.cin`, client.cin, "CIN conducteur obligatoire.");
+          requireField(`clients.${index}.client.nom`, client.nom, "Nom conducteur obligatoire.");
+          requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom conducteur obligatoire.");
+          requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
+          if (isBeforeToday(client.dateValiditePermis, today)) {
+            nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
+          }
+        });
+    }
+    if (section === "contrat") {
+      requireField("compagnieAssuranceId", compagnieAssuranceId, "Compagnie obligatoire.");
+      requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
+      requireField("dateEffet", dateEffet, "Date effet obligatoire.");
+      requireField("dateEcheance", dateEcheance, "Date échéance obligatoire.");
+      if (typeContrat === "CONVENTION") {
+        requireField("conventionId", conventionId, "Convention obligatoire.");
+      }
+    }
+    if (section === "grille") {
+      requireField("grilleTarifaireId", grilleTarifaireId, "Grille tarifaire obligatoire.");
+    }
+    setValidationErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      toast.error(Object.values(nextErrors)[0] ?? "Section incomplète");
+      return false;
+    }
+    return true;
+  };
+
+  const handleSaveSection = (section: ContratSectionKey) => {
+    const label = sectionLabel(section);
+    if (!validateSection(section)) {
+      return;
+    }
+    setSavedSections((current) => ({ ...current, [section]: true }));
+    toast.success(`${label} enregistré`);
+  };
+
   useEffect(() => {
     if (!canAutoPreview(typeContrat, request)) {
       setPreview(null);
@@ -291,6 +379,8 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     createMutation,
     handlePreview,
     handleCreate,
+    handleSaveSection,
+    savedSections,
     numeroContrat,
     setNumeroContrat,
     numeroPolice,
@@ -407,4 +497,17 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
     return false;
   }
   return request.garanties.length > 0;
+}
+
+function sectionLabel(section: ContratSectionKey) {
+  switch (section) {
+    case "souscripteur":
+      return "Souscripteur";
+    case "proprietaire":
+      return "Propriétaire";
+    case "contrat":
+      return "Contrat";
+    case "grille":
+      return "Grille tarifaire";
+  }
 }

@@ -444,6 +444,7 @@ export type UpsertCompagnieAssuranceRequest = {
   rc?: string;
   ice?: string;
   prefixeAttestation?: string;
+  ordreAffichage?: number;
   actif?: boolean;
 };
 

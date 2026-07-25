@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Plus } from "lucide-react";
+import { Edit, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
@@ -122,10 +122,14 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
   return (
     <SectionCard
       title="Grille tarifaire"
-      badge={selectedGrille ? selectedGrille.libelle : "Obligatoire"}
+      badge={form.savedSections.grille ? "Validé" : selectedGrille ? selectedGrille.libelle : "Obligatoire"}
       tone="production"
       action={
         <div className="flex gap-2">
+          <Button type="button" size="sm" variant="secondary" onClick={() => form.handleSaveSection("grille")}>
+            <Save className="size-4" />
+            Enregistrer
+          </Button>
           <Button
             type="button"
             size="sm"
@@ -160,6 +164,7 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
               emptyText="Aucune grille pour cette compagnie"
               invalidText="Sélectionnez une grille existante ou créez-en une."
             />
+            {form.validationErrors.grilleTarifaireId ? <span className="text-xs text-red-600">{form.validationErrors.grilleTarifaireId}</span> : null}
           </Field>
           <div className="flex items-end text-sm text-muted-foreground">
             {selectedGrille ? (

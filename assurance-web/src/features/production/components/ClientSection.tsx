@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,12 +36,16 @@ export function ClientSection({
   villes,
   showOptionalRoles = false,
   errors = {},
+  onSaveSection,
+  savedSections = {},
 }: {
   clients: ClientInput[];
   setClients: (clients: ClientInput[]) => void;
   villes: ReferenceOption[];
   showOptionalRoles?: boolean;
   errors?: Record<string, string>;
+  onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
+  savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
 }) {
   const [sameAsSouscripteur, setSameAsSouscripteur] = useState(false);
   const [lookupByIndex, setLookupByIndex] = useState<Record<number, LookupState>>({});
@@ -270,7 +274,7 @@ export function ClientSection({
                 </Field>
                 {morale ? (
                   <>
-                    <Field label="RC" required>
+                    <Field label="RC" required error={errors[`clients.${index}.client.rc`]}>
                       <Input
                         disabled={disabledByCopy}
                         value={item.client.rc ?? ""}
@@ -282,7 +286,7 @@ export function ClientSection({
                       />
                       <LookupMessage state={lookupByIndex[index]} />
                     </Field>
-                    <Field label="Raison sociale" required>
+                    <Field label="Raison sociale" required error={errors[`clients.${index}.client.raisonSociale`]}>
                       <Input disabled={disabledByCopy} value={item.client.raisonSociale ?? ""} onChange={(event) => updateClient(index, { raisonSociale: event.target.value })} />
                     </Field>
                     <Field label="ICE">
@@ -291,7 +295,7 @@ export function ClientSection({
                   </>
                 ) : (
                   <>
-                    <Field label="Intitulé" required>
+                    <Field label="Intitulé" required error={errors[`clients.${index}.client.civilite`]}>
                       <Select value={item.client.civilite ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { civilite: value })}>
                         <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                         <SelectContent>
@@ -300,7 +304,7 @@ export function ClientSection({
                         </SelectContent>
                       </Select>
                     </Field>
-                    <Field label="CIN" required>
+                    <Field label="CIN" required error={errors[`clients.${index}.client.cin`]}>
                       <Input
                         disabled={disabledByCopy}
                         value={item.client.cin ?? ""}
@@ -325,15 +329,15 @@ export function ClientSection({
                   </Field>
                 ) : (
                   <>
-                    <Field label="Nom" required>
+                    <Field label="Nom" required error={errors[`clients.${index}.client.nom`]}>
                       <Input disabled={disabledByCopy} value={item.client.nom ?? ""} onChange={(event) => updateClient(index, { nom: event.target.value })} />
                     </Field>
-                    <Field label="Prénom" required>
+                    <Field label="Prénom" required error={errors[`clients.${index}.client.prenom`]}>
                       <Input disabled={disabledByCopy} value={item.client.prenom ?? ""} onChange={(event) => updateClient(index, { prenom: event.target.value })} />
                     </Field>
                   </>
                 )}
-                <Field label="Ville" required>
+                <Field label="Ville" required error={errors[`clients.${index}.client.villeId`]}>
                   <AutocompleteSelect
                     value={item.client.villeId ?? ""}
                     disabled={disabledByCopy}
@@ -344,7 +348,7 @@ export function ClientSection({
                     onValueChange={(value) => updateClient(index, { villeId: value, sahara: false, justificatifSahara: undefined })}
                   />
                 </Field>
-                <Field label="Adresse" required>
+                <Field label="Adresse" required error={errors[`clients.${index}.client.adresse`]}>
                   <Input disabled={disabledByCopy} value={item.client.adresse ?? ""} onChange={(event) => updateClient(index, { adresse: event.target.value })} />
                 </Field>
               </div>
@@ -402,7 +406,7 @@ export function ClientSection({
                     <div className="mt-3 rounded-lg border bg-muted/20 p-3">
                       <div className="mb-3 text-sm font-medium">Conducteur habituel</div>
                       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        <Field label="Intitulé" required>
+                        <Field label="Intitulé" required error={errors[`clients.${conducteur.clientIndex}.client.civilite`]}>
                           <Select value={conducteur.client.client.civilite ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { civilite: value })}>
                             <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                             <SelectContent>
@@ -411,7 +415,7 @@ export function ClientSection({
                             </SelectContent>
                           </Select>
                         </Field>
-                        <Field label="CIN" required>
+                        <Field label="CIN" required error={errors[`clients.${conducteur.clientIndex}.client.cin`]}>
                           <Input
                             value={conducteur.client.client.cin ?? ""}
                             onBlur={() => searchClient(conducteur.clientIndex, { cin: conducteur.client.client.cin })}
@@ -422,10 +426,10 @@ export function ClientSection({
                           />
                           <LookupMessage state={lookupByIndex[conducteur.clientIndex]} />
                         </Field>
-                        <Field label="Nom" required>
+                        <Field label="Nom" required error={errors[`clients.${conducteur.clientIndex}.client.nom`]}>
                           <Input value={conducteur.client.client.nom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { nom: event.target.value })} />
                         </Field>
-                        <Field label="Prénom" required>
+                        <Field label="Prénom" required error={errors[`clients.${conducteur.clientIndex}.client.prenom`]}>
                           <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
                         </Field>
                         <Field label="N° permis">
@@ -455,11 +459,22 @@ export function ClientSection({
 
   return (
     <>
-      <SectionCard title="Souscripteur" badge="Obligatoire" tone="production">
+      <SectionCard
+        title="Souscripteur"
+        badge={savedSections.souscripteur ? "Validé" : "Obligatoire"}
+        tone="production"
+        action={onSaveSection ? <SaveSectionButton onClick={() => onSaveSection("souscripteur")} /> : undefined}
+      >
         {renderClients(["SOUSCRIPTEUR"])}
       </SectionCard>
 
-      <SectionCard title="Propriétaire" badge="Obligatoire" tone="production" defaultOpen={false}>
+      <SectionCard
+        title="Propriétaire"
+        badge={savedSections.proprietaire ? "Validé" : "Obligatoire"}
+        tone="production"
+        defaultOpen={false}
+        action={onSaveSection ? <SaveSectionButton onClick={() => onSaveSection("proprietaire")} /> : undefined}
+      >
         {renderClients(["PROPRIETAIRE"])}
       </SectionCard>
 
@@ -480,6 +495,15 @@ export function ClientSection({
         </SectionCard>
       ) : null}
     </>
+  );
+}
+
+function SaveSectionButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button type="button" size="sm" variant="secondary" onClick={onClick}>
+      <Save className="size-4" />
+      Enregistrer
+    </Button>
   );
 }
 

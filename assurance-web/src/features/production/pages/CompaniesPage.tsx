@@ -112,6 +112,7 @@ export default function CompaniesPage() {
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Compagnie</TableHead>
+                <TableHead className="text-right">Ordre</TableHead>
                 <TableHead>Ville</TableHead>
                 <TableHead>Téléphone</TableHead>
                 <TableHead>RC</TableHead>
@@ -129,6 +130,7 @@ export default function CompaniesPage() {
                     <div className="font-medium">{compagnie.libelle}</div>
                     <div className="text-xs text-muted-foreground">{companyField(compagnie, "adresse") || "-"}</div>
                   </TableCell>
+                  <TableCell className="text-right">{companyNumber(compagnie, "ordreAffichage") ?? "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "ville") || "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "telephone") || "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "rc") || "-"}</TableCell>
@@ -144,7 +146,7 @@ export default function CompaniesPage() {
               ))}
               {!compagnies.isLoading && filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Aucune compagnie.</TableCell>
+                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucune compagnie.</TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -187,6 +189,13 @@ export default function CompaniesPage() {
             <Field label="Préfixe attestation">
               <Input value={payload.prefixeAttestation ?? ""} onChange={(event) => update(setPayload, { prefixeAttestation: event.target.value })} />
             </Field>
+            <Field label="Ordre d'affichage">
+              <Input
+                type="number"
+                value={payload.ordreAffichage ?? ""}
+                onChange={(event) => update(setPayload, { ordreAffichage: event.target.value === "" ? undefined : Number(event.target.value) })}
+              />
+            </Field>
             <Field label="Adresse">
               <Input value={payload.adresse ?? ""} onChange={(event) => update(setPayload, { adresse: event.target.value })} />
             </Field>
@@ -222,7 +231,7 @@ function saveCompany(
 }
 
 function emptyCompany(): UpsertCompagnieAssuranceRequest {
-  return { code: "", nom: "", actif: true };
+  return { code: "", nom: "", ordreAffichage: 100, actif: true };
 }
 
 function companyPayload(compagnie: ReferenceOption): UpsertCompagnieAssuranceRequest {
@@ -236,6 +245,7 @@ function companyPayload(compagnie: ReferenceOption): UpsertCompagnieAssuranceReq
     rc: companyField(compagnie, "rc"),
     ice: companyField(compagnie, "ice"),
     prefixeAttestation: companyField(compagnie, "prefixeAttestation"),
+    ordreAffichage: companyNumber(compagnie, "ordreAffichage") ?? 100,
     actif: compagnie.actif !== false,
   };
 }
@@ -243,6 +253,16 @@ function companyPayload(compagnie: ReferenceOption): UpsertCompagnieAssuranceReq
 function companyField(compagnie: ReferenceOption, key: string) {
   const value = compagnie[key];
   return typeof value === "string" ? value : "";
+}
+
+function companyNumber(compagnie: ReferenceOption, key: string) {
+  const value = compagnie[key];
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function cleanCompanyPayload(payload: UpsertCompagnieAssuranceRequest): UpsertCompagnieAssuranceRequest {

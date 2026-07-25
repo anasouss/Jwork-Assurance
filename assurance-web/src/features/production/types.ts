@@ -367,6 +367,42 @@ export type UpsertLigneGrilleTarifaireRequest = {
   actif?: boolean;
 };
 
+export type UpsertFormuleGarantiePersonneRequest = {
+  garantieId: string;
+  usageId?: string;
+  formule?: string;
+  montantDeces?: number;
+  montantInvalidite?: number;
+  montantFraisMedicaux?: number;
+  montantFraisHospitalisation?: number;
+  montantFraisFuneraires?: number;
+  montantFraisChirurgie?: number;
+  primeNette?: number;
+  accessoire?: number;
+  ordreAffichage?: number;
+  actif?: boolean;
+};
+
+export type UpsertUsageRequest = {
+  code: string;
+  libelle: string;
+  criteria?: string;
+  groupeUsageAttestationId?: string;
+  consommeAttestation?: boolean;
+  byCarburantAndPf?: boolean;
+  bySousClasse?: boolean;
+  byPtc?: boolean;
+  byPrime?: boolean;
+  byCategorieTransport?: boolean;
+  garantiesPersonne?: boolean;
+  actif?: boolean;
+};
+
+export type UpsertReferenceRequest = {
+  libelle: string;
+  actif?: boolean;
+};
+
 export type ContratSummary = {
   id: string;
   numeroContrat: string;

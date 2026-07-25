@@ -11,4 +11,9 @@ public interface FormuleGarantiePersonneRepository extends JpaRepository<Formule
             String usageId,
             String garantieId
     );
+
+    List<FormuleGarantiePersonne> findByGrilleTarifaireIdAndGarantieIdAndActifTrueOrderByOrdreAffichageAscFormuleAsc(
+            String grilleTarifaireId,
+            String garantieId
+    );
 }

@@ -64,6 +64,10 @@ public class Usage extends BaseEntity {
     private Boolean byCategorieTransport = false;
 
     @Builder.Default
+    @Column(name = "garanties_personne")
+    private Boolean garantiesPersonne = false;
+
+    @Builder.Default
     @Column(nullable = false)
     private Boolean actif = true;
 

@@ -1026,10 +1026,30 @@ public class ContratService {
     }
 
     private FormuleGarantiePersonne resolveFormuleGarantiePersonne(String formuleId, Contrat contrat, Garantie garantie, Usage usageCible) {
-        if (formuleId == null || formuleId.isBlank()) {
-            return null;
+        FormuleGarantiePersonne formule;
+        if (garantie.getTypeGarantie() == TypeGarantie.PERSONNE
+                && usageCible != null
+                && !Boolean.TRUE.equals(usageCible.getGarantiesPersonne())) {
+            throw new BadRequestException("L'usage " + usageCible.getCode() + " n'autorise pas les garanties personne");
         }
-        FormuleGarantiePersonne formule = formuleGarantiePersonneRepository.findById(formuleId)
+        if (formuleId == null || formuleId.isBlank()) {
+            if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
+                    || contrat.getGrilleTarifaire() == null
+                    || garantie.getTypeGarantie() != TypeGarantie.PERSONNE) {
+                return null;
+            }
+            formule = formuleGarantiePersonneRepository
+                    .findByGrilleTarifaireIdAndGarantieIdAndActifTrueOrderByOrdreAffichageAscFormuleAsc(
+                            contrat.getGrilleTarifaire().getId(),
+                            garantie.getId()
+                    )
+                    .stream()
+                    .filter(candidate -> candidate.getUsage() == null || (usageCible != null && candidate.getUsage().getId().equals(usageCible.getId())))
+                    .findFirst()
+                    .orElse(null);
+            return formule;
+        }
+        formule = formuleGarantiePersonneRepository.findById(formuleId)
                 .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", formuleId));
         if (!formule.getGarantie().getId().equals(garantie.getId())) {
             throw new BadRequestException("La formule personne ne correspond pas a la garantie " + garantie.getCode());

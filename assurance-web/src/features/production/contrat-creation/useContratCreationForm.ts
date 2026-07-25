@@ -59,6 +59,12 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     enabled: Boolean(grilleTarifaireId),
   });
 
+  const formulesPersonne = useQuery({
+    queryKey: ["formules-garantie-personne", grilleTarifaireId],
+    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: grilleTarifaireId }),
+    enabled: Boolean(grilleTarifaireId),
+  });
+
   useEffect(() => {
     const garantiesReference = refs.garanties.data ?? [];
     const mandatory = garantiesReference.filter((garantie) => garantie.responsabiliteCivile);
@@ -266,6 +272,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     typeContrat,
     refs,
     lignesGrille,
+    formulesPersonne,
     request,
     preview,
     previewMutation,

@@ -28,6 +28,7 @@ export const transportCategorySchema = z.object({
   code: z.string().min(2, "Code obligatoire"),
   libelle: z.string().min(2, "Libelle obligatoire"),
   description: z.string().optional(),
+  actif: z.boolean().optional(),
 });
 
 export const grilleTarifaireSchema = z.object({
@@ -47,6 +48,40 @@ export const ligneGrilleTarifaireSchema = z.object({
   taux: z.number().optional(),
   tauxFranchise: z.number().optional(),
   franchiseMinimale: z.number().optional(),
+});
+
+export const formuleGarantiePersonneSchema = z.object({
+  garantieId: z.string().min(1, "Garantie personne obligatoire"),
+  usageId: z.string().optional(),
+  formule: z.string().optional(),
+  montantDeces: z.number().optional(),
+  montantInvalidite: z.number().optional(),
+  montantFraisMedicaux: z.number().optional(),
+  montantFraisHospitalisation: z.number().optional(),
+  montantFraisFuneraires: z.number().optional(),
+  montantFraisChirurgie: z.number().optional(),
+  primeNette: z.number().optional(),
+  accessoire: z.number().optional(),
+});
+
+export const usageSchema = z.object({
+  code: z.string().min(1, "Code obligatoire"),
+  libelle: z.string().min(2, "Libelle obligatoire"),
+  criteria: z.string().optional(),
+  groupeUsageAttestationId: z.string().optional(),
+  consommeAttestation: z.boolean().optional(),
+  byCarburantAndPf: z.boolean().optional(),
+  bySousClasse: z.boolean().optional(),
+  byPtc: z.boolean().optional(),
+  byPrime: z.boolean().optional(),
+  byCategorieTransport: z.boolean().optional(),
+  garantiesPersonne: z.boolean().optional(),
+  actif: z.boolean().optional(),
+});
+
+export const referenceSchema = z.object({
+  libelle: z.string().min(2, "Libelle obligatoire"),
+  actif: z.boolean().optional(),
 });
 
 export function cleanNumber(value: string): number | undefined {

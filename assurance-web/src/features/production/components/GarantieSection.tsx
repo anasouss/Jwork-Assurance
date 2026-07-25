@@ -89,6 +89,7 @@ export function GarantieSection({
               const isRc = Boolean(garantie.responsabiliteCivile);
               const rowDisabled = !checked;
               const locked = isRc;
+              const hasLine = !automaticPricing || isRc || linesForGuarantee(lignes, garantie).length > 0;
               const editable = checked && !locked;
               const isVehicleGuarantee = String(garantie.typeGarantie ?? "VEHICULE") === "VEHICULE";
 
@@ -103,12 +104,13 @@ export function GarantieSection({
                   )}
                 >
                   <td className="px-3 py-2">
-                    <Checkbox checked={checked} disabled={isRc} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
+                    <Checkbox checked={checked} disabled={isRc || !hasLine} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                   </td>
                   <td className="px-3 py-2">
                     <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
-                    <div className="mt-1 flex gap-1">
+                    <div className="mt-1 flex flex-wrap gap-1">
                       {isRc ? <Badge>RC obligatoire</Badge> : null}
+                      {automaticPricing && !isRc && !hasLine ? <Badge variant="outline">Tarif manquant</Badge> : null}
                     </div>
                   </td>
                   {vehiculeCount > 1 ? (
@@ -255,6 +257,10 @@ function defaultSource(garantie: ReferenceOption) {
     return "GLACE";
   }
   return "AUCUNE";
+}
+
+function linesForGuarantee(lignes: ReferenceOption[], garantie: ReferenceOption) {
+  return lignes.filter((ligne) => !ligne.garantieId || ligne.garantieId === garantie.id);
 }
 
 function controlClass(active: boolean) {

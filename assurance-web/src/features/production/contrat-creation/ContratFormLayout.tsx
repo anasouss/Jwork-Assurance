@@ -8,7 +8,7 @@ import { RemorqueSection } from "../components/RemorqueSection";
 import { SectionCard } from "../components/SectionCard";
 import { VehiculeSection } from "../components/VehiculeSection";
 import { ContractInfoSection } from "./ContractInfoSection";
-import { FlotteGarantieSection } from "./FlotteGarantieSection";
+import { FlotteTargetsSection } from "./FlotteTargetsSection";
 import { TariffGridSection } from "./TariffGridSection";
 import type { ContratCreationFormState } from "./useContratCreationForm";
 
@@ -87,15 +87,24 @@ export function ContratFormLayout({
     />
   );
 
-  const flotteGuaranteeSection = (
-    <FlotteGarantieSection
-      garanties={form.refs.garanties.data ?? []}
-      selected={form.garanties}
-      setSelected={form.setGaranties}
-      lignes={form.lignesGrille.data ?? []}
+  const flotteTargetsSection = (
+    <FlotteTargetsSection
       vehicules={form.vehicules}
+      setVehicules={form.setVehicules}
       remorques={form.remorques}
+      setRemorques={form.setRemorques}
+      garanties={form.refs.garanties.data ?? []}
+      selectedGaranties={form.garanties}
+      setSelectedGaranties={form.setGaranties}
+      lignes={form.lignesGrille.data ?? []}
+      formulesPersonne={form.formulesPersonne.data ?? []}
+      usages={form.refs.usages.data ?? []}
+      marques={form.refs.marques.data ?? []}
+      carrosseries={form.refs.carrosseries.data ?? []}
+      categoriesTransport={form.refs.categoriesTransport.data ?? []}
       grilleSelected={Boolean(form.grilleTarifaireId)}
+      maxRemorques={maxRemorques}
+      errors={form.validationErrors}
     />
   );
 
@@ -123,10 +132,8 @@ export function ContratFormLayout({
       {contractSection}
       {order === "flotte" ? (
         <>
-          {vehicleSection}
-          {allowRemorques ? remorqueSection : null}
           <TariffGridSection form={form} />
-          {flotteGuaranteeSection}
+          {flotteTargetsSection}
         </>
       ) : (
         <>

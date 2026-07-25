@@ -11,6 +11,7 @@ export function GrilleTarifaireDialog({
   onOpenChange,
   grille,
   defaultCompagnieAssuranceId,
+  hideCompagnie = false,
   compagnies,
   onSubmit,
   submitting,
@@ -19,6 +20,7 @@ export function GrilleTarifaireDialog({
   onOpenChange: (open: boolean) => void;
   grille?: ReferenceOption | null;
   defaultCompagnieAssuranceId?: string;
+  hideCompagnie?: boolean;
   compagnies: ReferenceOption[];
   onSubmit: (payload: UpsertGrilleTarifaireRequest) => void;
   submitting?: boolean;
@@ -41,16 +43,18 @@ export function GrilleTarifaireDialog({
           <DialogTitle>{grille ? "Modifier grille tarifaire" : "Ajouter grille tarifaire"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
-          <Field label="Compagnie">
-            <Select value={compagnieAssuranceId} onValueChange={setCompagnieAssuranceId}>
-              <SelectTrigger><SelectValue placeholder="Compagnie" /></SelectTrigger>
-              <SelectContent>
-                {compagnies.map((compagnie) => (
-                  <SelectItem key={compagnie.id} value={compagnie.id}>{compagnie.libelle}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          {hideCompagnie ? null : (
+            <Field label="Compagnie">
+              <Select value={compagnieAssuranceId} onValueChange={setCompagnieAssuranceId}>
+                <SelectTrigger><SelectValue placeholder="Compagnie" /></SelectTrigger>
+                <SelectContent>
+                  {compagnies.map((compagnie) => (
+                    <SelectItem key={compagnie.id} value={compagnie.id}>{compagnie.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Libellé">
             <Input value={libelle} onChange={(event) => setLibelle(event.target.value)} />
           </Field>

@@ -438,6 +438,7 @@ public class DataSeeder implements CommandLineRunner {
             boolean byCategorieTransport,
             Carrosserie... carrosseries
     ) {
+        boolean garantiesPersonne = "A".equalsIgnoreCase(code) || "C1".equalsIgnoreCase(code);
         Usage usage = usageRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 usageRepository.save(Usage.builder()
                         .code(code)
@@ -450,6 +451,7 @@ public class DataSeeder implements CommandLineRunner {
                         .byPtc(byPtc)
                         .byPrime(byPrime)
                         .byCategorieTransport(byCategorieTransport)
+                        .garantiesPersonne(garantiesPersonne)
                         .actif(true)
                         .build())
         );
@@ -462,6 +464,7 @@ public class DataSeeder implements CommandLineRunner {
         usage.setByPtc(byPtc);
         usage.setByPrime(byPrime);
         usage.setByCategorieTransport(byCategorieTransport);
+        usage.setGarantiesPersonne(garantiesPersonne);
         return usageRepository.save(usage);
     }
 

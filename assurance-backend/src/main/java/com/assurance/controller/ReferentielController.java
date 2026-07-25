@@ -1,17 +1,25 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
+import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
+import com.assurance.dto.request.UpsertReferenceRequest;
+import com.assurance.dto.request.UpsertUsageRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.entity.CategorieTransport;
+import com.assurance.entity.Carrosserie;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Convention;
+import com.assurance.entity.FormuleGarantiePersonne;
 import com.assurance.entity.Garantie;
 import com.assurance.entity.GrilleTarifaire;
+import com.assurance.entity.GroupeUsageAttestation;
 import com.assurance.entity.LigneGrilleTarifaire;
+import com.assurance.entity.Marque;
 import com.assurance.entity.Usage;
+import com.assurance.enums.TypeGarantie;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.*;
@@ -46,6 +54,7 @@ public class ReferentielController {
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final GrilleTarifaireRepository grilleTarifaireRepository;
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
+    private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
     private final VilleRepository villeRepository;
     private final CategorieClientRepository categorieClientRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
@@ -61,24 +70,110 @@ public class ReferentielController {
                         .putValue("byPtc", usage.getByPtc())
                         .putValue("byPrime", usage.getByPrime())
                         .putValue("byCategorieTransport", usage.getByCategorieTransport())
+                        .putValue("garantiesPersonne", Boolean.TRUE.equals(usage.getGarantiesPersonne()))
                         .putValue("consommeAttestation", usage.getConsommeAttestation())
+                        .putValue("groupeUsageAttestationId", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getId() : null)
                         .putValue("groupeUsageAttestationCode", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getCode() : null)
                         .map())
                 .toList()));
     }
 
+    @PostMapping("/usages")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createUsage(@Valid @RequestBody UpsertUsageRequest request) {
+        usageRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code usage deja utilise");
+        });
+        Usage usage = new Usage();
+        applyUsageRequest(usage, request);
+        return ResponseEntity.ok(ApiResponse.success(toUsageResponse(usageRepository.save(usage)), "Usage cree"));
+    }
+
+    @PutMapping("/usages/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateUsage(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertUsageRequest request
+    ) {
+        Usage usage = usageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Usage", id));
+        usageRepository.findByCodeIgnoreCase(request.getCode())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Code usage deja utilise");
+                });
+        applyUsageRequest(usage, request);
+        return ResponseEntity.ok(ApiResponse.success(toUsageResponse(usageRepository.save(usage)), "Usage modifie"));
+    }
+
     @GetMapping("/marques")
     public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> marques() {
         return ResponseEntity.ok(ApiResponse.success(marqueRepository.findAll(Sort.by("libelle")).stream()
-                .map(marque -> ReferenceOptionResponse.builder().id(marque.getId()).libelle(marque.getLibelle()).build())
+                .map(marque -> ReferenceOptionResponse.builder().id(marque.getId()).libelle(marque.getLibelle()).actif(marque.getActif()).build())
                 .toList()));
+    }
+
+    @PostMapping("/marques")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createMarque(@Valid @RequestBody UpsertReferenceRequest request) {
+        marqueRepository.findByLibelleIgnoreCase(request.getLibelle()).ifPresent(existing -> {
+            throw new BadRequestException("Marque deja existante");
+        });
+        Marque marque = marqueRepository.save(Marque.builder()
+                .libelle(request.getLibelle())
+                .actif(request.getActif() == null ? true : request.getActif())
+                .build());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(marque), "Marque creee"));
+    }
+
+    @PutMapping("/marques/{id}")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateMarque(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertReferenceRequest request
+    ) {
+        Marque marque = marqueRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Marque", id));
+        marqueRepository.findByLibelleIgnoreCase(request.getLibelle())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Marque deja existante");
+                });
+        marque.setLibelle(request.getLibelle());
+        marque.setActif(request.getActif() == null ? true : request.getActif());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(marqueRepository.save(marque)), "Marque modifiee"));
     }
 
     @GetMapping("/carrosseries")
     public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> carrosseries() {
         return ResponseEntity.ok(ApiResponse.success(carrosserieRepository.findAll(Sort.by("libelle")).stream()
-                .map(carrosserie -> ReferenceOptionResponse.builder().id(carrosserie.getId()).libelle(carrosserie.getLibelle()).build())
+                .map(carrosserie -> ReferenceOptionResponse.builder().id(carrosserie.getId()).libelle(carrosserie.getLibelle()).actif(carrosserie.getActif()).build())
                 .toList()));
+    }
+
+    @PostMapping("/carrosseries")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarrosserie(@Valid @RequestBody UpsertReferenceRequest request) {
+        carrosserieRepository.findByLibelleIgnoreCase(request.getLibelle()).ifPresent(existing -> {
+            throw new BadRequestException("Carrosserie deja existante");
+        });
+        Carrosserie carrosserie = carrosserieRepository.save(Carrosserie.builder()
+                .libelle(request.getLibelle())
+                .actif(request.getActif() == null ? true : request.getActif())
+                .build());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(carrosserie), "Carrosserie creee"));
+    }
+
+    @PutMapping("/carrosseries/{id}")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarrosserie(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertReferenceRequest request
+    ) {
+        Carrosserie carrosserie = carrosserieRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Carrosserie", id));
+        carrosserieRepository.findByLibelleIgnoreCase(request.getLibelle())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Carrosserie deja existante");
+                });
+        carrosserie.setLibelle(request.getLibelle());
+        carrosserie.setActif(request.getActif() == null ? true : request.getActif());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(carrosserieRepository.save(carrosserie)), "Carrosserie modifiee"));
     }
 
     @GetMapping("/compagnies-assurance")
@@ -205,6 +300,30 @@ public class ReferentielController {
                 .toList()));
     }
 
+    @GetMapping("/formules-garantie-personne")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> formulesGarantiePersonne(
+            @RequestParam String grilleId,
+            @RequestParam(required = false) String usageId,
+            @RequestParam(required = false) String garantieId
+    ) {
+        if (grilleId == null || grilleId.isBlank()) {
+            throw new BadRequestException("La grille tarifaire est obligatoire");
+        }
+        Usage usageFilter = usageId == null || usageId.isBlank() ? null :
+                usageRepository.findById(usageId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
+        if (usageFilter != null && !usageAllowsGarantiesPersonne(usageFilter)) {
+            return ResponseEntity.ok(ApiResponse.success(List.<Map<String, Object>>of()));
+        }
+        return ResponseEntity.ok(ApiResponse.success(formuleGarantiePersonneRepository.findAll(Sort.by("ordreAffichage", "formule")).stream()
+                .filter(formule -> Boolean.TRUE.equals(formule.getActif()))
+                .filter(formule -> formule.getGrilleTarifaire() != null && formule.getGrilleTarifaire().getId().equals(grilleId))
+                .filter(formule -> usageId == null || usageId.isBlank() || formule.getUsage() == null || formule.getUsage().getId().equals(usageId))
+                .filter(formule -> garantieId == null || garantieId.isBlank() || formule.getGarantie().getId().equals(garantieId))
+                .map(this::toFormulePersonneResponse)
+                .toList()));
+    }
+
     @PostMapping("/grilles-tarifaires/{grilleId}/lignes")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createLigneGrilleTarifaire(
             @PathVariable String grilleId,
@@ -227,6 +346,30 @@ public class ReferentielController {
                 .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", id));
         applyLigneRequest(ligne, request);
         return ResponseEntity.ok(ApiResponse.success(toLigneResponse(ligneGrilleTarifaireRepository.save(ligne)), "Ligne de grille modifiee"));
+    }
+
+    @PostMapping("/grilles-tarifaires/{grilleId}/formules-personne")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createFormuleGarantiePersonne(
+            @PathVariable String grilleId,
+            @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
+    ) {
+        GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
+                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", grilleId));
+        FormuleGarantiePersonne formule = new FormuleGarantiePersonne();
+        formule.setGrilleTarifaire(grille);
+        applyFormulePersonneRequest(formule, request);
+        return ResponseEntity.ok(ApiResponse.success(toFormulePersonneResponse(formuleGarantiePersonneRepository.save(formule)), "Formule garantie personne creee"));
+    }
+
+    @PutMapping("/formules-garantie-personne/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateFormuleGarantiePersonne(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
+    ) {
+        FormuleGarantiePersonne formule = formuleGarantiePersonneRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", id));
+        applyFormulePersonneRequest(formule, request);
+        return ResponseEntity.ok(ApiResponse.success(toFormulePersonneResponse(formuleGarantiePersonneRepository.save(formule)), "Formule garantie personne modifiee"));
     }
 
     @GetMapping("/villes")
@@ -314,6 +457,22 @@ public class ReferentielController {
                 .build();
     }
 
+    private ReferenceOptionResponse toResponse(Marque marque) {
+        return ReferenceOptionResponse.builder()
+                .id(marque.getId())
+                .libelle(marque.getLibelle())
+                .actif(marque.getActif())
+                .build();
+    }
+
+    private ReferenceOptionResponse toResponse(Carrosserie carrosserie) {
+        return ReferenceOptionResponse.builder()
+                .id(carrosserie.getId())
+                .libelle(carrosserie.getLibelle())
+                .actif(carrosserie.getActif())
+                .build();
+    }
+
     private ReferenceOptionResponse toGrilleResponse(GrilleTarifaire grille) {
         return ReferenceOptionResponse.builder()
                 .id(grille.getId())
@@ -326,9 +485,46 @@ public class ReferentielController {
                 .build();
     }
 
+    private void applyUsageRequest(Usage usage, UpsertUsageRequest request) {
+        GroupeUsageAttestation groupe = request.getGroupeUsageAttestationId() == null || request.getGroupeUsageAttestationId().isBlank() ? null :
+                groupeUsageAttestationRepository.findById(request.getGroupeUsageAttestationId())
+                        .orElseThrow(() -> new ResourceNotFoundException("GroupeUsageAttestation", request.getGroupeUsageAttestationId()));
+        usage.setCode(request.getCode());
+        usage.setLibelle(request.getLibelle());
+        usage.setCriteria(request.getCriteria());
+        usage.setGroupeUsageAttestation(groupe);
+        usage.setConsommeAttestation(request.getConsommeAttestation() == null ? true : request.getConsommeAttestation());
+        usage.setByCarburantAndPf(Boolean.TRUE.equals(request.getByCarburantAndPf()));
+        usage.setBySousClasse(Boolean.TRUE.equals(request.getBySousClasse()));
+        usage.setByPtc(Boolean.TRUE.equals(request.getByPtc()));
+        usage.setByPrime(Boolean.TRUE.equals(request.getByPrime()));
+        usage.setByCategorieTransport(Boolean.TRUE.equals(request.getByCategorieTransport()));
+        usage.setGarantiesPersonne(Boolean.TRUE.equals(request.getGarantiesPersonne()));
+        usage.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private Map<String, Object> toUsageResponse(Usage usage) {
+        return option(usage.getId(), usage.getCode(), usage.getLibelle())
+                .putValue("criteria", usage.getCriteria())
+                .putValue("byCarburantAndPf", usage.getByCarburantAndPf())
+                .putValue("bySousClasse", usage.getBySousClasse())
+                .putValue("byPtc", usage.getByPtc())
+                .putValue("byPrime", usage.getByPrime())
+                .putValue("byCategorieTransport", usage.getByCategorieTransport())
+                .putValue("garantiesPersonne", Boolean.TRUE.equals(usage.getGarantiesPersonne()))
+                .putValue("consommeAttestation", usage.getConsommeAttestation())
+                .putValue("groupeUsageAttestationId", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getId() : null)
+                .putValue("groupeUsageAttestationCode", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getCode() : null)
+                .putValue("actif", usage.getActif())
+                .map();
+    }
+
     private void applyLigneRequest(LigneGrilleTarifaire ligne, UpsertLigneGrilleTarifaireRequest request) {
         Garantie garantie = garantieRepository.findById(request.getGarantieId())
                 .orElseThrow(() -> new ResourceNotFoundException("Garantie", request.getGarantieId()));
+        if (garantie.getTypeGarantie() == TypeGarantie.PERSONNE) {
+            throw new BadRequestException("Les garanties personne doivent etre configurees dans les formules personne");
+        }
         Usage usage = request.getUsageId() == null || request.getUsageId().isBlank() ? null :
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
@@ -360,6 +556,33 @@ public class ReferentielController {
         ligne.setActif(request.getActif() == null ? true : request.getActif());
     }
 
+    private void applyFormulePersonneRequest(FormuleGarantiePersonne formule, UpsertFormuleGarantiePersonneRequest request) {
+        Garantie garantie = garantieRepository.findById(request.getGarantieId())
+                .orElseThrow(() -> new ResourceNotFoundException("Garantie", request.getGarantieId()));
+        if (garantie.getTypeGarantie() != TypeGarantie.PERSONNE) {
+            throw new BadRequestException("La garantie doit etre de type personne");
+        }
+        Usage usage = request.getUsageId() == null || request.getUsageId().isBlank() ? null :
+                usageRepository.findById(request.getUsageId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
+        if (usage != null && !usageAllowsGarantiesPersonne(usage)) {
+            throw new BadRequestException("Cet usage n'autorise pas les garanties personne");
+        }
+        formule.setGarantie(garantie);
+        formule.setUsage(usage);
+        formule.setFormule(request.getFormule() == null || request.getFormule().isBlank() ? garantie.getCode() : request.getFormule());
+        formule.setMontantDeces(request.getMontantDeces());
+        formule.setMontantInvalidite(request.getMontantInvalidite());
+        formule.setMontantFraisMedicaux(request.getMontantFraisMedicaux());
+        formule.setMontantFraisHospitalisation(request.getMontantFraisHospitalisation());
+        formule.setMontantFraisFuneraires(request.getMontantFraisFuneraires());
+        formule.setMontantFraisChirurgie(request.getMontantFraisChirurgie());
+        formule.setPrimeNette(request.getPrimeNette());
+        formule.setAccessoire(request.getAccessoire());
+        formule.setOrdreAffichage(request.getOrdreAffichage());
+        formule.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
     private Map<String, Object> toLigneResponse(LigneGrilleTarifaire ligne) {
         return option(ligne.getId(), null, ligne.getLibelleOption() != null ? ligne.getLibelleOption() : ligne.getGarantie().getLibelle())
                 .putValue("grilleId", ligne.getGrilleTarifaire() != null ? ligne.getGrilleTarifaire().getId() : null)
@@ -374,6 +597,31 @@ public class ReferentielController {
                 .putValue("franchiseMinimale", ligne.getFranchiseMinimale())
                 .putValue("actif", ligne.getActif())
                 .map();
+    }
+
+    private Map<String, Object> toFormulePersonneResponse(FormuleGarantiePersonne formule) {
+        return option(formule.getId(), null, formule.getFormule())
+                .putValue("grilleId", formule.getGrilleTarifaire() != null ? formule.getGrilleTarifaire().getId() : null)
+                .putValue("garantieId", formule.getGarantie() != null ? formule.getGarantie().getId() : null)
+                .putValue("garantieCode", formule.getGarantie() != null ? formule.getGarantie().getCode() : null)
+                .putValue("garantieLibelle", formule.getGarantie() != null ? formule.getGarantie().getLibelle() : null)
+                .putValue("usageId", formule.getUsage() != null ? formule.getUsage().getId() : null)
+                .putValue("usageCode", formule.getUsage() != null ? formule.getUsage().getCode() : null)
+                .putValue("usageLibelle", formule.getUsage() != null ? formule.getUsage().getLibelle() : null)
+                .putValue("montantDeces", formule.getMontantDeces())
+                .putValue("montantInvalidite", formule.getMontantInvalidite())
+                .putValue("montantFraisMedicaux", formule.getMontantFraisMedicaux())
+                .putValue("montantFraisHospitalisation", formule.getMontantFraisHospitalisation())
+                .putValue("montantFraisFuneraires", formule.getMontantFraisFuneraires())
+                .putValue("montantFraisChirurgie", formule.getMontantFraisChirurgie())
+                .putValue("primeNette", formule.getPrimeNette())
+                .putValue("accessoire", formule.getAccessoire())
+                .putValue("actif", formule.getActif())
+                .map();
+    }
+
+    private boolean usageAllowsGarantiesPersonne(Usage usage) {
+        return usage != null && Boolean.TRUE.equals(usage.getGarantiesPersonne());
     }
 
     private OptionMap option(String id, String code, String libelle) {

@@ -11,7 +11,10 @@ import type {
   QuittancePreview,
   ReferenceOption,
   UpsertGrilleTarifaireRequest,
+  UpsertFormuleGarantiePersonneRequest,
   UpsertLigneGrilleTarifaireRequest,
+  UpsertReferenceRequest,
+  UpsertUsageRequest,
 } from "./types";
 
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
@@ -25,6 +28,14 @@ export const productionApi = {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption[]>>(
         `/api/v1/referentiel/lignes-grille-tarifaire${buildQueryString(params)}`
+      )
+    );
+  },
+
+  async formulesGarantiePersonne(params: { grilleId?: string; usageId?: string; garantieId?: string }) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption[]>>(
+        `/api/v1/referentiel/formules-garantie-personne${buildQueryString(params)}`
       )
     );
   },
@@ -108,6 +119,69 @@ export const productionApi = {
     );
   },
 
+  async updateCategorieTransport(id: string, payload: { code: string; libelle: string; description?: string; actif?: boolean }) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/categories-transport/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createUsage(payload: UpsertUsageRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/usages", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateUsage(id: string, payload: UpsertUsageRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/usages/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createMarque(payload: UpsertReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/marques", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateMarque(id: string, payload: UpsertReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/marques/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createCarrosserie(payload: UpsertReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/carrosseries", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateCarrosserie(id: string, payload: UpsertReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/carrosseries/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
   async createGrilleTarifaire(payload: UpsertGrilleTarifaireRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/grilles-tarifaires", {
@@ -138,6 +212,24 @@ export const productionApi = {
   async updateLigneGrilleTarifaire(id: string, payload: UpsertLigneGrilleTarifaireRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/lignes-grille-tarifaire/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createFormuleGarantiePersonne(grilleId: string, payload: UpsertFormuleGarantiePersonneRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/grilles-tarifaires/${grilleId}/formules-personne`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateFormuleGarantiePersonne(id: string, payload: UpsertFormuleGarantiePersonneRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/formules-garantie-personne/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       })

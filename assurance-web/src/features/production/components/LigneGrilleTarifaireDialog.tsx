@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,10 @@ export function LigneGrilleTarifaireDialog({
   submitting?: boolean;
 }) {
   const [payload, setPayload] = useState<UpsertLigneGrilleTarifaireRequest>({ garantieId: "" });
+  const vehiculeGaranties = useMemo(
+    () => garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE"),
+    [garanties]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +63,7 @@ export function LigneGrilleTarifaireDialog({
             <Select value={payload.garantieId} onValueChange={(value) => update({ garantieId: value })}>
               <SelectTrigger><SelectValue placeholder="Garantie" /></SelectTrigger>
               <SelectContent>
-                {garanties.map((garantie) => (
+                {vehiculeGaranties.map((garantie) => (
                   <SelectItem key={garantie.id} value={garantie.id}>{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</SelectItem>
                 ))}
               </SelectContent>

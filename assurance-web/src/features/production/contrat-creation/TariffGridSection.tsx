@@ -8,11 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
 import { Field } from "../components/Field";
+import { FormuleGarantiePersonneDialog } from "../components/FormuleGarantiePersonneDialog";
 import { GrilleTarifaireDialog } from "../components/GrilleTarifaireDialog";
 import { LigneGrilleTarifaireDialog } from "../components/LigneGrilleTarifaireDialog";
 import { SectionCard } from "../components/SectionCard";
-import { grilleTarifaireSchema, ligneGrilleTarifaireSchema } from "../schemas";
-import type { ReferenceOption, UpsertGrilleTarifaireRequest, UpsertLigneGrilleTarifaireRequest } from "../types";
+import { formuleGarantiePersonneSchema, grilleTarifaireSchema, ligneGrilleTarifaireSchema } from "../schemas";
+import type {
+  ReferenceOption,
+  UpsertFormuleGarantiePersonneRequest,
+  UpsertGrilleTarifaireRequest,
+  UpsertLigneGrilleTarifaireRequest,
+} from "../types";
 import type { ContratCreationFormState } from "./useContratCreationForm";
 
 export function TariffGridSection({ form }: { form: ContratCreationFormState }) {
@@ -21,6 +27,8 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
   const [editingGrille, setEditingGrille] = useState<ReferenceOption | null>(null);
   const [ligneDialogOpen, setLigneDialogOpen] = useState(false);
   const [editingLigne, setEditingLigne] = useState<ReferenceOption | null>(null);
+  const [formuleDialogOpen, setFormuleDialogOpen] = useState(false);
+  const [editingFormule, setEditingFormule] = useState<ReferenceOption | null>(null);
 
   const filteredGrilles = (form.refs.grilles.data ?? []).filter(
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
@@ -30,6 +38,11 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
   const lignes = useQuery({
     queryKey: ["lignes-grille-contrat", form.grilleTarifaireId],
     queryFn: () => productionApi.lignesGrille({ grilleId: form.grilleTarifaireId }),
+    enabled: Boolean(form.grilleTarifaireId),
+  });
+  const formules = useQuery({
+    queryKey: ["formules-garantie-personne-contrat", form.grilleTarifaireId],
+    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: form.grilleTarifaireId }),
     enabled: Boolean(form.grilleTarifaireId),
   });
 
@@ -61,6 +74,21 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
     onError: showError,
   });
 
+  const saveFormule = useMutation({
+    mutationFn: ({ id, payload }: { id?: string; payload: UpsertFormuleGarantiePersonneRequest }) =>
+      id
+        ? productionApi.updateFormuleGarantiePersonne(id, payload)
+        : productionApi.createFormuleGarantiePersonne(form.grilleTarifaireId, payload),
+    onSuccess: async () => {
+      setFormuleDialogOpen(false);
+      setEditingFormule(null);
+      await queryClient.invalidateQueries({ queryKey: ["formules-garantie-personne-contrat", form.grilleTarifaireId] });
+      await queryClient.invalidateQueries({ queryKey: ["formules-garantie-personne"] });
+      toast.success("Formule personne enregistrée");
+    },
+    onError: showError,
+  });
+
   return (
     <SectionCard
       title="Grille tarifaire"
@@ -73,6 +101,10 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
             size="sm"
             variant="secondary"
             onClick={() => {
+              if (!form.compagnieAssuranceId) {
+                toast.error("Choisissez une compagnie dans la section contrat avant de créer une grille");
+                return;
+              }
               setEditingGrille(selectedGrille);
               setGrilleDialogOpen(true);
             }}
@@ -92,6 +124,19 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
           >
             <Plus className="size-4" />
             Ligne
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={!form.grilleTarifaireId}
+            onClick={() => {
+              setEditingFormule(null);
+              setFormuleDialogOpen(true);
+            }}
+          >
+            <Plus className="size-4" />
+            Formule personne
           </Button>
         </div>
       }
@@ -125,6 +170,7 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
         </div>
 
         <div className="overflow-x-auto rounded-md border">
+          <div className="border-b px-3 py-2 text-sm font-semibold">Garanties véhicule</div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -182,6 +228,64 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
             </TableBody>
           </Table>
         </div>
+
+        <div className="overflow-x-auto rounded-md border">
+          <div className="border-b px-3 py-2 text-sm font-semibold">Garanties personne</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Garantie</TableHead>
+                <TableHead>Usage</TableHead>
+                <TableHead>Formule</TableHead>
+                <TableHead>Décès</TableHead>
+                <TableHead>Invalidité</TableHead>
+                <TableHead>Frais médicaux</TableHead>
+                <TableHead>Prime nette</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!form.grilleTarifaireId ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                    Aucune grille sélectionnée.
+                  </TableCell>
+                </TableRow>
+              ) : (formules.data ?? []).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                    Aucune formule personne. Activez "garanties personne" sur les usages concernés puis ajoutez PP/PC.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                (formules.data ?? []).map((formule) => (
+                  <TableRow key={formule.id}>
+                    <TableCell className="font-medium">{text(formule.garantieCode)} - {text(formule.garantieLibelle)}</TableCell>
+                    <TableCell>{text(formule.usageCode) !== "-" ? `${text(formule.usageCode)} - ${text(formule.usageLibelle)}` : "Tous usages autorisés"}</TableCell>
+                    <TableCell>{formule.libelle}</TableCell>
+                    <TableCell>{money(formule.montantDeces)}</TableCell>
+                    <TableCell>{money(formule.montantInvalidite)}</TableCell>
+                    <TableCell>{money(formule.montantFraisMedicaux)}</TableCell>
+                    <TableCell>{money(formule.primeNette)}</TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditingFormule(formule);
+                          setFormuleDialogOpen(true);
+                        }}
+                      >
+                        <Edit className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <GrilleTarifaireDialog
@@ -189,6 +293,7 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
         onOpenChange={setGrilleDialogOpen}
         grille={editingGrille}
         defaultCompagnieAssuranceId={form.compagnieAssuranceId}
+        hideCompagnie
         compagnies={form.refs.compagnies.data ?? []}
         submitting={saveGrille.isPending}
         onSubmit={(payload) => {
@@ -216,6 +321,23 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
             return;
           }
           saveLigne.mutate({ id: editingLigne?.id, payload });
+        }}
+      />
+
+      <FormuleGarantiePersonneDialog
+        open={formuleDialogOpen}
+        onOpenChange={setFormuleDialogOpen}
+        formule={editingFormule}
+        garanties={form.refs.garanties.data ?? []}
+        usages={(form.refs.usages.data ?? []).filter((usage) => Boolean(usage.garantiesPersonne))}
+        submitting={saveFormule.isPending}
+        onSubmit={(payload) => {
+          const parsed = formuleGarantiePersonneSchema.safeParse(payload);
+          if (!parsed.success) {
+            toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
+            return;
+          }
+          saveFormule.mutate({ id: editingFormule?.id, payload });
         }}
       />
     </SectionCard>

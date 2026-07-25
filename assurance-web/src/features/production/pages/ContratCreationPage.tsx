@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Building2, Car, FilePlus2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { productionApi } from "../api";
 import { Field } from "../components/Field";
 import { useContratCreationForm } from "../contrat-creation/useContratCreationForm";
 import type { TypeContrat } from "../types";
@@ -23,12 +25,42 @@ export default function ContratCreationPage() {
     ),
     [form.compagnieAssuranceId, form.refs.conventions.data]
   );
+  const selectedConvention = useMemo(
+    () => filteredConventions.find((convention) => convention.id === form.conventionId) ?? null,
+    [filteredConventions, form.conventionId]
+  );
+  const assignedGrilleId = typeof selectedConvention?.grilleTarifaireId === "string" ? selectedConvention.grilleTarifaireId : "";
+  const shouldCheckConventionGrille = typeContrat === "CONVENTION" && Boolean(assignedGrilleId && form.usageId);
+  const conventionGrilleLines = useQuery({
+    queryKey: ["entry-convention-grille-lines", assignedGrilleId, form.usageId],
+    queryFn: () => productionApi.lignesGrille({ grilleId: assignedGrilleId, usageId: form.usageId }),
+    enabled: shouldCheckConventionGrille,
+    staleTime: 60_000,
+  });
+  const conventionPersonneFormules = useQuery({
+    queryKey: ["entry-convention-personne-formules", assignedGrilleId, form.usageId],
+    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: assignedGrilleId, usageId: form.usageId }),
+    enabled: shouldCheckConventionGrille,
+    staleTime: 60_000,
+  });
+  const conventionGrilleChecking = shouldCheckConventionGrille && (conventionGrilleLines.isLoading || conventionPersonneFormules.isLoading);
+  const conventionGrilleConfigured = shouldCheckConventionGrille
+    && !conventionGrilleChecking
+    && ((conventionGrilleLines.data?.length ?? 0) > 0 || (conventionPersonneFormules.data?.length ?? 0) > 0);
+  const conventionStartBlockedReason = conventionStartBlockReason({
+    typeContrat,
+    conventionSelected: Boolean(form.conventionId),
+    usageSelected: Boolean(form.usageId),
+    assignedGrilleId,
+    checking: conventionGrilleChecking,
+    configured: conventionGrilleConfigured,
+  });
 
   const canStart =
     assurance === "automobile" &&
     Boolean(typeContrat) &&
     (typeContrat !== "PARTICULIER" || Boolean(categorieClientId)) &&
-    (typeContrat !== "CONVENTION" || Boolean(form.compagnieAssuranceId && form.conventionId && form.usageId));
+    (typeContrat !== "CONVENTION" || Boolean(form.compagnieAssuranceId && form.conventionId && form.usageId && !conventionStartBlockedReason));
 
   const handleStart = () => {
     if (typeContrat === "PARTICULIER") {
@@ -167,6 +199,9 @@ export default function ContratCreationPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {conventionStartBlockedReason ? (
+                  <p className="mt-1 text-xs text-red-600">{conventionStartBlockedReason}</p>
+                ) : null}
               </Field>
             </div>
           ) : null}
@@ -186,4 +221,37 @@ export default function ContratCreationPage() {
       </Card>
     </div>
   );
+}
+
+function conventionStartBlockReason({
+  typeContrat,
+  conventionSelected,
+  usageSelected,
+  assignedGrilleId,
+  checking,
+  configured,
+}: {
+  typeContrat: TypeContrat | "";
+  conventionSelected: boolean;
+  usageSelected: boolean;
+  assignedGrilleId: string;
+  checking: boolean;
+  configured: boolean;
+}) {
+  if (typeContrat !== "CONVENTION" || !conventionSelected) {
+    return "";
+  }
+  if (!assignedGrilleId) {
+    return "Cette convention n'a pas de grille tarifaire affectée.";
+  }
+  if (!usageSelected) {
+    return "";
+  }
+  if (checking) {
+    return "Vérification de la grille tarifaire...";
+  }
+  if (!configured) {
+    return "La grille affectée à cette convention ne contient aucun tarif/formule pour cet usage.";
+  }
+  return "";
 }

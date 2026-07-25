@@ -31,8 +31,6 @@ export function ContractInfoSection({
   const filteredGrilles = (form.refs.grilles.data ?? []).filter(
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
   );
-  const selectedCompagnie = (form.refs.compagnies.data ?? []).find((item) => item.id === form.compagnieAssuranceId);
-  const selectedConvention = (form.refs.conventions.data ?? []).find((item) => item.id === form.conventionId);
   const selectedUsage = (form.refs.usages.data ?? []).find((item) => item.id === form.usageId);
   const souscripteur = form.clients.find((client) => client.role === "SOUSCRIPTEUR");
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
@@ -74,32 +72,26 @@ export function ContractInfoSection({
             )}
           </Field>
         ) : null}
-        <Field label="Compagnie" required error={form.validationErrors.compagnieAssuranceId}>
-          {readOnlyConventionContext ? (
-            <Input value={selectedCompagnie?.libelle ?? "Compagnie sélectionnée"} disabled />
-          ) : (
+        {!readOnlyConventionContext ? (
+          <Field label="Compagnie" required error={form.validationErrors.compagnieAssuranceId}>
             <Select value={form.compagnieAssuranceId} onValueChange={form.setCompagnieAssuranceId}>
               <SelectTrigger><SelectValue placeholder="Compagnie" /></SelectTrigger>
               <SelectContent>
                 {form.refs.compagnies.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
               </SelectContent>
             </Select>
-          )}
-        </Field>
-        {showConvention ? (
+          </Field>
+        ) : null}
+        {showConvention && !readOnlyConventionContext ? (
           <Field label="Convention / produit" required error={form.validationErrors.conventionId}>
-            {readOnlyConventionContext ? (
-              <Input value={formatReferenceLabel(selectedConvention) || "Convention sélectionnée"} disabled />
-            ) : (
-              <Select value={form.conventionId} onValueChange={form.setConventionId}>
-                <SelectTrigger><SelectValue placeholder="Convention" /></SelectTrigger>
-                <SelectContent>
-                  {filteredConventions.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Select value={form.conventionId} onValueChange={form.setConventionId}>
+              <SelectTrigger><SelectValue placeholder="Convention" /></SelectTrigger>
+              <SelectContent>
+                {filteredConventions.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
         ) : null}
         <Field label="Usage contrat">
@@ -176,7 +168,7 @@ export function ContractInfoSection({
         ) : null}
       </div>
       <div className="mt-4 flex justify-end border-t pt-3">
-        <Button type="button" size="sm" onClick={() => form.handleSaveSection("contrat")}>
+        <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => form.handleSaveSection("contrat")}>
           <Save className="size-4" />
           Enregistrer
         </Button>

@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface GrilleTarifaireRepository extends JpaRepository<GrilleTarifaire, String> {
     List<GrilleTarifaire> findByCompagnieAssuranceIdAndActifTrueOrderByCreatedAtDesc(String compagnieAssuranceId);
+
+    List<GrilleTarifaire> findByCompagnieAssuranceIdAndActifTrueOrderByLibelleAsc(String compagnieAssuranceId);
 }

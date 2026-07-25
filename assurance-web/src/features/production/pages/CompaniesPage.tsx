@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Edit, Plus, Search } from "lucide-react";
+import { Building2, Edit, Handshake, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -119,7 +120,7 @@ export default function CompaniesPage() {
                 <TableHead>ICE</TableHead>
                 <TableHead>Préfixe</TableHead>
                 <TableHead>Actif</TableHead>
-                <TableHead className="w-14" />
+                <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -137,8 +138,13 @@ export default function CompaniesPage() {
                   <TableCell>{companyField(compagnie, "ice") || "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "prefixeAttestation") || "-"}</TableCell>
                   <TableCell>{compagnie.actif === false ? "Non" : "Oui"}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => { setEditing(compagnie); setDialogOpen(true); }}>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link to={`/app/companies/conventions?compagnieId=${compagnie.id}`} aria-label={`Conventions ${compagnie.libelle}`}>
+                        <Handshake className="size-4" />
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => { setEditing(compagnie); setDialogOpen(true); }} aria-label={`Modifier ${compagnie.libelle}`}>
                       <Edit className="size-4" />
                     </Button>
                   </TableCell>

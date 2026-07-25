@@ -10,4 +10,6 @@ public interface ConventionRepository extends JpaRepository<Convention, String> 
     Optional<Convention> findByAgenceIdAndId(String agenceId, String id);
 
     List<Convention> findByAgenceIdAndActifTrueOrderByIntituleAsc(String agenceId);
+
+    List<Convention> findByAgenceIdAndCompagnieAssuranceIdAndActifTrueOrderByIntituleAsc(String agenceId, String compagnieAssuranceId);
 }

@@ -448,6 +448,21 @@ export type UpsertCompagnieAssuranceRequest = {
   actif?: boolean;
 };
 
+export type UpsertConventionRequest = {
+  compagnieAssuranceId: string;
+  code: string;
+  intitule: string;
+  description?: string;
+  organismeConventionne?: string;
+  typeEcheance: "A_ECHEANCE" | "DATE_A_DATE";
+  echeance?: string;
+  fractionnement?: "MENSUEL" | "TRIMESTRIEL" | "SEMESTRIEL" | "ANNUEL";
+  categorieClientId: string;
+  grilleTarifaireId: string;
+  usageIds: string[];
+  actif?: boolean;
+};
+
 export type UpsertReferenceRequest = {
   libelle: string;
   actif?: boolean;

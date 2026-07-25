@@ -13,6 +13,7 @@ import type {
   UpsertGrilleTarifaireRequest,
   BulkUpdateTarifUsageRequest,
   UpsertCompagnieAssuranceRequest,
+  UpsertConventionRequest,
   UpsertFormuleGarantiePersonneRequest,
   UpsertLigneGrilleTarifaireRequest,
   UpsertCodeReferenceRequest,
@@ -24,8 +25,8 @@ import type {
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
 
 export const productionApi = {
-  async referentiel(path: string): Promise<ReferenceOption[]> {
-    return unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>(`/api/v1/referentiel/${path}`));
+  async referentiel(path: string, params?: Record<string, string | undefined>): Promise<ReferenceOption[]> {
+    return unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>(`/api/v1/referentiel/${path}${buildQueryString(params ?? {})}`));
   },
 
   async lignesGrille(params: { grilleId?: string; usageId?: string; garantieId?: string }) {
@@ -179,6 +180,24 @@ export const productionApi = {
   async updateCompagnieAssurance(id: string, payload: UpsertCompagnieAssuranceRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/compagnies-assurance/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createConvention(payload: UpsertConventionRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/conventions", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateConvention(id: string, payload: UpsertConventionRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/conventions/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       })

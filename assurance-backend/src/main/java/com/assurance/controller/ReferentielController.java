@@ -4,6 +4,7 @@ import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
 import com.assurance.dto.request.UpsertCodeReferenceRequest;
 import com.assurance.dto.request.UpsertCompagnieAssuranceRequest;
+import com.assurance.dto.request.UpsertConventionRequest;
 import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
@@ -12,12 +13,14 @@ import com.assurance.dto.request.UpsertTarifUsageRequest;
 import com.assurance.dto.request.UpsertUsageRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
+import com.assurance.entity.CategorieClient;
 import com.assurance.entity.CategorieTransport;
 import com.assurance.entity.Carburant;
 import com.assurance.entity.Carrosserie;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Convention;
+import com.assurance.entity.Agence;
 import com.assurance.entity.FormuleGarantiePersonne;
 import com.assurance.entity.Garantie;
 import com.assurance.entity.GrilleTarifaire;
@@ -29,6 +32,7 @@ import com.assurance.entity.SousClasse;
 import com.assurance.entity.TarifProduitAssistance;
 import com.assurance.entity.TarifUsage;
 import com.assurance.entity.Usage;
+import com.assurance.enums.TypeEcheanceConvention;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
@@ -53,6 +57,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +86,7 @@ public class ReferentielController {
     private final ConventionRepository conventionRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final ProduitAssistanceRepository produitAssistanceRepository;
+    private final AgenceRepository agenceRepository;
 
     @GetMapping("/usages")
     @Transactional(readOnly = true)
@@ -345,8 +351,13 @@ public class ReferentielController {
     }
 
     @GetMapping("/grilles-tarifaires")
-    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> grillesTarifaires() {
-        return ResponseEntity.ok(ApiResponse.success(grilleTarifaireRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
+    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> grillesTarifaires(
+            @RequestParam(required = false) String compagnieAssuranceId
+    ) {
+        List<GrilleTarifaire> grilles = compagnieAssuranceId == null || compagnieAssuranceId.isBlank()
+                ? grilleTarifaireRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
+                : grilleTarifaireRepository.findByCompagnieAssuranceIdAndActifTrueOrderByLibelleAsc(compagnieAssuranceId);
+        return ResponseEntity.ok(ApiResponse.success(grilles.stream()
                 .filter(grille -> Boolean.TRUE.equals(grille.getActif()))
                 .map(grille -> ReferenceOptionResponse.builder()
                         .id(grille.getId())
@@ -425,21 +436,37 @@ public class ReferentielController {
     }
 
     @GetMapping("/conventions")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> conventions() {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> conventions(
+            @RequestParam(required = false) String compagnieAssuranceId
+    ) {
         String agenceId = TenantContext.getCurrentAgence();
-        return ResponseEntity.ok(ApiResponse.success(conventionRepository.findByAgenceIdAndActifTrueOrderByIntituleAsc(agenceId).stream()
-                .map(convention -> option(convention.getId(), convention.getCode(), convention.getIntitule())
-                        .putValue("description", convention.getDescription())
-                        .putValue("compagnieAssuranceId", convention.getCompagnieAssurance() != null ? convention.getCompagnieAssurance().getId() : null)
-                        .putValue("compagnieAssuranceLibelle", convention.getCompagnieAssurance() != null ? convention.getCompagnieAssurance().getNom() : null)
-                        .putValue("organismeConventionne", convention.getOrganismeConventionne())
-                        .putValue("dateEffet", convention.getDateEffet())
-                        .putValue("dateEcheance", convention.getDateEcheance())
-                        .putValue("typeEcheance", convention.getTypeEcheance())
-                        .putValue("echeance", convention.getEcheance())
-                        .putValue("fractionnement", convention.getFractionnement())
-                        .map())
+        List<Convention> conventions = compagnieAssuranceId == null || compagnieAssuranceId.isBlank()
+                ? conventionRepository.findByAgenceIdAndActifTrueOrderByIntituleAsc(agenceId)
+                : conventionRepository.findByAgenceIdAndCompagnieAssuranceIdAndActifTrueOrderByIntituleAsc(agenceId, compagnieAssuranceId);
+        return ResponseEntity.ok(ApiResponse.success(conventions.stream()
+                .map(this::toConventionResponse)
                 .toList()));
+    }
+
+    @PostMapping("/conventions")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createConvention(@Valid @RequestBody UpsertConventionRequest request) {
+        Convention convention = new Convention();
+        applyConventionRequest(convention, request);
+        return ResponseEntity.ok(ApiResponse.success(toConventionResponse(conventionRepository.save(convention)), "Convention creee"));
+    }
+
+    @PutMapping("/conventions/{id}")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateConvention(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertConventionRequest request
+    ) {
+        String agenceId = TenantContext.getCurrentAgence();
+        Convention convention = conventionRepository.findByAgenceIdAndId(agenceId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Convention", id));
+        applyConventionRequest(convention, request);
+        return ResponseEntity.ok(ApiResponse.success(toConventionResponse(conventionRepository.save(convention)), "Convention modifiee"));
     }
 
     @PostMapping("/grilles-tarifaires")
@@ -616,14 +643,15 @@ public class ReferentielController {
     }
 
     @GetMapping("/categories-client")
-    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> categoriesClient() {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> categoriesClient() {
         return ResponseEntity.ok(ApiResponse.success(categorieClientRepository.findAll(Sort.by("libelle")).stream()
-                .map(categorie -> ReferenceOptionResponse.builder()
-                        .id(categorie.getId())
-                        .code(categorie.getCode())
-                        .libelle(categorie.getLibelle())
-                        .actif(categorie.getActif())
-                        .build())
+                .map(categorie -> option(categorie.getId(), categorie.getCode(), categorie.getLibelle())
+                        .putValue("usageIds", categorie.getUsages().stream()
+                                .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
+                                .map(Usage::getId)
+                                .toList())
+                        .putValue("actif", categorie.getActif())
+                        .map())
                 .toList()));
     }
 
@@ -735,6 +763,87 @@ public class ReferentielController {
                 .compagnieAssuranceLibelle(grille.getCompagnieAssurance() != null ? grille.getCompagnieAssurance().getNom() : null)
                 .actif(grille.getActif())
                 .build();
+    }
+
+    private void applyConventionRequest(Convention convention, UpsertConventionRequest request) {
+        String agenceId = TenantContext.getCurrentAgence();
+        Agence agence = agenceRepository.findById(agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+        CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
+        CategorieClient categorieClient = categorieClientRepository.findById(request.getCategorieClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
+        GrilleTarifaire grille = grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
+                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+        if (grille.getCompagnieAssurance() == null || !grille.getCompagnieAssurance().getId().equals(compagnie.getId())) {
+            throw new BadRequestException("La grille tarifaire doit appartenir a la compagnie selectionnee");
+        }
+
+        Set<String> usageIds = new LinkedHashSet<>(request.getUsageIds() == null ? List.of() : request.getUsageIds());
+        if (usageIds.isEmpty()) {
+            throw new BadRequestException("Au moins un usage doit etre autorise pour la convention");
+        }
+        Set<Usage> usages = new LinkedHashSet<>(usageRepository.findAllById(usageIds));
+        if (usages.size() != usageIds.size()) {
+            throw new BadRequestException("Un ou plusieurs usages sont introuvables");
+        }
+        if (categorieClient.getUsages() != null && !categorieClient.getUsages().isEmpty()) {
+            Set<String> allowedUsageIds = categorieClient.getUsages().stream()
+                    .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
+                    .map(Usage::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+            boolean hasInvalidUsage = usages.stream().anyMatch(usage -> !allowedUsageIds.contains(usage.getId()));
+            if (hasInvalidUsage) {
+                throw new BadRequestException("Les usages selectionnes ne correspondent pas a la categorie client");
+            }
+        }
+
+        TypeEcheanceConvention typeEcheance = request.getTypeEcheance() == null
+                ? TypeEcheanceConvention.DATE_A_DATE
+                : request.getTypeEcheance();
+        convention.setAgence(agence);
+        convention.setCompagnieAssurance(compagnie);
+        convention.setCode(request.getCode());
+        convention.setIntitule(request.getIntitule());
+        convention.setDescription(blankToNull(request.getDescription()));
+        convention.setOrganismeConventionne(blankToNull(request.getOrganismeConventionne()));
+        convention.setCategorieClient(categorieClient);
+        convention.setGrilleTarifaire(grille);
+        convention.setDateEffet(request.getDateEffet());
+        convention.setDateEcheance(request.getDateEcheance());
+        convention.setTypeEcheance(typeEcheance);
+        convention.setEcheance(typeEcheance == TypeEcheanceConvention.A_ECHEANCE ? blankToNull(request.getEcheance()) : null);
+        convention.setFractionnement(request.getFractionnement());
+        convention.setActif(request.getActif() == null ? true : request.getActif());
+        convention.getUsages().clear();
+        convention.getUsages().addAll(usages);
+    }
+
+    private Map<String, Object> toConventionResponse(Convention convention) {
+        CompagnieAssurance compagnie = convention.getCompagnieAssurance();
+        CategorieClient categorieClient = convention.getCategorieClient();
+        GrilleTarifaire grille = convention.getGrilleTarifaire();
+        return option(convention.getId(), convention.getCode(), convention.getIntitule())
+                .putValue("description", convention.getDescription())
+                .putValue("compagnieAssuranceId", compagnie != null ? compagnie.getId() : null)
+                .putValue("compagnieAssuranceLibelle", compagnie != null ? compagnie.getNom() : null)
+                .putValue("organismeConventionne", convention.getOrganismeConventionne())
+                .putValue("categorieClientId", categorieClient != null ? categorieClient.getId() : null)
+                .putValue("categorieClientLibelle", categorieClient != null ? categorieClient.getLibelle() : null)
+                .putValue("grilleTarifaireId", grille != null ? grille.getId() : null)
+                .putValue("grilleTarifaireLibelle", grille != null ? grille.getLibelle() : null)
+                .putValue("dateEffet", convention.getDateEffet())
+                .putValue("dateEcheance", convention.getDateEcheance())
+                .putValue("typeEcheance", convention.getTypeEcheance())
+                .putValue("echeance", convention.getEcheance())
+                .putValue("fractionnement", convention.getFractionnement())
+                .putValue("usageIds", convention.getUsages().stream().map(Usage::getId).toList())
+                .putValue("usageLibelles", convention.getUsages().stream()
+                        .sorted(Comparator.comparing(Usage::getCode, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .map(usage -> (usage.getCode() == null ? "" : usage.getCode() + " - ") + usage.getLibelle())
+                        .toList())
+                .putValue("actif", convention.getActif())
+                .map();
     }
 
     private void applyCompagnieAssuranceRequest(CompagnieAssurance compagnie, UpsertCompagnieAssuranceRequest request) {

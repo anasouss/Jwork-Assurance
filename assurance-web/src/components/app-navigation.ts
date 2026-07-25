@@ -30,7 +30,7 @@ export const appModules: AppModule[] = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true },
   { title: "Production", url: "/app/production", icon: BadgeCheck, permission: "contrat:view" },
   { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, disabled: true },
-  { title: "Companies", url: "/app/companies", icon: Building2, permission: "config:view" },
+  { title: "Compagnies", url: "/app/companies", icon: Building2, permission: "config:view" },
   { title: "CRM", url: "/app/crm", icon: Users, disabled: true },
   { title: "Compta", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
   { title: "Admin", url: "/app/admin", icon: Settings, disabled: true, permission: "config:view" },
@@ -43,7 +43,9 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "production", title: "Contrats", url: "/app/production/contrats", icon: Files, permission: "contrat:view" },
   { module: "production", title: "Stock attestations", url: "/app/production/attestations-stock", icon: Boxes, permission: "contrat:view" },
   { module: "production", title: "Paramètres", url: "/app/production/parametres", icon: Settings, permission: "config:view" },
-  { module: "companies", title: "Compagnies", url: "/app/companies", icon: Building2, permission: "config:view" },
+  { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permission: "config:view" },
+  { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "config:view" },
+  { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "config:view" },
   { module: "compta", title: "Quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
 ];
 

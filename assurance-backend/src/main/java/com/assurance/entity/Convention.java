@@ -9,6 +9,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -18,6 +20,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "conventions", indexes = {
@@ -51,6 +55,23 @@ public class Convention extends BaseEntity {
 
     @Column(name = "organisme_conventionne", length = 180)
     private String organismeConventionne;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categorie_client_id")
+    private CategorieClient categorieClient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "grille_tarifaire_id")
+    private GrilleTarifaire grilleTarifaire;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "convention_usages",
+            joinColumns = @JoinColumn(name = "convention_id"),
+            inverseJoinColumns = @JoinColumn(name = "usage_id")
+    )
+    @Builder.Default
+    private Set<Usage> usages = new LinkedHashSet<>();
 
     @Column(name = "date_effet")
     private LocalDate dateEffet;

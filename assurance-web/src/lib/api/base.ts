@@ -63,27 +63,29 @@ export async function apiFetch<T>(
     headers,
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 || response.status === 403) {
+    let newToken: string;
     try {
-      const newToken = await getOrRefreshAccessToken();
-      headers.set("Authorization", `Bearer ${newToken}`);
-      const retry = await fetch(`${API_BASE_URL}${path}`, {
-        ...options,
-        headers,
-      });
-      if (!retry.ok) {
-        const errorData = await retry.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${retry.status}`);
-      }
-      return (await retry.json()) as T;
-    } catch {
+      newToken = await getOrRefreshAccessToken();
+    } catch (error) {
       void clearRefreshCookie();
       clearAuth();
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
-      throw new Error("Session expired");
+      throw error instanceof Error ? error : new Error("Session expired");
     }
+
+    headers.set("Authorization", `Bearer ${newToken}`);
+    const retry = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+    if (!retry.ok) {
+      const errorData = await retry.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${retry.status}`);
+    }
+    return (await retry.json()) as T;
   }
 
   if (!response.ok) {
@@ -110,26 +112,28 @@ export async function apiFetchBlob(
     headers,
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 || response.status === 403) {
+    let newToken: string;
     try {
-      const newToken = await getOrRefreshAccessToken();
-      headers.set("Authorization", `Bearer ${newToken}`);
-      const retry = await fetch(`${API_BASE_URL}${path}`, {
-        ...options,
-        headers,
-      });
-      if (!retry.ok) {
-        throw new Error(`HTTP ${retry.status}`);
-      }
-      return await retry.blob();
-    } catch {
+      newToken = await getOrRefreshAccessToken();
+    } catch (error) {
       void clearRefreshCookie();
       clearAuth();
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
-      throw new Error("Session expired");
+      throw error instanceof Error ? error : new Error("Session expired");
     }
+
+    headers.set("Authorization", `Bearer ${newToken}`);
+    const retry = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+    if (!retry.ok) {
+      throw new Error(`HTTP ${retry.status}`);
+    }
+    return await retry.blob();
   }
 
   if (!response.ok) {

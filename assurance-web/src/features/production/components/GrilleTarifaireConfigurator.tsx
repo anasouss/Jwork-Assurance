@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
-import { formuleGarantiePersonneSchema } from "../schemas";
-import { money, numberValue, text, toNumber } from "../utils/format";
-import { FormuleGarantiePersonneDialog } from "./FormuleGarantiePersonneDialog";
-import type { ReferenceOption, UpsertFormuleGarantiePersonneRequest, UpsertLigneGrilleTarifaireRequest } from "../types";
+import { numberValue, text, toNumber } from "../utils/format";
+import type {
+  ReferenceOption,
+  UpsertFormuleGarantiePersonneRequest,
+  UpsertGrilleUsageConfigurationRequest,
+  UpsertLigneGrilleTarifaireRequest,
+} from "../types";
 
 type Props = {
   grille: ReferenceOption;
@@ -29,6 +32,11 @@ type MatrixLine = UpsertLigneGrilleTarifaireRequest & {
   baseRow: boolean;
 };
 
+type PersonneMatrixLine = UpsertFormuleGarantiePersonneRequest & {
+  localKey: string;
+  checked: boolean;
+};
+
 export function GrilleTarifaireConfigurator({
   grille,
   garanties,
@@ -39,8 +47,7 @@ export function GrilleTarifaireConfigurator({
   const queryClient = useQueryClient();
   const [selectedUsageId, setSelectedUsageId] = useState("");
   const [drafts, setDrafts] = useState<MatrixLine[]>([]);
-  const [formuleDialogOpen, setFormuleDialogOpen] = useState(false);
-  const [editingFormule, setEditingFormule] = useState<ReferenceOption | null>(null);
+  const [personneDrafts, setPersonneDrafts] = useState<PersonneMatrixLine[]>([]);
 
   const lignes = useQuery({
     queryKey: ["lignes-grille", queryScope, grille.id],
@@ -98,9 +105,6 @@ export function GrilleTarifaireConfigurator({
     })),
     [drafts, vehicleGaranties]
   );
-  const visibleFormules = (formules.data ?? []).filter(
-    (formule) => String(formule.usageId ?? "") === activeUsageId
-  );
 
   useEffect(() => {
     if (selectedUsageId && usageTabs.some((usage) => usage.id === selectedUsageId)) {
@@ -113,30 +117,30 @@ export function GrilleTarifaireConfigurator({
     setDrafts(buildDrafts(vehicleGaranties, (lignes.data ?? []).filter((ligne) => String(ligne.usageId ?? "") === activeUsageId)));
   }, [activeUsageId, lignes.data, vehicleGaranties]);
 
+  useEffect(() => {
+    setPersonneDrafts(buildPersonneDrafts(
+      personneGaranties,
+      (formules.data ?? []).filter((formule) => String(formule.usageId ?? "") === activeUsageId)
+    ));
+  }, [activeUsageId, formules.data, personneGaranties]);
+
   const saveConfiguration = useMutation({
-    mutationFn: (payload: UpsertLigneGrilleTarifaireRequest[]) =>
-      productionApi.replaceGrilleUsageConfiguration(grille.id, activeUsageId, { lignes: payload }),
+    mutationFn: (payload: UpsertGrilleUsageConfigurationRequest) =>
+      productionApi.replaceGrilleUsageConfiguration(grille.id, activeUsageId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["lignes-grille"] });
-      toast.success("Configuration de l'usage enregistrée");
-    },
-    onError: showError,
-  });
-
-  const saveFormule = useMutation({
-    mutationFn: ({ id, payload }: { id?: string; payload: UpsertFormuleGarantiePersonneRequest }) =>
-      id ? productionApi.updateFormuleGarantiePersonne(id, payload) : productionApi.createFormuleGarantiePersonne(grille.id, payload),
-    onSuccess: async () => {
-      setFormuleDialogOpen(false);
-      setEditingFormule(null);
       await queryClient.invalidateQueries({ queryKey: ["formules-garantie-personne"] });
-      toast.success("Formule personne enregistrée");
+      toast.success("Configuration de l'usage enregistrée");
     },
     onError: showError,
   });
 
   const updateDraft = (localKey: string, patch: Partial<MatrixLine>) => {
     setDrafts((current) => current.map((draft) => draft.localKey === localKey ? { ...draft, ...patch } : draft));
+  };
+
+  const updatePersonneDraft = (localKey: string, patch: Partial<PersonneMatrixLine>) => {
+    setPersonneDrafts((current) => current.map((draft) => draft.localKey === localKey ? { ...draft, ...patch } : draft));
   };
 
   const addDraft = (garantie: ReferenceOption) => {
@@ -174,7 +178,14 @@ export function GrilleTarifaireConfigurator({
       toast.error(`Valeurs manquantes pour ${garantieLabel(garantie)}`);
       return;
     }
-    saveConfiguration.mutate(selected.map((draft) => cleanDraft(draft, activeUsageId, garantieById.get(draft.garantieId))));
+    saveConfiguration.mutate({
+      lignes: selected.map((draft) => cleanDraft(draft, activeUsageId, garantieById.get(draft.garantieId))),
+      formulesPersonne: activeUsage?.garantiesPersonne
+        ? personneDrafts
+            .filter((draft) => draft.checked)
+            .map((draft) => cleanPersonneDraft(draft, activeUsageId))
+        : undefined,
+    });
   };
 
   return (
@@ -342,67 +353,37 @@ export function GrilleTarifaireConfigurator({
       </div>
 
       <PersonnesLinesTable
-        formules={visibleFormules}
-        emptyText={!activeUsageId ? "Aucun usage sélectionné." : "Aucune formule personne pour cet usage."}
-        canAdd={Boolean(activeUsageId && activeUsage?.garantiesPersonne)}
-        onAdd={() => {
-          setEditingFormule(null);
-          setFormuleDialogOpen(true);
-        }}
-        onEdit={(formule) => {
-          setEditingFormule(formule);
-          setFormuleDialogOpen(true);
-        }}
-      />
-
-      <FormuleGarantiePersonneDialog
-        open={formuleDialogOpen}
-        onOpenChange={setFormuleDialogOpen}
-        formule={editingFormule}
-        garanties={personneGaranties}
-        usages={usageTabs.filter((usage) => Boolean(usage.garantiesPersonne))}
-        defaultUsageId={activeUsageId}
-        submitting={saveFormule.isPending}
-        onSubmit={(payload) => {
-          const parsed = formuleGarantiePersonneSchema.safeParse(payload);
-          if (!parsed.success) {
-            toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
-            return;
-          }
-          saveFormule.mutate({ id: editingFormule?.id, payload: { ...payload, usageId: activeUsageId } });
-        }}
+        drafts={personneDrafts}
+        enabled={Boolean(activeUsageId && activeUsage?.garantiesPersonne)}
+        activeUsage={activeUsage}
+        updateDraft={updatePersonneDraft}
       />
     </div>
   );
 }
 
 function PersonnesLinesTable({
-  formules,
-  emptyText,
-  canAdd,
-  onAdd,
-  onEdit,
+  drafts,
+  enabled,
+  activeUsage,
+  updateDraft,
 }: {
-  formules: ReferenceOption[];
-  emptyText: string;
-  canAdd: boolean;
-  onAdd: () => void;
-  onEdit: (formule: ReferenceOption) => void;
+  drafts: PersonneMatrixLine[];
+  enabled: boolean;
+  activeUsage: ReferenceOption | null;
+  updateDraft: (localKey: string, patch: Partial<PersonneMatrixLine>) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-md border">
       <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
         <div className="text-sm font-semibold text-blue-600">Garanties personnes</div>
-        <Button type="button" size="sm" variant="outline" disabled={!canAdd} onClick={onAdd}>
-          <Plus className="size-4" />
-          Ajouter formule
-        </Button>
+        {activeUsage ? <Badge variant="outline">{enabled ? (activeUsage.code ? `Usage ${activeUsage.code}` : activeUsage.libelle) : "Non applicable"}</Badge> : null}
       </div>
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">#</TableHead>
             <TableHead>Garantie</TableHead>
-            <TableHead>Formule</TableHead>
             <TableHead className="text-right">Décès</TableHead>
             <TableHead className="text-right">Invalidité</TableHead>
             <TableHead className="text-right">Frais médicaux</TableHead>
@@ -411,34 +392,53 @@ function PersonnesLinesTable({
             <TableHead className="text-right">Frais chirurgie</TableHead>
             <TableHead className="text-right">Prime</TableHead>
             <TableHead className="text-right">Accessoire</TableHead>
-            <TableHead className="w-12 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {formules.length === 0 ? (
+          {drafts.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">{emptyText}</TableCell>
+              <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucune garantie personne disponible.</TableCell>
             </TableRow>
           ) : (
-            formules.map((formule) => (
-              <TableRow key={formule.id}>
-                <TableCell className="font-semibold">{text(formule.garantieCode)}</TableCell>
-                <TableCell>{formule.libelle}</TableCell>
-                <TableCell className="text-right">{money(formule.montantDeces)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantInvalidite)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisMedicaux)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisHospitalisation)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisFuneraires)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisChirurgie)}</TableCell>
-                <TableCell className="text-right">{money(formule.primeNette)}</TableCell>
-                <TableCell className="text-right">{money(formule.accessoire)}</TableCell>
-                <TableCell className="text-right">
-                  <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(formule)}>
-                    <Edit className="size-4" />
-                  </Button>
+            drafts.map((draft) => {
+              const checked = enabled && draft.checked;
+              return (
+              <TableRow key={draft.localKey}>
+                <TableCell>
+                  <Checkbox
+                    checked={checked}
+                    disabled={!enabled}
+                    onCheckedChange={(value) => updateDraft(draft.localKey, { checked: value === true })}
+                  />
+                </TableCell>
+                <TableCell className="font-semibold">{draft.formule}</TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.montantDeces} onChange={(value) => updateDraft(draft.localKey, { montantDeces: value })} />
+                </TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.montantInvalidite} onChange={(value) => updateDraft(draft.localKey, { montantInvalidite: value })} />
+                </TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.montantFraisMedicaux} onChange={(value) => updateDraft(draft.localKey, { montantFraisMedicaux: value })} />
+                </TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.montantFraisHospitalisation} onChange={(value) => updateDraft(draft.localKey, { montantFraisHospitalisation: value })} />
+                </TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.montantFraisFuneraires} onChange={(value) => updateDraft(draft.localKey, { montantFraisFuneraires: value })} />
+                </TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.montantFraisChirurgie} onChange={(value) => updateDraft(draft.localKey, { montantFraisChirurgie: value })} />
+                </TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.primeNette} onChange={(value) => updateDraft(draft.localKey, { primeNette: value })} />
+                </TableCell>
+                <TableCell>
+                  <NumberCell disabled={!checked} value={draft.accessoire} onChange={(value) => updateDraft(draft.localKey, { accessoire: value })} />
                 </TableCell>
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>
@@ -518,6 +518,49 @@ function DraftNumberStack({
       ))}
     </div>
   );
+}
+
+function buildPersonneDrafts(garanties: ReferenceOption[], formules: ReferenceOption[]): PersonneMatrixLine[] {
+  const byGarantie = new Map<string, ReferenceOption>();
+  for (const formule of formules) {
+    const garantieId = String(formule.garantieId ?? "");
+    if (garantieId && !byGarantie.has(garantieId)) {
+      byGarantie.set(garantieId, formule);
+    }
+  }
+  return garanties.map((garantie) => {
+    const existing = byGarantie.get(garantie.id);
+    if (!existing) return emptyPersonneDraft(garantie);
+    return {
+      localKey: newLocalKey(),
+      checked: true,
+      id: existing.id,
+      garantieId: garantie.id,
+      usageId: String(existing.usageId ?? ""),
+      formule: stringValue(existing.garantieCode) || garantie.code || garantie.libelle,
+      montantDeces: toNumber(existing.montantDeces),
+      montantInvalidite: toNumber(existing.montantInvalidite),
+      montantFraisMedicaux: toNumber(existing.montantFraisMedicaux),
+      montantFraisHospitalisation: toNumber(existing.montantFraisHospitalisation),
+      montantFraisFuneraires: toNumber(existing.montantFraisFuneraires),
+      montantFraisChirurgie: toNumber(existing.montantFraisChirurgie),
+      primeNette: toNumber(existing.primeNette),
+      accessoire: toNumber(existing.accessoire),
+      ordreAffichage: toNumber(existing.ordreAffichage) ?? toNumber(garantie.ordreAffichage),
+      actif: true,
+    };
+  });
+}
+
+function emptyPersonneDraft(garantie: ReferenceOption): PersonneMatrixLine {
+  return {
+    localKey: newLocalKey(),
+    checked: false,
+    garantieId: garantie.id,
+    formule: garantie.code || garantie.libelle,
+    ordreAffichage: toNumber(garantie.ordreAffichage),
+    actif: true,
+  };
 }
 
 function buildDrafts(garanties: ReferenceOption[], lignes: ReferenceOption[]): MatrixLine[] {
@@ -600,6 +643,25 @@ function cleanDraft(draft: MatrixLine, usageId: string, garantie?: ReferenceOpti
     franchiseMinimale: franchise ? draft.franchiseMinimale : undefined,
     capital: mode === "CAPITAL" ? draft.capital : undefined,
     prime: mode === "CAPITAL" || mode === "PRIME_FIXE" ? draft.prime : undefined,
+    ordreAffichage: draft.ordreAffichage,
+    actif: true,
+  };
+}
+
+function cleanPersonneDraft(draft: PersonneMatrixLine, usageId: string): UpsertFormuleGarantiePersonneRequest {
+  return {
+    id: draft.id,
+    garantieId: draft.garantieId,
+    usageId,
+    formule: draft.formule || undefined,
+    montantDeces: draft.montantDeces,
+    montantInvalidite: draft.montantInvalidite,
+    montantFraisMedicaux: draft.montantFraisMedicaux,
+    montantFraisHospitalisation: draft.montantFraisHospitalisation,
+    montantFraisFuneraires: draft.montantFraisFuneraires,
+    montantFraisChirurgie: draft.montantFraisChirurgie,
+    primeNette: draft.primeNette,
+    accessoire: draft.accessoire,
     ordreAffichage: draft.ordreAffichage,
     actif: true,
   };

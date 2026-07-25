@@ -1171,6 +1171,7 @@ public class ReferentielController {
                 .putValue("montantFraisChirurgie", formule.getMontantFraisChirurgie())
                 .putValue("primeNette", formule.getPrimeNette())
                 .putValue("accessoire", formule.getAccessoire())
+                .putValue("ordreAffichage", formule.getOrdreAffichage())
                 .putValue("actif", formule.getActif())
                 .map();
     }

@@ -5,8 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
-import { money, numberValue } from "../utils/format";
-import type { GarantieInput, ReferenceOption, VehiculeInput } from "../types";
+import { formatMoney, money, numberValue } from "../utils/format";
+import type { GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 
 export function GarantieSection({
   garanties,
@@ -21,6 +21,9 @@ export function GarantieSection({
   allowPrimeColumn = false,
   primeColumnEnabled = false,
   setPrimeColumnEnabled,
+  preview,
+  previewing = false,
+  showTotalsSummary = false,
 }: {
   garanties: ReferenceOption[];
   selected: GarantieInput[];
@@ -34,6 +37,9 @@ export function GarantieSection({
   allowPrimeColumn?: boolean;
   primeColumnEnabled?: boolean;
   setPrimeColumnEnabled?: (value: boolean) => void;
+  preview?: QuittancePreview | null;
+  previewing?: boolean;
+  showTotalsSummary?: boolean;
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
   const vehiculeGaranties = garanties
@@ -349,8 +355,45 @@ export function GarantieSection({
           </div>
         </div>
       ) : null}
+      {showTotalsSummary ? <GuaranteeTotalsSummary preview={preview} loading={previewing} /> : null}
     </SectionCard>
   );
+}
+
+function GuaranteeTotalsSummary({
+  preview,
+  loading,
+}: {
+  preview?: QuittancePreview | null;
+  loading?: boolean;
+}) {
+  const rows: [string, number | undefined][] = [
+    ["TOTAL NET", preview?.primeNette],
+    ["EVCAT", linePrimeNette(preview, "EVCAT")],
+    ["PTA (Prime Personne)", linePrimeNette(preview, "CORPOREL")],
+    ["ACCESSOIRE", preview?.accessoire],
+    ["TAXE", preview?.taxe],
+    ["CNPAC", preview?.cnpac],
+    ["TOTAL À PAYER", preview?.primeTotale],
+    ["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")],
+  ];
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-md border">
+      {rows.map(([label, value]) => (
+        <div key={label} className="grid grid-cols-[1fr_160px] border-b last:border-b-0">
+          <div className="bg-muted/20 px-3 py-2 text-xs font-semibold uppercase">{label}</div>
+          <div className="px-3 py-2 text-right text-xs font-semibold">
+            {loading ? "Calcul..." : value == null ? "-" : formatMoney(value)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
+  return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
 }
 
 function defaultSource(garantie: ReferenceOption) {

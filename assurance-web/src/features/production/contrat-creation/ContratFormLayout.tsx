@@ -90,6 +90,9 @@ export function ContratFormLayout({
       allowPrimeColumn={allowSaisiePrimeNette}
       primeColumnEnabled={form.saisiePrimeNette}
       setPrimeColumnEnabled={form.setSaisiePrimeNette}
+      preview={form.preview}
+      previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
+      showTotalsSummary={showConvention}
     />
   );
 
@@ -164,7 +167,7 @@ export function ContratFormLayout({
         tone="production"
         defaultOpen={false}
       >
-        <QuittancePreviewCard preview={form.preview} />
+        <QuittancePreviewCard preview={form.preview} loading={form.previewMutation.isPending || form.autoPreviewMutation.isPending} />
       </SectionCard>
     )}
 

@@ -29,6 +29,18 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/ContratCreationPage")),
       },
       {
+        path: "production/ajouter-dossier/particulier",
+        lazy: lazyRoute(() => import("@/features/production/pages/ParticulierContratCreationPage")),
+      },
+      {
+        path: "production/ajouter-dossier/flotte",
+        lazy: lazyRoute(() => import("@/features/production/pages/FlotteContratCreationPage")),
+      },
+      {
+        path: "production/ajouter-dossier/convention",
+        lazy: lazyRoute(() => import("@/features/production/pages/ConventionContratCreationPage")),
+      },
+      {
         path: "production/contrats",
         lazy: lazyRoute(() => import("@/features/production/pages/ContratsPage")),
       },

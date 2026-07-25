@@ -1,17 +1,15 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight, Building2, Car, FilePlus2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "../components/Field";
-import { ConventionContratForm } from "../contrat-creation/ConventionContratForm";
-import { FlotteContratForm } from "../contrat-creation/FlotteContratForm";
-import { ParticulierContratForm } from "../contrat-creation/ParticulierContratForm";
 import { useContratCreationForm } from "../contrat-creation/useContratCreationForm";
 import type { TypeContrat } from "../types";
 
 export default function ContratCreationPage() {
-  const [started, setStarted] = useState(false);
+  const navigate = useNavigate();
   const [assurance, setAssurance] = useState("");
   const [typeContrat, setTypeContrat] = useState<TypeContrat | "">("");
   const [categorieClientId, setCategorieClientId] = useState("");
@@ -33,29 +31,23 @@ export default function ContratCreationPage() {
     (typeContrat !== "CONVENTION" || Boolean(form.compagnieAssuranceId && form.conventionId && form.usageId));
 
   const handleStart = () => {
-    if (typeContrat === "PARTICULIER" && categorieClientId) {
-      form.setClients(
-        form.clients.map((client) =>
-          client.role === "SOUSCRIPTEUR"
-            ? { ...client, client: { ...client.client, categorieClientId } }
-            : client
-        )
-      );
+    if (typeContrat === "PARTICULIER") {
+      navigate(`/app/production/ajouter-dossier/particulier?categorieClientId=${encodeURIComponent(categorieClientId)}`);
+      return;
     }
-    setStarted(true);
+    if (typeContrat === "FLOTTE") {
+      navigate("/app/production/ajouter-dossier/flotte");
+      return;
+    }
+    if (typeContrat === "CONVENTION") {
+      const params = new URLSearchParams({
+        compagnieAssuranceId: form.compagnieAssuranceId,
+        conventionId: form.conventionId,
+        usageId: form.usageId,
+      });
+      navigate(`/app/production/ajouter-dossier/convention?${params.toString()}`);
+    }
   };
-
-  if (started && typeContrat === "CONVENTION") {
-    return <ConventionContratForm form={form} />;
-  }
-
-  if (started && typeContrat === "FLOTTE") {
-    return <FlotteContratForm form={form} />;
-  }
-
-  if (started && typeContrat === "PARTICULIER") {
-    return <ParticulierContratForm form={form} />;
-  }
 
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-6">

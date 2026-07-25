@@ -9,6 +9,7 @@ export function FlotteContratForm({ form }: { form: ContratCreationFormState }) 
       description="Contrat flotte avec grille tarifaire et gestion multi-véhicules."
       showGrille
       allowMultipleVehicules
+      order="flotte"
     />
   );
 }

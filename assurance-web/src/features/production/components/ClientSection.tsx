@@ -27,11 +27,13 @@ export function ClientSection({
   setClients,
   villes,
   categoriesClient,
+  showOptionalRoles = false,
 }: {
   clients: ClientInput[];
   setClients: (clients: ClientInput[]) => void;
   villes: ReferenceOption[];
   categoriesClient: ReferenceOption[];
+  showOptionalRoles?: boolean;
 }) {
   const update = (index: number, patch: Partial<ClientInput>) => {
     setClients(clients.map((client, idx) => (idx === index ? { ...client, ...patch } : client)));
@@ -184,20 +186,22 @@ export function ClientSection({
         {renderClients(["PROPRIETAIRE"])}
       </SectionCard>
 
-      <SectionCard
-        title="Conducteurs et bénéficiaires"
-        badge="Optionnel"
-        tone="production"
-        defaultOpen={false}
-        action={
-          <Button type="button" variant="outline" size="sm" onClick={() => setClients([...clients, emptyClient("CONDUCTEUR")])}>
-            <Plus className="size-4" />
-            Conducteur
-          </Button>
-        }
-      >
-        {renderClients(["CONDUCTEUR", "BENEFICIAIRE"])}
-      </SectionCard>
+      {showOptionalRoles ? (
+        <SectionCard
+          title="Conducteurs et bénéficiaires"
+          badge="Optionnel"
+          tone="production"
+          defaultOpen={false}
+          action={
+            <Button type="button" variant="outline" size="sm" onClick={() => setClients([...clients, emptyClient("CONDUCTEUR")])}>
+              <Plus className="size-4" />
+              Conducteur
+            </Button>
+          }
+        >
+          {renderClients(["CONDUCTEUR", "BENEFICIAIRE"])}
+        </SectionCard>
+      ) : null}
     </>
   );
 }

@@ -58,7 +58,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
 
   useEffect(() => {
     const garantiesReference = refs.garanties.data ?? [];
-    const mandatory = garantiesReference.filter((garantie) => garantie.responsabiliteCivile || garantie.obligatoire);
+    const mandatory = garantiesReference.filter((garantie) => garantie.responsabiliteCivile);
     if (mandatory.length === 0) {
       return;
     }

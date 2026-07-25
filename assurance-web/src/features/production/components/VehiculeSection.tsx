@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
-import type { ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
+import type { ReferenceOption, VehiculeInput } from "../types";
 
 export function emptyVehicule(usageId?: string): VehiculeInput {
   return {
@@ -19,9 +19,7 @@ export function emptyVehicule(usageId?: string): VehiculeInput {
 
 export function VehiculeSection({
   vehicules,
-  remorques,
   setVehicules,
-  setRemorques,
   usages,
   marques,
   carrosseries,
@@ -29,9 +27,7 @@ export function VehiculeSection({
   allowMultipleVehicules = true,
 }: {
   vehicules: VehiculeInput[];
-  remorques: RemorqueInput[];
   setVehicules: (vehicules: VehiculeInput[]) => void;
-  setRemorques: (remorques: RemorqueInput[]) => void;
   usages: ReferenceOption[];
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
@@ -48,18 +44,12 @@ export function VehiculeSection({
       badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`}
       tone="production"
       action={
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setRemorques([...remorques, {}])}>
+        allowMultipleVehicules ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => setVehicules([...vehicules, emptyVehicule()])}>
             <Plus className="size-4" />
-            Remorque
+            Véhicule
           </Button>
-          {allowMultipleVehicules ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => setVehicules([...vehicules, emptyVehicule()])}>
-              <Plus className="size-4" />
-              Véhicule
-            </Button>
-          ) : null}
-        </div>
+        ) : null
       }
     >
       <div className="grid gap-4">
@@ -178,35 +168,6 @@ export function VehiculeSection({
             </div>
           );
         })}
-        {remorques.map((remorque, index) => (
-          <div key={index} className="rounded-lg border border-dashed p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-medium">Remorque {index + 1}</div>
-              <Button type="button" variant="ghost" size="icon" onClick={() => setRemorques(remorques.filter((_, idx) => idx !== index))}>
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              <Field label="Usage">
-                <Select value={remorque.usageId ?? ""} onValueChange={(value) => setRemorques(remorques.map((item, idx) => idx === index ? { ...item, usageId: value } : item))}>
-                  <SelectTrigger><SelectValue placeholder="Usage remorque" /></SelectTrigger>
-                  <SelectContent>
-                    {usages.map((usage) => <SelectItem key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Immatriculation">
-                <Input value={remorque.immatriculation ?? ""} onChange={(event) => setRemorques(remorques.map((item, idx) => idx === index ? { ...item, immatriculation: event.target.value } : item))} />
-              </Field>
-              <Field label="PTC">
-                <Input value={remorque.ptc ?? ""} onChange={(event) => setRemorques(remorques.map((item, idx) => idx === index ? { ...item, ptc: event.target.value } : item))} />
-              </Field>
-              <Field label="Valeur assurée">
-                <Input type="number" value={remorque.valeurAssuree ?? ""} onChange={(event) => setRemorques(remorques.map((item, idx) => idx === index ? { ...item, valeurAssuree: numberValue(event.target.value) } : item))} />
-              </Field>
-            </div>
-          </div>
-        ))}
       </div>
     </SectionCard>
   );

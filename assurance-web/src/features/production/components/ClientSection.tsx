@@ -508,7 +508,7 @@ export function ClientSection({
 
 function SaveSectionButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button type="button" size="sm" variant="secondary" onClick={onClick}>
+    <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={onClick}>
       <Save className="size-4" />
       Enregistrer
     </Button>

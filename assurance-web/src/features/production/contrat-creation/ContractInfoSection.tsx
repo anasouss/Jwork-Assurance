@@ -91,10 +91,14 @@ export function ContractInfoSection({
           </Field>
         ) : null}
         <Field label="Usage contrat">
-          <Select value={form.usageId} onValueChange={form.setUsageId}>
+          <Select
+            value={form.usageId}
+            onValueChange={form.setUsageId}
+            disabled={form.typeContrat === "CONVENTION" && (!form.conventionId || form.availableUsages.length === 0)}
+          >
             <SelectTrigger><SelectValue placeholder="Usage" /></SelectTrigger>
             <SelectContent>
-              {form.refs.usages.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>)}
+              {form.availableUsages.map((item) => <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>)}
             </SelectContent>
           </Select>
         </Field>

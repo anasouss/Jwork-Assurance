@@ -159,10 +159,10 @@ export default function ContratCreationPage() {
                 </Select>
               </Field>
               <Field label="Usage">
-                <Select value={form.usageId} onValueChange={form.setUsageId} disabled={!form.conventionId}>
+                <Select value={form.usageId} onValueChange={form.setUsageId} disabled={!form.conventionId || form.availableUsages.length === 0}>
                   <SelectTrigger><SelectValue placeholder="Choisir une option" /></SelectTrigger>
                   <SelectContent>
-                    {form.refs.usages.data?.map((usage) => (
+                    {form.availableUsages.map((usage) => (
                       <SelectItem key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</SelectItem>
                     ))}
                   </SelectContent>

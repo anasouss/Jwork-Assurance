@@ -61,6 +61,39 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     categoriesClient: useReference("categories-client"),
   };
 
+  const selectedConvention = useMemo(
+    () => refs.conventions.data?.find((item) => item.id === conventionId) ?? null,
+    [conventionId, refs.conventions.data]
+  );
+
+  const conventionUsageIds = useMemo(
+    () => referenceStringArray(selectedConvention, "usageIds"),
+    [selectedConvention]
+  );
+
+  const availableUsages = useMemo(() => {
+    const usages = refs.usages.data ?? [];
+    if (typeContrat !== "CONVENTION") {
+      return usages;
+    }
+    if (!conventionId || !selectedConvention) {
+      return [];
+    }
+    const allowedIds = new Set(conventionUsageIds);
+    return usages.filter((usage) => allowedIds.has(usage.id));
+  }, [conventionId, conventionUsageIds, refs.usages.data, selectedConvention, typeContrat]);
+
+  useEffect(() => {
+    if (typeContrat !== "CONVENTION" || !usageId || !selectedConvention) {
+      return;
+    }
+    if (conventionUsageIds.includes(usageId)) {
+      return;
+    }
+    setUsageId("");
+    setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
+  }, [conventionUsageIds, selectedConvention, typeContrat, usageId]);
+
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId],
     queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId }),
@@ -353,7 +386,21 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     return () => window.clearTimeout(timeout);
   }, [request, typeContrat]);
 
+  const setCompagnieForContrat = (value: string) => {
+    if (value === compagnieAssuranceId) {
+      return;
+    }
+    setCompagnieAssuranceId(value);
+    setConventionId("");
+    setUsageId("");
+    setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
+  };
+
   const setConventionForContrat = (value: string) => {
+    if (value !== conventionId) {
+      setUsageId("");
+      setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
+    }
     setConventionId(value);
     const convention = refs.conventions.data?.find((item) => item.id === value);
     const conventionFractionnement = convention?.fractionnement;
@@ -364,7 +411,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
 
   const setUsageForContrat = (value: string) => {
     setUsageId(value);
-    setVehicules(vehicules.map((vehicule) => ({ ...vehicule, usageId: value })));
+    setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: value })));
   };
 
   return {
@@ -381,6 +428,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     handleCreate,
     handleSaveSection,
     savedSections,
+    availableUsages,
     numeroContrat,
     setNumeroContrat,
     numeroPolice,
@@ -388,7 +436,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     numeroAttestation,
     setNumeroAttestation,
     compagnieAssuranceId,
-    setCompagnieAssuranceId,
+    setCompagnieAssuranceId: setCompagnieForContrat,
     conventionId,
     setConventionId: setConventionForContrat,
     usageId,
@@ -435,6 +483,11 @@ function useReference(path: string) {
 
 function emptyToUndefined(value: string) {
   return value.trim() ? value : undefined;
+}
+
+function referenceStringArray(option: ReferenceOption | null | undefined, key: string) {
+  const value = option?.[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function principalTelephone(telephones?: { numero: string; principal?: boolean }[]) {

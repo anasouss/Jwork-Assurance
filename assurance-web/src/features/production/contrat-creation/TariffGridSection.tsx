@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Plus, Save } from "lucide-react";
+import { Edit, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
@@ -154,10 +154,6 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
-          <Button type="button" size="sm" onClick={() => form.handleSaveSection("grille")}>
-            <Save className="size-4" />
-            Enregistrer
-          </Button>
           <Button
             type="button"
             size="sm"

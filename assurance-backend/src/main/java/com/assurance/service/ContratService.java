@@ -152,10 +152,8 @@ public class ContratService {
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
-            Marque marque = input.getMarqueId() == null ? null : marqueRepository.findById(input.getMarqueId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Marque", input.getMarqueId()));
-            Carrosserie carrosserie = input.getCarrosserieId() == null ? null : carrosserieRepository.findById(input.getCarrosserieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Carrosserie", input.getCarrosserieId()));
+            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
+            Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), true);
             CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
             validateCategorieTransport(usage, categorieTransport);
             Vehicule vehicule = vehiculeRepository.save(Vehicule.builder()
@@ -195,8 +193,7 @@ public class ContratService {
         for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
-            Marque marque = input.getMarqueId() == null ? null : marqueRepository.findById(input.getMarqueId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Marque", input.getMarqueId()));
+            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
             Remorque remorque = remorqueRepository.save(Remorque.builder()
                     .contrat(contrat)
                     .usage(usage)
@@ -423,10 +420,8 @@ public class ContratService {
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
-            Marque marque = input.getMarqueId() == null ? null : marqueRepository.findById(input.getMarqueId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Marque", input.getMarqueId()));
-            Carrosserie carrosserie = input.getCarrosserieId() == null ? null : carrosserieRepository.findById(input.getCarrosserieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Carrosserie", input.getCarrosserieId()));
+            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), false);
+            Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), false);
             CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
             validateCategorieTransport(usage, categorieTransport);
             vehicules.add(Vehicule.builder()
@@ -467,8 +462,7 @@ public class ContratService {
         for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
-            Marque marque = input.getMarqueId() == null ? null : marqueRepository.findById(input.getMarqueId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Marque", input.getMarqueId()));
+            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), false);
             remorques.add(Remorque.builder()
                     .contrat(contrat)
                     .usage(usage)
@@ -721,6 +715,38 @@ public class ContratService {
                 .mouvements(mouvements)
                 .elementsFacturables(elementsFacturables)
                 .build();
+    }
+
+    private Marque resolveMarque(String marqueId, String marqueLibelle, boolean createIfMissing) {
+        if (hasText(marqueId)) {
+            return marqueRepository.findById(marqueId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Marque", marqueId));
+        }
+        if (!hasText(marqueLibelle)) {
+            return null;
+        }
+        String libelle = marqueLibelle.trim();
+        return marqueRepository.findByLibelleIgnoreCase(libelle)
+                .orElseGet(() -> createIfMissing ? marqueRepository.save(Marque.builder()
+                        .libelle(libelle)
+                        .actif(true)
+                        .build()) : Marque.builder().libelle(libelle).actif(true).build());
+    }
+
+    private Carrosserie resolveCarrosserie(String carrosserieId, String carrosserieLibelle, boolean createIfMissing) {
+        if (hasText(carrosserieId)) {
+            return carrosserieRepository.findById(carrosserieId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Carrosserie", carrosserieId));
+        }
+        if (!hasText(carrosserieLibelle)) {
+            return null;
+        }
+        String libelle = carrosserieLibelle.trim();
+        return carrosserieRepository.findByLibelleIgnoreCase(libelle)
+                .orElseGet(() -> createIfMissing ? carrosserieRepository.save(Carrosserie.builder()
+                        .libelle(libelle)
+                        .actif(true)
+                        .build()) : Carrosserie.builder().libelle(libelle).actif(true).build());
     }
 
     private CategorieTransport resolveCategorieTransport(String categorieTransportId) {

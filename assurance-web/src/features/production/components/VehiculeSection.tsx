@@ -85,6 +85,7 @@ export function VehiculeSection({
                     value={vehicule.usageId ?? ""}
                     placeholder="Usage"
                     emptyText="Aucun usage trouvé"
+                    invalidText="Usage invalide : choisissez une option existante."
                     options={usages.map((usage) => ({
                       value: usage.id,
                       label: usage.code ? `${usage.code} - ${usage.libelle}` : usage.libelle,
@@ -108,19 +109,25 @@ export function VehiculeSection({
                 <Field label="Marque" required>
                   <AutocompleteSelect
                     value={vehicule.marqueId ?? ""}
+                    customValue={vehicule.marqueLibelle}
+                    allowCustomValue
                     placeholder="Marque"
                     emptyText="Aucune marque trouvée"
                     options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
-                    onValueChange={(value) => update(index, { marqueId: value })}
+                    onValueChange={(value) => update(index, { marqueId: value || undefined, marqueLibelle: undefined })}
+                    onCustomValueChange={(value) => update(index, { marqueId: undefined, marqueLibelle: value })}
                   />
                 </Field>
                 <Field label="Carrosserie" required>
                   <AutocompleteSelect
                     value={vehicule.carrosserieId ?? ""}
+                    customValue={vehicule.carrosserieLibelle}
+                    allowCustomValue
                     placeholder="Carrosserie"
                     emptyText="Aucune carrosserie trouvée"
                     options={carrosseries.map((carrosserie) => ({ value: carrosserie.id, label: carrosserie.libelle, keywords: carrosserie.code }))}
-                    onValueChange={(value) => update(index, { carrosserieId: value })}
+                    onValueChange={(value) => update(index, { carrosserieId: value || undefined, carrosserieLibelle: undefined })}
+                    onCustomValueChange={(value) => update(index, { carrosserieId: undefined, carrosserieLibelle: value })}
                   />
                 </Field>
                 {needsCarburantAndPf ? (

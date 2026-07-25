@@ -66,6 +66,7 @@ export function RemorqueSection({
                   value={remorque.usageId ?? ""}
                   placeholder="Usage remorque"
                   emptyText="Aucun usage trouvé"
+                  invalidText="Usage invalide : choisissez une option existante."
                   options={usages.map((usage) => ({
                     value: usage.id,
                     label: usage.code ? `${usage.code} - ${usage.libelle}` : usage.libelle,
@@ -80,10 +81,13 @@ export function RemorqueSection({
               <Field label="Marque">
                 <AutocompleteSelect
                   value={remorque.marqueId ?? ""}
+                  customValue={remorque.marqueLibelle}
+                  allowCustomValue
                   placeholder="Marque"
                   emptyText="Aucune marque trouvée"
                   options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
-                  onValueChange={(value) => update(index, { marqueId: value })}
+                  onValueChange={(value) => update(index, { marqueId: value || undefined, marqueLibelle: undefined })}
+                  onCustomValueChange={(value) => update(index, { marqueId: undefined, marqueLibelle: value })}
                 />
               </Field>
               <Field label="Modèle">

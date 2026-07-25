@@ -84,7 +84,9 @@ public class CreateContratRequest {
         private TypeVehiculeContrat typeVehicule;
         private String usageId;
         private String marqueId;
+        private String marqueLibelle;
         private String carrosserieId;
+        private String carrosserieLibelle;
         private String categorieTransportId;
         private String immatriculation;
         private String immatriculationProvisoire;
@@ -113,6 +115,7 @@ public class CreateContratRequest {
     public static class RemorqueInput {
         private String usageId;
         private String marqueId;
+        private String marqueLibelle;
         private String immatriculation;
         private String modele;
         private String ptc;

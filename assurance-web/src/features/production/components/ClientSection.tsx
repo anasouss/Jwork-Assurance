@@ -339,13 +339,12 @@ export function ClientSection({
                     disabled={disabledByCopy}
                     placeholder="Ville"
                     emptyText="Aucune ville trouvée"
+                    invalidText="Ville invalide : choisissez une option existante."
                     options={villes.map((ville) => ({ value: ville.id, label: ville.libelle, keywords: ville.code }))}
                     onValueChange={(value) => updateClient(index, { villeId: value, sahara: false, justificatifSahara: undefined })}
                   />
                 </Field>
-              </div>
-              <div className="mt-3 grid max-w-4xl gap-3 md:grid-cols-2">
-                <Field label="Adresse" required className="md:col-span-2">
+                <Field label="Adresse" required>
                   <Input disabled={disabledByCopy} value={item.client.adresse ?? ""} onChange={(event) => updateClient(index, { adresse: event.target.value })} />
                 </Field>
               </div>

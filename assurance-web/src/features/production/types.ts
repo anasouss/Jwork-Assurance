@@ -208,7 +208,9 @@ export type VehiculeInput = {
   typeVehicule: "AUTOMOBILE" | "CAMION" | "MOTO" | "BUS" | "TRACTEUR" | "AUTRE";
   usageId?: string;
   marqueId?: string;
+  marqueLibelle?: string;
   carrosserieId?: string;
+  carrosserieLibelle?: string;
   categorieTransportId?: string;
   immatriculation?: string;
   immatriculationProvisoire?: string;
@@ -236,6 +238,7 @@ export type VehiculeInput = {
 export type RemorqueInput = {
   usageId?: string;
   marqueId?: string;
+  marqueLibelle?: string;
   immatriculation?: string;
   modele?: string;
   ptc?: string;

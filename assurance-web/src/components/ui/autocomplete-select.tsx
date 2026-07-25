@@ -14,8 +14,12 @@ type AutocompleteSelectProps = {
   options: AutocompleteOption[];
   value?: string;
   onValueChange: (value: string) => void;
+  customValue?: string;
+  onCustomValueChange?: (value: string | undefined) => void;
+  allowCustomValue?: boolean;
   placeholder?: string;
   emptyText?: string;
+  invalidText?: string;
   disabled?: boolean;
   className?: string;
 };
@@ -24,21 +28,27 @@ export function AutocompleteSelect({
   options,
   value,
   onValueChange,
+  customValue,
+  onCustomValueChange,
+  allowCustomValue = false,
   placeholder = "Choisir",
   emptyText = "Aucun résultat",
+  invalidText = "Choisissez une option existante.",
   disabled = false,
   className,
 }: AutocompleteSelectProps) {
   const selectedOption = options.find((option) => option.value === value);
+  const selectedLabel = selectedOption?.label ?? customValue ?? "";
   const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState(selectedOption?.label ?? "");
+  const [query, setQuery] = React.useState(selectedLabel);
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const [invalid, setInvalid] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) {
-      setQuery(selectedOption?.label ?? "");
+      setQuery(selectedLabel);
     }
-  }, [open, selectedOption?.label]);
+  }, [open, selectedLabel]);
 
   const filtered = React.useMemo(() => {
     const normalized = normalize(query);
@@ -57,11 +67,41 @@ export function AutocompleteSelect({
   const selectOption = (option: AutocompleteOption) => {
     onValueChange(option.value);
     setQuery(option.label);
+    setInvalid(false);
     setOpen(false);
   };
 
+  const commitQuery = () => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      onValueChange("");
+      onCustomValueChange?.(undefined);
+      setInvalid(false);
+      return;
+    }
+
+    const exact = options.find((option) => normalize(option.label) === normalize(trimmed));
+    if (exact) {
+      selectOption(exact);
+      return;
+    }
+
+    if (allowCustomValue) {
+      onValueChange("");
+      onCustomValueChange?.(trimmed);
+      setQuery(trimmed);
+      setInvalid(false);
+      return;
+    }
+
+    onValueChange("");
+    onCustomValueChange?.(undefined);
+    setQuery(trimmed);
+    setInvalid(true);
+  };
+
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative grid gap-1.5", className)}>
       <Input
         value={query}
         disabled={disabled}
@@ -73,14 +113,14 @@ export function AutocompleteSelect({
         onChange={(event) => {
           setQuery(event.target.value);
           setOpen(true);
-          if (!event.target.value) {
-            onValueChange("");
-          }
+          setInvalid(false);
+          onValueChange("");
+          onCustomValueChange?.(allowCustomValue && event.target.value ? event.target.value : undefined);
         }}
         onBlur={() => {
           window.setTimeout(() => {
+            commitQuery();
             setOpen(false);
-            setQuery(selectedOption?.label ?? "");
           }, 120);
         }}
         onKeyDown={(event) => {
@@ -104,7 +144,7 @@ export function AutocompleteSelect({
             setOpen(false);
           }
         }}
-        className="pr-9"
+        className={cn("pr-9", invalid && "border-red-500 ring-1 ring-red-500/20")}
       />
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       {open && !disabled ? (
@@ -135,6 +175,7 @@ export function AutocompleteSelect({
           )}
         </div>
       ) : null}
+      {invalid ? <span className="text-xs text-red-600">{invalidText}</span> : null}
     </div>
   );
 }

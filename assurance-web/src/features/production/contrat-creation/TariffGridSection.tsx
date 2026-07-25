@@ -56,8 +56,7 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
       if (formule.usageId) usageIds.add(String(formule.usageId));
     }
     const usages = form.refs.usages.data ?? [];
-    const filtered = usageIds.size > 0 ? usages.filter((usage) => usageIds.has(usage.id)) : usages;
-    return filtered;
+    return usages.filter((usage) => usageIds.has(usage.id));
   }, [form.refs.usages.data, formules.data, lignes.data]);
   const activeUsageId = selectedUsageId || usageTabs[0]?.id || "";
   const activeUsage = usageTabs.find((usage) => usage.id === activeUsageId) ?? null;
@@ -143,19 +142,6 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
             {selectedGrille ? <Edit className="size-4" /> : <Plus className="size-4" />}
             {selectedGrille ? "Modifier grille" : "Créer grille"}
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={!form.grilleTarifaireId}
-            onClick={() => {
-              setEditingLigne(null);
-              setLigneDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            Ligne
-          </Button>
         </div>
       }
     >
@@ -187,22 +173,22 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {usageTabs.map((usage) => {
-            const active = usage.id === activeUsageId;
-            return (
-              <Button
-                key={usage.id}
-                type="button"
-                variant={active ? "default" : "outline"}
-                className={active ? "bg-emerald-600 text-white hover:bg-emerald-700" : ""}
-                onClick={() => setSelectedUsageId(usage.id)}
-              >
-                {usage.code ? `Usage ${usage.code}` : usage.libelle}
-              </Button>
-            );
-          })}
-          {form.grilleTarifaireId ? (
+        {form.grilleTarifaireId ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {usageTabs.map((usage) => {
+              const active = usage.id === activeUsageId;
+              return (
+                <Button
+                  key={usage.id}
+                  type="button"
+                  variant={active ? "default" : "outline"}
+                  className={active ? "bg-emerald-600 text-white hover:bg-emerald-700" : ""}
+                  onClick={() => setSelectedUsageId(usage.id)}
+                >
+                  {usage.code ? `Usage ${usage.code}` : usage.libelle}
+                </Button>
+              );
+            })}
             <Button
               type="button"
               size="icon"
@@ -214,8 +200,8 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
             >
               <Plus className="size-4" />
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         <div className="rounded-md border">
           <div className="flex items-center justify-between border-b px-3 py-2">

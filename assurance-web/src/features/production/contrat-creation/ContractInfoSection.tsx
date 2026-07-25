@@ -1,4 +1,5 @@
 import { DatePicker } from "@/components/ui/date-picker";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "../components/Field";
@@ -31,33 +32,37 @@ export function ContractInfoSection({
   const souscripteur = form.clients.find((client) => client.role === "SOUSCRIPTEUR");
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
   const selectedCategorie = (form.refs.categoriesClient.data ?? []).find((categorie) => categorie.id === categorieClientId);
+  const showCategorieClient = form.typeContrat === "PARTICULIER";
+  const showCrmPartage = form.typeContrat === "FLOTTE";
 
   return (
     <SectionCard title="Contrat" badge={badge} tone="production" defaultOpen={false}>
       <div className="grid gap-3 md:grid-cols-4">
-        <Field label="Catégorie">
-          {categorieClientId ? (
-            <Input value={selectedCategorie?.libelle ?? "Catégorie sélectionnée"} disabled />
-          ) : (
-            <Select
-              value={categorieClientId}
-              onValueChange={(value) =>
-                form.setClients(
-                  form.clients.map((client) =>
-                    client.role === "SOUSCRIPTEUR"
-                      ? { ...client, client: { ...client.client, categorieClientId: value } }
-                      : client
+        {showCategorieClient ? (
+          <Field label="Catégorie">
+            {categorieClientId ? (
+              <Input value={selectedCategorie?.libelle ?? "Catégorie sélectionnée"} disabled />
+            ) : (
+              <Select
+                value={categorieClientId}
+                onValueChange={(value) =>
+                  form.setClients(
+                    form.clients.map((client) =>
+                      client.role === "SOUSCRIPTEUR"
+                        ? { ...client, client: { ...client.client, categorieClientId: value } }
+                        : client
+                    )
                   )
-                )
-              }
-            >
-              <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
-              <SelectContent>
-                {form.refs.categoriesClient.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-        </Field>
+                }
+              >
+                <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
+                <SelectContent>
+                  {form.refs.categoriesClient.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+        ) : null}
         <Field label="Compagnie">
           <Select value={form.compagnieAssuranceId} onValueChange={form.setCompagnieAssuranceId}>
             <SelectTrigger><SelectValue placeholder="Compagnie" /></SelectTrigger>
@@ -127,6 +132,24 @@ export function ContractInfoSection({
               </SelectContent>
             </Select>
           </Field>
+        ) : null}
+        {showCrmPartage ? (
+          <>
+            <Field label="CRM partagé">
+              <label className="flex h-10 items-center gap-2 rounded-md border bg-background px-3 text-sm">
+                <Checkbox checked={form.crmPartage} onCheckedChange={(checked) => form.setCrmPartage(Boolean(checked))} />
+                <span>Appliquer à tous les véhicules</span>
+              </label>
+            </Field>
+            <Field label="CRM flotte">
+              <Input
+                value={form.crmPartageValeur}
+                disabled={!form.crmPartage}
+                placeholder="0,9"
+                onChange={(event) => form.setCrmPartageValeur(event.target.value)}
+              />
+            </Field>
+          </>
         ) : null}
       </div>
     </SectionCard>

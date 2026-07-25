@@ -14,6 +14,7 @@ import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.entity.CategorieTransport;
 import com.assurance.entity.Carburant;
 import com.assurance.entity.Carrosserie;
+import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Convention;
 import com.assurance.entity.FormuleGarantiePersonne;
@@ -22,7 +23,9 @@ import com.assurance.entity.GrilleTarifaire;
 import com.assurance.entity.GroupeUsageAttestation;
 import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.entity.Marque;
+import com.assurance.entity.ProduitAssistance;
 import com.assurance.entity.SousClasse;
+import com.assurance.entity.TarifProduitAssistance;
 import com.assurance.entity.TarifUsage;
 import com.assurance.entity.Usage;
 import com.assurance.enums.TypeGarantie;
@@ -75,6 +78,8 @@ public class ReferentielController {
     private final CategorieClientRepository categorieClientRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
     private final ConventionRepository conventionRepository;
+    private final CompagnieAssistanceRepository compagnieAssistanceRepository;
+    private final ProduitAssistanceRepository produitAssistanceRepository;
 
     @GetMapping("/usages")
     @Transactional(readOnly = true)
@@ -278,6 +283,34 @@ public class ReferentielController {
                         .libelle(compagnie.getNom())
                         .actif(compagnie.getActif())
                         .build())
+                .toList()));
+    }
+
+    @GetMapping("/compagnies-assistance")
+    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> compagniesAssistance() {
+        return ResponseEntity.ok(ApiResponse.success(compagnieAssistanceRepository.findAll(Sort.by("nom")).stream()
+                .filter(compagnie -> Boolean.TRUE.equals(compagnie.getActif()))
+                .map(compagnie -> ReferenceOptionResponse.builder()
+                        .id(compagnie.getId())
+                        .code(compagnie.getCode())
+                        .libelle(compagnie.getNom())
+                        .actif(compagnie.getActif())
+                        .build())
+                .toList()));
+    }
+
+    @GetMapping("/produits-assistance")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> produitsAssistance(
+            @RequestParam(required = false) String compagnieAssistanceId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(produitAssistanceRepository.findAll(Sort.by("libelle")).stream()
+                .filter(produit -> Boolean.TRUE.equals(produit.getActif()))
+                .filter(produit -> compagnieAssistanceId == null
+                        || compagnieAssistanceId.isBlank()
+                        || (produit.getCompagnieAssistance() != null
+                        && produit.getCompagnieAssistance().getId().equals(compagnieAssistanceId)))
+                .map(this::toProduitAssistanceResponse)
                 .toList()));
     }
 
@@ -896,6 +929,27 @@ public class ReferentielController {
                 .putValue("primeNette", formule.getPrimeNette())
                 .putValue("accessoire", formule.getAccessoire())
                 .putValue("actif", formule.getActif())
+                .map();
+    }
+
+    private Map<String, Object> toProduitAssistanceResponse(ProduitAssistance produit) {
+        TarifProduitAssistance tarif = produit.getTarifs() == null ? null : produit.getTarifs().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                .findFirst()
+                .orElse(null);
+        return option(produit.getId(), null, produit.getLibelle())
+                .putValue("type", produit.getType())
+                .putValue("compagnieAssistanceId", produit.getCompagnieAssistance() != null ? produit.getCompagnieAssistance().getId() : null)
+                .putValue("compagnieAssistanceLibelle", produit.getCompagnieAssistance() != null ? produit.getCompagnieAssistance().getNom() : null)
+                .putValue("categorieClientId", produit.getCategorieClient() != null ? produit.getCategorieClient().getId() : null)
+                .putValue("categorieClientLibelle", produit.getCategorieClient() != null ? produit.getCategorieClient().getLibelle() : null)
+                .putValue("usageIds", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getId).toList())
+                .putValue("usageCodes", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getCode).toList())
+                .putValue("montantHt", tarif != null ? tarif.getMontantHt() : null)
+                .putValue("montantTtc", tarif != null ? tarif.getMontantTtc() : null)
+                .putValue("dateDebutTarif", tarif != null ? tarif.getDateDebut() : null)
+                .putValue("dateFinTarif", tarif != null ? tarif.getDateFin() : null)
+                .putValue("actif", produit.getActif())
                 .map();
     }
 

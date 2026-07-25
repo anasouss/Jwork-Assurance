@@ -31,6 +31,9 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [dateEffet, setDateEffet] = useState<string | undefined>();
   const [dateEcheance, setDateEcheance] = useState<string | undefined>();
   const [fractionnement, setFractionnement] = useState<CreateContratRequest["fractionnement"]>("ANNUEL");
+  const [crmPartage, setCrmPartage] = useState(false);
+  const [crmPartageValeur, setCrmPartageValeur] = useState("");
+  const [assistanceEnabled, setAssistanceEnabled] = useState(false);
   const [saisiePrimeNette, setSaisiePrimeNette] = useState(false);
   const [clients, setClients] = useState<ClientInput[]>([emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")]);
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([emptyVehicule()]);
@@ -47,6 +50,8 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     categoriesTransport: useReference("categories-transport"),
     garanties: useReference("garanties"),
     compagnies: useReference("compagnies-assurance"),
+    compagniesAssistance: useReference("compagnies-assistance"),
+    produitsAssistance: useReference("produits-assistance"),
     conventions: useReference("conventions"),
     grilles: useReference("grilles-tarifaires"),
     villes: useReference("villes"),
@@ -111,7 +116,9 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     nombreVehicules: vehicules.length,
     nombreRemorques: remorques.length,
     prospection: false,
-    assistance: false,
+    assistance: typeContrat === "FLOTTE" ? assistanceEnabled : false,
+    crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
+    crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     clients: clients.map((client) => ({
       ...client,
       client: {
@@ -126,6 +133,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
       usageId: vehicule.usageId || usageId || undefined,
       dateEffet: vehicule.dateEffet || dateEffet,
       dateEcheance: vehicule.dateEcheance || dateEcheance,
+      crm: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : vehicule.crm,
     })),
     remorques: remorques.map((remorque) => ({
       ...remorque,
@@ -151,6 +159,9 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     dateEffet,
     dateEcheance,
     fractionnement,
+    crmPartage,
+    crmPartageValeur,
+    assistanceEnabled,
     modeSaisieGaranties,
     saisiePrimeNette,
     vehicules,
@@ -300,6 +311,12 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setDateEcheance,
     fractionnement,
     setFractionnement,
+    crmPartage,
+    setCrmPartage,
+    crmPartageValeur,
+    setCrmPartageValeur,
+    assistanceEnabled,
+    setAssistanceEnabled,
     saisiePrimeNette,
     setSaisiePrimeNette,
     clients,

@@ -102,7 +102,13 @@ export function ContratFormLayout({
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
+      compagniesAssistance={form.refs.compagniesAssistance.data ?? []}
+      produitsAssistance={form.refs.produitsAssistance.data ?? []}
       grilleSelected={Boolean(form.grilleTarifaireId)}
+      preview={form.preview}
+      previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
+      onPreviewQuittance={form.handlePreview}
+      setAssistanceEnabled={form.setAssistanceEnabled}
       maxRemorques={maxRemorques}
       errors={form.validationErrors}
     />

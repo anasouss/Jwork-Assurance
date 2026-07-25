@@ -14,8 +14,8 @@ import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { toDateOnly } from "../date";
-import { money, numberValue } from "../utils/format";
-import type { GarantieInput, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
+import { formatMoney, money, numberValue } from "../utils/format";
+import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
   kind: "vehicule" | "remorque";
@@ -27,6 +27,17 @@ type Target = {
   valeurNeuf?: number;
   valeurGlace?: number;
   valeurAssuree?: number;
+};
+
+type AssistanceDraft = {
+  enabled: boolean;
+  compagnieAssistanceId?: string;
+  produitAssistanceId?: string;
+  dateEffet?: string;
+  dateSouscription?: string;
+  echeanceCode?: string;
+  dateEcheance?: string;
+  numeroContratOuQuittance?: string;
 };
 
 type Props = {
@@ -43,7 +54,13 @@ type Props = {
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
+  compagniesAssistance: ReferenceOption[];
+  produitsAssistance: ReferenceOption[];
   grilleSelected: boolean;
+  preview?: QuittancePreview | null;
+  previewing?: boolean;
+  onPreviewQuittance?: () => void;
+  setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
   maxRemorques?: number | null;
   errors?: Record<string, string>;
 };
@@ -62,7 +79,13 @@ export function FlotteTargetsSection({
   marques,
   carrosseries,
   categoriesTransport,
+  compagniesAssistance,
+  produitsAssistance,
   grilleSelected,
+  preview,
+  previewing = false,
+  onPreviewQuittance,
+  setAssistanceEnabled,
   maxRemorques,
   errors = {},
 }: Props) {
@@ -90,6 +113,7 @@ export function FlotteTargetsSection({
   );
   const [activeKey, setActiveKey] = useState(targetKey(targets[0]));
   const [savedKeys, setSavedKeys] = useState<string[]>([]);
+  const [assistances, setAssistances] = useState<Record<string, AssistanceDraft>>({});
   const vehiculeGaranties = useMemo(
     () => garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE"),
     [garanties]
@@ -105,6 +129,17 @@ export function FlotteTargetsSection({
     vehiculeTargets.find((target) => targetKey(target) === activeKey) ?? vehiculeTargets[0];
   const activeRemorqueTarget =
     remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
+
+  const updateAssistance = (target: Target, patch: Partial<AssistanceDraft>) => {
+    setAssistances((current) => {
+      const key = targetKey(target);
+      const draft = current[key] ?? { enabled: false };
+      const nextForTarget = { ...draft, ...patch };
+      const next = { ...current, [key]: nextForTarget };
+      setAssistanceEnabled?.(Object.values(next).some((item) => item.enabled));
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!targets.some((target) => targetKey(target) === activeKey)) {
@@ -176,8 +211,8 @@ export function FlotteTargetsSection({
     }
   };
 
-  const saveTargetSection = (target: Target, label: string) => {
-    const key = targetKey(target);
+  const saveTargetSection = (target: Target, part: "info" | "garanties", label: string) => {
+    const key = `${targetKey(target)}:${part}`;
     setSavedKeys((current) => (current.includes(key) ? current : [...current, key]));
     toast.success(`${label} enregistré`);
   };
@@ -191,7 +226,7 @@ export function FlotteTargetsSection({
               {vehiculeTargets.map((target) => {
                 const key = targetKey(target);
                 const active = key === targetKey(activeVehiculeTarget);
-                const saved = savedKeys.includes(key);
+                const saved = savedKeys.includes(`${key}:info`) && savedKeys.includes(`${key}:garanties`);
                 return (
                   <button
                     key={key}
@@ -230,7 +265,15 @@ export function FlotteTargetsSection({
 
           {activeVehiculeTarget ? (
             <div className="grid gap-4">
-              <TargetSubsection title="Informations véhicule">
+              <TargetSubsection
+                title="Informations véhicule"
+                action={
+                  <Button type="button" onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule")}>
+                    <Save className="size-4" />
+                    Enregistrer informations
+                  </Button>
+                }
+              >
                 <VehicleForm
                   index={activeVehiculeTarget.index}
                   vehicule={vehicules[activeVehiculeTarget.index]}
@@ -245,6 +288,19 @@ export function FlotteTargetsSection({
               <TargetSubsection
                 title="Garanties"
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length > 1 ? "s" : ""}`}
+                action={
+                  <Button
+                    type="button"
+                    disabled={previewing}
+                    onClick={() => {
+                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
+                      onPreviewQuittance?.();
+                    }}
+                  >
+                    <Save className="size-4" />
+                    {previewing ? "Calcul..." : "Enregistrer garanties"}
+                  </Button>
+                }
               >
                 <TargetGuaranteesTable
                   target={activeVehiculeTarget}
@@ -255,15 +311,19 @@ export function FlotteTargetsSection({
                   lignes={lignes}
                   formulesPersonne={formulesPersonne}
                   usages={usages}
+                  compagniesAssistance={compagniesAssistance}
+                  produitsAssistance={produitsAssistance}
+                  assistance={assistances[targetKey(activeVehiculeTarget)] ?? { enabled: false }}
+                  onAssistanceChange={(patch) => updateAssistance(activeVehiculeTarget, patch)}
                   grilleSelected={grilleSelected}
                 />
+                <QuittanceTotalsSummary
+                  preview={preview}
+                  loading={previewing}
+                  showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeVehiculeTarget)}
+                  showAssistanceTotal={Boolean(assistances[targetKey(activeVehiculeTarget)]?.enabled || linePrimeNette(preview, "ASSISTANCE"))}
+                />
               </TargetSubsection>
-              <div className="flex justify-end border-t pt-3">
-                <Button type="button" onClick={() => saveTargetSection(activeVehiculeTarget, activeVehiculeTarget.label)}>
-                  <Save className="size-4" />
-                  Enregistrer véhicule
-                </Button>
-              </div>
             </div>
           ) : null}
         </div>
@@ -277,7 +337,7 @@ export function FlotteTargetsSection({
                 {remorqueTargets.map((target) => {
                   const key = targetKey(target);
                   const active = key === targetKey(activeRemorqueTarget);
-                  const saved = savedKeys.includes(key);
+                  const saved = savedKeys.includes(`${key}:info`) && savedKeys.includes(`${key}:garanties`);
                   return (
                     <button
                       key={key}
@@ -321,7 +381,15 @@ export function FlotteTargetsSection({
 
           {activeRemorqueTarget ? (
             <div className="grid gap-4">
-              <TargetSubsection title="Informations remorque">
+              <TargetSubsection
+                title="Informations remorque"
+                action={
+                  <Button type="button" onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque")}>
+                    <Save className="size-4" />
+                    Enregistrer informations
+                  </Button>
+                }
+              >
                 <RemorqueForm
                   index={activeRemorqueTarget.index}
                   remorque={remorques[activeRemorqueTarget.index]}
@@ -333,6 +401,19 @@ export function FlotteTargetsSection({
               <TargetSubsection
                 title="Garanties"
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length > 1 ? "s" : ""}`}
+                action={
+                  <Button
+                    type="button"
+                    disabled={previewing}
+                    onClick={() => {
+                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
+                      onPreviewQuittance?.();
+                    }}
+                  >
+                    <Save className="size-4" />
+                    {previewing ? "Calcul..." : "Enregistrer garanties"}
+                  </Button>
+                }
               >
                 <TargetGuaranteesTable
                   target={activeRemorqueTarget}
@@ -343,15 +424,19 @@ export function FlotteTargetsSection({
                   lignes={lignes}
                   formulesPersonne={formulesPersonne}
                   usages={usages}
+                  compagniesAssistance={compagniesAssistance}
+                  produitsAssistance={produitsAssistance}
+                  assistance={assistances[targetKey(activeRemorqueTarget)] ?? { enabled: false }}
+                  onAssistanceChange={(patch) => updateAssistance(activeRemorqueTarget, patch)}
                   grilleSelected={grilleSelected}
                 />
+                <QuittanceTotalsSummary
+                  preview={preview}
+                  loading={previewing}
+                  showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeRemorqueTarget)}
+                  showAssistanceTotal={Boolean(assistances[targetKey(activeRemorqueTarget)]?.enabled || linePrimeNette(preview, "ASSISTANCE"))}
+                />
               </TargetSubsection>
-              <div className="flex justify-end border-t pt-3">
-                <Button type="button" onClick={() => saveTargetSection(activeRemorqueTarget, activeRemorqueTarget.label)}>
-                  <Save className="size-4" />
-                  Enregistrer remorque
-                </Button>
-              </div>
             </div>
           ) : (
             <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
@@ -367,11 +452,13 @@ export function FlotteTargetsSection({
 function TargetSubsection({
   title,
   badge,
+  action,
   children,
   defaultOpen = true,
 }: {
   title: string;
   badge?: string;
+  action?: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
 }) {
@@ -389,10 +476,56 @@ function TargetSubsection({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="border-t p-4">{children}</div>
+        <div className="border-t p-4">
+          {children}
+          {action ? <div className="mt-4 flex justify-end border-t pt-3">{action}</div> : null}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );
+}
+
+function QuittanceTotalsSummary({
+  preview,
+  loading,
+  showPersonneTotals,
+  showAssistanceTotal,
+}: {
+  preview?: QuittancePreview | null;
+  loading?: boolean;
+  showPersonneTotals?: boolean;
+  showAssistanceTotal?: boolean;
+}) {
+  const rows: [string, number | undefined][] = [
+    ["TOTAL NET", preview?.primeNette],
+    ["EVCAT", linePrimeNette(preview, "EVCAT")],
+    ["TAXE", preview?.taxe],
+    ["CNPAC", preview?.cnpac],
+    ["TOTAL À PAYER", preview?.primeTotale],
+  ];
+  if (showPersonneTotals) {
+    rows.splice(2, 0, ["PTA (Prime Personne)", linePrimeNette(preview, "CORPOREL")], ["ACCESSOIRE", preview?.accessoire]);
+  }
+  if (showAssistanceTotal) {
+    rows.push(["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")]);
+  }
+
+  return (
+    <div className="mt-4 ml-auto w-full max-w-sm overflow-hidden rounded-md border">
+      {rows.map(([label, value]) => (
+        <div key={label} className="grid grid-cols-[1fr_120px] border-b last:border-b-0">
+          <div className="bg-muted/30 px-3 py-2 text-right text-xs font-semibold">{label}</div>
+          <div className="px-3 py-2 text-right text-xs">
+            {loading ? "Calcul..." : value == null ? "-" : formatMoney(value)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
+  return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
 }
 
 function VehicleForm({
@@ -645,6 +778,10 @@ function TargetGuaranteesTable({
   lignes,
   formulesPersonne,
   usages,
+  compagniesAssistance,
+  produitsAssistance,
+  assistance,
+  onAssistanceChange,
   grilleSelected,
 }: {
   target: Target;
@@ -655,6 +792,10 @@ function TargetGuaranteesTable({
   lignes: ReferenceOption[];
   formulesPersonne: ReferenceOption[];
   usages: ReferenceOption[];
+  compagniesAssistance: ReferenceOption[];
+  produitsAssistance: ReferenceOption[];
+  assistance: AssistanceDraft;
+  onAssistanceChange: (patch: Partial<AssistanceDraft>) => void;
   grilleSelected: boolean;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
@@ -733,12 +874,7 @@ function TargetGuaranteesTable({
                   </td>
                   <td className="px-3 py-2">
                     <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {isRc ? <Badge>RC obligatoire</Badge> : null}
-                      {!isRc && !grilleSelected ? <Badge variant="outline">Grille requise</Badge> : null}
-                      {!isRc && grilleSelected && !hasLine ? <Badge variant="outline">Tarif manquant</Badge> : null}
-                      {warning ? <Badge variant="destructive">{warning}</Badge> : null}
-                    </div>
+                    {warning ? <div className="mt-1 text-xs text-destructive">{warning}</div> : null}
                   </td>
                   <td className="px-3 py-2">
                     <Input
@@ -803,10 +939,6 @@ function TargetGuaranteesTable({
                     </td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {!grilleSelected ? <Badge variant="outline">Grille requise</Badge> : null}
-                        {grilleSelected && formules.length === 0 ? <Badge variant="outline">Formule manquante</Badge> : null}
-                      </div>
                     </td>
                     <td className="px-3 py-2">
                       <Select
@@ -846,6 +978,132 @@ function TargetGuaranteesTable({
           Les garanties personne s'affichent uniquement pour les usages autorisés dans Paramètres production.
         </div>
       ) : null}
+
+      {target.kind === "vehicule" ? (
+        <AssistanceTable
+          target={target}
+          assistance={assistance}
+          onChange={onAssistanceChange}
+          compagniesAssistance={compagniesAssistance}
+          produitsAssistance={produitsAssistance}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function AssistanceTable({
+  target,
+  assistance,
+  onChange,
+  compagniesAssistance,
+  produitsAssistance,
+}: {
+  target: Target;
+  assistance: AssistanceDraft;
+  onChange: (patch: Partial<AssistanceDraft>) => void;
+  compagniesAssistance: ReferenceOption[];
+  produitsAssistance: ReferenceOption[];
+}) {
+  const filteredProducts = produitsAssistance.filter((produit) => {
+    if (assistance.compagnieAssistanceId && produit.compagnieAssistanceId !== assistance.compagnieAssistanceId) {
+      return false;
+    }
+    const usageIds = Array.isArray(produit.usageIds) ? produit.usageIds.map(String) : [];
+    return usageIds.length === 0 || !target.usageId || usageIds.includes(target.usageId);
+  });
+  const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId)
+    ?? produitsAssistance.find((produit) => produit.id === assistance.produitAssistanceId);
+  const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
+        <Checkbox
+          checked={assistance.enabled}
+          onCheckedChange={(checked) => onChange({ enabled: Boolean(checked) })}
+        />
+        <span>Assistance</span>
+      </div>
+      <table className="w-full min-w-[1100px] border-collapse text-sm">
+        <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+          <tr>
+            <th className="px-3 py-3 text-left">Date effet</th>
+            <th className="px-3 py-3 text-left">Date souscription</th>
+            <th className="px-3 py-3 text-left">Échéance</th>
+            <th className="px-3 py-3 text-left">Date échéance</th>
+            <th className="px-3 py-3 text-left">N° contrat</th>
+            <th className="px-3 py-3 text-left">Compagnie</th>
+            <th className="px-3 py-3 text-left">Produit</th>
+            <th className="px-3 py-3 text-right">Prime</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className={cn("border-t align-middle", !assistance.enabled && "bg-muted/20 text-muted-foreground")}>
+            <td className="px-3 py-2">
+              <DatePicker disabled={!assistance.enabled} date={assistance.dateEffet} onSelect={(date) => onChange({ dateEffet: toDateOnly(date) })} />
+            </td>
+            <td className="px-3 py-2">
+              <DatePicker disabled={!assistance.enabled} date={assistance.dateSouscription} onSelect={(date) => onChange({ dateSouscription: toDateOnly(date) })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input
+                disabled={!assistance.enabled}
+                value={assistance.echeanceCode ?? ""}
+                placeholder="01/01"
+                onChange={(event) => onChange({ echeanceCode: event.target.value })}
+              />
+            </td>
+            <td className="px-3 py-2">
+              <DatePicker disabled={!assistance.enabled} date={assistance.dateEcheance} onSelect={(date) => onChange({ dateEcheance: toDateOnly(date) })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input
+                disabled={!assistance.enabled}
+                value={assistance.numeroContratOuQuittance ?? ""}
+                placeholder="N° contrat"
+                onChange={(event) => onChange({ numeroContratOuQuittance: event.target.value })}
+              />
+            </td>
+            <td className="px-3 py-2">
+              <Select
+                disabled={!assistance.enabled}
+                value={assistance.compagnieAssistanceId ?? ""}
+                onValueChange={(value) => onChange({ compagnieAssistanceId: value, produitAssistanceId: undefined })}
+              >
+                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                <SelectContent>
+                  {compagniesAssistance.map((compagnie) => (
+                    <SelectItem key={compagnie.id} value={compagnie.id}>{compagnie.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </td>
+            <td className="px-3 py-2">
+              <Select
+                disabled={!assistance.enabled || filteredProducts.length === 0}
+                value={assistance.produitAssistanceId ?? ""}
+                onValueChange={(value) => onChange({ produitAssistanceId: value })}
+              >
+                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                <SelectContent>
+                  {filteredProducts.map((produit) => (
+                    <SelectItem key={produit.id} value={produit.id}>{produit.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </td>
+            <td className="px-3 py-2 text-right font-medium">
+              {assistance.enabled && prime != null ? formatMoney(prime) : "-"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {assistance.enabled ? (
+        <div className="border-t px-3 py-2 text-xs text-muted-foreground">
+          Le prorata et la prime totale restent calculés par le service assistance lors de l'enregistrement sur le contrat créé.
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -865,6 +1123,14 @@ function sameTarget(item: GarantieInput, target?: Target) {
     return false;
   }
   return target.kind === "vehicule" ? item.vehiculeIndex === target.index : item.remorqueIndex === target.index;
+}
+
+function hasTargetPersonneGaranties(selected: GarantieInput[], personneGaranties: ReferenceOption[], target?: Target) {
+  if (!target || personneGaranties.length === 0) {
+    return false;
+  }
+  const personneIds = new Set(personneGaranties.map((garantie) => garantie.id));
+  return selected.some((item) => sameTarget(item, target) && personneIds.has(item.garantieId));
 }
 
 function targetKey(target?: Target) {

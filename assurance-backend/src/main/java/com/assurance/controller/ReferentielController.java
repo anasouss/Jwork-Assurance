@@ -7,6 +7,7 @@ import com.assurance.dto.request.UpsertCompagnieAssuranceRequest;
 import com.assurance.dto.request.UpsertConventionRequest;
 import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
+import com.assurance.dto.request.UpsertGrilleUsageConfigurationRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertReferenceRequest;
 import com.assurance.dto.request.UpsertTarifUsageRequest;
@@ -526,6 +527,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/lignes-grille-tarifaire")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> lignesGrilleTarifaire(
             @RequestParam String grilleId,
             @RequestParam(required = false) String usageId,
@@ -539,6 +541,8 @@ public class ReferentielController {
                 .filter(ligne -> garantieId == null || garantieId.isBlank() || ligne.getGarantie().getId().equals(garantieId))
                 .map(ligne -> option(ligne.getId(), null, ligne.getLibelleOption() != null ? ligne.getLibelleOption() : ligne.getGarantie().getLibelle())
                         .putValue("garantieId", ligne.getGarantie().getId())
+                        .putValue("garantieCode", ligne.getGarantie().getCode())
+                        .putValue("garantieLibelle", ligne.getGarantie().getLibelle())
                         .putValue("usageId", ligne.getUsage() != null ? ligne.getUsage().getId() : null)
                         .putValue("categorieTransportId", ligne.getCategorieTransport() != null ? ligne.getCategorieTransport().getId() : null)
                         .putValue("modeTarification", ligne.getModeTarification())
@@ -555,9 +559,6 @@ public class ReferentielController {
                         .putValue("taux", ligne.getTaux())
                         .putValue("tauxFranchise", ligne.getTauxFranchise())
                         .putValue("franchiseMinimale", ligne.getFranchiseMinimale())
-                        .putValue("tauxRemorque", ligne.getTauxRemorque())
-                        .putValue("tauxFranchiseRemorque", ligne.getTauxFranchiseRemorque())
-                        .putValue("franchiseMinimaleRemorque", ligne.getFranchiseMinimaleRemorque())
                         .putValue("ordreAffichage", ligne.getOrdreAffichage())
                         .map())
                 .toList()));
@@ -609,6 +610,75 @@ public class ReferentielController {
                 .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", id));
         applyLigneRequest(ligne, request);
         return ResponseEntity.ok(ApiResponse.success(toLigneResponse(ligneGrilleTarifaireRepository.save(ligne)), "Ligne de grille modifiee"));
+    }
+
+    @PostMapping("/grilles-tarifaires/{grilleId}/usages/{usageId}/configuration")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> replaceGrilleUsageConfiguration(
+            @PathVariable String grilleId,
+            @PathVariable String usageId,
+            @Valid @RequestBody UpsertGrilleUsageConfigurationRequest request
+    ) {
+        GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
+                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", grilleId));
+        Usage usage = usageRepository.findById(usageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
+
+        Set<String> ligneIds = new HashSet<>();
+        List<UpsertLigneGrilleTarifaireRequest> requestedLignes = request.getLignes() == null ? List.of() : request.getLignes();
+        List<UpsertFormuleGarantiePersonneRequest> requestedFormules = request.getFormulesPersonne() == null ? List.of() : request.getFormulesPersonne();
+
+        for (UpsertLigneGrilleTarifaireRequest ligneRequest : requestedLignes) {
+            ligneRequest.setUsageId(usage.getId());
+            ligneRequest.setActif(true);
+            LigneGrilleTarifaire ligne = ligneRequest.getId() == null || ligneRequest.getId().isBlank()
+                    ? new LigneGrilleTarifaire()
+                    : ligneGrilleTarifaireRepository.findById(ligneRequest.getId()).orElseGet(LigneGrilleTarifaire::new);
+            if (ligne.getGrilleTarifaire() != null && !ligne.getGrilleTarifaire().getId().equals(grille.getId())) {
+                throw new BadRequestException("La ligne n'appartient pas a cette grille tarifaire");
+            }
+            ligne.setGrilleTarifaire(grille);
+            applyLigneRequest(ligne, ligneRequest);
+            ligneIds.add(ligneGrilleTarifaireRepository.save(ligne).getId());
+        }
+        for (LigneGrilleTarifaire ligne : ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndUsageIdAndActifTrue(grilleId, usageId)) {
+            if (!ligneIds.contains(ligne.getId())) {
+                ligne.setActif(false);
+                ligneGrilleTarifaireRepository.save(ligne);
+            }
+        }
+
+        if (request.getFormulesPersonne() != null) {
+            Set<String> formuleIds = new HashSet<>();
+            for (UpsertFormuleGarantiePersonneRequest formuleRequest : requestedFormules) {
+                formuleRequest.setUsageId(usage.getId());
+                formuleRequest.setActif(true);
+                FormuleGarantiePersonne formule = formuleRequest.getId() == null || formuleRequest.getId().isBlank()
+                        ? new FormuleGarantiePersonne()
+                        : formuleGarantiePersonneRepository.findById(formuleRequest.getId()).orElseGet(FormuleGarantiePersonne::new);
+                if (formule.getGrilleTarifaire() != null && !formule.getGrilleTarifaire().getId().equals(grille.getId())) {
+                    throw new BadRequestException("La formule n'appartient pas a cette grille tarifaire");
+                }
+                formule.setGrilleTarifaire(grille);
+                applyFormulePersonneRequest(formule, formuleRequest);
+                formuleIds.add(formuleGarantiePersonneRepository.save(formule).getId());
+            }
+            for (FormuleGarantiePersonne formule : formuleGarantiePersonneRepository.findByGrilleTarifaireIdAndUsageIdAndActifTrue(grilleId, usageId)) {
+                if (!formuleIds.contains(formule.getId())) {
+                    formule.setActif(false);
+                    formuleGarantiePersonneRepository.save(formule);
+                }
+            }
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("lignes", ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndUsageIdAndActifTrue(grilleId, usageId).stream()
+                .map(this::toLigneResponse)
+                .toList());
+        data.put("formulesPersonne", formuleGarantiePersonneRepository.findByGrilleTarifaireIdAndUsageIdAndActifTrue(grilleId, usageId).stream()
+                .map(this::toFormulePersonneResponse)
+                .toList());
+        return ResponseEntity.ok(ApiResponse.success(data, "Configuration de l'usage enregistree"));
     }
 
     @PostMapping("/grilles-tarifaires/{grilleId}/formules-personne")
@@ -1021,9 +1091,6 @@ public class ReferentielController {
         ligne.setTaux(request.getTaux());
         ligne.setTauxFranchise(request.getTauxFranchise());
         ligne.setFranchiseMinimale(request.getFranchiseMinimale());
-        ligne.setTauxRemorque(request.getTauxRemorque());
-        ligne.setTauxFranchiseRemorque(request.getTauxFranchiseRemorque());
-        ligne.setFranchiseMinimaleRemorque(request.getFranchiseMinimaleRemorque());
         ligne.setPrime(request.getPrime());
         ligne.setCapital(request.getCapital());
         ligne.setLibelleOption(request.getLibelleOption());
@@ -1063,6 +1130,8 @@ public class ReferentielController {
         return option(ligne.getId(), null, ligne.getLibelleOption() != null ? ligne.getLibelleOption() : ligne.getGarantie().getLibelle())
                 .putValue("grilleId", ligne.getGrilleTarifaire() != null ? ligne.getGrilleTarifaire().getId() : null)
                 .putValue("garantieId", ligne.getGarantie() != null ? ligne.getGarantie().getId() : null)
+                .putValue("garantieCode", ligne.getGarantie() != null ? ligne.getGarantie().getCode() : null)
+                .putValue("garantieLibelle", ligne.getGarantie() != null ? ligne.getGarantie().getLibelle() : null)
                 .putValue("usageId", ligne.getUsage() != null ? ligne.getUsage().getId() : null)
                 .putValue("categorieTransportId", ligne.getCategorieTransport() != null ? ligne.getCategorieTransport().getId() : null)
                 .putValue("modeTarification", ligne.getModeTarification())
@@ -1079,9 +1148,6 @@ public class ReferentielController {
                 .putValue("taux", ligne.getTaux())
                 .putValue("tauxFranchise", ligne.getTauxFranchise())
                 .putValue("franchiseMinimale", ligne.getFranchiseMinimale())
-                .putValue("tauxRemorque", ligne.getTauxRemorque())
-                .putValue("tauxFranchiseRemorque", ligne.getTauxFranchiseRemorque())
-                .putValue("franchiseMinimaleRemorque", ligne.getFranchiseMinimaleRemorque())
                 .putValue("ordreAffichage", ligne.getOrdreAffichage())
                 .putValue("actif", ligne.getActif())
                 .map();

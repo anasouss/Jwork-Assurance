@@ -125,21 +125,21 @@ public class CalculGarantieService {
         if (ligne == null) {
             return null;
         }
-        return remorque && ligne.getTauxRemorque() != null ? ligne.getTauxRemorque() : ligne.getTaux();
+        return ligne.getTaux();
     }
 
     public BigDecimal resolveTauxFranchiseLigne(LigneGrilleTarifaire ligne, boolean remorque) {
         if (ligne == null) {
             return null;
         }
-        return remorque && ligne.getTauxFranchiseRemorque() != null ? ligne.getTauxFranchiseRemorque() : ligne.getTauxFranchise();
+        return ligne.getTauxFranchise();
     }
 
     public BigDecimal resolveFranchiseMinimaleLigne(LigneGrilleTarifaire ligne, boolean remorque) {
         if (ligne == null) {
             return null;
         }
-        return remorque && ligne.getFranchiseMinimaleRemorque() != null ? ligne.getFranchiseMinimaleRemorque() : ligne.getFranchiseMinimale();
+        return ligne.getFranchiseMinimale();
     }
 
     private BigDecimal calculerPrimeRcVehicule(Contrat contrat, Vehicule vehicule) {

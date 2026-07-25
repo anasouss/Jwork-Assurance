@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Plus } from "lucide-react";
+import { Edit, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
-import { formuleGarantiePersonneSchema, ligneGrilleTarifaireSchema } from "../schemas";
-import { money, text } from "../utils/format";
+import { formuleGarantiePersonneSchema } from "../schemas";
+import { money, numberValue, text, toNumber } from "../utils/format";
 import { FormuleGarantiePersonneDialog } from "./FormuleGarantiePersonneDialog";
-import { LigneGrilleTarifaireDialog } from "./LigneGrilleTarifaireDialog";
 import type { ReferenceOption, UpsertFormuleGarantiePersonneRequest, UpsertLigneGrilleTarifaireRequest } from "../types";
 
 type Props = {
@@ -21,18 +23,21 @@ type Props = {
   queryScope?: string;
 };
 
+type MatrixLine = UpsertLigneGrilleTarifaireRequest & {
+  localKey: string;
+  checked: boolean;
+};
+
 export function GrilleTarifaireConfigurator({
   grille,
   garanties,
   usages,
-  categoriesTransport,
   allowedUsageIds,
   queryScope = "grille-config",
 }: Props) {
   const queryClient = useQueryClient();
   const [selectedUsageId, setSelectedUsageId] = useState("");
-  const [ligneDialogOpen, setLigneDialogOpen] = useState(false);
-  const [editingLigne, setEditingLigne] = useState<ReferenceOption | null>(null);
+  const [drafts, setDrafts] = useState<MatrixLine[]>([]);
   const [formuleDialogOpen, setFormuleDialogOpen] = useState(false);
   const [editingFormule, setEditingFormule] = useState<ReferenceOption | null>(null);
 
@@ -69,13 +74,24 @@ export function GrilleTarifaireConfigurator({
 
   const activeUsageId = selectedUsageId || usageTabs[0]?.id || "";
   const activeUsage = usageTabs.find((usage) => usage.id === activeUsageId) ?? null;
-  const visibleLignes = (lignes.data ?? []).filter(
-    (ligne) => !activeUsageId || !ligne.usageId || String(ligne.usageId) === activeUsageId
+  const vehicleGaranties = useMemo(
+    () => garanties
+      .filter((garantie) => text(garantie.typeGarantie) !== "PERSONNE")
+      .sort((left, right) => (toNumber(left.ordreAffichage) ?? 9999) - (toNumber(right.ordreAffichage) ?? 9999)),
+    [garanties]
   );
-  const tauxLignes = visibleLignes.filter(isTauxLine);
-  const capitalLignes = visibleLignes.filter((ligne) => !isTauxLine(ligne));
+  const personneGaranties = useMemo(
+    () => garanties
+      .filter((garantie) => text(garantie.typeGarantie) === "PERSONNE")
+      .sort((left, right) => (toNumber(left.ordreAffichage) ?? 9999) - (toNumber(right.ordreAffichage) ?? 9999)),
+    [garanties]
+  );
+  const garantieById = useMemo(
+    () => new Map(garanties.map((garantie) => [garantie.id, garantie])),
+    [garanties]
+  );
   const visibleFormules = (formules.data ?? []).filter(
-    (formule) => !activeUsageId || !formule.usageId || String(formule.usageId) === activeUsageId
+    (formule) => String(formule.usageId ?? "") === activeUsageId
   );
 
   useEffect(() => {
@@ -85,14 +101,16 @@ export function GrilleTarifaireConfigurator({
     setSelectedUsageId(usageTabs[0]?.id ?? "");
   }, [selectedUsageId, usageTabs]);
 
-  const saveLigne = useMutation({
-    mutationFn: ({ id, payload }: { id?: string; payload: UpsertLigneGrilleTarifaireRequest }) =>
-      id ? productionApi.updateLigneGrilleTarifaire(id, payload) : productionApi.createLigneGrilleTarifaire(grille.id, payload),
+  useEffect(() => {
+    setDrafts(buildDrafts(vehicleGaranties, (lignes.data ?? []).filter((ligne) => String(ligne.usageId ?? "") === activeUsageId)));
+  }, [activeUsageId, lignes.data, vehicleGaranties]);
+
+  const saveConfiguration = useMutation({
+    mutationFn: (payload: UpsertLigneGrilleTarifaireRequest[]) =>
+      productionApi.replaceGrilleUsageConfiguration(grille.id, activeUsageId, { lignes: payload }),
     onSuccess: async () => {
-      setLigneDialogOpen(false);
-      setEditingLigne(null);
       await queryClient.invalidateQueries({ queryKey: ["lignes-grille"] });
-      toast.success("Ligne de grille enregistrée");
+      toast.success("Configuration de l'usage enregistrée");
     },
     onError: showError,
   });
@@ -109,6 +127,50 @@ export function GrilleTarifaireConfigurator({
     onError: showError,
   });
 
+  const updateDraft = (localKey: string, patch: Partial<MatrixLine>) => {
+    setDrafts((current) => current.map((draft) => draft.localKey === localKey ? { ...draft, ...patch } : draft));
+  };
+
+  const addDraft = (garantie: ReferenceOption) => {
+    setDrafts((current) => [
+      ...current,
+      {
+        localKey: newLocalKey(),
+        checked: true,
+        garantieId: garantie.id,
+        usageId: activeUsageId,
+        modeTarification: defaultMode(garantie),
+        ordreAffichage: nextOrder(current, garantie.id),
+      },
+    ]);
+  };
+
+  const removeDraft = (draft: MatrixLine) => {
+    setDrafts((current) => {
+      const next = current.filter((item) => item.localKey !== draft.localKey);
+      if (next.some((item) => item.garantieId === draft.garantieId)) {
+        return next;
+      }
+      const garantie = garantieById.get(draft.garantieId);
+      return garantie ? [...next, emptyDraft(garantie)] : next;
+    });
+  };
+
+  const submitMatrix = () => {
+    if (!activeUsageId) {
+      toast.error("Usage obligatoire");
+      return;
+    }
+    const selected = drafts.filter((draft) => draft.checked);
+    const invalid = selected.find((draft) => !hasRequiredPricing(draft, garantieById.get(draft.garantieId)));
+    if (invalid) {
+      const garantie = garantieById.get(invalid.garantieId);
+      toast.error(`Valeurs manquantes pour ${garantieLabel(garantie)}`);
+      return;
+    }
+    saveConfiguration.mutate(selected.map((draft) => cleanDraft(draft, activeUsageId, garantieById.get(draft.garantieId))));
+  };
+
   return (
     <div className="grid gap-4">
       <div className="rounded-md border bg-card p-3">
@@ -121,32 +183,26 @@ export function GrilleTarifaireConfigurator({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {usageTabs.map((usage) => {
-          const active = usage.id === activeUsageId;
-          return (
-            <Button
-              key={usage.id}
-              type="button"
-              variant={active ? "default" : "outline"}
-              className={active ? "bg-amber-600 text-white hover:bg-amber-700" : ""}
-              onClick={() => setSelectedUsageId(usage.id)}
-            >
-              {usage.code ? `Usage ${usage.code}` : usage.libelle}
-            </Button>
-          );
-        })}
-        <Button
-          type="button"
-          size="icon"
-          className="bg-amber-600 text-white hover:bg-amber-700"
-          disabled={!activeUsageId}
-          onClick={() => {
-            setEditingLigne(null);
-            setLigneDialogOpen(true);
-          }}
-        >
-          <Plus className="size-4" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {usageTabs.map((usage) => {
+            const active = usage.id === activeUsageId;
+            return (
+              <Button
+                key={usage.id}
+                type="button"
+                variant={active ? "default" : "outline"}
+                className={active ? "bg-amber-600 text-white hover:bg-amber-700" : ""}
+                onClick={() => setSelectedUsageId(usage.id)}
+              >
+                {usage.code ? `Usage ${usage.code}` : usage.libelle}
+              </Button>
+            );
+          })}
+        </div>
+        <Button type="button" disabled={!activeUsageId || saveConfiguration.isPending} onClick={submitMatrix}>
+          <Save className="size-4" />
+          Enregistrer l'usage
         </Button>
       </div>
 
@@ -155,30 +211,68 @@ export function GrilleTarifaireConfigurator({
           <div className="text-sm font-semibold text-blue-600">Garanties véhicule</div>
           {activeUsage ? <Badge variant="outline">{activeUsage.code ? `Usage ${activeUsage.code}` : activeUsage.libelle}</Badge> : null}
         </div>
-        <div className="grid gap-4 p-3 xl:grid-cols-[minmax(420px,1fr)_minmax(520px,1fr)]">
-          <TauxLinesTable
-            lines={tauxLignes}
-            emptyText={!activeUsageId ? "Aucun usage sélectionné." : "Aucune garantie par taux pour cet usage."}
-            onEdit={(ligne) => {
-              setEditingLigne(ligne);
-              setLigneDialogOpen(true);
-            }}
-          />
-          <CapitalLinesTable
-            lines={capitalLignes}
-            emptyText={!activeUsageId ? "Aucun usage sélectionné." : "Aucune garantie par capital ou prime pour cet usage."}
-            onEdit={(ligne) => {
-              setEditingLigne(ligne);
-              setLigneDialogOpen(true);
-            }}
-          />
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">#</TableHead>
+              <TableHead>Garantie</TableHead>
+              <TableHead className="min-w-32">Mode</TableHead>
+              <TableHead className="min-w-32 text-right">Taux de valeur</TableHead>
+              <TableHead className="min-w-32 text-right">Taux franchise</TableHead>
+              <TableHead className="min-w-32 text-right">Franchise minimale</TableHead>
+              <TableHead className="min-w-32 text-right">Capital</TableHead>
+              <TableHead className="min-w-32 text-right">Prime</TableHead>
+              <TableHead className="w-24 text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {drafts.map((draft) => {
+              const garantie = garantieById.get(draft.garantieId);
+              const mode = draft.modeTarification || defaultMode(garantie);
+              const enabled = draft.checked;
+              return (
+                <TableRow key={draft.localKey}>
+                  <TableCell>
+                    <Checkbox checked={enabled} onCheckedChange={(checked) => updateDraft(draft.localKey, { checked: checked === true })} />
+                  </TableCell>
+                  <TableCell className="font-semibold">
+                    <div>{garantieLabel(garantie)}</div>
+                    {draft.libelleOption ? <div className="text-xs font-normal text-muted-foreground">{draft.libelleOption}</div> : null}
+                  </TableCell>
+                  <TableCell>
+                    <ModeCell
+                      garantie={garantie}
+                      value={mode}
+                      disabled={!enabled}
+                      onChange={(value) => updateDraft(draft.localKey, normalizeModePatch(value))}
+                    />
+                  </TableCell>
+                  <TableCell><NumberCell disabled={!enabled || mode !== "TAUX"} value={draft.taux} onChange={(value) => updateDraft(draft.localKey, { taux: value })} /></TableCell>
+                  <TableCell><NumberCell disabled={!enabled || !hasFranchise(garantie)} value={draft.tauxFranchise} onChange={(value) => updateDraft(draft.localKey, { tauxFranchise: value })} /></TableCell>
+                  <TableCell><NumberCell disabled={!enabled || !hasFranchise(garantie)} value={draft.franchiseMinimale} onChange={(value) => updateDraft(draft.localKey, { franchiseMinimale: value })} /></TableCell>
+                  <TableCell><NumberCell disabled={!enabled || mode !== "CAPITAL"} value={draft.capital} onChange={(value) => updateDraft(draft.localKey, { capital: value })} /></TableCell>
+                  <TableCell><NumberCell disabled={!enabled || (mode !== "CAPITAL" && mode !== "PRIME_FIXE")} value={draft.prime} onChange={(value) => updateDraft(draft.localKey, { prime: value })} /></TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => garantie && addDraft(garantie)}>
+                        <Plus className="size-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDraft(draft)}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
       <PersonnesLinesTable
         formules={visibleFormules}
         emptyText={!activeUsageId ? "Aucun usage sélectionné." : "Aucune formule personne pour cet usage."}
-        canAdd={Boolean(activeUsageId)}
+        canAdd={Boolean(activeUsageId && activeUsage?.garantiesPersonne)}
         onAdd={() => {
           setEditingFormule(null);
           setFormuleDialogOpen(true);
@@ -189,30 +283,11 @@ export function GrilleTarifaireConfigurator({
         }}
       />
 
-      <LigneGrilleTarifaireDialog
-        open={ligneDialogOpen}
-        onOpenChange={setLigneDialogOpen}
-        ligne={editingLigne}
-        garanties={garanties}
-        usages={usageTabs}
-        categoriesTransport={categoriesTransport}
-        defaultUsageId={activeUsageId}
-        submitting={saveLigne.isPending}
-        onSubmit={(payload) => {
-          const parsed = ligneGrilleTarifaireSchema.safeParse(payload);
-          if (!parsed.success) {
-            toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
-            return;
-          }
-          saveLigne.mutate({ id: editingLigne?.id, payload });
-        }}
-      />
-
       <FormuleGarantiePersonneDialog
         open={formuleDialogOpen}
         onOpenChange={setFormuleDialogOpen}
         formule={editingFormule}
-        garanties={garanties}
+        garanties={personneGaranties}
         usages={usageTabs.filter((usage) => Boolean(usage.garantiesPersonne))}
         defaultUsageId={activeUsageId}
         submitting={saveFormule.isPending}
@@ -222,105 +297,9 @@ export function GrilleTarifaireConfigurator({
             toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
             return;
           }
-          saveFormule.mutate({ id: editingFormule?.id, payload });
+          saveFormule.mutate({ id: editingFormule?.id, payload: { ...payload, usageId: activeUsageId } });
         }}
       />
-    </div>
-  );
-}
-
-function TauxLinesTable({
-  lines,
-  emptyText,
-  onEdit,
-}: {
-  lines: ReferenceOption[];
-  emptyText: string;
-  onEdit: (ligne: ReferenceOption) => void;
-}) {
-  return (
-    <div className="overflow-x-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Garantie</TableHead>
-            <TableHead className="text-right">Taux de valeur</TableHead>
-            <TableHead className="text-right">Franchise taux</TableHead>
-            <TableHead className="text-right">Franchise minimum</TableHead>
-            <TableHead className="w-12 text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {lines.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">{emptyText}</TableCell>
-            </TableRow>
-          ) : (
-            lines.map((ligne) => (
-              <TableRow key={ligne.id}>
-                <TableCell className="font-semibold">{lineLabel(ligne)}</TableCell>
-                <TableCell className="text-right">{percentValue(ligne.taux)}</TableCell>
-                <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
-                <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
-                <TableCell className="text-right">
-                  <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(ligne)}>
-                    <Edit className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function CapitalLinesTable({
-  lines,
-  emptyText,
-  onEdit,
-}: {
-  lines: ReferenceOption[];
-  emptyText: string;
-  onEdit: (ligne: ReferenceOption) => void;
-}) {
-  return (
-    <div className="overflow-x-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Garantie</TableHead>
-            <TableHead className="text-right">Capital</TableHead>
-            <TableHead className="text-right">Prime</TableHead>
-            <TableHead className="text-right">Franchise taux</TableHead>
-            <TableHead className="text-right">Franchise minimum</TableHead>
-            <TableHead className="w-12 text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {lines.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">{emptyText}</TableCell>
-            </TableRow>
-          ) : (
-            lines.map((ligne) => (
-              <TableRow key={ligne.id}>
-                <TableCell className="font-semibold">{lineLabel(ligne)}</TableCell>
-                <TableCell className="text-right">{money(ligne.capital)}</TableCell>
-                <TableCell className="text-right">{money(ligne.prime)}</TableCell>
-                <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
-                <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
-                <TableCell className="text-right">
-                  <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(ligne)}>
-                    <Edit className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
     </div>
   );
 }
@@ -395,19 +374,195 @@ function PersonnesLinesTable({
   );
 }
 
-function isTauxLine(ligne: ReferenceOption) {
-  const mode = text(ligne.modeTarification);
-  return mode === "TAUX" || (mode === "-" && text(ligne.taux) !== "-");
+function ModeCell({
+  garantie,
+  value,
+  disabled,
+  onChange,
+}: {
+  garantie?: ReferenceOption;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const modes = allowedModes(garantie);
+  if (modes.length <= 1) {
+    return <Badge variant="outline">{modeLabel(value)}</Badge>;
+  }
+  return (
+    <Select value={value} disabled={disabled} onValueChange={onChange}>
+      <SelectTrigger className="h-9"><SelectValue placeholder="Mode" /></SelectTrigger>
+      <SelectContent>
+        {modes.map((mode) => (
+          <SelectItem key={mode} value={mode}>{modeLabel(mode)}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
-function lineLabel(ligne: ReferenceOption) {
-  const code = text(ligne.garantieCode);
-  return code !== "-" ? code : text(ligne.libelle);
+function NumberCell({
+  value,
+  disabled,
+  onChange,
+}: {
+  value?: number;
+  disabled: boolean;
+  onChange: (value?: number) => void;
+}) {
+  return (
+    <Input
+      type="number"
+      className="h-9 text-right"
+      disabled={disabled}
+      value={value ?? ""}
+      onChange={(event) => onChange(numberValue(event.target.value))}
+    />
+  );
 }
 
-function percentValue(value: unknown) {
-  const rendered = money(value);
-  return rendered === "-" ? "-" : rendered;
+function buildDrafts(garanties: ReferenceOption[], lignes: ReferenceOption[]): MatrixLine[] {
+  const result: MatrixLine[] = [];
+  const byGarantie = new Map<string, ReferenceOption[]>();
+  for (const ligne of lignes) {
+    const garantieId = String(ligne.garantieId ?? "");
+    if (!garantieId) continue;
+    byGarantie.set(garantieId, [...(byGarantie.get(garantieId) ?? []), ligne]);
+  }
+  for (const garantie of garanties) {
+    const existing = byGarantie.get(garantie.id) ?? [];
+    if (!existing.length) {
+      result.push(emptyDraft(garantie));
+      continue;
+    }
+    for (const ligne of existing) {
+      result.push({
+        localKey: newLocalKey(),
+        checked: true,
+        id: ligne.id,
+        garantieId: garantie.id,
+        usageId: String(ligne.usageId ?? ""),
+        categorieTransportId: stringValue(ligne.categorieTransportId),
+        puissanceFiscaleMin: toNumber(ligne.puissanceFiscaleMin),
+        puissanceFiscaleMax: toNumber(ligne.puissanceFiscaleMax),
+        nombrePlacesMin: toNumber(ligne.nombrePlacesMin),
+        nombrePlacesMax: toNumber(ligne.nombrePlacesMax),
+        ptcMin: toNumber(ligne.ptcMin),
+        ptcMax: toNumber(ligne.ptcMax),
+        sousClasse: stringValue(ligne.sousClasse),
+        carburant: stringValue(ligne.carburant),
+        modeTarification: stringValue(ligne.modeTarification) || defaultMode(garantie),
+        libelleOption: stringValue(ligne.libelleOption),
+        prime: toNumber(ligne.prime),
+        capital: toNumber(ligne.capital),
+        taux: toNumber(ligne.taux),
+        tauxFranchise: toNumber(ligne.tauxFranchise),
+        franchiseMinimale: toNumber(ligne.franchiseMinimale),
+        ordreAffichage: toNumber(ligne.ordreAffichage),
+      });
+    }
+  }
+  return result;
+}
+
+function emptyDraft(garantie: ReferenceOption): MatrixLine {
+  return {
+    localKey: newLocalKey(),
+    checked: false,
+    garantieId: garantie.id,
+    modeTarification: defaultMode(garantie),
+    ordreAffichage: toNumber(garantie.ordreAffichage),
+  };
+}
+
+function cleanDraft(draft: MatrixLine, usageId: string, garantie?: ReferenceOption): UpsertLigneGrilleTarifaireRequest {
+  const mode = draft.modeTarification || "TAUX";
+  const franchise = hasFranchise(garantie);
+  return {
+    id: draft.id,
+    garantieId: draft.garantieId,
+    usageId,
+    categorieTransportId: draft.categorieTransportId || undefined,
+    puissanceFiscaleMin: draft.puissanceFiscaleMin,
+    puissanceFiscaleMax: draft.puissanceFiscaleMax,
+    nombrePlacesMin: draft.nombrePlacesMin,
+    nombrePlacesMax: draft.nombrePlacesMax,
+    ptcMin: draft.ptcMin,
+    ptcMax: draft.ptcMax,
+    sousClasse: draft.sousClasse || undefined,
+    carburant: draft.carburant || undefined,
+    modeTarification: mode,
+    libelleOption: draft.libelleOption || undefined,
+    taux: mode === "TAUX" ? draft.taux : undefined,
+    tauxFranchise: franchise ? draft.tauxFranchise : undefined,
+    franchiseMinimale: franchise ? draft.franchiseMinimale : undefined,
+    capital: mode === "CAPITAL" ? draft.capital : undefined,
+    prime: mode === "CAPITAL" || mode === "PRIME_FIXE" ? draft.prime : undefined,
+    ordreAffichage: draft.ordreAffichage,
+    actif: true,
+  };
+}
+
+function normalizeModePatch(mode: string): Partial<MatrixLine> {
+  return {
+    modeTarification: mode,
+    taux: undefined,
+    capital: undefined,
+    prime: undefined,
+  };
+}
+
+function hasRequiredPricing(draft: MatrixLine, garantie?: ReferenceOption) {
+  const mode = draft.modeTarification || defaultMode(garantie);
+  if (mode === "TAUX") return draft.taux !== undefined;
+  if (mode === "CAPITAL") return draft.capital !== undefined && draft.prime !== undefined;
+  if (mode === "PRIME_FIXE") return draft.prime !== undefined;
+  return true;
+}
+
+function allowedModes(garantie?: ReferenceOption) {
+  const raw = Array.isArray(garantie?.modesAutorises) && garantie?.modesAutorises.length
+    ? garantie.modesAutorises
+    : [garantie?.modeParDefaut ?? "TAUX"];
+  return [...new Set(raw.map((mode) => String(mode)).filter((mode) => mode !== "PROTECTION"))];
+}
+
+function defaultMode(garantie?: ReferenceOption) {
+  const configured = stringValue(garantie?.modeParDefaut);
+  if (configured && configured !== "PROTECTION") return configured;
+  return allowedModes(garantie)[0] ?? "TAUX";
+}
+
+function hasFranchise(garantie?: ReferenceOption) {
+  return Boolean(garantie?.avecFranchise);
+}
+
+function modeLabel(mode: string) {
+  const labels: Record<string, string> = {
+    TAUX: "Taux",
+    CAPITAL: "Capital",
+    PRIME_FIXE: "Prime fixe",
+  };
+  return labels[mode] ?? mode;
+}
+
+function garantieLabel(garantie?: ReferenceOption) {
+  if (!garantie) return "Garantie";
+  return garantie.code ? `${garantie.code} - ${garantie.libelle}` : garantie.libelle;
+}
+
+function stringValue(value: unknown) {
+  return value === undefined || value === null ? undefined : String(value);
+}
+
+function nextOrder(drafts: MatrixLine[], garantieId: string) {
+  const existing = drafts.filter((draft) => draft.garantieId === garantieId);
+  const max = Math.max(0, ...existing.map((draft) => draft.ordreAffichage ?? 0));
+  return max + 1;
+}
+
+function newLocalKey() {
+  return Math.random().toString(36).slice(2);
 }
 
 function showError(error: unknown) {

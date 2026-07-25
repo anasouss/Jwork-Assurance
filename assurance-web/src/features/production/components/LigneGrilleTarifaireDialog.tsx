@@ -59,9 +59,6 @@ export function LigneGrilleTarifaireDialog({
       taux: toNumber(ligne?.taux),
       tauxFranchise: toNumber(ligne?.tauxFranchise),
       franchiseMinimale: toNumber(ligne?.franchiseMinimale),
-      tauxRemorque: toNumber(ligne?.tauxRemorque),
-      tauxFranchiseRemorque: toNumber(ligne?.tauxFranchiseRemorque),
-      franchiseMinimaleRemorque: toNumber(ligne?.franchiseMinimaleRemorque),
       ordreAffichage: toNumber(ligne?.ordreAffichage),
       actif: true,
     });
@@ -160,12 +157,9 @@ export function LigneGrilleTarifaireDialog({
             </div>
             {mode === "TAUX" ? (
               <div className="grid gap-3 md:grid-cols-3">
-                <NumberField label="Taux véhicule (%)" value={payload.taux} onChange={(value) => update({ taux: value })} />
-                <NumberField label="Taux remorque (%)" value={payload.tauxRemorque} onChange={(value) => update({ tauxRemorque: value })} />
+                <NumberField label="Taux (%)" value={payload.taux} onChange={(value) => update({ taux: value })} />
                 <NumberField label="Franchise min." value={payload.franchiseMinimale} onChange={(value) => update({ franchiseMinimale: value })} />
-                <NumberField label="Taux franchise véhicule (%)" value={payload.tauxFranchise} onChange={(value) => update({ tauxFranchise: value })} />
-                <NumberField label="Taux franchise remorque (%)" value={payload.tauxFranchiseRemorque} onChange={(value) => update({ tauxFranchiseRemorque: value })} />
-                <NumberField label="Franchise min. remorque" value={payload.franchiseMinimaleRemorque} onChange={(value) => update({ franchiseMinimaleRemorque: value })} />
+                <NumberField label="Taux franchise (%)" value={payload.tauxFranchise} onChange={(value) => update({ tauxFranchise: value })} />
               </div>
             ) : mode === "CAPITAL" ? (
               <div className="grid gap-3 md:grid-cols-3">
@@ -203,11 +197,8 @@ function cleanPayload(payload: UpsertLigneGrilleTarifaireRequest): UpsertLigneGr
     prime: mode === "TAUX" ? undefined : payload.prime,
     capital: mode === "TAUX" || mode === "PRIME_FIXE" ? undefined : payload.capital,
     taux: mode === "TAUX" ? payload.taux : undefined,
-    tauxRemorque: mode === "TAUX" ? payload.tauxRemorque : undefined,
     tauxFranchise: mode === "TAUX" ? payload.tauxFranchise : undefined,
-    tauxFranchiseRemorque: mode === "TAUX" ? payload.tauxFranchiseRemorque : undefined,
     franchiseMinimale: mode === "TAUX" ? payload.franchiseMinimale : undefined,
-    franchiseMinimaleRemorque: mode === "TAUX" ? payload.franchiseMinimaleRemorque : undefined,
   };
 }
 

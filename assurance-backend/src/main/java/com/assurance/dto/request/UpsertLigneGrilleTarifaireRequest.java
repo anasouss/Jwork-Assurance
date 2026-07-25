@@ -8,6 +8,8 @@ import java.math.BigDecimal;
 
 @Data
 public class UpsertLigneGrilleTarifaireRequest {
+    private String id;
+
     @NotBlank
     private String garantieId;
 
@@ -24,9 +26,6 @@ public class UpsertLigneGrilleTarifaireRequest {
     private BigDecimal taux;
     private BigDecimal tauxFranchise;
     private BigDecimal franchiseMinimale;
-    private BigDecimal tauxRemorque;
-    private BigDecimal tauxFranchiseRemorque;
-    private BigDecimal franchiseMinimaleRemorque;
     private BigDecimal prime;
     private BigDecimal capital;
     private String libelleOption;

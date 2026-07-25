@@ -9,6 +9,8 @@ import java.util.List;
 public interface LigneGrilleTarifaireRepository extends JpaRepository<LigneGrilleTarifaire, String> {
     List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndActifTrue(String grilleTarifaireId);
 
+    List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndActifTrue(String grilleTarifaireId, String usageId);
+
     List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndGarantieIdAndActifTrueOrderByOrdreAffichageAsc(
             String grilleTarifaireId,
             String usageId,

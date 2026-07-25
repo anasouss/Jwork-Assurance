@@ -81,15 +81,6 @@ public class LigneGrilleTarifaire extends BaseEntity {
     @Column(name = "franchise_minimale", precision = 14, scale = 2)
     private BigDecimal franchiseMinimale;
 
-    @Column(name = "taux_remorque", precision = 14, scale = 4)
-    private BigDecimal tauxRemorque;
-
-    @Column(name = "taux_franchise_remorque", precision = 14, scale = 4)
-    private BigDecimal tauxFranchiseRemorque;
-
-    @Column(name = "franchise_minimale_remorque", precision = 14, scale = 2)
-    private BigDecimal franchiseMinimaleRemorque;
-
     @Column(precision = 14, scale = 2)
     private BigDecimal prime;
 

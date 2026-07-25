@@ -354,6 +354,7 @@ export type UpsertGrilleTarifaireRequest = {
 };
 
 export type UpsertLigneGrilleTarifaireRequest = {
+  id?: string;
   garantieId: string;
   usageId?: string;
   categorieTransportId?: string;
@@ -372,14 +373,12 @@ export type UpsertLigneGrilleTarifaireRequest = {
   taux?: number;
   tauxFranchise?: number;
   franchiseMinimale?: number;
-  tauxRemorque?: number;
-  tauxFranchiseRemorque?: number;
-  franchiseMinimaleRemorque?: number;
   ordreAffichage?: number;
   actif?: boolean;
 };
 
 export type UpsertFormuleGarantiePersonneRequest = {
+  id?: string;
   garantieId: string;
   usageId?: string;
   formule?: string;
@@ -393,6 +392,11 @@ export type UpsertFormuleGarantiePersonneRequest = {
   accessoire?: number;
   ordreAffichage?: number;
   actif?: boolean;
+};
+
+export type UpsertGrilleUsageConfigurationRequest = {
+  lignes?: UpsertLigneGrilleTarifaireRequest[];
+  formulesPersonne?: UpsertFormuleGarantiePersonneRequest[];
 };
 
 export type UpsertUsageRequest = {

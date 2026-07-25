@@ -11,6 +11,7 @@ import type {
   QuittancePreview,
   ReferenceOption,
   UpsertGrilleTarifaireRequest,
+  UpsertGrilleUsageConfigurationRequest,
   BulkUpdateTarifUsageRequest,
   UpsertCompagnieAssuranceRequest,
   UpsertConventionRequest,
@@ -327,6 +328,18 @@ export const productionApi = {
         method: "PUT",
         body: JSON.stringify(payload),
       })
+    );
+  },
+
+  async replaceGrilleUsageConfiguration(grilleId: string, usageId: string, payload: UpsertGrilleUsageConfigurationRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<{ lignes: ReferenceOption[]; formulesPersonne: ReferenceOption[] }>>(
+        `/api/v1/referentiel/grilles-tarifaires/${grilleId}/usages/${usageId}/configuration`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }
+      )
     );
   },
 

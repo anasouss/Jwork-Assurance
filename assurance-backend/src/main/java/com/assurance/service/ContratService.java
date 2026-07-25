@@ -1338,9 +1338,6 @@ public class ContratService {
                 && ligne.getCategorieTransport().getId().equals(vehicule.getCategorieTransport().getId())) {
             score += 5;
         }
-        if (remorque != null && (ligne.getTauxRemorque() != null || ligne.getFranchiseMinimaleRemorque() != null || ligne.getTauxFranchiseRemorque() != null)) {
-            score += 2;
-        }
         if (ligne.getModeTarification() != null) {
             score += 1;
         }

@@ -56,9 +56,6 @@ export const ligneGrilleTarifaireSchema = z.object({
   taux: z.number().optional(),
   tauxFranchise: z.number().optional(),
   franchiseMinimale: z.number().optional(),
-  tauxRemorque: z.number().optional(),
-  tauxFranchiseRemorque: z.number().optional(),
-  franchiseMinimaleRemorque: z.number().optional(),
   ordreAffichage: z.number().optional(),
 });
 

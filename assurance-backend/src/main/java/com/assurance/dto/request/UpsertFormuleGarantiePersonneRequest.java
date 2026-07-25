@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 
 @Data
 public class UpsertFormuleGarantiePersonneRequest {
+    private String id;
+
     @NotBlank
     private String garantieId;
 

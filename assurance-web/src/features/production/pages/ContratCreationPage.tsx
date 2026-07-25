@@ -16,6 +16,8 @@ export default function ContratCreationPage() {
   const [typeContrat, setTypeContrat] = useState<TypeContrat | "">("");
   const [categorieClientId, setCategorieClientId] = useState("");
   const form = useContratCreationForm((typeContrat || "PARTICULIER") as TypeContrat);
+  const categoriesClient = form.refs.categoriesClient.data ?? [];
+  const categoriesClientBlocked = typeContrat === "PARTICULIER" && !form.refs.categoriesClient.isLoading && !form.refs.categoriesClient.isError && categoriesClient.length === 0;
 
   const filteredConventions = useMemo(
     () => (form.refs.conventions.data ?? []).filter(
@@ -113,14 +115,27 @@ export default function ContratCreationPage() {
           {typeContrat === "PARTICULIER" ? (
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Catégorie">
-                <Select value={categorieClientId} onValueChange={setCategorieClientId}>
+                <Select
+                  value={categorieClientId}
+                  onValueChange={setCategorieClientId}
+                  disabled={form.refs.categoriesClient.isLoading || form.refs.categoriesClient.isError || categoriesClientBlocked}
+                >
                   <SelectTrigger><SelectValue placeholder="Choisir une option" /></SelectTrigger>
                   <SelectContent>
-                    {form.refs.categoriesClient.data?.map((categorie) => (
+                    {form.refs.categoriesClient.isLoading ? (
+                      <SelectItem value="loading" disabled>Chargement des catégories...</SelectItem>
+                    ) : null}
+                    {categoriesClientBlocked ? (
+                      <SelectItem value="empty" disabled>Aucune catégorie configurée</SelectItem>
+                    ) : null}
+                    {categoriesClient.map((categorie) => (
                       <SelectItem key={categorie.id} value={categorie.id}>{categorie.libelle}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {form.refs.categoriesClient.isError ? (
+                  <p className="mt-1 text-xs text-red-600">Impossible de charger les catégories client.</p>
+                ) : null}
               </Field>
             </div>
           ) : null}
@@ -165,7 +180,12 @@ export default function ContratCreationPage() {
           ) : null}
 
           <div>
-            <Button type="button" onClick={handleStart} disabled={!canStart} className="bg-blue-600 hover:bg-blue-700">
+            <Button
+              type="button"
+              onClick={handleStart}
+              disabled={!canStart}
+              className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-muted disabled:text-muted-foreground"
+            >
               Ajouter
               <ArrowRight className="size-4" />
             </Button>

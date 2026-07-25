@@ -291,7 +291,8 @@ public class DataSeeder implements CommandLineRunner {
                 && compagnieAssuranceRepository.count() > 0
                 && userRepository.count() > 0
                 && usageRepository.count() > 0
-                && garantieRepository.count() > 0;
+                && garantieRepository.count() > 0
+                && categorieClientRepository.count() > 0;
     }
 
     private Permission seedPermission(String code, String nom, String module) {

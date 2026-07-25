@@ -11,16 +11,8 @@ export default function ConventionContratCreationPage() {
   const usageId = params.get("usageId");
 
   useEffect(() => {
-    if (compagnieAssuranceId) {
-      form.setCompagnieAssuranceId(compagnieAssuranceId);
-    }
-    if (conventionId) {
-      form.setConventionId(conventionId);
-    }
-    if (usageId) {
-      form.setUsageId(usageId);
-    }
-  }, [compagnieAssuranceId, conventionId, usageId]);
+    form.applyConventionContext({ compagnieAssuranceId, conventionId, usageId });
+  }, [compagnieAssuranceId, conventionId, usageId, form.refs.conventions.data]);
 
   return <ConventionContratForm form={form} />;
 }

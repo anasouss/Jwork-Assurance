@@ -251,6 +251,16 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     }
     const today = dateOnly(new Date());
     request.clients.forEach((item, index) => {
+      if (typeContrat === "FLOTTE" && item.role === "PROPRIETAIRE" && !item.client.categorieClientId) {
+        nextErrors[`clients.${index}.client.categorieClientId`] = "Catégorie obligatoire.";
+      }
+      if (
+        item.client.typeClient !== "PERSONNE_MORALE"
+        && (item.role === "CONDUCTEUR" || (item.role === "PROPRIETAIRE" && item.client.conducteurHabituel !== false))
+        && !item.client.dateValiditePermis
+      ) {
+        nextErrors[`clients.${index}.client.dateValiditePermis`] = "Validité permis obligatoire.";
+      }
       if (isBeforeToday(item.client.cinValidite, today)) {
         nextErrors[`clients.${index}.client.cinValidite`] = "La validité CIN ne doit pas être expirée.";
       }
@@ -319,6 +329,16 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
           if (isBeforeToday(client.cinValidite, today)) {
             nextErrors[`clients.${index}.client.cinValidite`] = "La validité CIN ne doit pas être expirée.";
           }
+        }
+        if (typeContrat === "FLOTTE" && role === "PROPRIETAIRE") {
+          requireField(`clients.${index}.client.categorieClientId`, client.categorieClientId, "Catégorie obligatoire.");
+        }
+        if (
+          client.typeClient !== "PERSONNE_MORALE"
+          && role === "PROPRIETAIRE"
+          && client.conducteurHabituel !== false
+        ) {
+          requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
         }
         if (isBeforeToday(client.dateValiditePermis, today)) {
           nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
@@ -409,6 +429,31 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     }
   };
 
+  const applyConventionContext = (context: { compagnieAssuranceId?: string | null; conventionId?: string | null; usageId?: string | null }) => {
+    const nextCompagnieId = context.compagnieAssuranceId ?? "";
+    const nextConventionId = context.conventionId ?? "";
+    const nextUsageId = context.usageId ?? "";
+    if (nextCompagnieId) {
+      setCompagnieAssuranceId(nextCompagnieId);
+    }
+    if (nextConventionId) {
+      setConventionId(nextConventionId);
+      const convention = refs.conventions.data?.find((item) => item.id === nextConventionId);
+      const conventionFractionnement = convention?.fractionnement;
+      if (isFractionnement(conventionFractionnement)) {
+        setFractionnement(conventionFractionnement);
+      }
+      const conventionGrilleId = typeof convention?.grilleTarifaireId === "string" ? convention.grilleTarifaireId : "";
+      if (conventionGrilleId) {
+        setGrilleTarifaireId(conventionGrilleId);
+      }
+    }
+    if (nextUsageId) {
+      setUsageId(nextUsageId);
+      setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: nextUsageId })));
+    }
+  };
+
   const setUsageForContrat = (value: string) => {
     setUsageId(value);
     setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: value })));
@@ -439,6 +484,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setCompagnieAssuranceId: setCompagnieForContrat,
     conventionId,
     setConventionId: setConventionForContrat,
+    applyConventionContext,
     usageId,
     setUsageId: setUsageForContrat,
     grilleTarifaireId,

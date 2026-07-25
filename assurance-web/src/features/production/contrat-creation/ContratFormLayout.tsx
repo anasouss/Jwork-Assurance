@@ -44,7 +44,9 @@ export function ContratFormLayout({
       clients={form.clients}
       setClients={form.setClients}
       villes={form.refs.villes.data ?? []}
+      categoriesClient={form.refs.categoriesClient.data ?? []}
       showOptionalRoles={false}
+      showProprietaireCategorie={order === "flotte"}
       errors={form.validationErrors}
       onSaveSection={form.handleSaveSection}
       savedSections={form.savedSections}
@@ -56,7 +58,7 @@ export function ContratFormLayout({
       form={form}
       badge={badge}
       showConvention={showConvention}
-      showGrille={showGrille && order !== "flotte"}
+      showGrille={showGrille && order !== "flotte" && !showConvention}
       showFractionnement={showFractionnement}
     />
   );

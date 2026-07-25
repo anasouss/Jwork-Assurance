@@ -34,7 +34,9 @@ export function ClientSection({
   clients,
   setClients,
   villes,
+  categoriesClient = [],
   showOptionalRoles = false,
+  showProprietaireCategorie = false,
   errors = {},
   onSaveSection,
   savedSections = {},
@@ -42,7 +44,9 @@ export function ClientSection({
   clients: ClientInput[];
   setClients: (clients: ClientInput[]) => void;
   villes: ReferenceOption[];
+  categoriesClient?: ReferenceOption[];
   showOptionalRoles?: boolean;
+  showProprietaireCategorie?: boolean;
   errors?: Record<string, string>;
   onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
   savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
@@ -321,6 +325,21 @@ export function ClientSection({
                     </Field>
                   </>
                 )}
+                {isProprietaire && showProprietaireCategorie ? (
+                  <Field label="Catégorie" required error={errors[`clients.${index}.client.categorieClientId`]}>
+                    <Select
+                      value={item.client.categorieClientId ?? ""}
+                      onValueChange={(value) => updateClient(index, { categorieClientId: value })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                      <SelectContent>
+                        {categoriesClient.map((categorie) => (
+                          <SelectItem key={categorie.id} value={categorie.id}>{categorie.libelle}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                ) : null}
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {morale ? (
@@ -402,43 +421,62 @@ export function ClientSection({
                       </label>
                     </div>
                   </div>
+                  {proprietorIsDriver ? (
+                    <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <Field label="Date de naissance">
+                        <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })} />
+                      </Field>
+                      <Field label="Date de délivrance du permis">
+                        <DatePicker date={item.client.dateDelivrancePermis} onSelect={(date) => updateClient(index, { dateDelivrancePermis: toDateOnly(date) })} />
+                      </Field>
+                      <Field label="N° de permis">
+                        <Input value={item.client.numeroPermis ?? ""} onChange={(event) => updateClient(index, { numeroPermis: event.target.value })} />
+                      </Field>
+                      <Field label="Date de validité du PC" required error={errors[`clients.${index}.client.dateValiditePermis`]}>
+                        <DatePicker date={item.client.dateValiditePermis} onSelect={(date) => updateClient(index, { dateValiditePermis: toDateOnly(date) })} />
+                      </Field>
+                    </div>
+                  ) : null}
                   {!proprietorIsDriver && conducteur ? (
-                    <div className="mt-3 rounded-lg border bg-muted/20 p-3">
-                      <div className="mb-3 text-sm font-medium">Conducteur habituel</div>
-                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        <Field label="Intitulé" required error={errors[`clients.${conducteur.clientIndex}.client.civilite`]}>
-                          <Select value={conducteur.client.client.civilite ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { civilite: value })}>
-                            <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="monsieur">Monsieur</SelectItem>
-                              <SelectItem value="madame">Madame</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                        <Field label="CIN" required error={errors[`clients.${conducteur.clientIndex}.client.cin`]}>
-                          <Input
-                            value={conducteur.client.client.cin ?? ""}
-                            onBlur={() => searchClient(conducteur.clientIndex, { cin: conducteur.client.client.cin })}
-                            onChange={(event) => {
-                              updateIdentity(conducteur.clientIndex, { cin: event.target.value });
-                              scheduleClientSearch(conducteur.clientIndex, { cin: event.target.value });
-                            }}
-                          />
-                          <LookupMessage state={lookupByIndex[conducteur.clientIndex]} />
-                        </Field>
-                        <Field label="Nom" required error={errors[`clients.${conducteur.clientIndex}.client.nom`]}>
-                          <Input value={conducteur.client.client.nom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { nom: event.target.value })} />
-                        </Field>
-                        <Field label="Prénom" required error={errors[`clients.${conducteur.clientIndex}.client.prenom`]}>
-                          <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
-                        </Field>
-                        <Field label="N° permis">
-                          <Input value={conducteur.client.client.numeroPermis ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { numeroPermis: event.target.value })} />
-                        </Field>
-                        <Field label="Validité permis" required error={errors[`clients.${conducteur.clientIndex}.client.dateValiditePermis`]}>
-                          <DatePicker date={conducteur.client.client.dateValiditePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateValiditePermis: toDateOnly(date) })} />
-                        </Field>
-                      </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <Field label="Intitulé" required error={errors[`clients.${conducteur.clientIndex}.client.civilite`]}>
+                        <Select value={conducteur.client.client.civilite ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { civilite: value })}>
+                          <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monsieur">Monsieur</SelectItem>
+                            <SelectItem value="madame">Madame</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Nom" required error={errors[`clients.${conducteur.clientIndex}.client.nom`]}>
+                        <Input value={conducteur.client.client.nom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { nom: event.target.value })} />
+                      </Field>
+                      <Field label="Prénom" required error={errors[`clients.${conducteur.clientIndex}.client.prenom`]}>
+                        <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
+                      </Field>
+                      <Field label="CIN" required error={errors[`clients.${conducteur.clientIndex}.client.cin`]}>
+                        <Input
+                          value={conducteur.client.client.cin ?? ""}
+                          onBlur={() => searchClient(conducteur.clientIndex, { cin: conducteur.client.client.cin })}
+                          onChange={(event) => {
+                            updateIdentity(conducteur.clientIndex, { cin: event.target.value });
+                            scheduleClientSearch(conducteur.clientIndex, { cin: event.target.value });
+                          }}
+                        />
+                        <LookupMessage state={lookupByIndex[conducteur.clientIndex]} />
+                      </Field>
+                      <Field label="Date de naissance">
+                        <DatePicker date={conducteur.client.client.dateNaissance} onSelect={(date) => updateClient(conducteur.clientIndex, { dateNaissance: toDateOnly(date) })} />
+                      </Field>
+                      <Field label="Date de délivrance du permis">
+                        <DatePicker date={conducteur.client.client.dateDelivrancePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateDelivrancePermis: toDateOnly(date) })} />
+                      </Field>
+                      <Field label="N° de permis">
+                        <Input value={conducteur.client.client.numeroPermis ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { numeroPermis: event.target.value })} />
+                      </Field>
+                      <Field label="Date de validité du PC" required error={errors[`clients.${conducteur.clientIndex}.client.dateValiditePermis`]}>
+                        <DatePicker date={conducteur.client.client.dateValiditePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateValiditePermis: toDateOnly(date) })} />
+                      </Field>
                     </div>
                   ) : null}
                 </>

@@ -1,4 +1,4 @@
-import { Save, Wand2 } from "lucide-react";
+import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClientSection } from "../components/ClientSection";
 import { GarantieSection } from "../components/GarantieSection";
@@ -8,6 +8,8 @@ import { RemorqueSection } from "../components/RemorqueSection";
 import { SectionCard } from "../components/SectionCard";
 import { VehiculeSection } from "../components/VehiculeSection";
 import { ContractInfoSection } from "./ContractInfoSection";
+import { FlotteGarantieSection } from "./FlotteGarantieSection";
+import { TariffGridSection } from "./TariffGridSection";
 import type { ContratCreationFormState } from "./useContratCreationForm";
 
 type Props = {
@@ -20,6 +22,7 @@ type Props = {
   allowMultipleVehicules?: boolean;
   allowRemorques?: boolean;
   maxRemorques?: number | null;
+  showFractionnement?: boolean;
   order?: "mono" | "flotte";
 };
 
@@ -33,6 +36,7 @@ export function ContratFormLayout({
   allowMultipleVehicules = false,
   allowRemorques = true,
   maxRemorques = 1,
+  showFractionnement = true,
   order = "mono",
 }: Props) {
   const clientSections = (
@@ -50,7 +54,8 @@ export function ContratFormLayout({
       form={form}
       badge={badge}
       showConvention={showConvention}
-      showGrille={showGrille}
+      showGrille={showGrille && order !== "flotte"}
+      showFractionnement={showFractionnement}
     />
   );
 
@@ -74,10 +79,23 @@ export function ContratFormLayout({
       setSelected={form.setGaranties}
       lignes={showGrille ? form.lignesGrille.data ?? [] : []}
       vehiculeCount={form.vehicules.length}
-      showLigneGrille={showGrille}
+      showLigneGrille={false}
+      automaticPricing={showGrille}
       allowPrimeColumn={allowSaisiePrimeNette}
       primeColumnEnabled={form.saisiePrimeNette}
       setPrimeColumnEnabled={form.setSaisiePrimeNette}
+    />
+  );
+
+  const flotteGuaranteeSection = (
+    <FlotteGarantieSection
+      garanties={form.refs.garanties.data ?? []}
+      selected={form.garanties}
+      setSelected={form.setGaranties}
+      lignes={form.lignesGrille.data ?? []}
+      vehicules={form.vehicules}
+      remorques={form.remorques}
+      grilleSelected={Boolean(form.grilleTarifaireId)}
     />
   );
 
@@ -105,9 +123,10 @@ export function ContratFormLayout({
       {contractSection}
       {order === "flotte" ? (
         <>
-          {guaranteeSection}
           {vehicleSection}
           {allowRemorques ? remorqueSection : null}
+          <TariffGridSection form={form} />
+          {flotteGuaranteeSection}
         </>
       ) : (
         <>
@@ -126,12 +145,6 @@ export function ContratFormLayout({
       )}
 
       <div className="flex justify-end gap-2 border-t pt-4">
-        {form.typeContrat !== "PARTICULIER" ? (
-          <Button variant="outline" onClick={form.handlePreview} disabled={form.previewMutation.isPending}>
-            <Wand2 className="size-4" />
-            Prévisualiser
-          </Button>
-        ) : null}
         <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
           <Save className="size-4" />
           Créer contrat

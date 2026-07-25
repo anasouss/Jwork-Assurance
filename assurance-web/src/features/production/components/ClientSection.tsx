@@ -401,7 +401,7 @@ export function ClientSection({
                   {!proprietorIsDriver && conducteur ? (
                     <div className="mt-3 rounded-lg border bg-muted/20 p-3">
                       <div className="mb-3 text-sm font-medium">Conducteur habituel</div>
-                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                         <Field label="Intitulé" required>
                           <Select value={conducteur.client.client.civilite ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { civilite: value })}>
                             <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -427,12 +427,6 @@ export function ClientSection({
                         </Field>
                         <Field label="Prénom" required>
                           <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
-                        </Field>
-                        <Field label="Date de naissance">
-                          <DatePicker date={conducteur.client.client.dateNaissance} onSelect={(date) => updateClient(conducteur.clientIndex, { dateNaissance: toDateOnly(date) })} />
-                        </Field>
-                        <Field label="Délivrance permis">
-                          <DatePicker date={conducteur.client.client.dateDelivrancePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateDelivrancePermis: toDateOnly(date) })} />
                         </Field>
                         <Field label="N° permis">
                           <Input value={conducteur.client.client.numeroPermis ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { numeroPermis: event.target.value })} />

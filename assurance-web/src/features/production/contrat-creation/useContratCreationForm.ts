@@ -54,8 +54,8 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   };
 
   const lignesGrille = useQuery({
-    queryKey: ["lignes-grille", grilleTarifaireId, usageId],
-    queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId, usageId }),
+    queryKey: ["lignes-grille", grilleTarifaireId],
+    queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId }),
     enabled: Boolean(grilleTarifaireId),
   });
 
@@ -163,6 +163,12 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Prévisualisation impossible"),
   });
 
+  const autoPreviewMutation = useMutation({
+    mutationFn: productionApi.previewQuittance,
+    onSuccess: setPreview,
+    onError: () => setPreview(null),
+  });
+
   const createMutation = useMutation({
     mutationFn: productionApi.createContrat,
     onSuccess: async () => {
@@ -231,6 +237,26 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     }
   };
 
+  useEffect(() => {
+    if (!canAutoPreview(typeContrat, request)) {
+      setPreview(null);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      autoPreviewMutation.mutate(request);
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [request, typeContrat]);
+
+  const setConventionForContrat = (value: string) => {
+    setConventionId(value);
+    const convention = refs.conventions.data?.find((item) => item.id === value);
+    const conventionFractionnement = convention?.fractionnement;
+    if (isFractionnement(conventionFractionnement)) {
+      setFractionnement(conventionFractionnement);
+    }
+  };
+
   const setUsageForContrat = (value: string) => {
     setUsageId(value);
     setVehicules(vehicules.map((vehicule) => ({ ...vehicule, usageId: value })));
@@ -243,6 +269,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     request,
     preview,
     previewMutation,
+    autoPreviewMutation,
     createMutation,
     handlePreview,
     handleCreate,
@@ -255,7 +282,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     compagnieAssuranceId,
     setCompagnieAssuranceId,
     conventionId,
-    setConventionId,
+    setConventionId: setConventionForContrat,
     usageId,
     setUsageId: setUsageForContrat,
     grilleTarifaireId,
@@ -327,6 +354,10 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function isFractionnement(value: unknown): value is CreateContratRequest["fractionnement"] {
+  return value === "ANNUEL" || value === "SEMESTRIEL" || value === "TRIMESTRIEL" || value === "MENSUEL";
+}
+
 function dateOnly(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -336,4 +367,20 @@ function dateOnly(date: Date) {
 
 function isBeforeToday(value: string | undefined | null, today: string) {
   return Boolean(value && value < today);
+}
+
+function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest) {
+  if (typeContrat === "PARTICULIER") {
+    return false;
+  }
+  if (!request.agenceId || !request.numeroContrat || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
+    return false;
+  }
+  if (typeContrat === "CONVENTION" && !request.conventionId) {
+    return false;
+  }
+  if (!request.vehicules.length && !request.remorques.length) {
+    return false;
+  }
+  return request.garanties.length > 0;
 }

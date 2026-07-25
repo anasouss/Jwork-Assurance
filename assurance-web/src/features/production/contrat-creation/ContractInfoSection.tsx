@@ -12,6 +12,7 @@ type Props = {
   badge: string;
   showConvention?: boolean;
   showGrille?: boolean;
+  showFractionnement?: boolean;
 };
 
 export function ContractInfoSection({
@@ -19,6 +20,7 @@ export function ContractInfoSection({
   badge,
   showConvention = false,
   showGrille = true,
+  showFractionnement = true,
 }: Props) {
   const filteredConventions = (form.refs.conventions.data ?? []).filter(
     (convention) => !form.compagnieAssuranceId || convention.compagnieAssuranceId === form.compagnieAssuranceId
@@ -113,17 +115,19 @@ export function ContractInfoSection({
         </Field>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-4">
-        <Field label="Fractionnement">
-          <Select value={form.fractionnement} onValueChange={(value) => form.setFractionnement(value as CreateContratRequest["fractionnement"])}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ANNUEL">Annuel</SelectItem>
-              <SelectItem value="SEMESTRIEL">Semestriel</SelectItem>
-              <SelectItem value="TRIMESTRIEL">Trimestriel</SelectItem>
-              <SelectItem value="MENSUEL">Mensuel</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
+        {showFractionnement ? (
+          <Field label="Périodicité">
+            <Select value={form.fractionnement} onValueChange={(value) => form.setFractionnement(value as CreateContratRequest["fractionnement"])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ANNUEL">Annuel</SelectItem>
+                <SelectItem value="SEMESTRIEL">Semestriel</SelectItem>
+                <SelectItem value="TRIMESTRIEL">Trimestriel</SelectItem>
+                <SelectItem value="MENSUEL">Mensuel</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
       </div>
     </SectionCard>
   );

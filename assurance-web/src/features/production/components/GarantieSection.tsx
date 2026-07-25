@@ -14,6 +14,7 @@ export function GarantieSection({
   lignes,
   vehiculeCount,
   showLigneGrille = true,
+  automaticPricing = false,
   allowPrimeColumn = false,
   primeColumnEnabled = false,
   setPrimeColumnEnabled,
@@ -24,6 +25,7 @@ export function GarantieSection({
   lignes: ReferenceOption[];
   vehiculeCount: number;
   showLigneGrille?: boolean;
+  automaticPricing?: boolean;
   allowPrimeColumn?: boolean;
   primeColumnEnabled?: boolean;
   setPrimeColumnEnabled?: (value: boolean) => void;
@@ -77,7 +79,7 @@ export function GarantieSection({
               <th className="w-40 px-3 py-3 text-left">Franchise (%)</th>
               <th className="w-40 px-3 py-3 text-left">Min franchise</th>
               {showLigneGrille ? <th className="w-56 px-3 py-3 text-left">Ligne grille</th> : null}
-              {primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+              {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -157,7 +159,9 @@ export function GarantieSection({
                       )}
                     </td>
                   ) : null}
-                  {primeColumnEnabled ? (
+                  {automaticPricing ? (
+                    <td className="px-3 py-2 text-muted-foreground">{checked ? "Calcul auto" : "-"}</td>
+                  ) : primeColumnEnabled ? (
                     <td className="px-3 py-2">
                       <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
                     </td>
@@ -183,7 +187,7 @@ export function GarantieSection({
                   <th className="w-48 px-3 py-3 text-left">Hospitalisation</th>
                   <th className="w-44 px-3 py-3 text-left">Frais funéraires</th>
                   <th className="w-56 px-3 py-3 text-left">Chirurgie réparatrice</th>
-                  {primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+                  {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -218,7 +222,9 @@ export function GarantieSection({
                       <td className="px-3 py-2">
                         <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie ?? ""} onChange={(event) => update(garantie.id, { montantFraisChirurgie: numberValue(event.target.value) })} />
                       </td>
-                      {primeColumnEnabled ? (
+                      {automaticPricing ? (
+                        <td className="px-3 py-2 text-muted-foreground">{checked ? "Calcul auto" : "-"}</td>
+                      ) : primeColumnEnabled ? (
                         <td className="px-3 py-2">
                           <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
                         </td>

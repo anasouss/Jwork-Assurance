@@ -10,6 +10,7 @@ export function GrilleTarifaireDialog({
   open,
   onOpenChange,
   grille,
+  defaultCompagnieAssuranceId,
   compagnies,
   onSubmit,
   submitting,
@@ -17,6 +18,7 @@ export function GrilleTarifaireDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   grille?: ReferenceOption | null;
+  defaultCompagnieAssuranceId?: string;
   compagnies: ReferenceOption[];
   onSubmit: (payload: UpsertGrilleTarifaireRequest) => void;
   submitting?: boolean;
@@ -27,10 +29,10 @@ export function GrilleTarifaireDialog({
 
   useEffect(() => {
     if (!open) return;
-    setCompagnieAssuranceId(grille?.compagnieAssuranceId ?? "");
+    setCompagnieAssuranceId(grille?.compagnieAssuranceId ?? defaultCompagnieAssuranceId ?? "");
     setLibelle(grille?.libelle ?? "");
     setDescription(grille?.description ?? "");
-  }, [grille, open]);
+  }, [defaultCompagnieAssuranceId, grille, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -217,15 +218,13 @@ public class ContratService {
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
             Garantie garantie = garantieRepository.findById(input.getGarantieId())
                     .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
-            LigneGrilleTarifaire ligneGrilleTarifaire = input.getLigneGrilleTarifaireId() == null ? null :
-                    ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
-                            .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
             Vehicule vehicule = input.getVehiculeIndex() == null ? null : resolveVehicule(vehiculesCrees, input.getVehiculeIndex(), "Garantie");
             Remorque remorque = input.getRemorqueIndex() == null ? null : resolveRemorque(remorquesCreees, input.getRemorqueIndex(), "Garantie");
             Usage usageCible = resolveUsageCible(contrat, vehicule, remorque);
+            LigneGrilleTarifaire ligneGrilleTarifaire = resolveLigneGrilleTarifaire(contrat, garantie, input, usageCible, vehicule, remorque);
             ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
             SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
@@ -492,15 +491,13 @@ public class ContratService {
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
             Garantie garantie = garantieRepository.findById(input.getGarantieId())
                     .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
-            LigneGrilleTarifaire ligneGrilleTarifaire = input.getLigneGrilleTarifaireId() == null ? null :
-                    ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
-                            .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
             Vehicule vehicule = input.getVehiculeIndex() == null ? null : resolveVehicule(vehicules, input.getVehiculeIndex(), "Garantie");
             Remorque remorque = input.getRemorqueIndex() == null ? null : resolveRemorque(remorques, input.getRemorqueIndex(), "Garantie");
             Usage usageCible = resolveUsageCible(contrat, vehicule, remorque);
+            LigneGrilleTarifaire ligneGrilleTarifaire = resolveLigneGrilleTarifaire(contrat, garantie, input, usageCible, vehicule, remorque);
             ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
             SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
@@ -1274,6 +1271,117 @@ public class ContratService {
                     || !ligneGrilleTarifaire.getCategorieTransport().getId().equals(vehicule.getCategorieTransport().getId())) {
                 throw new BadRequestException("La ligne de grille tarifaire ne correspond pas a la categorie transport du vehicule");
             }
+        }
+    }
+
+    private LigneGrilleTarifaire resolveLigneGrilleTarifaire(
+            Contrat contrat,
+            Garantie garantie,
+            CreateContratRequest.GarantieInput input,
+            Usage usageCible,
+            Vehicule vehicule,
+            Remorque remorque
+    ) {
+        if (input.getLigneGrilleTarifaireId() != null && !input.getLigneGrilleTarifaireId().isBlank()) {
+            return ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
+                    .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
+        }
+        if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
+                || contrat.getGrilleTarifaire() == null
+                || Boolean.TRUE.equals(garantie.getResponsabiliteCivile())
+                || garantie.getTypeGarantie() == TypeGarantie.PERSONNE) {
+            return null;
+        }
+
+        ModeTarificationGarantie requestedMode = parseMode(input.getModeSelectionne());
+        return ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndActifTrue(contrat.getGrilleTarifaire().getId()).stream()
+                .filter(ligne -> ligne.getGarantie() != null && ligne.getGarantie().getId().equals(garantie.getId()))
+                .filter(ligne -> requestedMode == null || ligne.getModeTarification() == null || ligne.getModeTarification() == requestedMode)
+                .filter(ligne -> ligne.getUsage() == null || (usageCible != null && ligne.getUsage().getId().equals(usageCible.getId())))
+                .filter(ligne -> ligne.getCategorieTransport() == null
+                        || (vehicule != null
+                        && vehicule.getCategorieTransport() != null
+                        && ligne.getCategorieTransport().getId().equals(vehicule.getCategorieTransport().getId())))
+                .filter(ligne -> matchesLigneConstraints(ligne, vehicule, remorque))
+                .max(Comparator.comparingInt(ligne -> ligneSpecificity(ligne, usageCible, vehicule, remorque)))
+                .orElse(null);
+    }
+
+    private int ligneSpecificity(LigneGrilleTarifaire ligne, Usage usageCible, Vehicule vehicule, Remorque remorque) {
+        int score = 0;
+        if (ligne.getUsage() != null && usageCible != null && ligne.getUsage().getId().equals(usageCible.getId())) {
+            score += 10;
+        }
+        if (ligne.getCategorieTransport() != null
+                && vehicule != null
+                && vehicule.getCategorieTransport() != null
+                && ligne.getCategorieTransport().getId().equals(vehicule.getCategorieTransport().getId())) {
+            score += 5;
+        }
+        if (remorque != null && (ligne.getTauxRemorque() != null || ligne.getFranchiseMinimaleRemorque() != null || ligne.getTauxFranchiseRemorque() != null)) {
+            score += 2;
+        }
+        if (ligne.getModeTarification() != null) {
+            score += 1;
+        }
+        if (matchesText(ligne.getSousClasse(), vehicule != null ? vehicule.getSousClasse() : null)) {
+            score += 1;
+        }
+        if (matchesText(ligne.getCarburant(), vehicule != null ? vehicule.getCarburant() : null)) {
+            score += 1;
+        }
+        return score;
+    }
+
+    private boolean matchesLigneConstraints(LigneGrilleTarifaire ligne, Vehicule vehicule, Remorque remorque) {
+        if (vehicule != null) {
+            return inRange(parseDecimal(vehicule.getPuissanceFiscale()), ligne.getPuissanceFiscaleMin(), ligne.getPuissanceFiscaleMax())
+                    && inRange(parseDecimal(vehicule.getNombrePlaces()), ligne.getNombrePlacesMin(), ligne.getNombrePlacesMax())
+                    && inRange(parseDecimal(vehicule.getPtc()), ligne.getPtcMin(), ligne.getPtcMax())
+                    && matchesText(ligne.getSousClasse(), vehicule.getSousClasse())
+                    && matchesText(ligne.getCarburant(), vehicule.getCarburant());
+        }
+        if (remorque != null) {
+            return inRange(parseDecimal(remorque.getPtc()), ligne.getPtcMin(), ligne.getPtcMax())
+                    && ligne.getPuissanceFiscaleMin() == null
+                    && ligne.getPuissanceFiscaleMax() == null
+                    && ligne.getNombrePlacesMin() == null
+                    && ligne.getNombrePlacesMax() == null
+                    && !hasText(ligne.getSousClasse())
+                    && !hasText(ligne.getCarburant());
+        }
+        return ligne.getPuissanceFiscaleMin() == null
+                && ligne.getPuissanceFiscaleMax() == null
+                && ligne.getNombrePlacesMin() == null
+                && ligne.getNombrePlacesMax() == null
+                && ligne.getPtcMin() == null
+                && ligne.getPtcMax() == null
+                && !hasText(ligne.getSousClasse())
+                && !hasText(ligne.getCarburant());
+    }
+
+    private boolean inRange(BigDecimal value, BigDecimal min, BigDecimal max) {
+        if (min == null && max == null) {
+            return true;
+        }
+        if (value == null) {
+            return false;
+        }
+        return (min == null || value.compareTo(min) >= 0) && (max == null || value.compareTo(max) <= 0);
+    }
+
+    private boolean matchesText(String expected, String actual) {
+        return !hasText(expected) || (hasText(actual) && expected.trim().equalsIgnoreCase(actual.trim()));
+    }
+
+    private BigDecimal parseDecimal(String value) {
+        if (!hasText(value)) {
+            return null;
+        }
+        try {
+            return new BigDecimal(value.trim().replace(',', '.'));
+        } catch (NumberFormatException exception) {
+            return null;
         }
     }
 

@@ -144,8 +144,6 @@ export function VehiculeSection({
                     </Select>
                   </Field>
                 ) : null}
-              </div>
-              <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {needsCarburantAndPf ? (
                   <Field label="Puissance fiscale / cylindrée" required>
                     <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
@@ -177,8 +175,6 @@ export function VehiculeSection({
                 <Field label="Nombre de places">
                   <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update(index, { nombrePlaces: event.target.value })} />
                 </Field>
-              </div>
-              <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Field label="Date mise en circulation">
                   <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toDateOnly(date) })} />
                 </Field>
@@ -188,8 +184,6 @@ export function VehiculeSection({
                 <Field label="N° attestation">
                   <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
                 </Field>
-              </div>
-              <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Field label="Valeur vénale">
                   <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update(index, { valeurVenale: numberValue(event.target.value) })} />
                 </Field>

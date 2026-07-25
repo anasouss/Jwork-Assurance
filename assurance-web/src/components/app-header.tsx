@@ -29,7 +29,7 @@ export function AppHeader() {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center border-b bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/90">
       <div className="grid w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-4">
         <div className="flex items-center">
           <SidebarTrigger className="-ms-1" />
@@ -79,22 +79,19 @@ export function AppHeader() {
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" className="h-10 gap-2 px-2">
+              <Button type="button" variant="ghost" size="icon" className="size-10 rounded-full">
                 <Avatar className="size-8">
                   <AvatarFallback className="bg-muted text-xs">
                     {initials || <User className="size-4" />}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden text-left leading-tight lg:grid">
-                  <span className="text-sm font-medium">{user?.agenceName ?? "Agence"}</span>
-                  <span className="text-xs text-muted-foreground">{user?.roleName ?? user?.roleCode}</span>
-                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="text-sm font-medium">{fullName}</div>
                 <div className="text-xs text-muted-foreground">{user?.email}</div>
+                <div className="mt-2 text-xs text-muted-foreground">{user?.agenceName ?? "Agence"} · {user?.roleName ?? user?.roleCode}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void logout()}>

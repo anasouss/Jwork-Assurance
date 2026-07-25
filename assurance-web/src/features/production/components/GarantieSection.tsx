@@ -410,10 +410,10 @@ function GuaranteeTotalsSummary({
   }
 
   return (
-    <div className="mt-4 overflow-hidden rounded-md border">
+    <div className="mt-4 ml-auto w-full max-w-sm overflow-hidden rounded-md border">
       {rows.map(([label, value]) => (
         <div key={label} className="grid grid-cols-[1fr_160px] border-b last:border-b-0">
-          <div className="bg-muted/20 px-3 py-2 text-xs font-semibold uppercase">{label}</div>
+          <div className="bg-muted/20 px-3 py-2 text-right text-xs font-semibold uppercase">{label}</div>
           <div className="px-3 py-2 text-right text-xs font-semibold">
             {loading ? "Calcul..." : value == null ? "-" : formatMoney(value)}
           </div>

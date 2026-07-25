@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
 import { money, numberValue } from "../utils/format";
-import type { GarantieInput, ReferenceOption } from "../types";
+import type { GarantieInput, ReferenceOption, VehiculeInput } from "../types";
 
 export function GarantieSection({
   garanties,
@@ -14,6 +14,7 @@ export function GarantieSection({
   setSelected,
   lignes,
   formulesPersonne = [],
+  vehicules = [],
   vehiculeCount,
   showLigneGrille = true,
   automaticPricing = false,
@@ -26,6 +27,7 @@ export function GarantieSection({
   setSelected: (value: GarantieInput[]) => void;
   lignes: ReferenceOption[];
   formulesPersonne?: ReferenceOption[];
+  vehicules?: VehiculeInput[];
   vehiculeCount: number;
   showLigneGrille?: boolean;
   automaticPricing?: boolean;
@@ -34,7 +36,9 @@ export function GarantieSection({
   setPrimeColumnEnabled?: (value: boolean) => void;
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
-  const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE");
+  const vehiculeGaranties = garanties
+    .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE")
+    .filter((garantie) => !automaticPricing || Boolean(garantie.responsabiliteCivile) || linesForGuarantee(lignes, garantie).length > 0);
   const personneGaranties = garanties
     .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE")
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
@@ -51,6 +55,7 @@ export function GarantieSection({
     if (checked) {
       const formules = type === "PERSONNE" ? formulesForGuarantee(formulesPersonne, garantie) : [];
       const formule = formules[0];
+      const line = type === "VEHICULE" ? linesForGuarantee(lignes, garantie)[0] : undefined;
       setSelected([
         ...selected,
         {
@@ -58,6 +63,7 @@ export function GarantieSection({
           vehiculeIndex: type === "VEHICULE" && vehiculeCount > 0 ? 0 : undefined,
           modeSelectionne: String(garantie.modeParDefaut ?? (type === "PERSONNE" ? "PROTECTION" : "TAUX")),
           sourceValeurSelectionnee: defaultSource(garantie),
+          ...lineSelectionPatch(garantie, line),
           formuleGarantiePersonneId: formule?.id,
           formule: formule ? String(formule.libelle ?? garantie.code ?? garantie.libelle) : undefined,
           prime: formule ? numberValue(String(formule.primeNette ?? "")) : undefined,
@@ -86,8 +92,17 @@ export function GarantieSection({
               {vehiculeCount > 1 ? <th className="w-40 px-3 py-3 text-left">Véhicule</th> : null}
               <th className="w-48 px-3 py-3 text-left">Valeur assurée</th>
               <th className="w-36 px-3 py-3 text-left">Taux (%)</th>
-              <th className="w-40 px-3 py-3 text-left">Franchise (%)</th>
-              <th className="w-40 px-3 py-3 text-left">Min franchise</th>
+              {automaticPricing ? (
+                <>
+                  <th className="w-56 px-3 py-3 text-left">Taux franchise / Min franchise</th>
+                  <th className="w-40 px-3 py-3 text-left">Prime annuelle</th>
+                </>
+              ) : (
+                <>
+                  <th className="w-40 px-3 py-3 text-left">Franchise (%)</th>
+                  <th className="w-40 px-3 py-3 text-left">Min franchise</th>
+                </>
+              )}
               {showLigneGrille ? <th className="w-56 px-3 py-3 text-left">Ligne grille</th> : null}
               {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
             </tr>
@@ -95,13 +110,19 @@ export function GarantieSection({
           <tbody>
             {vehiculeGaranties.map((garantie) => {
               const item = byId.get(garantie.id);
-              const checked = Boolean(item);
               const isRc = Boolean(garantie.responsabiliteCivile);
+              const checked = Boolean(item) || isRc;
               const rowDisabled = !checked;
               const locked = isRc;
               const hasLine = !automaticPricing || isRc || linesForGuarantee(lignes, garantie).length > 0;
               const editable = checked && !locked;
               const isVehicleGuarantee = String(garantie.typeGarantie ?? "VEHICULE") === "VEHICULE";
+              const lineOptions = linesForGuarantee(lignes, garantie);
+              const selectedLine = selectedLineFor(lineOptions, item);
+              const selectedVehicle = vehicules[item?.vehiculeIndex ?? 0] ?? vehicules[0];
+              const manualValue = isManualValue(garantie, selectedLine);
+              const displayCapital = guaranteeCapitalValue(garantie, selectedLine, selectedVehicle, item);
+              const estimatedPrime = automaticPricing && checked && !isRc ? estimatePrime(selectedLine, displayCapital) : undefined;
 
               return (
                 <tr
@@ -137,33 +158,96 @@ export function GarantieSection({
                       )}
                     </td>
                   ) : null}
-                  <td className="px-3 py-2">
-                    <Input
-                      type="number"
-                      disabled={rowDisabled || isRc}
-                      className={controlClass(editable)}
-                      value={item?.valeurAssuree ?? item?.capital ?? ""}
-                      onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale ?? ""} onChange={(event) => update(garantie.id, { franchiseMinimale: numberValue(event.target.value) })} />
-                  </td>
-                  {showLigneGrille ? (
+                  {automaticPricing ? (
+                    <>
+                      <td className="px-3 py-2">
+                        {manualValue && !isRc ? (
+                          <Input
+                            type="number"
+                            disabled={!editable}
+                            className={controlClass(editable)}
+                            value={item?.valeurAssuree ?? item?.capital ?? ""}
+                            onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
+                          />
+                        ) : lineOptions.length > 1 && lineMode(selectedLine) === "CAPITAL" ? (
+                          <Select
+                            value={selectedLine?.id ?? ""}
+                            disabled={!editable}
+                            onValueChange={(value) => {
+                              const line = lineOptions.find((option) => option.id === value);
+                              update(garantie.id, lineSelectionPatch(garantie, line));
+                            }}
+                          >
+                            <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Formule" /></SelectTrigger>
+                            <SelectContent>
+                              {lineOptions.map((line) => <SelectItem key={line.id} value={line.id}>{capitalLineLabel(line)}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={isRc ? "Capital RC" : capitalDisplay(garantie, selectedLine, selectedVehicle, displayCapital)} />
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {!isRc && lineOptions.length > 1 ? (
+                          <Select
+                            value={selectedLine?.id ?? ""}
+                            disabled={!editable}
+                            onValueChange={(value) => {
+                              const line = lineOptions.find((option) => option.id === value);
+                              update(garantie.id, lineSelectionPatch(garantie, line));
+                            }}
+                          >
+                            <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
+                            <SelectContent>
+                              {lineOptions.map((line) => <SelectItem key={line.id} value={line.id}>{tariffLineLabel(line)}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className={cn("block rounded-md px-3 py-2 text-right", rowDisabled ? "text-muted-foreground" : "")}>
+                            {isRc ? "-" : rateDisplay(selectedLine)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{estimatedPrime == null ? "-" : money(estimatedPrime)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-3 py-2">
+                        <Input
+                          type="number"
+                          disabled={rowDisabled || isRc}
+                          className={controlClass(editable)}
+                          value={item?.valeurAssuree ?? item?.capital ?? ""}
+                          onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale ?? ""} onChange={(event) => update(garantie.id, { franchiseMinimale: numberValue(event.target.value) })} />
+                      </td>
+                    </>
+                  )}
+                  {!automaticPricing && showLigneGrille ? (
                     <td className="px-3 py-2">
                       {!isRc ? (
-                        <Select value={item?.ligneGrilleTarifaireId ?? ""} disabled={rowDisabled} onValueChange={(value) => update(garantie.id, { ligneGrilleTarifaireId: value })}>
+                        <Select
+                          value={item?.ligneGrilleTarifaireId ?? ""}
+                          disabled={rowDisabled}
+                          onValueChange={(value) => {
+                            const line = lineOptions.find((option) => option.id === value);
+                            update(garantie.id, lineSelectionPatch(garantie, line));
+                          }}
+                        >
                           <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
                           <SelectContent>
-                            {lignes
-                              .filter((ligne) => !ligne.garantieId || ligne.garantieId === garantie.id)
-                              .map((ligne) => <SelectItem key={ligne.id} value={ligne.id}>{ligne.libelle}</SelectItem>)}
+                            {lineOptions.map((ligne) => <SelectItem key={ligne.id} value={ligne.id}>{ligne.libelle}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       ) : (
@@ -171,9 +255,7 @@ export function GarantieSection({
                       )}
                     </td>
                   ) : null}
-                  {automaticPricing ? (
-                    <td className="px-3 py-2 text-muted-foreground">{checked ? "Calcul auto" : "-"}</td>
-                  ) : primeColumnEnabled ? (
+                  {!automaticPricing && primeColumnEnabled ? (
                     <td className="px-3 py-2">
                       <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
                     </td>
@@ -284,15 +366,155 @@ function defaultSource(garantie: ReferenceOption) {
   if (garantie.requiertValeurGlace) {
     return "GLACE";
   }
+  if (garantie.saisieManuelleAutorisee) {
+    return "MANUEL";
+  }
   return "AUCUNE";
 }
 
 function linesForGuarantee(lignes: ReferenceOption[], garantie: ReferenceOption) {
-  return lignes.filter((ligne) => !ligne.garantieId || ligne.garantieId === garantie.id);
+  return lignes
+    .filter((ligne) => !ligne.garantieId || ligne.garantieId === garantie.id)
+    .sort((left, right) =>
+      (numberValue(String(left.ordreAffichage ?? "")) ?? 9999) - (numberValue(String(right.ordreAffichage ?? "")) ?? 9999)
+      || String(left.libelle ?? "").localeCompare(String(right.libelle ?? ""))
+    );
 }
 
 function formulesForGuarantee(formules: ReferenceOption[], garantie: ReferenceOption) {
   return formules.filter((formule) => !formule.garantieId || formule.garantieId === garantie.id);
+}
+
+function selectedLineFor(lines: ReferenceOption[], item?: GarantieInput) {
+  return lines.find((line) => line.id === item?.ligneGrilleTarifaireId) ?? lines[0];
+}
+
+function lineSelectionPatch(garantie: ReferenceOption, line?: ReferenceOption): Partial<GarantieInput> {
+  const mode = lineMode(line) || String(garantie.modeParDefaut ?? "TAUX");
+  const source = mode === "CAPITAL" ? "AUCUNE" : defaultSource(garantie);
+  return {
+    ligneGrilleTarifaireId: line?.id,
+    modeSelectionne: mode,
+    sourceValeurSelectionnee: source,
+    valeurAssuree: undefined,
+    capital: undefined,
+    taux: undefined,
+    tauxFranchise: undefined,
+    franchiseMinimale: undefined,
+    prime: undefined,
+  };
+}
+
+function lineMode(line?: ReferenceOption) {
+  return String(line?.modeTarification ?? "").toUpperCase();
+}
+
+function isManualValue(garantie: ReferenceOption, line?: ReferenceOption) {
+  if (lineMode(line) === "CAPITAL") {
+    return false;
+  }
+  return defaultSource(garantie) === "MANUEL";
+}
+
+function guaranteeCapitalValue(garantie: ReferenceOption, line?: ReferenceOption, vehicule?: VehiculeInput, item?: GarantieInput) {
+  if (lineMode(line) === "CAPITAL") {
+    return numeric(line?.capital);
+  }
+  if (isManualValue(garantie, line)) {
+    return item?.valeurAssuree ?? item?.capital;
+  }
+  const source = defaultSource(garantie);
+  if (source === "VENALE") {
+    return vehicule?.valeurVenale;
+  }
+  if (source === "NEUF") {
+    return vehicule?.valeurNeuf;
+  }
+  if (source === "GLACE") {
+    return vehicule?.valeurGlace;
+  }
+  return numeric(line?.capital);
+}
+
+function capitalDisplay(garantie: ReferenceOption, line?: ReferenceOption, vehicule?: VehiculeInput, capital?: number) {
+  const mode = lineMode(line);
+  if (mode === "CAPITAL") {
+    return capital == null ? "" : money(capital);
+  }
+  const source = defaultSource(garantie);
+  if (source === "VENALE") {
+    return `V.Vénale: ${money(vehicule?.valeurVenale)}`;
+  }
+  if (source === "NEUF") {
+    return `V.Neuf: ${money(vehicule?.valeurNeuf)}`;
+  }
+  if (source === "GLACE") {
+    return `V.Glace: ${money(vehicule?.valeurGlace)}`;
+  }
+  return capital == null ? "" : money(capital);
+}
+
+function capitalLineLabel(line: ReferenceOption) {
+  const capital = numeric(line.capital);
+  return capital == null ? String(line.libelle ?? "Option") : money(capital);
+}
+
+function tariffLineLabel(line: ReferenceOption) {
+  const mode = lineMode(line);
+  const taux = numeric(line.taux);
+  if (mode === "TAUX" && taux != null) {
+    return `${money(taux)} %`;
+  }
+  if (mode === "CAPITAL") {
+    return String(line.libelle ?? capitalLineLabel(line));
+  }
+  return String(line.libelle ?? rateDisplay(line));
+}
+
+function rateDisplay(line?: ReferenceOption) {
+  const taux = numeric(line?.taux);
+  if (lineMode(line) === "CAPITAL") {
+    return String(line?.libelle ?? "-");
+  }
+  return taux == null ? "-" : `${money(taux)} %`;
+}
+
+function franchiseDisplay(line?: ReferenceOption) {
+  const tauxFranchise = numeric(line?.tauxFranchise);
+  const franchiseMinimale = numeric(line?.franchiseMinimale);
+  if (tauxFranchise == null && franchiseMinimale == null) {
+    return "-";
+  }
+  const left = tauxFranchise == null ? "" : `${money(tauxFranchise)} %`;
+  const right = franchiseMinimale == null ? "" : `${money(franchiseMinimale)} DH`;
+  return [left, right].filter(Boolean).join(" _ ");
+}
+
+function estimatePrime(line?: ReferenceOption, capital?: number) {
+  const mode = lineMode(line);
+  const taux = numeric(line?.taux);
+  const prime = numeric(line?.prime);
+  if (mode === "CAPITAL" || mode === "PRIME_FIXE") {
+    if (taux != null && taux !== 0) {
+      return ((prime ?? 0) * taux) / 100;
+    }
+    return prime;
+  }
+  if (taux != null && capital != null) {
+    return (capital * taux) / 100;
+  }
+  return prime;
+}
+
+function numeric(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function controlClass(active: boolean) {

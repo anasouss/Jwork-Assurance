@@ -9,15 +9,19 @@ export type LoginRequest = {
 
 export const authApi = {
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    } catch {
+      throw new Error("Service inaccessible");
+    }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || "Échec de la connexion");
+      throw new Error(await loginErrorMessage(response));
     }
 
     const result = (await response.json()) as ApiResponse<AuthResponse>;
@@ -68,6 +72,18 @@ export const authApi = {
     }
   },
 };
+
+async function loginErrorMessage(response: Response): Promise<string> {
+  if (response.status === 401 || response.status === 403) {
+    return "Email ou mot de passe incorrect";
+  }
+  if (response.status >= 500) {
+    return "Service momentanément indisponible";
+  }
+
+  const errorData = await response.json().catch(() => ({}));
+  return errorData.message || "Échec de la connexion";
+}
 
 function normalizeAuthResponse(auth: AuthResponse): AuthResponse {
   const fullName = auth.user.fullName || [auth.user.firstName, auth.user.lastName].filter(Boolean).join(" ") || auth.user.email;

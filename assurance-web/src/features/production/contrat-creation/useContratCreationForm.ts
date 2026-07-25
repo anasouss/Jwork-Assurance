@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
@@ -31,7 +31,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [dateEcheance, setDateEcheance] = useState<string | undefined>();
   const [fractionnement, setFractionnement] = useState<CreateContratRequest["fractionnement"]>("ANNUEL");
   const [saisiePrimeNette, setSaisiePrimeNette] = useState(false);
-  const [clients, setClients] = useState<ClientInput[]>([emptyClient("SOUSCRIPTEUR")]);
+  const [clients, setClients] = useState<ClientInput[]>([emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")]);
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([emptyVehicule()]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [garanties, setGaranties] = useState<GarantieInput[]>([]);
@@ -55,6 +55,30 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId, usageId }),
     enabled: Boolean(grilleTarifaireId),
   });
+
+  useEffect(() => {
+    const garantiesReference = refs.garanties.data ?? [];
+    const mandatory = garantiesReference.filter((garantie) => garantie.responsabiliteCivile || garantie.obligatoire);
+    if (mandatory.length === 0) {
+      return;
+    }
+    setGaranties((current) => {
+      const existingIds = new Set(current.map((item) => item.garantieId));
+      const missing = mandatory.filter((garantie) => !existingIds.has(garantie.id));
+      if (missing.length === 0) {
+        return current;
+      }
+      return [
+        ...current,
+        ...missing.map((garantie) => ({
+          garantieId: garantie.id,
+          vehiculeIndex: String(garantie.typeGarantie ?? "VEHICULE") === "VEHICULE" ? 0 : undefined,
+          modeSelectionne: String(garantie.modeParDefaut ?? "TAUX"),
+          sourceValeurSelectionnee: String(garantie.sourceValeurParDefaut ?? "AUCUNE"),
+        })),
+      ];
+    });
+  }, [refs.garanties.data]);
 
   const modeSaisieGaranties = typeContrat === "PARTICULIER"
     ? saisiePrimeNette ? "MANUELLE_AVEC_PRIME_NETTE" : "MANUELLE"

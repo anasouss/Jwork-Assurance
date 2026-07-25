@@ -44,25 +44,20 @@ export function ClientSection({
     );
   };
 
-  return (
-    <SectionCard
-      title="Souscripteur, propriétaire, conducteur"
-      badge={`${clients.length} liaison${clients.length > 1 ? "s" : ""}`}
-      action={
-        <Button type="button" variant="outline" size="sm" onClick={() => setClients([...clients, emptyClient("CONDUCTEUR")])}>
-          <Plus className="size-4" />
-          Conducteur
-        </Button>
-      }
-    >
+  const renderClients = (rolesToShow: ClientInput["role"][]) => {
+    const visibleClients = clients
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => rolesToShow.includes(item.role));
+
+    return (
       <div className="grid gap-4">
-        {clients.map((item, index) => {
+        {visibleClients.map(({ item, index }) => {
           const morale = item.client.typeClient === "PERSONNE_MORALE";
           return (
             <div key={index} className="rounded-lg border p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-sm font-medium">Client {index + 1}</div>
-                {clients.length > 1 ? (
+                <div className="text-sm font-medium">{item.role === "SOUSCRIPTEUR" ? "Souscripteur" : item.role === "PROPRIETAIRE" ? "Propriétaire" : item.role}</div>
+                {clients.length > 1 && item.role !== "SOUSCRIPTEUR" && item.role !== "PROPRIETAIRE" ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -176,7 +171,34 @@ export function ClientSection({
           );
         })}
       </div>
-    </SectionCard>
+    );
+  };
+
+  return (
+    <>
+      <SectionCard title="Souscripteur" badge="Obligatoire" tone="production">
+        {renderClients(["SOUSCRIPTEUR"])}
+      </SectionCard>
+
+      <SectionCard title="Propriétaire" badge="Obligatoire" tone="production" defaultOpen={false}>
+        {renderClients(["PROPRIETAIRE"])}
+      </SectionCard>
+
+      <SectionCard
+        title="Conducteurs et bénéficiaires"
+        badge="Optionnel"
+        tone="production"
+        defaultOpen={false}
+        action={
+          <Button type="button" variant="outline" size="sm" onClick={() => setClients([...clients, emptyClient("CONDUCTEUR")])}>
+            <Plus className="size-4" />
+            Conducteur
+          </Button>
+        }
+      >
+        {renderClients(["CONDUCTEUR", "BENEFICIAIRE"])}
+      </SectionCard>
+    </>
   );
 }
 

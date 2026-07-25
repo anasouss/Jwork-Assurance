@@ -27,12 +27,13 @@ export function GarantieSection({
   };
 
   return (
-    <SectionCard title="Garanties" badge={`${selected.length} sélectionnée${selected.length > 1 ? "s" : ""}`}>
+    <SectionCard title="Garanties" badge={`${selected.length} sélectionnée${selected.length > 1 ? "s" : ""}`} tone="production">
       <div className="grid gap-3">
         {garanties.map((garantie) => {
           const item = byId.get(garantie.id);
           const checked = Boolean(item);
           const type = String(garantie.typeGarantie ?? "VEHICULE");
+          const locked = Boolean(garantie.responsabiliteCivile || garantie.obligatoire);
           const sources = [
             garantie.requiertValeurVenale ? "VENALE" : null,
             garantie.requiertValeurNeuf ? "NEUF" : null,
@@ -45,7 +46,11 @@ export function GarantieSection({
                 <div className="flex items-center gap-3">
                   <Checkbox
                     checked={checked}
+                    disabled={locked}
                     onCheckedChange={(value) => {
+                      if (locked) {
+                        return;
+                      }
                       if (value) {
                         setSelected([
                           ...selected,
@@ -65,14 +70,14 @@ export function GarantieSection({
                     <div className="text-sm font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                     <div className="mt-1 flex gap-1">
                       <Badge variant="outline">{type}</Badge>
-                      {garantie.responsabiliteCivile ? <Badge>RC</Badge> : null}
+                      {garantie.responsabiliteCivile ? <Badge>RC obligatoire</Badge> : null}
                     </div>
                   </div>
                 </div>
               </div>
               {checked && item ? (
                 <div className="mt-3 grid gap-3 md:grid-cols-5">
-                  {type === "VEHICULE" && vehiculeCount > 0 ? (
+                  {type === "VEHICULE" && vehiculeCount > 1 && !garantie.responsabiliteCivile ? (
                     <Field label="Véhicule">
                       <Select value={String(item.vehiculeIndex ?? 0)} onValueChange={(value) => update(garantie.id, { vehiculeIndex: Number(value) })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -83,7 +88,7 @@ export function GarantieSection({
                     </Field>
                   ) : null}
                   <Field label="Mode">
-                    <Select value={item.modeSelectionne ?? ""} onValueChange={(value) => update(garantie.id, { modeSelectionne: value })}>
+                    <Select value={item.modeSelectionne ?? ""} onValueChange={(value) => update(garantie.id, { modeSelectionne: value })} disabled={locked}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="TAUX">Taux</SelectItem>
@@ -94,7 +99,7 @@ export function GarantieSection({
                     </Select>
                   </Field>
                   <Field label="Source valeur">
-                    <Select value={item.sourceValeurSelectionnee ?? "AUCUNE"} onValueChange={(value) => update(garantie.id, { sourceValeurSelectionnee: value })}>
+                    <Select value={item.sourceValeurSelectionnee ?? "AUCUNE"} onValueChange={(value) => update(garantie.id, { sourceValeurSelectionnee: value })} disabled={locked}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="AUCUNE">Aucune</SelectItem>
@@ -105,7 +110,7 @@ export function GarantieSection({
                       </SelectContent>
                     </Select>
                   </Field>
-                  {showLigneGrille ? (
+                  {showLigneGrille && !garantie.responsabiliteCivile ? (
                     <Field label="Ligne grille">
                       <Select value={item.ligneGrilleTarifaireId ?? ""} onValueChange={(value) => update(garantie.id, { ligneGrilleTarifaireId: value })}>
                         <SelectTrigger><SelectValue placeholder="Option" /></SelectTrigger>

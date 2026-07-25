@@ -44,8 +44,9 @@ export function VehiculeSection({
 
   return (
     <SectionCard
-      title="Véhicules et remorques"
+      title="Véhicule"
       badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`}
+      tone="production"
       action={
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setRemorques([...remorques, {}])}>

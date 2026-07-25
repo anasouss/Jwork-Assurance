@@ -58,7 +58,7 @@ export function ContratFormLayout({
         </div>
       </div>
 
-      <SectionCard title="Type et informations contrat" badge={badge}>
+      <SectionCard title="Contrat" badge={badge} tone="production">
         <div className="grid gap-3 md:grid-cols-4">
           <Field label="Compagnie">
             <Select value={form.compagnieAssuranceId} onValueChange={form.setCompagnieAssuranceId}>
@@ -165,7 +165,9 @@ export function ContratFormLayout({
         showLigneGrille={showGrille}
       />
 
-      <QuittancePreviewCard preview={form.preview} />
+      <SectionCard title="Quittances" tone="production" defaultOpen={false}>
+        <QuittancePreviewCard preview={form.preview} />
+      </SectionCard>
     </div>
   );
 }

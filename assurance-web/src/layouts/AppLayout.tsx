@@ -30,10 +30,10 @@ export default function AppLayout() {
 
   return (
     <SidebarProvider>
-      <AppSidebar variant="floating" />
+      <AppSidebar />
       <SidebarInset>
         <AppHeader />
-        <main className="flex flex-1 flex-col gap-4 px-4 pb-4">
+        <main className="flex flex-1 flex-col gap-4 px-4 py-4">
           <Outlet />
         </main>
       </SidebarInset>

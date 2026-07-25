@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
+import { numberValue } from "../utils/format";
 import type { ReferenceOption, RemorqueInput } from "../types";
 
 export function RemorqueSection({
@@ -120,10 +121,4 @@ export function RemorqueSection({
       </div>
     </SectionCard>
   );
-}
-
-function numberValue(value: string) {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }

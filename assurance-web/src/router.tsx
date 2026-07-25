@@ -56,6 +56,34 @@ export const router = createBrowserRouter([
         path: "production/parametres",
         lazy: lazyRoute(() => import("@/features/production/pages/ProductionSettingsPage")),
       },
+      {
+        path: "production/parametres/tarifs-usage",
+        lazy: lazyRoute(() => import("@/features/production/pages/TarifUsageSettingsPage")),
+      },
+      {
+        path: "production/parametres/usages",
+        lazy: lazyRoute(() => import("@/features/production/pages/UsagesSettingsPage")),
+      },
+      {
+        path: "production/parametres/marques",
+        lazy: lazyRoute(() => import("@/features/production/pages/MarquesSettingsPage")),
+      },
+      {
+        path: "production/parametres/carrosseries",
+        lazy: lazyRoute(() => import("@/features/production/pages/CarrosseriesSettingsPage")),
+      },
+      {
+        path: "production/parametres/carburants",
+        lazy: lazyRoute(() => import("@/features/production/pages/CarburantsSettingsPage")),
+      },
+      {
+        path: "production/parametres/sous-classes",
+        lazy: lazyRoute(() => import("@/features/production/pages/SousClassesSettingsPage")),
+      },
+      {
+        path: "production/parametres/categories-transport",
+        lazy: lazyRoute(() => import("@/features/production/pages/CategoriesTransportSettingsPage")),
+      },
       { path: "*", lazy: lazyRoute(() => import("@/pages/app/AppNotFound")) },
     ],
   },

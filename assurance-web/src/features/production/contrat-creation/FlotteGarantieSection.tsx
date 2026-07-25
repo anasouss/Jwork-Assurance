@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { SectionCard } from "../components/SectionCard";
+import { numberValue } from "../utils/format";
 import type { GarantieInput, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
@@ -291,10 +292,4 @@ function controlClass(active: boolean) {
   return active
     ? "border-slate-300 bg-slate-50/70 shadow-none focus-visible:border-ring focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-input/30"
     : "border-transparent bg-muted/40 text-muted-foreground shadow-none";
-}
-
-function numberValue(value: string) {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }

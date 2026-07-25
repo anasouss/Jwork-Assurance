@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
+import { numberValue } from "../utils/format";
 import type { ReferenceOption, VehiculeInput } from "../types";
 
 export function emptyVehicule(usageId?: string): VehiculeInput {
@@ -214,10 +215,4 @@ export function VehiculeSection({
       </div>
     </SectionCard>
   );
-}
-
-function numberValue(value: string) {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }

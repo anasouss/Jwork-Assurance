@@ -11,9 +11,12 @@ import type {
   QuittancePreview,
   ReferenceOption,
   UpsertGrilleTarifaireRequest,
+  BulkUpdateTarifUsageRequest,
   UpsertFormuleGarantiePersonneRequest,
   UpsertLigneGrilleTarifaireRequest,
+  UpsertCodeReferenceRequest,
   UpsertReferenceRequest,
+  UpsertTarifUsageRequest,
   UpsertUsageRequest,
 } from "./types";
 
@@ -128,6 +131,41 @@ export const productionApi = {
     );
   },
 
+  async createTarifUsage(payload: UpsertTarifUsageRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/tarifs-usage", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateTarifUsage(id: string, payload: UpsertTarifUsageRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/tarifs-usage/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async deleteTarifUsage(id: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/tarifs-usage/${id}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
+  async bulkUpdateTarifUsagePrimeNette(payload: BulkUpdateTarifUsageRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<{ updatedRows: number }>>("/api/v1/referentiel/tarifs-usage/bulk-prime-nette", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
   async createUsage(payload: UpsertUsageRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/usages", {
@@ -176,6 +214,42 @@ export const productionApi = {
   async updateCarrosserie(id: string, payload: UpsertReferenceRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/carrosseries/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createCarburant(payload: UpsertCodeReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/carburants", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateCarburant(id: string, payload: UpsertCodeReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/carburants/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createSousClasse(payload: UpsertCodeReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/sous-classes", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateSousClasse(id: string, payload: UpsertCodeReferenceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/sous-classes/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       })

@@ -37,6 +37,8 @@ public class DataSeeder implements CommandLineRunner {
     private final CategorieClientRepository categorieClientRepository;
     private final MarqueRepository marqueRepository;
     private final CarrosserieRepository carrosserieRepository;
+    private final CarburantRepository carburantRepository;
+    private final SousClasseRepository sousClasseRepository;
     private final UtilisateurRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ParametreApplicationRepository parametreApplicationRepository;
@@ -108,6 +110,17 @@ public class DataSeeder implements CommandLineRunner {
         seedMarque("Peugeot");
         seedMarque("Toyota");
         seedMarque("Mercedes-Benz");
+
+        seedCarburant("ESSENCE", "Essence");
+        seedCarburant("DIESEL", "Diesel");
+        seedCarburant("ELECTRIQUE", "Electrique");
+        seedCarburant("HYBRIDE_E", "Hybride essence");
+        seedCarburant("HYBRIDE_D", "Hybride diesel");
+
+        seedSousClasse("SC1", "SC1");
+        seedSousClasse("SC2", "SC2");
+        seedSousClasse("SC3", "SC3");
+        seedSousClasse("SC4", "SC4");
 
         seedCategorieTransport("PETIT_TAXIS", "Petit taxi", "Taxi urbain");
         seedCategorieTransport("GRAND_TAXIS", "Grand taxi", "Taxi interurbain");
@@ -410,6 +423,30 @@ public class DataSeeder implements CommandLineRunner {
         );
     }
 
+    private Carburant seedCarburant(String code, String libelle) {
+        Carburant carburant = carburantRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+                carburantRepository.save(Carburant.builder()
+                        .code(code)
+                        .libelle(libelle)
+                        .actif(true)
+                        .build())
+        );
+        carburant.setLibelle(libelle);
+        return carburantRepository.save(carburant);
+    }
+
+    private SousClasse seedSousClasse(String code, String libelle) {
+        SousClasse sousClasse = sousClasseRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+                sousClasseRepository.save(SousClasse.builder()
+                        .code(code)
+                        .libelle(libelle)
+                        .actif(true)
+                        .build())
+        );
+        sousClasse.setLibelle(libelle);
+        return sousClasseRepository.save(sousClasse);
+    }
+
     private Usage seedUsage(
             String code,
             String libelle,
@@ -464,7 +501,9 @@ public class DataSeeder implements CommandLineRunner {
         usage.setByPtc(byPtc);
         usage.setByPrime(byPrime);
         usage.setByCategorieTransport(byCategorieTransport);
-        usage.setGarantiesPersonne(garantiesPersonne);
+        if (usage.getGarantiesPersonne() == null) {
+            usage.setGarantiesPersonne(garantiesPersonne);
+        }
         return usageRepository.save(usage);
     }
 

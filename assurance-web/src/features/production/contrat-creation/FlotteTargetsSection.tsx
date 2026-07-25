@@ -12,6 +12,7 @@ import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { toDateOnly } from "../date";
+import { money, numberValue } from "../utils/format";
 import type { GarantieInput, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
@@ -801,18 +802,4 @@ function controlClass(active: boolean) {
   return active
     ? "border-slate-300 bg-slate-50/70 shadow-none focus-visible:border-ring focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-input/30"
     : "border-transparent bg-muted/40 text-muted-foreground shadow-none";
-}
-
-function numberValue(value: string) {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function money(value: unknown) {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed.toLocaleString("fr-FR") : String(value);
 }

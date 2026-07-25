@@ -1,4 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatMoney } from "../utils/format";
 import type { QuittancePreview } from "../types";
 
 export function QuittancePreviewCard({ preview }: { preview?: QuittancePreview | null }) {
@@ -36,8 +37,4 @@ export function QuittancePreviewCard({ preview }: { preview?: QuittancePreview |
       )}
     </div>
   );
-}
-
-function formatMoney(value?: number) {
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value ?? 0);
 }

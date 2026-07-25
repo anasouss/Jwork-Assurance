@@ -398,7 +398,37 @@ export type UpsertUsageRequest = {
   actif?: boolean;
 };
 
+export type UpsertTarifUsageRequest = {
+  usageId: string;
+  categorieTransportId?: string;
+  puissanceFiscaleMin?: number;
+  puissanceFiscaleMax?: number;
+  nombrePlacesMin?: number;
+  nombrePlacesMax?: number;
+  ptcMin?: number;
+  ptcMax?: number;
+  sousClasse?: string;
+  carburant?: string;
+  primeNette?: number;
+  primeParPlace?: number;
+  actif?: boolean;
+};
+
+export type BulkUpdateTarifUsageRequest = {
+  tarifIds?: string[];
+  usageIds?: string[];
+  adjustmentType: "PERCENT" | "FIXED";
+  direction: "INCREASE" | "DECREASE";
+  value: number;
+};
+
 export type UpsertReferenceRequest = {
+  libelle: string;
+  actif?: boolean;
+};
+
+export type UpsertCodeReferenceRequest = {
+  code: string;
   libelle: string;
   actif?: boolean;
 };

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
+import { formatMoney } from "../utils/format";
 
 export default function QuittancesPage() {
   const quittances = useQuery({ queryKey: ["elements-facturables"], queryFn: productionApi.listQuittances });
@@ -35,8 +36,4 @@ export default function QuittancesPage() {
       </CardContent>
     </Card>
   );
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value);
 }

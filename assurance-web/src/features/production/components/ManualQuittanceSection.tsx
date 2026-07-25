@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { SectionCard } from "./SectionCard";
+import { formatMoney, numberOrZero, numberValue, roundMoney } from "../utils/format";
 import type { QuittanceInput } from "../types";
 
 type Props = {
@@ -96,22 +97,4 @@ function totalLine(ligne: QuittanceInput) {
       + numberOrZero(ligne.accessoire)
       + numberOrZero(ligne.cnpac)
   );
-}
-
-function numberValue(value: string) {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function numberOrZero(value?: number) {
-  return Number.isFinite(value) ? Number(value) : 0;
-}
-
-function roundMoney(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
-function formatMoney(value?: number) {
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value ?? 0);
 }

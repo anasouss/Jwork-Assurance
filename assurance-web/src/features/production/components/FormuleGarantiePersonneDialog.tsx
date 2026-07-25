@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
+import { numberValue, toNumber } from "../utils/format";
 import type { ReferenceOption, UpsertFormuleGarantiePersonneRequest } from "../types";
 
 export function FormuleGarantiePersonneDialog({
@@ -115,16 +116,6 @@ export function FormuleGarantiePersonneDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-function numberValue(value: string) {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function toNumber(value: unknown) {
-  return typeof value === "number" ? value : value ? Number(value) : undefined;
 }
 
 function cleanPayload(payload: UpsertFormuleGarantiePersonneRequest): UpsertFormuleGarantiePersonneRequest {

@@ -79,8 +79,38 @@ export const usageSchema = z.object({
   actif: z.boolean().optional(),
 });
 
+export const tarifUsageSchema = z.object({
+  usageId: z.string().min(1, "Usage obligatoire"),
+  categorieTransportId: z.string().optional(),
+  puissanceFiscaleMin: z.number().optional(),
+  puissanceFiscaleMax: z.number().optional(),
+  nombrePlacesMin: z.number().optional(),
+  nombrePlacesMax: z.number().optional(),
+  ptcMin: z.number().optional(),
+  ptcMax: z.number().optional(),
+  sousClasse: z.string().optional(),
+  carburant: z.string().optional(),
+  primeNette: z.number().optional(),
+  primeParPlace: z.number().optional(),
+  actif: z.boolean().optional(),
+});
+
+export const bulkTarifUsageSchema = z.object({
+  tarifIds: z.array(z.string()).optional(),
+  usageIds: z.array(z.string()).optional(),
+  adjustmentType: z.enum(["PERCENT", "FIXED"]),
+  direction: z.enum(["INCREASE", "DECREASE"]),
+  value: z.number().positive("Valeur obligatoire"),
+});
+
 export const referenceSchema = z.object({
   libelle: z.string().min(2, "Libelle obligatoire"),
+  actif: z.boolean().optional(),
+});
+
+export const codeReferenceSchema = z.object({
+  code: z.string().min(1, "Code obligatoire"),
+  libelle: z.string().min(1, "Libelle obligatoire"),
   actif: z.boolean().optional(),
 });
 

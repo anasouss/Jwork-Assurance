@@ -1,14 +1,18 @@
 package com.assurance.controller;
 
+import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
+import com.assurance.dto.request.UpsertCodeReferenceRequest;
 import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertReferenceRequest;
+import com.assurance.dto.request.UpsertTarifUsageRequest;
 import com.assurance.dto.request.UpsertUsageRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.entity.CategorieTransport;
+import com.assurance.entity.Carburant;
 import com.assurance.entity.Carrosserie;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Convention;
@@ -18,6 +22,8 @@ import com.assurance.entity.GrilleTarifaire;
 import com.assurance.entity.GroupeUsageAttestation;
 import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.entity.Marque;
+import com.assurance.entity.SousClasse;
+import com.assurance.entity.TarifUsage;
 import com.assurance.entity.Usage;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.exception.BadRequestException;
@@ -29,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -37,9 +44,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/referentiel")
@@ -50,11 +62,14 @@ public class ReferentielController {
     private final UsageRepository usageRepository;
     private final MarqueRepository marqueRepository;
     private final CarrosserieRepository carrosserieRepository;
+    private final CarburantRepository carburantRepository;
+    private final SousClasseRepository sousClasseRepository;
     private final GarantieRepository garantieRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final GrilleTarifaireRepository grilleTarifaireRepository;
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
     private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
+    private final TarifUsageRepository tarifUsageRepository;
     private final VilleRepository villeRepository;
     private final CategorieClientRepository categorieClientRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
@@ -176,6 +191,82 @@ public class ReferentielController {
         return ResponseEntity.ok(ApiResponse.success(toResponse(carrosserieRepository.save(carrosserie)), "Carrosserie modifiee"));
     }
 
+    @GetMapping("/carburants")
+    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> carburants() {
+        return ResponseEntity.ok(ApiResponse.success(carburantRepository.findAll(Sort.by("code")).stream()
+                .map(this::toResponse)
+                .toList()));
+    }
+
+    @PostMapping("/carburants")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarburant(@Valid @RequestBody UpsertCodeReferenceRequest request) {
+        carburantRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code carburant deja utilise");
+        });
+        Carburant carburant = carburantRepository.save(Carburant.builder()
+                .code(request.getCode())
+                .libelle(request.getLibelle())
+                .actif(request.getActif() == null ? true : request.getActif())
+                .build());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(carburant), "Carburant cree"));
+    }
+
+    @PutMapping("/carburants/{id}")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarburant(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertCodeReferenceRequest request
+    ) {
+        Carburant carburant = carburantRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Carburant", id));
+        carburantRepository.findByCodeIgnoreCase(request.getCode())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Code carburant deja utilise");
+                });
+        carburant.setCode(request.getCode());
+        carburant.setLibelle(request.getLibelle());
+        carburant.setActif(request.getActif() == null ? true : request.getActif());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(carburantRepository.save(carburant)), "Carburant modifie"));
+    }
+
+    @GetMapping("/sous-classes")
+    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> sousClasses() {
+        return ResponseEntity.ok(ApiResponse.success(sousClasseRepository.findAll(Sort.by("code")).stream()
+                .map(this::toResponse)
+                .toList()));
+    }
+
+    @PostMapping("/sous-classes")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createSousClasse(@Valid @RequestBody UpsertCodeReferenceRequest request) {
+        sousClasseRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code sous-classe deja utilise");
+        });
+        SousClasse sousClasse = sousClasseRepository.save(SousClasse.builder()
+                .code(request.getCode())
+                .libelle(request.getLibelle())
+                .actif(request.getActif() == null ? true : request.getActif())
+                .build());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasse), "Sous-classe creee"));
+    }
+
+    @PutMapping("/sous-classes/{id}")
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateSousClasse(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertCodeReferenceRequest request
+    ) {
+        SousClasse sousClasse = sousClasseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("SousClasse", id));
+        sousClasseRepository.findByCodeIgnoreCase(request.getCode())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Code sous-classe deja utilise");
+                });
+        sousClasse.setCode(request.getCode());
+        sousClasse.setLibelle(request.getLibelle());
+        sousClasse.setActif(request.getActif() == null ? true : request.getActif());
+        return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasseRepository.save(sousClasse)), "Sous-classe modifiee"));
+    }
+
     @GetMapping("/compagnies-assurance")
     public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> compagniesAssurance() {
         return ResponseEntity.ok(ApiResponse.success(compagnieAssuranceRepository.findAll(Sort.by("nom")).stream()
@@ -202,6 +293,69 @@ public class ReferentielController {
                         .actif(grille.getActif())
                         .build())
                 .toList()));
+    }
+
+    @GetMapping("/tarifs-usage")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> tarifsUsage() {
+        return ResponseEntity.ok(ApiResponse.success(tarifUsageRepository.findAll().stream()
+                .filter(tarif -> Boolean.TRUE.equals(tarif.getActif()))
+                .sorted(Comparator
+                        .comparing((TarifUsage tarif) -> tarif.getUsage() != null ? tarif.getUsage().getCode() : "")
+                        .thenComparing(TarifUsage::getPuissanceFiscaleMin, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(this::toTarifUsageResponse)
+                .toList()));
+    }
+
+    @PostMapping("/tarifs-usage")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createTarifUsage(@Valid @RequestBody UpsertTarifUsageRequest request) {
+        TarifUsage tarif = new TarifUsage();
+        applyTarifUsageRequest(tarif, request);
+        return ResponseEntity.ok(ApiResponse.success(toTarifUsageResponse(tarifUsageRepository.save(tarif)), "Tarif usage cree"));
+    }
+
+    @PutMapping("/tarifs-usage/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifUsage(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertTarifUsageRequest request
+    ) {
+        TarifUsage tarif = tarifUsageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("TarifUsage", id));
+        applyTarifUsageRequest(tarif, request);
+        return ResponseEntity.ok(ApiResponse.success(toTarifUsageResponse(tarifUsageRepository.save(tarif)), "Tarif usage modifie"));
+    }
+
+    @DeleteMapping("/tarifs-usage/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteTarifUsage(@PathVariable String id) {
+        TarifUsage tarif = tarifUsageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("TarifUsage", id));
+        tarif.setActif(false);
+        tarifUsageRepository.save(tarif);
+        return ResponseEntity.ok(ApiResponse.success((Void) null, "Tarif usage supprime"));
+    }
+
+    @PostMapping("/tarifs-usage/bulk-prime-nette")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> bulkUpdatePrimeNette(
+            @Valid @RequestBody BulkUpdateTarifUsageRequest request
+    ) {
+        String adjustmentType = request.getAdjustmentType().trim().toUpperCase();
+        String direction = request.getDirection().trim().toUpperCase();
+        if (!"PERCENT".equals(adjustmentType) && !"FIXED".equals(adjustmentType)) {
+            throw new BadRequestException("Type d'ajustement non supporte");
+        }
+        if (!"INCREASE".equals(direction) && !"DECREASE".equals(direction)) {
+            throw new BadRequestException("Sens d'ajustement non supporte");
+        }
+
+        List<TarifUsage> targetTarifs = resolveBulkTarifTargets(request);
+        targetTarifs.forEach(tarif -> tarif.setPrimeNette(adjustPrimeNette(
+                tarif.getPrimeNette(),
+                adjustmentType,
+                direction,
+                request.getValue()
+        )));
+        tarifUsageRepository.saveAll(targetTarifs);
+
+        return ResponseEntity.ok(ApiResponse.success(Map.of("updatedRows", targetTarifs.size()), "Primes nettes mises a jour"));
     }
 
     @GetMapping("/conventions")
@@ -473,6 +627,24 @@ public class ReferentielController {
                 .build();
     }
 
+    private ReferenceOptionResponse toResponse(Carburant carburant) {
+        return ReferenceOptionResponse.builder()
+                .id(carburant.getId())
+                .code(carburant.getCode())
+                .libelle(carburant.getLibelle())
+                .actif(carburant.getActif())
+                .build();
+    }
+
+    private ReferenceOptionResponse toResponse(SousClasse sousClasse) {
+        return ReferenceOptionResponse.builder()
+                .id(sousClasse.getId())
+                .code(sousClasse.getCode())
+                .libelle(sousClasse.getLibelle())
+                .actif(sousClasse.getActif())
+                .build();
+    }
+
     private ReferenceOptionResponse toGrilleResponse(GrilleTarifaire grille) {
         return ReferenceOptionResponse.builder()
                 .id(grille.getId())
@@ -517,6 +689,84 @@ public class ReferentielController {
                 .putValue("groupeUsageAttestationCode", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getCode() : null)
                 .putValue("actif", usage.getActif())
                 .map();
+    }
+
+    private void applyTarifUsageRequest(TarifUsage tarif, UpsertTarifUsageRequest request) {
+        Usage usage = usageRepository.findById(request.getUsageId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
+        CategorieTransport categorieTransport = request.getCategorieTransportId() == null || request.getCategorieTransportId().isBlank() ? null :
+                categorieTransportRepository.findById(request.getCategorieTransportId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CategorieTransport", request.getCategorieTransportId()));
+        tarif.setUsage(usage);
+        tarif.setCategorieTransport(categorieTransport);
+        tarif.setPuissanceFiscaleMin(request.getPuissanceFiscaleMin());
+        tarif.setPuissanceFiscaleMax(request.getPuissanceFiscaleMax());
+        tarif.setNombrePlacesMin(request.getNombrePlacesMin());
+        tarif.setNombrePlacesMax(request.getNombrePlacesMax());
+        tarif.setPtcMin(request.getPtcMin());
+        tarif.setPtcMax(request.getPtcMax());
+        tarif.setSousClasse(blankToNull(request.getSousClasse()));
+        tarif.setCarburant(blankToNull(request.getCarburant()));
+        tarif.setPrimeNette(request.getPrimeNette());
+        tarif.setPrimeParPlace(request.getPrimeParPlace());
+        tarif.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private Map<String, Object> toTarifUsageResponse(TarifUsage tarif) {
+        Usage usage = tarif.getUsage();
+        CategorieTransport categorieTransport = tarif.getCategorieTransport();
+        return option(tarif.getId(), usage != null ? usage.getCode() : null, usage != null ? usage.getLibelle() : "Tarif usage")
+                .putValue("usageId", usage != null ? usage.getId() : null)
+                .putValue("usageCode", usage != null ? usage.getCode() : null)
+                .putValue("usageLibelle", usage != null ? usage.getLibelle() : null)
+                .putValue("byCarburantAndPf", usage != null ? usage.getByCarburantAndPf() : null)
+                .putValue("bySousClasse", usage != null ? usage.getBySousClasse() : null)
+                .putValue("byPtc", usage != null ? usage.getByPtc() : null)
+                .putValue("byPrime", usage != null ? usage.getByPrime() : null)
+                .putValue("byCategorieTransport", usage != null ? usage.getByCategorieTransport() : null)
+                .putValue("categorieTransportId", categorieTransport != null ? categorieTransport.getId() : null)
+                .putValue("categorieTransportLibelle", categorieTransport != null ? categorieTransport.getLibelle() : null)
+                .putValue("puissanceFiscaleMin", tarif.getPuissanceFiscaleMin())
+                .putValue("puissanceFiscaleMax", tarif.getPuissanceFiscaleMax())
+                .putValue("nombrePlacesMin", tarif.getNombrePlacesMin())
+                .putValue("nombrePlacesMax", tarif.getNombrePlacesMax())
+                .putValue("ptcMin", tarif.getPtcMin())
+                .putValue("ptcMax", tarif.getPtcMax())
+                .putValue("sousClasse", tarif.getSousClasse())
+                .putValue("carburant", tarif.getCarburant())
+                .putValue("primeNette", tarif.getPrimeNette())
+                .putValue("primeParPlace", tarif.getPrimeParPlace())
+                .putValue("actif", tarif.getActif())
+                .map();
+    }
+
+    private List<TarifUsage> resolveBulkTarifTargets(BulkUpdateTarifUsageRequest request) {
+        Set<String> tarifIds = new HashSet<>(request.getTarifIds() == null ? List.of() : request.getTarifIds());
+        Set<String> usageIds = new HashSet<>(request.getUsageIds() == null ? List.of() : request.getUsageIds());
+        return tarifUsageRepository.findAll().stream()
+                .filter(tarif -> Boolean.TRUE.equals(tarif.getActif()))
+                .filter(tarif -> tarifIds.isEmpty() || tarifIds.contains(tarif.getId()))
+                .filter(tarif -> !tarifIds.isEmpty()
+                        || usageIds.isEmpty()
+                        || (tarif.getUsage() != null && usageIds.contains(tarif.getUsage().getId())))
+                .toList();
+    }
+
+    private BigDecimal adjustPrimeNette(BigDecimal currentPrime, String adjustmentType, String direction, BigDecimal value) {
+        BigDecimal basePrime = currentPrime == null ? BigDecimal.ZERO : currentPrime;
+        BigDecimal adjusted;
+        if ("PERCENT".equals(adjustmentType)) {
+            BigDecimal factor = value.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
+            adjusted = "DECREASE".equals(direction)
+                    ? basePrime.multiply(BigDecimal.ONE.subtract(factor))
+                    : basePrime.multiply(BigDecimal.ONE.add(factor));
+        } else {
+            adjusted = "DECREASE".equals(direction) ? basePrime.subtract(value) : basePrime.add(value);
+        }
+        if (adjusted.signum() < 0) {
+            adjusted = BigDecimal.ZERO;
+        }
+        return adjusted.setScale(2, RoundingMode.HALF_UP);
     }
 
     private void applyLigneRequest(LigneGrilleTarifaire ligne, UpsertLigneGrilleTarifaireRequest request) {
@@ -622,6 +872,10 @@ public class ReferentielController {
 
     private boolean usageAllowsGarantiesPersonne(Usage usage) {
         return usage != null && Boolean.TRUE.equals(usage.getGarantiesPersonne());
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private OptionMap option(String id, String code, String libelle) {

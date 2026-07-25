@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "../api";
+import { formatOptionalMoney } from "../utils/format";
 import type { ContratSummary } from "../types";
 import type { ReactNode } from "react";
 
@@ -132,7 +133,7 @@ function ContratExpandedDetails({ contrat, mouvements }: { contrat: ContratSumma
                   <TableCell>{mouvement.categorie ?? "-"}</TableCell>
                   <TableCell>{mouvement.dateEffet ?? "-"}</TableCell>
                   <TableCell>{mouvement.dateEcheance ?? "-"}</TableCell>
-                  <TableCell>{money(mouvement.primeTotale)}</TableCell>
+                  <TableCell>{formatOptionalMoney(mouvement.primeTotale)}</TableCell>
                   <TableCell>{mouvement.statut ?? "-"}</TableCell>
                 </TableRow>
               ))}
@@ -169,7 +170,7 @@ function ContratExpandedDetails({ contrat, mouvements }: { contrat: ContratSumma
             <div key={garantie.contratGarantieId} className="rounded-md border p-2">
               <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
               <div className="text-xs text-muted-foreground">
-                Prime {money(garantie.prime)} · Capital {money(garantie.capital)}
+                Prime {formatOptionalMoney(garantie.prime)} · Capital {formatOptionalMoney(garantie.capital)}
               </div>
             </div>
           ))}
@@ -184,7 +185,7 @@ function ContratExpandedDetails({ contrat, mouvements }: { contrat: ContratSumma
               <div key={element.id} className="rounded-md border p-2">
                 <div className="font-medium">{element.libelle}</div>
                 <div className="text-xs text-muted-foreground">
-                  {element.codeMouvement ?? element.nature} · {element.statut} · {money(element.primeTotale)}
+                  {element.codeMouvement ?? element.nature} · {element.statut} · {formatOptionalMoney(element.primeTotale)}
                 </div>
               </div>
             ))}
@@ -248,9 +249,4 @@ function statusLabel(
 function TypeBadge({ type }: { type: ContratSummary["typeContrat"] }) {
   const label = type === "PARTICULIER" ? "P" : type === "FLOTTE" ? "F" : "C";
   return <Badge variant="secondary">{label}</Badge>;
-}
-
-function money(value?: number | null) {
-  if (value == null) return "-";
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value);
 }

@@ -13,6 +13,7 @@ import { GrilleTarifaireDialog } from "../components/GrilleTarifaireDialog";
 import { LigneGrilleTarifaireDialog } from "../components/LigneGrilleTarifaireDialog";
 import { SectionCard } from "../components/SectionCard";
 import { formuleGarantiePersonneSchema, grilleTarifaireSchema, ligneGrilleTarifaireSchema } from "../schemas";
+import { money, text } from "../utils/format";
 import type {
   ReferenceOption,
   UpsertFormuleGarantiePersonneRequest,
@@ -351,18 +352,6 @@ function labelFromRefs(ligne: ReferenceOption, refs: ReferenceOption[], key: "ga
   }
   const id = text(ligne[`${key}Id`]);
   return refs.find((item) => item.id === id)?.libelle ?? "-";
-}
-
-function text(value: unknown) {
-  return value === undefined || value === null || value === "" ? "-" : String(value);
-}
-
-function money(value: unknown) {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed.toLocaleString("fr-FR") : String(value);
 }
 
 function franchise(ligne: ReferenceOption) {

@@ -33,7 +33,7 @@ export const appModules: AppModule[] = [
   { title: "SRM", url: "/app/srm", icon: Handshake, disabled: true },
   { title: "CRM", url: "/app/crm", icon: Users, disabled: true },
   { title: "Compta", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
-  { title: "Admin", url: "/app/production/parametres", icon: Settings, permission: "config:view" },
+  { title: "Admin", url: "/app/admin", icon: Settings, disabled: true, permission: "config:view" },
 ];
 
 export const appNavigation: AppNavigationItem[] = [
@@ -42,19 +42,19 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "production", title: "Ajouter dossier", url: "/app/production/ajouter-dossier", icon: FilePlus2, permission: "contrat:create" },
   { module: "production", title: "Contrats", url: "/app/production/contrats", icon: Files, permission: "contrat:view" },
   { module: "production", title: "Stock attestations", url: "/app/production/attestations-stock", icon: Boxes, permission: "contrat:view" },
+  { module: "production", title: "Paramètres", url: "/app/production/parametres", icon: Settings, permission: "config:view" },
   { module: "compta", title: "Quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
-  { module: "admin", title: "Paramètres production", url: "/app/production/parametres", icon: Settings, permission: "config:view" },
 ];
 
 export function moduleForPath(pathname: string): AppNavigationItem["module"] {
   if (pathname.startsWith("/app/compta")) {
     return "compta";
   }
-  if (pathname.startsWith("/app/production/parametres")) {
-    return "admin";
-  }
   if (pathname.startsWith("/app/production")) {
     return "production";
+  }
+  if (pathname.startsWith("/app/admin")) {
+    return "admin";
   }
   if (pathname.startsWith("/app/sinistre")) {
     return "sinistre";

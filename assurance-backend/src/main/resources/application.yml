@@ -33,6 +33,8 @@ jwt:
   refresh-token-expiration-mobile: ${JWT_REFRESH_EXPIRATION_MOBILE:7776000000}
 
 app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175}
   seed:
     enabled: ${SEED_ENABLED:true}
     admin-email: ${ADMIN_EMAIL:admin@assurance.local}

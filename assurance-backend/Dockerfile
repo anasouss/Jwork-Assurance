@@ -17,6 +17,7 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=build /app/target/*.jar /app/app.jar
 
 ENV JAVA_OPTS=""
+ENV PORT=8080
 EXPOSE 8080
 
 USER app

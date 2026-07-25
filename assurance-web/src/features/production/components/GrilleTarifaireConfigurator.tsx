@@ -321,7 +321,14 @@ export function GrilleTarifaireConfigurator({
                         </Button>
                       ) : null}
                       {extraDrafts.map((draft) => (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeDraft(draft)}>
+                        <Button
+                          key={draft.localKey}
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={!enabled}
+                          onClick={() => removeDraft(draft)}
+                        >
                           <Trash2 className="size-4" />
                         </Button>
                       ))}

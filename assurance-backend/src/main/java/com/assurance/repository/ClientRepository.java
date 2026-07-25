@@ -8,5 +8,7 @@ import java.util.Optional;
 
 public interface ClientRepository extends JpaRepository<Client, String> {
     Optional<Client> findByAgenceIdAndId(String agenceId, String id);
+    Optional<Client> findFirstByAgenceIdAndCinIgnoreCase(String agenceId, String cin);
+    Optional<Client> findFirstByAgenceIdAndRcIgnoreCase(String agenceId, String rc);
     List<Client> findByAgenceIdAndClientParentId(String agenceId, String clientParentId);
 }

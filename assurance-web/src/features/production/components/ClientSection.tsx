@@ -1,14 +1,22 @@
-import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { SectionCard } from "./SectionCard";
 import { Field } from "./Field";
 import { toDateOnly } from "../date";
-import type { ClientInput, ReferenceOption } from "../types";
+import { productionApi } from "../api";
+import type { ClientInput, ClientResponse, ReferenceOption } from "../types";
+
+type LookupStatus = "idle" | "loading" | "found" | "new" | "error";
+type LookupState = {
+  status: LookupStatus;
+  message?: string;
+};
 
 export function emptyClient(role: ClientInput["role"] = "SOUSCRIPTEUR"): ClientInput {
   return {
@@ -27,13 +35,17 @@ export function ClientSection({
   setClients,
   villes,
   showOptionalRoles = false,
+  errors = {},
 }: {
   clients: ClientInput[];
   setClients: (clients: ClientInput[]) => void;
   villes: ReferenceOption[];
   showOptionalRoles?: boolean;
+  errors?: Record<string, string>;
 }) {
   const [sameAsSouscripteur, setSameAsSouscripteur] = useState(false);
+  const [lookupByIndex, setLookupByIndex] = useState<Record<number, LookupState>>({});
+  const lookupTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
@@ -50,6 +62,10 @@ export function ClientSection({
     }
   }, [clients, setClients, showOptionalRoles]);
 
+  useEffect(() => () => {
+    Object.values(lookupTimers.current).forEach(clearTimeout);
+  }, []);
+
   const updateClient = (index: number, patch: Partial<ClientInput["client"]>) => {
     setClients(
       clients.map((client, idx) =>
@@ -58,6 +74,104 @@ export function ClientSection({
           : client
       )
     );
+  };
+
+  const updateIdentity = (index: number, patch: Partial<ClientInput["client"]>) => {
+    setLookupByIndex((current) => ({ ...current, [index]: { status: "idle" } }));
+    setClients(
+      clients.map((client, idx) => {
+        const shouldPatch = idx === index || (sameAsSouscripteur && clients[index]?.role === "SOUSCRIPTEUR" && client.role === "PROPRIETAIRE");
+        return shouldPatch ? { ...client, clientId: undefined, client: { ...client.client, ...patch } } : client;
+      })
+    );
+  };
+
+  const fillExistingClient = (index: number, found: ClientResponse) => {
+    setClients(
+      clients.map((client, idx) => {
+        const shouldFill = idx === index || (sameAsSouscripteur && clients[index]?.role === "SOUSCRIPTEUR" && client.role === "PROPRIETAIRE");
+        return shouldFill
+          ? {
+              ...client,
+              clientId: found.id,
+              client: {
+                ...client.client,
+                typeClient: found.typeClient,
+                civilite: found.civilite ?? undefined,
+                prenom: found.prenom ?? undefined,
+                nom: found.nom ?? undefined,
+                raisonSociale: found.raisonSociale ?? undefined,
+                cin: found.cin ?? undefined,
+                cinValidite: found.cinValidite ?? undefined,
+                rc: found.rc ?? undefined,
+                ice: found.ice ?? undefined,
+                numeroPermis: found.numeroPermis ?? undefined,
+                dateDelivrancePermis: found.dateDelivrancePermis ?? undefined,
+                dateValiditePermis: found.dateValiditePermis ?? undefined,
+                dateNaissance: found.dateNaissance ?? undefined,
+                adresse: found.adresse ?? undefined,
+                villeId: found.villeId ?? undefined,
+                categorieClientId: found.categorieClientId ?? undefined,
+                telephone: found.telephone ?? undefined,
+                email: found.email ?? undefined,
+                activite: found.activite ?? undefined,
+                conducteurHabituel: found.conducteurHabituel ?? client.client.conducteurHabituel,
+                sahara: found.sahara ?? false,
+                justificatifSahara: found.justificatifSahara ?? undefined,
+                telephones: found.telephones?.map((telephone) => ({
+                  numero: telephone.numero,
+                  principal: Boolean(telephone.principal),
+                  whatsapp: Boolean(telephone.whatsapp),
+                })),
+              },
+            }
+          : client;
+      })
+    );
+  };
+
+  const searchClient = async (index: number, params: { cin?: string; rc?: string }) => {
+    const cin = params.cin?.trim();
+    const rc = params.rc?.trim();
+    if (!cin && !rc) {
+      setLookupByIndex((current) => ({ ...current, [index]: { status: "idle" } }));
+      return;
+    }
+    setLookupByIndex((current) => ({ ...current, [index]: { status: "loading", message: "Recherche du client..." } }));
+    try {
+      const found = await productionApi.searchClient({ cin, rc });
+      if (found) {
+        fillExistingClient(index, found);
+        setLookupByIndex((current) => ({
+          ...current,
+          [index]: { status: "found", message: `Client existant chargé${found.nomAffichage ? ` : ${found.nomAffichage}` : ""}.` },
+        }));
+        return;
+      }
+      setLookupByIndex((current) => ({
+        ...current,
+        [index]: { status: "new", message: "Nouveau client : aucune fiche trouvée." },
+      }));
+    } catch {
+      setLookupByIndex((current) => ({
+        ...current,
+        [index]: { status: "error", message: "Recherche client indisponible." },
+      }));
+    }
+  };
+
+  const scheduleClientSearch = (index: number, params: { cin?: string; rc?: string }) => {
+    clearTimeout(lookupTimers.current[index]);
+    const cin = params.cin?.trim();
+    const rc = params.rc?.trim();
+    if ((cin ?? rc ?? "").length < 3) {
+      setLookupByIndex((current) => ({ ...current, [index]: { status: "idle" } }));
+      return;
+    }
+    setLookupByIndex((current) => ({ ...current, [index]: { status: "loading", message: "Recherche du client..." } }));
+    lookupTimers.current[index] = setTimeout(() => {
+      void searchClient(index, params);
+    }, 500);
   };
 
   const setProprietaireConducteur = (index: number, value: boolean) => {
@@ -140,7 +254,7 @@ export function ClientSection({
                   Le propriétaire est-il lui-même le souscripteur ?
                 </label>
               ) : null}
-              <div className="grid gap-3 md:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <Field label="Type" required>
                   <Select
                     value={item.client.typeClient}
@@ -156,11 +270,20 @@ export function ClientSection({
                 </Field>
                 {morale ? (
                   <>
+                    <Field label="RC" required>
+                      <Input
+                        disabled={disabledByCopy}
+                        value={item.client.rc ?? ""}
+                        onBlur={() => searchClient(index, { rc: item.client.rc })}
+                        onChange={(event) => {
+                          updateIdentity(index, { rc: event.target.value });
+                          scheduleClientSearch(index, { rc: event.target.value });
+                        }}
+                      />
+                      <LookupMessage state={lookupByIndex[index]} />
+                    </Field>
                     <Field label="Raison sociale" required>
                       <Input disabled={disabledByCopy} value={item.client.raisonSociale ?? ""} onChange={(event) => updateClient(index, { raisonSociale: event.target.value })} />
-                    </Field>
-                    <Field label="RC" required>
-                      <Input disabled={disabledByCopy} value={item.client.rc ?? ""} onChange={(event) => updateClient(index, { rc: event.target.value })} />
                     </Field>
                     <Field label="ICE">
                       <Input disabled={disabledByCopy} value={item.client.ice ?? ""} onChange={(event) => updateClient(index, { ice: event.target.value })} />
@@ -178,15 +301,24 @@ export function ClientSection({
                       </Select>
                     </Field>
                     <Field label="CIN" required>
-                      <Input disabled={disabledByCopy} value={item.client.cin ?? ""} onChange={(event) => updateClient(index, { cin: event.target.value })} />
+                      <Input
+                        disabled={disabledByCopy}
+                        value={item.client.cin ?? ""}
+                        onBlur={() => searchClient(index, { cin: item.client.cin })}
+                        onChange={(event) => {
+                          updateIdentity(index, { cin: event.target.value });
+                          scheduleClientSearch(index, { cin: event.target.value });
+                        }}
+                      />
+                      <LookupMessage state={lookupByIndex[index]} />
                     </Field>
-                    <Field label="Validité CIN" required>
+                    <Field label="Validité CIN" required error={errors[`clients.${index}.client.cinValidite`]}>
                       <DatePicker date={item.client.cinValidite} disabled={disabledByCopy} onSelect={(date) => updateClient(index, { cinValidite: toDateOnly(date) })} />
                     </Field>
                   </>
                 )}
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {morale ? (
                   <Field label="Activité">
                     <Input disabled={disabledByCopy} value={item.client.activite ?? ""} onChange={(event) => updateClient(index, { activite: event.target.value })} />
@@ -202,22 +334,24 @@ export function ClientSection({
                   </>
                 )}
                 <Field label="Ville" required>
-                  <Select value={item.client.villeId ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { villeId: value, sahara: false, justificatifSahara: undefined })}>
-                    <SelectTrigger><SelectValue placeholder="Ville" /></SelectTrigger>
-                    <SelectContent>
-                      {villes.map((ville) => <SelectItem key={ville.id} value={ville.id}>{ville.libelle}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <AutocompleteSelect
+                    value={item.client.villeId ?? ""}
+                    disabled={disabledByCopy}
+                    placeholder="Ville"
+                    emptyText="Aucune ville trouvée"
+                    options={villes.map((ville) => ({ value: ville.id, label: ville.libelle, keywords: ville.code }))}
+                    onValueChange={(value) => updateClient(index, { villeId: value, sahara: false, justificatifSahara: undefined })}
+                  />
                 </Field>
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <div className="mt-3 grid max-w-4xl gap-3 md:grid-cols-2">
                 <Field label="Adresse" required className="md:col-span-2">
                   <Input disabled={disabledByCopy} value={item.client.adresse ?? ""} onChange={(event) => updateClient(index, { adresse: event.target.value })} />
                 </Field>
               </div>
               {isProprietaire ? (
                 <>
-                  <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                     <div className="flex items-end gap-2 pb-2">
                       <Checkbox
                         checked={Boolean(item.client.sahara)}
@@ -245,7 +379,7 @@ export function ClientSection({
                     </Field>
                     <TelephoneList client={item} updateClient={(patch) => updateClient(index, patch)} />
                   </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-4">
+                  <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                     <div className="flex items-end gap-3 pb-2 text-sm md:col-span-2">
                       <span>Le propriétaire est-il lui-même le conducteur ?</span>
                       <label className="flex items-center gap-1">
@@ -268,7 +402,7 @@ export function ClientSection({
                   {!proprietorIsDriver && conducteur ? (
                     <div className="mt-3 rounded-lg border bg-muted/20 p-3">
                       <div className="mb-3 text-sm font-medium">Conducteur habituel</div>
-                      <div className="grid gap-3 md:grid-cols-4">
+                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                         <Field label="Intitulé" required>
                           <Select value={conducteur.client.client.civilite ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { civilite: value })}>
                             <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -279,27 +413,21 @@ export function ClientSection({
                           </Select>
                         </Field>
                         <Field label="CIN" required>
-                          <Input value={conducteur.client.client.cin ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { cin: event.target.value })} />
-                        </Field>
-                        <Field label="Validité CIN">
-                          <DatePicker date={conducteur.client.client.cinValidite} onSelect={(date) => updateClient(conducteur.clientIndex, { cinValidite: toDateOnly(date) })} />
-                        </Field>
-                        <Field label="Ville">
-                          <Select value={conducteur.client.client.villeId ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { villeId: value })}>
-                            <SelectTrigger><SelectValue placeholder="Ville" /></SelectTrigger>
-                            <SelectContent>
-                              {villes.map((ville) => <SelectItem key={ville.id} value={ville.id}>{ville.libelle}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          <Input
+                            value={conducteur.client.client.cin ?? ""}
+                            onBlur={() => searchClient(conducteur.clientIndex, { cin: conducteur.client.client.cin })}
+                            onChange={(event) => {
+                              updateIdentity(conducteur.clientIndex, { cin: event.target.value });
+                              scheduleClientSearch(conducteur.clientIndex, { cin: event.target.value });
+                            }}
+                          />
+                          <LookupMessage state={lookupByIndex[conducteur.clientIndex]} />
                         </Field>
                         <Field label="Nom" required>
                           <Input value={conducteur.client.client.nom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { nom: event.target.value })} />
                         </Field>
                         <Field label="Prénom" required>
                           <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
-                        </Field>
-                        <Field label="Adresse" className="md:col-span-2">
-                          <Input value={conducteur.client.client.adresse ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { adresse: event.target.value })} />
                         </Field>
                         <Field label="Date de naissance">
                           <DatePicker date={conducteur.client.client.dateNaissance} onSelect={(date) => updateClient(conducteur.clientIndex, { dateNaissance: toDateOnly(date) })} />
@@ -310,7 +438,7 @@ export function ClientSection({
                         <Field label="N° permis">
                           <Input value={conducteur.client.client.numeroPermis ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { numeroPermis: event.target.value })} />
                         </Field>
-                        <Field label="Validité permis" required>
+                        <Field label="Validité permis" required error={errors[`clients.${conducteur.clientIndex}.client.dateValiditePermis`]}>
                           <DatePicker date={conducteur.client.client.dateValiditePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateValiditePermis: toDateOnly(date) })} />
                         </Field>
                       </div>
@@ -319,7 +447,7 @@ export function ClientSection({
                 </>
               ) : null}
               {!isProprietaire && !morale ? (
-                <div className="mt-3 grid gap-3 md:grid-cols-4">
+                <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                   <Field label="Date de naissance">
                     <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })} />
                   </Field>
@@ -359,6 +487,26 @@ export function ClientSection({
         </SectionCard>
       ) : null}
     </>
+  );
+}
+
+function LookupMessage({ state }: { state?: LookupState }) {
+  if (!state || state.status === "idle") {
+    return null;
+  }
+  const tone = state.status === "found"
+    ? "text-emerald-700 dark:text-emerald-400"
+    : state.status === "new"
+      ? "text-slate-500"
+      : state.status === "error"
+        ? "text-red-600"
+        : "text-muted-foreground";
+
+  return (
+    <span className={`flex items-center gap-1 text-xs ${tone}`}>
+      {state.status === "loading" ? <Loader2 className="size-3 animate-spin" /> : null}
+      {state.message}
+    </span>
   );
 }
 

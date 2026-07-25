@@ -18,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class ClientService {
@@ -31,6 +33,22 @@ public class ClientService {
     @Transactional
     public ClientResponse create(CreateClientRequest request) {
         return toResponse(createEntity(request));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ClientResponse> searchByIdentity(String agenceId, String cin, String rc) {
+        if (agenceId == null || agenceId.isBlank()) {
+            throw new BadRequestException("L'agence est obligatoire");
+        }
+        if (cin != null && !cin.isBlank()) {
+            return clientRepository.findFirstByAgenceIdAndCinIgnoreCase(agenceId, cin.trim())
+                    .map(this::toResponse);
+        }
+        if (rc != null && !rc.isBlank()) {
+            return clientRepository.findFirstByAgenceIdAndRcIgnoreCase(agenceId, rc.trim())
+                    .map(this::toResponse);
+        }
+        return Optional.empty();
     }
 
     @Transactional

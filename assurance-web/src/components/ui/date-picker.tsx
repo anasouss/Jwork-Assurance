@@ -112,7 +112,8 @@ export function DatePicker({
           <Button
             type="button"
             variant="outline"
-            className="h-9 rounded-l-none border-slate-300 bg-slate-50/70 px-3 shadow-none hover:bg-slate-50 hover:text-foreground disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 dark:border-slate-700 dark:bg-input/30 dark:disabled:bg-slate-900/60"
+            data-slot="date-trigger"
+            className="h-9 rounded-l-none border-slate-300 bg-slate-50/70 px-3 shadow-none hover:bg-slate-50 hover:text-foreground disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:disabled:border-slate-800 dark:disabled:bg-slate-950 dark:disabled:text-slate-600"
             disabled={disabled}
             aria-label="Choisir une date"
           >

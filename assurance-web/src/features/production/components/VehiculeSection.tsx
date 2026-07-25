@@ -2,6 +2,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
@@ -26,6 +27,7 @@ export function VehiculeSection({
   carrosseries,
   categoriesTransport,
   allowMultipleVehicules = true,
+  errors = {},
 }: {
   vehicules: VehiculeInput[];
   setVehicules: (vehicules: VehiculeInput[]) => void;
@@ -34,6 +36,7 @@ export function VehiculeSection({
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
   allowMultipleVehicules?: boolean;
+  errors?: Record<string, string>;
 }) {
   const update = (index: number, patch: Partial<VehiculeInput>) => {
     setVehicules(vehicules.map((vehicule, idx) => (idx === index ? { ...vehicule, ...patch } : vehicule)));
@@ -76,10 +79,17 @@ export function VehiculeSection({
                   </Button>
                 ) : null}
               </div>
-              <div className="grid gap-3 md:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <Field label="Usage" required>
-                  <Select
+                  <AutocompleteSelect
                     value={vehicule.usageId ?? ""}
+                    placeholder="Usage"
+                    emptyText="Aucun usage trouvé"
+                    options={usages.map((usage) => ({
+                      value: usage.id,
+                      label: usage.code ? `${usage.code} - ${usage.libelle}` : usage.libelle,
+                      keywords: usage.code,
+                    }))}
                     onValueChange={(value) =>
                       update(index, {
                         usageId: value,
@@ -90,31 +100,28 @@ export function VehiculeSection({
                         ptc: undefined,
                       })
                     }
-                  >
-                    <SelectTrigger><SelectValue placeholder="Usage" /></SelectTrigger>
-                    <SelectContent>
-                      {usages.map((usage) => <SelectItem key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  />
                 </Field>
                 <Field label="Immatriculation" required>
                   <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
                 </Field>
                 <Field label="Marque" required>
-                  <Select value={vehicule.marqueId ?? ""} onValueChange={(value) => update(index, { marqueId: value })}>
-                    <SelectTrigger><SelectValue placeholder="Marque" /></SelectTrigger>
-                    <SelectContent>
-                      {marques.map((marque) => <SelectItem key={marque.id} value={marque.id}>{marque.libelle}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <AutocompleteSelect
+                    value={vehicule.marqueId ?? ""}
+                    placeholder="Marque"
+                    emptyText="Aucune marque trouvée"
+                    options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
+                    onValueChange={(value) => update(index, { marqueId: value })}
+                  />
                 </Field>
                 <Field label="Carrosserie" required>
-                  <Select value={vehicule.carrosserieId ?? ""} onValueChange={(value) => update(index, { carrosserieId: value })}>
-                    <SelectTrigger><SelectValue placeholder="Carrosserie" /></SelectTrigger>
-                    <SelectContent>
-                      {carrosseries.map((carrosserie) => <SelectItem key={carrosserie.id} value={carrosserie.id}>{carrosserie.libelle}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <AutocompleteSelect
+                    value={vehicule.carrosserieId ?? ""}
+                    placeholder="Carrosserie"
+                    emptyText="Aucune carrosserie trouvée"
+                    options={carrosseries.map((carrosserie) => ({ value: carrosserie.id, label: carrosserie.libelle, keywords: carrosserie.code }))}
+                    onValueChange={(value) => update(index, { carrosserieId: value })}
+                  />
                 </Field>
                 {needsCarburantAndPf ? (
                   <Field label="Carburant" required>
@@ -131,7 +138,7 @@ export function VehiculeSection({
                   </Field>
                 ) : null}
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {needsCarburantAndPf ? (
                   <Field label="Puissance fiscale / cylindrée" required>
                     <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
@@ -160,26 +167,26 @@ export function VehiculeSection({
                 <Field label="Modèle">
                   <Input value={vehicule.modele ?? ""} onChange={(event) => update(index, { modele: event.target.value })} />
                 </Field>
-                <Field label="Places">
+                <Field label="Nombre de places">
                   <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update(index, { nombrePlaces: event.target.value })} />
                 </Field>
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Field label="Date mise en circulation">
                   <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toDateOnly(date) })} />
                 </Field>
-                <Field label="Date validité CG" required>
+                <Field label="Date validité CG" required error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
                   <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toDateOnly(date) })} />
                 </Field>
                 <Field label="N° attestation">
                   <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
                 </Field>
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Field label="Valeur vénale">
                   <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update(index, { valeurVenale: numberValue(event.target.value) })} />
                 </Field>
-                <Field label="Valeur à neuf">
+                <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
                   <Input type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update(index, { valeurNeuf: numberValue(event.target.value) })} />
                 </Field>
                 <Field label="Valeur glace">
@@ -191,7 +198,7 @@ export function VehiculeSection({
                 <span className="text-sm">Organisme de crédit</span>
               </div>
               {vehicule.organismeCredit ? (
-                <div className="mt-3 grid gap-3 md:grid-cols-4">
+                <div className="mt-3 grid max-w-3xl gap-3 md:grid-cols-2">
                   <Field label="Nom organisme">
                     <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update(index, { nomOrganismeCredit: event.target.value })} />
                   </Field>

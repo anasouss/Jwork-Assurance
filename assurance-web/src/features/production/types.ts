@@ -191,6 +191,19 @@ export type ClientInput = {
   };
 };
 
+export type ClientResponse = ClientInput["client"] & {
+  id: string;
+  clientParentId?: string | null;
+  codeClient?: string | null;
+  nomAffichage?: string | null;
+  ville?: string | null;
+  villeSaharienne?: boolean | null;
+  categorieClientCode?: string | null;
+  categorieClientLibelle?: string | null;
+  actif?: boolean | null;
+  telephones?: { id?: string; numero: string; principal?: boolean; whatsapp?: boolean }[];
+};
+
 export type VehiculeInput = {
   typeVehicule: "AUTOMOBILE" | "CAMION" | "MOTO" | "BUS" | "TRACTEUR" | "AUTRE";
   usageId?: string;

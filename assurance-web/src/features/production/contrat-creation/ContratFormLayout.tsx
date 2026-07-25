@@ -41,6 +41,7 @@ export function ContratFormLayout({
       setClients={form.setClients}
       villes={form.refs.villes.data ?? []}
       showOptionalRoles={false}
+      errors={form.validationErrors}
     />
   );
 
@@ -62,6 +63,7 @@ export function ContratFormLayout({
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
       allowMultipleVehicules={allowMultipleVehicules}
+      errors={form.validationErrors}
     />
   );
 

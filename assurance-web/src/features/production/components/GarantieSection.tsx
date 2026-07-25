@@ -253,7 +253,7 @@ function defaultSource(garantie: ReferenceOption) {
 
 function controlClass(active: boolean) {
   return active
-    ? "border-emerald-300 bg-white shadow-sm focus-visible:border-emerald-600 focus-visible:ring-emerald-200 dark:bg-background"
+    ? "border-slate-300 bg-slate-50/70 shadow-none focus-visible:border-ring focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-input/30"
     : "border-transparent bg-muted/40 text-muted-foreground shadow-none";
 }
 

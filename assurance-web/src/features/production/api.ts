@@ -5,6 +5,7 @@ import type {
   ContratSummary,
   CreateLivraisonAttestationRequest,
   CreateContratRequest,
+  ClientResponse,
   ElementFacturable,
   LivraisonAttestation,
   QuittancePreview,
@@ -30,6 +31,10 @@ export const productionApi = {
 
   async listContrats() {
     return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats"));
+  },
+
+  async searchClient(params: { cin?: string; rc?: string }) {
+    return unwrap(await apiFetch<ApiResponse<ClientResponse | null>>(`/api/v1/clients/search${buildQueryString(params)}`));
   },
 
   async createContrat(request: CreateContratRequest) {

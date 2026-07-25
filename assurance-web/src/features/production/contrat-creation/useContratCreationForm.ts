@@ -38,6 +38,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [garanties, setGaranties] = useState<GarantieInput[]>([]);
   const [quittances, setQuittances] = useState<QuittanceInput[]>(defaultQuittanceLines());
   const [preview, setPreview] = useState<QuittancePreview | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const refs = {
     usages: useReference("usages"),
@@ -172,17 +173,47 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   });
 
   const validate = () => {
+    const nextErrors: Record<string, string> = {};
     const result = contratSchema.safeParse(request);
     if (!result.success) {
+      setValidationErrors({});
       toast.error(result.error.issues[0]?.message ?? "Formulaire incomplet");
       return false;
     }
     if (typeContrat === "CONVENTION" && !conventionId) {
+      setValidationErrors({});
       toast.error("Une convention est obligatoire pour un contrat convention");
       return false;
     }
     if (typeContrat !== "PARTICULIER" && !grilleTarifaireId) {
+      setValidationErrors({});
       toast.error("Une grille tarifaire est obligatoire pour convention/flotte");
+      return false;
+    }
+    const today = dateOnly(new Date());
+    request.clients.forEach((item, index) => {
+      if (isBeforeToday(item.client.cinValidite, today)) {
+        nextErrors[`clients.${index}.client.cinValidite`] = "La validité CIN ne doit pas être expirée.";
+      }
+      if (isBeforeToday(item.client.dateValiditePermis, today)) {
+        nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
+      }
+    });
+    request.vehicules.forEach((vehicule, index) => {
+      if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
+        nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
+      }
+      if (
+        vehicule.valeurNeuf !== undefined
+        && vehicule.valeurVenale !== undefined
+        && Number(vehicule.valeurNeuf) < Number(vehicule.valeurVenale)
+      ) {
+        nextErrors[`vehicules.${index}.valeurNeuf`] = "La valeur à neuf doit être supérieure ou égale à la valeur vénale.";
+      }
+    });
+    setValidationErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      toast.error("Corrigez les champs indiqués");
       return false;
     }
     return true;
@@ -247,6 +278,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setGaranties,
     quittances,
     setQuittances,
+    validationErrors,
   };
 }
 
@@ -293,4 +325,15 @@ function numberOrZero(value?: number) {
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function dateOnly(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isBeforeToday(value: string | undefined | null, today: string) {
+  return Boolean(value && value < today);
 }

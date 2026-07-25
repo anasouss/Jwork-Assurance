@@ -1,8 +1,8 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
@@ -60,25 +60,31 @@ export function RemorqueSection({
                 <Trash2 className="size-4" />
               </Button>
             </div>
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid max-w-6xl gap-3 md:grid-cols-2 lg:grid-cols-4">
               <Field label="Usage" required>
-                <Select value={remorque.usageId ?? ""} onValueChange={(value) => update(index, { usageId: value })}>
-                  <SelectTrigger><SelectValue placeholder="Usage remorque" /></SelectTrigger>
-                  <SelectContent>
-                    {usages.map((usage) => <SelectItem key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <AutocompleteSelect
+                  value={remorque.usageId ?? ""}
+                  placeholder="Usage remorque"
+                  emptyText="Aucun usage trouvé"
+                  options={usages.map((usage) => ({
+                    value: usage.id,
+                    label: usage.code ? `${usage.code} - ${usage.libelle}` : usage.libelle,
+                    keywords: usage.code,
+                  }))}
+                  onValueChange={(value) => update(index, { usageId: value })}
+                />
               </Field>
               <Field label="Immatriculation">
                 <Input value={remorque.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
               </Field>
               <Field label="Marque">
-                <Select value={remorque.marqueId ?? ""} onValueChange={(value) => update(index, { marqueId: value })}>
-                  <SelectTrigger><SelectValue placeholder="Marque" /></SelectTrigger>
-                  <SelectContent>
-                    {marques.map((marque) => <SelectItem key={marque.id} value={marque.id}>{marque.libelle}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <AutocompleteSelect
+                  value={remorque.marqueId ?? ""}
+                  placeholder="Marque"
+                  emptyText="Aucune marque trouvée"
+                  options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
+                  onValueChange={(value) => update(index, { marqueId: value })}
+                />
               </Field>
               <Field label="Modèle">
                 <Input value={remorque.modele ?? ""} onChange={(event) => update(index, { modele: event.target.value })} />

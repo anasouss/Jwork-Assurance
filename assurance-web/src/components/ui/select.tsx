@@ -40,8 +40,9 @@ const SelectTrigger = React.forwardRef<
   return (
     <SelectPrimitive.Trigger
       ref={triggerRef}
+      data-slot="select-trigger"
       className={cn(
-        "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-slate-300 bg-slate-50/70 px-3 py-2 text-sm shadow-none ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 [&>span]:line-clamp-1 transition-colors cursor-pointer dark:border-slate-700 dark:bg-input/30 dark:disabled:bg-slate-900/60",
+        "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-slate-300 bg-slate-50/70 px-3 py-2 text-sm shadow-none ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 [&>span]:line-clamp-1 transition-colors cursor-pointer dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:data-[placeholder]:text-slate-500 dark:disabled:border-slate-800 dark:disabled:bg-slate-950 dark:disabled:text-slate-600",
         className
       )}
       {...props}

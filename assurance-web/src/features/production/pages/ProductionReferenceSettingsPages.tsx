@@ -6,6 +6,7 @@ import { Edit, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
@@ -65,6 +66,7 @@ export function CategoriesTransportSettingsPage() {
   const queryClient = useQueryClient();
   const query = useReference("categories-transport");
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState({ code: "", libelle: "", description: "", actif: true });
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export function CategoriesTransportSettingsPage() {
       id ? productionApi.updateCategorieTransport(id, cleanTextPayload(value)) : productionApi.createCategorieTransport(cleanTextPayload(value)),
     onSuccess: async () => {
       setEditing(null);
+      setDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "categories-transport"] });
       toast.success("Catégorie transport enregistrée");
     },
@@ -89,9 +92,18 @@ export function CategoriesTransportSettingsPage() {
 
   return (
     <ReferenceShell title="Catégories transport" description="Catégories utilisées par les usages et les tarifs RC.">
-      <Card className="border-border/70 shadow-none">
-        <CardHeader><CardTitle className="text-base">{editing ? "Modifier catégorie" : "Ajouter catégorie"}</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 lg:grid-cols-4">
+      <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setPayload({ code: "", libelle: "", description: "", actif: true }); setDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Ajouter catégorie
+        </Button>
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier catégorie" : "Ajouter catégorie"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 lg:grid-cols-2">
           <Field label="Code" required>
             <Input value={payload.code} onChange={(event) => setPayload((current) => ({ ...current, code: event.target.value }))} />
           </Field>
@@ -114,11 +126,12 @@ export function CategoriesTransportSettingsPage() {
               <Plus className="size-4" />
               {editing ? "Modifier" : "Ajouter"}
             </Button>
-            {editing ? <Button variant="outline" onClick={() => setEditing(null)}>Annuler</Button> : null}
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
           </div>
-        </CardContent>
-      </Card>
-      <ReferenceTable query={query} columns={["Code", "Libellé", "Description", "Actif"]} onEdit={setEditing} />
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ReferenceTable query={query} columns={["Code", "Libellé", "Description", "Actif"]} onEdit={(item) => { setEditing(item); setDialogOpen(true); }} />
     </ReferenceShell>
   );
 }
@@ -135,6 +148,7 @@ export function UsagesSettingsPage() {
   const usages = useReference("usages");
   const groupes = useReference("groupes-usage-attestation");
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertUsageRequest>(emptyUsage());
 
   useEffect(() => {
@@ -159,6 +173,7 @@ export function UsagesSettingsPage() {
       id ? productionApi.updateUsage(id, value) : productionApi.createUsage(value),
     onSuccess: async () => {
       setEditing(null);
+      setDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "usages"] });
       toast.success("Usage enregistré");
     },
@@ -167,9 +182,19 @@ export function UsagesSettingsPage() {
 
   return (
     <ReferenceShell title="Usages" description="Critères qui pilotent les champs visibles, le stock d'attestations et les garanties personne.">
-      <Card className="border-border/70 shadow-none">
-        <CardHeader><CardTitle className="text-base">{editing ? "Modifier usage" : "Ajouter usage"}</CardTitle></CardHeader>
-        <CardContent className="grid gap-4">
+      <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setPayload(emptyUsage()); setDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Ajouter usage
+        </Button>
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent className="sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier usage" : "Ajouter usage"}</DialogTitle>
+            <DialogDescription>Ces paramètres pilotent les champs visibles dans la création de contrat et le calcul RC.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
           <div className="grid gap-3 lg:grid-cols-4">
             <Field label="Code" required>
               <Input value={payload.code} onChange={(event) => setPayload((current) => ({ ...current, code: event.target.value }))} />
@@ -213,10 +238,11 @@ export function UsagesSettingsPage() {
               <Plus className="size-4" />
               {editing ? "Modifier" : "Ajouter"}
             </Button>
-            {editing ? <Button variant="outline" onClick={() => setEditing(null)}>Annuler</Button> : null}
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
           </div>
-        </CardContent>
-      </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Card className="border-border/70 shadow-none">
         <CardHeader><CardTitle className="text-base">Liste des usages</CardTitle></CardHeader>
         <CardContent>
@@ -243,7 +269,7 @@ export function UsagesSettingsPage() {
                     <TableCell>{usage.garantiesPersonne ? "Oui" : "Non"}</TableCell>
                     <TableCell>{usageCriteria(usage)}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => setEditing(usage)}>
+                      <Button variant="ghost" size="icon" onClick={() => { setEditing(usage); setDialogOpen(true); }}>
                         <Edit className="size-4" />
                       </Button>
                     </TableCell>
@@ -274,6 +300,7 @@ function SimpleReferencePage({
   const queryClient = useQueryClient();
   const query = useReference(path);
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertReferenceRequest>({ libelle: "", actif: true });
 
   useEffect(() => {
@@ -284,6 +311,7 @@ function SimpleReferencePage({
     mutationFn: ({ id, value }: { id?: string; value: UpsertReferenceRequest }) => id ? update(id, value) : create(value),
     onSuccess: async () => {
       setEditing(null);
+      setDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", path] });
       toast.success(`${title} enregistré`);
     },
@@ -292,9 +320,18 @@ function SimpleReferencePage({
 
   return (
     <ReferenceShell title={title} description={description}>
-      <Card className="border-border/70 shadow-none">
-        <CardHeader><CardTitle className="text-base">{editing ? "Modifier" : "Ajouter"}</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+      <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setPayload({ libelle: "", actif: true }); setDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Ajouter
+        </Button>
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier" : "Ajouter"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
           <Field label="Libellé" required>
             <Input value={payload.libelle} onChange={(event) => setPayload((current) => ({ ...current, libelle: event.target.value }))} />
           </Field>
@@ -311,11 +348,12 @@ function SimpleReferencePage({
               <Plus className="size-4" />
               {editing ? "Modifier" : "Ajouter"}
             </Button>
-            {editing ? <Button variant="outline" onClick={() => setEditing(null)}>Annuler</Button> : null}
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
           </div>
-        </CardContent>
-      </Card>
-      <ReferenceTable query={query} columns={["Libellé", "Actif"]} onEdit={setEditing} />
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ReferenceTable query={query} columns={["Libellé", "Actif"]} onEdit={(item) => { setEditing(item); setDialogOpen(true); }} />
     </ReferenceShell>
   );
 }
@@ -336,6 +374,7 @@ function CodeReferencePage({
   const queryClient = useQueryClient();
   const query = useReference(path);
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertCodeReferenceRequest>({ code: "", libelle: "", actif: true });
 
   useEffect(() => {
@@ -348,6 +387,7 @@ function CodeReferencePage({
     mutationFn: ({ id, value }: { id?: string; value: UpsertCodeReferenceRequest }) => id ? update(id, value) : create(value),
     onSuccess: async () => {
       setEditing(null);
+      setDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", path] });
       toast.success(`${title} enregistré`);
     },
@@ -356,9 +396,18 @@ function CodeReferencePage({
 
   return (
     <ReferenceShell title={title} description={description}>
-      <Card className="border-border/70 shadow-none">
-        <CardHeader><CardTitle className="text-base">{editing ? "Modifier" : "Ajouter"}</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-[220px_1fr_auto_auto]">
+      <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setPayload({ code: "", libelle: "", actif: true }); setDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Ajouter
+        </Button>
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier" : "Ajouter"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
           <Field label="Code" required>
             <Input value={payload.code} onChange={(event) => setPayload((current) => ({ ...current, code: event.target.value }))} />
           </Field>
@@ -378,11 +427,12 @@ function CodeReferencePage({
               <Plus className="size-4" />
               {editing ? "Modifier" : "Ajouter"}
             </Button>
-            {editing ? <Button variant="outline" onClick={() => setEditing(null)}>Annuler</Button> : null}
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
           </div>
-        </CardContent>
-      </Card>
-      <ReferenceTable query={query} columns={["Code", "Libellé", "Actif"]} onEdit={setEditing} />
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ReferenceTable query={query} columns={["Code", "Libellé", "Actif"]} onEdit={(item) => { setEditing(item); setDialogOpen(true); }} />
     </ReferenceShell>
   );
 }

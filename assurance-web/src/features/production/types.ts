@@ -434,6 +434,19 @@ export type BulkUpdateTarifUsageRequest = {
   value: number;
 };
 
+export type UpsertCompagnieAssuranceRequest = {
+  code: string;
+  nom: string;
+  adresse?: string;
+  ville?: string;
+  email?: string;
+  telephone?: string;
+  rc?: string;
+  ice?: string;
+  prefixeAttestation?: string;
+  actif?: boolean;
+};
+
 export type UpsertReferenceRequest = {
   libelle: string;
   actif?: boolean;

@@ -29,6 +29,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ProfilRepository roleRepository;
     private final AgenceRepository agenceRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
+    private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final GarantieRepository garantieRepository;
     private final CompagnieGarantieRepository compagnieGarantieRepository;
     private final UsageRepository usageRepository;
@@ -84,20 +85,8 @@ public class DataSeeder implements CommandLineRunner {
                         .build()
         ));
 
-        CompagnieAssurance compagnie = compagnieAssuranceRepository.findByCode("COMP-001").orElseGet(() -> compagnieAssuranceRepository.save(
-                CompagnieAssurance.builder()
-                        .code("COMP-001")
-                        .nom("Compagnie Centrale")
-                        .ville("Casablanca")
-                        .email("compagnie@assurance.local")
-                        .telephone("+212611111111")
-                        .prefixeAttestation("COMP")
-                        .build()
-        ));
-        if (compagnie.getPrefixeAttestation() == null || compagnie.getPrefixeAttestation().isBlank()) {
-            compagnie.setPrefixeAttestation("COMP");
-            compagnieAssuranceRepository.save(compagnie);
-        }
+        List<CompagnieAssurance> compagniesAssurance = seedCompagniesAssurance();
+        seedCompagniesAssistance();
 
         Carrosserie berline = seedCarrosserie("Berline");
         Carrosserie utilitaire = seedCarrosserie("Utilitaire");
@@ -282,7 +271,8 @@ public class DataSeeder implements CommandLineRunner {
                 seedGarantie("PC", "Protection Conducteur", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, 120,
                         ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false)
         );
-        garanties.forEach(garantie -> seedCompagnieGarantie(compagnie, garantie));
+        compagniesAssurance.forEach(compagnieAssurance ->
+                garanties.forEach(garantie -> seedCompagnieGarantie(compagnieAssurance, garantie)));
 
         userRepository.findByEmail(adminEmail).orElseGet(() -> userRepository.save(
                 Utilisateur.builder()
@@ -321,6 +311,196 @@ public class DataSeeder implements CommandLineRunner {
                         .superAdminOnly(superAdminOnly)
                         .build())
         );
+    }
+
+    private List<CompagnieAssurance> seedCompagniesAssurance() {
+        return List.of(
+                seedCompagnieAssurance(
+                        "WAFA",
+                        "WAFA ASSURANCE",
+                        "1, Boulevard Abdelmoumen",
+                        "Casablanca",
+                        null,
+                        "0522545555",
+                        "31719",
+                        "000083736000004",
+                        "WAFA"
+                ),
+                seedCompagnieAssurance(
+                        "SANLAM",
+                        "SANLAM MAROC",
+                        "216, Boulevard Zerktouni",
+                        "Casablanca",
+                        null,
+                        "0522474040",
+                        "22341",
+                        null,
+                        "SANLAM"
+                ),
+                seedCompagnieAssurance(
+                        "RMA",
+                        "ROYALE MAROCAINE D'ASSURANCE",
+                        "83, Avenue de l'Armee Royale",
+                        "Casablanca",
+                        null,
+                        "0522312163",
+                        "15207",
+                        "001530601000041",
+                        "RMA"
+                ),
+                seedCompagnieAssurance(
+                        "AXA",
+                        "AXA ASSURANCE MAROC",
+                        "120-122, Avenue Hassan II",
+                        "Casablanca",
+                        null,
+                        null,
+                        "34221",
+                        null,
+                        "AXA"
+                ),
+                seedCompagnieAssurance(
+                        "ALLIANZ",
+                        "ALLIANZ MAROC",
+                        "166-168, Boulevard Mohamed Zerktouni",
+                        "Casablanca",
+                        null,
+                        "0522499700",
+                        "23041",
+                        "001536538000083",
+                        "ALLIANZ"
+                ),
+                seedCompagnieAssurance(
+                        "ATLANTA_SANAD",
+                        "ATLANTA SANAD",
+                        "181, Boulevard d'Anfa",
+                        "Casablanca",
+                        null,
+                        "0522957676",
+                        null,
+                        null,
+                        "ATLANTA"
+                ),
+                seedCompagnieAssurance(
+                        "MAMDA",
+                        "MUTUELLE AGRICOLE MAROCAINE D'ASSURANCE",
+                        "2, Rue Tetouan",
+                        "Meknes",
+                        null,
+                        "0537766960",
+                        null,
+                        null,
+                        "MAMDA"
+                ),
+                seedCompagnieAssurance(
+                        "MCMA",
+                        "MUTUELLE CENTRALE MAROCAINE D'ASSURANCE",
+                        "Angle Avenue Mohammed VI et Rue Houmane El Fatouaki",
+                        "Rabat",
+                        null,
+                        "0537544400",
+                        "59791",
+                        "000211866000096",
+                        "MCMA"
+                ),
+                seedCompagnieAssurance(
+                        "CAT",
+                        "CAT ASSURANCE ET REASSURANCE",
+                        null,
+                        "Casablanca",
+                        null,
+                        null,
+                        "68845",
+                        null,
+                        "CAT"
+                ),
+                seedCompagnieAssurance(
+                        "MATU",
+                        "MUTUELLE D'ASSURANCES DES TRANSPORTEURS UNIS",
+                        "207-209, Boulevard Mohamed Bouziane",
+                        "Casablanca",
+                        "info@matu-assurance.ma",
+                        "0522596850",
+                        null,
+                        null,
+                        "MATU"
+                ),
+                seedCompagnieAssurance(
+                        "MAROCAINE_VIE",
+                        "MAROCAINE VIE",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "MVIE"
+                ),
+                seedCompagnieAssurance(
+                        "ATTAMINE_CHAABI",
+                        "MUTUELLE ATTAMINE CHAABI",
+                        "Angle Avenue Mohammed VI et Rue Houmane El Fatouaki",
+                        "Rabat",
+                        null,
+                        null,
+                        null,
+                        null,
+                        "ATC"
+                )
+        );
+    }
+
+    private CompagnieAssurance seedCompagnieAssurance(
+            String code,
+            String nom,
+            String adresse,
+            String ville,
+            String email,
+            String telephone,
+            String rc,
+            String ice,
+            String prefixeAttestation
+    ) {
+        CompagnieAssurance compagnie = compagnieAssuranceRepository.findByCode(code).orElseGet(() ->
+                compagnieAssuranceRepository.save(CompagnieAssurance.builder()
+                        .code(code)
+                        .nom(nom)
+                        .actif(true)
+                        .build())
+        );
+        compagnie.setNom(nom);
+        compagnie.setAdresse(adresse);
+        compagnie.setVille(ville);
+        compagnie.setEmail(email);
+        compagnie.setTelephone(telephone);
+        compagnie.setRc(rc);
+        compagnie.setIce(ice);
+        compagnie.setPrefixeAttestation(prefixeAttestation);
+        compagnie.setActif(true);
+        return compagnieAssuranceRepository.save(compagnie);
+    }
+
+    private void seedCompagniesAssistance() {
+        seedCompagnieAssistanceProvider("AFRICA_FIRST_ASSIST", "AFRICA FIRST ASSIST", null, null);
+        seedCompagnieAssistanceProvider("COVER_EDGE", "COVER EDGE", null, null);
+        seedCompagnieAssistanceProvider("MAROC_ASSISTANCE_INTERNATIONAL", "MAROC ASSISTANCE INTERNATIONAL", null, null);
+        seedCompagnieAssistanceProvider("RMA_ASSISTANCE", "RMA ASSISTANCE", null, null);
+        seedCompagnieAssistanceProvider("WAFA_IMA_ASSISTANCE", "WAFA IMA ASSISTANCE", null, null);
+    }
+
+    private CompagnieAssistance seedCompagnieAssistanceProvider(String code, String nom, String email, String telephone) {
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+                compagnieAssistanceRepository.save(CompagnieAssistance.builder()
+                        .code(code)
+                        .nom(nom)
+                        .actif(true)
+                        .build())
+        );
+        compagnie.setNom(nom);
+        compagnie.setEmail(email);
+        compagnie.setTelephone(telephone);
+        compagnie.setActif(true);
+        return compagnieAssistanceRepository.save(compagnie);
     }
 
     private Garantie seedGarantie(

@@ -3,6 +3,7 @@ package com.assurance.controller;
 import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
 import com.assurance.dto.request.UpsertCodeReferenceRequest;
+import com.assurance.dto.request.UpsertCompagnieAssuranceRequest;
 import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
@@ -275,15 +276,44 @@ public class ReferentielController {
     }
 
     @GetMapping("/compagnies-assurance")
-    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> compagniesAssurance() {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> compagniesAssurance() {
         return ResponseEntity.ok(ApiResponse.success(compagnieAssuranceRepository.findAll(Sort.by("nom")).stream()
-                .map(compagnie -> ReferenceOptionResponse.builder()
-                        .id(compagnie.getId())
-                        .code(compagnie.getCode())
-                        .libelle(compagnie.getNom())
-                        .actif(compagnie.getActif())
-                        .build())
+                .map(this::toCompagnieAssuranceResponse)
                 .toList()));
+    }
+
+    @PostMapping("/compagnies-assurance")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssurance(
+            @Valid @RequestBody UpsertCompagnieAssuranceRequest request
+    ) {
+        compagnieAssuranceRepository.findByCode(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code compagnie deja utilise");
+        });
+        CompagnieAssurance compagnie = new CompagnieAssurance();
+        applyCompagnieAssuranceRequest(compagnie, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toCompagnieAssuranceResponse(compagnieAssuranceRepository.save(compagnie)),
+                "Compagnie creee"
+        ));
+    }
+
+    @PutMapping("/compagnies-assurance/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssurance(
+            @PathVariable String id,
+            @Valid @RequestBody UpsertCompagnieAssuranceRequest request
+    ) {
+        CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", id));
+        compagnieAssuranceRepository.findByCode(request.getCode())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Code compagnie deja utilise");
+                });
+        applyCompagnieAssuranceRequest(compagnie, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toCompagnieAssuranceResponse(compagnieAssuranceRepository.save(compagnie)),
+                "Compagnie modifiee"
+        ));
     }
 
     @GetMapping("/compagnies-assistance")
@@ -705,6 +735,33 @@ public class ReferentielController {
                 .compagnieAssuranceLibelle(grille.getCompagnieAssurance() != null ? grille.getCompagnieAssurance().getNom() : null)
                 .actif(grille.getActif())
                 .build();
+    }
+
+    private void applyCompagnieAssuranceRequest(CompagnieAssurance compagnie, UpsertCompagnieAssuranceRequest request) {
+        compagnie.setCode(request.getCode());
+        compagnie.setNom(request.getNom());
+        compagnie.setAdresse(blankToNull(request.getAdresse()));
+        compagnie.setVille(blankToNull(request.getVille()));
+        compagnie.setEmail(blankToNull(request.getEmail()));
+        compagnie.setTelephone(blankToNull(request.getTelephone()));
+        compagnie.setRc(blankToNull(request.getRc()));
+        compagnie.setIce(blankToNull(request.getIce()));
+        compagnie.setPrefixeAttestation(blankToNull(request.getPrefixeAttestation()));
+        compagnie.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private Map<String, Object> toCompagnieAssuranceResponse(CompagnieAssurance compagnie) {
+        return option(compagnie.getId(), compagnie.getCode(), compagnie.getNom())
+                .putValue("nom", compagnie.getNom())
+                .putValue("adresse", compagnie.getAdresse())
+                .putValue("ville", compagnie.getVille())
+                .putValue("email", compagnie.getEmail())
+                .putValue("telephone", compagnie.getTelephone())
+                .putValue("rc", compagnie.getRc())
+                .putValue("ice", compagnie.getIce())
+                .putValue("prefixeAttestation", compagnie.getPrefixeAttestation())
+                .putValue("actif", compagnie.getActif())
+                .map();
     }
 
     private void applyUsageRequest(Usage usage, UpsertUsageRequest request) {

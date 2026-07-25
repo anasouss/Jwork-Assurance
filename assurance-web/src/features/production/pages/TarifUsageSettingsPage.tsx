@@ -5,7 +5,9 @@ import { Edit, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
 import { bulkTarifUsageSchema, tarifUsageSchema } from "../schemas";
@@ -23,6 +25,8 @@ export default function TarifUsageSettingsPage() {
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [payload, setPayload] = useState<UpsertTarifUsageRequest>(emptyTarifUsage());
   const [filterUsageId, setFilterUsageId] = useState("");
+  const [tarifDialogOpen, setTarifDialogOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkPayload, setBulkPayload] = useState<BulkUpdateTarifUsageRequest>({
     adjustmentType: "PERCENT",
@@ -49,6 +53,7 @@ export default function TarifUsageSettingsPage() {
     onSuccess: async () => {
       setEditing(null);
       setPayload(emptyTarifUsage());
+      setTarifDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "tarifs-usage"] });
       toast.success("Tarif usage enregistré");
     },
@@ -68,6 +73,7 @@ export default function TarifUsageSettingsPage() {
     mutationFn: productionApi.bulkUpdateTarifUsagePrimeNette,
     onSuccess: async (result) => {
       setSelectedIds([]);
+      setBulkDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "tarifs-usage"] });
       toast.success(`${result.updatedRows} tarif(s) mis à jour`);
     },
@@ -84,11 +90,41 @@ export default function TarifUsageSettingsPage() {
         <p className="text-sm text-muted-foreground">Base de calcul RC par usage, alignée avec Skay params/tarifs-usage.</p>
       </div>
 
-      <Card className="border-border/70 shadow-none">
-        <CardHeader>
-          <CardTitle className="text-base">{editing ? "Modifier tarif usage" : "Ajouter tarif usage"}</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4">
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 md:flex-row md:items-center md:justify-between">
+        <Field label="Filtrer usage">
+          <Select value={filterUsageId || "all"} onValueChange={(value) => setFilterUsageId(value === "all" ? "" : value)}>
+            <SelectTrigger className="md:w-80">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les usages</SelectItem>
+              {(usages.data ?? []).map((usage) => (
+                <SelectItem key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => {
+            setEditing(null);
+            setPayload(emptyTarifUsage());
+            setTarifDialogOpen(true);
+          }}>
+            <Plus className="size-4" />
+            Ajouter tarif usage
+          </Button>
+          <Button onClick={() => setBulkDialogOpen(true)}>
+            Ajustement groupé prime nette
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={tarifDialogOpen} onOpenChange={(open) => { setTarifDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent className="sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier tarif usage" : "Ajouter tarif usage"}</DialogTitle>
+            <DialogDescription>Les champs visibles dépendent du paramétrage de l'usage sélectionné.</DialogDescription>
+          </DialogHeader>
           <div className="grid gap-3 lg:grid-cols-4">
             <Field label="Usage" required>
               <select
@@ -184,29 +220,19 @@ export default function TarifUsageSettingsPage() {
                 <Plus className="size-4" />
                 {editing ? "Modifier" : "Ajouter"}
               </Button>
-              {editing ? <Button variant="outline" onClick={() => setEditing(null)}>Annuler</Button> : null}
+              <Button variant="outline" onClick={() => setTarifDialogOpen(false)}>Annuler</Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
 
-      <Card className="border-border/70 shadow-none">
-        <CardHeader>
-          <CardTitle className="text-base">Ajustement groupé prime nette</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 lg:grid-cols-5">
-          <Field label="Filtrer usage">
-            <select
-              className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
-              value={filterUsageId}
-              onChange={(event) => setFilterUsageId(event.target.value)}
-            >
-              <option value="">Tous les usages</option>
-              {(usages.data ?? []).map((usage) => (
-                <option key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</option>
-              ))}
-            </select>
-          </Field>
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Ajustement groupé prime nette</DialogTitle>
+            <DialogDescription>Applique un pourcentage ou un montant fixe aux lignes cochées, ou au filtre usage courant.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 lg:grid-cols-4">
           <Field label="Type">
             <select
               className="h-10 w-full rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
@@ -259,11 +285,15 @@ export default function TarifUsageSettingsPage() {
               Appliquer
             </Button>
           </div>
-          <p className="lg:col-span-5 text-xs text-muted-foreground">
+          <p className="lg:col-span-4 text-xs text-muted-foreground">
             Si aucune ligne n'est cochée, l'ajustement cible le filtre usage courant. Sans filtre, il cible tous les tarifs actifs.
           </p>
-        </CardContent>
-      </Card>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-border/70 shadow-none">
         <CardHeader>
@@ -315,7 +345,7 @@ export default function TarifUsageSettingsPage() {
                     <TableCell>{money(tarif.primeNette)}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => setEditing(tarif)}>
+                        <Button variant="ghost" size="icon" onClick={() => { setEditing(tarif); setTarifDialogOpen(true); }}>
                           <Edit className="size-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => remove.mutate(tarif.id)}>

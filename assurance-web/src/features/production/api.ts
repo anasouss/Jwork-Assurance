@@ -12,6 +12,7 @@ import type {
   ReferenceOption,
   UpsertGrilleTarifaireRequest,
   BulkUpdateTarifUsageRequest,
+  UpsertCompagnieAssuranceRequest,
   UpsertFormuleGarantiePersonneRequest,
   UpsertLigneGrilleTarifaireRequest,
   UpsertCodeReferenceRequest,
@@ -161,6 +162,24 @@ export const productionApi = {
     return unwrap(
       await apiFetch<ApiResponse<{ updatedRows: number }>>("/api/v1/referentiel/tarifs-usage/bulk-prime-nette", {
         method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createCompagnieAssurance(payload: UpsertCompagnieAssuranceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/compagnies-assurance", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateCompagnieAssurance(id: string, payload: UpsertCompagnieAssuranceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/compagnies-assurance/${id}`, {
+        method: "PUT",
         body: JSON.stringify(payload),
       })
     );

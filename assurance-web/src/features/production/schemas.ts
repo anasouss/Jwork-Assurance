@@ -115,6 +115,19 @@ export const bulkTarifUsageSchema = z.object({
   value: z.number().positive("Valeur obligatoire"),
 });
 
+export const compagnieAssuranceSchema = z.object({
+  code: z.string().min(1, "Code obligatoire"),
+  nom: z.string().min(2, "Nom obligatoire"),
+  adresse: z.string().optional(),
+  ville: z.string().optional(),
+  email: z.string().optional(),
+  telephone: z.string().optional(),
+  rc: z.string().optional(),
+  ice: z.string().optional(),
+  prefixeAttestation: z.string().optional(),
+  actif: z.boolean().optional(),
+});
+
 export const referenceSchema = z.object({
   libelle: z.string().min(2, "Libelle obligatoire"),
   actif: z.boolean().optional(),

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DatePicker } from "@/components/ui/date-picker";
+import { EcheanceInput } from "@/components/ui/echeance-input";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1047,11 +1048,10 @@ function AssistanceTable({
               <DatePicker disabled={!assistance.enabled} date={assistance.dateSouscription} onSelect={(date) => onChange({ dateSouscription: toDateOnly(date) })} />
             </td>
             <td className="px-3 py-2">
-              <Input
+              <EcheanceInput
                 disabled={!assistance.enabled}
                 value={assistance.echeanceCode ?? ""}
-                placeholder="01/01"
-                onChange={(event) => onChange({ echeanceCode: event.target.value })}
+                onValueChange={(value) => onChange({ echeanceCode: value })}
               />
             </td>
             <td className="px-3 py-2">

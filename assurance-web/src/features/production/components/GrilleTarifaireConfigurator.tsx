@@ -35,6 +35,7 @@ type MatrixLine = UpsertLigneGrilleTarifaireRequest & {
 type PersonneMatrixLine = UpsertFormuleGarantiePersonneRequest & {
   localKey: string;
   checked: boolean;
+  baseRow: boolean;
 };
 
 export function GrilleTarifaireConfigurator({
@@ -105,6 +106,13 @@ export function GrilleTarifaireConfigurator({
     })),
     [drafts, vehicleGaranties]
   );
+  const personneDraftGroups = useMemo(
+    () => personneGaranties.map((garantie) => ({
+      garantie,
+      drafts: personneDrafts.filter((draft) => draft.garantieId === garantie.id),
+    })),
+    [personneDrafts, personneGaranties]
+  );
 
   useEffect(() => {
     if (selectedUsageId && usageTabs.some((usage) => usage.id === selectedUsageId)) {
@@ -143,6 +151,10 @@ export function GrilleTarifaireConfigurator({
     setPersonneDrafts((current) => current.map((draft) => draft.localKey === localKey ? { ...draft, ...patch } : draft));
   };
 
+  const setPersonneGarantieEnabled = (garantieId: string, checked: boolean) => {
+    setPersonneDrafts((current) => current.map((draft) => draft.garantieId === garantieId ? { ...draft, checked } : draft));
+  };
+
   const addDraft = (garantie: ReferenceOption) => {
     setDrafts((current) => [
       ...current,
@@ -164,6 +176,30 @@ export function GrilleTarifaireConfigurator({
       return;
     }
     setDrafts((current) => current.filter((item) => item.localKey !== draft.localKey));
+  };
+
+  const addPersonneDraft = (garantie: ReferenceOption) => {
+    setPersonneDrafts((current) => [
+      ...current,
+      {
+        localKey: newLocalKey(),
+        checked: true,
+        baseRow: false,
+        garantieId: garantie.id,
+        usageId: activeUsageId,
+        formule: nextFormuleLabel(current, garantie.id),
+        ordreAffichage: nextPersonneOrder(current, garantie.id),
+        actif: true,
+      },
+    ]);
+  };
+
+  const removePersonneDraft = (draft: PersonneMatrixLine) => {
+    if (draft.baseRow) {
+      updatePersonneDraft(draft.localKey, { checked: false });
+      return;
+    }
+    setPersonneDrafts((current) => current.filter((item) => item.localKey !== draft.localKey));
   };
 
   const submitMatrix = () => {
@@ -353,25 +389,34 @@ export function GrilleTarifaireConfigurator({
       </div>
 
       <PersonnesLinesTable
-        drafts={personneDrafts}
+        groups={personneDraftGroups}
         enabled={Boolean(activeUsageId && activeUsage?.garantiesPersonne)}
         activeUsage={activeUsage}
         updateDraft={updatePersonneDraft}
+        setGarantieEnabled={setPersonneGarantieEnabled}
+        addDraft={addPersonneDraft}
+        removeDraft={removePersonneDraft}
       />
     </div>
   );
 }
 
 function PersonnesLinesTable({
-  drafts,
+  groups,
   enabled,
   activeUsage,
   updateDraft,
+  setGarantieEnabled,
+  addDraft,
+  removeDraft,
 }: {
-  drafts: PersonneMatrixLine[];
+  groups: { garantie: ReferenceOption; drafts: PersonneMatrixLine[] }[];
   enabled: boolean;
   activeUsage: ReferenceOption | null;
   updateDraft: (localKey: string, patch: Partial<PersonneMatrixLine>) => void;
+  setGarantieEnabled: (garantieId: string, checked: boolean) => void;
+  addDraft: (garantie: ReferenceOption) => void;
+  removeDraft: (draft: PersonneMatrixLine) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -384,6 +429,7 @@ function PersonnesLinesTable({
           <TableRow>
             <TableHead className="w-10">#</TableHead>
             <TableHead>Garantie</TableHead>
+            <TableHead className="min-w-32">Formule</TableHead>
             <TableHead className="text-right">Décès</TableHead>
             <TableHead className="text-right">Invalidité</TableHead>
             <TableHead className="text-right">Frais médicaux</TableHead>
@@ -392,49 +438,89 @@ function PersonnesLinesTable({
             <TableHead className="text-right">Frais chirurgie</TableHead>
             <TableHead className="text-right">Prime</TableHead>
             <TableHead className="text-right">Accessoire</TableHead>
+            <TableHead className="w-16 text-right"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {drafts.length === 0 ? (
+          {groups.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucune garantie personne disponible.</TableCell>
+              <TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Aucune garantie personne disponible.</TableCell>
             </TableRow>
           ) : (
-            drafts.map((draft) => {
-              const checked = enabled && draft.checked;
+            groups.map(({ garantie, drafts: groupDrafts }) => {
+              const baseDraft = groupDrafts.find((draft) => draft.baseRow) ?? emptyPersonneDraft(garantie);
+              const extraDrafts = groupDrafts.filter((draft) => !draft.baseRow);
+              const groupEnabled = enabled && baseDraft.checked;
+              const allDrafts = [baseDraft, ...extraDrafts];
               return (
-              <TableRow key={draft.localKey}>
+              <TableRow key={garantie.id}>
                 <TableCell>
                   <Checkbox
-                    checked={checked}
+                    checked={groupEnabled}
                     disabled={!enabled}
-                    onCheckedChange={(value) => updateDraft(draft.localKey, { checked: value === true })}
+                    onCheckedChange={(value) => setGarantieEnabled(garantie.id, value === true)}
                   />
                 </TableCell>
-                <TableCell className="font-semibold">{draft.formule}</TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.montantDeces} onChange={(value) => updateDraft(draft.localKey, { montantDeces: value })} />
+                <TableCell className="align-top font-semibold">
+                  <div className="pt-2">{garantie.code || garantie.libelle}</div>
                 </TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.montantInvalidite} onChange={(value) => updateDraft(draft.localKey, { montantInvalidite: value })} />
+                <TableCell className="align-top">
+                  <div className="grid gap-2">
+                    {allDrafts.map((draft) => (
+                      <Input
+                        key={`${draft.localKey}-formule`}
+                        className="h-9"
+                        disabled={!groupEnabled}
+                        value={draft.formule ?? ""}
+                        onChange={(event) => updateDraft(draft.localKey, { formule: event.target.value })}
+                      />
+                    ))}
+                  </div>
                 </TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.montantFraisMedicaux} onChange={(value) => updateDraft(draft.localKey, { montantFraisMedicaux: value })} />
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="montantDeces" updateDraft={updateDraft} />
                 </TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.montantFraisHospitalisation} onChange={(value) => updateDraft(draft.localKey, { montantFraisHospitalisation: value })} />
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="montantInvalidite" updateDraft={updateDraft} />
                 </TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.montantFraisFuneraires} onChange={(value) => updateDraft(draft.localKey, { montantFraisFuneraires: value })} />
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="montantFraisMedicaux" updateDraft={updateDraft} />
                 </TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.montantFraisChirurgie} onChange={(value) => updateDraft(draft.localKey, { montantFraisChirurgie: value })} />
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="montantFraisHospitalisation" updateDraft={updateDraft} />
                 </TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.primeNette} onChange={(value) => updateDraft(draft.localKey, { primeNette: value })} />
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="montantFraisFuneraires" updateDraft={updateDraft} />
                 </TableCell>
-                <TableCell>
-                  <NumberCell disabled={!checked} value={draft.accessoire} onChange={(value) => updateDraft(draft.localKey, { accessoire: value })} />
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="montantFraisChirurgie" updateDraft={updateDraft} />
+                </TableCell>
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="primeNette" updateDraft={updateDraft} />
+                </TableCell>
+                <TableCell className="align-top">
+                  <PersonneNumberStack drafts={allDrafts} enabled={groupEnabled} field="accessoire" updateDraft={updateDraft} />
+                </TableCell>
+                <TableCell className="align-top">
+                  <div className="grid gap-2 pt-1">
+                    {canAddMultipleRows(garantie) ? (
+                      <Button type="button" variant="ghost" size="icon" disabled={!groupEnabled} onClick={() => addDraft(garantie)}>
+                        <Plus className="size-4" />
+                      </Button>
+                    ) : null}
+                    {extraDrafts.map((draft) => (
+                      <Button
+                        key={draft.localKey}
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={!groupEnabled}
+                        onClick={() => removeDraft(draft)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ))}
+                  </div>
                 </TableCell>
               </TableRow>
               );
@@ -520,44 +606,86 @@ function DraftNumberStack({
   );
 }
 
+function PersonneNumberStack({
+  drafts,
+  enabled,
+  field,
+  updateDraft,
+}: {
+  drafts: PersonneMatrixLine[];
+  enabled: boolean;
+  field:
+    | "montantDeces"
+    | "montantInvalidite"
+    | "montantFraisMedicaux"
+    | "montantFraisHospitalisation"
+    | "montantFraisFuneraires"
+    | "montantFraisChirurgie"
+    | "primeNette"
+    | "accessoire";
+  updateDraft: (localKey: string, patch: Partial<PersonneMatrixLine>) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      {drafts.map((draft) => (
+        <NumberCell
+          key={`${draft.localKey}-${field}`}
+          disabled={!enabled}
+          value={draft[field]}
+          onChange={(value) => updateDraft(draft.localKey, { [field]: value })}
+        />
+      ))}
+    </div>
+  );
+}
+
 function buildPersonneDrafts(garanties: ReferenceOption[], formules: ReferenceOption[]): PersonneMatrixLine[] {
-  const byGarantie = new Map<string, ReferenceOption>();
+  const result: PersonneMatrixLine[] = [];
+  const byGarantie = new Map<string, ReferenceOption[]>();
   for (const formule of formules) {
     const garantieId = String(formule.garantieId ?? "");
-    if (garantieId && !byGarantie.has(garantieId)) {
-      byGarantie.set(garantieId, formule);
+    if (garantieId) {
+      byGarantie.set(garantieId, [...(byGarantie.get(garantieId) ?? []), formule]);
     }
   }
-  return garanties.map((garantie) => {
-    const existing = byGarantie.get(garantie.id);
-    if (!existing) return emptyPersonneDraft(garantie);
-    return {
-      localKey: newLocalKey(),
-      checked: true,
-      id: existing.id,
-      garantieId: garantie.id,
-      usageId: String(existing.usageId ?? ""),
-      formule: stringValue(existing.garantieCode) || garantie.code || garantie.libelle,
-      montantDeces: toNumber(existing.montantDeces),
-      montantInvalidite: toNumber(existing.montantInvalidite),
-      montantFraisMedicaux: toNumber(existing.montantFraisMedicaux),
-      montantFraisHospitalisation: toNumber(existing.montantFraisHospitalisation),
-      montantFraisFuneraires: toNumber(existing.montantFraisFuneraires),
-      montantFraisChirurgie: toNumber(existing.montantFraisChirurgie),
-      primeNette: toNumber(existing.primeNette),
-      accessoire: toNumber(existing.accessoire),
-      ordreAffichage: toNumber(existing.ordreAffichage) ?? toNumber(garantie.ordreAffichage),
-      actif: true,
-    };
-  });
+  for (const garantie of garanties) {
+    const existing = byGarantie.get(garantie.id) ?? [];
+    if (!existing.length) {
+      result.push(emptyPersonneDraft(garantie));
+      continue;
+    }
+    existing.forEach((formule, index) => {
+      result.push({
+        localKey: newLocalKey(),
+        checked: true,
+        baseRow: index === 0,
+        id: formule.id,
+        garantieId: garantie.id,
+        usageId: String(formule.usageId ?? ""),
+        formule: stringValue(formule.libelle) || defaultFormuleLabel(index),
+        montantDeces: toNumber(formule.montantDeces),
+        montantInvalidite: toNumber(formule.montantInvalidite),
+        montantFraisMedicaux: toNumber(formule.montantFraisMedicaux),
+        montantFraisHospitalisation: toNumber(formule.montantFraisHospitalisation),
+        montantFraisFuneraires: toNumber(formule.montantFraisFuneraires),
+        montantFraisChirurgie: toNumber(formule.montantFraisChirurgie),
+        primeNette: toNumber(formule.primeNette),
+        accessoire: toNumber(formule.accessoire),
+        ordreAffichage: toNumber(formule.ordreAffichage) ?? toNumber(garantie.ordreAffichage),
+        actif: true,
+      });
+    });
+  }
+  return result;
 }
 
 function emptyPersonneDraft(garantie: ReferenceOption): PersonneMatrixLine {
   return {
     localKey: newLocalKey(),
     checked: false,
+    baseRow: true,
     garantieId: garantie.id,
-    formule: garantie.code || garantie.libelle,
+    formule: defaultFormuleLabel(0),
     ordreAffichage: toNumber(garantie.ordreAffichage),
     actif: true,
   };
@@ -732,6 +860,21 @@ function nextOrder(drafts: MatrixLine[], garantieId: string) {
   const existing = drafts.filter((draft) => draft.garantieId === garantieId);
   const max = Math.max(0, ...existing.map((draft) => draft.ordreAffichage ?? 0));
   return max + 1;
+}
+
+function nextPersonneOrder(drafts: PersonneMatrixLine[], garantieId: string) {
+  const existing = drafts.filter((draft) => draft.garantieId === garantieId);
+  const max = Math.max(0, ...existing.map((draft) => draft.ordreAffichage ?? 0));
+  return max + 1;
+}
+
+function nextFormuleLabel(drafts: PersonneMatrixLine[], garantieId: string) {
+  const count = drafts.filter((draft) => draft.garantieId === garantieId).length;
+  return defaultFormuleLabel(count);
+}
+
+function defaultFormuleLabel(index: number) {
+  return `Formule ${index + 1}`;
 }
 
 function newLocalKey() {

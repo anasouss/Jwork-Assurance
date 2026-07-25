@@ -1168,12 +1168,17 @@ function matchingPersonneFormules(formules: ReferenceOption[], garantie: Referen
   if (!target || target.kind !== "vehicule") {
     return [];
   }
-  return formules.filter((formule) => {
-    if (formule.garantieId !== garantie.id) {
-      return false;
-    }
-    return !formule.usageId || formule.usageId === target.usageId;
-  });
+  return formules
+    .filter((formule) => {
+      if (formule.garantieId !== garantie.id) {
+        return false;
+      }
+      return !formule.usageId || formule.usageId === target.usageId;
+    })
+    .sort((left, right) =>
+      (numberValue(String(left.ordreAffichage ?? "")) ?? 9999) - (numberValue(String(right.ordreAffichage ?? "")) ?? 9999)
+      || String(left.libelle ?? "").localeCompare(String(right.libelle ?? ""))
+    );
 }
 
 function valueWarning(garantie: ReferenceOption, target?: Target) {

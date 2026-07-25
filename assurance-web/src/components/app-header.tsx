@@ -1,41 +1,37 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { BadgeCheck, FilePlus2 } from "lucide-react";
+import { BadgeCheck, Bell, FilePlus2, LogOut, User } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { appModules, moduleActiveClass, moduleForPath } from "@/components/app-navigation";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/store/auth-store";
-
-const titles: Record<string, string> = {
-  "/app": "Tableau de bord",
-  "/app/production": "Production",
-  "/app/production/ajouter-dossier": "Ajouter dossier",
-  "/app/production/contrats": "Contrats",
-  "/app/production/attestations-stock": "Stock attestations",
-  "/app/compta/quittances": "Quittances",
-  "/app/production/parametres": "Paramètres production",
-};
 
 export function AppHeader() {
   const { pathname } = useLocation();
-  const { user } = useAuthStore();
-  const title = titles[pathname] ?? "Production";
+  const { user, logout } = useAuthStore();
   const canCreateContrat = user?.permissions?.includes("contrat:create") ?? false;
   const permissions = user?.permissions ?? [];
   const activeModule = moduleForPath(pathname);
+  const fullName = user?.fullName || user?.email || "Utilisateur";
+  const initials = fullName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 shrink-0 flex-col border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="flex min-h-16 w-full items-center justify-between gap-3 px-4">
+    <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="flex w-full min-w-0 items-center gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <SidebarTrigger className="-ms-1" />
           <Link to="/app" className="flex min-w-0 items-center gap-2">
@@ -47,39 +43,9 @@ export function AppHeader() {
               <span className="truncate text-xs text-muted-foreground">Plateforme agence</span>
             </span>
           </Link>
-          <Separator orientation="vertical" className="hidden h-5 md:block" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink asChild>
-                  <Link to="/app">Assurance</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{title}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden text-right text-xs text-muted-foreground md:block">
-            <div className="font-medium text-foreground">{user?.agenceName ?? "Agence"}</div>
-            <div>{user?.roleName ?? user?.roleCode}</div>
-          </div>
-          {canCreateContrat ? (
-            <Button asChild size="sm">
-              <Link to="/app/production/ajouter-dossier">
-                <FilePlus2 className="size-4" />
-                Ajouter dossier
-              </Link>
-            </Button>
-          ) : null}
-          <ThemeToggle />
-        </div>
-      </div>
-      <nav className="flex min-h-11 items-center gap-1 overflow-x-auto px-4 pb-2">
+        <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {appModules
           .filter((item) => !item.permission || permissions.includes(item.permission))
           .map((item) => {
@@ -89,7 +55,7 @@ export function AppHeader() {
                   key={item.url}
                   type="button"
                   disabled
-                  className="flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground/55"
+                    className="flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground/45"
                 >
                   <item.icon className="size-4" />
                   {item.title}
@@ -104,7 +70,7 @@ export function AppHeader() {
                 key={item.url}
                 to={item.url}
                 className={[
-                  "flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm transition-colors",
+                    "flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors",
                   isActive ? moduleActiveClass(itemModule) : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
@@ -113,7 +79,50 @@ export function AppHeader() {
               </NavLink>
             );
           })}
-      </nav>
+        </nav>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {canCreateContrat ? (
+            <Button asChild size="sm">
+              <Link to="/app/production/ajouter-dossier">
+                <FilePlus2 className="size-4" />
+                Ajouter dossier
+              </Link>
+            </Button>
+          ) : null}
+          <Button type="button" variant="ghost" size="icon" className="relative">
+            <Bell className="size-4" />
+            <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500" />
+          </Button>
+          <ThemeToggle />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" className="h-10 gap-2 px-2">
+                <Avatar className="size-8">
+                  <AvatarFallback className="bg-muted text-xs">
+                    {initials || <User className="size-4" />}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="hidden text-left leading-tight lg:grid">
+                  <span className="text-sm font-medium">{user?.agenceName ?? "Agence"}</span>
+                  <span className="text-xs text-muted-foreground">{user?.roleName ?? user?.roleCode}</span>
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="text-sm font-medium">{fullName}</div>
+                <div className="text-xs text-muted-foreground">{user?.email}</div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => void logout()}>
+                <LogOut className="text-red-500" />
+                Déconnexion
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     </header>
   );
 }

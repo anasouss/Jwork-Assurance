@@ -1,10 +1,8 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { NavUser } from "@/components/nav-user";
 import { appNavigation, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -56,9 +54,6 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

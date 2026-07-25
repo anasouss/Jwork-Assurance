@@ -29,8 +29,8 @@ export default function AppLayout() {
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
+    <SidebarProvider defaultOpen={false}>
+      <AppSidebar variant="floating" />
       <SidebarInset>
         <AppHeader />
         <main className="flex flex-1 flex-col gap-4 px-4 py-4">

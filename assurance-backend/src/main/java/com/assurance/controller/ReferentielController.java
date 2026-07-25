@@ -34,6 +34,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -76,6 +77,7 @@ public class ReferentielController {
     private final ConventionRepository conventionRepository;
 
     @GetMapping("/usages")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> usages() {
         return ResponseEntity.ok(ApiResponse.success(usageRepository.findAll(Sort.by("code")).stream()
                 .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
@@ -296,6 +298,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/tarifs-usage")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> tarifsUsage() {
         return ResponseEntity.ok(ApiResponse.success(tarifUsageRepository.findAll().stream()
                 .filter(tarif -> Boolean.TRUE.equals(tarif.getActif()))

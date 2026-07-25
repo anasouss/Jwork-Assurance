@@ -97,6 +97,12 @@ export function FlotteTargetsSection({
     [garanties]
   );
   const canAddRemorque = maxRemorques == null || remorques.length < maxRemorques;
+  const vehiculeTargets = targets.filter((target) => target.kind === "vehicule");
+  const remorqueTargets = targets.filter((target) => target.kind === "remorque");
+  const activeVehiculeTarget =
+    vehiculeTargets.find((target) => targetKey(target) === activeKey) ?? vehiculeTargets[0];
+  const activeRemorqueTarget =
+    remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
 
   useEffect(() => {
     if (!targets.some((target) => targetKey(target) === activeKey)) {
@@ -138,29 +144,29 @@ export function FlotteTargetsSection({
     });
   };
 
-  const removeActiveTarget = () => {
-    if (!activeTarget) {
+  const removeTarget = (target?: Target) => {
+    if (!target) {
       return;
     }
-    if (activeTarget.kind === "vehicule" && vehicules.length > 1) {
-      setVehicules((current) => current.filter((_, index) => index !== activeTarget.index));
+    if (target.kind === "vehicule" && vehicules.length > 1) {
+      setVehicules((current) => current.filter((_, index) => index !== target.index));
       setSelectedGaranties((current) =>
         current
-          .filter((item) => item.vehiculeIndex !== activeTarget.index)
+          .filter((item) => item.vehiculeIndex !== target.index)
           .map((item) =>
-            item.vehiculeIndex !== undefined && item.vehiculeIndex > activeTarget.index
+            item.vehiculeIndex !== undefined && item.vehiculeIndex > target.index
               ? { ...item, vehiculeIndex: item.vehiculeIndex - 1 }
               : item
           )
       );
     }
-    if (activeTarget.kind === "remorque") {
-      setRemorques((current) => current.filter((_, index) => index !== activeTarget.index));
+    if (target.kind === "remorque") {
+      setRemorques((current) => current.filter((_, index) => index !== target.index));
       setSelectedGaranties((current) =>
         current
-          .filter((item) => item.remorqueIndex !== activeTarget.index)
+          .filter((item) => item.remorqueIndex !== target.index)
           .map((item) =>
-            item.remorqueIndex !== undefined && item.remorqueIndex > activeTarget.index
+            item.remorqueIndex !== undefined && item.remorqueIndex > target.index
               ? { ...item, remorqueIndex: item.remorqueIndex - 1 }
               : item
           )
@@ -169,9 +175,131 @@ export function FlotteTargetsSection({
   };
 
   return (
-    <SectionCard title="Véhicules et garanties" badge={`${targets.length} élément${targets.length > 1 ? "s" : ""}`} tone="production">
-      <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
-        <div className="grid content-start gap-3">
+    <>
+      <SectionCard title="Véhicules" badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`} tone="production">
+        <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
+          <div className="grid content-start gap-3">
+            <div className="grid gap-2">
+              {vehiculeTargets.map((target) => {
+                const active = targetKey(target) === targetKey(activeVehiculeTarget);
+                return (
+                  <button
+                    key={targetKey(target)}
+                    type="button"
+                    className={cn(
+                      "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                      active ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100" : "hover:bg-muted/60"
+                    )}
+                    onClick={() => setActiveKey(targetKey(target))}
+                  >
+                    <span className="font-medium">{target.label}</span>
+                    <Badge variant="secondary">
+                      {selectedGaranties.filter((item) => sameTarget(item, target)).length}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid gap-2 border-t pt-3">
+              <Button type="button" variant="outline" size="sm" onClick={addVehicle}>
+                <Plus className="size-4" />
+                Véhicule
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!activeVehiculeTarget || vehicules.length === 1}
+                onClick={() => removeTarget(activeVehiculeTarget)}
+              >
+                <Trash2 className="size-4" />
+                Retirer
+              </Button>
+            </div>
+          </div>
+
+          {activeVehiculeTarget ? (
+            <VehicleForm
+              index={activeVehiculeTarget.index}
+              vehicule={vehicules[activeVehiculeTarget.index]}
+              setVehicules={setVehicules}
+              usages={usages}
+              marques={marques}
+              carrosseries={carrosseries}
+              categoriesTransport={categoriesTransport}
+              errors={errors}
+            />
+          ) : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Remorques" badge={`${remorques.length} remorque${remorques.length > 1 ? "s" : ""}`} tone="production" defaultOpen={remorques.length > 0}>
+        <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
+          <div className="grid content-start gap-3">
+            {remorqueTargets.length > 0 ? (
+              <div className="grid gap-2">
+                {remorqueTargets.map((target) => {
+                  const active = targetKey(target) === targetKey(activeRemorqueTarget);
+                  return (
+                    <button
+                      key={targetKey(target)}
+                      type="button"
+                      className={cn(
+                        "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                        active ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100" : "hover:bg-muted/60"
+                      )}
+                      onClick={() => setActiveKey(targetKey(target))}
+                    >
+                      <span className="font-medium">{target.label}</span>
+                      <Badge variant="secondary">
+                        {selectedGaranties.filter((item) => sameTarget(item, target)).length}
+                      </Badge>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                Aucune remorque ajoutée.
+              </div>
+            )}
+            <div className="grid gap-2 border-t pt-3">
+              <Button type="button" variant="outline" size="sm" disabled={!canAddRemorque} onClick={addRemorque}>
+                <Plus className="size-4" />
+                Remorque
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!activeRemorqueTarget}
+                onClick={() => removeTarget(activeRemorqueTarget)}
+              >
+                <Trash2 className="size-4" />
+                Retirer
+              </Button>
+            </div>
+          </div>
+
+          {activeRemorqueTarget ? (
+            <RemorqueForm
+              index={activeRemorqueTarget.index}
+              remorque={remorques[activeRemorqueTarget.index]}
+              setRemorques={setRemorques}
+              usages={usages}
+              marques={marques}
+            />
+          ) : (
+            <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+              Ajoutez une remorque pour renseigner ses informations.
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Garanties" badge={`${selectedGaranties.length} sélectionnée${selectedGaranties.length > 1 ? "s" : ""}`} tone="production">
+        <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
+          <div className="grid content-start gap-3">
           <div className="grid gap-2">
             {targets.map((target) => {
               const active = targetKey(target) === targetKey(activeTarget);
@@ -192,50 +320,9 @@ export function FlotteTargetsSection({
               );
             })}
           </div>
-          <div className="grid gap-2 border-t pt-3">
-            <Button type="button" variant="outline" size="sm" onClick={addVehicle}>
-              <Plus className="size-4" />
-              Véhicule
-            </Button>
-            <Button type="button" variant="outline" size="sm" disabled={!canAddRemorque} onClick={addRemorque}>
-              <Plus className="size-4" />
-              Remorque
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={!activeTarget || (activeTarget.kind === "vehicule" && vehicules.length === 1)}
-              onClick={removeActiveTarget}
-            >
-              <Trash2 className="size-4" />
-              Retirer
-            </Button>
-          </div>
         </div>
 
         <div className="grid gap-4">
-          {activeTarget?.kind === "vehicule" ? (
-            <VehicleForm
-              index={activeTarget.index}
-              vehicule={vehicules[activeTarget.index]}
-              setVehicules={setVehicules}
-              usages={usages}
-              marques={marques}
-              carrosseries={carrosseries}
-              categoriesTransport={categoriesTransport}
-              errors={errors}
-            />
-          ) : activeTarget?.kind === "remorque" ? (
-            <RemorqueForm
-              index={activeTarget.index}
-              remorque={remorques[activeTarget.index]}
-              setRemorques={setRemorques}
-              usages={usages}
-              marques={marques}
-            />
-          ) : null}
-
           {activeTarget ? (
             <TargetGuaranteesTable
               target={activeTarget}
@@ -251,7 +338,8 @@ export function FlotteTargetsSection({
           ) : null}
         </div>
       </div>
-    </SectionCard>
+      </SectionCard>
+    </>
   );
 }
 

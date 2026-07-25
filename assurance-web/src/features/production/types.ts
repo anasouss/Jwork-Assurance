@@ -160,6 +160,7 @@ export type TypeClient = "PERSONNE_PHYSIQUE" | "PERSONNE_MORALE";
 export type RoleClientContrat = "SOUSCRIPTEUR" | "PROPRIETAIRE" | "CONDUCTEUR" | "BENEFICIAIRE";
 
 export type ClientInput = {
+  clientId?: string;
   role: RoleClientContrat;
   principalPourRole: boolean;
   client: {
@@ -184,6 +185,7 @@ export type ClientInput = {
     email?: string;
     profession?: string;
     activite?: string;
+    conducteurHabituel?: boolean;
     sahara?: boolean;
     justificatifSahara?: string;
     telephones?: { numero: string; principal?: boolean; whatsapp?: boolean }[];
@@ -241,11 +243,31 @@ export type GarantieInput = {
   valeurNeuf?: number;
   valeurGlace?: number;
   valeurAssuree?: number;
+  formule?: string;
+  montantDeces?: number;
+  montantInvalidite?: number;
+  montantFraisMedicaux?: number;
+  montantFraisHospitalisation?: number;
+  montantFraisFuneraires?: number;
+  montantFraisChirurgie?: number;
+  accessoire?: number;
   capital?: number;
   taux?: number;
   prime?: number;
   tauxFranchise?: number;
   franchiseMinimale?: number;
+};
+
+export type QuittanceInput = {
+  categorie: "AUTOMOBILE" | "CORPOREL" | "EVCAT" | "ASSISTANCE" | "TOTAL";
+  ordre?: number;
+  globale?: boolean;
+  primeNette?: number;
+  taxe?: number;
+  taxeParafiscale?: number;
+  accessoire?: number;
+  cnpac?: number;
+  primeTotale?: number;
 };
 
 export type CreateContratRequest = {
@@ -278,6 +300,7 @@ export type CreateContratRequest = {
   vehicules: VehiculeInput[];
   remorques: RemorqueInput[];
   garanties: GarantieInput[];
+  quittances?: QuittanceInput[];
 };
 
 export type QuittancePreview = {

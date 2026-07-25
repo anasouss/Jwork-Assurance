@@ -2,6 +2,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
 import type { GarantieInput, ReferenceOption } from "../types";
 
@@ -12,7 +14,9 @@ export function GarantieSection({
   lignes,
   vehiculeCount,
   showLigneGrille = true,
-  showPrimeColumn = false,
+  allowPrimeColumn = false,
+  primeColumnEnabled = false,
+  setPrimeColumnEnabled,
 }: {
   garanties: ReferenceOption[];
   selected: GarantieInput[];
@@ -20,9 +24,13 @@ export function GarantieSection({
   lignes: ReferenceOption[];
   vehiculeCount: number;
   showLigneGrille?: boolean;
-  showPrimeColumn?: boolean;
+  allowPrimeColumn?: boolean;
+  primeColumnEnabled?: boolean;
+  setPrimeColumnEnabled?: (value: boolean) => void;
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
+  const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE");
+  const personneGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE");
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
   };
@@ -50,6 +58,12 @@ export function GarantieSection({
 
   return (
     <SectionCard title="Garanties" badge={`${selected.length} sélectionnée${selected.length > 1 ? "s" : ""}`} tone="production">
+      {allowPrimeColumn ? (
+        <div className="mb-4 flex items-center gap-2 text-sm">
+          <Switch checked={primeColumnEnabled} onCheckedChange={(value) => setPrimeColumnEnabled?.(value)} />
+          <span>Saisie avec primes</span>
+        </div>
+      ) : null}
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full min-w-[980px] border-collapse text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
@@ -57,25 +71,34 @@ export function GarantieSection({
               <th className="w-12 px-3 py-3 text-left"></th>
               <th className="px-3 py-3 text-left">Garantie</th>
               {vehiculeCount > 1 ? <th className="w-40 px-3 py-3 text-left">Véhicule</th> : null}
-              <th className="w-44 px-3 py-3 text-left">Mode</th>
               <th className="w-48 px-3 py-3 text-left">Valeur assurée</th>
               <th className="w-36 px-3 py-3 text-left">Taux (%)</th>
               <th className="w-40 px-3 py-3 text-left">Franchise (%)</th>
               <th className="w-40 px-3 py-3 text-left">Min franchise</th>
               {showLigneGrille ? <th className="w-56 px-3 py-3 text-left">Ligne grille</th> : null}
-              {showPrimeColumn ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+              {primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
             </tr>
           </thead>
           <tbody>
-            {garanties.map((garantie) => {
+            {vehiculeGaranties.map((garantie) => {
               const item = byId.get(garantie.id);
               const checked = Boolean(item);
               const isRc = Boolean(garantie.responsabiliteCivile);
               const type = String(garantie.typeGarantie ?? "VEHICULE");
               const rowDisabled = !checked;
+              const locked = isRc;
+              const editable = checked && !locked;
 
               return (
-                <tr key={garantie.id} className="border-t align-middle">
+                <tr
+                  key={garantie.id}
+                  className={cn(
+                    "border-t align-middle transition-colors",
+                    rowDisabled && "bg-muted/20 text-muted-foreground",
+                    editable && "bg-background",
+                    locked && "bg-amber-50/50 dark:bg-amber-950/20"
+                  )}
+                >
                   <td className="px-3 py-2">
                     <Checkbox checked={checked} disabled={isRc} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                   </td>
@@ -90,7 +113,7 @@ export function GarantieSection({
                     <td className="px-3 py-2">
                       {type === "VEHICULE" && !isRc ? (
                         <Select value={String(item?.vehiculeIndex ?? 0)} disabled={rowDisabled} onValueChange={(value) => update(garantie.id, { vehiculeIndex: Number(value) })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger className={controlClass(editable)}><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {Array.from({ length: vehiculeCount }).map((_, index) => <SelectItem key={index} value={String(index)}>Véhicule {index + 1}</SelectItem>)}
                           </SelectContent>
@@ -101,38 +124,28 @@ export function GarantieSection({
                     </td>
                   ) : null}
                   <td className="px-3 py-2">
-                    <Select value={item?.modeSelectionne ?? String(garantie.modeParDefaut ?? "TAUX")} disabled={rowDisabled || isRc} onValueChange={(value) => update(garantie.id, { modeSelectionne: value })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="TAUX">Taux</SelectItem>
-                        <SelectItem value="CAPITAL">Capital</SelectItem>
-                        <SelectItem value="PRIME_FIXE">Prime fixe</SelectItem>
-                        <SelectItem value="PROTECTION">Protection</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-3 py-2">
                     <Input
                       type="number"
                       disabled={rowDisabled || isRc}
+                      className={controlClass(editable)}
                       value={item?.valeurAssuree ?? item?.capital ?? ""}
                       onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <Input type="number" disabled={rowDisabled || isRc} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
+                    <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
                   </td>
                   <td className="px-3 py-2">
-                    <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
+                    <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
                   </td>
                   <td className="px-3 py-2">
-                    <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} value={item?.franchiseMinimale ?? ""} onChange={(event) => update(garantie.id, { franchiseMinimale: numberValue(event.target.value) })} />
+                    <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale ?? ""} onChange={(event) => update(garantie.id, { franchiseMinimale: numberValue(event.target.value) })} />
                   </td>
                   {showLigneGrille ? (
                     <td className="px-3 py-2">
                       {!isRc ? (
                         <Select value={item?.ligneGrilleTarifaireId ?? ""} disabled={rowDisabled} onValueChange={(value) => update(garantie.id, { ligneGrilleTarifaireId: value })}>
-                          <SelectTrigger><SelectValue placeholder="Option" /></SelectTrigger>
+                          <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
                           <SelectContent>
                             {lignes
                               .filter((ligne) => !ligne.garantieId || ligne.garantieId === garantie.id)
@@ -144,9 +157,9 @@ export function GarantieSection({
                       )}
                     </td>
                   ) : null}
-                  {showPrimeColumn ? (
+                  {primeColumnEnabled ? (
                     <td className="px-3 py-2">
-                      <Input type="number" disabled={rowDisabled} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
+                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
                     </td>
                   ) : null}
                 </tr>
@@ -155,6 +168,67 @@ export function GarantieSection({
           </tbody>
         </table>
       </div>
+      {personneGaranties.length > 0 ? (
+        <div className="mt-4 overflow-x-auto rounded-md border">
+          <table className="w-full min-w-[1120px] border-collapse text-sm">
+            <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="w-12 px-3 py-3 text-left"></th>
+                <th className="px-3 py-3 text-left">Garantie</th>
+                <th className="w-40 px-3 py-3 text-left">Décès</th>
+                <th className="w-40 px-3 py-3 text-left">Invalidité</th>
+                <th className="w-44 px-3 py-3 text-left">Frais médicaux</th>
+                <th className="w-48 px-3 py-3 text-left">Hospitalisation</th>
+                <th className="w-44 px-3 py-3 text-left">Frais funéraires</th>
+                <th className="w-56 px-3 py-3 text-left">Chirurgie réparatrice</th>
+                {primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {personneGaranties.map((garantie) => {
+                const item = byId.get(garantie.id);
+                const checked = Boolean(item);
+                const rowDisabled = !checked;
+
+                return (
+                  <tr key={garantie.id} className={cn("border-t align-middle transition-colors", rowDisabled ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
+                    <td className="px-3 py-2">
+                      <Checkbox checked={checked} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
+                      <Badge variant="outline" className="mt-1">PERSONNE</Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces ?? ""} onChange={(event) => update(garantie.id, { montantDeces: numberValue(event.target.value) })} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantInvalidite ?? ""} onChange={(event) => update(garantie.id, { montantInvalidite: numberValue(event.target.value) })} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisMedicaux ?? ""} onChange={(event) => update(garantie.id, { montantFraisMedicaux: numberValue(event.target.value) })} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisHospitalisation ?? ""} onChange={(event) => update(garantie.id, { montantFraisHospitalisation: numberValue(event.target.value) })} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisFuneraires ?? ""} onChange={(event) => update(garantie.id, { montantFraisFuneraires: numberValue(event.target.value) })} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie ?? ""} onChange={(event) => update(garantie.id, { montantFraisChirurgie: numberValue(event.target.value) })} />
+                    </td>
+                    {primeColumnEnabled ? (
+                      <td className="px-3 py-2">
+                        <Input type="number" disabled={rowDisabled} className={controlClass(checked)} value={item?.prime ?? ""} onChange={(event) => update(garantie.id, { prime: numberValue(event.target.value) })} />
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </SectionCard>
   );
 }
@@ -173,6 +247,12 @@ function defaultSource(garantie: ReferenceOption) {
     return "GLACE";
   }
   return "AUCUNE";
+}
+
+function controlClass(active: boolean) {
+  return active
+    ? "border-emerald-300 bg-white shadow-sm focus-visible:border-emerald-600 focus-visible:ring-emerald-200 dark:bg-background"
+    : "border-transparent bg-muted/40 text-muted-foreground shadow-none";
 }
 
 function numberValue(value: string) {

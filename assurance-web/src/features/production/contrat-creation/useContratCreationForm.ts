@@ -10,6 +10,7 @@ import type {
   ClientInput,
   CreateContratRequest,
   GarantieInput,
+  QuittanceInput,
   QuittancePreview,
   ReferenceOption,
   RemorqueInput,
@@ -35,6 +36,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([emptyVehicule()]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [garanties, setGaranties] = useState<GarantieInput[]>([]);
+  const [quittances, setQuittances] = useState<QuittanceInput[]>(defaultQuittanceLines());
   const [preview, setPreview] = useState<QuittancePreview | null>(null);
 
   const refs = {
@@ -124,6 +126,12 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
       usageId: remorque.usageId || usageId || undefined,
     })),
     garanties,
+    quittances: typeContrat === "PARTICULIER"
+      ? quittances.map((ligne) => ({
+          ...ligne,
+          primeTotale: totalLine(ligne),
+        }))
+      : undefined,
   }), [
     user?.agenceId,
     typeContrat,
@@ -143,6 +151,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     remorques,
     clients,
     garanties,
+    quittances,
   ]);
 
   const previewMutation = useMutation({
@@ -237,6 +246,8 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setRemorques,
     garanties,
     setGaranties,
+    quittances,
+    setQuittances,
   };
 }
 
@@ -252,4 +263,30 @@ function useReference(path: string) {
 
 function emptyToUndefined(value: string) {
   return value.trim() ? value : undefined;
+}
+
+function defaultQuittanceLines(): QuittanceInput[] {
+  return [
+    { categorie: "AUTOMOBILE", ordre: 10 },
+    { categorie: "CORPOREL", ordre: 20 },
+    { categorie: "EVCAT", ordre: 30 },
+  ];
+}
+
+function totalLine(ligne: QuittanceInput) {
+  return roundMoney(
+    numberOrZero(ligne.primeNette)
+      + numberOrZero(ligne.taxe)
+      + numberOrZero(ligne.taxeParafiscale)
+      + numberOrZero(ligne.accessoire)
+      + numberOrZero(ligne.cnpac)
+  );
+}
+
+function numberOrZero(value?: number) {
+  return Number.isFinite(value) ? Number(value) : 0;
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
 }

@@ -1,7 +1,6 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
 import type { CreateContratRequest } from "../types";
@@ -12,7 +11,6 @@ type Props = {
   badge: string;
   showConvention?: boolean;
   showGrille?: boolean;
-  allowSaisiePrimeNette?: boolean;
 };
 
 export function ContractInfoSection({
@@ -20,7 +18,6 @@ export function ContractInfoSection({
   badge,
   showConvention = false,
   showGrille = true,
-  allowSaisiePrimeNette = false,
 }: Props) {
   const filteredConventions = (form.refs.conventions.data ?? []).filter(
     (convention) => !form.compagnieAssuranceId || convention.compagnieAssuranceId === form.compagnieAssuranceId
@@ -28,10 +25,36 @@ export function ContractInfoSection({
   const filteredGrilles = (form.refs.grilles.data ?? []).filter(
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
   );
+  const souscripteur = form.clients.find((client) => client.role === "SOUSCRIPTEUR");
+  const categorieClientId = souscripteur?.client.categorieClientId ?? "";
+  const selectedCategorie = (form.refs.categoriesClient.data ?? []).find((categorie) => categorie.id === categorieClientId);
 
   return (
     <SectionCard title="Contrat" badge={badge} tone="production" defaultOpen={false}>
       <div className="grid gap-3 md:grid-cols-4">
+        <Field label="Catégorie">
+          {categorieClientId ? (
+            <Input value={selectedCategorie?.libelle ?? "Catégorie sélectionnée"} disabled />
+          ) : (
+            <Select
+              value={categorieClientId}
+              onValueChange={(value) =>
+                form.setClients(
+                  form.clients.map((client) =>
+                    client.role === "SOUSCRIPTEUR"
+                      ? { ...client, client: { ...client.client, categorieClientId: value } }
+                      : client
+                  )
+                )
+              }
+            >
+              <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
+              <SelectContent>
+                {form.refs.categoriesClient.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
         <Field label="Compagnie">
           <Select value={form.compagnieAssuranceId} onValueChange={form.setCompagnieAssuranceId}>
             <SelectTrigger><SelectValue placeholder="Compagnie" /></SelectTrigger>
@@ -100,12 +123,6 @@ export function ContractInfoSection({
             </SelectContent>
           </Select>
         </Field>
-        {allowSaisiePrimeNette ? (
-          <div className="flex items-end gap-2 pb-2">
-            <Switch checked={form.saisiePrimeNette} onCheckedChange={form.setSaisiePrimeNette} />
-            <span className="text-sm">Saisie prime nette</span>
-          </div>
-        ) : null}
       </div>
     </SectionCard>
   );

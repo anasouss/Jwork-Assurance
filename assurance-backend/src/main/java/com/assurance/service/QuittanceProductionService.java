@@ -40,7 +40,15 @@ public class QuittanceProductionService {
         int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
         int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
         QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
+        return genererPourMouvement(contrat, mouvement, typeMouvement, calcul);
+    }
 
+    public Quittance genererPourMouvement(
+            Contrat contrat,
+            MouvementContrat mouvement,
+            TypeMouvementContrat typeMouvement,
+            QuittanceCalculService.Resultat calcul
+    ) {
         ElementFacturable element = elementFacturableRepository.save(ElementFacturable.builder()
                 .agence(contrat.getAgence())
                 .contrat(contrat)

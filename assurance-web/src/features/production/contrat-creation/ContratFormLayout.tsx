@@ -2,6 +2,7 @@ import { Save, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClientSection } from "../components/ClientSection";
 import { GarantieSection } from "../components/GarantieSection";
+import { ManualQuittanceSection } from "../components/ManualQuittanceSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { RemorqueSection } from "../components/RemorqueSection";
 import { SectionCard } from "../components/SectionCard";
@@ -17,6 +18,8 @@ type Props = {
   showGrille?: boolean;
   allowSaisiePrimeNette?: boolean;
   allowMultipleVehicules?: boolean;
+  allowRemorques?: boolean;
+  maxRemorques?: number | null;
   order?: "mono" | "flotte";
 };
 
@@ -28,6 +31,8 @@ export function ContratFormLayout({
   showGrille = true,
   allowSaisiePrimeNette = false,
   allowMultipleVehicules = false,
+  allowRemorques = true,
+  maxRemorques = 1,
   order = "mono",
 }: Props) {
   const clientSections = (
@@ -35,7 +40,6 @@ export function ContratFormLayout({
       clients={form.clients}
       setClients={form.setClients}
       villes={form.refs.villes.data ?? []}
-      categoriesClient={form.refs.categoriesClient.data ?? []}
       showOptionalRoles={false}
     />
   );
@@ -46,7 +50,6 @@ export function ContratFormLayout({
       badge={badge}
       showConvention={showConvention}
       showGrille={showGrille}
-      allowSaisiePrimeNette={allowSaisiePrimeNette}
     />
   );
 
@@ -70,7 +73,9 @@ export function ContratFormLayout({
       lignes={showGrille ? form.lignesGrille.data ?? [] : []}
       vehiculeCount={form.vehicules.length}
       showLigneGrille={showGrille}
-      showPrimeColumn={allowSaisiePrimeNette && form.saisiePrimeNette}
+      allowPrimeColumn={allowSaisiePrimeNette}
+      primeColumnEnabled={form.saisiePrimeNette}
+      setPrimeColumnEnabled={form.setSaisiePrimeNette}
     />
   );
 
@@ -79,6 +84,7 @@ export function ContratFormLayout({
       remorques={form.remorques}
       setRemorques={form.setRemorques}
       usages={form.refs.usages.data ?? []}
+      maxRemorques={maxRemorques}
     />
   );
 
@@ -108,19 +114,23 @@ export function ContratFormLayout({
         <>
           {guaranteeSection}
           {vehicleSection}
-          {remorqueSection}
+          {allowRemorques ? remorqueSection : null}
         </>
       ) : (
         <>
           {vehicleSection}
-          {remorqueSection}
+          {allowRemorques ? remorqueSection : null}
           {guaranteeSection}
         </>
       )}
 
-      <SectionCard title="Quittances" tone="production" defaultOpen={false}>
-        <QuittancePreviewCard preview={form.preview} />
-      </SectionCard>
+      {form.typeContrat === "PARTICULIER" ? (
+        <ManualQuittanceSection lignes={form.quittances} setLignes={form.setQuittances} />
+      ) : (
+        <SectionCard title="Quittances" badge={form.preview ? "Calculée" : "Non calculée"} tone="production" defaultOpen={false}>
+          <QuittancePreviewCard preview={form.preview} />
+        </SectionCard>
+      )}
     </div>
   );
 }

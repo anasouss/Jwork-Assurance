@@ -1,10 +1,9 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SectionCard } from "./SectionCard";
 import type { QuittancePreview } from "../types";
 
 export function QuittancePreviewCard({ preview }: { preview?: QuittancePreview | null }) {
   return (
-    <SectionCard title="Prévisualisation quittance" badge={preview ? formatMoney(preview.primeTotale) : "Non calculée"}>
+    <div className="grid gap-3">
       {!preview ? (
         <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
           Lancez la prévisualisation pour contrôler automobile, corporel, EVCAT, CNPAC et total avant création.
@@ -35,7 +34,7 @@ export function QuittancePreviewCard({ preview }: { preview?: QuittancePreview |
           </TableBody>
         </Table>
       )}
-    </SectionCard>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ package com.assurance.dto.request;
 
 import com.assurance.enums.Fractionnement;
 import com.assurance.enums.ModeSaisieGarantieContrat;
+import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.TypeVehiculeContrat;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.TypeContrat;
@@ -64,6 +65,9 @@ public class CreateContratRequest {
 
     @Valid
     private List<GarantieInput> garanties;
+
+    @Valid
+    private List<QuittanceInput> quittances;
 
     @Data
     public static class ClientInput {
@@ -149,6 +153,20 @@ public class CreateContratRequest {
         private BigDecimal prime;
         private BigDecimal tauxFranchise;
         private BigDecimal franchiseMinimale;
+    }
+
+    @Data
+    public static class QuittanceInput {
+        @NotNull
+        private CategorieQuittance categorie;
+        private Integer ordre;
+        private Boolean globale;
+        private BigDecimal primeNette;
+        private BigDecimal taxe;
+        private BigDecimal taxeParafiscale;
+        private BigDecimal accessoire;
+        private BigDecimal cnpac;
+        private BigDecimal primeTotale;
     }
 
 }

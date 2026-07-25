@@ -10,14 +10,17 @@ export function RemorqueSection({
   remorques,
   setRemorques,
   usages,
+  maxRemorques,
 }: {
   remorques: RemorqueInput[];
   setRemorques: (remorques: RemorqueInput[]) => void;
   usages: ReferenceOption[];
+  maxRemorques?: number | null;
 }) {
   const update = (index: number, patch: Partial<RemorqueInput>) => {
     setRemorques(remorques.map((remorque, idx) => (idx === index ? { ...remorque, ...patch } : remorque)));
   };
+  const canAdd = maxRemorques == null || remorques.length < maxRemorques;
 
   return (
     <SectionCard
@@ -26,7 +29,14 @@ export function RemorqueSection({
       tone="production"
       defaultOpen={false}
       action={
-        <Button type="button" variant="outline" size="sm" onClick={() => setRemorques([...remorques, {}])}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-white/50 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+          disabled={!canAdd}
+          onClick={() => setRemorques([...remorques, {}])}
+        >
           <Plus className="size-4" />
           Remorque
         </Button>

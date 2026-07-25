@@ -45,7 +45,13 @@ export function VehiculeSection({
       tone="production"
       action={
         allowMultipleVehicules ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setVehicules([...vehicules, emptyVehicule()])}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-white/50 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+            onClick={() => setVehicules([...vehicules, emptyVehicule()])}
+          >
             <Plus className="size-4" />
             Véhicule
           </Button>
@@ -55,6 +61,9 @@ export function VehiculeSection({
       <div className="grid gap-4">
         {vehicules.map((vehicule, index) => {
           const usage = usages.find((item) => item.id === vehicule.usageId);
+          const needsCarburantAndPf = Boolean(usage?.byCarburantAndPf);
+          const needsSousClasse = Boolean(usage?.bySousClasse);
+          const needsPtc = Boolean(usage?.byPtc);
           const needsCategorieTransport = Boolean(usage?.byCategorieTransport);
           return (
             <div key={index} className="rounded-lg border p-3">
@@ -68,12 +77,27 @@ export function VehiculeSection({
               </div>
               <div className="grid gap-3 md:grid-cols-4">
                 <Field label="Usage">
-                  <Select value={vehicule.usageId ?? ""} onValueChange={(value) => update(index, { usageId: value, categorieTransportId: undefined })}>
+                  <Select
+                    value={vehicule.usageId ?? ""}
+                    onValueChange={(value) =>
+                      update(index, {
+                        usageId: value,
+                        categorieTransportId: undefined,
+                        carburant: undefined,
+                        puissanceFiscale: undefined,
+                        sousClasse: undefined,
+                        ptc: undefined,
+                      })
+                    }
+                  >
                     <SelectTrigger><SelectValue placeholder="Usage" /></SelectTrigger>
                     <SelectContent>
                       {usages.map((usage) => <SelectItem key={usage.id} value={usage.id}>{usage.code ? `${usage.code} - ` : ""}{usage.libelle}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </Field>
+                <Field label="Immatriculation">
+                  <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
                 </Field>
                 <Field label="Marque">
                   <Select value={vehicule.marqueId ?? ""} onValueChange={(value) => update(index, { marqueId: value })}>
@@ -91,6 +115,37 @@ export function VehiculeSection({
                     </SelectContent>
                   </Select>
                 </Field>
+                {needsCarburantAndPf ? (
+                  <Field label="Carburant">
+                    <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update(index, { carburant: value })}>
+                      <SelectTrigger><SelectValue placeholder="Carburant" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Diesel">Diesel</SelectItem>
+                        <SelectItem value="Essence">Essence</SelectItem>
+                        <SelectItem value="Électrique">Électrique</SelectItem>
+                        <SelectItem value="Hybride_E">Hybride_E</SelectItem>
+                        <SelectItem value="Hybride_D">Hybride_D</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                ) : null}
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-4">
+                {needsCarburantAndPf ? (
+                  <Field label="Puissance fiscale / cylindrée">
+                    <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
+                  </Field>
+                ) : null}
+                {needsSousClasse ? (
+                  <Field label="Sous-classe">
+                    <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update(index, { sousClasse: event.target.value })} />
+                  </Field>
+                ) : null}
+                {needsPtc ? (
+                  <Field label="PTC">
+                    <Input value={vehicule.ptc ?? ""} onChange={(event) => update(index, { ptc: event.target.value })} />
+                  </Field>
+                ) : null}
                 {needsCategorieTransport ? (
                   <Field label="Catégorie transport">
                     <Select value={vehicule.categorieTransportId ?? ""} onValueChange={(value) => update(index, { categorieTransportId: value })}>
@@ -100,51 +155,23 @@ export function VehiculeSection({
                       </SelectContent>
                     </Select>
                   </Field>
-                ) : (
-                  <Field label="Immatriculation">
-                    <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
-                  </Field>
-                )}
-              </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-4">
-                {needsCategorieTransport ? (
-                  <Field label="Immatriculation">
-                    <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
-                  </Field>
                 ) : null}
                 <Field label="Modèle">
                   <Input value={vehicule.modele ?? ""} onChange={(event) => update(index, { modele: event.target.value })} />
-                </Field>
-                <Field label="Carburant">
-                  <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update(index, { carburant: value })}>
-                    <SelectTrigger><SelectValue placeholder="Carburant" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ESSENCE">Essence</SelectItem>
-                      <SelectItem value="DIESEL">Diesel</SelectItem>
-                      <SelectItem value="HYBRIDE">Hybride</SelectItem>
-                      <SelectItem value="ELECTRIQUE">Électrique</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Puissance fiscale">
-                  <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
                 </Field>
                 <Field label="Places">
                   <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update(index, { nombrePlaces: event.target.value })} />
                 </Field>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-4">
-                <Field label="PTC">
-                  <Input value={vehicule.ptc ?? ""} onChange={(event) => update(index, { ptc: event.target.value })} />
+                <Field label="Date mise en circulation">
+                  <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toIso(date) })} />
                 </Field>
-                <Field label="Sous-classe">
-                  <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update(index, { sousClasse: event.target.value })} />
+                <Field label="Date validité CG">
+                  <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toIso(date) })} />
                 </Field>
-                <Field label="Date effet">
-                  <DatePicker date={vehicule.dateEffet} onSelect={(date) => update(index, { dateEffet: toIso(date) })} />
-                </Field>
-                <Field label="Date échéance">
-                  <DatePicker date={vehicule.dateEcheance} onSelect={(date) => update(index, { dateEcheance: toIso(date) })} />
+                <Field label="N° attestation">
+                  <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
                 </Field>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-4">
@@ -157,14 +184,21 @@ export function VehiculeSection({
                 <Field label="Valeur glace">
                   <Input type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update(index, { valeurGlace: numberValue(event.target.value) })} />
                 </Field>
-                <Field label="N° attestation">
-                  <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
-                </Field>
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <Checkbox checked={Boolean(vehicule.organismeCredit)} onCheckedChange={(checked) => update(index, { organismeCredit: Boolean(checked) })} />
                 <span className="text-sm">Organisme de crédit</span>
               </div>
+              {vehicule.organismeCredit ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-4">
+                  <Field label="Nom organisme">
+                    <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update(index, { nomOrganismeCredit: event.target.value })} />
+                  </Field>
+                  <Field label="Date fin crédit">
+                    <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update(index, { dateFinCredit: toIso(date) })} />
+                  </Field>
+                </div>
+              ) : null}
             </div>
           );
         })}

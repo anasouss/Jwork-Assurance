@@ -67,7 +67,18 @@ public class MouvementContratService {
             List<Remorque> remorques,
             List<ContratGarantie> garanties
     ) {
-        return creerMouvementInitial(contrat, null, CODE_AFFAIRE_NOUVELLE, vehicules, remorques, garanties);
+        return creerAffaireNouvelle(contrat, vehicules, remorques, garanties, null);
+    }
+
+    @Transactional
+    public MouvementContrat creerAffaireNouvelle(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> garanties,
+            QuittanceCalculService.Resultat quittanceManuelle
+    ) {
+        return creerMouvementInitial(contrat, null, CODE_AFFAIRE_NOUVELLE, vehicules, remorques, garanties, quittanceManuelle);
     }
 
     @Transactional
@@ -78,7 +89,7 @@ public class MouvementContratService {
             List<Remorque> remorques,
             List<ContratGarantie> garanties
     ) {
-        return creerMouvementInitial(contrat, contratOrigine, CODE_RENOUVELLEMENT, vehicules, remorques, garanties);
+        return creerMouvementInitial(contrat, contratOrigine, CODE_RENOUVELLEMENT, vehicules, remorques, garanties, null);
     }
 
     @Transactional(readOnly = true)
@@ -171,10 +182,11 @@ public class MouvementContratService {
             String codeTypeMouvement,
             List<Vehicule> vehicules,
             List<Remorque> remorques,
-            List<ContratGarantie> garanties
+            List<ContratGarantie> garanties,
+            QuittanceCalculService.Resultat quittanceManuelle
     ) {
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(codeTypeMouvement, contrat.getTypeContrat());
-        QuittanceCalculService.Resultat montants = calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
+        QuittanceCalculService.Resultat montants = quittanceManuelle != null ? quittanceManuelle : calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
 
         MouvementContrat mouvement = mouvementContratRepository.save(MouvementContrat.builder()
                 .agence(contrat.getAgence())
@@ -202,7 +214,11 @@ public class MouvementContratService {
         consommerAttestations(contrat, mouvement, vehicules, remorques);
 
         if (Boolean.TRUE.equals(typeMouvement.getGenereQuittance())) {
-            quittanceProductionService.genererPourMouvement(contrat, mouvement, typeMouvement, garanties, vehicules, remorques);
+            if (quittanceManuelle != null) {
+                quittanceProductionService.genererPourMouvement(contrat, mouvement, typeMouvement, quittanceManuelle);
+            } else {
+                quittanceProductionService.genererPourMouvement(contrat, mouvement, typeMouvement, garanties, vehicules, remorques);
+            }
         }
 
         return mouvement;

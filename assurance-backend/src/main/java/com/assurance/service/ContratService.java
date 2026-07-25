@@ -4,6 +4,7 @@ import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
+import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.SourceValeurGarantie;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -265,8 +267,9 @@ public class ContratService {
             contrat.getGaranties().add(contratGarantie);
         }
 
+        QuittanceCalculService.Resultat quittanceManuelle = buildManualQuittanceResult(request);
         if (contratOrigine == null) {
-            mouvementContratService.creerAffaireNouvelle(contrat, vehiculesCrees, remorquesCreees, garantiesCreees);
+            mouvementContratService.creerAffaireNouvelle(contrat, vehiculesCrees, remorquesCreees, garantiesCreees, quittanceManuelle);
         } else {
             mouvementContratService.creerRenouvellement(contrat, contratOrigine, vehiculesCrees, remorquesCreees, garantiesCreees);
         }
@@ -360,7 +363,10 @@ public class ContratService {
         contrat.getGaranties().addAll(garanties);
 
         int unitesCnpac = Math.max(1, vehicules.size() + remorques.size());
-        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, null, garanties, unitesCnpac);
+        QuittanceCalculService.Resultat calcul = buildManualQuittanceResult(request);
+        if (calcul == null) {
+            calcul = quittanceCalculService.calculer(contrat, null, garanties, unitesCnpac);
+        }
         return QuittanceResponse.builder()
                 .numeroContrat(contrat.getNumeroContrat())
                 .type("AN")
@@ -735,6 +741,98 @@ public class ContratService {
         if (!Boolean.TRUE.equals(usage.getByCategorieTransport()) && categorieTransport != null) {
             throw new BadRequestException("La categorie transport n'est pas applicable pour l'usage " + usage.getCode());
         }
+    }
+
+    private QuittanceCalculService.Resultat buildManualQuittanceResult(CreateContratRequest request) {
+        if (request.getQuittances() == null || request.getQuittances().isEmpty()) {
+            return null;
+        }
+        if (request.getTypeContrat() != com.assurance.enums.TypeContrat.PARTICULIER) {
+            throw new BadRequestException("La quittance manuelle est autorisee uniquement pour les contrats particuliers");
+        }
+
+        List<QuittanceCalculService.Ligne> lignes = new ArrayList<>();
+        BigDecimal primeNette = BigDecimal.ZERO;
+        BigDecimal taxe = BigDecimal.ZERO;
+        BigDecimal taxeParafiscale = BigDecimal.ZERO;
+        BigDecimal accessoire = BigDecimal.ZERO;
+        BigDecimal cnpac = BigDecimal.ZERO;
+        BigDecimal primeTotale = BigDecimal.ZERO;
+
+        for (CreateContratRequest.QuittanceInput input : request.getQuittances()) {
+            if (input == null || input.getCategorie() == null || input.getCategorie() == CategorieQuittance.TOTAL) {
+                continue;
+            }
+            BigDecimal lignePrimeNette = scale(zeroIfNull(input.getPrimeNette()));
+            BigDecimal ligneTaxe = scale(zeroIfNull(input.getTaxe()));
+            BigDecimal ligneTaxeParafiscale = scale(zeroIfNull(input.getTaxeParafiscale()));
+            BigDecimal ligneAccessoire = scale(zeroIfNull(input.getAccessoire()));
+            BigDecimal ligneCnpac = scale(zeroIfNull(input.getCnpac()));
+            BigDecimal lignePrimeTotale = input.getPrimeTotale() == null
+                    ? scale(lignePrimeNette.add(ligneTaxe).add(ligneTaxeParafiscale).add(ligneAccessoire).add(ligneCnpac))
+                    : scale(input.getPrimeTotale());
+
+            lignes.add(new QuittanceCalculService.Ligne(
+                    input.getCategorie(),
+                    input.getOrdre() == null ? defaultQuittanceOrder(input.getCategorie()) : input.getOrdre(),
+                    false,
+                    lignePrimeNette,
+                    ligneTaxe,
+                    ligneTaxeParafiscale,
+                    ligneAccessoire,
+                    ligneCnpac,
+                    lignePrimeTotale
+            ));
+            primeNette = primeNette.add(lignePrimeNette);
+            taxe = taxe.add(ligneTaxe);
+            taxeParafiscale = taxeParafiscale.add(ligneTaxeParafiscale);
+            accessoire = accessoire.add(ligneAccessoire);
+            cnpac = cnpac.add(ligneCnpac);
+            primeTotale = primeTotale.add(lignePrimeTotale);
+        }
+
+        if (lignes.isEmpty()) {
+            return null;
+        }
+        lignes.sort((left, right) -> Integer.compare(left.ordre(), right.ordre()));
+        lignes.add(new QuittanceCalculService.Ligne(
+                CategorieQuittance.TOTAL,
+                99,
+                true,
+                scale(primeNette),
+                scale(taxe),
+                scale(taxeParafiscale),
+                scale(accessoire),
+                scale(cnpac),
+                scale(primeTotale)
+        ));
+        return new QuittanceCalculService.Resultat(
+                lignes,
+                scale(primeNette),
+                scale(taxe),
+                scale(taxeParafiscale),
+                scale(accessoire),
+                scale(cnpac),
+                scale(primeTotale)
+        );
+    }
+
+    private int defaultQuittanceOrder(CategorieQuittance categorie) {
+        return switch (categorie) {
+            case AUTOMOBILE -> 10;
+            case CORPOREL -> 20;
+            case EVCAT -> 30;
+            case ASSISTANCE -> 40;
+            case TOTAL -> 99;
+        };
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private BigDecimal scale(BigDecimal value) {
+        return value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private QuittanceResponse.Ligne toLignePreviewResponse(QuittanceCalculService.Ligne ligne) {

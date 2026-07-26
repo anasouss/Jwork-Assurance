@@ -75,7 +75,7 @@ public class DevisPdfService {
             writer.footer("Document genere par Skay Assurance. Le devis reste indicatif jusqu'a conversion en contrat.");
             document.save(output);
             return output.toByteArray();
-        } catch (IOException ex) {
+        } catch (IOException | IllegalArgumentException ex) {
             throw new BadRequestException("Generation du devis impossible");
         }
     }
@@ -621,10 +621,28 @@ public class DevisPdfService {
         }
 
         private static String safe(String text) {
-            return (text == null ? "" : text)
+            String clean = (text == null ? "" : text)
                     .replace('\n', ' ')
                     .replace('\r', ' ')
+                    .replace('\t', ' ')
+                    .replace('\u00A0', ' ')
+                    .replace('\u2007', ' ')
+                    .replace('\u2009', ' ')
+                    .replace('\u202F', ' ')
                     .replace('’', '\'')
+                    .replace('‘', '\'')
+                    .replace('“', '"')
+                    .replace('”', '"')
+                    .replace('–', '-')
+                    .replace('—', '-')
+                    .replace('−', '-')
+                    .replace("°", "")
+                    .replace("œ", "oe")
+                    .replace("Œ", "OE")
+                    .trim();
+            return clean
+                    .replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", " ")
+                    .replaceAll("[^\\u0020-\\u00FF]", " ")
                     .replace("°", "")
                     .trim();
         }

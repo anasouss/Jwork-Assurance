@@ -1169,7 +1169,7 @@ function TargetGuaranteesTable({
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
               const previewLine = previewGuaranteeLine(preview, garantie, target, item);
               const previewPrime = previewLine?.primeNette;
-              const rowCalculating = Boolean(previewing && pendingCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
+              const rowCalculating = Boolean(pendingCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
 
               return (
                 <tr
@@ -1293,7 +1293,7 @@ function TargetGuaranteesTable({
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
                 const disabled = !grilleSelected || formules.length === 0;
                 const previewLine = previewGuaranteeLine(preview, garantie, target, item);
-                const rowCalculating = Boolean(previewing && pendingCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
+                const rowCalculating = Boolean(pendingCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
 
                 return (
                   <tr

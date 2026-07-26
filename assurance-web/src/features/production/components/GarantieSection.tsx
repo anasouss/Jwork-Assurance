@@ -160,7 +160,9 @@ export function GarantieSection({
               const lineOptions = linesForGuarantee(lignes, garantie);
               const selectedLine = selectedLineFor(lineOptions, item);
               const selectedVehicle = vehicules[item?.vehiculeIndex ?? 0] ?? vehicules[0];
-              const manualValue = isManualValue(garantie, selectedLine);
+              const selectedSource = selectedValueSource(garantie, item, selectedLine, selectedVehicle);
+              const sourceOptions = selectableVehicleValueSources(garantie, selectedLine);
+              const manualValue = selectedSource === "MANUEL";
               const displayCapital = guaranteeCapitalValue(garantie, selectedLine, selectedVehicle, item);
               const estimatedPrime = automaticPricing && checked && !isRc ? estimatePrime(selectedLine, displayCapital) : undefined;
               const rcPrime = isRc ? resolveRcPrime(preview, selected, garanties, lignes, vehicules) : undefined;
@@ -222,6 +224,30 @@ export function GarantieSection({
                             value={item?.valeurAssuree ?? item?.capital ?? ""}
                             onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
                           />
+                        ) : sourceOptions.length > 1 && !isRc ? (
+                          <Select
+                            value={selectedSource}
+                            disabled={!editable}
+                            onValueChange={(value) => {
+                              if (!hasVehicleValue(selectedVehicle, value)) {
+                                toast.error(`Renseignez ${sourceLabel(value)} avant de sélectionner cette source.`);
+                                return;
+                              }
+                              const patch: Partial<GarantieInput> = {
+                                sourceValeurSelectionnee: value,
+                                valeurAssuree: undefined,
+                                capital: undefined,
+                              };
+                              update(garantie.id, patch);
+                            }}
+                          >
+                            <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Source" /></SelectTrigger>
+                            <SelectContent>
+                              {sourceOptions.map((source) => (
+                                <SelectItem key={source} value={source}>{sourceOptionLabel(source, selectedVehicle)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : lineOptions.length > 1 && lineMode(selectedLine) === "CAPITAL" ? (
                           <Select
                             value={selectedLine?.id ?? ""}
@@ -237,7 +263,7 @@ export function GarantieSection({
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={isRc ? money(resolveRcCapital(selectedVehicle, usages)) : capitalDisplay(garantie, selectedLine, selectedVehicle, displayCapital)} />
+                          <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={isRc ? money(resolveRcCapital(selectedVehicle, usages)) : capitalDisplay(garantie, selectedLine, selectedVehicle, displayCapital, item)} />
                         )}
                       </td>
                       <td className="px-3 py-2">
@@ -252,7 +278,7 @@ export function GarantieSection({
                           >
                             <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
                             <SelectContent>
-                              {lineOptions.map((line) => <SelectItem key={line.id} value={line.id}>{tariffLineLabel(line)}</SelectItem>)}
+                              {lineOptions.map((line, index) => <SelectItem key={line.id} value={line.id}>{tariffLineLabel(line, index)}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         ) : (
@@ -660,7 +686,9 @@ function selectedLineFor(lines: ReferenceOption[], item?: GarantieInput) {
 
 function lineSelectionPatch(garantie: ReferenceOption, line?: ReferenceOption): Partial<GarantieInput> {
   const mode = lineMode(line) || String(garantie.modeParDefaut ?? "TAUX");
-  const source = mode === "CAPITAL" ? "AUCUNE" : defaultSource(garantie);
+  const source = mode === "CAPITAL"
+    ? "AUCUNE"
+    : effectiveVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 0 ? defaultSource(garantie) : undefined);
   return {
     ligneGrilleTarifaireId: line?.id,
     modeSelectionne: mode,
@@ -683,6 +711,30 @@ function isManualValue(garantie: ReferenceOption, line?: ReferenceOption) {
     return false;
   }
   return defaultSource(garantie) === "MANUEL";
+}
+
+function selectedValueSource(garantie: ReferenceOption, item?: GarantieInput, line?: ReferenceOption, vehicule?: VehiculeInput) {
+  if (lineMode(line) === "CAPITAL") {
+    return "AUCUNE";
+  }
+  const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
+  if (selected) {
+    return selected;
+  }
+  const defaultValue = effectiveVehicleValueSource(garantie);
+  if (defaultValue) {
+    return defaultValue;
+  }
+  const sourceWithValue = allowedVehicleValueSources(garantie).find((source) => vehicule && hasVehicleValue(vehicule, source));
+  return sourceWithValue ?? allowedVehicleValueSources(garantie)[0] ?? defaultSource(garantie);
+}
+
+function selectableVehicleValueSources(garantie: ReferenceOption, line?: ReferenceOption) {
+  if (lineMode(line) === "CAPITAL") {
+    return [];
+  }
+  const sources = allowedVehicleValueSources(garantie);
+  return sources.length > 0 ? sources : defaultSource(garantie) === "MANUEL" ? ["MANUEL"] : [];
 }
 
 function requiredVehicleValueWarning(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
@@ -765,7 +817,7 @@ function guaranteeCapitalValue(garantie: ReferenceOption, line?: ReferenceOption
   if (isManualValue(garantie, line)) {
     return item?.valeurAssuree ?? item?.capital;
   }
-  const source = defaultSource(garantie);
+  const source = selectedValueSource(garantie, item, line, vehicule);
   if (source === "VENALE") {
     return vehicule?.valeurVenale;
   }
@@ -778,12 +830,12 @@ function guaranteeCapitalValue(garantie: ReferenceOption, line?: ReferenceOption
   return numeric(line?.capital);
 }
 
-function capitalDisplay(garantie: ReferenceOption, line?: ReferenceOption, vehicule?: VehiculeInput, capital?: number) {
+function capitalDisplay(garantie: ReferenceOption, line?: ReferenceOption, vehicule?: VehiculeInput, capital?: number, item?: GarantieInput) {
   const mode = lineMode(line);
   if (mode === "CAPITAL") {
     return capital == null ? "" : money(capital);
   }
-  const source = defaultSource(garantie);
+  const source = selectedValueSource(garantie, item, line, vehicule);
   if (source === "VENALE") {
     return `V.Vénale: ${money(vehicule?.valeurVenale)}`;
   }
@@ -796,19 +848,33 @@ function capitalDisplay(garantie: ReferenceOption, line?: ReferenceOption, vehic
   return capital == null ? "" : money(capital);
 }
 
+function sourceOptionLabel(source: string, vehicule?: VehiculeInput) {
+  if (source === "NEUF") {
+    return `V.Neuf: ${money(vehicule?.valeurNeuf)}`;
+  }
+  if (source === "VENALE") {
+    return `V.Vénale: ${money(vehicule?.valeurVenale)}`;
+  }
+  if (source === "GLACE") {
+    return `V.Glace: ${money(vehicule?.valeurGlace)}`;
+  }
+  return sourceLabel(source);
+}
+
 function capitalLineLabel(line: ReferenceOption) {
   const capital = numeric(line.capital);
   return capital == null ? String(line.libelle ?? "Option") : money(capital);
 }
 
-function tariffLineLabel(line: ReferenceOption) {
+function tariffLineLabel(line: ReferenceOption, index = 0) {
   const mode = lineMode(line);
   const taux = numeric(line.taux);
   if (mode === "TAUX" && taux != null) {
     return `${money(taux)} %`;
   }
   if (mode === "CAPITAL") {
-    return String(line.libelle ?? capitalLineLabel(line));
+    const label = String(line.libelle ?? "");
+    return label.toLowerCase().includes("formule") ? label : `Formule ${index + 1}`;
   }
   return String(line.libelle ?? rateDisplay(line));
 }

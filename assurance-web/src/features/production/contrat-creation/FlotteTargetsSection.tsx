@@ -880,6 +880,8 @@ function TargetGuaranteesTable({
               const disabled = isRc || !grilleSelected || !hasLine;
               const editable = checked && !isRc;
               const warning = checked ? valueWarning(garantie, target) : "";
+              const sourceOptions = target.kind === "vehicule" ? allowedVehicleValueSources(garantie) : [];
+              const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target) : "";
 
               return (
                 <tr
@@ -899,13 +901,36 @@ function TargetGuaranteesTable({
                     {warning ? <div className="mt-1 text-xs text-destructive">{warning}</div> : null}
                   </td>
                   <td className="px-3 py-2">
-                    <Input
-                      type="number"
-                      disabled={!editable}
-                      className={controlClass(editable)}
-                      value={item?.valeurAssuree ?? item?.capital ?? ""}
-                      onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
-                    />
+                    {sourceOptions.length > 1 ? (
+                      <Select
+                        value={selectedSource}
+                        disabled={!editable}
+                        onValueChange={(value) => {
+                          if (!hasTargetValue(target, value)) {
+                            toast.error(`${sourceLabel(value)} requise`);
+                            return;
+                          }
+                          update(garantie.id, { sourceValeurSelectionnee: value, valeurAssuree: undefined, capital: undefined });
+                        }}
+                      >
+                        <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Source" /></SelectTrigger>
+                        <SelectContent>
+                          {sourceOptions.map((source) => (
+                            <SelectItem key={source} value={source}>{targetSourceOptionLabel(source, target)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : sourceOptions.length === 1 ? (
+                      <Input readOnly disabled className={controlClass(false)} value={targetSourceOptionLabel(sourceOptions[0], target)} />
+                    ) : (
+                      <Input
+                        type="number"
+                        disabled={!editable}
+                        className={controlClass(editable)}
+                        value={item?.valeurAssuree ?? item?.capital ?? ""}
+                        onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
+                      />
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <Input type="number" disabled={!editable} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
@@ -1135,7 +1160,7 @@ function targetedInput(garantie: ReferenceOption, target: Target): GarantieInput
     vehiculeIndex: target.kind === "vehicule" ? target.index : undefined,
     remorqueIndex: target.kind === "remorque" ? target.index : undefined,
     modeSelectionne: String(garantie.modeParDefaut ?? "TAUX"),
-    sourceValeurSelectionnee: defaultSource(garantie),
+    sourceValeurSelectionnee: defaultTargetSource(garantie, target),
   };
 }
 
@@ -1261,6 +1286,39 @@ function hasTargetValue(target: Target, source: string) {
     return Boolean(target.valeurGlace);
   }
   return false;
+}
+
+function selectedTargetValueSource(garantie: ReferenceOption, item: GarantieInput | undefined, target: Target) {
+  const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
+  if (selected && selected !== "AUCUNE") {
+    return selected;
+  }
+  return defaultTargetSource(garantie, target);
+}
+
+function defaultTargetSource(garantie: ReferenceOption, target: Target) {
+  if (target.kind !== "vehicule") {
+    return defaultSource(garantie);
+  }
+  const source = effectiveVehicleValueSource(garantie);
+  if (source) {
+    return source;
+  }
+  return allowedVehicleValueSources(garantie).find((allowedSource) => hasTargetValue(target, allowedSource))
+    ?? (allowedVehicleValueSources(garantie).length > 0 ? allowedVehicleValueSources(garantie)[0] : defaultSource(garantie));
+}
+
+function targetSourceOptionLabel(source: string, target: Target) {
+  if (source === "NEUF") {
+    return `V.Neuf: ${money(target.valeurNeuf)}`;
+  }
+  if (source === "VENALE") {
+    return `V.Vénale: ${money(target.valeurVenale)}`;
+  }
+  if (source === "GLACE") {
+    return `V.Glace: ${money(target.valeurGlace)}`;
+  }
+  return sourceLabel(source);
 }
 
 function sourceLabel(source: string) {

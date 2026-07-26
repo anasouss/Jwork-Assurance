@@ -1139,6 +1139,10 @@ function TargetGuaranteesTable({
                       </Select>
                     ) : sourceOptions.length === 1 ? (
                       <Input readOnly disabled className={controlClass(false)} value={targetSourceOptionLabel(sourceOptions[0], target)} />
+                    ) : isRc ? (
+                      <span className="block rounded-md px-3 py-2 text-right text-muted-foreground">
+                        {target.kind === "vehicule" ? money(resolveRcCapital(target, usages)) : "Capital RC"}
+                      </span>
                     ) : (
                       <Input readOnly disabled className={controlClass(false)} value={capitalDisplay(garantie, selectedLine, target, displayCapital)} />
                     )}
@@ -1546,6 +1550,12 @@ function estimateTargetPrime(line?: ReferenceOption, capital?: number) {
     return (capital * taux) / 100;
   }
   return prime;
+}
+
+function resolveRcCapital(target: Target | undefined, usages: ReferenceOption[]) {
+  const usage = usages.find((item) => item.id === target?.usageId);
+  const usageText = `${usage?.code ?? ""} ${usage?.libelle ?? ""}`.toUpperCase();
+  return usageText.includes("CYCLO") ? 5_000_000 : 50_000_000;
 }
 
 function matchingPersonneFormules(formules: ReferenceOption[], garantie: ReferenceOption, target?: Target) {

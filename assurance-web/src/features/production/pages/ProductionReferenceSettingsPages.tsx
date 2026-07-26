@@ -1230,7 +1230,13 @@ function UsageMultiSelect({
       <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
           <CommandInput placeholder="Rechercher usage..." />
-          <CommandList>
+          <CommandList
+            className="max-h-72 overscroll-contain"
+            onWheelCapture={(event) => {
+              event.currentTarget.scrollTop += event.deltaY;
+              event.stopPropagation();
+            }}
+          >
             <CommandEmpty>Aucun usage.</CommandEmpty>
             <CommandGroup>
               <CommandItem value="__all__" onSelect={() => onChange([])}>

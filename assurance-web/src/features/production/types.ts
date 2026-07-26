@@ -473,6 +473,26 @@ export type QuittancePreview = {
     cnpac: number;
     primeTotale: number;
   }[];
+  garanties?: {
+    garantieId?: string;
+    code?: string;
+    libelle?: string;
+    typeGarantie?: string;
+    vehiculeIndex?: number;
+    remorqueIndex?: number;
+    ligneGrilleTarifaireId?: string;
+    modeSelectionne?: string;
+    sourceValeurSelectionnee?: string;
+    formuleGarantiePersonneId?: string;
+    capital?: number;
+    valeurVenale?: number;
+    valeurNeuf?: number;
+    valeurGlace?: number;
+    taux?: number;
+    primeNette?: number;
+    tauxFranchise?: number;
+    franchiseMinimale?: number;
+  }[];
 };
 
 export type UpsertGrilleTarifaireRequest = {

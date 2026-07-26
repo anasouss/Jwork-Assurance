@@ -370,6 +370,7 @@ export function FlotteTargetsSection({
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
                   preview={preview}
+                  previewing={previewing}
                 />
                 <QuittanceTotalsSummary
                   preview={preview}
@@ -486,6 +487,8 @@ export function FlotteTargetsSection({
                   onAssistanceChange={(patch) => updateAssistance(activeRemorqueTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
+                  preview={preview}
+                  previewing={previewing}
                 />
                 <QuittanceTotalsSummary
                   preview={preview}
@@ -605,18 +608,23 @@ function QuittanceTotalsSummary({
   showPersonneTotals?: boolean;
   showAssistanceTotal?: boolean;
 }) {
+  const evcatNet = linePrimeNette(preview, "EVCAT");
+  const corporealNet = linePrimeNette(preview, "CORPOREL");
+  const assistanceNet = linePrimeNette(preview, "ASSISTANCE");
+  const totalNetWithoutEvcat = subtractOptional(preview?.primeNette, evcatNet);
+  const totalTax = addOptional(preview?.taxe, preview?.taxeParafiscale);
   const rows: [string, number | undefined][] = [
-    ["TOTAL NET", preview?.primeNette],
-    ["EVCAT", linePrimeNette(preview, "EVCAT")],
-    ["TAXE", preview?.taxe],
+    ["TOTAL NET", totalNetWithoutEvcat],
+    ["EVCAT", evcatNet],
+    ["TAXE", totalTax],
     ["CNPAC", preview?.cnpac],
     ["TOTAL À PAYER", preview?.primeTotale],
   ];
   if (showPersonneTotals) {
-    rows.splice(2, 0, ["PTA (Prime Personne)", linePrimeNette(preview, "CORPOREL")], ["ACCESSOIRE", preview?.accessoire]);
+    rows.splice(2, 0, ["PTA (Prime Personne)", corporealNet], ["ACCESSOIRE", preview?.accessoire]);
   }
   if (showAssistanceTotal) {
-    rows.push(["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")]);
+    rows.push(["ASSISTANCE", assistanceNet]);
   }
 
   return (
@@ -625,7 +633,7 @@ function QuittanceTotalsSummary({
         <div key={label} className="grid grid-cols-[1fr_120px] border-b last:border-b-0">
           <div className="bg-muted/30 px-3 py-2 text-right text-xs font-semibold">{label}</div>
           <div className="px-3 py-2 text-right text-xs">
-            {loading ? "Calcul..." : value == null ? "-" : formatMoney(value)}
+            {loading ? <CalculationValue loading value={value} fallback="-" /> : value == null ? "-" : formatMoney(value)}
           </div>
         </div>
       ))}
@@ -637,8 +645,58 @@ function linePrimeNette(preview: QuittancePreview | null | undefined, categorie:
   return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
 }
 
-function autoPrimeDisplay(value?: number) {
-  return value == null ? "Calcul auto" : money(value);
+function previewGuaranteeLine(
+  preview: QuittancePreview | null | undefined,
+  garantie: ReferenceOption,
+  target: Target,
+  selected?: GarantieInput
+) {
+  const expectedLineId = selected?.ligneGrilleTarifaireId;
+  const expectedFormuleId = selected?.formuleGarantiePersonneId;
+  return preview?.garanties?.find((line) => {
+    if (String(line.garantieId ?? "") !== String(garantie.id)) {
+      return false;
+    }
+    if (target.kind === "vehicule" && line.vehiculeIndex !== target.index) {
+      return false;
+    }
+    if (target.kind === "remorque" && line.remorqueIndex !== target.index) {
+      return false;
+    }
+    if (expectedLineId && line.ligneGrilleTarifaireId && String(line.ligneGrilleTarifaireId) !== String(expectedLineId)) {
+      return false;
+    }
+    if (expectedFormuleId && line.formuleGarantiePersonneId && String(line.formuleGarantiePersonneId) !== String(expectedFormuleId)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function addOptional(left?: number, right?: number) {
+  if (left == null && right == null) {
+    return undefined;
+  }
+  return (left ?? 0) + (right ?? 0);
+}
+
+function subtractOptional(left?: number, right?: number) {
+  if (left == null) {
+    return undefined;
+  }
+  return left - (right ?? 0);
+}
+
+function CalculationValue({ value, loading, fallback = "Calcul auto" }: { value?: number; loading?: boolean; fallback?: string }) {
+  if (loading) {
+    return (
+      <span className="inline-flex items-center justify-end gap-1 text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" />
+        <span>Calcul...</span>
+      </span>
+    );
+  }
+  return value == null ? fallback : money(value);
 }
 
 function stringValue(value: unknown) {
@@ -995,6 +1053,7 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId,
   grilleSelected,
   preview,
+  previewing,
 }: {
   target: Target;
   garanties: ReferenceOption[];
@@ -1011,6 +1070,7 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId?: string;
   grilleSelected: boolean;
   preview?: QuittancePreview | null;
+  previewing?: boolean;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected((current) => current.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item)));
@@ -1059,9 +1119,9 @@ function TargetGuaranteesTable({
   return (
     <div className="grid gap-4">
       <div className="overflow-x-auto rounded-md border">
-        <div className="border-b bg-emerald-50/70 px-3 py-2 text-sm font-semibold text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">Garanties véhicule</div>
+        <div className="border-b px-3 py-2 text-sm font-semibold">Garanties véhicule</div>
         <table className="w-full min-w-[860px] border-collapse text-sm">
-          <thead className="bg-emerald-50/70 text-xs uppercase text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
+          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="w-12 px-3 py-3 text-left" />
               <th className="px-3 py-3 text-left">Garantie</th>
@@ -1086,8 +1146,8 @@ function TargetGuaranteesTable({
               const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target, selectedLine) : "";
               const manualValue = defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL";
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
-              const estimatedPrime = checked && !isRc ? estimateTargetPrime(selectedLine, displayCapital) : undefined;
-              const rcPrime = isRc ? resolveTargetRcPrime(preview, selected, garanties, lignes, target) : undefined;
+              const previewLine = previewGuaranteeLine(preview, garantie, target, item);
+              const previewPrime = previewLine?.primeNette;
 
               return (
                 <tr
@@ -1152,7 +1212,7 @@ function TargetGuaranteesTable({
                       <Input readOnly disabled className={cn(controlClass(false), "text-right")} value={targetSourceOptionLabel(sourceOptions[0], target)} />
                     ) : isRc ? (
                       <span className="block rounded-md px-3 py-2 text-right text-muted-foreground">
-                        {target.kind === "vehicule" ? money(resolveRcCapital(target, usages)) : "Capital RC"}
+                        {money(previewLine?.capital ?? (target.kind === "vehicule" ? resolveRcCapital(target, usages) : undefined)) || "Capital RC"}
                       </span>
                     ) : (
                       <Input readOnly disabled className={cn(controlClass(false), "text-right")} value={capitalDisplay(garantie, selectedLine, target, displayCapital)} />
@@ -1179,7 +1239,7 @@ function TargetGuaranteesTable({
                   </td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
                   <td className="px-3 py-2 text-right font-medium">
-                    {isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}
+                    {checked ? <CalculationValue value={previewPrime} loading={previewing} /> : "-"}
                   </td>
                 </tr>
               );
@@ -1190,9 +1250,9 @@ function TargetGuaranteesTable({
 
       {showPersonne ? (
         <div className="overflow-x-auto rounded-md border">
-          <div className="border-b bg-emerald-50/70 px-3 py-2 text-sm font-semibold text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">Garanties personne</div>
+          <div className="border-b px-3 py-2 text-sm font-semibold">Garanties personne</div>
           <table className="w-full min-w-[980px] border-collapse text-sm">
-            <thead className="bg-emerald-50/70 text-xs uppercase text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
+            <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="w-12 px-3 py-3 text-left" />
                 <th className="px-3 py-3 text-left">Garantie</th>
@@ -1210,6 +1270,7 @@ function TargetGuaranteesTable({
                 const formules = matchingPersonneFormules(formulesPersonne, garantie, target);
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
                 const disabled = !grilleSelected || formules.length === 0;
+                const previewLine = previewGuaranteeLine(preview, garantie, target, item);
 
                 return (
                   <tr
@@ -1252,7 +1313,7 @@ function TargetGuaranteesTable({
                     <td className="px-3 py-2">{money(selectedFormule?.montantDeces)}</td>
                     <td className="px-3 py-2">{money(selectedFormule?.montantInvalidite)}</td>
                     <td className="px-3 py-2">{money(selectedFormule?.montantFraisMedicaux)}</td>
-                    <td className="px-3 py-2">{money(selectedFormule?.primeNette)}</td>
+                    <td className="px-3 py-2">{checked ? <CalculationValue value={previewLine?.primeNette} loading={previewing} /> : "-"}</td>
                   </tr>
                 );
               })}
@@ -1324,7 +1385,7 @@ function AssistanceTable({
         <span>Assistance</span>
       </div>
       <table className="w-full min-w-[1100px] border-collapse text-sm">
-        <thead className="bg-emerald-50/70 text-xs uppercase text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
+        <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-3 py-3 text-left">Date effet</th>
             <th className="px-3 py-3 text-left">Date souscription</th>
@@ -1547,48 +1608,6 @@ function franchiseDisplay(line?: ReferenceOption) {
   const left = tauxFranchise == null ? "" : `${money(tauxFranchise)} %`;
   const right = franchiseMinimale == null ? "" : `${money(franchiseMinimale)} DH`;
   return [left, right].filter(Boolean).join(" _ ");
-}
-
-function estimateTargetPrime(line?: ReferenceOption, capital?: number) {
-  const mode = lineMode(line);
-  const taux = toNumber(line?.taux);
-  const prime = toNumber(line?.prime);
-  if (mode === "CAPITAL" || mode === "PRIME_FIXE") {
-    if (taux != null && taux !== 0) {
-      return ((prime ?? 0) * taux) / 100;
-    }
-    return prime;
-  }
-  if (taux != null && capital != null) {
-    return (capital * taux) / 100;
-  }
-  return prime;
-}
-
-function resolveTargetRcPrime(
-  preview: QuittancePreview | null | undefined,
-  selected: GarantieInput[],
-  garanties: ReferenceOption[],
-  lignes: ReferenceOption[],
-  target: Target
-) {
-  const automobileNet = linePrimeNette(preview, "AUTOMOBILE");
-  if (automobileNet == null) {
-    return undefined;
-  }
-  const nonRcPrime = selected.reduce((total, item) => {
-    if (!sameTarget(item, target)) {
-      return total;
-    }
-    const garantie = garanties.find((option) => option.id === item.garantieId);
-    if (!garantie || Boolean(garantie.responsabiliteCivile) || String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE") {
-      return total;
-    }
-    const line = selectedLineFor(matchingLines(lignes, garantie, target), item);
-    const capital = targetGuaranteeCapitalValue(garantie, line, target, item);
-    return total + (estimateTargetPrime(line, capital) ?? 0);
-  }, 0);
-  return Math.max(0, automobileNet - nonRcPrime);
 }
 
 function resolveRcCapital(target: Target | undefined, usages: ReferenceOption[]) {

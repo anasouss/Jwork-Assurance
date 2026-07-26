@@ -30,6 +30,7 @@ public class QuittanceResponse {
     private BigDecimal cnpac;
     private BigDecimal primeTotale;
     private List<Ligne> lignes;
+    private List<GarantieLigne> garanties;
 
     @Data
     @Builder
@@ -43,5 +44,28 @@ public class QuittanceResponse {
         private BigDecimal accessoire;
         private BigDecimal cnpac;
         private BigDecimal primeTotale;
+    }
+
+    @Data
+    @Builder
+    public static class GarantieLigne {
+        private Long garantieId;
+        private String code;
+        private String libelle;
+        private String typeGarantie;
+        private Integer vehiculeIndex;
+        private Integer remorqueIndex;
+        private Long ligneGrilleTarifaireId;
+        private String modeSelectionne;
+        private String sourceValeurSelectionnee;
+        private Long formuleGarantiePersonneId;
+        private BigDecimal capital;
+        private BigDecimal valeurVenale;
+        private BigDecimal valeurNeuf;
+        private BigDecimal valeurGlace;
+        private BigDecimal taux;
+        private BigDecimal primeNette;
+        private BigDecimal tauxFranchise;
+        private BigDecimal franchiseMinimale;
     }
 }

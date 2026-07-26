@@ -948,6 +948,7 @@ public class ContratService {
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toLignePreviewResponse).toList())
+                .garanties(garanties.stream().map(garantie -> toGarantiePreviewResponse(garantie, vehicules, remorques)).toList())
                 .build();
     }
 
@@ -1459,6 +1460,47 @@ public class ContratService {
                 .cnpac(ligne.cnpac())
                 .primeTotale(ligne.primeTotale())
                 .build();
+    }
+
+    private QuittanceResponse.GarantieLigne toGarantiePreviewResponse(
+            ContratGarantie contratGarantie,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        Garantie garantie = contratGarantie.getGarantie();
+        LigneGrilleTarifaire ligne = contratGarantie.getLigneGrilleTarifaire();
+        return QuittanceResponse.GarantieLigne.builder()
+                .garantieId(garantie == null ? null : garantie.getId())
+                .code(garantie == null ? null : garantie.getCode())
+                .libelle(garantie == null ? null : garantie.getLibelle())
+                .typeGarantie(garantie == null || garantie.getTypeGarantie() == null ? null : garantie.getTypeGarantie().name())
+                .vehiculeIndex(indexOfIdentity(vehicules, contratGarantie.getVehicule()))
+                .remorqueIndex(indexOfIdentity(remorques, contratGarantie.getRemorque()))
+                .ligneGrilleTarifaireId(ligne == null ? null : ligne.getId())
+                .modeSelectionne(contratGarantie.getModeSelectionne() == null ? null : contratGarantie.getModeSelectionne().name())
+                .sourceValeurSelectionnee(contratGarantie.getSourceValeurSelectionnee() == null ? null : contratGarantie.getSourceValeurSelectionnee().name())
+                .formuleGarantiePersonneId(contratGarantie.getFormuleGarantiePersonne() == null ? null : contratGarantie.getFormuleGarantiePersonne().getId())
+                .capital(contratGarantie.getCapital())
+                .valeurVenale(contratGarantie.getValeurVenale())
+                .valeurNeuf(contratGarantie.getValeurNeuf())
+                .valeurGlace(contratGarantie.getValeurGlace())
+                .taux(contratGarantie.getTaux())
+                .primeNette(contratGarantie.getPrime())
+                .tauxFranchise(contratGarantie.getTauxFranchise())
+                .franchiseMinimale(contratGarantie.getFranchiseMinimale())
+                .build();
+    }
+
+    private <T> Integer indexOfIdentity(List<T> source, T target) {
+        if (target == null) {
+            return null;
+        }
+        for (int index = 0; index < source.size(); index++) {
+            if (source.get(index) == target) {
+                return index;
+            }
+        }
+        return null;
     }
 
     private Vehicule resolveVehicule(List<Vehicule> vehicules, Integer index, String contexte) {

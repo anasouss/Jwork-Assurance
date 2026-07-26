@@ -573,6 +573,26 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     });
   };
 
+  const saveGrilleSelection = (value: string) => {
+    setGrilleTarifaireId(value);
+    setSavedSections((current) => ({ ...current, grille: false }));
+    if (!draftId) {
+      return;
+    }
+    saveDraftMutation.mutate(
+      {
+        ...request,
+        grilleTarifaireId: typeContrat === "PARTICULIER" ? undefined : emptyToUndefined(value),
+      },
+      {
+        onSuccess: () => {
+          setSavedSections((current) => ({ ...current, grille: true }));
+          toast.success("Grille tarifaire enregistrée");
+        },
+      }
+    );
+  };
+
   useEffect(() => {
     if (!canAutoPreview(typeContrat, request)) {
       setPreview(null);
@@ -689,7 +709,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     usageId,
     setUsageId: setUsageForContrat,
     grilleTarifaireId,
-    setGrilleTarifaireId,
+    setGrilleTarifaireId: saveGrilleSelection,
     dateEffet,
     setDateEffet,
     dateEcheance,

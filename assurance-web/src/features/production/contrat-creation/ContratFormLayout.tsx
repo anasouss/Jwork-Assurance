@@ -188,6 +188,8 @@ export function ContratFormLayout({
       onSaveDraft={form.handleSaveDraft}
       setAssistanceEnabled={form.setAssistanceEnabled}
       assistanceCategorieClientId={assistanceCategorieClientId}
+      crmPartage={form.crmPartage}
+      crmPartageValeur={form.crmPartageValeur}
       maxRemorques={maxRemorques}
       errors={form.validationErrors}
       openSection={activeSection}

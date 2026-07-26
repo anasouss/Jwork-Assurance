@@ -67,6 +67,8 @@ type Props = {
   onSaveDraft?: (label: string, onSuccess?: () => void) => void;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
   assistanceCategorieClientId?: string;
+  crmPartage?: boolean;
+  crmPartageValeur?: string;
   maxRemorques?: number | null;
   errors?: Record<string, string>;
   openSection?: ContratSectionKey;
@@ -97,6 +99,8 @@ export function FlotteTargetsSection({
   onSaveDraft,
   setAssistanceEnabled,
   assistanceCategorieClientId,
+  crmPartage = false,
+  crmPartageValeur = "",
   maxRemorques,
   errors = {},
   openSection,
@@ -298,6 +302,8 @@ export function FlotteTargetsSection({
                   marques={marques}
                   carrosseries={carrosseries}
                   categoriesTransport={categoriesTransport}
+                  crmPartage={crmPartage}
+                  crmPartageValeur={crmPartageValeur}
                   errors={errors}
                 />
                 <SectionSubmitButton saving={saving} onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule")}>
@@ -580,6 +586,8 @@ function VehicleForm({
   marques,
   carrosseries,
   categoriesTransport,
+  crmPartage,
+  crmPartageValeur,
   errors,
 }: {
   index: number;
@@ -589,6 +597,8 @@ function VehicleForm({
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
+  crmPartage: boolean;
+  crmPartageValeur: string;
   errors: Record<string, string>;
 }) {
   const usage = usages.find((item) => item.id === vehicule.usageId);
@@ -603,6 +613,21 @@ function VehicleForm({
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
+          <AutocompleteSelect
+            value={vehicule.marqueId ?? ""}
+            customValue={vehicule.marqueLibelle}
+            allowCustomValue
+            placeholder="Marque"
+            emptyText="Aucune marque trouvée"
+            options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
+            onValueChange={(value) => update({ marqueId: value || undefined, marqueLibelle: undefined })}
+            onCustomValueChange={(value) => update({ marqueId: undefined, marqueLibelle: value })}
+          />
+        </Field>
+        <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
+          <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update({ immatriculation: event.target.value })} />
+        </Field>
         <Field label="Usage" required error={errors[`vehicules.${index}.usageId`]}>
           <AutocompleteSelect
             value={vehicule.usageId ?? ""}
@@ -624,21 +649,6 @@ function VehicleForm({
                 ptc: undefined,
               })
             }
-          />
-        </Field>
-        <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
-          <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update({ immatriculation: event.target.value })} />
-        </Field>
-        <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
-          <AutocompleteSelect
-            value={vehicule.marqueId ?? ""}
-            customValue={vehicule.marqueLibelle}
-            allowCustomValue
-            placeholder="Marque"
-            emptyText="Aucune marque trouvée"
-            options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
-            onValueChange={(value) => update({ marqueId: value || undefined, marqueLibelle: undefined })}
-            onCustomValueChange={(value) => update({ marqueId: undefined, marqueLibelle: value })}
           />
         </Field>
         <Field label="Carrosserie" required error={errors[`vehicules.${index}.carrosserieId`]}>
@@ -712,6 +722,14 @@ function VehicleForm({
         </Field>
         <Field label="Valeur glace">
           <Input type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update({ valeurGlace: numberValue(event.target.value) })} />
+        </Field>
+        <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
+          <Input
+            value={crmPartage ? crmPartageValeur : vehicule.crm ?? ""}
+            readOnly={crmPartage}
+            className={crmPartage ? "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400" : undefined}
+            onChange={(event) => update({ crm: event.target.value })}
+          />
         </Field>
       </div>
       <div className="mt-3 flex items-center gap-2">

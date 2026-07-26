@@ -178,6 +178,17 @@ export function GrilleTarifaireConfigurator({
     setDrafts((current) => current.filter((item) => item.localKey !== draft.localKey));
   };
 
+  const setVehicleGarantieEnabled = (garantie: ReferenceOption, baseDraft: MatrixLine, checked: boolean) => {
+    if (checked) {
+      updateDraft(baseDraft.localKey, { checked: true });
+      return;
+    }
+    setDrafts((current) => [
+      ...current.filter((draft) => draft.garantieId !== garantie.id),
+      emptyDraft(garantie),
+    ]);
+  };
+
   const addPersonneDraft = (garantie: ReferenceOption) => {
     setPersonneDrafts((current) => [
       ...current,
@@ -288,7 +299,7 @@ export function GrilleTarifaireConfigurator({
               return (
                 <TableRow key={garantie.id}>
                   <TableCell>
-                    <Checkbox checked={enabled} onCheckedChange={(checked) => updateDraft(baseDraft.localKey, { checked: checked === true })} />
+                    <Checkbox checked={enabled} onCheckedChange={(checked) => setVehicleGarantieEnabled(garantie, baseDraft, checked === true)} />
                   </TableCell>
                   <TableCell className="align-top font-semibold">
                     <div className="pt-2">{garantieLabel(garantie)}</div>

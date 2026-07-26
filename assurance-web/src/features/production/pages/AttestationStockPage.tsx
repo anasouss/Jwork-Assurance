@@ -8,6 +8,14 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -174,25 +182,111 @@ function AttestationStockDashboardPage() {
       </div>
 
       <Card className="border-border/70 shadow-none">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Settings2 className="size-4" />
             Paramètres stock
           </CardTitle>
-          <div className="flex items-center gap-3 rounded-md border px-3 py-2">
-            <div className="text-right">
-              <div className="text-sm font-medium">Contrôle à la saisie</div>
-              <div className="text-xs text-muted-foreground">Valide et consomme le numéro en création contrat</div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline">
+                  <Settings2 className="size-4" />
+                  Seuils d’alerte
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>Seuils d’alerte stock</DialogTitle>
+                  <DialogDescription>Configuration par compagnie et usage stock.</DialogDescription>
+                </DialogHeader>
+                <div className="grid max-h-[70vh] gap-4 overflow-y-auto pr-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+                  <form className="space-y-3" onSubmit={submitSeuil}>
+                    <Field label="Compagnie">
+                      <Select
+                        value={seuilForm.compagnieAssuranceId}
+                        onValueChange={(value) => setSeuilForm((current) => ({ ...current, compagnieAssuranceId: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(compagnies.data ?? []).map((compagnie) => (
+                            <SelectItem key={compagnie.id} value={String(compagnie.id)}>
+                              {compagnie.libelle}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Usage stock">
+                      <GroupIdSelect
+                        value={seuilForm.groupeUsageAttestationId}
+                        groupes={groupes.data ?? []}
+                        onChange={(value) => setSeuilForm((current) => ({ ...current, groupeUsageAttestationId: value }))}
+                      />
+                    </Field>
+                    <Field label="Seuil minimum">
+                      <Input
+                        inputMode="numeric"
+                        value={seuilForm.minimumStock}
+                        onChange={(event) => setSeuilForm((current) => ({ ...current, minimumStock: event.target.value }))}
+                      />
+                    </Field>
+                    <Button type="submit" className="w-full" disabled={saveSeuil.isPending}>
+                      {seuilForm.id ? "Modifier le seuil" : "Ajouter le seuil"}
+                    </Button>
+                  </form>
+
+                  <div className="max-h-[60vh] overflow-auto rounded-md border">
+                    <Table>
+                      <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
+                        <TableRow className="hover:bg-emerald-700">
+                          <TableHead>Compagnie</TableHead>
+                          <TableHead>Usage</TableHead>
+                          <TableHead className="text-right">Seuil</TableHead>
+                          <TableHead className="text-right">Dispo.</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {seuils.map((seuil) => (
+                          <TableRow key={seuil.id} className="cursor-pointer" onClick={() => editSeuil(seuil, setSeuilForm)}>
+                            <TableCell>{seuil.compagnieAssuranceNom}</TableCell>
+                            <TableCell>
+                              <Badge variant={seuil.stockFaible ? "destructive" : "outline"}>{seuil.groupeUsageAttestationCode}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{seuil.minimumStock}</TableCell>
+                            <TableCell className="text-right">{seuil.stockDisponible}</TableCell>
+                          </TableRow>
+                        ))}
+                        {seuils.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-20 text-center text-sm text-muted-foreground">
+                              Aucun seuil paramétré.
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <div className="flex items-center gap-3 rounded-md border px-3 py-2">
+              <div className="text-right">
+                <div className="text-sm font-medium">Contrôle à la saisie</div>
+                <div className="text-xs text-muted-foreground">Valide et consomme le numéro en création contrat</div>
+              </div>
+              <Switch
+                checked={Boolean(dashboard.data?.controleStockActif)}
+                disabled={updateSettings.isPending || dashboard.isLoading}
+                onCheckedChange={(checked) => updateSettings.mutate({ controleStockActif: checked })}
+              />
             </div>
-            <Switch
-              checked={Boolean(dashboard.data?.controleStockActif)}
-              disabled={updateSettings.isPending || dashboard.isLoading}
-              onCheckedChange={(checked) => updateSettings.mutate({ controleStockActif: checked })}
-            />
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="grid gap-3 lg:grid-cols-2">
+        <CardContent>
+          <div className="grid gap-3 xl:grid-cols-2">
             {groupedByCompany.map((company) => (
               <StockPieCard
                 key={company.compagnieAssuranceId}
@@ -213,82 +307,6 @@ function AttestationStockDashboardPage() {
               </div>
             ) : null}
           </div>
-
-          <Card className="border-border/70 shadow-none">
-            <CardHeader>
-              <CardTitle className="text-base">Seuils d’alerte</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <form className="space-y-3" onSubmit={submitSeuil}>
-                <Field label="Compagnie">
-                  <Select
-                    value={seuilForm.compagnieAssuranceId}
-                    onValueChange={(value) => setSeuilForm((current) => ({ ...current, compagnieAssuranceId: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(compagnies.data ?? []).map((compagnie) => (
-                        <SelectItem key={compagnie.id} value={String(compagnie.id)}>
-                          {compagnie.libelle}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Usage stock">
-                  <GroupIdSelect
-                    value={seuilForm.groupeUsageAttestationId}
-                    groupes={groupes.data ?? []}
-                    onChange={(value) => setSeuilForm((current) => ({ ...current, groupeUsageAttestationId: value }))}
-                  />
-                </Field>
-                <Field label="Seuil minimum">
-                  <Input
-                    inputMode="numeric"
-                    value={seuilForm.minimumStock}
-                    onChange={(event) => setSeuilForm((current) => ({ ...current, minimumStock: event.target.value }))}
-                  />
-                </Field>
-                <Button type="submit" className="w-full" disabled={saveSeuil.isPending}>
-                  {seuilForm.id ? "Modifier le seuil" : "Ajouter le seuil"}
-                </Button>
-              </form>
-
-              <div className="max-h-72 overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
-                    <TableRow className="hover:bg-emerald-700">
-                      <TableHead>Compagnie</TableHead>
-                      <TableHead>Usage</TableHead>
-                      <TableHead className="text-right">Seuil</TableHead>
-                      <TableHead className="text-right">Dispo.</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {seuils.map((seuil) => (
-                      <TableRow key={seuil.id} className="cursor-pointer" onClick={() => editSeuil(seuil, setSeuilForm)}>
-                        <TableCell>{seuil.compagnieAssuranceNom}</TableCell>
-                        <TableCell>
-                          <Badge variant={seuil.stockFaible ? "destructive" : "outline"}>{seuil.groupeUsageAttestationCode}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">{seuil.minimumStock}</TableCell>
-                        <TableCell className="text-right">{seuil.stockDisponible}</TableCell>
-                      </TableRow>
-                    ))}
-                    {seuils.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-20 text-center text-sm text-muted-foreground">
-                          Aucun seuil paramétré.
-                        </TableCell>
-                      </TableRow>
-                    ) : null}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
         </CardContent>
       </Card>
 

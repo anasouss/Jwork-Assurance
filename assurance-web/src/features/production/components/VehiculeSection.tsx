@@ -186,7 +186,7 @@ export function VehiculeSection({
                     </Select>
                   </Field>
                 ) : null}
-                <Field label="Nombre de places">
+                <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
                   <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update(index, { nombrePlaces: event.target.value })} />
                 </Field>
                 <Field label="Date mise en circulation">

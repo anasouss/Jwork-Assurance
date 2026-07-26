@@ -442,6 +442,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       if (!vehicule.crm?.trim()) {
         nextErrors[`vehicules.${index}.crm`] = "CRM obligatoire.";
       }
+      if (!vehicule.nombrePlaces?.trim()) {
+        nextErrors[`vehicules.${index}.nombrePlaces`] = "Nombre de places obligatoire.";
+      }
       if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
         nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
       }

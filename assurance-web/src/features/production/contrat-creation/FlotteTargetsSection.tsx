@@ -1055,7 +1055,7 @@ function VehicleForm({
             <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
           </Field>
         ) : null}
-        <Field label="Nombre de places">
+        <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
           <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
         <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
@@ -1420,7 +1420,7 @@ function TargetGuaranteesTable({
                 <th className="w-32 px-3 py-3 text-left">Décès</th>
                 <th className="w-32 px-3 py-3 text-left">Invalidité</th>
                 <th className="w-32 px-3 py-3 text-left">Frais médicaux</th>
-                <th className="w-32 px-3 py-3 text-left">Prime nette</th>
+                <th className="w-32 px-3 py-3 text-right">Prime nette</th>
               </tr>
             </thead>
             <tbody>
@@ -1474,7 +1474,7 @@ function TargetGuaranteesTable({
                     <td className="px-3 py-2">{money(selectedFormule?.montantDeces)}</td>
                     <td className="px-3 py-2">{money(selectedFormule?.montantInvalidite)}</td>
                     <td className="px-3 py-2">{money(selectedFormule?.montantFraisMedicaux)}</td>
-                    <td className="px-3 py-2">{checked ? <CalculationValue value={previewLine?.primeNette} loading={rowCalculating} /> : "-"}</td>
+                    <td className="px-3 py-2 text-right">{checked ? <CalculationValue value={previewLine?.primeNette} loading={rowCalculating} /> : "-"}</td>
                   </tr>
                 );
               })}

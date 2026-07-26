@@ -7,6 +7,7 @@ import com.assurance.enums.TypeVehiculeContrat;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.TypeContrat;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -92,6 +93,7 @@ public class CreateContratRequest {
         private String immatriculationProvisoire;
         private String carburant;
         private String puissanceFiscale;
+        @NotBlank
         private String nombrePlaces;
         private String sousClasse;
         private String ptc;

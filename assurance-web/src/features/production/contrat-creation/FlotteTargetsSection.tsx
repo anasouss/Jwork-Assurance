@@ -1348,10 +1348,6 @@ function TargetGuaranteesTable({
             </tbody>
           </table>
         </div>
-      ) : target.kind === "vehicule" ? (
-        <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          Les garanties personne s'affichent uniquement pour les usages autorisés dans Paramètres production.
-        </div>
       ) : null}
 
       {target.kind === "vehicule" ? (

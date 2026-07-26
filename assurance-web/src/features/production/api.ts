@@ -15,6 +15,7 @@ import type {
   BulkUpdateTarifUsageRequest,
   UpsertCompagnieAssuranceRequest,
   UpsertCompagnieAssistanceRequest,
+  UpsertCategorieClientRequest,
   UpsertConventionRequest,
   UpsertFormuleGarantiePersonneRequest,
   UpsertGarantieRequest,
@@ -136,6 +137,24 @@ export const productionApi = {
   async updateCategorieTransport(id: string, payload: { code: string; libelle: string; description?: string; actif?: boolean }) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/categories-transport/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createCategorieClient(payload: UpsertCategorieClientRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/categories-client", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateCategorieClient(id: string, payload: UpsertCategorieClientRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/categories-client/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       })

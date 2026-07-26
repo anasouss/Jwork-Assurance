@@ -63,6 +63,7 @@ type Props = {
   previewing?: boolean;
   onPreviewQuittance?: () => void;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
+  assistanceCategorieClientId?: string;
   maxRemorques?: number | null;
   errors?: Record<string, string>;
 };
@@ -88,6 +89,7 @@ export function FlotteTargetsSection({
   previewing = false,
   onPreviewQuittance,
   setAssistanceEnabled,
+  assistanceCategorieClientId,
   maxRemorques,
   errors = {},
 }: Props) {
@@ -312,6 +314,7 @@ export function FlotteTargetsSection({
                   produitsAssistance={produitsAssistance}
                   assistance={assistances[targetKey(activeVehiculeTarget)] ?? { enabled: false }}
                   onAssistanceChange={(patch) => updateAssistance(activeVehiculeTarget, patch)}
+                  assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
                 />
                 <QuittanceTotalsSummary
@@ -420,6 +423,7 @@ export function FlotteTargetsSection({
                   produitsAssistance={produitsAssistance}
                   assistance={assistances[targetKey(activeRemorqueTarget)] ?? { enabled: false }}
                   onAssistanceChange={(patch) => updateAssistance(activeRemorqueTarget, patch)}
+                  assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
                 />
                 <QuittanceTotalsSummary
@@ -797,6 +801,7 @@ function TargetGuaranteesTable({
   produitsAssistance,
   assistance,
   onAssistanceChange,
+  assistanceCategorieClientId,
   grilleSelected,
 }: {
   target: Target;
@@ -811,6 +816,7 @@ function TargetGuaranteesTable({
   produitsAssistance: ReferenceOption[];
   assistance: AssistanceDraft;
   onAssistanceChange: (patch: Partial<AssistanceDraft>) => void;
+  assistanceCategorieClientId?: string;
   grilleSelected: boolean;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
@@ -1033,6 +1039,7 @@ function TargetGuaranteesTable({
           onChange={onAssistanceChange}
           compagniesAssistance={compagniesAssistance}
           produitsAssistance={produitsAssistance}
+          categorieClientId={assistanceCategorieClientId}
         />
       ) : null}
     </div>
@@ -1045,23 +1052,34 @@ function AssistanceTable({
   onChange,
   compagniesAssistance,
   produitsAssistance,
+  categorieClientId,
 }: {
   target: Target;
   assistance: AssistanceDraft;
   onChange: (patch: Partial<AssistanceDraft>) => void;
   compagniesAssistance: ReferenceOption[];
   produitsAssistance: ReferenceOption[];
+  categorieClientId?: string;
 }) {
   const filteredProducts = produitsAssistance.filter((produit) => {
     if (assistance.compagnieAssistanceId && produit.compagnieAssistanceId !== assistance.compagnieAssistanceId) {
       return false;
     }
+    if (!assistanceProductMatchesCategory(produit, categorieClientId)) {
+      return false;
+    }
     const usageIds = Array.isArray(produit.usageIds) ? produit.usageIds.map(String) : [];
     return usageIds.length === 0 || !target.usageId || usageIds.includes(target.usageId);
   });
-  const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId)
-    ?? produitsAssistance.find((produit) => produit.id === assistance.produitAssistanceId);
+  const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
+  const selectedProductId = selectedProduct?.id ?? "";
   const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+
+  useEffect(() => {
+    if (assistance.produitAssistanceId && !selectedProductId) {
+      onChange({ produitAssistanceId: undefined });
+    }
+  }, [assistance.produitAssistanceId, onChange, selectedProductId]);
 
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -1128,7 +1146,7 @@ function AssistanceTable({
             <td className="px-3 py-2">
               <Select
                 disabled={!assistance.enabled || filteredProducts.length === 0}
-                value={assistance.produitAssistanceId ?? ""}
+                value={selectedProductId}
                 onValueChange={(value) => onChange({ produitAssistanceId: value })}
               >
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -1351,6 +1369,12 @@ function defaultSource(garantie: ReferenceOption) {
     return "GLACE";
   }
   return "AUCUNE";
+}
+
+function assistanceProductMatchesCategory(produit: ReferenceOption, categorieClientId?: string) {
+  const productCategoryId = produit.categorieClientId == null ? "" : String(produit.categorieClientId);
+  if (!productCategoryId) return true;
+  return Boolean(categorieClientId) && productCategoryId === String(categorieClientId);
 }
 
 function controlClass(active: boolean) {

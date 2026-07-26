@@ -33,6 +33,13 @@ export type UpsertProduitAssistanceRequest = {
   actif?: boolean;
 };
 
+export type UpsertCategorieClientRequest = {
+  code: string;
+  libelle: string;
+  usageIds?: string[];
+  actif?: boolean;
+};
+
 export type UpsertTarifProduitAssistanceRequest = {
   dateDebut: string;
   dateFin?: string;

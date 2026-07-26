@@ -120,6 +120,11 @@ export default function AssistanceProductsSettingsPage() {
     });
   }, [productSearch, products.data, selectedCompanyId]);
 
+  const productUsages = useMemo(
+    () => usagesForCategory(usages.data ?? [], categories.data ?? [], productPayload.categorieClientId),
+    [categories.data, productPayload.categorieClientId, usages.data]
+  );
+
   const saveProduct = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertProduitAssistanceRequest }) =>
       id ? productionApi.updateProduitAssistance(id, value) : productionApi.createProduitAssistance(value),
@@ -304,7 +309,16 @@ export default function AssistanceProductsSettingsPage() {
               <Input value={productPayload.libelle} onChange={(event) => setProductPayload((current) => ({ ...current, libelle: event.target.value }))} />
             </Field>
             <Field label="Catégorie client">
-              <Select value={productPayload.categorieClientId || NONE} onValueChange={(value) => setProductPayload((current) => ({ ...current, categorieClientId: value === NONE ? undefined : value }))}>
+              <Select value={productPayload.categorieClientId || NONE} onValueChange={(value) => {
+                const categorieClientId = value === NONE ? undefined : value;
+                const allowedUsages = usagesForCategory(usages.data ?? [], categories.data ?? [], categorieClientId);
+                const allowedIds = new Set(allowedUsages.map((usage) => usage.id));
+                setProductPayload((current) => ({
+                  ...current,
+                  categorieClientId,
+                  usageIds: (current.usageIds ?? []).filter((usageId) => allowedIds.has(usageId)),
+                }));
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Toutes les catégories</SelectItem>
@@ -316,7 +330,7 @@ export default function AssistanceProductsSettingsPage() {
             </Field>
             <Field label="Usages couverts">
               <UsagesMultiSelect
-                usages={usages.data ?? []}
+                usages={productUsages}
                 value={productPayload.usageIds ?? []}
                 onChange={(usageIds) => setProductPayload((current) => ({ ...current, usageIds }))}
               />
@@ -548,6 +562,14 @@ function usageLabel(usage: ReferenceOption) {
   return `${usage.code ? `${usage.code} - ` : ""}${usage.libelle}`;
 }
 
+function usagesForCategory(usages: ReferenceOption[], categories: ReferenceOption[], categorieClientId?: string) {
+  if (!categorieClientId) return usages;
+  const category = categories.find((item) => item.id === categorieClientId);
+  const allowedIds = new Set(refArray(category ?? {}, "usageIds"));
+  if (allowedIds.size === 0) return usages;
+  return usages.filter((usage) => allowedIds.has(usage.id));
+}
+
 function refString(item: ReferenceOption | Record<string, unknown>, key: string) {
   const value = item[key];
   return typeof value === "string" ? value : value == null ? "" : String(value);
@@ -560,7 +582,7 @@ function refNumber(item: ReferenceOption, key: string) {
   return undefined;
 }
 
-function refArray(item: ReferenceOption, key: string) {
+function refArray(item: ReferenceOption | Record<string, unknown>, key: string) {
   const value = item[key];
   if (!Array.isArray(value)) return [];
   return value.map((entry) => String(entry));

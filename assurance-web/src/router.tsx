@@ -89,6 +89,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/UsagesSettingsPage")),
       },
       {
+        path: "production/parametres/categories-client",
+        lazy: lazyRoute(() => import("@/features/production/pages/CategoriesClientSettingsPage")),
+      },
+      {
         path: "production/parametres/garanties",
         lazy: lazyRoute(() => import("@/features/production/pages/GarantiesSettingsPage")),
       },

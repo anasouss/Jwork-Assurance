@@ -2,19 +2,22 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Edit, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Edit, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
-import { codeReferenceSchema, garantieSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
+import { clientCategorySchema, codeReferenceSchema, garantieSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { numberValue, toNumber } from "../utils/format";
-import type { ReferenceOption, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
+import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
 
 export function MarquesSettingsPage() {
   return (
@@ -138,12 +141,138 @@ export function CategoriesTransportSettingsPage() {
   );
 }
 
+export function CategoriesClientSettingsPage() {
+  const queryClient = useQueryClient();
+  const categories = useReference("categories-client");
+  const usages = useReference("usages");
+  const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [payload, setPayload] = useState<UpsertCategorieClientRequest>(emptyCategorieClient());
+
+  useEffect(() => {
+    setPayload(editing ? {
+      code: editing.code ?? "",
+      libelle: editing.libelle,
+      usageIds: refArray(editing, "usageIds"),
+      actif: editing.actif !== false,
+    } : emptyCategorieClient());
+  }, [editing]);
+
+  const save = useMutation({
+    mutationFn: ({ id, value }: { id?: string; value: UpsertCategorieClientRequest }) =>
+      id ? productionApi.updateCategorieClient(id, value) : productionApi.createCategorieClient(value),
+    onSuccess: async () => {
+      setEditing(null);
+      setDialogOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "categories-client"] });
+      toast.success("Catégorie client enregistrée");
+    },
+    onError: showError,
+  });
+
+  return (
+    <ReferenceShell
+      title="Catégories client"
+      description="Catégories qui limitent les usages autorisés pour conventions, flottes et produits d'assistance."
+    >
+      <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setPayload(emptyCategorieClient()); setDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Ajouter catégorie
+        </Button>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier catégorie client" : "Ajouter catégorie client"}</DialogTitle>
+            <DialogDescription>Les usages cochés seront les seuls proposés pour cette catégorie. Aucun usage sélectionné signifie aucun filtre.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Field label="Code" required>
+              <Input value={payload.code} onChange={(event) => setPayload((current) => ({ ...current, code: event.target.value }))} />
+            </Field>
+            <Field label="Libellé" required>
+              <Input value={payload.libelle} onChange={(event) => setPayload((current) => ({ ...current, libelle: event.target.value }))} />
+            </Field>
+            <Field label="Usages autorisés">
+              <UsageMultiSelect
+                usages={usages.data ?? []}
+                value={payload.usageIds ?? []}
+                onChange={(usageIds) => setPayload((current) => ({ ...current, usageIds }))}
+              />
+            </Field>
+            <Flag label="Actif" checked={payload.actif} onChange={(actif) => setPayload((current) => ({ ...current, actif }))} />
+            <div className="flex items-end gap-2 lg:col-span-2">
+              <Button disabled={save.isPending} onClick={() => {
+                const parsed = clientCategorySchema.safeParse(cleanTextPayload(payload));
+                if (!parsed.success) {
+                  toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
+                  return;
+                }
+                save.mutate({ id: editing?.id, value: parsed.data });
+              }}>
+                <Plus className="size-4" />
+                {editing ? "Modifier" : "Ajouter"}
+              </Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Card className="border-border/70 shadow-none">
+        <CardHeader><CardTitle className="text-base">Liste des catégories client</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
+                <TableRow className="hover:bg-emerald-700">
+                  <TableHead>Code</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead>Usages autorisés</TableHead>
+                  <TableHead>Actif</TableHead>
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(categories.data ?? []).map((categorie) => (
+                  <TableRow key={categorie.id}>
+                    <TableCell className="font-medium">{categorie.code ?? "-"}</TableCell>
+                    <TableCell>{categorie.libelle}</TableCell>
+                    <TableCell>{categoryUsageSummary(categorie)}</TableCell>
+                    <TableCell>{categorie.actif === false ? "Non" : "Oui"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" onClick={() => { setEditing(categorie); setDialogOpen(true); }} aria-label={`Modifier ${categorie.libelle}`}>
+                        <Edit className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!categories.isLoading && (categories.data ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Aucune catégorie client.</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </ReferenceShell>
+  );
+}
+
 type TransportCategoryPayload = {
   code: string;
   libelle: string;
   description?: string;
   actif?: boolean;
 };
+
+function emptyCategorieClient(): UpsertCategorieClientRequest {
+  return { code: "", libelle: "", usageIds: [], actif: true };
+}
 
 export function UsagesSettingsPage() {
   const queryClient = useQueryClient();
@@ -1060,6 +1189,71 @@ function Flag({ label, checked, onChange }: { label: string; checked?: boolean; 
   );
 }
 
+function UsageMultiSelect({
+  usages,
+  value,
+  onChange,
+}: {
+  usages: ReferenceOption[];
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const selected = usages.filter((usage) => value.includes(usage.id));
+  const label = selected.length === 0
+    ? "Tous les usages"
+    : selected.length === 1
+      ? usageLabel(selected[0])
+      : `${selected.length} usages sélectionnés`;
+
+  const toggle = (usageId: string) => {
+    const ids = new Set(value);
+    if (ids.has(usageId)) {
+      ids.delete(usageId);
+    } else {
+      ids.add(usageId);
+    }
+    onChange(Array.from(ids));
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 w-full justify-between border-slate-300 bg-slate-50/70 px-3 font-normal shadow-none dark:border-slate-600 dark:bg-slate-900"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="size-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder="Rechercher usage..." />
+          <CommandList>
+            <CommandEmpty>Aucun usage.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="__all__" onSelect={() => onChange([])}>
+                <Check className={cn("size-4", value.length === 0 ? "opacity-100" : "opacity-0")} />
+                Tous les usages
+              </CommandItem>
+              {usages.map((usage) => {
+                const checked = value.includes(usage.id);
+                return (
+                  <CommandItem key={usage.id} value={usageLabel(usage)} onSelect={() => toggle(usage.id)}>
+                    <Check className={cn("size-4", checked ? "opacity-100" : "opacity-0")} />
+                    <span className="truncate">{usageLabel(usage)}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function useReference(path: string) {
   return useQuery({
     queryKey: ["referentiel", path],
@@ -1258,6 +1452,25 @@ function usageCriteria(usage: ReferenceOption) {
     usage.byCategorieTransport ? "Catégorie transport" : null,
   ].filter(Boolean);
   return flags.length ? flags.join(", ") : "-";
+}
+
+function usageLabel(usage: ReferenceOption) {
+  return `${usage.code ? `${usage.code} - ` : ""}${usage.libelle}`;
+}
+
+function categoryUsageSummary(category: ReferenceOption) {
+  const codes = refArray(category, "usageCodes").filter(Boolean);
+  const libelles = refArray(category, "usageLibelles").filter(Boolean);
+  if (codes.length === 0 && libelles.length === 0) {
+    return "Tous les usages";
+  }
+  return codes.length > 0 ? codes.join(", ") : libelles.join(", ");
+}
+
+function refArray(item: ReferenceOption | Record<string, unknown>, key: string) {
+  const value = item[key];
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => String(entry));
 }
 
 function cleanTextPayload<T extends Record<string, unknown>>(payload: T): T {

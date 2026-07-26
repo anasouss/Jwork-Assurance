@@ -39,6 +39,12 @@ export function ContratFormLayout({
   showFractionnement = true,
   order = "mono",
 }: Props) {
+  const souscripteurCategorieClientId = form.clients.find((client) => client.role === "SOUSCRIPTEUR")?.client.categorieClientId ?? "";
+  const proprietaireCategorieClientId = form.clients.find((client) => client.role === "PROPRIETAIRE")?.client.categorieClientId ?? "";
+  const assistanceCategorieClientId = order === "flotte"
+    ? proprietaireCategorieClientId || souscripteurCategorieClientId
+    : souscripteurCategorieClientId;
+
   const clientSections = (
     <ClientSection
       clients={form.clients}
@@ -105,6 +111,7 @@ export function ContratFormLayout({
       compagniesAssistance={form.refs.compagniesAssistance.data ?? []}
       produitsAssistance={form.refs.produitsAssistance.data ?? []}
       assistanceUsageId={form.usageId}
+      assistanceCategorieClientId={assistanceCategorieClientId}
     />
   );
 
@@ -130,6 +137,7 @@ export function ContratFormLayout({
       previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
       onPreviewQuittance={form.handlePreview}
       setAssistanceEnabled={form.setAssistanceEnabled}
+      assistanceCategorieClientId={assistanceCategorieClientId}
       maxRemorques={maxRemorques}
       errors={form.validationErrors}
     />

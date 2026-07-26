@@ -31,6 +31,13 @@ export const transportCategorySchema = z.object({
   actif: z.boolean().optional(),
 });
 
+export const clientCategorySchema = z.object({
+  code: z.string().min(2, "Code obligatoire"),
+  libelle: z.string().min(2, "Libelle obligatoire"),
+  usageIds: z.array(z.string()).optional(),
+  actif: z.boolean().optional(),
+});
+
 export const grilleTarifaireSchema = z.object({
   compagnieAssuranceId: z.string().min(1, "Compagnie obligatoire"),
   libelle: z.string().min(2, "Libelle obligatoire"),

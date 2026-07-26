@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +39,7 @@ export function GarantieSection({
   compagniesAssistance = [],
   produitsAssistance = [],
   assistanceUsageId,
+  assistanceCategorieClientId,
 }: {
   garanties: ReferenceOption[];
   selected: GarantieInput[];
@@ -63,6 +65,7 @@ export function GarantieSection({
   compagniesAssistance?: ReferenceOption[];
   produitsAssistance?: ReferenceOption[];
   assistanceUsageId?: string;
+  assistanceCategorieClientId?: string;
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
   const vehiculeGaranties = garanties
@@ -379,6 +382,7 @@ export function GarantieSection({
               compagniesAssistance={compagniesAssistance}
               produitsAssistance={produitsAssistance}
               usageId={assistanceUsageId}
+              categorieClientId={assistanceCategorieClientId}
             />
           </div>
         ) : (
@@ -528,23 +532,34 @@ function AssistanceTable({
   compagniesAssistance,
   produitsAssistance,
   usageId,
+  categorieClientId,
 }: {
   assistance: AssistanceDraft;
   onChange: (patch: Partial<AssistanceDraft>) => void;
   compagniesAssistance: ReferenceOption[];
   produitsAssistance: ReferenceOption[];
   usageId?: string;
+  categorieClientId?: string;
 }) {
   const filteredProducts = produitsAssistance.filter((produit) => {
     if (assistance.compagnieAssistanceId && produit.compagnieAssistanceId !== assistance.compagnieAssistanceId) {
       return false;
     }
+    if (!assistanceProductMatchesCategory(produit, categorieClientId)) {
+      return false;
+    }
     const usageIds = Array.isArray(produit.usageIds) ? produit.usageIds.map(String) : [];
     return usageIds.length === 0 || !usageId || usageIds.includes(usageId);
   });
-  const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId)
-    ?? produitsAssistance.find((produit) => produit.id === assistance.produitAssistanceId);
+  const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
+  const selectedProductId = selectedProduct?.id ?? "";
   const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+
+  useEffect(() => {
+    if (assistance.produitAssistanceId && !selectedProductId) {
+      onChange({ produitAssistanceId: undefined });
+    }
+  }, [assistance.produitAssistanceId, onChange, selectedProductId]);
 
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -608,7 +623,7 @@ function AssistanceTable({
             <td className="px-3 py-2">
               <Select
                 disabled={!assistance.enabled || filteredProducts.length === 0}
-                value={assistance.produitAssistanceId ?? ""}
+                value={selectedProductId}
                 onValueChange={(value) => onChange({ produitAssistanceId: value })}
               >
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -952,6 +967,12 @@ function estimatePrime(line?: ReferenceOption, capital?: number) {
     return (capital * taux) / 100;
   }
   return prime;
+}
+
+function assistanceProductMatchesCategory(produit: ReferenceOption, categorieClientId?: string) {
+  const productCategoryId = produit.categorieClientId == null ? "" : String(produit.categorieClientId);
+  if (!productCategoryId) return true;
+  return Boolean(categorieClientId) && productCategoryId === String(categorieClientId);
 }
 
 function numeric(value: unknown) {

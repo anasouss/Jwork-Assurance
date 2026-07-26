@@ -1,6 +1,7 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
+import com.assurance.dto.request.UpsertCategorieClientRequest;
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
 import com.assurance.dto.request.UpsertCompagnieAssistanceRequest;
 import com.assurance.dto.request.UpsertCodeReferenceRequest;
@@ -387,6 +388,8 @@ public class ReferentielController {
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> produitsAssistance(
             @RequestParam(required = false) Long compagnieAssistanceId,
+            @RequestParam(required = false) Long categorieClientId,
+            @RequestParam(required = false) Long usageId,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
         return ResponseEntity.ok(ApiResponse.success(produitAssistanceRepository.findAll(Sort.by("libelle")).stream()
@@ -394,6 +397,13 @@ public class ReferentielController {
                 .filter(produit -> compagnieAssistanceId == null
                         || (produit.getCompagnieAssistance() != null
                         && produit.getCompagnieAssistance().getId().equals(compagnieAssistanceId)))
+                .filter(produit -> categorieClientId == null
+                        || produit.getCategorieClient() == null
+                        || produit.getCategorieClient().getId().equals(categorieClientId))
+                .filter(produit -> usageId == null
+                        || produit.getUsages() == null
+                        || produit.getUsages().isEmpty()
+                        || produit.getUsages().stream().anyMatch(usage -> usage.getId().equals(usageId)))
                 .map(this::toProduitAssistanceResponse)
                 .toList()));
     }
@@ -881,14 +891,36 @@ public class ReferentielController {
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> categoriesClient() {
         return ResponseEntity.ok(ApiResponse.success(categorieClientRepository.findAllByOrderByLibelleAsc().stream()
-                .map(categorie -> option(categorie.getId(), categorie.getCode(), categorie.getLibelle())
-                        .putValue("usageIds", categorie.getUsages().stream()
-                                .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
-                                .map(Usage::getId)
-                                .toList())
-                        .putValue("actif", categorie.getActif())
-                        .map())
+                .map(this::toCategorieClientResponse)
                 .toList()));
+    }
+
+    @PostMapping("/categories-client")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createCategorieClient(
+            @Valid @RequestBody UpsertCategorieClientRequest request
+    ) {
+        categorieClientRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code categorie client deja utilise");
+        });
+        CategorieClient categorie = new CategorieClient();
+        applyCategorieClientRequest(categorie, request);
+        return ResponseEntity.ok(ApiResponse.success(toCategorieClientResponse(categorieClientRepository.save(categorie)), "Categorie client creee"));
+    }
+
+    @PutMapping("/categories-client/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateCategorieClient(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertCategorieClientRequest request
+    ) {
+        CategorieClient categorie = categorieClientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", id));
+        categorieClientRepository.findByCodeIgnoreCase(request.getCode())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Code categorie client deja utilise");
+                });
+        applyCategorieClientRequest(categorie, request);
+        return ResponseEntity.ok(ApiResponse.success(toCategorieClientResponse(categorieClientRepository.save(categorie)), "Categorie client modifiee"));
     }
 
     @GetMapping("/groupes-usage-attestation")
@@ -1412,6 +1444,17 @@ public class ReferentielController {
             if (foundUsages.size() != request.getUsageIds().size()) {
                 throw new ResourceNotFoundException("Usage", request.getUsageIds());
             }
+            if (categorieClient != null && categorieClient.getUsages() != null && !categorieClient.getUsages().isEmpty()) {
+                Set<Long> allowedUsageIds = categorieClient.getUsages().stream()
+                        .map(Usage::getId)
+                        .collect(java.util.stream.Collectors.toSet());
+                boolean incompatibleUsage = foundUsages.stream()
+                        .map(Usage::getId)
+                        .anyMatch(usageId -> !allowedUsageIds.contains(usageId));
+                if (incompatibleUsage) {
+                    throw new BadRequestException("Les usages selectionnes ne correspondent pas a la categorie client");
+                }
+            }
             usages.addAll(foundUsages.stream()
                     .sorted(Comparator.comparing(Usage::getCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                     .toList());
@@ -1428,6 +1471,23 @@ public class ReferentielController {
         produit.getUsages().clear();
         produit.getUsages().addAll(usages);
         produit.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private void applyCategorieClientRequest(CategorieClient categorie, UpsertCategorieClientRequest request) {
+        List<Usage> usages = request.getUsageIds() == null || request.getUsageIds().isEmpty()
+                ? List.of()
+                : usageRepository.findAllById(request.getUsageIds());
+        if (request.getUsageIds() != null && usages.size() != request.getUsageIds().size()) {
+            throw new ResourceNotFoundException("Usage", request.getUsageIds());
+        }
+        categorie.setCode(request.getCode().trim().toUpperCase());
+        categorie.setLibelle(request.getLibelle().trim());
+        if (categorie.getUsages() == null) {
+            categorie.setUsages(new HashSet<>());
+        }
+        categorie.getUsages().clear();
+        categorie.getUsages().addAll(usages);
+        categorie.setActif(request.getActif() == null ? true : request.getActif());
     }
 
     private void applyTarifProduitAssistanceRequest(
@@ -1526,6 +1586,18 @@ public class ReferentielController {
                 .putValue("dateDebutTarif", tarif != null ? tarif.getDateDebut() : null)
                 .putValue("dateFinTarif", tarif != null ? tarif.getDateFin() : null)
                 .putValue("actif", produit.getActif())
+                .map();
+    }
+
+    private Map<String, Object> toCategorieClientResponse(CategorieClient categorie) {
+        List<Usage> usages = categorie.getUsages() == null ? List.of() : categorie.getUsages().stream()
+                .sorted(Comparator.comparing(Usage::getCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+        return option(categorie.getId(), categorie.getCode(), categorie.getLibelle())
+                .putValue("usageIds", usages.stream().map(Usage::getId).toList())
+                .putValue("usageCodes", usages.stream().map(Usage::getCode).toList())
+                .putValue("usageLibelles", usages.stream().map(Usage::getLibelle).toList())
+                .putValue("actif", categorie.getActif())
                 .map();
     }
 

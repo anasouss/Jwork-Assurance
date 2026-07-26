@@ -126,6 +126,7 @@ export default function ProspectionPage() {
       toast.error("Sélectionnez au moins un usage");
       return;
     }
+    const previewWindow = window.open("", "_blank", "noopener,noreferrer");
     setGeneratingPdf(true);
     try {
       const blob = await productionApi.downloadDevisPdf(pdfTarget.id, {
@@ -140,10 +141,13 @@ export default function ProspectionPage() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.open(url, "_blank", "noopener,noreferrer");
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      }
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       toast.success("PDF généré");
     } catch (error) {
+      previewWindow?.close();
       toast.error(error instanceof Error ? error.message : "Génération du PDF impossible");
     } finally {
       setGeneratingPdf(false);

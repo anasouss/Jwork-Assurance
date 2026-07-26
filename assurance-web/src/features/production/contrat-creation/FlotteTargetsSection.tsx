@@ -81,7 +81,7 @@ type Props = {
   preview?: QuittancePreview | null;
   previewing?: boolean;
   saving?: boolean;
-  onPreviewQuittance?: (target?: Target) => void;
+  onPreviewQuittance?: (target: Target) => void;
   onSaveDraft?: (label: string, onSuccess?: () => void) => void;
   onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
   onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;

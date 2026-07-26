@@ -81,7 +81,7 @@ export function GarantieSection({
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
   const personneIds = new Set(personneGaranties.map((garantie) => garantie.id));
   const showPersonneTotals = selected.some((item) => personneIds.has(item.garantieId))
-    || lineTaxeParafiscale(preview, "CORPOREL") != null
+    || linePrimeNette(preview, "CORPOREL") != null
     || (preview?.accessoire ?? 0) > 0;
   const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || linePrimeNette(preview, "ASSISTANCE") != null;
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
@@ -517,7 +517,7 @@ function GuaranteeTotalsSummary({
     ["TOTAL À PAYER", preview?.primeTotale],
   ];
   if (showPersonneTotals) {
-    rows.splice(2, 0, ["PTA (Prime Personne)", lineTaxeParafiscale(preview, "CORPOREL")], ["ACCESSOIRE", preview?.accessoire]);
+    rows.splice(2, 0, ["PTA (Prime Personne)", linePrimeNette(preview, "CORPOREL")], ["ACCESSOIRE", preview?.accessoire]);
   }
   if (showAssistanceTotal) {
     rows.push(["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")]);
@@ -669,10 +669,6 @@ function AssistanceTable({
 
 function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
   return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
-}
-
-function lineTaxeParafiscale(preview: QuittancePreview | null | undefined, categorie: string) {
-  return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.taxeParafiscale;
 }
 
 function autoPrimeDisplay(value?: number) {

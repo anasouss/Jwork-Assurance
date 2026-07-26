@@ -625,7 +625,7 @@ function QuittanceTotalsSummary({
   showAssistanceTotal?: boolean;
 }) {
   const evcatNet = linePrimeNette(preview, "EVCAT");
-  const pta = lineTaxeParafiscale(preview, "CORPOREL");
+  const pta = linePrimeNette(preview, "CORPOREL");
   const assistanceNet = linePrimeNette(preview, "ASSISTANCE");
   const totalNetWithoutEvcat = subtractOptional(preview?.primeNette, evcatNet);
   const totalTax = addOptional(preview?.taxe, preview?.taxeParafiscale);
@@ -659,10 +659,6 @@ function QuittanceTotalsSummary({
 
 function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
   return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
-}
-
-function lineTaxeParafiscale(preview: QuittancePreview | null | undefined, categorie: string) {
-  return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.taxeParafiscale;
 }
 
 function previewGuaranteeLine(

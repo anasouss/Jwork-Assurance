@@ -28,6 +28,7 @@ public class UpsertGarantieRequest {
     private Boolean avecFranchise;
     private Boolean avecCapital;
     private Boolean tarificationMultiple;
+    private Set<ModeTarificationGarantie> modesTarificationMultiple;
     private Set<ModeTarificationGarantie> modesAutorises;
     private ModeTarificationGarantie modeParDefaut;
     private Set<SourceValeurGarantie> sourcesValeurAutorisees;

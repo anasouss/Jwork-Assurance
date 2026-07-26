@@ -1206,6 +1206,13 @@ public class ReferentielController {
         if (typeGarantie == TypeGarantie.VEHICULE && (modeParDefaut == ModeTarificationGarantie.PROTECTION || modes.contains(ModeTarificationGarantie.PROTECTION))) {
             throw new BadRequestException("Le mode PROTECTION est reserve aux garanties personne");
         }
+        LinkedHashSet<ModeTarificationGarantie> modesTarificationMultiple = new LinkedHashSet<>(
+                request.getModesTarificationMultiple() == null ? Set.of() : request.getModesTarificationMultiple()
+        );
+        modesTarificationMultiple.removeIf(mode -> !modes.contains(mode));
+        if (Boolean.TRUE.equals(request.getTarificationMultiple()) && modesTarificationMultiple.isEmpty() && typeGarantie == TypeGarantie.VEHICULE) {
+            modesTarificationMultiple.add(modeParDefaut);
+        }
 
         LinkedHashSet<SourceValeurGarantie> sources = new LinkedHashSet<>(
                 request.getSourcesValeurAutorisees() == null ? Set.of() : request.getSourcesValeurAutorisees()
@@ -1228,7 +1235,9 @@ public class ReferentielController {
         garantie.setRequiertValeurGlace(Boolean.TRUE.equals(request.getRequiertValeurGlace()));
         garantie.setAvecFranchise(Boolean.TRUE.equals(request.getAvecFranchise()));
         garantie.setAvecCapital(Boolean.TRUE.equals(request.getAvecCapital()));
-        garantie.setTarificationMultiple(Boolean.TRUE.equals(request.getTarificationMultiple()));
+        garantie.setTarificationMultiple(!modesTarificationMultiple.isEmpty());
+        garantie.getModesTarificationMultiple().clear();
+        garantie.getModesTarificationMultiple().addAll(modesTarificationMultiple);
         garantie.setModeParDefaut(modeParDefaut);
         garantie.getModesAutorises().clear();
         garantie.getModesAutorises().addAll(modes);
@@ -1261,6 +1270,7 @@ public class ReferentielController {
                 .putValue("avecFranchise", garantie.getAvecFranchise())
                 .putValue("avecCapital", garantie.getAvecCapital())
                 .putValue("tarificationMultiple", garantie.getTarificationMultiple())
+                .putValue("modesTarificationMultiple", garantie.getModesTarificationMultiple())
                 .putValue("modeParDefaut", garantie.getModeParDefaut())
                 .putValue("modesAutorises", garantie.getModesAutorises())
                 .putValue("sourceValeurParDefaut", garantie.getSourceValeurParDefaut())

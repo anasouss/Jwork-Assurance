@@ -571,6 +571,7 @@ export type UpsertGarantieRequest = {
   avecFranchise?: boolean;
   avecCapital?: boolean;
   tarificationMultiple?: boolean;
+  modesTarificationMultiple?: string[];
   modesAutorises?: string[];
   modeParDefaut?: string;
   sourcesValeurAutorisees?: string[];

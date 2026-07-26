@@ -679,7 +679,38 @@ export function GarantiesSettingsPage() {
         return current;
       }
       const modeParDefaut = modes.includes(current.modeParDefaut ?? "") ? current.modeParDefaut : modes[0];
-      return { ...current, modesAutorises: modes, modeParDefaut };
+      const modesTarificationMultiple = (current.modesTarificationMultiple ?? []).filter((item) => modes.includes(item));
+      return { ...current, modesAutorises: modes, modeParDefaut, modesTarificationMultiple, tarificationMultiple: modesTarificationMultiple.length > 0 };
+    });
+  };
+
+  const setTarificationMultiple = (checked: boolean) => {
+    setPayload((current) => {
+      if (!checked) {
+        return { ...current, tarificationMultiple: false, modesTarificationMultiple: [] };
+      }
+      const fallbackMode = current.modeParDefaut && current.modeParDefaut !== "PROTECTION"
+        ? current.modeParDefaut
+        : (current.modesAutorises ?? []).find((mode) => mode !== "PROTECTION");
+      return {
+        ...current,
+        tarificationMultiple: Boolean(fallbackMode),
+        modesTarificationMultiple: fallbackMode ? [fallbackMode] : [],
+      };
+    });
+  };
+
+  const setMultipleModeAllowed = (mode: string, checked: boolean) => {
+    setPayload((current) => {
+      if (!(current.modesAutorises ?? []).includes(mode)) {
+        return current;
+      }
+      const modesTarificationMultiple = toggleArray(current.modesTarificationMultiple ?? [], mode, checked);
+      return {
+        ...current,
+        tarificationMultiple: modesTarificationMultiple.length > 0,
+        modesTarificationMultiple,
+      };
     });
   };
 
@@ -706,6 +737,8 @@ export function GarantiesSettingsPage() {
         requiertValeurGlace: false,
         avecFranchise: false,
         avecCapital: true,
+        tarificationMultiple: false,
+        modesTarificationMultiple: [],
       });
       return;
     }
@@ -713,6 +746,8 @@ export function GarantiesSettingsPage() {
       typeGarantie,
       modesAutorises: ["TAUX"],
       modeParDefaut: "TAUX",
+      tarificationMultiple: false,
+      modesTarificationMultiple: [],
     });
   };
 
@@ -764,7 +799,7 @@ export function GarantiesSettingsPage() {
               <Flag label="Défense et recours" checked={payload.defenseRecours} onChange={(value) => update({ defenseRecours: value })} />
               <Flag label="Avec capital" checked={payload.avecCapital} onChange={(value) => update({ avecCapital: value })} />
               <Flag label="Avec franchise" checked={payload.avecFranchise} onChange={(value) => update({ avecFranchise: value })} />
-              <Flag label="Tarification multiple" checked={payload.tarificationMultiple} onChange={(value) => update({ tarificationMultiple: value })} />
+              <Flag label="Tarification multiple" checked={(payload.modesTarificationMultiple ?? []).length > 0} onChange={setTarificationMultiple} />
               <Flag label="Saisie manuelle" checked={payload.saisieManuelleAutorisee} onChange={(value) => update({ saisieManuelleAutorisee: value })} />
               <Flag label="Verrouillée" checked={payload.verrouillee} onChange={(value) => update({ verrouillee: value })} />
               <Flag label="Active" checked={payload.actif} onChange={(value) => update({ actif: value })} />
@@ -791,6 +826,21 @@ export function GarantiesSettingsPage() {
                     </SelectContent>
                   </Select>
                 </Field>
+                {(payload.modesAutorises ?? []).filter((mode) => mode !== "PROTECTION").length > 0 ? (
+                  <div className="grid gap-2">
+                    <div className="text-xs font-medium text-muted-foreground">Modes avec plusieurs formules</div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {(payload.modesAutorises ?? []).filter((mode) => mode !== "PROTECTION").map((mode) => (
+                        <Flag
+                          key={mode}
+                          label={modeLabel(mode)}
+                          checked={(payload.modesTarificationMultiple ?? []).includes(mode)}
+                          onChange={(checked) => setMultipleModeAllowed(mode, checked)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid gap-3 rounded-md border p-3">
@@ -1514,6 +1564,7 @@ function emptyGarantie(): UpsertGarantieRequest {
     avecFranchise: false,
     avecCapital: false,
     tarificationMultiple: false,
+    modesTarificationMultiple: [],
     modesAutorises: ["TAUX"],
     modeParDefaut: "TAUX",
     sourcesValeurAutorisees: [],
@@ -1541,6 +1592,7 @@ function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantie
     avecFranchise: Boolean(garantie.avecFranchise),
     avecCapital: Boolean(garantie.avecCapital),
     tarificationMultiple: Boolean(garantie.tarificationMultiple),
+    modesTarificationMultiple: stringArray(garantie.modesTarificationMultiple),
     modesAutorises: stringArray(garantie.modesAutorises, String(garantie.modeParDefaut ?? "TAUX")),
     modeParDefaut: String(garantie.modeParDefaut ?? "TAUX"),
     sourcesValeurAutorisees: stringArray(garantie.sourcesValeurAutorisees),
@@ -1559,6 +1611,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     .filter((mode) => allowedModes.includes(mode));
   const normalizedModes = modesAutorises.length ? modesAutorises : [allowedModes[0]];
   const modeParDefaut = normalizedModes.includes(payload.modeParDefaut ?? "") ? payload.modeParDefaut : normalizedModes[0];
+  const modesTarificationMultiple = (payload.modesTarificationMultiple ?? []).filter((mode) => normalizedModes.includes(mode));
 
   if (typeGarantie === "PERSONNE") {
     return {
@@ -1573,6 +1626,8 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
       requiertValeurGlace: false,
       avecFranchise: false,
       avecCapital: true,
+      tarificationMultiple: false,
+      modesTarificationMultiple: [],
     };
   }
 
@@ -1586,6 +1641,8 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     typeGarantie,
     modesAutorises: normalizedModes,
     modeParDefaut,
+    tarificationMultiple: modesTarificationMultiple.length > 0,
+    modesTarificationMultiple,
     sourcesValeurAutorisees,
     sourceValeurParDefaut,
   };

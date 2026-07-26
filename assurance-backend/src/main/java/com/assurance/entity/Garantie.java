@@ -88,6 +88,13 @@ public class Garantie extends BaseEntity {
 
     @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "garantie_modes_tarification_multiple", joinColumns = @JoinColumn(name = "garantie_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_tarification", nullable = false, length = 40)
+    private Set<ModeTarificationGarantie> modesTarificationMultiple = new LinkedHashSet<>();
+
+    @Builder.Default
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "garantie_modes_tarification", joinColumns = @JoinColumn(name = "garantie_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "mode_tarification", nullable = false, length = 40)

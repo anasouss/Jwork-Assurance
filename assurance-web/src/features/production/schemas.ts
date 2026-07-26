@@ -130,6 +130,7 @@ export const garantieSchema = z.object({
   avecFranchise: z.boolean().optional(),
   avecCapital: z.boolean().optional(),
   tarificationMultiple: z.boolean().optional(),
+  modesTarificationMultiple: z.array(z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"])).optional(),
   modesAutorises: z.array(z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"])).min(1, "Au moins un mode est obligatoire"),
   modeParDefaut: z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"]),
   sourcesValeurAutorisees: z.array(z.enum(["VENALE", "NEUF", "GLACE", "MANUEL"])).optional(),
@@ -147,6 +148,10 @@ export const garantieSchema = z.object({
   }
   if (value.typeGarantie === "VEHICULE" && (value.modeParDefaut === "PROTECTION" || value.modesAutorises.includes("PROTECTION"))) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Le mode PROTECTION est réservé aux garanties personne" });
+  }
+  const invalidMultipleMode = (value.modesTarificationMultiple ?? []).find((mode) => !value.modesAutorises.includes(mode));
+  if (invalidMultipleMode) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["modesTarificationMultiple"], message: "Les modes multiples doivent faire partie des modes autorisés" });
   }
   if (value.sourceValeurParDefaut !== "AUCUNE" && !(value.sourcesValeurAutorisees ?? []).includes(value.sourceValeurParDefaut)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["sourceValeurParDefaut"], message: "La source par défaut doit être autorisée" });

@@ -284,7 +284,7 @@ export function GrilleTarifaireConfigurator({
               const extraDrafts = groupDrafts.filter((draft) => !draft.baseRow);
               const mode = baseDraft.modeTarification || defaultMode(garantie);
               const enabled = baseDraft.checked;
-              const multiEntry = canAddMultipleRows(garantie);
+              const multiEntry = canAddMultipleRows(garantie, mode);
               return (
                 <TableRow key={garantie.id}>
                   <TableCell>
@@ -299,7 +299,12 @@ export function GrilleTarifaireConfigurator({
                         garantie={garantie}
                         value={mode}
                         disabled={!enabled}
-                        onChange={(value) => updateDraft(baseDraft.localKey, normalizeModePatch(value))}
+                        onChange={(value) => {
+                          updateDraft(baseDraft.localKey, normalizeModePatch(value));
+                          if (!canAddMultipleRows(garantie, value)) {
+                            setDrafts((current) => current.filter((draft) => draft.garantieId !== garantie.id || draft.baseRow));
+                          }
+                        }}
                       />
                       {extraDrafts.map((draft) => (
                         <ModeCell
@@ -815,8 +820,14 @@ function isConfigurableVehicleGarantie(garantie: ReferenceOption) {
     && !Boolean(garantie.responsabiliteCivile);
 }
 
-function canAddMultipleRows(garantie?: ReferenceOption) {
-  return Boolean(garantie?.tarificationMultiple);
+function canAddMultipleRows(garantie?: ReferenceOption, mode?: string) {
+  const configuredModes = Array.isArray(garantie?.modesTarificationMultiple)
+    ? garantie.modesTarificationMultiple.map((item) => String(item))
+    : [];
+  if (!mode) {
+    return configuredModes.length > 0 || Boolean(garantie?.tarificationMultiple);
+  }
+  return configuredModes.includes(mode);
 }
 
 function allowedModes(garantie?: ReferenceOption) {

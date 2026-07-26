@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @Order(2)
@@ -577,6 +578,11 @@ public class DataSeeder implements CommandLineRunner {
         garantie.setAvecCapital(avecCapital);
         garantie.setAvecFranchise(avecFranchise);
         garantie.setTarificationMultiple(tarificationMultiple);
+        if (garantie.getModesTarificationMultiple() == null) {
+            garantie.setModesTarificationMultiple(new LinkedHashSet<>());
+        }
+        garantie.getModesTarificationMultiple().clear();
+        garantie.getModesTarificationMultiple().addAll(defaultModesTarificationMultiple(code, tarificationMultiple, modeParDefaut));
         garantie.setOrdreAffichage(ordreAffichage);
         garantie.setModeParDefaut(modeParDefaut);
         if (garantie.getModesAutorises() == null) {
@@ -594,6 +600,17 @@ public class DataSeeder implements CommandLineRunner {
         garantie.setVerrouillee(verrouillee);
         garantie.setActif(true);
         return garantieRepository.save(garantie);
+    }
+
+    private Set<ModeTarificationGarantie> defaultModesTarificationMultiple(String code, boolean tarificationMultiple, ModeTarificationGarantie modeParDefaut) {
+        if (!tarificationMultiple) {
+            return Set.of();
+        }
+        return switch (code) {
+            case "DC", "DR", "RF", "BOR", "VOR" -> Set.of(ModeTarificationGarantie.CAPITAL);
+            case "DV" -> Set.of(ModeTarificationGarantie.TAUX);
+            default -> Set.of(modeParDefaut);
+        };
     }
 
     private CompagnieGarantie seedCompagnieGarantie(CompagnieAssurance compagnie, Garantie garantie) {

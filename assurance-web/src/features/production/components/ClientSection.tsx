@@ -398,7 +398,11 @@ export function ClientSection({
                     <Field label="Email">
                       <Input type="email" value={item.client.email ?? ""} onChange={(event) => updateClient(index, { email: event.target.value })} />
                     </Field>
-                    <TelephoneList client={item} updateClient={(patch) => updateClient(index, patch)} />
+                    <TelephoneList
+                      client={item}
+                      updateClient={(patch) => updateClient(index, patch)}
+                      error={errors[`clients.${index}.client.telephones`]}
+                    />
                   </div>
                   {showProprietaireConducteur ? (
                     <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -577,9 +581,11 @@ function LookupMessage({ state }: { state?: LookupState }) {
 function TelephoneList({
   client,
   updateClient,
+  error,
 }: {
   client: ClientInput;
   updateClient: (patch: Partial<ClientInput["client"]>) => void;
+  error?: string;
 }) {
   const telephones = client.client.telephones && client.client.telephones.length > 0
     ? client.client.telephones
@@ -612,7 +618,9 @@ function TelephoneList({
   return (
     <div className="grid gap-2 md:col-span-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">Téléphones</span>
+        <span className="text-sm font-medium">
+          Téléphones<span className="ml-1 text-red-500">*</span>
+        </span>
         <Button type="button" variant="outline" size="sm" onClick={addTelephone}>
           <Plus className="size-4" />
           Téléphone
@@ -621,7 +629,12 @@ function TelephoneList({
       <div className="grid gap-2">
         {telephones.map((telephone, index) => (
           <div key={index} className="grid gap-2 rounded-md border bg-muted/20 p-2 md:grid-cols-[1fr_auto_auto_auto]">
-            <Input value={telephone.numero} onChange={(event) => updateTelephone(index, { numero: event.target.value })} placeholder="Numéro" />
+            <Input
+              value={telephone.numero}
+              aria-invalid={Boolean(error)}
+              onChange={(event) => updateTelephone(index, { numero: event.target.value })}
+              placeholder="Numéro"
+            />
             <label className="flex items-center gap-2 text-xs">
               <Checkbox checked={Boolean(telephone.principal)} onCheckedChange={(checked) => updateTelephone(index, { principal: Boolean(checked) })} />
               Principal
@@ -636,6 +649,7 @@ function TelephoneList({
           </div>
         ))}
       </div>
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>
   );
 }

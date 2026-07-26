@@ -346,6 +346,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       if (typeContrat === "FLOTTE" && item.role === "PROPRIETAIRE" && !item.client.categorieClientId) {
         nextErrors[`clients.${index}.client.categorieClientId`] = "Catégorie obligatoire.";
       }
+      if (item.role === "PROPRIETAIRE" && !hasTelephone(item.client.telephones)) {
+        nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
+      }
       if (
         item.client.typeClient !== "PERSONNE_MORALE"
         && (item.role === "CONDUCTEUR" || (item.role === "PROPRIETAIRE" && item.client.conducteurHabituel !== false))
@@ -424,6 +427,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         }
         if (typeContrat === "FLOTTE" && role === "PROPRIETAIRE") {
           requireField(`clients.${index}.client.categorieClientId`, client.categorieClientId, "Catégorie obligatoire.");
+        }
+        if (role === "PROPRIETAIRE" && !hasTelephone(client.telephones)) {
+          nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
         }
         if (
           client.typeClient !== "PERSONNE_MORALE"
@@ -686,6 +692,10 @@ function referenceStringArray(option: ReferenceOption | null | undefined, key: s
 function principalTelephone(telephones?: { numero: string; principal?: boolean }[]) {
   const valid = (telephones ?? []).filter((telephone) => telephone.numero.trim());
   return valid.find((telephone) => telephone.principal)?.numero ?? valid[0]?.numero;
+}
+
+function hasTelephone(telephones?: { numero: string }[]) {
+  return (telephones ?? []).some((telephone) => telephone.numero.trim());
 }
 
 function defaultQuittanceLines(): QuittanceInput[] {

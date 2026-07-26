@@ -131,16 +131,26 @@ export async function apiFetchBlob(
       headers,
     });
     if (!retry.ok) {
-      throw new Error(`HTTP ${retry.status}`);
+      throw new Error(await responseErrorMessage(retry));
     }
     return await retry.blob();
   }
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    throw new Error(await responseErrorMessage(response));
   }
 
   return await response.blob();
+}
+
+async function responseErrorMessage(response: Response): Promise<string> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const errorData = await response.json().catch(() => ({}));
+    return errorData.message || `HTTP ${response.status}`;
+  }
+  const text = await response.text().catch(() => "");
+  return text || `HTTP ${response.status}`;
 }
 
 export async function apiUpload<T>(

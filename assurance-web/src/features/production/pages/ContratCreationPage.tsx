@@ -88,7 +88,7 @@ export default function ContratCreationPage() {
       typeContrat,
       compagnieAssuranceId: form.compagnieAssuranceId || undefined,
       conventionId: typeContrat === "CONVENTION" ? form.conventionId || undefined : undefined,
-      usageId: form.usageId || undefined,
+      usageId: typeContrat === "FLOTTE" ? undefined : form.usageId || undefined,
       grilleTarifaireId: typeContrat === "CONVENTION" ? assignedGrilleId || undefined : form.grilleTarifaireId || undefined,
       clients: typeContrat === "PARTICULIER"
         ? form.request.clients.map((client) =>

@@ -67,7 +67,7 @@ export default function ContratsPage() {
                         {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                       </Button>
                     </TableCell>
-                    <TableCell className="font-medium">{contrat.numeroContrat}</TableCell>
+                    <TableCell className="font-medium">{contrat.numeroContrat ?? contrat.numeroPolice ?? "-"}</TableCell>
                     <TableCell><TypeBadge type={contrat.typeContrat} /></TableCell>
                     <TableCell>{mainClient(contrat)}</TableCell>
                     <TableCell>{productLabel(contrat)}</TableCell>

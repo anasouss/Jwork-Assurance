@@ -187,7 +187,7 @@ export type AddLotAttestationRequest = {
 export type ElementFacturable = {
   id: string;
   contratId: string;
-  numeroContrat: string;
+  numeroContrat?: string;
   mouvementContratId?: string | null;
   codeMouvement?: string | null;
   libelleMouvement?: string | null;
@@ -413,7 +413,7 @@ export type CreateContratRequest = {
   usageId?: string;
   grilleTarifaireId?: string;
   typeContrat: TypeContrat;
-  numeroContrat: string;
+  numeroContrat?: string;
   numeroDevis?: string;
   numeroPolice?: string;
   numeroAttestation?: string;
@@ -631,7 +631,7 @@ export type UpsertCodeReferenceRequest = {
 
 export type ContratSummary = {
   id: string;
-  numeroContrat: string;
+  numeroContrat?: string | null;
   numeroPolice?: string | null;
   typeContrat: TypeContrat;
   statut: string;

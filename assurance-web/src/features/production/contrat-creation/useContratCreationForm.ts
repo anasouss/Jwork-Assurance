@@ -188,16 +188,17 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const modeSaisieGaranties = typeContrat === "PARTICULIER"
     ? saisiePrimeNette ? "MANUELLE_AVEC_PRIME_NETTE" : "MANUELLE"
     : "AUTOMATIQUE_GRILLE";
+  const contractUsageFallback = typeContrat === "FLOTTE" ? "" : usageId;
 
   const request = useMemo<CreateContratRequest>(() => ({
     agenceId: user?.agenceId ?? "",
     typeContrat,
-    numeroContrat,
+    numeroContrat: typeContrat === "FLOTTE" ? undefined : numeroContrat,
     numeroPolice,
-    numeroAttestation,
+    numeroAttestation: typeContrat === "FLOTTE" ? undefined : numeroAttestation,
     compagnieAssuranceId: emptyToUndefined(compagnieAssuranceId),
     conventionId: typeContrat === "CONVENTION" ? emptyToUndefined(conventionId) : undefined,
-    usageId: emptyToUndefined(usageId),
+    usageId: typeContrat === "FLOTTE" ? undefined : emptyToUndefined(usageId),
     grilleTarifaireId: typeContrat === "PARTICULIER" ? undefined : emptyToUndefined(grilleTarifaireId),
     dateEffet,
     dateEcheance,
@@ -226,14 +227,14 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     })),
     vehicules: vehicules.map((vehicule) => ({
       ...vehicule,
-      usageId: vehicule.usageId || usageId || undefined,
+      usageId: vehicule.usageId || contractUsageFallback || undefined,
       dateEffet: vehicule.dateEffet || dateEffet,
       dateEcheance: vehicule.dateEcheance || dateEcheance,
       crm: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : vehicule.crm,
     })),
     remorques: remorques.map((remorque) => ({
       ...remorque,
-      usageId: remorque.usageId || usageId || undefined,
+      usageId: remorque.usageId || contractUsageFallback || undefined,
     })),
     garanties,
     quittances: typeContrat === "PARTICULIER"
@@ -251,6 +252,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     compagnieAssuranceId,
     conventionId,
     usageId,
+    contractUsageFallback,
     grilleTarifaireId,
     dateEffet,
     dateEcheance,
@@ -477,7 +479,11 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     }
     if (section === "contrat") {
       requireField("compagnieAssuranceId", compagnieAssuranceId, "Compagnie obligatoire.");
-      requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
+      if (typeContrat === "FLOTTE") {
+        requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
+      } else {
+        requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
+      }
       requireField("typeRenouvellement", typeRenouvellement, "Type de contrat obligatoire.");
       requireField("dateEffet", dateEffet, "Date effet obligatoire.");
       requireField("dateEcheance", dateEcheance, "Date échéance obligatoire.");
@@ -497,7 +503,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     }
     if (section === "vehicule" || section === "flotteTargets") {
       request.vehicules.forEach((vehicule, index) => {
-        const vehiculeUsageId = vehicule.usageId || usageId;
+        const vehiculeUsageId = vehicule.usageId || contractUsageFallback;
         const vehiculeUsage = refs.usages.data?.find((usage) => usage.id === vehiculeUsageId);
         requireField(`vehicules.${index}.typeVehicule`, vehicule.typeVehicule, "Type véhicule obligatoire.");
         requireField(`vehicules.${index}.usageId`, vehiculeUsageId, "Usage véhicule obligatoire.");
@@ -880,7 +886,8 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
   if (typeContrat === "PARTICULIER") {
     return false;
   }
-  if (!request.agenceId || !request.numeroContrat || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
+  const hasContractReference = typeContrat === "FLOTTE" ? Boolean(request.numeroPolice) : Boolean(request.numeroContrat);
+  if (!request.agenceId || !hasContractReference || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
     return false;
   }
   if (typeContrat === "CONVENTION" && !request.conventionId) {

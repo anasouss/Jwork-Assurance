@@ -9,6 +9,7 @@ import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.StatutContrat;
+import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
@@ -139,6 +140,7 @@ public class ContratService {
     }
 
     private ContratResponse createContrat(CreateContratRequest request, Contrat contratOrigine) {
+        validateContractReference(request);
         if (hasText(request.getNumeroContrat()) && contratRepository.existsByAgenceIdAndNumeroContrat(request.getAgenceId(), request.getNumeroContrat())) {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
         }
@@ -349,6 +351,7 @@ public class ContratService {
         if (request.getTypeContrat() == null) {
             throw new BadRequestException("Le type de contrat est obligatoire");
         }
+        validateContractReference(request);
         CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
                 compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                         .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
@@ -1472,6 +1475,21 @@ public class ContratService {
 
     private String blankToNull(String value) {
         return hasText(value) ? value.trim() : null;
+    }
+
+    private void validateContractReference(CreateContratRequest request) {
+        if (request.getTypeContrat() == null) {
+            throw new BadRequestException("Le type de contrat est obligatoire");
+        }
+        if (request.getTypeContrat() == TypeContrat.FLOTTE) {
+            if (!hasText(request.getNumeroPolice())) {
+                throw new BadRequestException("Numero de police obligatoire pour un contrat flotte");
+            }
+            return;
+        }
+        if (!hasText(request.getNumeroContrat())) {
+            throw new BadRequestException("Numero de contrat obligatoire");
+        }
     }
 
     private ModeSaisieGarantieContrat resolveModeSaisieGaranties(CreateContratRequest request) {

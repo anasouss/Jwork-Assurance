@@ -12,7 +12,8 @@ const optionalNumber = z
 export const contratSchema = z.object({
   agenceId: z.string().min(1, "Agence obligatoire"),
   typeContrat: z.enum(["PARTICULIER", "CONVENTION", "FLOTTE"]),
-  numeroContrat: z.string().min(1, "Numero contrat obligatoire"),
+  numeroContrat: z.string().optional(),
+  numeroPolice: z.string().optional(),
   compagnieAssuranceId: z.string().optional(),
   usageId: z.string().optional(),
   grilleTarifaireId: z.string().optional(),
@@ -22,6 +23,16 @@ export const contratSchema = z.object({
   vehicules: z.array(z.any()),
   remorques: z.array(z.any()),
   garanties: z.array(z.any()),
+}).superRefine((value, ctx) => {
+  if (value.typeContrat === "FLOTTE") {
+    if (!value.numeroPolice?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["numeroPolice"], message: "Numero police obligatoire" });
+    }
+    return;
+  }
+  if (!value.numeroContrat?.trim()) {
+    ctx.addIssue({ code: "custom", path: ["numeroContrat"], message: "Numero contrat obligatoire" });
+  }
 });
 
 export const transportCategorySchema = z.object({

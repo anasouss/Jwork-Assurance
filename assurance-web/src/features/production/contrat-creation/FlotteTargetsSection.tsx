@@ -79,6 +79,7 @@ type Props = {
   produitsAssistance: ReferenceOption[];
   grilleSelected: boolean;
   preview?: QuittancePreview | null;
+  targetPreview?: QuittancePreview | null;
   previewing?: boolean;
   saving?: boolean;
   onPreviewQuittance?: (target: Target) => void;
@@ -114,6 +115,7 @@ export function FlotteTargetsSection({
   produitsAssistance,
   grilleSelected,
   preview,
+  targetPreview,
   previewing = false,
   saving = false,
   onPreviewQuittance,
@@ -175,6 +177,8 @@ export function FlotteTargetsSection({
     vehiculeTargets.find((target) => targetKey(target) === activeKey) ?? vehiculeTargets[0];
   const activeRemorqueTarget =
     remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
+  const activeVehiculePreview = previewForTarget(preview, targetPreview, activeVehiculeTarget);
+  const activeRemorquePreview = previewForTarget(preview, targetPreview, activeRemorqueTarget);
 
   useEffect(() => {
     if (!recalculationRequest || !onPreviewQuittance) {
@@ -401,9 +405,7 @@ export function FlotteTargetsSection({
                     type="button"
                     disabled={previewing || saving}
                     onClick={() => {
-                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule", () => {
-                        onPreviewQuittance?.(activeVehiculeTarget);
-                      });
+                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
@@ -426,13 +428,13 @@ export function FlotteTargetsSection({
                   onAssistanceChange={(patch) => updateAssistance(activeVehiculeTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
-                  preview={preview}
+                  preview={activeVehiculePreview}
                   previewing={previewing}
                   dirtyCalculationKeys={dirtyCalculationKeys}
                   onRequestCalculation={requestTargetCalculation}
                 />
                 <QuittanceTotalsSummary
-                  preview={preview}
+                  preview={activeVehiculePreview}
                   target={activeVehiculeTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeVehiculeTarget)}
@@ -523,9 +525,7 @@ export function FlotteTargetsSection({
                     type="button"
                     disabled={previewing || saving}
                     onClick={() => {
-                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque", () => {
-                        onPreviewQuittance?.(activeRemorqueTarget);
-                      });
+                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
@@ -548,13 +548,13 @@ export function FlotteTargetsSection({
                   onAssistanceChange={(patch) => updateAssistance(activeRemorqueTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
-                  preview={preview}
+                  preview={activeRemorquePreview}
                   previewing={previewing}
                   dirtyCalculationKeys={dirtyCalculationKeys}
                   onRequestCalculation={requestTargetCalculation}
                 />
                 <QuittanceTotalsSummary
-                  preview={preview}
+                  preview={activeRemorquePreview}
                   target={activeRemorqueTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeRemorqueTarget)}
@@ -762,6 +762,23 @@ function targetQuittanceSummary(preview: QuittancePreview | null | undefined, ta
     cnpac,
     totalAPayer,
   };
+}
+
+function previewForTarget(
+  preview: QuittancePreview | null | undefined,
+  targetPreview: QuittancePreview | null | undefined,
+  target?: Target
+) {
+  if (!target || !targetPreview) {
+    return preview;
+  }
+  if (backendTargetSummary(targetPreview, target)) {
+    return targetPreview;
+  }
+  if ((targetPreview.garanties ?? []).some((line) => previewLineMatchesTarget(line, target))) {
+    return targetPreview;
+  }
+  return preview;
 }
 
 function backendTargetSummary(preview: QuittancePreview, target: Target) {

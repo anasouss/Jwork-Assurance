@@ -57,6 +57,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const [garanties, setGaranties] = useState<GarantieInput[]>([]);
   const [quittances, setQuittances] = useState<QuittanceInput[]>(defaultQuittanceLines());
   const [preview, setPreview] = useState<QuittancePreview | null>(null);
+  const [targetPreview, setTargetPreview] = useState<QuittancePreview | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [savedSections, setSavedSections] = useState<Partial<Record<SavableContratSectionKey, boolean>>>({});
   const [hydratedDraftId, setHydratedDraftId] = useState<string | null>(null);
@@ -199,6 +200,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setRemorques(hydrated.remorques);
     setGaranties(hydrated.garanties);
     setPreview(hydrated.preview);
+    setTargetPreview(hydrated.targetPreview);
     setHydratedDraftId(draftId);
   }, [draftId, draftQuery.data, hydratedDraftId]);
 
@@ -340,13 +342,23 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     mutationFn: productionApi.previewQuittance,
     onSuccess: (data) => {
       setPreview(data);
+      setTargetPreview(null);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Prévisualisation impossible"),
   });
 
+  const targetPreviewMutation = useMutation({
+    mutationFn: productionApi.previewQuittance,
+    onSuccess: setTargetPreview,
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Calcul impossible"),
+  });
+
   const autoPreviewMutation = useMutation({
     mutationFn: productionApi.previewQuittance,
-    onSuccess: setPreview,
+    onSuccess: (data) => {
+      setPreview(data);
+      setTargetPreview(null);
+    },
     onError: () => setPreview(null),
   });
 
@@ -424,6 +436,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
           ...savedTargetGaranties,
         ]);
         setPreview(hydrated.preview);
+        setTargetPreview(hydrated.targetPreview);
       }
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
@@ -519,7 +532,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     if (!validateTarget(target, "garanties")) {
       return;
     }
-    previewMutation.mutate(scopedTargetRequest(request, target));
+    targetPreviewMutation.mutate(scopedTargetRequest(request, target));
   };
 
   const handleCreate = () => {
@@ -888,7 +901,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     draftId,
     draftQuery,
     preview,
+    targetPreview,
     previewMutation,
+    targetPreviewMutation,
     autoPreviewMutation,
     createMutation,
     saveDraftMutation,
@@ -1286,10 +1301,21 @@ function hydrateDraft(draft: ContratSummary) {
     remorques,
     garanties,
     preview: savedPreviewFromDraft(draft),
+    targetPreview: savedTargetPreviewFromDraft(draft),
   };
 }
 
 function savedPreviewFromDraft(draft: ContratSummary): QuittancePreview | null {
+  if (draft.quittancePreview) {
+    return draft.quittancePreview;
+  }
+  return null;
+}
+
+function savedTargetPreviewFromDraft(draft: ContratSummary): QuittancePreview | null {
+  if (draft.quittancePreview) {
+    return draft.quittancePreview;
+  }
   if (!draft.targetSummaries?.length) {
     return null;
   }

@@ -994,4 +994,5 @@ export type ContratSummary = {
   }[];
   elementsFacturables?: ElementFacturable[];
   targetSummaries?: QuittancePreview["targetSummaries"];
+  quittancePreview?: QuittancePreview | null;
 };

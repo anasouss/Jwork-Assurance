@@ -198,7 +198,8 @@ export function ContratFormLayout({
       produitsAssistance={form.refs.produitsAssistance.data ?? []}
       grilleSelected={Boolean(form.grilleTarifaireId)}
       preview={form.preview}
-      previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
+      targetPreview={form.targetPreview}
+      previewing={form.targetPreviewMutation.isPending}
       saving={form.saveDraftMutation.isPending || form.saveTargetDraftMutation.isPending}
       onPreviewQuittance={form.handlePreviewTarget}
       onSaveDraft={form.handleSaveDraft}

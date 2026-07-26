@@ -1304,7 +1304,7 @@ public class ContratService {
         List<ContratGarantie> garanties = buildGarantiesPreview(request, contrat, vehicules, remorques);
         contrat.getGaranties().addAll(garanties);
 
-        int unitesCnpac = Math.max(1, vehicules.size() + remorques.size());
+        int unitesCnpac = countCnpacUnits(garanties, vehicules, remorques);
         QuittanceCalculService.Resultat calcul = buildManualQuittanceResult(request);
         boolean quittanceManuelle = calcul != null;
         if (!quittanceManuelle) {
@@ -1642,9 +1642,10 @@ public class ContratService {
                     .primeTotale(element.getPrimeTotale())
                     .build());
         }
-        List<QuittanceResponse.TargetSummary> targetSummaries = !includeTargetSummaries || contrat.getGaranties().isEmpty()
+        QuittanceResponse quittancePreview = buildSavedQuittancePreview(contrat, includeTargetSummaries);
+        List<QuittanceResponse.TargetSummary> targetSummaries = quittancePreview == null
                 ? List.of()
-                : elementFacturableCibleService.calculer(contrat, contrat.getGaranties(), contrat.getVehicules(), contrat.getRemorques());
+                : quittancePreview.getTargetSummaries();
 
         return ContratResponse.builder()
                 .id(contrat.getId())
@@ -1693,7 +1694,91 @@ public class ContratService {
                 .mouvements(mouvements)
                 .elementsFacturables(elementsFacturables)
                 .targetSummaries(targetSummaries)
+                .quittancePreview(quittancePreview)
                 .build();
+    }
+
+    private QuittanceResponse buildSavedQuittancePreview(Contrat contrat, boolean include) {
+        if (!include || contrat.getGaranties().isEmpty()) {
+            return null;
+        }
+        int unitesCnpac = countCnpacUnits(contrat.getGaranties(), contrat.getVehicules(), contrat.getRemorques());
+        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, null, contrat.getGaranties(), unitesCnpac);
+        List<QuittanceResponse.TargetSummary> targetSummaries = elementFacturableCibleService.calculer(
+                contrat,
+                contrat.getGaranties(),
+                contrat.getVehicules(),
+                contrat.getRemorques()
+        );
+        return QuittanceResponse.builder()
+                .numeroContrat(contrat.getNumeroContrat())
+                .type("AN")
+                .categorie("TOTAL")
+                .globale(true)
+                .dateDebut(contrat.getDateEffet())
+                .dateFin(contrat.getDateEcheance())
+                .primeNette(calcul.primeNette())
+                .taxe(calcul.taxe())
+                .taxeParafiscale(calcul.taxeParafiscale())
+                .accessoire(calcul.accessoire())
+                .cnpac(calcul.cnpac())
+                .primeTotale(calcul.primeTotale())
+                .lignes(calcul.lignes().stream().map(this::toLignePreviewResponse).toList())
+                .garanties(contrat.getGaranties().stream()
+                        .map(garantie -> toGarantiePreviewResponse(garantie, contrat.getVehicules(), contrat.getRemorques()))
+                        .toList())
+                .targetSummaries(targetSummaries)
+                .build();
+    }
+
+    private int countCnpacUnits(List<ContratGarantie> garanties, List<Vehicule> vehicules, List<Remorque> remorques) {
+        Set<String> units = new LinkedHashSet<>();
+        for (ContratGarantie garantie : garanties == null ? List.<ContratGarantie>of() : garanties) {
+            if (!isResponsabiliteCivile(garantie)) {
+                continue;
+            }
+            String key = targetUnitKey(garantie, vehicules, remorques);
+            if (key != null) {
+                units.add(key);
+            }
+        }
+        if (!units.isEmpty()) {
+            return units.size();
+        }
+        int fallbackUnits = (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size());
+        return Math.max(1, fallbackUnits);
+    }
+
+    private boolean isResponsabiliteCivile(ContratGarantie contratGarantie) {
+        if (contratGarantie == null || contratGarantie.getGarantie() == null) {
+            return false;
+        }
+        Garantie garantie = contratGarantie.getGarantie();
+        String code = garantie.getCode() == null ? "" : garantie.getCode().trim().toUpperCase(Locale.ROOT);
+        return Boolean.TRUE.equals(garantie.getResponsabiliteCivile()) || "RC".equals(code);
+    }
+
+    private String targetUnitKey(ContratGarantie garantie, List<Vehicule> vehicules, List<Remorque> remorques) {
+        if (garantie.getVehicule() != null) {
+            Long id = garantie.getVehicule().getId();
+            return "V:" + (id != null ? id : identityIndex(vehicules, garantie.getVehicule()));
+        }
+        if (garantie.getRemorque() != null) {
+            Long id = garantie.getRemorque().getId();
+            return "R:" + (id != null ? id : identityIndex(remorques, garantie.getRemorque()));
+        }
+        return "CONTRAT";
+    }
+
+    private int identityIndex(List<?> items, Object target) {
+        if (items != null) {
+            for (int index = 0; index < items.size(); index++) {
+                if (items.get(index) == target) {
+                    return index;
+                }
+            }
+        }
+        return System.identityHashCode(target);
     }
 
     private Marque resolveMarque(Long marqueId, String marqueLibelle, boolean createIfMissing) {

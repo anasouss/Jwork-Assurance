@@ -72,7 +72,7 @@ public class DevisPdfService {
             writeLegend(writer, garantieCodes, garantieLabels);
             writeFranchises(writer, contrat, vehicules, garantieCodes);
             writeAssistances(writer, assistances);
-            writer.footer("Document genere par Skay Assurance. Le devis reste indicatif jusqu'a conversion en contrat.");
+            writer.close();
             document.save(output);
             return output.toByteArray();
         } catch (IOException | IllegalArgumentException ex) {
@@ -84,8 +84,8 @@ public class DevisPdfService {
         float width = 500;
         float x = (writer.pageWidth() - width) / 2;
         writer.rect(x, writer.y() - 52, width, 52, new Color(245, 248, 252), ACCENT);
-        writer.center("PROPOSITION D'ASSURANCE", x, writer.y() - 19, width, PDType1Font.HELVETICA_BOLD, 15, ACCENT);
-        writer.center("FLOTTE AUTOMOBILE", x, writer.y() - 39, width, PDType1Font.HELVETICA_BOLD, 15, ACCENT);
+        writer.center("PROPOSITION D'ASSURANCE", x, writer.y() - 19, width, PDType1Font.HELVETICA_BOLD, 13, ACCENT);
+        writer.center("FLOTTE AUTOMOBILE", x, writer.y() - 39, width, PDType1Font.HELVETICA_BOLD, 13, ACCENT);
         writer.moveDown(70);
     }
 
@@ -94,7 +94,7 @@ public class DevisPdfService {
         float leftW = (writer.pageWidth() - writer.margin() * 2) * 0.69f;
         float rightW = writer.pageWidth() - writer.margin() * 2 - leftW;
         writer.rect(writer.margin(), y - 50, leftW, 50, null, SOFT_BORDER);
-        writer.text("Assure : " + resolveAssure(contrat), writer.margin() + 8, y - 17, PDType1Font.HELVETICA_BOLD, 10, ACCENT, leftW - 16);
+        writer.text("Assuré : " + resolveAssure(contrat), writer.margin() + 8, y - 17, PDType1Font.HELVETICA_BOLD, 10, ACCENT, leftW - 16);
         writer.text("Adresse : " + resolveAddress(contrat), writer.margin() + 8, y - 33, PDType1Font.HELVETICA_BOLD, 9.4f, ACCENT, leftW - 16);
         writer.rect(writer.margin() + leftW, y - 50, rightW, 50, null, SOFT_BORDER);
         writer.right("Devis N° " + value(contrat.getNumeroDevis(), value(contrat.getNumeroPolice(), "DEV-" + contrat.getId())),
@@ -106,7 +106,7 @@ public class DevisPdfService {
         y = writer.y();
         writer.rect(writer.margin(), y - 58, writer.pageWidth() - writer.margin() * 2, 58, new Color(248, 250, 253), SOFT_BORDER);
         writer.text("Messieurs,", writer.margin() + 8, y - 14, PDType1Font.HELVETICA_BOLD, 10, Color.BLACK, 740);
-        writer.text("Nous avons l'honneur de vous communiquer ci-dessous notre proposition d'assurance automobile, correspondante a votre parc automobile, et ce pour la periode :",
+        writer.text("Nous avons l'honneur de vous communiquer ci-dessous notre proposition d'assurance automobile, correspondante à votre parc automobile, et ce pour la période :",
                 writer.margin() + 8, y - 30, PDType1Font.HELVETICA_BOLD, 9, Color.BLACK, 740);
         writer.text("Du " + formatDate(contrat.getDateEffet()) + "  Au " + formatDate(contrat.getDateEcheance()),
                 writer.margin() + 8, y - 47, PDType1Font.HELVETICA_BOLD, 10, ACCENT, 740);
@@ -125,29 +125,29 @@ public class DevisPdfService {
         int fixedColumns = 10;
         int totalColumns = fixedColumns + codes.size();
         float tableWidth = writer.pageWidth() - writer.margin() * 2;
-        float[] widths = new float[totalColumns];
-        widths[0] = 72;
-        widths[1] = 48;
-        widths[2] = 58;
-        widths[3] = 56;
-        widths[4] = 40;
-        widths[5] = 50;
-        widths[6] = 44;
-        widths[7] = 44;
-        widths[8] = 44;
-        widths[totalColumns - 1] = 62;
-        for (int i = 0; i < codes.size(); i++) {
-            widths[9 + i] = preferredGarantieWidth(codes.get(i));
+        float[] weights = new float[totalColumns];
+        for (int i = 0; i < totalColumns; i++) {
+            weights[i] = 1.0f;
         }
-        float diff = tableWidth - sum(widths, 0, totalColumns);
-        widths[totalColumns - 1] = Math.max(54, widths[totalColumns - 1] + diff);
+        weights[0] = 1.2f;
+        weights[1] = 1.3f;
+        weights[2] = 1.5f;
+        weights[3] = 1.2f;
+        weights[4] = 1.0f;
+        weights[5] = 1.0f;
+        weights[totalColumns - 1] = 1.4f;
+        float unit = tableWidth / sum(weights, 0, totalColumns);
+        float[] widths = new float[totalColumns];
+        for (int i = 0; i < totalColumns; i++) {
+            widths[i] = weights[i] * unit;
+        }
 
         writer.ensureRows(2 + vehicules.size() + 2, 18);
         float x = writer.margin();
         float y = writer.y();
         writer.cell(x, y, widths[0], 48, "Usage", true, HEADER_BG);
         writer.cell(x += widths[0], y, widths[1], 48, "Marque", true, HEADER_BG);
-        writer.cell(x += widths[1], y, widths[2], 48, "Nº d'immatric", true, HEADER_BG);
+        writer.cell(x += widths[1], y, widths[2], 48, "N° d'immatric", true, HEADER_BG);
         writer.cell(x += widths[2], y, widths[3], 48, "Date de MC", true, HEADER_BG);
         writer.cell(x += widths[3], y, widths[4], 48, "PF/PTC", true, HEADER_BG);
         writer.cell(x += widths[4], y, widths[5], 48, "ENERGIE", true, HEADER_BG);
@@ -157,8 +157,8 @@ public class DevisPdfService {
         writer.cell(writer.margin() + sum(widths, 0, totalColumns - 1), y, widths[totalColumns - 1], 48, "Montant total", true, HEADER_BG);
         y -= 24;
         x += widths[5];
-        writer.cell(x, y, widths[6], 24, "Valeur a Neuf", true, HEADER_BG);
-        writer.cell(x += widths[6], y, widths[7], 24, "Valeur Venale", true, HEADER_BG);
+        writer.cell(x, y, widths[6], 24, "Valeur à Neuf", true, HEADER_BG);
+        writer.cell(x += widths[6], y, widths[7], 24, "Valeur Vénale", true, HEADER_BG);
         writer.cell(x += widths[7], y, widths[8], 24, "Valeur des glaces", true, HEADER_BG);
         x += widths[8];
         for (int i = 0; i < codes.size(); i++) {
@@ -171,7 +171,7 @@ public class DevisPdfService {
         BigDecimal grandTotal = BigDecimal.ZERO;
         int rowIndex = 0;
         for (Vehicule vehicule : vehicules) {
-            Color bg = null;
+            Color bg = rowIndex % 2 == 0 ? null : ALT_ROW_BG;
             BigDecimal vehicleTotal = totalVehicule(contrat, vehicule).add(totalAssistance(assistances, vehicule));
             grandTotal = grandTotal.add(vehicleTotal);
             Map<String, List<ContratGarantie>> garanties = garantiesByCode(contrat, vehicule);
@@ -632,12 +632,7 @@ public class DevisPdfService {
             newPage();
         }
 
-        private void footer(String text) throws IOException {
-            if (y < 70) {
-                content.close();
-                newPage();
-            }
-            text(text, margin, 24, PDType1Font.HELVETICA_OBLIQUE, 8, Color.GRAY, pageWidth - margin * 2);
+        private void close() throws IOException {
             content.close();
         }
 

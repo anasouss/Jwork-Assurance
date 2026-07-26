@@ -16,7 +16,7 @@ import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { productionApi } from "../api";
 import { toDateOnly } from "../date";
-import { formatMoney, money, numberValue } from "../utils/format";
+import { formatMoney, money, numberValue, toNumber } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput, VehiculeResponse } from "../types";
 import type { ContratSectionKey } from "./useContratCreationForm";
@@ -1010,15 +1010,17 @@ function TargetGuaranteesTable({
     if (Boolean(garantie.responsabiliteCivile)) {
       return;
     }
+    const lineOptions = matchingLines(lignes, garantie, target);
+    const selectedLine = selectedLineFor(lineOptions);
     if (checked) {
-      const warning = valueWarning(garantie, target);
+      const warning = valueWarning(garantie, target, selectedLine);
       if (warning) {
         toast.error(warning);
         return;
       }
     }
     setSelected((current) => checked
-      ? [...current, targetedInput(garantie, target)]
+      ? [...current, { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target) }]
       : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target))));
   };
 
@@ -1048,15 +1050,14 @@ function TargetGuaranteesTable({
     <div className="grid gap-4">
       <div className="overflow-x-auto rounded-md border">
         <div className="border-b px-3 py-2 text-sm font-semibold">Garanties véhicule</div>
-        <table className="w-full min-w-[920px] border-collapse text-sm">
+        <table className="w-full min-w-[860px] border-collapse text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="w-12 px-3 py-3 text-left" />
               <th className="px-3 py-3 text-left">Garantie</th>
               <th className="w-44 px-3 py-3 text-left">Capital / valeur</th>
               <th className="w-36 px-3 py-3 text-left">Taux (%)</th>
-              <th className="w-40 px-3 py-3 text-left">Franchise (%)</th>
-              <th className="w-40 px-3 py-3 text-left">Min franchise</th>
+              <th className="w-56 px-3 py-3 text-left">Taux franchise / Min franchise</th>
               <th className="w-40 px-3 py-3 text-left">Prime nette</th>
             </tr>
           </thead>
@@ -1065,12 +1066,17 @@ function TargetGuaranteesTable({
               const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
               const checked = Boolean(item);
               const isRc = Boolean(garantie.responsabiliteCivile);
-              const hasLine = isRc || matchingLines(lignes, garantie, target).length > 0;
+              const lineOptions = matchingLines(lignes, garantie, target);
+              const selectedLine = selectedLineFor(lineOptions, item);
+              const hasLine = isRc || lineOptions.length > 0;
               const disabled = isRc || !grilleSelected || !hasLine;
               const editable = checked && !isRc;
-              const warning = checked ? valueWarning(garantie, target) : "";
-              const sourceOptions = target.kind === "vehicule" ? availableTargetValueSources(garantie, target) : [];
-              const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target) : "";
+              const warning = checked ? valueWarning(garantie, target, selectedLine) : "";
+              const sourceOptions = target.kind === "vehicule" ? availableTargetValueSources(garantie, target, selectedLine) : [];
+              const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target, selectedLine) : "";
+              const manualValue = defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL";
+              const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
+              const estimatedPrime = checked && !isRc ? estimateTargetPrime(selectedLine, displayCapital) : undefined;
 
               return (
                 <tr
@@ -1090,7 +1096,29 @@ function TargetGuaranteesTable({
                     {warning ? <div className="mt-1 text-xs text-destructive">{warning}</div> : null}
                   </td>
                   <td className="px-3 py-2">
-                    {sourceOptions.length > 1 ? (
+                    {manualValue ? (
+                      <Input
+                        type="number"
+                        disabled={!editable}
+                        className={controlClass(editable)}
+                        value={item?.valeurAssuree ?? item?.capital ?? ""}
+                        onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
+                      />
+                    ) : lineOptions.length > 1 && lineMode(selectedLine) === "CAPITAL" ? (
+                      <Select
+                        value={selectedLine?.id ?? ""}
+                        disabled={!editable}
+                        onValueChange={(value) => {
+                          const line = lineOptions.find((option) => option.id === value);
+                          update(garantie.id, targetLineSelectionPatch(garantie, line, target));
+                        }}
+                      >
+                        <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Formule" /></SelectTrigger>
+                        <SelectContent>
+                          {lineOptions.map((line) => <SelectItem key={line.id} value={line.id}>{capitalLineLabel(line)}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : sourceOptions.length > 1 ? (
                       <Select
                         value={selectedSource}
                         disabled={!editable}
@@ -1112,25 +1140,30 @@ function TargetGuaranteesTable({
                     ) : sourceOptions.length === 1 ? (
                       <Input readOnly disabled className={controlClass(false)} value={targetSourceOptionLabel(sourceOptions[0], target)} />
                     ) : (
-                      <Input
-                        type="number"
-                        disabled={!editable}
-                        className={controlClass(editable)}
-                        value={item?.valeurAssuree ?? item?.capital ?? ""}
-                        onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
-                      />
+                      <Input readOnly disabled className={controlClass(false)} value={capitalDisplay(garantie, selectedLine, target, displayCapital)} />
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <Input type="number" disabled={!editable} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
+                    {!isRc && lineOptions.length > 1 ? (
+                      <Select
+                        value={selectedLine?.id ?? ""}
+                        disabled={!editable}
+                        onValueChange={(value) => {
+                          const line = lineOptions.find((option) => option.id === value);
+                          update(garantie.id, targetLineSelectionPatch(garantie, line, target));
+                        }}
+                      >
+                        <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
+                        <SelectContent>
+                          {lineOptions.map((line, index) => <SelectItem key={line.id} value={line.id}>{tariffLineLabel(line, index)}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="block rounded-md px-3 py-2 text-right text-muted-foreground">{isRc ? "-" : rateDisplay(selectedLine)}</span>
+                    )}
                   </td>
-                  <td className="px-3 py-2">
-                    <Input type="number" disabled={!editable || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input type="number" disabled={!editable || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale ?? ""} onChange={(event) => update(garantie.id, { franchiseMinimale: numberValue(event.target.value) })} />
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{checked ? "Calcul auto" : "-"}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}</td>
                 </tr>
               );
             })}
@@ -1388,18 +1421,131 @@ function matchingLines(lignes: ReferenceOption[], garantie: ReferenceOption, tar
   if (!target) {
     return [];
   }
-  return lignes.filter((ligne) => {
-    if (ligne.garantieId && ligne.garantieId !== garantie.id) {
-      return false;
+  return lignes
+    .filter((ligne) => {
+      if (ligne.garantieId && ligne.garantieId !== garantie.id) {
+        return false;
+      }
+      if (ligne.usageId && ligne.usageId !== target.usageId) {
+        return false;
+      }
+      if (ligne.categorieTransportId) {
+        return target.kind === "vehicule" && ligne.categorieTransportId === target.categorieTransportId;
+      }
+      return true;
+    })
+    .sort((left, right) =>
+      (numberValue(String(left.ordreAffichage ?? "")) ?? 9999) - (numberValue(String(right.ordreAffichage ?? "")) ?? 9999)
+      || String(left.libelle ?? "").localeCompare(String(right.libelle ?? ""))
+    );
+}
+
+function selectedLineFor(lines: ReferenceOption[], item?: GarantieInput) {
+  return lines.find((line) => line.id === item?.ligneGrilleTarifaireId) ?? lines[0];
+}
+
+function targetLineSelectionPatch(garantie: ReferenceOption, line: ReferenceOption | undefined, target?: Target): Partial<GarantieInput> {
+  const mode = lineMode(line) || String(garantie.modeParDefaut ?? "TAUX");
+  const source = mode === "CAPITAL"
+    ? "AUCUNE"
+    : target ? defaultTargetSource(garantie, target, line) : defaultSource(garantie);
+  return {
+    ligneGrilleTarifaireId: line?.id,
+    modeSelectionne: mode,
+    sourceValeurSelectionnee: source,
+    valeurAssuree: undefined,
+    capital: undefined,
+    taux: toNumber(line?.taux),
+    prime: toNumber(line?.prime),
+    tauxFranchise: toNumber(line?.tauxFranchise),
+    franchiseMinimale: toNumber(line?.franchiseMinimale),
+  };
+}
+
+function lineMode(line?: ReferenceOption) {
+  return String(line?.modeTarification ?? "").toUpperCase();
+}
+
+function targetGuaranteeCapitalValue(garantie: ReferenceOption, line: ReferenceOption | undefined, target: Target, item?: GarantieInput) {
+  if (lineMode(line) === "CAPITAL") {
+    return toNumber(line?.capital);
+  }
+  if (defaultSource(garantie) === "MANUEL") {
+    return item?.valeurAssuree ?? item?.capital;
+  }
+  const source = selectedTargetValueSource(garantie, item, target, line);
+  if (target.kind === "vehicule") {
+    if (source === "VENALE") return target.valeurVenale;
+    if (source === "NEUF") return target.valeurNeuf;
+    if (source === "GLACE") return target.valeurGlace;
+  }
+  return target.kind === "remorque" ? target.valeurAssuree : toNumber(line?.capital);
+}
+
+function capitalDisplay(garantie: ReferenceOption, line: ReferenceOption | undefined, target: Target, capital?: number) {
+  if (lineMode(line) === "CAPITAL") {
+    return capital == null ? "" : money(capital);
+  }
+  if (target.kind === "vehicule") {
+    const source = selectedTargetValueSource(garantie, undefined, target, line);
+    if (source === "VENALE") return `V.Vénale: ${money(target.valeurVenale)}`;
+    if (source === "NEUF") return `V.Neuf: ${money(target.valeurNeuf)}`;
+    if (source === "GLACE") return `V.Glace: ${money(target.valeurGlace)}`;
+  }
+  return capital == null ? "" : money(capital);
+}
+
+function capitalLineLabel(line: ReferenceOption) {
+  const capital = toNumber(line.capital);
+  return capital == null ? String(line.libelle ?? "Formule") : money(capital);
+}
+
+function tariffLineLabel(line: ReferenceOption, index = 0) {
+  const mode = lineMode(line);
+  const taux = toNumber(line.taux);
+  if (mode === "TAUX" && taux != null) {
+    return `${money(taux)} %`;
+  }
+  if (mode === "CAPITAL") {
+    const label = String(line.libelle ?? "");
+    return label.toLowerCase().includes("formule") ? label : `Formule ${index + 1}`;
+  }
+  return String(line.libelle ?? rateDisplay(line));
+}
+
+function rateDisplay(line?: ReferenceOption) {
+  const taux = toNumber(line?.taux);
+  if (lineMode(line) === "CAPITAL") {
+    return String(line?.libelle ?? "-");
+  }
+  return taux == null ? "-" : `${money(taux)} %`;
+}
+
+function franchiseDisplay(line?: ReferenceOption) {
+  const tauxFranchise = toNumber(line?.tauxFranchise);
+  const franchiseMinimale = toNumber(line?.franchiseMinimale);
+  if (tauxFranchise == null && franchiseMinimale == null) {
+    return "-";
+  }
+  const left = tauxFranchise == null ? "" : `${money(tauxFranchise)} %`;
+  const right = franchiseMinimale == null ? "" : `${money(franchiseMinimale)} DH`;
+  return [left, right].filter(Boolean).join(" _ ");
+}
+
+function estimateTargetPrime(line?: ReferenceOption, capital?: number) {
+  const mode = lineMode(line);
+  const taux = toNumber(line?.taux);
+  const prime = toNumber(line?.prime);
+  if (mode === "CAPITAL" || mode === "PRIME_FIXE") {
+    if (taux != null && taux !== 0) {
+      return ((prime ?? 0) * taux) / 100;
     }
-    if (ligne.usageId && ligne.usageId !== target.usageId) {
-      return false;
-    }
-    if (ligne.categorieTransportId) {
-      return target.kind === "vehicule" && ligne.categorieTransportId === target.categorieTransportId;
-    }
-    return true;
-  });
+    return prime;
+  }
+  if (taux != null && capital != null) {
+    return (capital * taux) / 100;
+  }
+  return prime;
 }
 
 function matchingPersonneFormules(formules: ReferenceOption[], garantie: ReferenceOption, target?: Target) {
@@ -1419,11 +1565,14 @@ function matchingPersonneFormules(formules: ReferenceOption[], garantie: Referen
     );
 }
 
-function valueWarning(garantie: ReferenceOption, target?: Target) {
+function valueWarning(garantie: ReferenceOption, target?: Target, line?: ReferenceOption) {
   if (!target) {
     return "";
   }
   if (target.kind === "vehicule") {
+    if (lineMode(line) === "CAPITAL" || defaultSource(garantie) === "MANUEL") {
+      return validateValeurVenale(target) ?? "";
+    }
     const allowedSources = allowedVehicleValueSources(garantie);
     if (allowedSources.length > 1) {
       if (allowedSources.some((allowedSource) => hasTargetValue(target, allowedSource))) {
@@ -1488,21 +1637,30 @@ function hasTargetValue(target: Target, source: string) {
   return false;
 }
 
-function availableTargetValueSources(garantie: ReferenceOption, target: Target) {
+function availableTargetValueSources(garantie: ReferenceOption, target: Target, line?: ReferenceOption) {
+  if (lineMode(line) === "CAPITAL") {
+    return [];
+  }
   return allowedVehicleValueSources(garantie).filter((source) => hasTargetValue(target, source));
 }
 
-function selectedTargetValueSource(garantie: ReferenceOption, item: GarantieInput | undefined, target: Target) {
+function selectedTargetValueSource(garantie: ReferenceOption, item: GarantieInput | undefined, target: Target, line?: ReferenceOption) {
+  if (lineMode(line) === "CAPITAL") {
+    return "AUCUNE";
+  }
   const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
   if (selected && selected !== "AUCUNE" && hasTargetValue(target, selected)) {
     return selected;
   }
-  return defaultTargetSource(garantie, target);
+  return defaultTargetSource(garantie, target, line);
 }
 
-function defaultTargetSource(garantie: ReferenceOption, target: Target) {
+function defaultTargetSource(garantie: ReferenceOption, target: Target, line?: ReferenceOption) {
   if (target.kind !== "vehicule") {
     return defaultSource(garantie);
+  }
+  if (lineMode(line) === "CAPITAL") {
+    return "AUCUNE";
   }
   const sourceWithValue = allowedVehicleValueSources(garantie).find((allowedSource) => hasTargetValue(target, allowedSource));
   if (sourceWithValue) {

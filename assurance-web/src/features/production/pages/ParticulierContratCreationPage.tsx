@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { ParticulierContratForm } from "../contrat-creation/ParticulierContratForm";
 import { useContratCreationForm } from "../contrat-creation/useContratCreationForm";
 
 export default function ParticulierContratCreationPage() {
+  const { draftId } = useParams();
   const [params] = useSearchParams();
-  const form = useContratCreationForm("PARTICULIER");
+  const form = useContratCreationForm("PARTICULIER", draftId);
   const categorieClientId = params.get("categorieClientId");
 
   useEffect(() => {

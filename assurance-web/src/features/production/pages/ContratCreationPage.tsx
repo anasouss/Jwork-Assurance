@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Building2, Car, FilePlus2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,23 +62,42 @@ export default function ContratCreationPage() {
     (typeContrat !== "PARTICULIER" || Boolean(categorieClientId)) &&
     (typeContrat !== "CONVENTION" || Boolean(form.compagnieAssuranceId && form.conventionId && form.usageId && !conventionStartBlockedReason));
 
+  const createDraftMutation = useMutation({
+    mutationFn: productionApi.createContratDraft,
+    onSuccess: (draft) => {
+      if (typeContrat === "PARTICULIER") {
+        navigate(`/app/production/ajouter-dossier/particulier/${draft.id}?categorieClientId=${encodeURIComponent(categorieClientId)}`);
+        return;
+      }
+      if (typeContrat === "FLOTTE") {
+        navigate(`/app/production/ajouter-dossier/flotte/${draft.id}`);
+        return;
+      }
+      if (typeContrat === "CONVENTION") {
+        navigate(`/app/production/ajouter-dossier/convention/${draft.id}`);
+      }
+    },
+  });
+
   const handleStart = () => {
-    if (typeContrat === "PARTICULIER") {
-      navigate(`/app/production/ajouter-dossier/particulier?categorieClientId=${encodeURIComponent(categorieClientId)}`);
+    if (!typeContrat) {
       return;
     }
-    if (typeContrat === "FLOTTE") {
-      navigate("/app/production/ajouter-dossier/flotte");
-      return;
-    }
-    if (typeContrat === "CONVENTION") {
-      const params = new URLSearchParams({
-        compagnieAssuranceId: form.compagnieAssuranceId,
-        conventionId: form.conventionId,
-        usageId: form.usageId,
-      });
-      navigate(`/app/production/ajouter-dossier/convention?${params.toString()}`);
-    }
+    createDraftMutation.mutate({
+      ...form.request,
+      typeContrat,
+      compagnieAssuranceId: form.compagnieAssuranceId || undefined,
+      conventionId: typeContrat === "CONVENTION" ? form.conventionId || undefined : undefined,
+      usageId: form.usageId || undefined,
+      grilleTarifaireId: typeContrat === "CONVENTION" ? assignedGrilleId || undefined : form.grilleTarifaireId || undefined,
+      clients: typeContrat === "PARTICULIER"
+        ? form.request.clients.map((client) =>
+            client.role === "SOUSCRIPTEUR"
+              ? { ...client, client: { ...client.client, categorieClientId } }
+              : client
+          )
+        : form.request.clients,
+    });
   };
 
   return (
@@ -210,12 +229,17 @@ export default function ContratCreationPage() {
             <Button
               type="button"
               onClick={handleStart}
-              disabled={!canStart}
+              disabled={!canStart || createDraftMutation.isPending}
               className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-muted disabled:text-muted-foreground"
             >
-              Ajouter
+              {createDraftMutation.isPending ? "Création..." : "Ajouter"}
               <ArrowRight className="size-4" />
             </Button>
+            {createDraftMutation.isError ? (
+              <p className="mt-2 text-xs text-red-600">
+                {createDraftMutation.error instanceof Error ? createDraftMutation.error.message : "Création du brouillon impossible"}
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>

@@ -111,7 +111,19 @@ public class ClientService {
         return client;
     }
 
-    private ClientResponse toResponse(Client client) {
+    @Transactional
+    public Client updateEntity(Long agenceId, Long clientId, CreateClientRequest request) {
+        Client client = clientRepository.findByAgenceIdAndId(agenceId, clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+        applyRequest(client, request);
+        client = clientRepository.save(client);
+        clientTelephoneRepository.deleteAll(client.getTelephones());
+        client.getTelephones().clear();
+        saveTelephones(client, request);
+        return client;
+    }
+
+    public ClientResponse toResponse(Client client) {
         var telephones = client.getTelephones() == null ? java.util.List.<ClientResponse.TelephoneView>of() :
                 client.getTelephones().stream()
                         .map(telephone -> ClientResponse.TelephoneView.builder()
@@ -161,6 +173,54 @@ public class ClientService {
                 .actif(client.getActif())
                 .telephones(telephones)
                 .build();
+    }
+
+    private void applyRequest(Client client, CreateClientRequest request) {
+        if (request.getTypeClient() == null) {
+            throw new BadRequestException("Le type client est obligatoire");
+        }
+        Long agenceId = client.getAgence().getId();
+        Client clientParent = request.getClientParentId() == null ? null :
+                clientRepository.findByAgenceIdAndId(agenceId, request.getClientParentId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Client parent", request.getClientParentId()));
+        Ville ville = request.getVilleId() == null ? null :
+                villeRepository.findById(request.getVilleId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Ville", request.getVilleId()));
+        CategorieClient categorieClient = request.getCategorieClientId() == null ? null :
+                categorieClientRepository.findById(request.getCategorieClientId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
+        if (Boolean.TRUE.equals(request.getSahara()) && (ville == null || !Boolean.TRUE.equals(ville.getSaharienne()))) {
+            throw new BadRequestException("La reduction saharienne n'est disponible que pour une ville saharienne");
+        }
+        client.setClientParent(clientParent);
+        client.setVille(ville);
+        client.setCategorieClient(categorieClient);
+        client.setTypeClient(request.getTypeClient());
+        client.setCodeClient(request.getCodeClient());
+        client.setCivilite(request.getCivilite());
+        client.setPrenom(request.getPrenom());
+        client.setNom(request.getNom());
+        client.setRaisonSociale(request.getRaisonSociale());
+        client.setCin(request.getCin());
+        client.setRc(request.getRc());
+        client.setIce(request.getIce());
+        client.setNumeroPermis(request.getNumeroPermis());
+        client.setDateDelivrancePermis(request.getDateDelivrancePermis());
+        client.setDateValiditePermis(request.getDateValiditePermis());
+        client.setDateNaissance(request.getDateNaissance());
+        client.setAdresse(request.getAdresse());
+        client.setTelephone(resolveTelephonePrincipal(request));
+        client.setEmail(request.getEmail());
+        client.setCinValidite(request.getCinValidite());
+        client.setNationalite(request.getNationalite());
+        client.setPassport(request.getPassport());
+        client.setCarteResidence(request.getCarteResidence());
+        client.setIff(request.getIff());
+        client.setPatente(request.getPatente());
+        client.setCnss(request.getCnss());
+        client.setConducteurHabituel(request.getConducteurHabituel() == null ? true : request.getConducteurHabituel());
+        client.setSahara(request.getSahara() == null ? false : request.getSahara());
+        client.setJustificatifSahara(request.getJustificatifSahara());
     }
 
     private String resolveTelephonePrincipal(CreateClientRequest request) {

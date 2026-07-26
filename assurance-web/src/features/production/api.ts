@@ -77,6 +77,37 @@ export const productionApi = {
     );
   },
 
+  async createContratDraft(request: CreateContratRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>("/api/v1/contrats/drafts", {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async getContratDraft(id: string) {
+    return unwrap(await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}`));
+  },
+
+  async updateContratDraft(id: string, request: CreateContratRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async finalizeContratDraft(id: string, request: CreateContratRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}/finaliser`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
   async previewQuittance(request: CreateContratRequest) {
     return unwrap(
       await apiFetch<ApiResponse<QuittancePreview>>("/api/v1/contrats/previsualisation-quittance", {

@@ -10,6 +10,7 @@ import { validateValeurVenale } from "../utils/vehicle-validation";
 import type {
   AssistanceDraft,
   ClientInput,
+  ContratSummary,
   CreateContratRequest,
   GarantieInput,
   QuittanceInput,
@@ -22,7 +23,7 @@ import type {
 
 export type ContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille";
 
-export function useContratCreationForm(typeContrat: TypeContrat) {
+export function useContratCreationForm(typeContrat: TypeContrat, draftId?: string) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [numeroContrat, setNumeroContrat] = useState("");
@@ -52,6 +53,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [preview, setPreview] = useState<QuittancePreview | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [savedSections, setSavedSections] = useState<Partial<Record<ContratSectionKey, boolean>>>({});
+  const [hydratedDraftId, setHydratedDraftId] = useState<string | null>(null);
 
   const refs = {
     usages: useReference("usages"),
@@ -120,6 +122,43 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: grilleTarifaireId, usageId: grilleUsageFilter }),
     enabled: Boolean(grilleTarifaireId),
   });
+
+  const draftQuery = useQuery({
+    queryKey: ["contrat-draft", draftId],
+    queryFn: () => productionApi.getContratDraft(draftId ?? ""),
+    enabled: Boolean(draftId),
+  });
+
+  useEffect(() => {
+    const draft = draftQuery.data;
+    if (!draftId || !draft || hydratedDraftId === draftId) {
+      return;
+    }
+    const hydrated = hydrateDraft(draft);
+    setNumeroContrat(hydrated.numeroContrat);
+    setNumeroPolice(hydrated.numeroPolice);
+    setNumeroAttestation(hydrated.numeroAttestation);
+    setCompagnieAssuranceId(hydrated.compagnieAssuranceId);
+    setConventionId(hydrated.conventionId);
+    setUsageId(hydrated.usageId);
+    setGrilleTarifaireId(hydrated.grilleTarifaireId);
+    setDateEffet(hydrated.dateEffet);
+    setDateEcheance(hydrated.dateEcheance);
+    setTypeRenouvellement(hydrated.typeRenouvellement);
+    setEcheance(hydrated.echeance);
+    setModeReglement(hydrated.modeReglement);
+    setNumeroBonCommande(hydrated.numeroBonCommande);
+    setFractionnement(hydrated.fractionnement);
+    setCrmPartage(hydrated.crmPartage);
+    setCrmPartageValeur(hydrated.crmPartageValeur);
+    setAssistanceEnabled(hydrated.assistanceEnabled);
+    setSaisiePrimeNette(hydrated.saisiePrimeNette);
+    setClients(hydrated.clients);
+    setVehicules(hydrated.vehicules);
+    setRemorques(hydrated.remorques);
+    setGaranties(hydrated.garanties);
+    setHydratedDraftId(draftId);
+  }, [draftId, draftQuery.data, hydratedDraftId]);
 
   useEffect(() => {
     const garantiesReference = refs.garanties.data ?? [];
@@ -249,12 +288,29 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   });
 
   const createMutation = useMutation({
-    mutationFn: productionApi.createContrat,
+    mutationFn: (payload: CreateContratRequest) =>
+      draftId ? productionApi.finalizeContratDraft(draftId, payload) : productionApi.createContrat(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
+      if (draftId) {
+        await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
+      }
       toast.success("Contrat créé");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
+  });
+
+  const saveDraftMutation = useMutation({
+    mutationFn: (payload: CreateContratRequest) => {
+      if (!draftId) {
+        throw new Error("Brouillon introuvable pour enregistrer cette section");
+      }
+      return productionApi.updateContratDraft(draftId, payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
 
   const validate = () => {
@@ -435,8 +491,12 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     if (!validateSection(section)) {
       return;
     }
-    setSavedSections((current) => ({ ...current, [section]: true }));
-    toast.success(`${label} enregistré`);
+    saveDraftMutation.mutate(request, {
+      onSuccess: () => {
+        setSavedSections((current) => ({ ...current, [section]: true }));
+        toast.success(`${label} enregistré`);
+      },
+    });
   };
 
   useEffect(() => {
@@ -527,10 +587,13 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     lignesGrille,
     formulesPersonne,
     request,
+    draftId,
+    draftQuery,
     preview,
     previewMutation,
     autoPreviewMutation,
     createMutation,
+    saveDraftMutation,
     handlePreview,
     handleCreate,
     handleSaveSection,
@@ -720,4 +783,150 @@ function sectionLabel(section: ContratSectionKey) {
     case "grille":
       return "Grille tarifaire";
   }
+}
+
+function hydrateDraft(draft: ContratSummary) {
+  const vehicleIdToIndex = new Map((draft.vehicules ?? []).map((vehicule, index) => [vehicule.vehiculeId, index]));
+  const remorqueIdToIndex = new Map((draft.remorques ?? []).map((remorque, index) => [remorque.remorqueId, index]));
+  const clients = (draft.clients ?? []).length > 0
+    ? (draft.clients ?? []).map((link) => {
+        const role = asRole(link.role);
+        return {
+          clientId: link.clientId,
+          role,
+          principalPourRole: Boolean(link.principalPourRole),
+          client: {
+            ...emptyClient(role).client,
+            ...(link.client ?? {}),
+            agenceId: link.client?.agenceId,
+            typeClient: link.client?.typeClient ?? emptyClient(role).client.typeClient,
+            telephones: (link.client?.telephones ?? []).map((telephone) => ({
+              numero: telephone.numero,
+              principal: telephone.principal,
+              whatsapp: telephone.whatsapp,
+            })),
+          },
+        } satisfies ClientInput;
+      })
+    : [emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")];
+
+  const vehicules = (draft.vehicules ?? []).length > 0
+    ? (draft.vehicules ?? []).map((vehicule) => ({
+        ...emptyVehicule(),
+        typeVehicule: asVehiculeType(vehicule.typeVehicule),
+        usageId: nullToUndefined(vehicule.usageId),
+        marqueId: nullToUndefined(vehicule.marqueId),
+        marqueLibelle: nullToUndefined(vehicule.marque),
+        carrosserieId: nullToUndefined(vehicule.carrosserieId),
+        carrosserieLibelle: nullToUndefined(vehicule.carrosserie),
+        categorieTransportId: nullToUndefined(vehicule.categorieTransportId),
+        immatriculation: nullToUndefined(vehicule.immatriculation),
+        carburant: nullToUndefined(vehicule.carburant),
+        puissanceFiscale: nullToUndefined(vehicule.puissanceFiscale),
+        nombrePlaces: nullToUndefined(vehicule.nombrePlaces),
+        sousClasse: nullToUndefined(vehicule.sousClasse),
+        ptc: nullToUndefined(vehicule.ptc),
+        datePremiereCirculation: nullToUndefined(vehicule.datePremiereCirculation),
+        dateExpirationCarteGrise: nullToUndefined(vehicule.dateExpirationCarteGrise),
+        dateEffet: nullToUndefined(vehicule.dateEffet),
+        dateEcheance: nullToUndefined(vehicule.dateEcheance),
+        crm: nullToUndefined(vehicule.crm),
+        numeroAttestation: nullToUndefined(vehicule.numeroAttestation),
+        coefficientProrata: nullToUndefined(vehicule.coefficientProrata),
+        remorque: Boolean(vehicule.remorque),
+        valeurVenale: nullToUndefined(vehicule.valeurVenale),
+        valeurNeuf: nullToUndefined(vehicule.valeurNeuf),
+        valeurGlace: nullToUndefined(vehicule.valeurGlace),
+        organismeCredit: Boolean(vehicule.organismeCredit),
+        nomOrganismeCredit: nullToUndefined(vehicule.nomOrganismeCredit),
+        montantCredit: nullToUndefined(vehicule.montantCredit),
+        dateFinCredit: nullToUndefined(vehicule.dateFinCredit),
+      } satisfies VehiculeInput))
+    : [emptyVehicule()];
+
+  const remorques = (draft.remorques ?? []).map((remorque) => ({
+    usageId: nullToUndefined(remorque.usageId),
+    marqueId: nullToUndefined(remorque.marqueId),
+    marqueLibelle: nullToUndefined(remorque.marque),
+    immatriculation: nullToUndefined(remorque.immatriculation),
+    ptc: nullToUndefined(remorque.ptc),
+    dateMiseEnCirculation: nullToUndefined(remorque.dateMiseEnCirculation),
+    dateEffet: nullToUndefined(remorque.dateEffet),
+    dateEcheance: nullToUndefined(remorque.dateEcheance),
+    crm: nullToUndefined(remorque.crm),
+    numeroAttestation: nullToUndefined(remorque.numeroAttestation),
+    coefficientProrata: nullToUndefined(remorque.coefficientProrata),
+    valeurAssuree: nullToUndefined(remorque.valeurAssuree),
+  } satisfies RemorqueInput));
+
+  const garanties = (draft.garanties ?? []).map((garantie) => ({
+    garantieId: garantie.garantieId,
+    ligneGrilleTarifaireId: nullToUndefined(garantie.ligneGrilleTarifaireId),
+    clientId: nullToUndefined(garantie.clientId),
+    vehiculeIndex: garantie.vehiculeId ? vehicleIdToIndex.get(garantie.vehiculeId) : undefined,
+    remorqueIndex: garantie.remorqueId ? remorqueIdToIndex.get(garantie.remorqueId) : undefined,
+    modeSelectionne: nullToUndefined(garantie.modeSelectionne),
+    sourceValeurSelectionnee: nullToUndefined(garantie.sourceValeurSelectionnee),
+    formuleGarantiePersonneId: nullToUndefined(garantie.formuleGarantiePersonneId),
+    valeurVenale: nullToUndefined(garantie.valeurVenale),
+    valeurNeuf: nullToUndefined(garantie.valeurNeuf),
+    valeurGlace: nullToUndefined(garantie.valeurGlace),
+    valeurAssuree: nullToUndefined(garantie.valeurAssuree),
+    formule: nullToUndefined(garantie.formule),
+    montantDeces: nullToUndefined(garantie.montantDeces),
+    montantInvalidite: nullToUndefined(garantie.montantInvalidite),
+    montantFraisMedicaux: nullToUndefined(garantie.montantFraisMedicaux),
+    montantFraisHospitalisation: nullToUndefined(garantie.montantFraisHospitalisation),
+    montantFraisFuneraires: nullToUndefined(garantie.montantFraisFuneraires),
+    montantFraisChirurgie: nullToUndefined(garantie.montantFraisChirurgie),
+    accessoire: nullToUndefined(garantie.accessoire),
+    capital: nullToUndefined(garantie.capital),
+    taux: nullToUndefined(garantie.taux),
+    prime: nullToUndefined(garantie.prime),
+    tauxFranchise: nullToUndefined(garantie.tauxFranchise),
+    franchiseMinimale: nullToUndefined(garantie.franchiseMinimale),
+  } satisfies GarantieInput));
+
+  return {
+    numeroContrat: draft.numeroContrat ?? "",
+    numeroPolice: draft.numeroPolice ?? "",
+    numeroAttestation: draft.numeroAttestation ?? "",
+    compagnieAssuranceId: draft.compagnieAssuranceId ?? "",
+    conventionId: draft.conventionId ?? "",
+    usageId: draft.usageId ?? "",
+    grilleTarifaireId: draft.grilleTarifaireId ?? "",
+    dateEffet: draft.dateEffet,
+    dateEcheance: draft.dateEcheance,
+    typeRenouvellement: draft.typeRenouvellement === "ferme" ? "ferme" as const : "renouvelable" as const,
+    echeance: draft.echeance ?? undefined,
+    modeReglement: draft.modeReglement ?? "bureau",
+    numeroBonCommande: draft.numeroBonCommande ?? "",
+    fractionnement: asFractionnement(draft.fractionnement),
+    crmPartage: Boolean(draft.crmPartage),
+    crmPartageValeur: draft.crmPartageValeur ?? "",
+    assistanceEnabled: Boolean(draft.assistance),
+    saisiePrimeNette: Boolean(draft.saisiePrimeNette),
+    clients,
+    vehicules,
+    remorques,
+    garanties,
+  };
+}
+
+function nullToUndefined<T>(value: T | null | undefined): T | undefined {
+  return value == null ? undefined : value;
+}
+
+function asRole(value: string): ClientInput["role"] {
+  return value === "PROPRIETAIRE" || value === "CONDUCTEUR" || value === "BENEFICIAIRE" ? value : "SOUSCRIPTEUR";
+}
+
+function asVehiculeType(value: string): VehiculeInput["typeVehicule"] {
+  return value === "CAMION" || value === "MOTO" || value === "BUS" || value === "TRACTEUR" || value === "AUTRE"
+    ? value
+    : "AUTOMOBILE";
+}
+
+function asFractionnement(value: string | null | undefined): CreateContratRequest["fractionnement"] {
+  return isFractionnement(value) ? value : "ANNUEL";
 }

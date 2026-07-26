@@ -22,9 +22,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -79,8 +81,65 @@ public class ContratService {
         return response;
     }
 
+    @Transactional
+    public ContratResponse createDraft(CreateContratRequest request) {
+        if (request.getAgenceId() == null) {
+            throw new BadRequestException("L'agence est obligatoire");
+        }
+        if (request.getTypeContrat() == null) {
+            throw new BadRequestException("Le type de contrat est obligatoire");
+        }
+        Agence agence = agenceRepository.findById(request.getAgenceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", request.getAgenceId()));
+        Contrat contrat = Contrat.builder()
+                .agence(agence)
+                .typeContrat(request.getTypeContrat())
+                .statut(StatutContrat.DRAFT)
+                .brouillon(true)
+                .build();
+        contrat = contratRepository.save(contrat);
+        applyDraftRequest(contrat, request);
+        return toResponse(contrat);
+    }
+
+    @Transactional(readOnly = true)
+    public ContratResponse getDraft(Long agenceId, Long contratId) {
+        Contrat contrat = resolveDraft(agenceId, contratId);
+        return toResponse(contrat);
+    }
+
+    @Transactional
+    public ContratResponse updateDraft(Long agenceId, Long contratId, CreateContratRequest request) {
+        Contrat contrat = resolveDraft(agenceId, contratId);
+        request.setAgenceId(agenceId);
+        applyDraftRequest(contrat, request);
+        return toResponse(contrat);
+    }
+
+    @Transactional
+    public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
+        Contrat contrat = resolveDraft(agenceId, contratId);
+        request.setAgenceId(agenceId);
+        if (hasText(request.getNumeroContrat())
+                && contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(agenceId, request.getNumeroContrat(), contrat.getId())) {
+            throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
+        }
+        PersistedDraftGraph graph = applyFinalRequestToExistingContrat(contrat, request);
+        contrat.setStatut(StatutContrat.ACTIVE);
+        contrat.setBrouillon(false);
+        contratRepository.save(contrat);
+        mouvementContratService.creerAffaireNouvelle(
+                contrat,
+                graph.vehicules(),
+                graph.remorques(),
+                graph.garanties(),
+                graph.quittanceManuelle()
+        );
+        return toResponse(contrat);
+    }
+
     private ContratResponse createContrat(CreateContratRequest request, Contrat contratOrigine) {
-        if (contratRepository.existsByAgenceIdAndNumeroContrat(request.getAgenceId(), request.getNumeroContrat())) {
+        if (hasText(request.getNumeroContrat()) && contratRepository.existsByAgenceIdAndNumeroContrat(request.getAgenceId(), request.getNumeroContrat())) {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
         }
 
@@ -275,6 +334,430 @@ public class ContratService {
         }
 
         return toResponse(contrat);
+    }
+
+    private Contrat resolveDraft(Long agenceId, Long contratId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (!Boolean.TRUE.equals(contrat.getBrouillon()) || contrat.getStatut() != StatutContrat.DRAFT) {
+            throw new BadRequestException("Ce contrat n'est pas un brouillon modifiable");
+        }
+        return contrat;
+    }
+
+    private void applyDraftRequest(Contrat contrat, CreateContratRequest request) {
+        applyDraftScalars(contrat, request);
+        contrat = contratRepository.save(contrat);
+        replaceDraftChildren(contrat, request, false);
+    }
+
+    private PersistedDraftGraph applyFinalRequestToExistingContrat(Contrat contrat, CreateContratRequest request) {
+        if (request.getAgenceId() == null) {
+            throw new BadRequestException("L'agence est obligatoire");
+        }
+        if (request.getTypeContrat() == null) {
+            throw new BadRequestException("Le type de contrat est obligatoire");
+        }
+        CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
+                compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
+        Convention convention = request.getConventionId() == null ? null :
+                conventionRepository.findByAgenceIdAndId(request.getAgenceId(), request.getConventionId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Convention", request.getConventionId()));
+        Usage usageContrat = request.getUsageId() == null ? null :
+                usageRepository.findById(request.getUsageId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
+        GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
+                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
+                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+        ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
+        boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
+                || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
+        validateModeSaisiePourTypeContrat(request, modeSaisieGaranties, convention);
+        if (modeSaisieGaranties == ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE && grilleTarifaire == null) {
+            throw new BadRequestException("Une grille tarifaire est obligatoire pour un contrat convention ou flotte");
+        }
+        ContractDates contractDates = resolveContractDates(request);
+        applyContratScalars(
+                contrat,
+                request,
+                compagnie,
+                convention,
+                usageContrat,
+                grilleTarifaire,
+                modeSaisieGaranties,
+                saisiePrimeNette,
+                contractDates
+        );
+        contratRepository.save(contrat);
+        return replaceDraftChildren(contrat, request, true);
+    }
+
+    private void applyDraftScalars(Contrat contrat, CreateContratRequest request) {
+        CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
+                compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
+        Convention convention = request.getConventionId() == null ? null :
+                conventionRepository.findByAgenceIdAndId(request.getAgenceId(), request.getConventionId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Convention", request.getConventionId()));
+        Usage usageContrat = request.getUsageId() == null ? null :
+                usageRepository.findById(request.getUsageId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
+        GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
+                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
+                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+        ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
+        boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
+                || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
+        ContractDates contractDates = new ContractDates(request.getDateEffet(), request.getDateEcheance(), blankToNull(request.getEcheance()));
+        applyContratScalars(
+                contrat,
+                request,
+                compagnie,
+                convention,
+                usageContrat,
+                grilleTarifaire,
+                modeSaisieGaranties,
+                saisiePrimeNette,
+                contractDates
+        );
+    }
+
+    private void applyContratScalars(
+            Contrat contrat,
+            CreateContratRequest request,
+            CompagnieAssurance compagnie,
+            Convention convention,
+            Usage usageContrat,
+            GrilleTarifaire grilleTarifaire,
+            ModeSaisieGarantieContrat modeSaisieGaranties,
+            boolean saisiePrimeNette,
+            ContractDates contractDates
+    ) {
+        contrat.setCompagnieAssurance(compagnie);
+        contrat.setConvention(convention);
+        contrat.setUsage(usageContrat);
+        contrat.setGrilleTarifaire(grilleTarifaire);
+        contrat.setTypeContrat(request.getTypeContrat());
+        contrat.setNumeroContrat(blankToNull(request.getNumeroContrat()));
+        contrat.setNumeroDevis(blankToNull(request.getNumeroDevis()));
+        contrat.setNumeroDossier(blankToNull(request.getNumeroDossier()));
+        contrat.setNumeroPolice(blankToNull(request.getNumeroPolice()));
+        contrat.setNumeroAttestation(blankToNull(request.getNumeroAttestation()));
+        contrat.setDateEffet(contractDates.dateEffet());
+        contrat.setDateEcheance(contractDates.dateEcheance());
+        contrat.setEcheance(contractDates.echeance());
+        contrat.setTypeRenouvellement(blankToNull(request.getTypeRenouvellement()));
+        contrat.setModePaiement(blankToNull(request.getModePaiement()));
+        contrat.setModeReglement(blankToNull(request.getModeReglement()));
+        contrat.setNumeroBonCommande(blankToNull(request.getNumeroBonCommande()));
+        contrat.setPeriodicite(blankToNull(request.getPeriodicite()));
+        contrat.setFractionnement(request.getFractionnement());
+        contrat.setTauxRc(request.getTauxRc());
+        contrat.setModeSaisieGaranties(modeSaisieGaranties);
+        contrat.setSaisiePrimeNette(saisiePrimeNette);
+        contrat.setNombreVehicules(request.getNombreVehicules());
+        contrat.setNombreRemorques(request.getNombreRemorques());
+        contrat.setProspection(request.getProspection() == null ? false : request.getProspection());
+        contrat.setAssistance(request.getAssistance() == null ? false : request.getAssistance());
+        contrat.setCrmPartage(request.getCrmPartage() == null ? false : request.getCrmPartage());
+        contrat.setCrmPartageValeur(blankToNull(request.getCrmPartageValeur()));
+        contrat.setNotes(request.getNotes());
+    }
+
+    private PersistedDraftGraph replaceDraftChildren(Contrat contrat, CreateContratRequest request, boolean finalMode) {
+        Map<String, Client> existingClients = new HashMap<>();
+        for (ContratClient link : contrat.getClients()) {
+            existingClients.put(clientDraftKey(link.getRole(), Boolean.TRUE.equals(link.getPrincipalPourRole())), link.getClient());
+        }
+        clearDraftChildren(contrat);
+
+        for (CreateContratRequest.ClientInput input : request.getClients() == null ? List.<CreateContratRequest.ClientInput>of() : request.getClients()) {
+            Client client = resolveClientForDraft(request.getAgenceId(), input, existingClients, finalMode);
+            if (client == null) {
+                continue;
+            }
+            ContratClient link = contratClientRepository.save(ContratClient.builder()
+                    .contrat(contrat)
+                    .client(client)
+                    .role(input.getRole())
+                    .principalPourRole(input.isPrincipalPourRole())
+                    .build());
+            contrat.getClients().add(link);
+        }
+
+        Usage usageContrat = contrat.getUsage();
+        List<Vehicule> vehiculesCrees = new ArrayList<>();
+        for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
+            if (input.getTypeVehicule() == null) {
+                if (finalMode) {
+                    throw new BadRequestException("Le type vehicule est obligatoire");
+                }
+                continue;
+            }
+            Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
+            Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), true);
+            CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
+            validateCategorieTransport(usage, categorieTransport);
+            Vehicule vehicule = vehiculeRepository.save(Vehicule.builder()
+                    .contrat(contrat)
+                    .typeVehicule(input.getTypeVehicule())
+                    .usage(usage)
+                    .marque(marque)
+                    .carrosserie(carrosserie)
+                    .categorieTransport(categorieTransport)
+                    .immatriculation(input.getImmatriculation())
+                    .immatriculationProvisoire(input.getImmatriculationProvisoire())
+                    .carburant(input.getCarburant())
+                    .puissanceFiscale(input.getPuissanceFiscale())
+                    .nombrePlaces(input.getNombrePlaces())
+                    .sousClasse(input.getSousClasse())
+                    .ptc(input.getPtc())
+                    .datePremiereCirculation(input.getDatePremiereCirculation())
+                    .dateExpirationCarteGrise(input.getDateExpirationCarteGrise())
+                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
+                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
+                    .crm(input.getCrm())
+                    .numeroAttestation(input.getNumeroAttestation())
+                    .remorque(input.getRemorque() == null ? false : input.getRemorque())
+                    .coefficientProrata(input.getCoefficientProrata())
+                    .valeurVenale(input.getValeurVenale())
+                    .valeurNeuf(input.getValeurNeuf())
+                    .valeurGlace(input.getValeurGlace())
+                    .organismeCredit(input.getOrganismeCredit() == null ? false : input.getOrganismeCredit())
+                    .nomOrganismeCredit(input.getNomOrganismeCredit())
+                    .montantCredit(input.getMontantCredit())
+                    .dateFinCredit(input.getDateFinCredit())
+                    .build());
+            vehiculesCrees.add(vehicule);
+            contrat.getVehicules().add(vehicule);
+        }
+
+        List<Remorque> remorquesCreees = new ArrayList<>();
+        for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
+            Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
+            Remorque remorque = remorqueRepository.save(Remorque.builder()
+                    .contrat(contrat)
+                    .usage(usage)
+                    .marque(marque)
+                    .immatriculation(input.getImmatriculation())
+                    .ptc(input.getPtc())
+                    .dateMiseEnCirculation(input.getDateMiseEnCirculation())
+                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
+                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
+                    .crm(input.getCrm())
+                    .numeroAttestation(input.getNumeroAttestation())
+                    .coefficientProrata(input.getCoefficientProrata())
+                    .valeurAssuree(input.getValeurAssuree())
+                    .build());
+            remorquesCreees.add(remorque);
+            contrat.getRemorques().add(remorque);
+        }
+
+        List<ContratGarantie> garantiesCreees = finalMode
+                ? replaceFinalGaranties(contrat, request, vehiculesCrees, remorquesCreees)
+                : replaceRawDraftGaranties(contrat, request, vehiculesCrees, remorquesCreees);
+        return new PersistedDraftGraph(vehiculesCrees, remorquesCreees, garantiesCreees, buildManualQuittanceResult(request));
+    }
+
+    private void clearDraftChildren(Contrat contrat) {
+        contratGarantieRepository.deleteByContratId(contrat.getId());
+        contratClientRepository.deleteByContratId(contrat.getId());
+        remorqueRepository.deleteByContratId(contrat.getId());
+        vehiculeRepository.deleteByContratId(contrat.getId());
+        contratGarantieRepository.flush();
+        contratClientRepository.flush();
+        remorqueRepository.flush();
+        vehiculeRepository.flush();
+        contrat.getGaranties().clear();
+        contrat.getClients().clear();
+        contrat.getRemorques().clear();
+        contrat.getVehicules().clear();
+    }
+
+    private Client resolveClientForDraft(
+            Long agenceId,
+            CreateContratRequest.ClientInput input,
+            Map<String, Client> existingClients,
+            boolean finalMode
+    ) {
+        if (input.getRole() == null) {
+            if (finalMode) {
+                throw new BadRequestException("Le role client est obligatoire");
+            }
+            return null;
+        }
+        if (input.getClientId() != null) {
+            return clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
+        }
+        if (input.getClient() == null) {
+            if (finalMode) {
+                throw new BadRequestException("Le role " + input.getRole() + " doit renseigner clientId ou client");
+            }
+            return null;
+        }
+        if (input.getClient().getAgenceId() == null) {
+            input.getClient().setAgenceId(agenceId);
+        }
+        if (!agenceId.equals(input.getClient().getAgenceId())) {
+            throw new BadRequestException("Le client inline doit appartenir a l'agence du contrat");
+        }
+        Client existing = existingClients.get(clientDraftKey(input.getRole(), input.isPrincipalPourRole()));
+        if (existing != null) {
+            return clientService.updateEntity(agenceId, existing.getId(), input.getClient());
+        }
+        return clientService.createEntity(input.getClient());
+    }
+
+    private String clientDraftKey(com.assurance.enums.RoleClientContrat role, boolean principal) {
+        return role.name() + ":" + principal;
+    }
+
+    private List<ContratGarantie> replaceFinalGaranties(
+            Contrat contrat,
+            CreateContratRequest request,
+            List<Vehicule> vehiculesCrees,
+            List<Remorque> remorquesCreees
+    ) {
+        List<ContratGarantie> garantiesCreees = new ArrayList<>();
+        for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
+            Garantie garantie = garantieRepository.findById(input.getGarantieId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Client client = input.getClientId() == null ? null :
+                    clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
+            Vehicule vehicule = input.getVehiculeIndex() == null ? null : resolveVehicule(vehiculesCrees, input.getVehiculeIndex(), "Garantie");
+            Remorque remorque = input.getRemorqueIndex() == null ? null : resolveRemorque(remorquesCreees, input.getRemorqueIndex(), "Garantie");
+            Usage usageCible = resolveUsageCible(contrat, vehicule, remorque);
+            LigneGrilleTarifaire ligneGrilleTarifaire = resolveLigneGrilleTarifaire(contrat, garantie, input, usageCible, vehicule, remorque);
+            ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
+            SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
+            FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
+            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
+            validateGarantieTarget(garantie, vehicule, remorque, client);
+            validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
+            validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
+            ContratGarantie contratGarantie = saveContratGarantie(
+                    contrat,
+                    garantie,
+                    vehicule,
+                    remorque,
+                    client,
+                    ligneGrilleTarifaire,
+                    modeSelectionne,
+                    sourceValeurSelectionnee,
+                    formuleGarantiePersonne,
+                    montants
+            );
+            garantiesCreees.add(contratGarantie);
+            contrat.getGaranties().add(contratGarantie);
+        }
+        return garantiesCreees;
+    }
+
+    private List<ContratGarantie> replaceRawDraftGaranties(
+            Contrat contrat,
+            CreateContratRequest request,
+            List<Vehicule> vehiculesCrees,
+            List<Remorque> remorquesCreees
+    ) {
+        List<ContratGarantie> garantiesCreees = new ArrayList<>();
+        for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
+            if (input.getGarantieId() == null) {
+                continue;
+            }
+            Garantie garantie = garantieRepository.findById(input.getGarantieId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Client client = input.getClientId() == null ? null :
+                    clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
+            Vehicule vehicule = input.getVehiculeIndex() == null ? null : resolveVehicule(vehiculesCrees, input.getVehiculeIndex(), "Garantie");
+            Remorque remorque = input.getRemorqueIndex() == null ? null : resolveRemorque(remorquesCreees, input.getRemorqueIndex(), "Garantie");
+            LigneGrilleTarifaire ligne = input.getLigneGrilleTarifaireId() == null ? null :
+                    ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
+                            .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
+            FormuleGarantiePersonne formule = input.getFormuleGarantiePersonneId() == null ? null :
+                    formuleGarantiePersonneRepository.findById(input.getFormuleGarantiePersonneId())
+                            .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", input.getFormuleGarantiePersonneId()));
+            ModeTarificationGarantie mode = parseMode(input.getModeSelectionne());
+            SourceValeurGarantie source = parseSource(input.getSourceValeurSelectionnee());
+            ContratGarantie contratGarantie = contratGarantieRepository.save(ContratGarantie.builder()
+                    .contrat(contrat)
+                    .garantie(garantie)
+                    .vehicule(vehicule)
+                    .remorque(remorque)
+                    .client(client)
+                    .ligneGrilleTarifaire(ligne)
+                    .modeSelectionne(mode)
+                    .sourceValeurSelectionnee(source)
+                    .formuleGarantiePersonne(formule)
+                    .valeurVenale(input.getValeurVenale())
+                    .valeurNeuf(input.getValeurNeuf())
+                    .valeurGlace(input.getValeurGlace())
+                    .formule(input.getFormule())
+                    .montantDeces(input.getMontantDeces())
+                    .montantInvalidite(input.getMontantInvalidite())
+                    .montantFraisMedicaux(input.getMontantFraisMedicaux())
+                    .montantFraisHospitalisation(input.getMontantFraisHospitalisation())
+                    .montantFraisFuneraires(input.getMontantFraisFuneraires())
+                    .montantFraisChirurgie(input.getMontantFraisChirurgie())
+                    .accessoire(input.getAccessoire())
+                    .capital(firstNonNull(input.getCapital(), input.getValeurAssuree()))
+                    .taux(input.getTaux())
+                    .prime(input.getPrime())
+                    .tauxFranchise(input.getTauxFranchise())
+                    .franchiseMinimale(input.getFranchiseMinimale())
+                    .build());
+            garantiesCreees.add(contratGarantie);
+            contrat.getGaranties().add(contratGarantie);
+        }
+        return garantiesCreees;
+    }
+
+    private ContratGarantie saveContratGarantie(
+            Contrat contrat,
+            Garantie garantie,
+            Vehicule vehicule,
+            Remorque remorque,
+            Client client,
+            LigneGrilleTarifaire ligneGrilleTarifaire,
+            ModeTarificationGarantie modeSelectionne,
+            SourceValeurGarantie sourceValeurSelectionnee,
+            FormuleGarantiePersonne formuleGarantiePersonne,
+            GarantieMontants montants
+    ) {
+        return contratGarantieRepository.save(ContratGarantie.builder()
+                .contrat(contrat)
+                .garantie(garantie)
+                .vehicule(vehicule)
+                .remorque(remorque)
+                .client(client)
+                .ligneGrilleTarifaire(ligneGrilleTarifaire)
+                .modeSelectionne(modeSelectionne)
+                .sourceValeurSelectionnee(sourceValeurSelectionnee)
+                .formuleGarantiePersonne(formuleGarantiePersonne)
+                .valeurVenale(montants.valeurVenale())
+                .valeurNeuf(montants.valeurNeuf())
+                .valeurGlace(montants.valeurGlace())
+                .formule(montants.formule())
+                .montantDeces(montants.montantDeces())
+                .montantInvalidite(montants.montantInvalidite())
+                .montantFraisMedicaux(montants.montantFraisMedicaux())
+                .montantFraisHospitalisation(montants.montantFraisHospitalisation())
+                .montantFraisFuneraires(montants.montantFraisFuneraires())
+                .montantFraisChirurgie(montants.montantFraisChirurgie())
+                .accessoire(montants.accessoire())
+                .capital(montants.capital())
+                .taux(montants.taux())
+                .prime(montants.prime())
+                .tauxFranchise(montants.tauxFranchise())
+                .franchiseMinimale(montants.franchiseMinimale())
+                .build());
     }
 
     @Transactional(readOnly = true)
@@ -549,6 +1032,7 @@ public class ContratService {
                     .nomAffichage(link.getClient().getNomAffichage())
                     .role(link.getRole().name())
                     .principalPourRole(Boolean.TRUE.equals(link.getPrincipalPourRole()))
+                    .client(clientService.toResponse(link.getClient()))
                     .build());
         }
 
@@ -572,6 +1056,16 @@ public class ContratService {
                     .categorieTransportId(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getId() : null)
                     .categorieTransportCode(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getCode() : null)
                     .categorieTransportLibelle(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getLibelle() : null)
+                    .carburant(vehicule.getCarburant())
+                    .puissanceFiscale(vehicule.getPuissanceFiscale())
+                    .nombrePlaces(vehicule.getNombrePlaces())
+                    .sousClasse(vehicule.getSousClasse())
+                    .ptc(vehicule.getPtc())
+                    .datePremiereCirculation(vehicule.getDatePremiereCirculation())
+                    .dateExpirationCarteGrise(vehicule.getDateExpirationCarteGrise())
+                    .dateEffet(vehicule.getDateEffet())
+                    .dateEcheance(vehicule.getDateEcheance())
+                    .crm(vehicule.getCrm())
                     .coefficientProrata(vehicule.getCoefficientProrata())
                     .valeurVenale(vehicule.getValeurVenale())
                     .valeurNeuf(vehicule.getValeurNeuf())
@@ -597,6 +1091,10 @@ public class ContratService {
                     .marqueId(remorque.getMarque() != null ? remorque.getMarque().getId() : null)
                     .marque(remorque.getMarque() != null ? remorque.getMarque().getLibelle() : null)
                     .ptc(remorque.getPtc())
+                    .dateMiseEnCirculation(remorque.getDateMiseEnCirculation())
+                    .dateEffet(remorque.getDateEffet())
+                    .dateEcheance(remorque.getDateEcheance())
+                    .crm(remorque.getCrm())
                     .coefficientProrata(remorque.getCoefficientProrata())
                     .valeurAssuree(remorque.getValeurAssuree())
                     .build());
@@ -1523,6 +2021,14 @@ public class ContratService {
             java.time.LocalDate dateEffet,
             java.time.LocalDate dateEcheance,
             String echeance
+    ) {
+    }
+
+    private record PersistedDraftGraph(
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> garanties,
+            QuittanceCalculService.Resultat quittanceManuelle
     ) {
     }
 }

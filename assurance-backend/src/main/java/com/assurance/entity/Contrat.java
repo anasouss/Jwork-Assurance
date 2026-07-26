@@ -74,7 +74,7 @@ public class Contrat extends BaseEntity {
     @Builder.Default
     private StatutContrat statut = StatutContrat.DRAFT;
 
-    @Column(name = "numero_contrat", nullable = false, length = 80)
+    @Column(name = "numero_contrat", length = 80)
     private String numeroContrat;
 
     @Column(name = "numero_devis", length = 80)

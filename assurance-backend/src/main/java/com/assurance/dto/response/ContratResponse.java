@@ -56,7 +56,6 @@ public class ContratResponse {
     private List<GarantieView> garanties;
     private List<MouvementView> mouvements;
     private List<ElementFacturableView> elementsFacturables;
-
     @Data
     @Builder
     public static class ClientLink {
@@ -64,6 +63,7 @@ public class ContratResponse {
         private String nomAffichage;
         private String role;
         private boolean principalPourRole;
+        private ClientResponse client;
     }
 
     @Data
@@ -86,6 +86,16 @@ public class ContratResponse {
         private Long categorieTransportId;
         private String categorieTransportCode;
         private String categorieTransportLibelle;
+        private String carburant;
+        private String puissanceFiscale;
+        private String nombrePlaces;
+        private String sousClasse;
+        private String ptc;
+        private LocalDate datePremiereCirculation;
+        private LocalDate dateExpirationCarteGrise;
+        private LocalDate dateEffet;
+        private LocalDate dateEcheance;
+        private String crm;
         private BigDecimal coefficientProrata;
         private BigDecimal valeurVenale;
         private BigDecimal valeurNeuf;
@@ -110,6 +120,10 @@ public class ContratResponse {
         private Long marqueId;
         private String marque;
         private String ptc;
+        private LocalDate dateMiseEnCirculation;
+        private LocalDate dateEffet;
+        private LocalDate dateEcheance;
+        private String crm;
         private BigDecimal coefficientProrata;
         private BigDecimal valeurAssuree;
     }

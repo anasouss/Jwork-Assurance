@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,6 +39,29 @@ public class ContratController {
     @PostMapping
     public ResponseEntity<ApiResponse<ContratResponse>> create(@Valid @RequestBody CreateContratRequest request) {
         return ResponseEntity.ok(ApiResponse.success(contratService.create(request), "Contrat cree"));
+    }
+
+    @PostMapping("/drafts")
+    public ResponseEntity<ApiResponse<ContratResponse>> createDraft(@RequestBody CreateContratRequest request) {
+        if (request.getAgenceId() == null) {
+            request.setAgenceId(TenantContext.getCurrentAgence());
+        }
+        return ResponseEntity.ok(ApiResponse.success(contratService.createDraft(request), "Brouillon cree"));
+    }
+
+    @GetMapping("/drafts/{id}")
+    public ResponseEntity<ApiResponse<ContratResponse>> getDraft(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(contratService.getDraft(TenantContext.getCurrentAgence(), id)));
+    }
+
+    @PutMapping("/drafts/{id}")
+    public ResponseEntity<ApiResponse<ContratResponse>> updateDraft(@PathVariable Long id, @RequestBody CreateContratRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(contratService.updateDraft(TenantContext.getCurrentAgence(), id, request), "Brouillon enregistre"));
+    }
+
+    @PostMapping("/drafts/{id}/finaliser")
+    public ResponseEntity<ApiResponse<ContratResponse>> finalizeDraft(@PathVariable Long id, @Valid @RequestBody CreateContratRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(contratService.finalizeDraft(TenantContext.getCurrentAgence(), id, request), "Contrat cree"));
     }
 
     @PostMapping("/previsualisation-quittance")

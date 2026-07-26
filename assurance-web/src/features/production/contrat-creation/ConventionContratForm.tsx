@@ -10,6 +10,7 @@ export function ConventionContratForm({ form }: { form: ContratCreationFormState
       showConvention
       showGrille
       allowMultipleVehicules={false}
+      allowRemorques={false}
       showFractionnement={false}
     />
   );

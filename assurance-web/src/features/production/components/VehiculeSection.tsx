@@ -28,6 +28,9 @@ export function VehiculeSection({
   carrosseries,
   categoriesTransport,
   allowMultipleVehicules = true,
+  showUsage = true,
+  showAttestation = true,
+  showRemorqueFlag = false,
   errors = {},
 }: {
   vehicules: VehiculeInput[];
@@ -37,6 +40,9 @@ export function VehiculeSection({
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
   allowMultipleVehicules?: boolean;
+  showUsage?: boolean;
+  showAttestation?: boolean;
+  showRemorqueFlag?: boolean;
   errors?: Record<string, string>;
 }) {
   const update = (index: number, patch: Partial<VehiculeInput>) => {
@@ -81,29 +87,31 @@ export function VehiculeSection({
                 ) : null}
               </div>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                <Field label="Usage" required>
-                  <AutocompleteSelect
-                    value={vehicule.usageId ?? ""}
-                    placeholder="Usage"
-                    emptyText="Aucun usage trouvé"
-                    invalidText="Usage invalide : choisissez une option existante."
-                    options={usages.map((usage) => ({
-                      value: usage.id,
-                      label: usage.code ? `${usage.code} - ${usage.libelle}` : usage.libelle,
-                      keywords: usage.code,
-                    }))}
-                    onValueChange={(value) =>
-                      update(index, {
-                        usageId: value,
-                        categorieTransportId: undefined,
-                        carburant: undefined,
-                        puissanceFiscale: undefined,
-                        sousClasse: undefined,
-                        ptc: undefined,
-                      })
-                    }
-                  />
-                </Field>
+                {showUsage ? (
+                  <Field label="Usage" required>
+                    <AutocompleteSelect
+                      value={vehicule.usageId ?? ""}
+                      placeholder="Usage"
+                      emptyText="Aucun usage trouvé"
+                      invalidText="Usage invalide : choisissez une option existante."
+                      options={usages.map((usage) => ({
+                        value: usage.id,
+                        label: usage.code ? `${usage.code} - ${usage.libelle}` : usage.libelle,
+                        keywords: usage.code,
+                      }))}
+                      onValueChange={(value) =>
+                        update(index, {
+                          usageId: value,
+                          categorieTransportId: undefined,
+                          carburant: undefined,
+                          puissanceFiscale: undefined,
+                          sousClasse: undefined,
+                          ptc: undefined,
+                        })
+                      }
+                    />
+                  </Field>
+                ) : null}
                 <Field label="Immatriculation" required>
                   <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
                 </Field>
@@ -170,9 +178,6 @@ export function VehiculeSection({
                     </Select>
                   </Field>
                 ) : null}
-                <Field label="Modèle">
-                  <Input value={vehicule.modele ?? ""} onChange={(event) => update(index, { modele: event.target.value })} />
-                </Field>
                 <Field label="Nombre de places">
                   <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update(index, { nombrePlaces: event.target.value })} />
                 </Field>
@@ -182,9 +187,11 @@ export function VehiculeSection({
                 <Field label="Date validité CG" required error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
                   <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toDateOnly(date) })} />
                 </Field>
-                <Field label="N° attestation">
-                  <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
-                </Field>
+                {showAttestation ? (
+                  <Field label="N° attestation">
+                    <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
+                  </Field>
+                ) : null}
                 <Field label="Valeur vénale">
                   <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update(index, { valeurVenale: numberValue(event.target.value) })} />
                 </Field>
@@ -194,15 +201,35 @@ export function VehiculeSection({
                 <Field label="Valeur glace">
                   <Input type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update(index, { valeurGlace: numberValue(event.target.value) })} />
                 </Field>
+                <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
+                  <Input value={vehicule.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />
+                </Field>
+                {showRemorqueFlag ? (
+                  <Field label="Remorque">
+                    <div className="flex h-9 items-center">
+                      <Checkbox checked={Boolean(vehicule.remorque)} onCheckedChange={(checked) => update(index, { remorque: Boolean(checked) })} />
+                    </div>
+                  </Field>
+                ) : null}
               </div>
               <div className="mt-3 flex items-center gap-2">
-                <Checkbox checked={Boolean(vehicule.organismeCredit)} onCheckedChange={(checked) => update(index, { organismeCredit: Boolean(checked) })} />
+                <Checkbox
+                  checked={Boolean(vehicule.organismeCredit)}
+                  onCheckedChange={(checked) =>
+                    update(index, Boolean(checked)
+                      ? { organismeCredit: true }
+                      : { organismeCredit: false, nomOrganismeCredit: undefined, montantCredit: undefined, dateFinCredit: undefined })
+                  }
+                />
                 <span className="text-sm">Organisme de crédit</span>
               </div>
               {vehicule.organismeCredit ? (
-                <div className="mt-3 grid max-w-3xl gap-3 md:grid-cols-2">
+                <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-3">
                   <Field label="Nom organisme">
                     <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update(index, { nomOrganismeCredit: event.target.value })} />
+                  </Field>
+                  <Field label="Montant de crédit">
+                    <Input type="number" value={vehicule.montantCredit ?? ""} onChange={(event) => update(index, { montantCredit: numberValue(event.target.value) })} />
                   </Field>
                   <Field label="Date fin crédit">
                     <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update(index, { dateFinCredit: toDateOnly(date) })} />

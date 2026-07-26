@@ -658,9 +658,6 @@ function VehicleForm({
             </Select>
           </Field>
         ) : null}
-        <Field label="Modèle">
-          <Input value={vehicule.modele ?? ""} onChange={(event) => update({ modele: event.target.value })} />
-        </Field>
         <Field label="Nombre de places">
           <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
@@ -684,13 +681,23 @@ function VehicleForm({
         </Field>
       </div>
       <div className="mt-3 flex items-center gap-2">
-        <Checkbox checked={Boolean(vehicule.organismeCredit)} onCheckedChange={(checked) => update({ organismeCredit: Boolean(checked) })} />
+        <Checkbox
+          checked={Boolean(vehicule.organismeCredit)}
+          onCheckedChange={(checked) =>
+            update(Boolean(checked)
+              ? { organismeCredit: true }
+              : { organismeCredit: false, nomOrganismeCredit: undefined, montantCredit: undefined, dateFinCredit: undefined })
+          }
+        />
         <span className="text-sm">Organisme de crédit</span>
       </div>
       {vehicule.organismeCredit ? (
-        <div className="mt-3 grid max-w-3xl gap-3 md:grid-cols-2">
+        <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-3">
           <Field label="Nom organisme">
             <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update({ nomOrganismeCredit: event.target.value })} />
+          </Field>
+          <Field label="Montant de crédit">
+            <Input type="number" value={vehicule.montantCredit ?? ""} onChange={(event) => update({ montantCredit: numberValue(event.target.value) })} />
           </Field>
           <Field label="Date fin crédit">
             <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update({ dateFinCredit: toDateOnly(date) })} />
@@ -749,9 +756,6 @@ function RemorqueForm({
             onValueChange={(value) => update({ marqueId: value || undefined, marqueLibelle: undefined })}
             onCustomValueChange={(value) => update({ marqueId: undefined, marqueLibelle: value })}
           />
-        </Field>
-        <Field label="Modèle">
-          <Input value={remorque.modele ?? ""} onChange={(event) => update({ modele: event.target.value })} />
         </Field>
         <Field label="PTC">
           <Input value={remorque.ptc ?? ""} onChange={(event) => update({ ptc: event.target.value })} />

@@ -370,7 +370,6 @@ public class MouvementContratService {
                     .categorieTransport(vehicule.getCategorieTransport())
                     .immatriculation(vehicule.getImmatriculation())
                     .immatriculationProvisoire(vehicule.getImmatriculationProvisoire())
-                    .modele(vehicule.getModele())
                     .carburant(vehicule.getCarburant())
                     .puissanceFiscale(vehicule.getPuissanceFiscale())
                     .nombrePlaces(vehicule.getNombrePlaces())
@@ -386,6 +385,10 @@ public class MouvementContratService {
                     .valeurVenale(vehicule.getValeurVenale())
                     .valeurNeuf(vehicule.getValeurNeuf())
                     .valeurGlace(vehicule.getValeurGlace())
+                    .organismeCredit(vehicule.getOrganismeCredit())
+                    .nomOrganismeCredit(vehicule.getNomOrganismeCredit())
+                    .montantCredit(vehicule.getMontantCredit())
+                    .dateFinCredit(vehicule.getDateFinCredit())
                     .build());
             mouvement.getVehicules().add(snapshot);
         }
@@ -400,7 +403,6 @@ public class MouvementContratService {
                     .usage(remorque.getUsage())
                     .marque(remorque.getMarque())
                     .immatriculation(remorque.getImmatriculation())
-                    .modele(remorque.getModele())
                     .ptc(remorque.getPtc())
                     .dateMiseEnCirculation(remorque.getDateMiseEnCirculation())
                     .dateEffet(remorque.getDateEffet())

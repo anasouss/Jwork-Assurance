@@ -155,13 +155,13 @@ function ContratExpandedDetails({ contrat, mouvements }: { contrat: ContratSumma
           {contrat.vehicules?.map((vehicule) => (
             <div key={vehicule.vehiculeId} className="rounded-md border p-2">
               <div className="font-medium">{vehicule.immatriculation ?? "Sans immatriculation"}</div>
-              <div className="text-xs text-muted-foreground">{vehicule.usageCode} {vehicule.marque} {vehicule.modele}</div>
+              <div className="text-xs text-muted-foreground">{vehicule.usageCode} {vehicule.marque}</div>
             </div>
           ))}
           {contrat.remorques?.map((remorque) => (
             <div key={remorque.remorqueId} className="rounded-md border border-dashed p-2">
               <div className="font-medium">Remorque {remorque.immatriculation ?? ""}</div>
-              <div className="text-xs text-muted-foreground">{remorque.usageCode} {remorque.marque} {remorque.modele}</div>
+              <div className="text-xs text-muted-foreground">{remorque.usageCode} {remorque.marque}</div>
             </div>
           ))}
         </DetailBlock>

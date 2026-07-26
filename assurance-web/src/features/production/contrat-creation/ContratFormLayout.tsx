@@ -72,6 +72,9 @@ export function ContratFormLayout({
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
       allowMultipleVehicules={allowMultipleVehicules}
+      showUsage={!showConvention}
+      showAttestation={!showConvention}
+      showRemorqueFlag={showConvention}
       errors={form.validationErrors}
     />
   );

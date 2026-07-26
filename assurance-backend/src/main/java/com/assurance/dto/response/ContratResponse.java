@@ -77,9 +77,9 @@ public class ContratResponse {
         private Boolean consommeAttestation;
         private String immatriculation;
         private String numeroAttestation;
+        private Boolean remorque;
         private String marqueId;
         private String marque;
-        private String modele;
         private String carrosserieId;
         private String carrosserie;
         private String categorieTransportId;
@@ -89,6 +89,10 @@ public class ContratResponse {
         private BigDecimal valeurVenale;
         private BigDecimal valeurNeuf;
         private BigDecimal valeurGlace;
+        private Boolean organismeCredit;
+        private String nomOrganismeCredit;
+        private BigDecimal montantCredit;
+        private LocalDate dateFinCredit;
     }
 
     @Data
@@ -104,7 +108,6 @@ public class ContratResponse {
         private String numeroAttestation;
         private String marqueId;
         private String marque;
-        private String modele;
         private String ptc;
         private BigDecimal coefficientProrata;
         private BigDecimal valeurAssuree;

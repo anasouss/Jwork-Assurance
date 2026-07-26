@@ -90,7 +90,6 @@ public class CreateContratRequest {
         private String categorieTransportId;
         private String immatriculation;
         private String immatriculationProvisoire;
-        private String modele;
         private String carburant;
         private String puissanceFiscale;
         private String nombrePlaces;
@@ -102,12 +101,14 @@ public class CreateContratRequest {
         private LocalDate dateEcheance;
         private String crm;
         private String numeroAttestation;
+        private Boolean remorque;
         private BigDecimal coefficientProrata;
         private BigDecimal valeurVenale;
         private BigDecimal valeurNeuf;
         private BigDecimal valeurGlace;
         private Boolean organismeCredit;
         private String nomOrganismeCredit;
+        private BigDecimal montantCredit;
         private LocalDate dateFinCredit;
     }
 
@@ -117,7 +118,6 @@ public class CreateContratRequest {
         private String marqueId;
         private String marqueLibelle;
         private String immatriculation;
-        private String modele;
         private String ptc;
         private LocalDate dateMiseEnCirculation;
         private LocalDate dateEffet;

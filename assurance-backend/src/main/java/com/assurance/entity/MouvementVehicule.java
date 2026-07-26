@@ -71,9 +71,6 @@ public class MouvementVehicule extends BaseEntity {
     @Column(name = "ww_immatriculation", length = 80)
     private String immatriculationProvisoire;
 
-    @Column(length = 80)
-    private String modele;
-
     @Column(length = 40)
     private String carburant;
 
@@ -114,4 +111,17 @@ public class MouvementVehicule extends BaseEntity {
 
     @Column(name = "valeur_glace", precision = 14, scale = 2)
     private BigDecimal valeurGlace;
+
+    @Builder.Default
+    @Column(name = "organisme_credit", nullable = false)
+    private Boolean organismeCredit = false;
+
+    @Column(name = "nom_organisme_credit", length = 160)
+    private String nomOrganismeCredit;
+
+    @Column(name = "montant_credit", precision = 14, scale = 2)
+    private BigDecimal montantCredit;
+
+    @Column(name = "date_fin_credit")
+    private LocalDate dateFinCredit;
 }

@@ -62,9 +62,6 @@ public class Vehicule extends BaseEntity {
     @Column(name = "ww_immatriculation", length = 80)
     private String immatriculationProvisoire;
 
-    @Column(length = 80)
-    private String modele;
-
     @Column(length = 40)
     private String carburant;
 
@@ -94,6 +91,10 @@ public class Vehicule extends BaseEntity {
     @Column(name = "numero_attestation", length = 80)
     private String numeroAttestation;
 
+    @Builder.Default
+    @Column(name = "remorque", nullable = false)
+    private Boolean remorque = false;
+
     @Column(name = "coefficient_prorata", precision = 14, scale = 6)
     private BigDecimal coefficientProrata;
 
@@ -112,6 +113,9 @@ public class Vehicule extends BaseEntity {
 
     @Column(name = "nom_organisme_credit", length = 160)
     private String nomOrganismeCredit;
+
+    @Column(name = "montant_credit", precision = 14, scale = 2)
+    private BigDecimal montantCredit;
 
     @Column(name = "date_fin_credit")
     private LocalDate dateFinCredit;

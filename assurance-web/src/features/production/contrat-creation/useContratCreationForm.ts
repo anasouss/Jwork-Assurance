@@ -271,6 +271,9 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
       }
     });
     request.vehicules.forEach((vehicule, index) => {
+      if (!vehicule.crm?.trim()) {
+        nextErrors[`vehicules.${index}.crm`] = "CRM obligatoire.";
+      }
       if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
         nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
       }

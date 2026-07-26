@@ -214,7 +214,6 @@ export type VehiculeInput = {
   categorieTransportId?: string;
   immatriculation?: string;
   immatriculationProvisoire?: string;
-  modele?: string;
   carburant?: string;
   puissanceFiscale?: string;
   nombrePlaces?: string;
@@ -227,11 +226,13 @@ export type VehiculeInput = {
   crm?: string;
   numeroAttestation?: string;
   coefficientProrata?: number;
+  remorque?: boolean;
   valeurVenale?: number;
   valeurNeuf?: number;
   valeurGlace?: number;
   organismeCredit?: boolean;
   nomOrganismeCredit?: string;
+  montantCredit?: number;
   dateFinCredit?: string;
 };
 
@@ -240,7 +241,6 @@ export type RemorqueInput = {
   marqueId?: string;
   marqueLibelle?: string;
   immatriculation?: string;
-  modele?: string;
   ptc?: string;
   dateMiseEnCirculation?: string;
   dateEffet?: string;
@@ -549,11 +549,14 @@ export type ContratSummary = {
     immatriculation?: string | null;
     numeroAttestation?: string | null;
     marque?: string | null;
-    modele?: string | null;
     categorieTransportLibelle?: string | null;
     valeurVenale?: number | null;
     valeurNeuf?: number | null;
     valeurGlace?: number | null;
+    organismeCredit?: boolean | null;
+    nomOrganismeCredit?: string | null;
+    montantCredit?: number | null;
+    dateFinCredit?: string | null;
   }[];
   remorques?: {
     remorqueId: string;
@@ -562,7 +565,6 @@ export type ContratSummary = {
     immatriculation?: string | null;
     numeroAttestation?: string | null;
     marque?: string | null;
-    modele?: string | null;
     ptc?: string | null;
     valeurAssuree?: number | null;
   }[];

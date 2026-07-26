@@ -91,9 +91,6 @@ export function RemorqueSection({
                   onCustomValueChange={(value) => update(index, { marqueId: undefined, marqueLibelle: value })}
                 />
               </Field>
-              <Field label="Modèle">
-                <Input value={remorque.modele ?? ""} onChange={(event) => update(index, { modele: event.target.value })} />
-              </Field>
               <Field label="PTC">
                 <Input value={remorque.ptc ?? ""} onChange={(event) => update(index, { ptc: event.target.value })} />
               </Field>

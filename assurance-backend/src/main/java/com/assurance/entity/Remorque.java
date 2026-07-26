@@ -43,9 +43,6 @@ public class Remorque extends BaseEntity {
     @Column(name = "immatriculation", length = 80)
     private String immatriculation;
 
-    @Column(length = 80)
-    private String modele;
-
     @Column(length = 40)
     private String ptc;
 

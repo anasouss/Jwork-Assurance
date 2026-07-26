@@ -54,9 +54,6 @@ public class MouvementRemorque extends BaseEntity {
     @Column(length = 80)
     private String immatriculation;
 
-    @Column(length = 80)
-    private String modele;
-
     @Column(length = 40)
     private String ptc;
 

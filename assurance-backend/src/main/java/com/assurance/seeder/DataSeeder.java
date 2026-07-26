@@ -163,13 +163,13 @@ public class DataSeeder implements CommandLineRunner {
         seedCapitalResponsabiliteCivile("CYCLOS", BigDecimal.valueOf(5_000_000L));
 
         seedParametreApplication("CNPAC", "DECIMAL", "17", "Montant CNPAC utilise dans les quittances");
-        seedParametreApplication("TAUX_EVCAT_1", "DECIMAL", "0", "Taux EVCAT applique a la RC hors TPV");
+        seedParametreApplication("TAUX_EVCAT_1", "DECIMAL", "0.035", "Taux EVCAT applique a la RC hors TPV");
         seedParametreApplication("TAUX_EVCAT_2", "DECIMAL", "0.015", "Taux EVCAT applique aux autres garanties");
         seedParametreApplication("TAUX_EVCAT_3", "DECIMAL", "0.02", "Taux EVCAT applique aux garanties personne");
         seedParametreApplication("TAUX_EVCAT_TPV_RC", "DECIMAL", "0.02", "Taux EVCAT applique a la RC TPV");
         seedParametreApplication("TAUX_TAXE_1", "DECIMAL", "0.155", "Taxe RC");
         seedParametreApplication("TAUX_TAXE_2", "DECIMAL", "0.14", "Taxe garanties");
-        seedParametreApplication("TAUX_TAXE_PF", "DECIMAL", "0.01", "Taxe parafiscale");
+        seedParametreApplication("TAUX_TAXE_PF", "DECIMAL", "0.015", "Taxe parafiscale");
         seedParametreApplication("TAUX_RSS", "DECIMAL", "0.60", "Coefficient RC lorsque le client est saharien");
         seedParametreApplication("MULTIPLICATEUR_RC_DEFAUT", "DECIMAL", "1", "Multiplicateur RC par defaut");
         seedParametreApplication("MULTIPLICATEUR_RC_TPV", "DECIMAL", "1", "Multiplicateur RC TPV par defaut");

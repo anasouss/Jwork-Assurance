@@ -17,6 +17,11 @@ public interface LigneGrilleTarifaireRepository extends JpaRepository<LigneGrill
             Long garantieId
     );
 
+    List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndGarantieResponsabiliteCivileTrueAndActifTrueOrderByOrdreAffichageAsc(
+            Long grilleTarifaireId,
+            Long usageId
+    );
+
     List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndGarantieIdAndModeTarificationAndActifTrueOrderByOrdreAffichageAsc(
             Long grilleTarifaireId,
             Long usageId,

@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.entity.CapitalResponsabiliteCivile;
 import com.assurance.entity.Carburant;
+import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
@@ -11,7 +12,9 @@ import com.assurance.entity.TarifUsage;
 import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.ModeTarificationGarantie;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.repository.CapitalResponsabiliteCivileRepository;
+import com.assurance.repository.LigneGrilleTarifaireRepository;
 import com.assurance.repository.TarifUsageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,7 @@ public class CalculGarantieService {
     private final ParametreApplicationService parametreApplicationService;
     private final TarifUsageRepository tarifUsageRepository;
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
+    private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
 
     public BigDecimal calculerProrata(LocalDate dateEffet, LocalDate dateEcheance) {
         if (dateEffet == null || dateEcheance == null || dateEcheance.isBefore(dateEffet)) {
@@ -112,6 +116,10 @@ public class CalculGarantieService {
     }
 
     public BigDecimal resolveMultiplicateurRc(Contrat contrat, Usage usage) {
+        BigDecimal tauxLocationGrille = resolveTauxRcLocationGrille(contrat, usage);
+        if (tauxLocationGrille != null) {
+            return tauxLocationGrille;
+        }
         if (contrat != null && contrat.getTauxRc() != null && contrat.getTauxRc().compareTo(BigDecimal.ZERO) > 0) {
             return contrat.getTauxRc();
         }
@@ -120,6 +128,23 @@ public class CalculGarantieService {
             return parametreApplicationService.getDecimal(agenceId, "MULTIPLICATEUR_RC_TPV", BigDecimal.ONE);
         }
         return parametreApplicationService.getDecimal(agenceId, "MULTIPLICATEUR_RC_DEFAUT", BigDecimal.ONE);
+    }
+
+    private BigDecimal resolveTauxRcLocationGrille(Contrat contrat, Usage usage) {
+        if (!isContratLocation(contrat) || usage == null || usage.getId() == null || contrat.getGrilleTarifaire() == null) {
+            return null;
+        }
+        Long grilleId = contrat.getGrilleTarifaire().getId();
+        if (grilleId == null) {
+            return null;
+        }
+        return ligneGrilleTarifaireRepository
+                .findByGrilleTarifaireIdAndUsageIdAndGarantieResponsabiliteCivileTrueAndActifTrueOrderByOrdreAffichageAsc(grilleId, usage.getId())
+                .stream()
+                .map(LigneGrilleTarifaire::getTaux)
+                .filter(taux -> taux != null && taux.compareTo(BigDecimal.ZERO) > 0)
+                .findFirst()
+                .orElse(null);
     }
 
     public BigDecimal resolveTauxLigne(LigneGrilleTarifaire ligne, boolean remorque) {
@@ -329,6 +354,32 @@ public class CalculGarantieService {
                 .map(Vehicule::getUsage)
                 .filter(Objects::nonNull)
                 .anyMatch(candidate -> isUsageInCategorie(candidate, "TPV"));
+    }
+
+    private boolean isContratLocation(Contrat contrat) {
+        if (contrat == null || contrat.getClients() == null) {
+            return false;
+        }
+        boolean proprietaireLocation = contrat.getClients().stream()
+                .filter(Objects::nonNull)
+                .filter(link -> link.getRole() == RoleClientContrat.PROPRIETAIRE)
+                .map(ContratClient::getClient)
+                .anyMatch(this::isClientLocation);
+        if (proprietaireLocation) {
+            return true;
+        }
+        return contrat.getClients().stream()
+                .filter(Objects::nonNull)
+                .map(ContratClient::getClient)
+                .anyMatch(this::isClientLocation);
+    }
+
+    private boolean isClientLocation(Client client) {
+        if (client == null) {
+            return false;
+        }
+        CategorieClient categorieClient = client.getCategorieClient();
+        return categorieClient != null && equalsIgnoreCase(categorieClient.getCode(), "LOCATION");
     }
 
     private boolean isUsageInCategorie(Usage usage, String codeCategorie) {

@@ -46,6 +46,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const [fractionnement, setFractionnement] = useState<CreateContratRequest["fractionnement"]>("ANNUEL");
   const [crmPartage, setCrmPartage] = useState(false);
   const [crmPartageValeur, setCrmPartageValeur] = useState("");
+  const [tauxRc, setTauxRc] = useState("");
   const [assistanceEnabled, setAssistanceEnabled] = useState(false);
   const [assistanceDraft, setAssistanceDraft] = useState<AssistanceDraft>({ enabled: false });
   const [saisiePrimeNette, setSaisiePrimeNette] = useState(false);
@@ -92,6 +93,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     () => refs.categoriesClient.data?.find((item) => item.id === flotteCategorieClientId) ?? null,
     [flotteCategorieClientId, refs.categoriesClient.data]
   );
+  const isFlotteLocationCategory = typeContrat === "FLOTTE" && String(selectedFlotteCategorie?.code ?? "").trim().toUpperCase() === "LOCATION";
   const flotteUsageIds = useMemo(
     () => referenceStringArray(selectedFlotteCategorie, "usageIds"),
     [selectedFlotteCategorie]
@@ -188,6 +190,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setFractionnement(hydrated.fractionnement);
     setCrmPartage(hydrated.crmPartage);
     setCrmPartageValeur(hydrated.crmPartageValeur);
+    setTauxRc(hydrated.tauxRc);
     setAssistanceEnabled(hydrated.assistanceEnabled);
     setSaisiePrimeNette(hydrated.saisiePrimeNette);
     setClients(hydrated.clients);
@@ -196,6 +199,12 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setGaranties(hydrated.garanties);
     setHydratedDraftId(draftId);
   }, [draftId, draftQuery.data, hydratedDraftId]);
+
+  useEffect(() => {
+    if (!isFlotteLocationCategory && tauxRc) {
+      setTauxRc("");
+    }
+  }, [isFlotteLocationCategory, tauxRc]);
 
   useEffect(() => {
     const garantiesReference = refs.garanties.data ?? [];
@@ -252,6 +261,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled || assistanceDraft.enabled : false,
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
+    tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
     clients: clients.map((client) => ({
       ...client,
       client: {
@@ -300,6 +310,8 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     fractionnement,
     crmPartage,
     crmPartageValeur,
+    isFlotteLocationCategory,
+    tauxRc,
     assistanceEnabled,
     assistanceDraft.enabled,
     modeSaisieGaranties,
@@ -399,6 +411,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       setValidationErrors({ numeroBonCommande: "N° bon de commande obligatoire." });
       toast.error("N° bon de commande obligatoire.");
       return false;
+    }
+    if (isFlotteLocationCategory && !positiveNumberOrUndefined(tauxRc)) {
+      nextErrors.tauxRc = "Taux RC obligatoire.";
     }
     const today = dateOnly(new Date());
     request.clients.forEach((item, index) => {
@@ -538,6 +553,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       requireField("dateEcheance", dateEcheance, "Date échéance obligatoire.");
       if (showContractEcheance) {
         requireField("echeance", effectiveEcheance, "Échéance obligatoire.");
+      }
+      if (isFlotteLocationCategory && !positiveNumberOrUndefined(tauxRc)) {
+        nextErrors.tauxRc = "Taux RC obligatoire.";
       }
       if (typeContrat === "CONVENTION") {
         requireField("conventionId", conventionId, "Convention obligatoire.");
@@ -778,6 +796,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setCrmPartage,
     crmPartageValeur,
     setCrmPartageValeur,
+    tauxRc,
+    setTauxRc,
+    isFlotteLocationCategory,
     assistanceEnabled,
     setAssistanceEnabled,
     assistanceDraft,
@@ -847,6 +868,11 @@ function totalLine(ligne: QuittanceInput) {
 
 function numberOrZero(value?: number) {
   return Number.isFinite(value) ? Number(value) : 0;
+}
+
+function positiveNumberOrUndefined(value: string) {
+  const parsed = Number(value.trim().replace(",", "."));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function roundMoney(value: number) {
@@ -1087,6 +1113,7 @@ function hydrateDraft(draft: ContratSummary) {
     fractionnement: asFractionnement(draft.fractionnement),
     crmPartage: Boolean(draft.crmPartage),
     crmPartageValeur: draft.crmPartageValeur ?? "",
+    tauxRc: draft.tauxRc == null ? "" : String(draft.tauxRc),
     assistanceEnabled: Boolean(draft.assistance),
     saisiePrimeNette: Boolean(draft.saisiePrimeNette),
     clients,

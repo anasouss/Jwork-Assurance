@@ -1626,7 +1626,7 @@ function tariffLineLabel(line: ReferenceOption, index = 0) {
 function rateDisplay(line?: ReferenceOption) {
   const taux = toNumber(line?.taux);
   if (lineMode(line) === "CAPITAL") {
-    return String(line?.libelle ?? "-");
+    return "";
   }
   return taux == null ? "-" : `${money(taux)} %`;
 }

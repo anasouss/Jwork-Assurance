@@ -272,6 +272,16 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     quittances,
   ]);
 
+  useEffect(() => {
+    setValidationErrors((current) => {
+      const today = dateOnly(new Date());
+      const next = Object.fromEntries(
+        Object.entries(current).filter(([key]) => !isValidationErrorResolved(key, request, today))
+      );
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
+    });
+  }, [request]);
+
   const previewMutation = useMutation({
     mutationFn: productionApi.previewQuittance,
     onSuccess: (data) => {
@@ -774,6 +784,53 @@ function dateOnly(date: Date) {
 
 function isBeforeToday(value: string | undefined | null, today: string) {
   return Boolean(value && value < today);
+}
+
+function isValidationErrorResolved(key: string, request: CreateContratRequest, today: string) {
+  const clientMatch = key.match(/^clients\.(\d+)\.client\.(.+)$/);
+  if (clientMatch) {
+    const client = request.clients[Number(clientMatch[1])]?.client;
+    if (!client) {
+      return false;
+    }
+    const field = clientMatch[2] as keyof ClientInput["client"] | "telephones";
+    if (field === "telephones") {
+      return hasTelephone(client.telephones);
+    }
+    if (field === "cinValidite" || field === "dateValiditePermis") {
+      const value = client[field];
+      return Boolean(value && !isBeforeToday(value, today));
+    }
+    const value = client[field as keyof ClientInput["client"]];
+    return value != null && (typeof value !== "string" || value.trim() !== "");
+  }
+
+  const vehiculeMatch = key.match(/^vehicules\.(\d+)\.(.+)$/);
+  if (vehiculeMatch) {
+    const vehicule = request.vehicules[Number(vehiculeMatch[1])];
+    if (!vehicule) {
+      return false;
+    }
+    const field = vehiculeMatch[2] as keyof VehiculeInput;
+    if (field === "dateExpirationCarteGrise") {
+      const value = vehicule[field];
+      return Boolean(value && !isBeforeToday(value, today));
+    }
+    if (field === "valeurVenale") {
+      return !validateValeurVenale(vehicule);
+    }
+    const value = vehicule[field];
+    return value != null && (typeof value !== "string" || value.trim() !== "");
+  }
+
+  if (key === "echeance") {
+    return Boolean(request.echeance);
+  }
+  if (key === "numeroBonCommande") {
+    return Boolean(request.numeroBonCommande?.trim());
+  }
+  const value = request[key as keyof CreateContratRequest];
+  return value != null && (typeof value !== "string" || value.trim() !== "");
 }
 
 function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest) {

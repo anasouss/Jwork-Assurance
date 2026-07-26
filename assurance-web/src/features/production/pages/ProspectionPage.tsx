@@ -56,6 +56,7 @@ export default function ProspectionPage() {
   const [selectedVehicules, setSelectedVehicules] = useState<string[]>([]);
   const [selectedUsages, setSelectedUsages] = useState<string[]>([]);
   const [convertTarget, setConvertTarget] = useState<ContratSummary | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [numeroPolice, setNumeroPolice] = useState("");
   const [attestations, setAttestations] = useState<Record<string, string>>({});
   const [assistanceRefs, setAssistanceRefs] = useState<Record<string, string>>({});
@@ -125,11 +126,28 @@ export default function ProspectionPage() {
       toast.error("Sélectionnez au moins un usage");
       return;
     }
-    const blob = await productionApi.downloadDevisPdf(pdfTarget.id, {
-      vehiculeIds: pdfScope === "vehicles" ? selectedVehicules : undefined,
-      usageIds: pdfScope === "usages" ? selectedUsages : undefined,
-    });
-    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+    setGeneratingPdf(true);
+    try {
+      const blob = await productionApi.downloadDevisPdf(pdfTarget.id, {
+        vehiculeIds: pdfScope === "vehicles" ? selectedVehicules : undefined,
+        usageIds: pdfScope === "usages" ? selectedUsages : undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const fileName = `devis-${pdfTarget.numeroDevis ?? pdfTarget.id}.pdf`;
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success("PDF généré");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Génération du PDF impossible");
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   const openConvertModal = (contrat: ContratSummary) => {
@@ -270,8 +288,8 @@ export default function ProspectionPage() {
           </RadioGroup>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPdfTarget(null)}>Annuler</Button>
-            <Button type="button" onClick={generatePdf}>
-              Générer le PDF
+            <Button type="button" onClick={generatePdf} disabled={generatingPdf}>
+              {generatingPdf ? "Génération..." : "Générer le PDF"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -532,7 +550,7 @@ function mainClient(contrat: ContratSummary) {
 
 function companyLabel(contrat: ContratSummary, companyMap: Map<string, ReferenceOption>) {
   const company = contrat.compagnieAssuranceId ? companyMap.get(String(contrat.compagnieAssuranceId)) : undefined;
-  return String(company?.code ?? company?.libelle ?? contrat.compagnieAssuranceId ?? "-");
+  return String(company?.libelle ?? company?.code ?? contrat.compagnieAssuranceId ?? "-");
 }
 
 function uniqueUsages(contrat: ContratSummary | null) {

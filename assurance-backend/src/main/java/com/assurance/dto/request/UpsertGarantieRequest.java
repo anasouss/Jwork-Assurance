@@ -26,6 +26,7 @@ public class UpsertGarantieRequest {
     private Boolean requiertValeurNeuf;
     private Boolean requiertValeurGlace;
     private Boolean avecFranchise;
+    private Boolean avecFranchiseMinimale;
     private Boolean avecCapital;
     private Boolean tarificationMultiple;
     private Set<ModeTarificationGarantie> modesTarificationMultiple;

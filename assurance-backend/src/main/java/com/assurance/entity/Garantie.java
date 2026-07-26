@@ -79,6 +79,10 @@ public class Garantie extends BaseEntity {
     private Boolean avecFranchise = false;
 
     @Builder.Default
+    @Column(name = "avec_franchise_minimale", nullable = false)
+    private Boolean avecFranchiseMinimale = false;
+
+    @Builder.Default
     @Column(name = "avec_capital", nullable = false)
     private Boolean avecCapital = false;
 

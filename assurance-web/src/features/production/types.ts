@@ -569,6 +569,7 @@ export type UpsertGarantieRequest = {
   requiertValeurNeuf?: boolean;
   requiertValeurGlace?: boolean;
   avecFranchise?: boolean;
+  avecFranchiseMinimale?: boolean;
   avecCapital?: boolean;
   tarificationMultiple?: boolean;
   modesTarificationMultiple?: string[];

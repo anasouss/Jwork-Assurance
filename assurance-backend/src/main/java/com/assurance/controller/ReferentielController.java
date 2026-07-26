@@ -1234,6 +1234,7 @@ public class ReferentielController {
         garantie.setRequiertValeurNeuf(Boolean.TRUE.equals(request.getRequiertValeurNeuf()));
         garantie.setRequiertValeurGlace(Boolean.TRUE.equals(request.getRequiertValeurGlace()));
         garantie.setAvecFranchise(Boolean.TRUE.equals(request.getAvecFranchise()));
+        garantie.setAvecFranchiseMinimale(Boolean.TRUE.equals(request.getAvecFranchiseMinimale()));
         garantie.setAvecCapital(Boolean.TRUE.equals(request.getAvecCapital()));
         garantie.setTarificationMultiple(!modesTarificationMultiple.isEmpty());
         garantie.getModesTarificationMultiple().clear();
@@ -1268,6 +1269,7 @@ public class ReferentielController {
                 .putValue("requiertValeurNeuf", garantie.getRequiertValeurNeuf())
                 .putValue("requiertValeurGlace", garantie.getRequiertValeurGlace())
                 .putValue("avecFranchise", garantie.getAvecFranchise())
+                .putValue("avecFranchiseMinimale", garantie.getAvecFranchiseMinimale())
                 .putValue("avecCapital", garantie.getAvecCapital())
                 .putValue("tarificationMultiple", garantie.getTarificationMultiple())
                 .putValue("modesTarificationMultiple", garantie.getModesTarificationMultiple())

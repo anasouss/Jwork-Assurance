@@ -128,6 +128,7 @@ export const garantieSchema = z.object({
   requiertValeurNeuf: z.boolean().optional(),
   requiertValeurGlace: z.boolean().optional(),
   avecFranchise: z.boolean().optional(),
+  avecFranchiseMinimale: z.boolean().optional(),
   avecCapital: z.boolean().optional(),
   tarificationMultiple: z.boolean().optional(),
   modesTarificationMultiple: z.array(z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"])).optional(),

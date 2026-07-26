@@ -561,6 +561,7 @@ public class DataSeeder implements CommandLineRunner {
                         .requiertValeurGlace(requiertValeurGlace)
                         .avecCapital(avecCapital)
                         .avecFranchise(avecFranchise)
+                        .avecFranchiseMinimale(defaultAvecFranchiseMinimale(code, avecFranchise))
                         .tarificationMultiple(tarificationMultiple)
                         .ordreAffichage(ordreAffichage)
                         .actif(true)
@@ -577,6 +578,7 @@ public class DataSeeder implements CommandLineRunner {
         garantie.setRequiertValeurGlace(requiertValeurGlace);
         garantie.setAvecCapital(avecCapital);
         garantie.setAvecFranchise(avecFranchise);
+        garantie.setAvecFranchiseMinimale(defaultAvecFranchiseMinimale(code, avecFranchise));
         garantie.setTarificationMultiple(tarificationMultiple);
         if (garantie.getModesTarificationMultiple() == null) {
             garantie.setModesTarificationMultiple(new LinkedHashSet<>());
@@ -611,6 +613,10 @@ public class DataSeeder implements CommandLineRunner {
             case "DV" -> Set.of(ModeTarificationGarantie.TAUX);
             default -> Set.of(modeParDefaut);
         };
+    }
+
+    private boolean defaultAvecFranchiseMinimale(String code, boolean avecFranchise) {
+        return avecFranchise && !"V".equals(code) && !"I".equals(code);
     }
 
     private CompagnieGarantie seedCompagnieGarantie(CompagnieAssurance compagnie, Garantie garantie) {

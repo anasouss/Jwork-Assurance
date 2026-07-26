@@ -798,7 +798,8 @@ export function GarantiesSettingsPage() {
               <Flag label="Responsabilité civile" checked={payload.responsabiliteCivile} onChange={(value) => update({ responsabiliteCivile: value })} />
               <Flag label="Défense et recours" checked={payload.defenseRecours} onChange={(value) => update({ defenseRecours: value })} />
               <Flag label="Avec capital" checked={payload.avecCapital} onChange={(value) => update({ avecCapital: value })} />
-              <Flag label="Avec franchise" checked={payload.avecFranchise} onChange={(value) => update({ avecFranchise: value })} />
+              <Flag label="Taux franchise" checked={payload.avecFranchise} onChange={(value) => update({ avecFranchise: value, avecFranchiseMinimale: value ? payload.avecFranchiseMinimale : false })} />
+              <Flag label="Franchise minimale" checked={payload.avecFranchiseMinimale} onChange={(value) => update({ avecFranchiseMinimale: value, avecFranchise: value ? true : payload.avecFranchise })} />
               <Flag label="Tarification multiple" checked={(payload.modesTarificationMultiple ?? []).length > 0} onChange={setTarificationMultiple} />
               <Flag label="Saisie manuelle" checked={payload.saisieManuelleAutorisee} onChange={(value) => update({ saisieManuelleAutorisee: value })} />
               <Flag label="Verrouillée" checked={payload.verrouillee} onChange={(value) => update({ verrouillee: value })} />
@@ -1080,7 +1081,7 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
               </TableCell>
               <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="taux" disabledFor={(row) => row.mode !== "TAUX"} updateRow={updateVehicleRow} /></TableCell>
               <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="tauxFranchise" disabledFor={() => !payload.avecFranchise} updateRow={updateVehicleRow} /></TableCell>
-              <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="franchiseMinimale" disabledFor={() => !payload.avecFranchise} updateRow={updateVehicleRow} /></TableCell>
+              <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="franchiseMinimale" disabledFor={() => !payload.avecFranchiseMinimale} updateRow={updateVehicleRow} /></TableCell>
               <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="capital" disabledFor={(row) => row.mode !== "CAPITAL"} updateRow={updateVehicleRow} /></TableCell>
               <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="prime" disabledFor={(row) => row.mode !== "CAPITAL" && row.mode !== "PRIME_FIXE"} updateRow={updateVehicleRow} /></TableCell>
               <TableCell className="align-top">
@@ -1562,6 +1563,7 @@ function emptyGarantie(): UpsertGarantieRequest {
     requiertValeurNeuf: false,
     requiertValeurGlace: false,
     avecFranchise: false,
+    avecFranchiseMinimale: false,
     avecCapital: false,
     tarificationMultiple: false,
     modesTarificationMultiple: [],
@@ -1590,6 +1592,7 @@ function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantie
     requiertValeurNeuf: Boolean(garantie.requiertValeurNeuf),
     requiertValeurGlace: Boolean(garantie.requiertValeurGlace),
     avecFranchise: Boolean(garantie.avecFranchise),
+    avecFranchiseMinimale: Boolean(garantie.avecFranchiseMinimale),
     avecCapital: Boolean(garantie.avecCapital),
     tarificationMultiple: Boolean(garantie.tarificationMultiple),
     modesTarificationMultiple: stringArray(garantie.modesTarificationMultiple),
@@ -1625,6 +1628,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
       requiertValeurNeuf: false,
       requiertValeurGlace: false,
       avecFranchise: false,
+      avecFranchiseMinimale: false,
       avecCapital: true,
       tarificationMultiple: false,
       modesTarificationMultiple: [],
@@ -1641,6 +1645,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     typeGarantie,
     modesAutorises: normalizedModes,
     modeParDefaut,
+    avecFranchiseMinimale: Boolean(payload.avecFranchise && payload.avecFranchiseMinimale),
     tarificationMultiple: modesTarificationMultiple.length > 0,
     modesTarificationMultiple,
     sourcesValeurAutorisees,
@@ -1674,7 +1679,8 @@ function garantieTags(garantie: ReferenceOption) {
     garantie.obligatoire ? "Obligatoire" : null,
     garantie.responsabiliteCivile ? "RC" : null,
     garantie.avecCapital ? "Capital" : null,
-    garantie.avecFranchise ? "Franchise" : null,
+    garantie.avecFranchise ? "Taux franchise" : null,
+    garantie.avecFranchiseMinimale ? "Franchise min." : null,
     garantie.tarificationMultiple ? "Multiple" : null,
   ].filter(Boolean) as string[];
 }

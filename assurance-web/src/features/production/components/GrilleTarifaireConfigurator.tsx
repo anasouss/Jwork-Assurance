@@ -340,7 +340,7 @@ export function GrilleTarifaireConfigurator({
                       drafts={[baseDraft, ...extraDrafts]}
                       enabled={enabled}
                       field="franchiseMinimale"
-                      disabledFor={() => !hasFranchise(garantie)}
+                      disabledFor={() => !hasFranchiseMinimale(garantie)}
                       updateDraft={updateDraft}
                     />
                   </TableCell>
@@ -754,6 +754,7 @@ function emptyDraft(garantie: ReferenceOption): MatrixLine {
 function cleanDraft(draft: MatrixLine, usageId: string, garantie?: ReferenceOption): UpsertLigneGrilleTarifaireRequest {
   const mode = draft.modeTarification || "TAUX";
   const franchise = hasFranchise(garantie);
+  const franchiseMinimale = hasFranchiseMinimale(garantie);
   return {
     id: draft.id,
     garantieId: draft.garantieId,
@@ -771,7 +772,7 @@ function cleanDraft(draft: MatrixLine, usageId: string, garantie?: ReferenceOpti
     libelleOption: draft.libelleOption || undefined,
     taux: mode === "TAUX" ? draft.taux : undefined,
     tauxFranchise: franchise ? draft.tauxFranchise : undefined,
-    franchiseMinimale: franchise ? draft.franchiseMinimale : undefined,
+    franchiseMinimale: franchiseMinimale ? draft.franchiseMinimale : undefined,
     capital: mode === "CAPITAL" ? draft.capital : undefined,
     prime: mode === "CAPITAL" || mode === "PRIME_FIXE" ? draft.prime : undefined,
     ordreAffichage: draft.ordreAffichage,
@@ -845,6 +846,10 @@ function defaultMode(garantie?: ReferenceOption) {
 
 function hasFranchise(garantie?: ReferenceOption) {
   return Boolean(garantie?.avecFranchise);
+}
+
+function hasFranchiseMinimale(garantie?: ReferenceOption) {
+  return Boolean(garantie?.avecFranchiseMinimale);
 }
 
 function usageAllowsGarantiesPersonne(usage?: ReferenceOption | null) {

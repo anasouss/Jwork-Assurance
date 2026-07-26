@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Edit, Handshake, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -23,6 +24,7 @@ import type { ReferenceOption, UpsertCompagnieAssuranceRequest } from "../types"
 
 export default function CompaniesPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const compagnies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
     queryFn: () => productionApi.referentiel("compagnies-assurance"),
@@ -120,7 +122,7 @@ export default function CompaniesPage() {
                 <TableHead>ICE</TableHead>
                 <TableHead>Préfixe</TableHead>
                 <TableHead>Actif</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -139,14 +141,21 @@ export default function CompaniesPage() {
                   <TableCell>{companyField(compagnie, "prefixeAttestation") || "-"}</TableCell>
                   <TableCell>{compagnie.actif === false ? "Non" : "Oui"}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link to={`/app/companies/conventions?compagnieId=${compagnie.id}`} aria-label={`Conventions ${compagnie.libelle}`}>
-                        <Handshake className="size-4" />
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { setEditing(compagnie); setDialogOpen(true); }} aria-label={`Modifier ${compagnie.libelle}`}>
-                      <Edit className="size-4" />
-                    </Button>
+                    <TableRowActions
+                      label={`Actions ${compagnie.libelle}`}
+                      actions={[
+                        {
+                          label: "Conventions",
+                          icon: Handshake,
+                          onSelect: () => navigate(`/app/companies/conventions?compagnieId=${compagnie.id}`),
+                        },
+                        {
+                          label: "Modifier",
+                          icon: Edit,
+                          onSelect: () => { setEditing(compagnie); setDialogOpen(true); },
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

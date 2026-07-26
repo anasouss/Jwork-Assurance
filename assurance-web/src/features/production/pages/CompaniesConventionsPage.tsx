@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Edit, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EcheanceInput, isValidEcheance } from "@/components/ui/echeance-input";
@@ -198,7 +199,7 @@ export default function CompaniesConventionsPage() {
                 <TableHead>Usages</TableHead>
                 <TableHead>Échéance</TableHead>
                 <TableHead>Fractionnement</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -225,17 +226,22 @@ export default function CompaniesConventionsPage() {
                   <TableCell>{formatEcheance(convention)}</TableCell>
                   <TableCell>{conventionField(convention, "fractionnement") || "-"}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={!conventionField(convention, "grilleTarifaireId")}
-                      onClick={() => setConfiguring(convention)}
-                    >
-                      <SlidersHorizontal className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { setEditing(convention); setDialogOpen(true); }}>
-                      <Edit className="size-4" />
-                    </Button>
+                    <TableRowActions
+                      label={`Actions ${convention.libelle}`}
+                      actions={[
+                        {
+                          label: "Configurer la grille",
+                          icon: SlidersHorizontal,
+                          disabled: !conventionField(convention, "grilleTarifaireId"),
+                          onSelect: () => setConfiguring(convention),
+                        },
+                        {
+                          label: "Modifier",
+                          icon: Edit,
+                          onSelect: () => { setEditing(convention); setDialogOpen(true); },
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

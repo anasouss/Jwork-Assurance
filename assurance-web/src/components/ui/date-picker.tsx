@@ -127,7 +127,7 @@ export function DatePicker({
               variant="outline"
               data-slot="date-trigger"
               className={cn(
-                "h-9 rounded-l-none border-slate-300 bg-slate-50/70 px-3 shadow-none hover:bg-slate-50 hover:text-foreground disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:disabled:border-slate-800 dark:disabled:bg-slate-950 dark:disabled:text-slate-600",
+                "h-9 rounded-l-none border-slate-300 bg-slate-50/70 px-3 shadow-none hover:bg-slate-50 hover:text-foreground disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 dark:border-neutral-700 dark:bg-neutral-950/70 dark:text-neutral-100 dark:hover:bg-neutral-900 dark:disabled:border-neutral-800 dark:disabled:bg-neutral-950 dark:disabled:text-neutral-500",
                 typedError && "border-red-500"
               )}
               disabled={disabled}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ambulance, CalendarDays, Edit, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -224,7 +225,7 @@ export default function AssistanceSettingsPage() {
                 <TableHead>Téléphone</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Actif</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -236,15 +237,28 @@ export default function AssistanceSettingsPage() {
                   <TableCell>{refString(company, "email") || "-"}</TableCell>
                   <TableCell>{company.actif === false ? "Non" : "Oui"}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => { setSelectedCompanyId(company.id); setEditingProduct(null); setProductDialogOpen(true); }} aria-label="Ajouter produit">
-                      <Plus className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingCompany(company); setCompanyDialogOpen(true); }} aria-label="Modifier">
-                      <Edit className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" disabled={company.actif === false || deleteCompany.isPending} onClick={() => deleteCompany.mutate(company.id)} aria-label="Désactiver">
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <TableRowActions
+                      label={`Actions ${company.libelle}`}
+                      actions={[
+                        {
+                          label: "Ajouter produit",
+                          icon: Plus,
+                          onSelect: () => { setSelectedCompanyId(company.id); setEditingProduct(null); setProductDialogOpen(true); },
+                        },
+                        {
+                          label: "Modifier",
+                          icon: Edit,
+                          onSelect: () => { setEditingCompany(company); setCompanyDialogOpen(true); },
+                        },
+                        {
+                          label: "Désactiver",
+                          icon: Trash2,
+                          destructive: true,
+                          disabled: company.actif === false || deleteCompany.isPending,
+                          onSelect: () => deleteCompany.mutate(company.id),
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -294,7 +308,7 @@ export default function AssistanceSettingsPage() {
                 <TableHead className="text-right">TTC</TableHead>
                 <TableHead>Période</TableHead>
                 <TableHead>Actif</TableHead>
-                <TableHead className="w-28" />
+                <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -315,15 +329,28 @@ export default function AssistanceSettingsPage() {
                   <TableCell>{periodLabel(product)}</TableCell>
                   <TableCell>{product.actif === false ? "Non" : "Oui"}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => { setTarifProduct(product); setEditingTarif(null); }} aria-label="Tarifs">
-                      <CalendarDays className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingProduct(product); setProductDialogOpen(true); }} aria-label="Modifier">
-                      <Edit className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" disabled={product.actif === false || deleteProduct.isPending} onClick={() => deleteProduct.mutate(product.id)} aria-label="Désactiver">
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <TableRowActions
+                      label={`Actions ${product.libelle}`}
+                      actions={[
+                        {
+                          label: "Tarifs",
+                          icon: CalendarDays,
+                          onSelect: () => { setTarifProduct(product); setEditingTarif(null); },
+                        },
+                        {
+                          label: "Modifier",
+                          icon: Edit,
+                          onSelect: () => { setEditingProduct(product); setProductDialogOpen(true); },
+                        },
+                        {
+                          label: "Désactiver",
+                          icon: Trash2,
+                          destructive: true,
+                          disabled: product.actif === false || deleteProduct.isPending,
+                          onSelect: () => deleteProduct.mutate(product.id),
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -481,7 +508,7 @@ export default function AssistanceSettingsPage() {
                   <TableHead>Période</TableHead>
                   <TableHead className="text-right">Montant HT</TableHead>
                   <TableHead className="text-right">Montant TTC</TableHead>
-                  <TableHead className="w-24" />
+                  <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -491,10 +518,23 @@ export default function AssistanceSettingsPage() {
                     <TableCell className="text-right">{money(refNumber(tarif, "montantHt"))}</TableCell>
                     <TableCell className="text-right font-medium">{money(refNumber(tarif, "montantTtc"))}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => setEditingTarif(tarif)} aria-label="Modifier tarif"><Edit className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" disabled={!tarifProduct || deleteTarif.isPending} onClick={() => tarifProduct && deleteTarif.mutate({ productId: tarifProduct.id, tarifId: tarif.id })} aria-label="Supprimer tarif">
-                        <Trash2 className="size-4" />
-                      </Button>
+                      <TableRowActions
+                        label="Actions tarif"
+                        actions={[
+                          {
+                            label: "Modifier tarif",
+                            icon: Edit,
+                            onSelect: () => setEditingTarif(tarif),
+                          },
+                          {
+                            label: "Supprimer tarif",
+                            icon: Trash2,
+                            destructive: true,
+                            disabled: !tarifProduct || deleteTarif.isPending,
+                            onSelect: () => tarifProduct && deleteTarif.mutate({ productId: tarifProduct.id, tarifId: tarif.id }),
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

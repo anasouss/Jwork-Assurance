@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Edit, KeyRound, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -218,7 +219,7 @@ function UsersPanel({
               <TableHead>Téléphone</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead>Dernière connexion</TableHead>
-              <TableHead className="w-36" />
+              <TableHead className="w-20 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -233,18 +234,31 @@ function UsersPanel({
                 <TableCell>{item.telephone ?? "-"}</TableCell>
                 <TableCell><Badge variant={item.actif ? "default" : "outline"}>{item.actif ? "Actif" : "Inactif"}</Badge></TableCell>
                 <TableCell>{formatDateTime(item.lastLogin)}</TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" disabled={!canManage} onClick={() => { setEditing(item); setDialogOpen(true); }}>
-                      <Edit className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" disabled={!canManage} onClick={() => setPasswordTarget(item)}>
-                      <KeyRound className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" disabled={!canManage || item.id === currentUserId || !item.actif} onClick={() => deactivate.mutate(item.id)}>
-                      <Trash2 className="size-4 text-red-500" />
-                    </Button>
-                  </div>
+                <TableCell className="text-right">
+                  <TableRowActions
+                    label={`Actions ${item.fullName}`}
+                    actions={[
+                      {
+                        label: "Modifier",
+                        icon: Edit,
+                        disabled: !canManage,
+                        onSelect: () => { setEditing(item); setDialogOpen(true); },
+                      },
+                      {
+                        label: "Changer le mot de passe",
+                        icon: KeyRound,
+                        disabled: !canManage,
+                        onSelect: () => setPasswordTarget(item),
+                      },
+                      {
+                        label: "Désactiver",
+                        icon: Trash2,
+                        destructive: true,
+                        disabled: !canManage || item.id === currentUserId || !item.actif,
+                        onSelect: () => deactivate.mutate(item.id),
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -359,7 +373,7 @@ function RolesPanel({
               <TableHead>Agence</TableHead>
               <TableHead>Permissions</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead className="w-28" />
+              <TableHead className="w-20 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -372,15 +386,25 @@ function RolesPanel({
                 <TableCell>{role.agenceNom ?? "Global"}</TableCell>
                 <TableCell>{role.permissionCodes.length} permission(s)</TableCell>
                 <TableCell><Badge variant={role.systemRole ? "default" : "outline"}>{role.systemRole ? "Système" : "Custom"}</Badge></TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" disabled={!canManage} onClick={() => { setEditing(role); setDialogOpen(true); }}>
-                      <Edit className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" disabled={!canManage || role.systemRole} onClick={() => remove.mutate(role.id)}>
-                      <Trash2 className="size-4 text-red-500" />
-                    </Button>
-                  </div>
+                <TableCell className="text-right">
+                  <TableRowActions
+                    label={`Actions ${role.nom}`}
+                    actions={[
+                      {
+                        label: "Modifier",
+                        icon: Edit,
+                        disabled: !canManage,
+                        onSelect: () => { setEditing(role); setDialogOpen(true); },
+                      },
+                      {
+                        label: "Supprimer",
+                        icon: Trash2,
+                        destructive: true,
+                        disabled: !canManage || role.systemRole,
+                        onSelect: () => remove.mutate(role.id),
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -494,7 +518,7 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
               <TableHead>Ville</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Statut</TableHead>
-              <TableHead className="w-20" />
+              <TableHead className="w-20 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -511,7 +535,7 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
                 </TableCell>
                 <TableCell><Badge variant={agence.statut === "ACTIVE" ? "default" : "outline"}>{agence.statut}</Badge></TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" disabled={!canManage} onClick={() => { setEditing(agence); setDialogOpen(true); }}>
+                  <Button variant="ghost" size="icon-sm" disabled={!canManage} onClick={() => { setEditing(agence); setDialogOpen(true); }} aria-label={`Modifier ${agence.nom}`}>
                     <Edit className="size-4" />
                   </Button>
                 </TableCell>

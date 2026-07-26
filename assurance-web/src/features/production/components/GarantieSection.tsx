@@ -967,6 +967,6 @@ function numeric(value: unknown) {
 
 function controlClass(active: boolean) {
   return active
-    ? "border-slate-300 bg-slate-50/70 shadow-none focus-visible:border-ring focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-input/30"
+    ? "border-slate-300 bg-slate-50/70 shadow-none focus-visible:border-ring focus-visible:ring-ring/50 dark:border-neutral-700 dark:bg-neutral-950/70"
     : "border-transparent bg-muted/40 text-muted-foreground shadow-none";
 }

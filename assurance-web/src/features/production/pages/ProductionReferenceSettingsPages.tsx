@@ -260,7 +260,7 @@ export function UsagesSettingsPage() {
                   <TableHead>Attestation</TableHead>
                   <TableHead>Garanties personne</TableHead>
                   <TableHead>Critères tarif</TableHead>
-                  <TableHead className="w-14" />
+                  <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -272,8 +272,8 @@ export function UsagesSettingsPage() {
                     <TableCell>{usage.consommeAttestation === false ? "Non" : "Oui"}</TableCell>
                     <TableCell>{usage.garantiesPersonne ? "Oui" : "Non"}</TableCell>
                     <TableCell>{usageCriteria(usage)}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => { setEditing(usage); setDialogOpen(true); }}>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" onClick={() => { setEditing(usage); setDialogOpen(true); }} aria-label={`Modifier ${usage.libelle}`}>
                         <Edit className="size-4" />
                       </Button>
                     </TableCell>
@@ -518,7 +518,7 @@ export function GarantiesSettingsPage() {
                   <TableHead>Grille</TableHead>
                   <TableHead>Valeurs</TableHead>
                   <TableHead>Actif</TableHead>
-                  <TableHead className="w-14" />
+                  <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -532,8 +532,8 @@ export function GarantiesSettingsPage() {
                     <TableCell>{garantieTags(garantie).join(", ") || "-"}</TableCell>
                     <TableCell>{valueTags(garantie).join(", ") || "-"}</TableCell>
                     <TableCell>{garantie.actif === false ? "Non" : "Oui"}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => { setEditing(garantie); setDialogOpen(true); }}>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" onClick={() => { setEditing(garantie); setDialogOpen(true); }} aria-label={`Modifier ${garantie.libelle}`}>
                         <Edit className="size-4" />
                       </Button>
                     </TableCell>
@@ -1021,7 +1021,7 @@ function ReferenceTable({
             <TableHeader>
               <TableRow>
                 {columns.map((column) => <TableHead key={column}>{column}</TableHead>)}
-                <TableHead className="w-14" />
+                <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1031,8 +1031,8 @@ function ReferenceTable({
                   <TableCell>{item.libelle}</TableCell>
                   {columns.includes("Description") ? <TableCell>{item.description ?? "-"}</TableCell> : null}
                   <TableCell>{item.actif === false ? "Non" : "Oui"}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => onEdit(item)}>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon-sm" onClick={() => onEdit(item)} aria-label={`Modifier ${item.libelle}`}>
                       <Edit className="size-4" />
                     </Button>
                   </TableCell>

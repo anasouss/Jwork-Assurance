@@ -25,9 +25,9 @@ export function Field({
         "[&_[data-slot=date-trigger]]:border-slate-300 [&_[data-slot=date-trigger]]:bg-slate-50/70 [&_[data-slot=date-trigger]]:shadow-none",
         "[&_[data-slot=input]:disabled]:border-slate-200 [&_[data-slot=input]:disabled]:bg-slate-100",
         error ? "[&_[data-slot=input]]:border-red-500 [&_[data-slot=input]]:ring-1 [&_[data-slot=input]]:ring-red-500/20 [&_[data-slot=date-trigger]]:border-red-500" : "",
-        "dark:[&_[data-slot=input]]:border-slate-600 dark:[&_[data-slot=input]]:bg-slate-900",
-        "dark:[&_[data-slot=select-trigger]]:border-slate-600 dark:[&_[data-slot=select-trigger]]:bg-slate-900",
-        "dark:[&_[data-slot=date-trigger]]:border-slate-600 dark:[&_[data-slot=date-trigger]]:bg-slate-900",
+        "dark:[&_[data-slot=input]]:border-neutral-700 dark:[&_[data-slot=input]]:bg-neutral-950/70",
+        "dark:[&_[data-slot=select-trigger]]:border-neutral-700 dark:[&_[data-slot=select-trigger]]:bg-neutral-950/70",
+        "dark:[&_[data-slot=date-trigger]]:border-neutral-700 dark:[&_[data-slot=date-trigger]]:bg-neutral-950/70",
         className
       )}
     >

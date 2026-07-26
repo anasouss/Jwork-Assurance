@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Edit, Plus, Trash2 } from "lucide-react";
+import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -326,7 +327,7 @@ export default function TarifUsageSettingsPage() {
                   <TableHead>Sous-classe</TableHead>
                   <TableHead>Prime place</TableHead>
                   <TableHead>Prime nette</TableHead>
-                  <TableHead className="w-20" />
+                  <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -355,15 +356,23 @@ export default function TarifUsageSettingsPage() {
                     <TableCell>{text(tarif.sousClasse)}</TableCell>
                     <TableCell>{money(tarif.primeParPlace)}</TableCell>
                     <TableCell>{money(tarif.primeNette)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => { setEditing(tarif); setTarifDialogOpen(true); }}>
-                          <Edit className="size-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => remove.mutate(tarif.id)}>
-                          <Trash2 className="size-4 text-red-500" />
-                        </Button>
-                      </div>
+                    <TableCell className="text-right">
+                      <TableRowActions
+                        label={`Actions tarif ${text(tarif.usageCode)}`}
+                        actions={[
+                          {
+                            label: "Modifier",
+                            icon: Edit,
+                            onSelect: () => { setEditing(tarif); setTarifDialogOpen(true); },
+                          },
+                          {
+                            label: "Supprimer",
+                            icon: Trash2,
+                            destructive: true,
+                            onSelect: () => remove.mutate(tarif.id),
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

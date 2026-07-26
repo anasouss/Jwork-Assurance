@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClientSection } from "../components/ClientSection";
@@ -10,7 +11,7 @@ import { VehiculeSection } from "../components/VehiculeSection";
 import { ContractInfoSection } from "./ContractInfoSection";
 import { FlotteTargetsSection } from "./FlotteTargetsSection";
 import { TariffGridSection } from "./TariffGridSection";
-import type { ContratCreationFormState } from "./useContratCreationForm";
+import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
 type Props = {
   form: ContratCreationFormState;
@@ -44,6 +45,44 @@ export function ContratFormLayout({
   const assistanceCategorieClientId = order === "flotte"
     ? proprietaireCategorieClientId || souscripteurCategorieClientId
     : souscripteurCategorieClientId;
+  const workflowSections = useMemo<ContratSectionKey[]>(() => {
+    if (order === "flotte") {
+      return ["souscripteur", "proprietaire", "contrat", "grille", "flotteTargets", "remorque", "quittances"];
+    }
+    return [
+      "souscripteur",
+      "proprietaire",
+      "contrat",
+      "vehicule",
+      ...(allowRemorques ? (["remorque"] as ContratSectionKey[]) : []),
+      "garanties",
+      "quittances",
+    ];
+  }, [allowRemorques, order]);
+  const [activeSection, setActiveSection] = useState<ContratSectionKey>("souscripteur");
+
+  useEffect(() => {
+    if (!workflowSections.includes(activeSection)) {
+      setActiveSection(workflowSections[0] ?? "souscripteur");
+    }
+  }, [activeSection, workflowSections]);
+
+  const handleSectionOpenChange = (section: ContratSectionKey, open: boolean) => {
+    if (!open) {
+      return;
+    }
+    const targetIndex = workflowSections.indexOf(section);
+    if (targetIndex === -1) {
+      return;
+    }
+    for (const previous of workflowSections.slice(0, targetIndex)) {
+      if (!form.validateSection(previous)) {
+        setActiveSection(previous);
+        return;
+      }
+    }
+    setActiveSection(section);
+  };
 
   const clientSections = (
     <ClientSection
@@ -57,6 +96,8 @@ export function ContratFormLayout({
       onSaveSection={form.handleSaveSection}
       savedSections={form.savedSections}
       saving={form.saveDraftMutation.isPending}
+      openSection={activeSection}
+      onSectionOpenChange={handleSectionOpenChange}
     />
   );
 
@@ -67,6 +108,8 @@ export function ContratFormLayout({
       showConvention={showConvention}
       showGrille={showGrille && order !== "flotte" && !showConvention}
       showFractionnement={showFractionnement}
+      openSection={activeSection}
+      onSectionOpenChange={handleSectionOpenChange}
     />
   );
 
@@ -83,6 +126,8 @@ export function ContratFormLayout({
       showAttestation={!showConvention}
       showRemorqueFlag={showConvention}
       errors={form.validationErrors}
+      openSection={activeSection}
+      onSectionOpenChange={handleSectionOpenChange}
     />
   );
 
@@ -113,6 +158,8 @@ export function ContratFormLayout({
       produitsAssistance={form.refs.produitsAssistance.data ?? []}
       assistanceUsageId={form.usageId}
       assistanceCategorieClientId={assistanceCategorieClientId}
+      openSection={activeSection}
+      onSectionOpenChange={handleSectionOpenChange}
     />
   );
 
@@ -143,6 +190,8 @@ export function ContratFormLayout({
       assistanceCategorieClientId={assistanceCategorieClientId}
       maxRemorques={maxRemorques}
       errors={form.validationErrors}
+      openSection={activeSection}
+      onSectionOpenChange={handleSectionOpenChange}
     />
   );
 
@@ -153,6 +202,8 @@ export function ContratFormLayout({
       usages={form.refs.usages.data ?? []}
       marques={form.refs.marques.data ?? []}
       maxRemorques={maxRemorques}
+      openSection={activeSection}
+      onSectionOpenChange={handleSectionOpenChange}
     />
   );
 
@@ -170,7 +221,7 @@ export function ContratFormLayout({
       {contractSection}
       {order === "flotte" ? (
         <>
-          <TariffGridSection form={form} />
+          <TariffGridSection form={form} openSection={activeSection} onSectionOpenChange={handleSectionOpenChange} />
           {flotteTargetsSection}
         </>
       ) : (
@@ -182,13 +233,20 @@ export function ContratFormLayout({
       )}
 
       {form.typeContrat === "PARTICULIER" ? (
-      <ManualQuittanceSection lignes={form.quittances} setLignes={form.setQuittances} />
+      <ManualQuittanceSection
+        lignes={form.quittances}
+        setLignes={form.setQuittances}
+        openSection={activeSection}
+        onSectionOpenChange={handleSectionOpenChange}
+      />
     ) : (
       <SectionCard
         title="Quittances"
         badge={form.preview ? "Calculée" : "Non calculée"}
         tone="production"
         defaultOpen={false}
+        open={activeSection === "quittances"}
+        onOpenChange={(open) => handleSectionOpenChange("quittances", open)}
       >
         <QuittancePreviewCard preview={form.preview} loading={form.previewMutation.isPending || form.autoPreviewMutation.isPending} />
       </SectionCard>

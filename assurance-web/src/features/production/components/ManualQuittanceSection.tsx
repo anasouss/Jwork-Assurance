@@ -2,10 +2,13 @@ import { Input } from "@/components/ui/input";
 import { SectionCard } from "./SectionCard";
 import { formatMoney, numberOrZero, numberValue, roundMoney } from "../utils/format";
 import type { QuittanceInput } from "../types";
+import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 type Props = {
   lignes: QuittanceInput[];
   setLignes: (value: QuittanceInput[]) => void;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 };
 
 const LABELS: Record<QuittanceInput["categorie"], string> = {
@@ -24,7 +27,7 @@ const COLUMNS: { key: keyof QuittanceInput; label: string }[] = [
   { key: "cnpac", label: "CNPAC" },
 ];
 
-export function ManualQuittanceSection({ lignes, setLignes }: Props) {
+export function ManualQuittanceSection({ lignes, setLignes, openSection, onSectionOpenChange }: Props) {
   const totals = lignes.reduce(
     (acc, ligne) => ({
       primeNette: acc.primeNette + numberOrZero(ligne.primeNette),
@@ -42,7 +45,14 @@ export function ManualQuittanceSection({ lignes, setLignes }: Props) {
   };
 
   return (
-    <SectionCard title="Quittances" badge={formatMoney(totals.primeTotale)} tone="production" defaultOpen>
+    <SectionCard
+      title="Quittances"
+      badge={formatMoney(totals.primeTotale)}
+      tone="production"
+      defaultOpen={false}
+      open={openSection === "quittances"}
+      onOpenChange={(open) => onSectionOpenChange?.("quittances", open)}
+    >
       <div className="overflow-x-auto rounded-md border bg-background">
         <table className="w-full min-w-[980px] border-collapse text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">

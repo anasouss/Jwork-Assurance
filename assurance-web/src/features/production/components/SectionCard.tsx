@@ -10,6 +10,8 @@ export function SectionCard({
   children,
   action,
   defaultOpen = true,
+  open: controlledOpen,
+  onOpenChange,
   tone = "default",
 }: {
   title: string;
@@ -17,9 +19,18 @@ export function SectionCard({
   children: ReactNode;
   action?: ReactNode;
   defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   tone?: "default" | "production";
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    onOpenChange?.(next);
+    if (controlledOpen === undefined) {
+      setUncontrolledOpen(next);
+    }
+  };
 
   return (
     <Card className="border-border/70 shadow-none">
@@ -28,7 +39,7 @@ export function SectionCard({
           "flex cursor-pointer flex-row items-center justify-between gap-3 space-y-0 py-3",
           tone === "production" && "bg-emerald-600 text-white"
         )}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen(!open)}
       >
         <div className="flex min-w-0 items-center gap-2">
           <ChevronDown className={cn("size-4 shrink-0 transition-transform", !open && "-rotate-90")} />

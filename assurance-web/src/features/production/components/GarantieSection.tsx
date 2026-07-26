@@ -13,6 +13,7 @@ import { toDateOnly } from "../date";
 import { formatMoney, money, numberValue } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
+import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 export function GarantieSection({
   garanties,
@@ -40,6 +41,8 @@ export function GarantieSection({
   produitsAssistance = [],
   assistanceUsageId,
   assistanceCategorieClientId,
+  openSection,
+  onSectionOpenChange,
 }: {
   garanties: ReferenceOption[];
   selected: GarantieInput[];
@@ -66,6 +69,8 @@ export function GarantieSection({
   produitsAssistance?: ReferenceOption[];
   assistanceUsageId?: string;
   assistanceCategorieClientId?: string;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
   const vehiculeGaranties = garanties
@@ -121,7 +126,13 @@ export function GarantieSection({
   };
 
   return (
-    <SectionCard title="Garanties" badge={`${selected.length} sélectionnée${selected.length > 1 ? "s" : ""}`} tone="production">
+    <SectionCard
+      title="Garanties"
+      badge={`${selected.length} sélectionnée${selected.length > 1 ? "s" : ""}`}
+      tone="production"
+      open={openSection === "garanties"}
+      onOpenChange={(open) => onSectionOpenChange?.("garanties", open)}
+    >
       {allowPrimeColumn ? (
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Switch checked={primeColumnEnabled} onCheckedChange={(value) => setPrimeColumnEnabled?.(value)} />

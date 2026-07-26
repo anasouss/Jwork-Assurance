@@ -11,6 +11,7 @@ import { Field } from "./Field";
 import { toDateOnly } from "../date";
 import { productionApi } from "../api";
 import type { ClientInput, ClientResponse, ReferenceOption } from "../types";
+import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 type LookupStatus = "idle" | "loading" | "found" | "new" | "error";
 type LookupState = {
@@ -41,6 +42,8 @@ export function ClientSection({
   onSaveSection,
   savedSections = {},
   saving = false,
+  openSection,
+  onSectionOpenChange,
 }: {
   clients: ClientInput[];
   setClients: (clients: ClientInput[]) => void;
@@ -52,6 +55,8 @@ export function ClientSection({
   onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
   savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
   saving?: boolean;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
   const [sameAsSouscripteur, setSameAsSouscripteur] = useState(false);
   const [lookupByIndex, setLookupByIndex] = useState<Record<number, LookupState>>({});
@@ -578,6 +583,8 @@ export function ClientSection({
         title="Souscripteur"
         badge={savedSections.souscripteur ? "Validé" : "Obligatoire"}
         tone="production"
+        open={openSection === "souscripteur"}
+        onOpenChange={(open) => onSectionOpenChange?.("souscripteur", open)}
       >
         {renderClients(["SOUSCRIPTEUR"])}
         {onSaveSection ? (
@@ -592,6 +599,8 @@ export function ClientSection({
         badge={savedSections.proprietaire ? "Validé" : "Obligatoire"}
         tone="production"
         defaultOpen={false}
+        open={openSection === "proprietaire"}
+        onOpenChange={(open) => onSectionOpenChange?.("proprietaire", open)}
       >
         {renderClients(["PROPRIETAIRE"])}
         {onSaveSection ? (

@@ -21,7 +21,8 @@ import type {
   VehiculeInput,
 } from "../types";
 
-export type ContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille";
+export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille";
+export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorque" | "flotteTargets" | "garanties" | "quittances";
 
 export function useContratCreationForm(typeContrat: TypeContrat, draftId?: string) {
   const { user } = useAuthStore();
@@ -52,7 +53,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const [quittances, setQuittances] = useState<QuittanceInput[]>(defaultQuittanceLines());
   const [preview, setPreview] = useState<QuittancePreview | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [savedSections, setSavedSections] = useState<Partial<Record<ContratSectionKey, boolean>>>({});
+  const [savedSections, setSavedSections] = useState<Partial<Record<SavableContratSectionKey, boolean>>>({});
   const [hydratedDraftId, setHydratedDraftId] = useState<string | null>(null);
 
   const refs = {
@@ -494,6 +495,47 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     if (section === "grille") {
       requireField("grilleTarifaireId", grilleTarifaireId, "Grille tarifaire obligatoire.");
     }
+    if (section === "vehicule" || section === "flotteTargets") {
+      request.vehicules.forEach((vehicule, index) => {
+        const vehiculeUsageId = vehicule.usageId || usageId;
+        const vehiculeUsage = refs.usages.data?.find((usage) => usage.id === vehiculeUsageId);
+        requireField(`vehicules.${index}.typeVehicule`, vehicule.typeVehicule, "Type véhicule obligatoire.");
+        requireField(`vehicules.${index}.usageId`, vehiculeUsageId, "Usage véhicule obligatoire.");
+        requireField(`vehicules.${index}.immatriculation`, vehicule.immatriculation, "Immatriculation obligatoire.");
+        requireField(`vehicules.${index}.marqueId`, vehicule.marqueId || vehicule.marqueLibelle, "Marque obligatoire.");
+        requireField(`vehicules.${index}.carrosserieId`, vehicule.carrosserieId || vehicule.carrosserieLibelle, "Carrosserie obligatoire.");
+        if (vehiculeUsage?.byCarburantAndPf) {
+          requireField(`vehicules.${index}.carburant`, vehicule.carburant, "Carburant obligatoire.");
+          requireField(`vehicules.${index}.puissanceFiscale`, vehicule.puissanceFiscale, "Puissance fiscale obligatoire.");
+        }
+        if (vehiculeUsage?.bySousClasse) {
+          requireField(`vehicules.${index}.sousClasse`, vehicule.sousClasse, "Sous-classe obligatoire.");
+        }
+        if (vehiculeUsage?.byPtc) {
+          requireField(`vehicules.${index}.ptc`, vehicule.ptc, "PTC obligatoire.");
+        }
+        if (vehiculeUsage?.byCategorieTransport) {
+          requireField(`vehicules.${index}.categorieTransportId`, vehicule.categorieTransportId, "Catégorie transport obligatoire.");
+        }
+        requireField(`vehicules.${index}.dateExpirationCarteGrise`, vehicule.dateExpirationCarteGrise, "Date validité CG obligatoire.");
+        requireField(`vehicules.${index}.crm`, vehicule.crm, "CRM obligatoire.");
+        if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
+          nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
+        }
+        const valeurVenaleError = validateValeurVenale(vehicule);
+        if (valeurVenaleError) {
+          nextErrors[`vehicules.${index}.valeurVenale`] = valeurVenaleError;
+        }
+      });
+    }
+    if (section === "remorque") {
+      request.remorques.forEach((remorque, index) => {
+        requireField(`remorques.${index}.usageId`, remorque.usageId, "Usage remorque obligatoire.");
+      });
+    }
+    if (section === "garanties" && request.garanties.length === 0) {
+      nextErrors.garanties = "Au moins une garantie est obligatoire.";
+    }
     setValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       toast.error(Object.values(nextErrors)[0] ?? "Section incomplète");
@@ -502,7 +544,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     return true;
   };
 
-  const handleSaveSection = (section: ContratSectionKey) => {
+  const handleSaveSection = (section: SavableContratSectionKey) => {
     const label = sectionLabel(section);
     if (!validateSection(section)) {
       return;
@@ -623,6 +665,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     handleCreate,
     handleSaveSection,
     handleSaveDraft,
+    validateSection,
     savedSections,
     availableUsages,
     numeroContrat,
@@ -849,7 +892,7 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
   return request.garanties.length > 0;
 }
 
-function sectionLabel(section: ContratSectionKey) {
+function sectionLabel(section: SavableContratSectionKey) {
   switch (section) {
     case "souscripteur":
       return "Souscripteur";

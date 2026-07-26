@@ -18,6 +18,7 @@ import { toDateOnly } from "../date";
 import { formatMoney, money, numberValue } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
+import type { ContratSectionKey } from "./useContratCreationForm";
 
 type Target = {
   kind: "vehicule" | "remorque";
@@ -68,6 +69,8 @@ type Props = {
   assistanceCategorieClientId?: string;
   maxRemorques?: number | null;
   errors?: Record<string, string>;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 };
 
 export function FlotteTargetsSection({
@@ -96,6 +99,8 @@ export function FlotteTargetsSection({
   assistanceCategorieClientId,
   maxRemorques,
   errors = {},
+  openSection,
+  onSectionOpenChange,
 }: Props) {
   const targets = useMemo<Target[]>(
     () => [
@@ -232,7 +237,13 @@ export function FlotteTargetsSection({
 
   return (
     <>
-      <SectionCard title="Véhicules" badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`} tone="production">
+      <SectionCard
+        title="Véhicules"
+        badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`}
+        tone="production"
+        open={openSection === "flotteTargets"}
+        onOpenChange={(open) => onSectionOpenChange?.("flotteTargets", open)}
+      >
         <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
           <div className="grid content-start gap-3">
             <div className="grid gap-2">
@@ -338,7 +349,14 @@ export function FlotteTargetsSection({
         </div>
       </SectionCard>
 
-      <SectionCard title="Remorques" badge={`${remorques.length} remorque${remorques.length > 1 ? "s" : ""}`} tone="production" defaultOpen={remorques.length > 0}>
+      <SectionCard
+        title="Remorques"
+        badge={`${remorques.length} remorque${remorques.length > 1 ? "s" : ""}`}
+        tone="production"
+        defaultOpen={false}
+        open={openSection === "remorque"}
+        onOpenChange={(open) => onSectionOpenChange?.("remorque", open)}
+      >
         <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
           <div className="grid content-start gap-3">
             {remorqueTargets.length > 0 ? (
@@ -585,7 +603,7 @@ function VehicleForm({
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Usage" required>
+        <Field label="Usage" required error={errors[`vehicules.${index}.usageId`]}>
           <AutocompleteSelect
             value={vehicule.usageId ?? ""}
             placeholder="Usage"
@@ -608,10 +626,10 @@ function VehicleForm({
             }
           />
         </Field>
-        <Field label="Immatriculation" required>
+        <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
           <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update({ immatriculation: event.target.value })} />
         </Field>
-        <Field label="Marque" required>
+        <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
           <AutocompleteSelect
             value={vehicule.marqueId ?? ""}
             customValue={vehicule.marqueLibelle}
@@ -623,7 +641,7 @@ function VehicleForm({
             onCustomValueChange={(value) => update({ marqueId: undefined, marqueLibelle: value })}
           />
         </Field>
-        <Field label="Carrosserie" required>
+        <Field label="Carrosserie" required error={errors[`vehicules.${index}.carrosserieId`]}>
           <AutocompleteSelect
             value={vehicule.carrosserieId ?? ""}
             customValue={vehicule.carrosserieLibelle}
@@ -636,7 +654,7 @@ function VehicleForm({
           />
         </Field>
         {needsCarburantAndPf ? (
-          <Field label="Carburant" required>
+          <Field label="Carburant" required error={errors[`vehicules.${index}.carburant`]}>
             <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update({ carburant: value })}>
               <SelectTrigger><SelectValue placeholder="Carburant" /></SelectTrigger>
               <SelectContent>
@@ -650,22 +668,22 @@ function VehicleForm({
           </Field>
         ) : null}
         {needsCarburantAndPf ? (
-          <Field label="Puissance fiscale / cylindrée" required>
+          <Field label="Puissance fiscale / cylindrée" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
             <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update({ puissanceFiscale: event.target.value })} />
           </Field>
         ) : null}
         {needsSousClasse ? (
-          <Field label="Sous-classe" required>
+          <Field label="Sous-classe" required error={errors[`vehicules.${index}.sousClasse`]}>
             <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update({ sousClasse: event.target.value })} />
           </Field>
         ) : null}
         {needsPtc ? (
-          <Field label="PTC" required>
+          <Field label="PTC" required error={errors[`vehicules.${index}.ptc`]}>
             <Input value={vehicule.ptc ?? ""} onChange={(event) => update({ ptc: event.target.value })} />
           </Field>
         ) : null}
         {needsCategorieTransport ? (
-          <Field label="Catégorie transport" required>
+          <Field label="Catégorie transport" required error={errors[`vehicules.${index}.categorieTransportId`]}>
             <Select value={vehicule.categorieTransportId ?? ""} onValueChange={(value) => update({ categorieTransportId: value })}>
               <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
               <SelectContent>

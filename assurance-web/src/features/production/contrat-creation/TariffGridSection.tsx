@@ -20,9 +20,17 @@ import type {
   UpsertGrilleTarifaireRequest,
   UpsertLigneGrilleTarifaireRequest,
 } from "../types";
-import type { ContratCreationFormState } from "./useContratCreationForm";
+import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
-export function TariffGridSection({ form }: { form: ContratCreationFormState }) {
+export function TariffGridSection({
+  form,
+  openSection,
+  onSectionOpenChange,
+}: {
+  form: ContratCreationFormState;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
+}) {
   const queryClient = useQueryClient();
   const [grilleDialogOpen, setGrilleDialogOpen] = useState(false);
   const [editingGrille, setEditingGrille] = useState<ReferenceOption | null>(null);
@@ -124,6 +132,8 @@ export function TariffGridSection({ form }: { form: ContratCreationFormState }) 
       title="Grille tarifaire"
       badge={form.savedSections.grille ? "Validé" : selectedGrille ? selectedGrille.libelle : "Obligatoire"}
       tone="production"
+      open={openSection === "grille"}
+      onOpenChange={(open) => onSectionOpenChange?.("grille", open)}
     >
       <div className="grid gap-4">
         <div className="grid gap-3 md:grid-cols-[minmax(260px,420px)_1fr]">

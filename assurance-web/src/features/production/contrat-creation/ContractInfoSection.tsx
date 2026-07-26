@@ -9,7 +9,7 @@ import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
 import { toDateOnly } from "../date";
 import type { CreateContratRequest } from "../types";
-import type { ContratCreationFormState } from "./useContratCreationForm";
+import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
 type Props = {
   form: ContratCreationFormState;
@@ -17,6 +17,8 @@ type Props = {
   showConvention?: boolean;
   showGrille?: boolean;
   showFractionnement?: boolean;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 };
 
 export function ContractInfoSection({
@@ -25,6 +27,8 @@ export function ContractInfoSection({
   showConvention = false,
   showGrille = true,
   showFractionnement = true,
+  openSection,
+  onSectionOpenChange,
 }: Props) {
   const filteredConventions = (form.refs.conventions.data ?? []).filter(
     (convention) => !form.compagnieAssuranceId || convention.compagnieAssuranceId === form.compagnieAssuranceId
@@ -50,6 +54,8 @@ export function ContractInfoSection({
       badge={form.savedSections.contrat ? "Validé" : badge}
       tone="production"
       defaultOpen={false}
+      open={openSection === "contrat"}
+      onOpenChange={(open) => onSectionOpenChange?.("contrat", open)}
     >
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {showCategorieClient ? (

@@ -11,6 +11,7 @@ import { toDateOnly } from "../date";
 import { numberValue } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { ReferenceOption, VehiculeInput } from "../types";
+import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 export function emptyVehicule(usageId?: string): VehiculeInput {
   return {
@@ -33,6 +34,8 @@ export function VehiculeSection({
   showAttestation = true,
   showRemorqueFlag = false,
   errors = {},
+  openSection,
+  onSectionOpenChange,
 }: {
   vehicules: VehiculeInput[];
   setVehicules: (vehicules: VehiculeInput[]) => void;
@@ -45,6 +48,8 @@ export function VehiculeSection({
   showAttestation?: boolean;
   showRemorqueFlag?: boolean;
   errors?: Record<string, string>;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
   const update = (index: number, patch: Partial<VehiculeInput>) => {
     setVehicules(vehicules.map((vehicule, idx) => (idx === index ? { ...vehicule, ...patch } : vehicule)));
@@ -55,6 +60,8 @@ export function VehiculeSection({
       title="Véhicule"
       badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`}
       tone="production"
+      open={openSection === "vehicule"}
+      onOpenChange={(open) => onSectionOpenChange?.("vehicule", open)}
       action={
         allowMultipleVehicules ? (
           <Button
@@ -89,7 +96,7 @@ export function VehiculeSection({
               </div>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {showUsage ? (
-                  <Field label="Usage" required>
+                  <Field label="Usage" required error={errors[`vehicules.${index}.usageId`]}>
                     <AutocompleteSelect
                       value={vehicule.usageId ?? ""}
                       placeholder="Usage"
@@ -113,10 +120,10 @@ export function VehiculeSection({
                     />
                   </Field>
                 ) : null}
-                <Field label="Immatriculation" required>
+                <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
                   <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
                 </Field>
-                <Field label="Marque" required>
+                <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
                   <AutocompleteSelect
                     value={vehicule.marqueId ?? ""}
                     customValue={vehicule.marqueLibelle}
@@ -128,7 +135,7 @@ export function VehiculeSection({
                     onCustomValueChange={(value) => update(index, { marqueId: undefined, marqueLibelle: value })}
                   />
                 </Field>
-                <Field label="Carrosserie" required>
+                <Field label="Carrosserie" required error={errors[`vehicules.${index}.carrosserieId`]}>
                   <AutocompleteSelect
                     value={vehicule.carrosserieId ?? ""}
                     customValue={vehicule.carrosserieLibelle}
@@ -141,7 +148,7 @@ export function VehiculeSection({
                   />
                 </Field>
                 {needsCarburantAndPf ? (
-                  <Field label="Carburant" required>
+                  <Field label="Carburant" required error={errors[`vehicules.${index}.carburant`]}>
                     <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update(index, { carburant: value })}>
                       <SelectTrigger><SelectValue placeholder="Carburant" /></SelectTrigger>
                       <SelectContent>
@@ -155,22 +162,22 @@ export function VehiculeSection({
                   </Field>
                 ) : null}
                 {needsCarburantAndPf ? (
-                  <Field label="Puissance fiscale / cylindrée" required>
+                  <Field label="Puissance fiscale / cylindrée" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
                     <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
                   </Field>
                 ) : null}
                 {needsSousClasse ? (
-                  <Field label="Sous-classe" required>
+                  <Field label="Sous-classe" required error={errors[`vehicules.${index}.sousClasse`]}>
                     <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update(index, { sousClasse: event.target.value })} />
                   </Field>
                 ) : null}
                 {needsPtc ? (
-                  <Field label="PTC" required>
+                  <Field label="PTC" required error={errors[`vehicules.${index}.ptc`]}>
                     <Input value={vehicule.ptc ?? ""} onChange={(event) => update(index, { ptc: event.target.value })} />
                   </Field>
                 ) : null}
                 {needsCategorieTransport ? (
-                  <Field label="Catégorie transport" required>
+                  <Field label="Catégorie transport" required error={errors[`vehicules.${index}.categorieTransportId`]}>
                     <Select value={vehicule.categorieTransportId ?? ""} onValueChange={(value) => update(index, { categorieTransportId: value })}>
                       <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
                       <SelectContent>

@@ -8,6 +8,7 @@ import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
 import { numberValue } from "../utils/format";
 import type { ReferenceOption, RemorqueInput } from "../types";
+import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 export function RemorqueSection({
   remorques,
@@ -15,12 +16,16 @@ export function RemorqueSection({
   usages,
   marques,
   maxRemorques,
+  openSection,
+  onSectionOpenChange,
 }: {
   remorques: RemorqueInput[];
   setRemorques: (remorques: RemorqueInput[]) => void;
   usages: ReferenceOption[];
   marques: ReferenceOption[];
   maxRemorques?: number | null;
+  openSection?: ContratSectionKey;
+  onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
   const update = (index: number, patch: Partial<RemorqueInput>) => {
     setRemorques(remorques.map((remorque, idx) => (idx === index ? { ...remorque, ...patch } : remorque)));
@@ -33,6 +38,8 @@ export function RemorqueSection({
       badge={`${remorques.length} remorque${remorques.length > 1 ? "s" : ""}`}
       tone="production"
       defaultOpen={false}
+      open={openSection === "remorque"}
+      onOpenChange={(open) => onSectionOpenChange?.("remorque", open)}
       action={
         <Button
           type="button"

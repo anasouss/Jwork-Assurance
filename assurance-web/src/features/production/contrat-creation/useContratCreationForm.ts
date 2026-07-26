@@ -363,8 +363,10 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
       }
       if (
-        item.client.typeClient !== "PERSONNE_MORALE"
-        && (item.role === "CONDUCTEUR" || (item.role === "PROPRIETAIRE" && item.client.conducteurHabituel !== false))
+        (
+          item.role === "CONDUCTEUR"
+          || (item.role === "PROPRIETAIRE" && (typeContrat === "FLOTTE" || (item.client.typeClient !== "PERSONNE_MORALE" && item.client.conducteurHabituel !== false)))
+        )
         && !item.client.dateValiditePermis
       ) {
         nextErrors[`clients.${index}.client.dateValiditePermis`] = "Validité permis obligatoire.";
@@ -445,9 +447,8 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
           nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
         }
         if (
-          client.typeClient !== "PERSONNE_MORALE"
-          && role === "PROPRIETAIRE"
-          && client.conducteurHabituel !== false
+          role === "PROPRIETAIRE"
+          && (typeContrat === "FLOTTE" || (client.typeClient !== "PERSONNE_MORALE" && client.conducteurHabituel !== false))
         ) {
           requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
         }

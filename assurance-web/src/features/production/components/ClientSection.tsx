@@ -317,7 +317,7 @@ export function ClientSection({
           const disabledByCopy = isProprietaire && sameAsSouscripteur;
           const showProprietaireConducteur = isProprietaire && !showProprietaireCategorie;
           const proprietorIsDriver = showProprietaireConducteur && !morale && item.client.conducteurHabituel !== false;
-          const showProprietairePermisFields = isProprietaire && !morale && (showProprietaireCategorie || proprietorIsDriver);
+          const showProprietairePermisFields = isProprietaire && (showProprietaireCategorie || (!morale && proprietorIsDriver));
           const conducteur = clients
             .map((client, clientIndex) => ({ client, clientIndex }))
             .find(({ client }) => client.role === "CONDUCTEUR");

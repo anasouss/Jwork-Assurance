@@ -1,5 +1,5 @@
 
-import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { flushSync } from "react-dom";
 import { useTheme } from "next-themes";
@@ -15,7 +15,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     setMounted(true);
   }, []);
 
-  const toggleTheme = useCallback(async (event?: MouseEvent<HTMLButtonElement>) => {
+  const toggleTheme = useCallback(async () => {
     if (!buttonRef.current || !resolvedTheme) return;
 
     const newTheme = resolvedTheme === "dark" ? "light" : "dark";
@@ -27,24 +27,29 @@ export function ThemeToggle({ className }: { className?: string }) {
     }
 
     const { top, left, width, height } = buttonRef.current.getBoundingClientRect();
-    const x = event?.clientX ?? left + width / 2;
-    const y = event?.clientY ?? top + height / 2;
+    const x = Math.round(left + width / 2);
+    const y = Math.round(top + height / 2);
     const maxRadius = Math.hypot(
       Math.max(x, window.innerWidth - x),
       Math.max(y, window.innerHeight - y)
     );
 
-    await document.startViewTransition(() => {
+    document.documentElement.style.setProperty("--theme-transition-x", `${x}px`);
+    document.documentElement.style.setProperty("--theme-transition-y", `${y}px`);
+
+    const transition = document.startViewTransition(() => {
       flushSync(() => {
         setTheme(newTheme);
       });
-    }).ready;
+    });
+
+    await transition.ready;
 
     document.documentElement.animate(
       {
         clipPath: [
-          `circle(0px at ${x}px ${y}px)`,
-          `circle(${maxRadius}px at ${x}px ${y}px)`,
+          `circle(0px at var(--theme-transition-x) var(--theme-transition-y))`,
+          `circle(${maxRadius}px at var(--theme-transition-x) var(--theme-transition-y))`,
         ],
       },
       {

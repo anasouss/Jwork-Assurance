@@ -127,9 +127,6 @@ public class Client extends BaseEntity {
     @Column(length = 120)
     private String cnss;
 
-    @Column(length = 120)
-    private String activite;
-
     @Builder.Default
     @Column(name = "conducteur_habituel", nullable = false)
     private Boolean conducteurHabituel = true;

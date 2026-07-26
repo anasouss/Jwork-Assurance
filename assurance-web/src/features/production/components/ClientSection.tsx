@@ -122,7 +122,6 @@ export function ClientSection({
                 categorieClientId: found.categorieClientId ?? undefined,
                 telephone: found.telephone ?? undefined,
                 email: found.email ?? undefined,
-                activite: found.activite ?? undefined,
                 conducteurHabituel: found.conducteurHabituel ?? client.client.conducteurHabituel,
                 sahara: found.sahara ?? false,
                 justificatifSahara: found.justificatifSahara ?? undefined,
@@ -342,11 +341,7 @@ export function ClientSection({
                 ) : null}
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                {morale ? (
-                  <Field label="Activité">
-                    <Input disabled={disabledByCopy} value={item.client.activite ?? ""} onChange={(event) => updateClient(index, { activite: event.target.value })} />
-                  </Field>
-                ) : (
+                {!morale ? (
                   <>
                     <Field label="Nom" required error={errors[`clients.${index}.client.nom`]}>
                       <Input disabled={disabledByCopy} value={item.client.nom ?? ""} onChange={(event) => updateClient(index, { nom: event.target.value })} />
@@ -355,7 +350,7 @@ export function ClientSection({
                       <Input disabled={disabledByCopy} value={item.client.prenom ?? ""} onChange={(event) => updateClient(index, { prenom: event.target.value })} />
                     </Field>
                   </>
-                )}
+                ) : null}
                 <Field label="Ville" required error={errors[`clients.${index}.client.villeId`]}>
                   <AutocompleteSelect
                     value={item.client.villeId ?? ""}

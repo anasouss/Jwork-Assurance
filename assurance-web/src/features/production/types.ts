@@ -287,7 +287,6 @@ export type ClientInput = {
     categorieClientId?: string;
     telephone?: string;
     email?: string;
-    activite?: string;
     conducteurHabituel?: boolean;
     sahara?: boolean;
     justificatifSahara?: string;

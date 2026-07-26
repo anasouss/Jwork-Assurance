@@ -41,7 +41,6 @@ public class CreateClientRequest {
     private String iff;
     private String patente;
     private String cnss;
-    private String activite;
     private Boolean conducteurHabituel;
     private Boolean sahara;
     private String justificatifSahara;

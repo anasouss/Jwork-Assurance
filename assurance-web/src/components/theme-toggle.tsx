@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { flushSync } from "react-dom";
 import { useTheme } from "next-themes";
@@ -15,7 +15,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     setMounted(true);
   }, []);
 
-  const toggleTheme = useCallback(async () => {
+  const toggleTheme = useCallback(async (event?: MouseEvent<HTMLButtonElement>) => {
     if (!buttonRef.current || !resolvedTheme) return;
 
     const newTheme = resolvedTheme === "dark" ? "light" : "dark";
@@ -27,8 +27,8 @@ export function ThemeToggle({ className }: { className?: string }) {
     }
 
     const { top, left, width, height } = buttonRef.current.getBoundingClientRect();
-    const x = left + width / 2;
-    const y = top + height / 2;
+    const x = event?.clientX ?? left + width / 2;
+    const y = event?.clientY ?? top + height / 2;
     const maxRadius = Math.hypot(
       Math.max(x, window.innerWidth - x),
       Math.max(y, window.innerHeight - y)

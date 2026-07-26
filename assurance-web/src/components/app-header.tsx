@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { appModules, moduleActiveClass, moduleForPath } from "@/components/app-navigation";
+import { appModules, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,7 @@ export function AppHeader() {
   const [savingPassword, setSavingPassword] = useState(false);
   const permissions = user?.permissions ?? [];
   const activeModule = moduleForPath(pathname);
+  const activeModuleTitle = moduleTitle(activeModule);
   const fullName = user?.fullName || user?.email || "Utilisateur";
   const initials = fullName
     .split(" ")
@@ -45,13 +46,16 @@ export function AppHeader() {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center border-b bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/90">
-      <div className="grid w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-4">
-        <div className="flex items-center">
+    <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center border-b bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/90 sm:px-4">
+      <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 lg:grid-cols-[auto_1fr_auto] lg:gap-4">
+        <div className="flex min-w-0 items-center gap-2">
           <SidebarTrigger className="-ms-1" />
+          <div className="min-w-0 lg:hidden">
+            <div className="truncate text-sm font-semibold">{activeModuleTitle}</div>
+          </div>
         </div>
 
-        <nav className="flex min-w-0 items-center justify-center gap-1 overflow-x-auto">
+        <nav className="hidden min-w-0 items-center justify-center gap-1 overflow-x-auto lg:flex">
           {appModules
             .filter((item) => !item.permission || permissions.includes(item.permission))
             .map((item) => {
@@ -87,7 +91,7 @@ export function AppHeader() {
             })}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <Button type="button" variant="ghost" size="icon" className="relative">
             <Bell className="size-4" />
             <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500" />

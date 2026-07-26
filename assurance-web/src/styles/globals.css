@@ -222,9 +222,11 @@
   }
 }
 
+::view-transition-group(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
+  transform: none;
   mix-blend-mode: normal;
 }
 

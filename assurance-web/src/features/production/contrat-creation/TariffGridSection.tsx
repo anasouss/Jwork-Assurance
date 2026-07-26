@@ -260,7 +260,7 @@ function TauxLinesTable({
     <div className="overflow-x-auto rounded-md border">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-emerald-50 hover:bg-emerald-50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/30">
             <TableHead>Garantie</TableHead>
             <TableHead className="text-right">Taux de valeur</TableHead>
             <TableHead className="text-right">Franchise taux</TableHead>
@@ -308,7 +308,7 @@ function CapitalLinesTable({
     <div className="overflow-x-auto rounded-md border">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-emerald-50 hover:bg-emerald-50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/30">
             <TableHead>Garantie</TableHead>
             <TableHead className="text-right">Capital</TableHead>
             <TableHead className="text-right">Prime</TableHead>

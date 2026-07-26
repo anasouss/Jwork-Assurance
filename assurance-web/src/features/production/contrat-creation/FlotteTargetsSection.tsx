@@ -880,7 +880,7 @@ function TargetGuaranteesTable({
               const disabled = isRc || !grilleSelected || !hasLine;
               const editable = checked && !isRc;
               const warning = checked ? valueWarning(garantie, target) : "";
-              const sourceOptions = target.kind === "vehicule" ? allowedVehicleValueSources(garantie) : [];
+              const sourceOptions = target.kind === "vehicule" ? availableTargetValueSources(garantie, target) : [];
               const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target) : "";
 
               return (
@@ -1223,7 +1223,14 @@ function valueWarning(garantie: ReferenceOption, target?: Target) {
     return "";
   }
   if (target.kind === "vehicule") {
-    const source = effectiveVehicleValueSource(garantie);
+    const allowedSources = allowedVehicleValueSources(garantie);
+    if (allowedSources.length > 1) {
+      if (allowedSources.some((allowedSource) => hasTargetValue(target, allowedSource))) {
+        return validateValeurVenale(target) ?? "";
+      }
+      return `${allowedSources.map(sourceLabel).join(" ou ")} requise`;
+    }
+    const source = configuredDefaultVehicleValueSource(garantie) || allowedSources[0];
     if (source === "NEUF" && !target.valeurNeuf) {
       return "Valeur à neuf requise";
     }
@@ -1232,13 +1239,6 @@ function valueWarning(garantie: ReferenceOption, target?: Target) {
     }
     if (source === "GLACE" && !target.valeurGlace) {
       return "Valeur glace requise";
-    }
-    if (!source && allowedVehicleValueSources(garantie).some((allowedSource) => hasTargetValue(target, allowedSource))) {
-      const valeurVenaleError = validateValeurVenale(target);
-      return valeurVenaleError ?? "";
-    }
-    if (!source && allowedVehicleValueSources(garantie).length > 0) {
-      return `${allowedVehicleValueSources(garantie).map(sourceLabel).join(" ou ")} requise`;
     }
     const valeurVenaleError = validateValeurVenale(target);
     if (valeurVenaleError) {
@@ -1251,13 +1251,12 @@ function valueWarning(garantie: ReferenceOption, target?: Target) {
   return "";
 }
 
-function effectiveVehicleValueSource(garantie: ReferenceOption) {
+function configuredDefaultVehicleValueSource(garantie: ReferenceOption) {
   const source = String(garantie.sourceValeurParDefaut ?? "").toUpperCase();
   if (["VENALE", "NEUF", "GLACE"].includes(source)) {
     return source;
   }
-  const allowedSources = allowedVehicleValueSources(garantie);
-  return allowedSources.length === 1 ? allowedSources[0] : "";
+  return "";
 }
 
 function allowedVehicleValueSources(garantie: ReferenceOption) {
@@ -1288,9 +1287,13 @@ function hasTargetValue(target: Target, source: string) {
   return false;
 }
 
+function availableTargetValueSources(garantie: ReferenceOption, target: Target) {
+  return allowedVehicleValueSources(garantie).filter((source) => hasTargetValue(target, source));
+}
+
 function selectedTargetValueSource(garantie: ReferenceOption, item: GarantieInput | undefined, target: Target) {
   const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
-  if (selected && selected !== "AUCUNE") {
+  if (selected && selected !== "AUCUNE" && hasTargetValue(target, selected)) {
     return selected;
   }
   return defaultTargetSource(garantie, target);
@@ -1300,12 +1303,12 @@ function defaultTargetSource(garantie: ReferenceOption, target: Target) {
   if (target.kind !== "vehicule") {
     return defaultSource(garantie);
   }
-  const source = effectiveVehicleValueSource(garantie);
-  if (source) {
-    return source;
+  const sourceWithValue = allowedVehicleValueSources(garantie).find((allowedSource) => hasTargetValue(target, allowedSource));
+  if (sourceWithValue) {
+    return sourceWithValue;
   }
-  return allowedVehicleValueSources(garantie).find((allowedSource) => hasTargetValue(target, allowedSource))
-    ?? (allowedVehicleValueSources(garantie).length > 0 ? allowedVehicleValueSources(garantie)[0] : defaultSource(garantie));
+  const source = configuredDefaultVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 1 ? allowedVehicleValueSources(garantie)[0] : "");
+  return source || (allowedVehicleValueSources(garantie).length > 0 ? allowedVehicleValueSources(garantie)[0] : defaultSource(garantie));
 }
 
 function targetSourceOptionLabel(source: string, target: Target) {

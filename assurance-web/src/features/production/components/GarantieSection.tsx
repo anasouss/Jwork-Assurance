@@ -96,14 +96,17 @@ export function GarantieSection({
         toast.error(warning);
         return;
       }
+      const linePatch = lineSelectionPatch(garantie, line);
       setSelected([
         ...selected,
         {
           garantieId: garantie.id,
           vehiculeIndex: type === "VEHICULE" && vehiculeCount > 0 ? 0 : undefined,
-          modeSelectionne: String(garantie.modeParDefaut ?? (type === "PERSONNE" ? "PROTECTION" : "TAUX")),
-          sourceValeurSelectionnee: defaultSource(garantie),
-          ...lineSelectionPatch(garantie, line),
+          modeSelectionne: String(linePatch.modeSelectionne ?? garantie.modeParDefaut ?? (type === "PERSONNE" ? "PROTECTION" : "TAUX")),
+          ...linePatch,
+          sourceValeurSelectionnee: type === "VEHICULE"
+            ? initialVehicleValueSource(garantie, selectedVehicle, line)
+            : defaultSource(garantie),
           formuleGarantiePersonneId: formule?.id,
           formule: formule ? String(formule.libelle ?? garantie.code ?? garantie.libelle) : undefined,
           prime: formule ? numberValue(String(formule.primeNette ?? "")) : undefined,
@@ -161,7 +164,7 @@ export function GarantieSection({
               const selectedLine = selectedLineFor(lineOptions, item);
               const selectedVehicle = vehicules[item?.vehiculeIndex ?? 0] ?? vehicules[0];
               const selectedSource = selectedValueSource(garantie, item, selectedLine, selectedVehicle);
-              const sourceOptions = selectableVehicleValueSources(garantie, selectedLine);
+              const sourceOptions = availableVehicleValueSources(garantie, selectedVehicle, selectedLine);
               const manualValue = selectedSource === "MANUEL";
               const displayCapital = guaranteeCapitalValue(garantie, selectedLine, selectedVehicle, item);
               const estimatedPrime = automaticPricing && checked && !isRc ? estimatePrime(selectedLine, displayCapital) : undefined;
@@ -200,7 +203,12 @@ export function GarantieSection({
                               toast.error(warning);
                               return;
                             }
-                            update(garantie.id, { vehiculeIndex: Number(value) });
+                            update(garantie.id, {
+                              vehiculeIndex: Number(value),
+                              sourceValeurSelectionnee: initialVehicleValueSource(garantie, nextVehicle, selectedLine),
+                              valeurAssuree: undefined,
+                              capital: undefined,
+                            });
                           }}
                         >
                           <SelectTrigger className={controlClass(editable)}><SelectValue /></SelectTrigger>
@@ -248,13 +256,18 @@ export function GarantieSection({
                               ))}
                             </SelectContent>
                           </Select>
+                        ) : sourceOptions.length === 1 && !isRc ? (
+                          <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={sourceOptionLabel(sourceOptions[0], selectedVehicle)} />
                         ) : lineOptions.length > 1 && lineMode(selectedLine) === "CAPITAL" ? (
                           <Select
                             value={selectedLine?.id ?? ""}
                             disabled={!editable}
                             onValueChange={(value) => {
                               const line = lineOptions.find((option) => option.id === value);
-                              update(garantie.id, lineSelectionPatch(garantie, line));
+                              update(garantie.id, {
+                                ...lineSelectionPatch(garantie, line),
+                                sourceValeurSelectionnee: initialVehicleValueSource(garantie, selectedVehicle, line),
+                              });
                             }}
                           >
                             <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Formule" /></SelectTrigger>
@@ -273,7 +286,10 @@ export function GarantieSection({
                             disabled={!editable}
                             onValueChange={(value) => {
                               const line = lineOptions.find((option) => option.id === value);
-                              update(garantie.id, lineSelectionPatch(garantie, line));
+                              update(garantie.id, {
+                                ...lineSelectionPatch(garantie, line),
+                                sourceValeurSelectionnee: initialVehicleValueSource(garantie, selectedVehicle, line),
+                              });
                             }}
                           >
                             <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
@@ -321,7 +337,10 @@ export function GarantieSection({
                           disabled={rowDisabled}
                           onValueChange={(value) => {
                             const line = lineOptions.find((option) => option.id === value);
-                            update(garantie.id, lineSelectionPatch(garantie, line));
+                            update(garantie.id, {
+                              ...lineSelectionPatch(garantie, line),
+                              sourceValeurSelectionnee: initialVehicleValueSource(garantie, selectedVehicle, line),
+                            });
                           }}
                         >
                           <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
@@ -686,9 +705,10 @@ function selectedLineFor(lines: ReferenceOption[], item?: GarantieInput) {
 
 function lineSelectionPatch(garantie: ReferenceOption, line?: ReferenceOption): Partial<GarantieInput> {
   const mode = lineMode(line) || String(garantie.modeParDefaut ?? "TAUX");
+  const allowedSources = allowedVehicleValueSources(garantie);
   const source = mode === "CAPITAL"
     ? "AUCUNE"
-    : effectiveVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 0 ? defaultSource(garantie) : undefined);
+    : allowedSources.length <= 1 ? (configuredDefaultVehicleValueSource(garantie) || allowedSources[0] || defaultSource(garantie)) : undefined;
   return {
     ligneGrilleTarifaireId: line?.id,
     modeSelectionne: mode,
@@ -718,30 +738,57 @@ function selectedValueSource(garantie: ReferenceOption, item?: GarantieInput, li
     return "AUCUNE";
   }
   const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
-  if (selected) {
+  if (selected && (!vehicule || hasVehicleValue(vehicule, selected))) {
     return selected;
   }
-  const defaultValue = effectiveVehicleValueSource(garantie);
+  const sourceWithValue = allowedVehicleValueSources(garantie).find((source) => vehicule && hasVehicleValue(vehicule, source));
+  if (sourceWithValue) {
+    return sourceWithValue;
+  }
+  const defaultValue = configuredDefaultVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 1 ? allowedVehicleValueSources(garantie)[0] : "");
   if (defaultValue) {
     return defaultValue;
   }
-  const sourceWithValue = allowedVehicleValueSources(garantie).find((source) => vehicule && hasVehicleValue(vehicule, source));
-  return sourceWithValue ?? allowedVehicleValueSources(garantie)[0] ?? defaultSource(garantie);
+  return allowedVehicleValueSources(garantie)[0] ?? defaultSource(garantie);
 }
 
-function selectableVehicleValueSources(garantie: ReferenceOption, line?: ReferenceOption) {
+function initialVehicleValueSource(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
+  if (lineMode(line) === "CAPITAL") {
+    return "AUCUNE";
+  }
+  if (defaultSource(garantie) === "MANUEL") {
+    return "MANUEL";
+  }
+  const availableSource = availableVehicleValueSources(garantie, vehicule, line)[0];
+  if (availableSource) {
+    return availableSource;
+  }
+  const allowedSources = allowedVehicleValueSources(garantie);
+  return configuredDefaultVehicleValueSource(garantie)
+    || (allowedSources.length === 1 ? allowedSources[0] : "")
+    || allowedSources[0]
+    || defaultSource(garantie);
+}
+
+function availableVehicleValueSources(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
   if (lineMode(line) === "CAPITAL") {
     return [];
   }
-  const sources = allowedVehicleValueSources(garantie);
-  return sources.length > 0 ? sources : defaultSource(garantie) === "MANUEL" ? ["MANUEL"] : [];
+  return allowedVehicleValueSources(garantie).filter((source) => vehicule && hasVehicleValue(vehicule, source));
 }
 
 function requiredVehicleValueWarning(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
   if (!vehicule || lineMode(line) === "CAPITAL" || defaultSource(garantie) === "MANUEL") {
     return "";
   }
-  const source = effectiveVehicleValueSource(garantie);
+  const allowedSources = allowedVehicleValueSources(garantie);
+  if (allowedSources.length > 1) {
+    if (allowedSources.some((allowedSource) => hasVehicleValue(vehicule, allowedSource))) {
+      return validateValeurVenale(vehicule) ?? "";
+    }
+    return `Renseignez ${allowedSources.map(sourceLabel).join(" ou ")} avant de sélectionner cette garantie.`;
+  }
+  const source = configuredDefaultVehicleValueSource(garantie) || allowedSources[0];
   if (source === "NEUF" && !vehicule.valeurNeuf) {
     return "Renseignez la valeur à neuf avant de sélectionner cette garantie.";
   }
@@ -751,22 +798,15 @@ function requiredVehicleValueWarning(garantie: ReferenceOption, vehicule?: Vehic
   if (source === "GLACE" && !vehicule.valeurGlace) {
     return "Renseignez la valeur glace avant de sélectionner cette garantie.";
   }
-  if (!source && allowedVehicleValueSources(garantie).some((allowedSource) => hasVehicleValue(vehicule, allowedSource))) {
-    return validateValeurVenale(vehicule) ?? "";
-  }
-  if (!source && allowedVehicleValueSources(garantie).length > 0) {
-    return `Renseignez ${allowedVehicleValueSources(garantie).map(sourceLabel).join(" ou ")} avant de sélectionner cette garantie.`;
-  }
   return validateValeurVenale(vehicule) ?? "";
 }
 
-function effectiveVehicleValueSource(garantie: ReferenceOption) {
+function configuredDefaultVehicleValueSource(garantie: ReferenceOption) {
   const source = String(garantie.sourceValeurParDefaut ?? "").toUpperCase();
   if (["VENALE", "NEUF", "GLACE"].includes(source)) {
     return source;
   }
-  const allowedSources = allowedVehicleValueSources(garantie);
-  return allowedSources.length === 1 ? allowedSources[0] : "";
+  return "";
 }
 
 function allowedVehicleValueSources(garantie: ReferenceOption) {

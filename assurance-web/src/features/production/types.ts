@@ -208,6 +208,7 @@ export type ElementFacturable = {
   cnpac: number;
   primeTotale: number;
   lignesQuittance?: QuittancePreview["lignes"];
+  targetSummaries?: QuittancePreview["targetSummaries"];
 };
 
 export type MouvementDisponible = {

@@ -58,6 +58,7 @@ public class ContratService {
     private final ClientService clientService;
     private final CalculGarantieService calculGarantieService;
     private final QuittanceCalculService quittanceCalculService;
+    private final ElementFacturableCibleService elementFacturableCibleService;
     private final MouvementContratService mouvementContratService;
     private final EcheanceService echeanceService;
 
@@ -1100,7 +1101,8 @@ public class ContratService {
 
         int unitesCnpac = Math.max(1, vehicules.size() + remorques.size());
         QuittanceCalculService.Resultat calcul = buildManualQuittanceResult(request);
-        if (calcul == null) {
+        boolean quittanceManuelle = calcul != null;
+        if (!quittanceManuelle) {
             calcul = quittanceCalculService.calculer(contrat, null, garanties, unitesCnpac);
         }
         return QuittanceResponse.builder()
@@ -1118,7 +1120,7 @@ public class ContratService {
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toLignePreviewResponse).toList())
                 .garanties(garanties.stream().map(garantie -> toGarantiePreviewResponse(garantie, vehicules, remorques)).toList())
-                .targetSummaries(buildTargetSummaries(contrat, garanties, vehicules, remorques))
+                .targetSummaries(quittanceManuelle ? List.of() : elementFacturableCibleService.calculer(contrat, garanties, vehicules, remorques))
                 .build();
     }
 
@@ -1633,90 +1635,6 @@ public class ContratService {
                 .cnpac(ligne.cnpac())
                 .primeTotale(ligne.primeTotale())
                 .build();
-    }
-
-    private List<QuittanceResponse.TargetSummary> buildTargetSummaries(
-            Contrat contrat,
-            List<ContratGarantie> garanties,
-            List<Vehicule> vehicules,
-            List<Remorque> remorques
-    ) {
-        List<QuittanceResponse.TargetSummary> summaries = new ArrayList<>();
-        for (int index = 0; index < vehicules.size(); index++) {
-            Vehicule vehicule = vehicules.get(index);
-            List<ContratGarantie> targetGaranties = garanties.stream()
-                    .filter(garantie -> garantie.getVehicule() == vehicule)
-                    .toList();
-            if (!targetGaranties.isEmpty()) {
-                boolean hasRc = hasRcGarantie(targetGaranties);
-                summaries.add(toTargetSummary("VEHICULE", index, null, calculerTargetSummary(contrat, targetGaranties), hasRc));
-            }
-        }
-        for (int index = 0; index < remorques.size(); index++) {
-            Remorque remorque = remorques.get(index);
-            List<ContratGarantie> targetGaranties = garanties.stream()
-                    .filter(garantie -> garantie.getRemorque() == remorque)
-                    .toList();
-            if (!targetGaranties.isEmpty()) {
-                boolean hasRc = hasRcGarantie(targetGaranties);
-                summaries.add(toTargetSummary("REMORQUE", null, index, calculerTargetSummary(contrat, targetGaranties), hasRc));
-            }
-        }
-        return summaries;
-    }
-
-    private QuittanceCalculService.Resultat calculerTargetSummary(Contrat contrat, List<ContratGarantie> garanties) {
-        int unitesCnpac = hasRcGarantie(garanties) ? 1 : 0;
-        return quittanceCalculService.calculer(contrat, null, garanties, unitesCnpac);
-    }
-
-    private QuittanceResponse.TargetSummary toTargetSummary(
-            String kind,
-            Integer vehiculeIndex,
-            Integer remorqueIndex,
-            QuittanceCalculService.Resultat calcul,
-            boolean hasRc
-    ) {
-        QuittanceCalculService.Ligne automobile = ligne(calcul, CategorieQuittance.AUTOMOBILE);
-        QuittanceCalculService.Ligne corporel = ligne(calcul, CategorieQuittance.CORPOREL);
-        QuittanceCalculService.Ligne evcat = ligne(calcul, CategorieQuittance.EVCAT);
-        BigDecimal evcatPrimeNette = value(evcat == null ? null : evcat.primeNette());
-        return QuittanceResponse.TargetSummary.builder()
-                .kind(kind)
-                .vehiculeIndex(vehiculeIndex)
-                .remorqueIndex(remorqueIndex)
-                .primeNette(calcul.primeNette())
-                .primeNetteHorsEvcat(scale(calcul.primeNette().subtract(evcatPrimeNette)))
-                .automobilePrimeNette(value(automobile == null ? null : automobile.primeNette()))
-                .corporelPrimeNette(value(corporel == null ? null : corporel.primeNette()))
-                .evcatPrimeNette(evcatPrimeNette)
-                .taxe(calcul.taxe())
-                .taxeParafiscale(calcul.taxeParafiscale())
-                .accessoire(calcul.accessoire())
-                .cnpac(hasRc ? calcul.cnpac() : BigDecimal.ZERO)
-                .primeTotale(hasRc ? calcul.primeTotale() : scale(calcul.primeTotale().subtract(calcul.cnpac())))
-                .build();
-    }
-
-    private QuittanceCalculService.Ligne ligne(QuittanceCalculService.Resultat calcul, CategorieQuittance categorie) {
-        return calcul.lignes().stream()
-                .filter(ligne -> ligne.categorie() == categorie)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private boolean hasRcGarantie(List<ContratGarantie> garanties) {
-        return garanties.stream().anyMatch(garantie -> {
-            if (garantie.getGarantie() == null) {
-                return false;
-            }
-            String code = garantie.getGarantie().getCode() == null ? "" : garantie.getGarantie().getCode().trim().toUpperCase(Locale.ROOT);
-            return Boolean.TRUE.equals(garantie.getGarantie().getResponsabiliteCivile()) || "RC".equals(code);
-        });
-    }
-
-    private BigDecimal value(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
     }
 
     private QuittanceResponse.GarantieLigne toGarantiePreviewResponse(

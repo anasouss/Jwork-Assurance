@@ -28,6 +28,7 @@ public class QuittanceProductionService {
     private final ElementFacturableRepository elementFacturableRepository;
     private final QuittanceRepository quittanceRepository;
     private final LigneQuittanceRepository ligneQuittanceRepository;
+    private final ElementFacturableCibleService elementFacturableCibleService;
 
     public Quittance genererPourMouvement(
             Contrat contrat,
@@ -40,7 +41,7 @@ public class QuittanceProductionService {
         int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
         int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
         QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
-        return genererPourMouvement(contrat, mouvement, typeMouvement, calcul);
+        return genererPourMouvement(contrat, mouvement, typeMouvement, calcul, garanties, vehicules, remorques);
     }
 
     public Quittance genererPourMouvement(
@@ -48,6 +49,18 @@ public class QuittanceProductionService {
             MouvementContrat mouvement,
             TypeMouvementContrat typeMouvement,
             QuittanceCalculService.Resultat calcul
+    ) {
+        return genererPourMouvement(contrat, mouvement, typeMouvement, calcul, List.of(), List.of(), List.of());
+    }
+
+    private Quittance genererPourMouvement(
+            Contrat contrat,
+            MouvementContrat mouvement,
+            TypeMouvementContrat typeMouvement,
+            QuittanceCalculService.Resultat calcul,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
     ) {
         ElementFacturable element = elementFacturableRepository.save(ElementFacturable.builder()
                 .agence(contrat.getAgence())
@@ -107,6 +120,7 @@ public class QuittanceProductionService {
             quittance.getLignes().add(ligneQuittance);
         }
 
+        elementFacturableCibleService.generer(element, contrat, garanties, vehicules, remorques);
         contrat.getElementsFacturables().add(element);
         contrat.getQuittances().add(quittance);
         return quittance;

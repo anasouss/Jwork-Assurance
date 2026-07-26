@@ -33,4 +33,5 @@ public class ElementFacturableResponse {
     private BigDecimal cnpac;
     private BigDecimal primeTotale;
     private List<QuittanceResponse.Ligne> lignesQuittance;
+    private List<QuittanceResponse.TargetSummary> targetSummaries;
 }

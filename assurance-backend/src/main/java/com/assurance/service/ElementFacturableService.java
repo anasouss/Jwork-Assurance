@@ -20,6 +20,7 @@ public class ElementFacturableService {
 
     private final ElementFacturableRepository elementFacturableRepository;
     private final LigneQuittanceRepository ligneQuittanceRepository;
+    private final ElementFacturableCibleService elementFacturableCibleService;
 
     @Transactional(readOnly = true)
     public List<ElementFacturableResponse> list(Long agenceId) {
@@ -55,6 +56,7 @@ public class ElementFacturableService {
                 .lignesQuittance(ligneQuittanceRepository.findByQuittance_ElementFacturable_IdOrderByOrdreAsc(element.getId()).stream()
                         .map(this::toLigneResponse)
                         .toList())
+                .targetSummaries(elementFacturableCibleService.listByElementFacturable(element.getId()))
                 .build();
     }
 

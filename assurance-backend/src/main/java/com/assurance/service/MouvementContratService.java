@@ -59,6 +59,7 @@ public class MouvementContratService {
     private final AttestationStockService attestationStockService;
     private final QuittanceProductionService quittanceProductionService;
     private final QuittanceCalculService quittanceCalculService;
+    private final ElementFacturableCibleService elementFacturableCibleService;
 
     @Transactional
     public MouvementContrat creerAffaireNouvelle(
@@ -490,6 +491,9 @@ public class MouvementContratService {
                 .cnpac(quittance.getCnpac())
                 .primeTotale(quittance.getPrimeTotale())
                 .lignes(lignes.stream().map(this::toLigneResponse).toList())
+                .targetSummaries(elementFacturableCibleService.listByElementFacturable(
+                        quittance.getElementFacturable() != null ? quittance.getElementFacturable().getId() : null
+                ))
                 .build();
     }
 
@@ -516,6 +520,12 @@ public class MouvementContratService {
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toLignePreviewResponse).toList())
+                .targetSummaries(elementFacturableCibleService.calculer(
+                        contrat,
+                        contrat.getGaranties(),
+                        contrat.getVehicules(),
+                        contrat.getRemorques()
+                ))
                 .build();
     }
 

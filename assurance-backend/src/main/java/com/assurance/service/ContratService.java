@@ -39,6 +39,7 @@ public class ContratService {
     private final ConventionRepository conventionRepository;
     private final ClientRepository clientRepository;
     private final ContratRepository contratRepository;
+    private final NumeroDossierSequenceRepository numeroDossierSequenceRepository;
     private final ContratClientRepository contratClientRepository;
     private final VehiculeRepository vehiculeRepository;
     private final RemorqueRepository remorqueRepository;
@@ -126,6 +127,9 @@ public class ContratService {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
         }
         PersistedDraftGraph graph = applyFinalRequestToExistingContrat(contrat, request);
+        if (!hasText(contrat.getNumeroDossier())) {
+            contrat.setNumeroDossier(nextNumeroDossier(contrat.getAgence(), contrat.getCompagnieAssurance(), contrat.getDateEffet()));
+        }
         contrat.setStatut(StatutContrat.ACTIVE);
         contrat.setBrouillon(false);
         contratRepository.save(contrat);
@@ -178,7 +182,7 @@ public class ContratService {
                 .typeContrat(request.getTypeContrat())
                 .numeroContrat(request.getNumeroContrat())
                 .numeroDevis(request.getNumeroDevis())
-                .numeroDossier(request.getNumeroDossier())
+                .numeroDossier(nextNumeroDossier(agence, compagnie, contractDates.dateEffet()))
                 .numeroPolice(request.getNumeroPolice())
                 .numeroAttestation(request.getNumeroAttestation())
                 .dateEffet(contractDates.dateEffet())
@@ -439,7 +443,6 @@ public class ContratService {
         contrat.setTypeContrat(request.getTypeContrat());
         contrat.setNumeroContrat(blankToNull(request.getNumeroContrat()));
         contrat.setNumeroDevis(blankToNull(request.getNumeroDevis()));
-        contrat.setNumeroDossier(blankToNull(request.getNumeroDossier()));
         contrat.setNumeroPolice(blankToNull(request.getNumeroPolice()));
         contrat.setNumeroAttestation(blankToNull(request.getNumeroAttestation()));
         contrat.setDateEffet(contractDates.dateEffet());
@@ -850,16 +853,19 @@ public class ContratService {
                 .build());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ContratResponse> list(Long agenceId) {
-        return contratRepository.findByAgenceIdOrderByCreatedAtDesc(agenceId).stream().map(this::toResponse).toList();
+        return contratRepository.findByAgenceIdOrderByCreatedAtDesc(agenceId).stream()
+                .map(this::ensureNumeroDossier)
+                .map(this::toResponse)
+                .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ContratResponse get(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
-        return toResponse(contrat);
+        return toResponse(ensureNumeroDossier(contrat));
     }
 
     @Transactional(readOnly = true)
@@ -896,7 +902,6 @@ public class ContratService {
                 .typeContrat(request.getTypeContrat())
                 .numeroContrat(request.getNumeroContrat())
                 .numeroDevis(request.getNumeroDevis())
-                .numeroDossier(request.getNumeroDossier())
                 .numeroPolice(request.getNumeroPolice())
                 .numeroAttestation(request.getNumeroAttestation())
                 .dateEffet(contractDates.dateEffet())
@@ -1261,6 +1266,7 @@ public class ContratService {
         return ContratResponse.builder()
                 .id(contrat.getId())
                 .numeroContrat(contrat.getNumeroContrat())
+                .numeroDossier(contrat.getNumeroDossier())
                 .numeroPolice(contrat.getNumeroPolice())
                 .typeContrat(contrat.getTypeContrat())
                 .statut(contrat.getStatut())
@@ -1515,6 +1521,52 @@ public class ContratService {
             throw new BadRequestException(contexte + " cible une remorque invalide");
         }
         return remorques.get(index);
+    }
+
+    private Contrat ensureNumeroDossier(Contrat contrat) {
+        if (hasText(contrat.getNumeroDossier())
+                || Boolean.TRUE.equals(contrat.getBrouillon())
+                || contrat.getStatut() == StatutContrat.DRAFT) {
+            return contrat;
+        }
+        if (contrat.getAgence() == null
+                || contrat.getCompagnieAssurance() == null
+                || !hasText(contrat.getCompagnieAssurance().getCode())) {
+            return contrat;
+        }
+        contrat.setNumeroDossier(nextNumeroDossier(contrat.getAgence(), contrat.getCompagnieAssurance(), contrat.getDateEffet()));
+        return contratRepository.save(contrat);
+    }
+
+    private synchronized String nextNumeroDossier(Agence agence, CompagnieAssurance compagnie, LocalDate dateEffet) {
+        if (agence == null || agence.getId() == null) {
+            throw new BadRequestException("L'agence est obligatoire pour generer le numero de dossier");
+        }
+        if (compagnie == null || compagnie.getId() == null || !hasText(compagnie.getCode())) {
+            throw new BadRequestException("La compagnie est obligatoire pour generer le numero de dossier");
+        }
+        int annee = (dateEffet == null ? LocalDate.now() : dateEffet).getYear();
+        NumeroDossierSequence sequence = resolveNumeroDossierSequence(agence, compagnie, annee);
+        String prefixe = compagnie.getCode().trim().toUpperCase(Locale.ROOT);
+        String numeroDossier;
+        do {
+            int numero = sequence.getProchainNumero() == null ? 1 : sequence.getProchainNumero();
+            sequence.setProchainNumero(numero + 1);
+            numeroDossier = prefixe + "/" + annee + "/" + String.format(Locale.ROOT, "%05d", numero);
+        } while (contratRepository.existsByAgenceIdAndNumeroDossier(agence.getId(), numeroDossier));
+        numeroDossierSequenceRepository.save(sequence);
+        return numeroDossier;
+    }
+
+    private NumeroDossierSequence resolveNumeroDossierSequence(Agence agence, CompagnieAssurance compagnie, int annee) {
+        return numeroDossierSequenceRepository
+                .findByAgenceIdAndCompagnieAssuranceIdAndAnnee(agence.getId(), compagnie.getId(), annee)
+                .orElseGet(() -> numeroDossierSequenceRepository.save(NumeroDossierSequence.builder()
+                        .agence(agence)
+                        .compagnieAssurance(compagnie)
+                        .annee(annee)
+                        .prochainNumero(1)
+                        .build()));
     }
 
     private boolean hasText(String value) {

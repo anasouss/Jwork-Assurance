@@ -27,7 +27,10 @@ import java.util.List;
 
 @Entity
 @Table(name = "contrats",
-        uniqueConstraints = @UniqueConstraint(name = "uk_contrat_agence_numero", columnNames = {"agence_id", "numero_contrat"}),
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_contrat_agence_numero", columnNames = {"agence_id", "numero_contrat"}),
+                @UniqueConstraint(name = "uk_contrat_agence_numero_dossier", columnNames = {"agence_id", "numero_dossier"})
+        },
         indexes = {
                 @Index(name = "idx_contrat_agence", columnList = "agence_id"),
                 @Index(name = "idx_contrat_compagnie", columnList = "compagnie_assurance_id"),

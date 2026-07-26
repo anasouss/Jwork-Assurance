@@ -277,7 +277,7 @@ function ContratRow({
           <Button type="button" variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Visualiser">
             <Eye className="size-4" />
           </Button>
-          <RowActions contrat={contrat} child={child} />
+          <RowActions contrat={contrat} movement={movement} child={child} />
           {canExpand ? (
             <Button type="button" size="icon" className="size-8 bg-blue-600 hover:bg-blue-700" onClick={onToggle} title={expanded ? "Masquer les mouvements" : `Afficher ${movementCount - 1} mouvement(s)`}>
               <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} />
@@ -289,8 +289,9 @@ function ContratRow({
   );
 }
 
-function RowActions({ contrat, child }: { contrat: ContratSummary; child?: boolean }) {
+function RowActions({ contrat, movement, child }: { contrat: ContratSummary; movement: MovementLine; child?: boolean }) {
   const isFlotte = contrat.typeContrat === "FLOTTE";
+  const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.key && !movement.isSynthetic ? `?mouvementId=${movement.key}` : ""}`;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -320,7 +321,9 @@ function RowActions({ contrat, child }: { contrat: ContratSummary; child?: boole
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem>Télécharger</DropdownMenuItem>
-        <DropdownMenuItem>Les pièces jointes</DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to={piecesPath}>Les pièces jointes</Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive">Supprimer</DropdownMenuItem>
       </DropdownMenuContent>
@@ -414,7 +417,7 @@ function optionMap(options?: ReferenceOption[]) {
 }
 
 function dossierNumber(contrat: ContratSummary) {
-  return contrat.numeroContrat ?? contrat.numeroPolice ?? `#${contrat.id}`;
+  return contrat.numeroDossier ?? contrat.numeroContrat ?? contrat.numeroPolice ?? `#${contrat.id}`;
 }
 
 function clientCode(contrat: ContratSummary) {

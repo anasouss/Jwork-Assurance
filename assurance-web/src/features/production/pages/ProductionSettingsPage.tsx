@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BadgeCheck, Boxes, Car, Fuel, Layers3, ShieldCheck, Tags, Truck, UserRound, Wrench } from "lucide-react";
+import { BadgeCheck, Boxes, Car, FileText, Fuel, Layers3, ShieldCheck, Tags, Truck, UserRound, Wrench } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,12 @@ const settings = [
     description: "Modes, valeurs, franchises, ordre et formules multiples.",
     href: "/app/production/parametres/garanties",
     icon: ShieldCheck,
+  },
+  {
+    title: "Pièces jointes",
+    description: "Documents attendus selon le mouvement, le contrat et le client.",
+    href: "/app/production/parametres/pieces-jointes",
+    icon: FileText,
   },
   {
     title: "Marques",

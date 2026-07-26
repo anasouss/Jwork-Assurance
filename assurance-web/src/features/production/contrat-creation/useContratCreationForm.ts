@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "../api";
@@ -27,6 +28,7 @@ export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorqu
 export function useContratCreationForm(typeContrat: TypeContrat, draftId?: string) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [numeroContrat, setNumeroContrat] = useState("");
   const [numeroPolice, setNumeroPolice] = useState("");
   const [numeroAttestation, setNumeroAttestation] = useState("");
@@ -336,12 +338,13 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const createMutation = useMutation({
     mutationFn: (payload: CreateContratRequest) =>
       draftId ? productionApi.finalizeContratDraft(draftId, payload) : productionApi.createContrat(payload),
-    onSuccess: async () => {
+    onSuccess: async (contrat) => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
       if (draftId) {
         await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
       }
       toast.success("Contrat créé");
+      navigate(`/app/production/contrats/${contrat.id}/pieces-jointes`);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
   });

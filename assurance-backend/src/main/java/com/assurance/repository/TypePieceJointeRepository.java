@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface TypePieceJointeRepository extends JpaRepository<TypePieceJointe, Long> {
     List<TypePieceJointe> findByActifTrueOrderByLibelleAsc();
+
+    List<TypePieceJointe> findByAgenceIdOrAgenceIsNullOrderByLibelleAsc(Long agenceId);
 }

@@ -1,4 +1,4 @@
-import { apiFetch, buildQueryString } from "@/lib/api/base";
+import { apiFetch, apiFetchBlob, apiUpload, buildQueryString } from "@/lib/api/base";
 import type {
   ApiResponse,
   AddLotAttestationRequest,
@@ -11,8 +11,11 @@ import type {
   ClientResponse,
   ElementFacturable,
   LivraisonAttestation,
+  PieceJointe,
+  PiecesJointesContrat,
   QuittancePreview,
   ReferenceOption,
+  TypePieceJointe,
   UpsertGrilleTarifaireRequest,
   UpsertGrilleUsageConfigurationRequest,
   UpsertGroupeUsageAttestationRequest,
@@ -23,6 +26,7 @@ import type {
   UpsertConventionRequest,
   UpsertFormuleGarantiePersonneRequest,
   UpsertGarantieRequest,
+  UpsertTypePieceJointeRequest,
   UpsertLigneGrilleTarifaireRequest,
   UpsertProduitAssistanceRequest,
   UpsertCodeReferenceRequest,
@@ -61,8 +65,76 @@ export const productionApi = {
     return unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/garanties/parametrage"));
   },
 
+  async listTypesPieceJointe(includeInactive = false) {
+    return unwrap(
+      await apiFetch<ApiResponse<TypePieceJointe[]>>(
+        `/api/v1/pieces-jointes/types${buildQueryString({ includeInactive: String(includeInactive) })}`
+      )
+    );
+  },
+
+  async listTypesMouvementPieceJointe() {
+    return unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/pieces-jointes/types-mouvements"));
+  },
+
+  async createTypePieceJointe(request: UpsertTypePieceJointeRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<TypePieceJointe>>("/api/v1/pieces-jointes/types", {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async updateTypePieceJointe(id: string, request: UpsertTypePieceJointeRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<TypePieceJointe>>(`/api/v1/pieces-jointes/types/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async deleteTypePieceJointe(id: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/pieces-jointes/types/${id}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
   async listContrats() {
     return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats"));
+  },
+
+  async getContratPiecesJointes(contratId: string, mouvementId?: string | null) {
+    return unwrap(
+      await apiFetch<ApiResponse<PiecesJointesContrat>>(
+        `/api/v1/contrats/${contratId}/pieces-jointes${buildQueryString({ mouvementId: mouvementId ?? undefined })}`
+      )
+    );
+  },
+
+  async uploadPieceJointe(contratId: string, payload: { typePieceJointeId: string; mouvementId?: string | null; files: File[] }) {
+    const formData = new FormData();
+    formData.append("typePieceJointeId", payload.typePieceJointeId);
+    if (payload.mouvementId) {
+      formData.append("mouvementId", payload.mouvementId);
+    }
+    payload.files.forEach((file) => formData.append("files", file));
+    return unwrap(await apiUpload<ApiResponse<PieceJointe>>(`/api/v1/contrats/${contratId}/pieces-jointes`, formData));
+  },
+
+  async downloadPieceJointe(contratId: string, pieceId: string) {
+    return apiFetchBlob(`/api/v1/contrats/${contratId}/pieces-jointes/${pieceId}/download`);
+  },
+
+  async deletePieceJointe(contratId: string, pieceId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}/pieces-jointes/${pieceId}`, {
+        method: "DELETE",
+      })
+    );
   },
 
   async searchClient(params: { cin?: string; rc?: string }) {

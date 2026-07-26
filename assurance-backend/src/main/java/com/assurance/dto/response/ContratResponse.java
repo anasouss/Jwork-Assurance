@@ -16,6 +16,7 @@ import java.util.List;
 public class ContratResponse {
     private Long id;
     private String numeroContrat;
+    private String numeroDossier;
     private String numeroPolice;
     private TypeContrat typeContrat;
     private StatutContrat statut;

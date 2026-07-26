@@ -663,9 +663,59 @@ export type UpsertCodeReferenceRequest = {
   actif?: boolean;
 };
 
+export type TypePieceJointe = {
+  id: string;
+  libelle: string;
+  typeContrat?: TypeContrat | null;
+  typeClient?: TypeClient | null;
+  typeMouvementId?: string | null;
+  typeMouvementCode?: string | null;
+  typeMouvementLibelle?: string | null;
+  obligatoire?: boolean | null;
+  actif?: boolean | null;
+  ordreAffichage?: number | null;
+};
+
+export type UpsertTypePieceJointeRequest = {
+  libelle: string;
+  typeContrat?: TypeContrat | null;
+  typeClient?: TypeClient | null;
+  typeMouvementId?: string | null;
+  obligatoire?: boolean;
+  actif?: boolean;
+  ordreAffichage?: number | null;
+};
+
+export type PieceJointe = {
+  id: string;
+  contratId: string;
+  mouvementContratId?: string | null;
+  typePieceJointeId?: string | null;
+  typePieceJointeLibelle?: string | null;
+  obligatoire?: boolean | null;
+  nomFichier: string;
+  contentType?: string | null;
+  tailleOctets?: number | null;
+  createdAt?: string | null;
+};
+
+export type PiecesJointesContrat = {
+  contratId: string;
+  numeroDossier?: string | null;
+  numeroPolice?: string | null;
+  typeContrat: TypeContrat;
+  typeClient?: TypeClient | null;
+  mouvementContratId?: string | null;
+  mouvementCode?: string | null;
+  mouvementLibelle?: string | null;
+  types: TypePieceJointe[];
+  pieces: PieceJointe[];
+};
+
 export type ContratSummary = {
   id: string;
   numeroContrat?: string | null;
+  numeroDossier?: string | null;
   numeroPolice?: string | null;
   typeContrat: TypeContrat;
   statut: string;

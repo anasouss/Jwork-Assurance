@@ -52,6 +52,9 @@ public class TypePieceJointe extends BaseEntity {
     @Column(nullable = false)
     private Boolean obligatoire = false;
 
+    @Column(name = "ordre_affichage")
+    private Integer ordreAffichage;
+
     @Builder.Default
     @Column(nullable = false)
     private Boolean actif = true;

@@ -20,4 +20,6 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
     boolean existsByAgenceIdAndNumeroContrat(Long agenceId, String numeroContrat);
 
     boolean existsByAgenceIdAndNumeroContratAndIdNot(Long agenceId, String numeroContrat, Long id);
+
+    boolean existsByAgenceIdAndNumeroDossier(Long agenceId, String numeroDossier);
 }

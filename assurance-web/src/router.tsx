@@ -57,6 +57,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/ContratsPage")),
       },
       {
+        path: "production/contrats/:contratId/pieces-jointes",
+        lazy: lazyRoute(() => import("@/features/production/pages/ContratPiecesJointesPage")),
+      },
+      {
         path: "production/attestations-stock",
         lazy: lazyRoute(() => import("@/features/production/pages/AttestationStockPage")),
       },
@@ -139,6 +143,10 @@ export const router = createBrowserRouter([
       {
         path: "production/parametres/categories-transport",
         lazy: lazyRoute(() => import("@/features/production/pages/CategoriesTransportSettingsPage")),
+      },
+      {
+        path: "production/parametres/pieces-jointes",
+        lazy: lazyRoute(() => import("@/features/production/pages/PiecesJointesSettingsPage")),
       },
       { path: "*", lazy: lazyRoute(() => import("@/pages/app/AppNotFound")) },
     ],

@@ -7,4 +7,8 @@ import java.util.List;
 
 public interface PieceJointeRepository extends JpaRepository<PieceJointe, Long> {
     List<PieceJointe> findByContratIdOrderByCreatedAtDesc(Long contratId);
+
+    List<PieceJointe> findByContratIdAndMouvementContratIdOrderByCreatedAtDesc(Long contratId, Long mouvementContratId);
+
+    List<PieceJointe> findByContratIdAndMouvementContratIsNullOrderByCreatedAtDesc(Long contratId);
 }

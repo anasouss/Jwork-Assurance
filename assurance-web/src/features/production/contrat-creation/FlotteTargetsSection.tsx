@@ -156,7 +156,10 @@ export function FlotteTargetsSection({
   const [activeTargetPart, setActiveTargetPart] = useState<"info" | "garanties">("info");
   const [savedKeys, setSavedKeys] = useState<string[]>([]);
   const [recalculationRequest, setRecalculationRequest] = useState<{ targetKey: string; seq: number } | null>(null);
+  const [dirtyCalculationKeys, setDirtyCalculationKeys] = useState<string[]>([]);
   const [assistances, setAssistances] = useState<Record<string, AssistanceDraft>>({});
+  const calculationTargetKeyRef = useRef("");
+  const wasPreviewingRef = useRef(false);
   const vehiculeGaranties = useMemo(
     () => garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE"),
     [garanties]
@@ -183,8 +186,22 @@ export function FlotteTargetsSection({
     }
   }, [recalculationRequest?.seq]);
 
-  const requestTargetCalculation = (target: Target) => {
+  useEffect(() => {
+    if (wasPreviewingRef.current && !previewing) {
+      const targetPrefix = calculationTargetKeyRef.current ? `${calculationTargetKeyRef.current}:` : "";
+      setDirtyCalculationKeys((current) => targetPrefix ? current.filter((key) => !key.startsWith(targetPrefix)) : []);
+      calculationTargetKeyRef.current = "";
+    }
+    wasPreviewingRef.current = previewing;
+  }, [previewing]);
+
+  const requestTargetCalculation = (target: Target, garantieId?: string) => {
     const key = targetKey(target);
+    calculationTargetKeyRef.current = key;
+    if (garantieId) {
+      const dirtyKey = guaranteeCalculationKey(target, garantieId);
+      setDirtyCalculationKeys((current) => (current.includes(dirtyKey) ? current : [...current, dirtyKey]));
+    }
     setRecalculationRequest((current) => ({ targetKey: key, seq: (current?.seq ?? 0) + 1 }));
   };
 
@@ -413,6 +430,7 @@ export function FlotteTargetsSection({
                   grilleSelected={grilleSelected}
                   preview={preview}
                   previewing={previewing}
+                  dirtyCalculationKeys={dirtyCalculationKeys}
                   onRequestCalculation={requestTargetCalculation}
                 />
                 <QuittanceTotalsSummary
@@ -536,6 +554,7 @@ export function FlotteTargetsSection({
                   grilleSelected={grilleSelected}
                   preview={preview}
                   previewing={previewing}
+                  dirtyCalculationKeys={dirtyCalculationKeys}
                   onRequestCalculation={requestTargetCalculation}
                 />
                 <QuittanceTotalsSummary
@@ -1219,6 +1238,7 @@ function TargetGuaranteesTable({
   grilleSelected,
   preview,
   previewing,
+  dirtyCalculationKeys,
   onRequestCalculation,
 }: {
   target: Target;
@@ -1237,11 +1257,12 @@ function TargetGuaranteesTable({
   grilleSelected: boolean;
   preview?: QuittancePreview | null;
   previewing?: boolean;
-  onRequestCalculation?: (target: Target) => void;
+  dirtyCalculationKeys?: string[];
+  onRequestCalculation?: (target: Target, garantieId?: string) => void;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected((current) => current.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item)));
-    onRequestCalculation?.(target);
+    onRequestCalculation?.(target, garantieId);
   };
 
   const toggle = (garantie: ReferenceOption, checked: boolean) => {
@@ -1260,7 +1281,7 @@ function TargetGuaranteesTable({
     setSelected((current) => checked
       ? [...current, { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target) }]
       : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target))));
-    onRequestCalculation?.(target);
+    onRequestCalculation?.(target, garantie.id);
   };
 
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
@@ -1280,7 +1301,7 @@ function TargetGuaranteesTable({
           ]
         : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)))
     );
-    onRequestCalculation?.(target);
+    onRequestCalculation?.(target, garantie.id);
   };
 
   const usage = target.kind === "vehicule" ? usages.find((item) => item.id === target.usageId) : undefined;
@@ -1319,8 +1340,8 @@ function TargetGuaranteesTable({
               const manualValue = defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL";
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
               const previewLine = previewGuaranteeLine(preview, garantie, target, item);
-              const previewPrime = previewLine?.primeNette;
-              const rowCalculating = checked && Boolean(previewing);
+              const calculatedPrime = previewLine?.primeNette ?? item?.prime;
+              const rowCalculating = checked && Boolean(previewing) && Boolean(dirtyCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
 
               return (
                 <tr
@@ -1411,7 +1432,7 @@ function TargetGuaranteesTable({
                   </td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
                   <td className="px-3 py-2 text-right font-medium">
-                    {checked ? <CalculationValue value={previewPrime} loading={rowCalculating} /> : "-"}
+                    {checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
                   </td>
                 </tr>
               );
@@ -1450,7 +1471,8 @@ function TargetGuaranteesTable({
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
                 const disabled = !grilleSelected || formules.length === 0;
                 const previewLine = previewGuaranteeLine(preview, garantie, target, item);
-                const rowCalculating = checked && Boolean(previewing);
+                const calculatedPrime = previewLine?.primeNette ?? item?.prime;
+                const rowCalculating = checked && Boolean(previewing) && Boolean(dirtyCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
 
                 return (
                   <tr
@@ -1493,7 +1515,7 @@ function TargetGuaranteesTable({
                     <td className="px-3 py-2">{money(selectedFormule?.montantDeces)}</td>
                     <td className="px-3 py-2">{money(selectedFormule?.montantInvalidite)}</td>
                     <td className="px-3 py-2">{money(selectedFormule?.montantFraisMedicaux)}</td>
-                    <td className="px-3 py-2 text-right">{checked ? <CalculationValue value={previewLine?.primeNette} loading={rowCalculating} /> : "-"}</td>
+                    <td className="px-3 py-2 text-right">{checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}</td>
                   </tr>
                 );
               })}
@@ -1681,6 +1703,10 @@ function hasTargetPersonneGaranties(selected: GarantieInput[], personneGaranties
 
 function targetKey(target?: Target) {
   return target ? `${target.kind}:${target.index}` : "";
+}
+
+function guaranteeCalculationKey(target: Target, garantieId: string) {
+  return `${targetKey(target)}:${garantieId}`;
 }
 
 function matchingLines(lignes: ReferenceOption[], garantie: ReferenceOption, target?: Target) {

@@ -45,6 +45,22 @@ export function ContratFormLayout({
   const assistanceCategorieClientId = order === "flotte"
     ? proprietaireCategorieClientId || souscripteurCategorieClientId
     : souscripteurCategorieClientId;
+  const flotteTargetUsages = useMemo(() => {
+    if (order !== "flotte") {
+      return form.availableUsages;
+    }
+    if (!form.grilleTarifaireId) {
+      return [];
+    }
+    const configuredUsageIds = new Set<string>();
+    for (const ligne of form.lignesGrille.data ?? []) {
+      if (ligne.usageId) configuredUsageIds.add(String(ligne.usageId));
+    }
+    for (const formule of form.formulesPersonne.data ?? []) {
+      if (formule.usageId) configuredUsageIds.add(String(formule.usageId));
+    }
+    return form.availableUsages.filter((usage) => configuredUsageIds.has(usage.id));
+  }, [form.availableUsages, form.formulesPersonne.data, form.grilleTarifaireId, form.lignesGrille.data, order]);
   const workflowSections = useMemo<ContratSectionKey[]>(() => {
     if (order === "flotte") {
       return ["souscripteur", "proprietaire", "contrat", "grille", "flotteTargets", "remorque", "quittances"];
@@ -174,7 +190,7 @@ export function ContratFormLayout({
       setSelectedGaranties={form.setGaranties}
       lignes={form.lignesGrille.data ?? []}
       formulesPersonne={form.formulesPersonne.data ?? []}
-      usages={form.refs.usages.data ?? []}
+      usages={flotteTargetUsages}
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}

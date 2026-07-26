@@ -80,9 +80,29 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     () => referenceStringArray(selectedConvention, "usageIds"),
     [selectedConvention]
   );
+  const flotteCategorieClientId = useMemo(() => {
+    const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE")?.client.categorieClientId;
+    const souscripteur = clients.find((client) => client.role === "SOUSCRIPTEUR")?.client.categorieClientId;
+    return proprietaire || souscripteur || "";
+  }, [clients]);
+  const selectedFlotteCategorie = useMemo(
+    () => refs.categoriesClient.data?.find((item) => item.id === flotteCategorieClientId) ?? null,
+    [flotteCategorieClientId, refs.categoriesClient.data]
+  );
+  const flotteUsageIds = useMemo(
+    () => referenceStringArray(selectedFlotteCategorie, "usageIds"),
+    [selectedFlotteCategorie]
+  );
 
   const availableUsages = useMemo(() => {
     const usages = refs.usages.data ?? [];
+    if (typeContrat === "FLOTTE") {
+      if (!flotteCategorieClientId || flotteUsageIds.length === 0) {
+        return usages;
+      }
+      const allowedIds = new Set(flotteUsageIds);
+      return usages.filter((usage) => allowedIds.has(usage.id));
+    }
     if (typeContrat !== "CONVENTION") {
       return usages;
     }
@@ -91,7 +111,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     }
     const allowedIds = new Set(conventionUsageIds);
     return usages.filter((usage) => allowedIds.has(usage.id));
-  }, [conventionId, conventionUsageIds, refs.usages.data, selectedConvention, typeContrat]);
+  }, [conventionId, conventionUsageIds, flotteCategorieClientId, flotteUsageIds, refs.usages.data, selectedConvention, typeContrat]);
 
   useEffect(() => {
     if (typeContrat !== "CONVENTION" || !usageId || !selectedConvention) {
@@ -103,6 +123,19 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setUsageId("");
     setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
   }, [conventionUsageIds, selectedConvention, typeContrat, usageId]);
+
+  useEffect(() => {
+    if (typeContrat !== "FLOTTE" || flotteUsageIds.length === 0) {
+      return;
+    }
+    const allowedIds = new Set(flotteUsageIds);
+    setVehicules((current) => {
+      const next = current.map((vehicule) => (
+        vehicule.usageId && !allowedIds.has(vehicule.usageId) ? { ...vehicule, usageId: "" } : vehicule
+      ));
+      return next.some((vehicule, index) => vehicule.usageId !== current[index]?.usageId) ? next : current;
+    });
+  }, [flotteUsageIds, typeContrat]);
 
   const grilleUsageFilter = typeContrat === "CONVENTION" ? usageId : undefined;
   const selectedConventionTypeEcheance = selectedConvention?.typeEcheance;

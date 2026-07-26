@@ -9,6 +9,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -16,8 +17,10 @@ import java.util.List;
 public class ContratResponse {
     private Long id;
     private String numeroContrat;
+    private String numeroDevis;
     private String numeroDossier;
     private String numeroPolice;
+    private LocalDateTime createdAt;
     private TypeContrat typeContrat;
     private StatutContrat statut;
     private Long agenceId;

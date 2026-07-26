@@ -113,6 +113,35 @@ export const productionApi = {
     return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats"));
   },
 
+  async listProspections() {
+    return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats/prospections"));
+  },
+
+  async convertProspection(
+    contratId: string,
+    request: {
+      numeroPolice: string;
+      vehicules?: { vehiculeId: string; numeroAttestation?: string }[];
+      remorques?: { remorqueId: string; numeroAttestation?: string }[];
+      assistances?: { assistanceId: string; numeroContratOuQuittance?: string }[];
+    }
+  ) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/${contratId}/convertir-prospection`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async downloadDevisPdf(contratId: string, filter?: { vehiculeIds?: string[]; usageIds?: string[] }) {
+    return apiFetchBlob(`/api/v1/contrats/${contratId}/devis-pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(filter ?? {}),
+    });
+  },
+
   async getAssistanceContext(contratId: string, params?: { mouvementId?: string | null; dateSouscription?: string | null }) {
     return unwrap(
       await apiFetch<ApiResponse<AssistanceContratContext>>(

@@ -23,6 +23,7 @@ public class AssistanceContratResponse {
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String echeanceCode;
+    private String numeroContratOuQuittance;
     private Integer trimestres;
     private BigDecimal prorataRatio;
     private BigDecimal primeNette;

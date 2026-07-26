@@ -433,6 +433,7 @@ export type AssistanceContrat = {
   dateEffet?: string | null;
   dateEcheance?: string | null;
   echeanceCode?: string | null;
+  numeroContratOuQuittance?: string | null;
   trimestres?: number | null;
   prorataRatio?: number | null;
   primeNette?: number | null;
@@ -836,8 +837,10 @@ export type PiecesJointesContrat = {
 export type ContratSummary = {
   id: string;
   numeroContrat?: string | null;
+  numeroDevis?: string | null;
   numeroDossier?: string | null;
   numeroPolice?: string | null;
+  createdAt?: string | null;
   typeContrat: TypeContrat;
   statut: string;
   agenceId?: string;
@@ -879,6 +882,8 @@ export type ContratSummary = {
     usageId?: string | null;
     usageCode?: string | null;
     usageLibelle?: string | null;
+    groupeUsageAttestationCode?: string | null;
+    consommeAttestation?: boolean | null;
     immatriculation?: string | null;
     numeroAttestation?: string | null;
     remorque?: boolean | null;
@@ -913,6 +918,8 @@ export type ContratSummary = {
     usageId?: string | null;
     usageCode?: string | null;
     usageLibelle?: string | null;
+    groupeUsageAttestationCode?: string | null;
+    consommeAttestation?: boolean | null;
     immatriculation?: string | null;
     numeroAttestation?: string | null;
     marqueId?: string | null;

@@ -1,6 +1,8 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.dto.request.ConvertirProspectionRequest;
+import com.assurance.dto.request.DevisPdfFilterRequest;
 import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.request.UpsertCarteVerteRequest;
@@ -17,9 +19,12 @@ import com.assurance.service.AssistanceContratService;
 import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
+import com.assurance.service.DevisPdfService;
 import com.assurance.service.MouvementContratService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -43,6 +48,7 @@ public class ContratController {
     private final ContratActionService contratActionService;
     private final AssistanceContratService assistanceContratService;
     private final CarteVerteService carteVerteService;
+    private final DevisPdfService devisPdfService;
     private final MouvementContratService mouvementContratService;
 
     @PostMapping
@@ -91,9 +97,31 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(contratService.list(TenantContext.getCurrentAgence())));
     }
 
+    @GetMapping("/prospections")
+    public ResponseEntity<ApiResponse<List<ContratResponse>>> listProspections() {
+        return ResponseEntity.ok(ApiResponse.success(contratService.listProspections(TenantContext.getCurrentAgence())));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ContratResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(contratService.get(TenantContext.getCurrentAgence(), id)));
+    }
+
+    @PostMapping("/{id}/convertir-prospection")
+    public ResponseEntity<ApiResponse<ContratResponse>> convertirProspection(
+            @PathVariable Long id,
+            @RequestBody(required = false) ConvertirProspectionRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(contratService.convertirProspection(TenantContext.getCurrentAgence(), id, request), "Devis converti en contrat"));
+    }
+
+    @PostMapping("/{id}/devis-pdf")
+    public ResponseEntity<byte[]> devisPdf(@PathVariable Long id, @RequestBody(required = false) DevisPdfFilterRequest request) {
+        byte[] pdf = devisPdfService.generate(TenantContext.getCurrentAgence(), id, request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=devis-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @GetMapping("/{id}/actions")

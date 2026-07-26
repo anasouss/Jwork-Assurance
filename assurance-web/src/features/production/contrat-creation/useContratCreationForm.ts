@@ -26,7 +26,7 @@ import type {
 export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille";
 export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorque" | "flotteTargets" | "garanties" | "quittances";
 
-export function useContratCreationForm(typeContrat: TypeContrat, draftId?: string) {
+export function useContratCreationForm(typeContrat: TypeContrat, draftId?: string, options?: { prospectionMode?: boolean }) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -248,7 +248,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     saisiePrimeNette: typeContrat === "PARTICULIER" ? saisiePrimeNette : false,
     nombreVehicules: vehicules.length,
     nombreRemorques: remorques.length,
-    prospection: false,
+    prospection: Boolean(options?.prospectionMode),
     assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled || assistanceDraft.enabled : false,
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
@@ -309,6 +309,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     clients,
     garanties,
     quittances,
+    options?.prospectionMode,
   ]);
 
   useEffect(() => {
@@ -344,6 +345,12 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       if (draftId) {
         await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
       }
+      if (options?.prospectionMode) {
+        await queryClient.invalidateQueries({ queryKey: ["prospections"] });
+        toast.success("Devis créé");
+        navigate("/app/production/prospection");
+        return;
+      }
       toast.success("Contrat créé");
       navigate(`/app/production/contrats/${contrat.id}/pieces-jointes`);
     },
@@ -365,7 +372,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
-    const result = contratSchema.safeParse(request);
+    const result = contratSchema.safeParse(options?.prospectionMode && typeContrat === "FLOTTE"
+      ? { ...request, numeroPolice: request.numeroPolice || "DEVIS" }
+      : request);
     if (!result.success) {
       setValidationErrors({});
       toast.error(result.error.issues[0]?.message ?? "Formulaire incomplet");
@@ -518,7 +527,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     if (section === "contrat") {
       requireField("compagnieAssuranceId", compagnieAssuranceId, "Compagnie obligatoire.");
       if (typeContrat === "FLOTTE") {
-        requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
+        if (!options?.prospectionMode) {
+          requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
+        }
       } else {
         requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
       }
@@ -784,6 +795,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     quittances,
     setQuittances,
     validationErrors,
+    prospectionMode: Boolean(options?.prospectionMode),
   };
 }
 
@@ -921,7 +933,7 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
   if (typeContrat === "PARTICULIER") {
     return false;
   }
-  const hasContractReference = typeContrat === "FLOTTE" ? Boolean(request.numeroPolice) : Boolean(request.numeroContrat);
+  const hasContractReference = Boolean(request.prospection) || (typeContrat === "FLOTTE" ? Boolean(request.numeroPolice) : Boolean(request.numeroContrat));
   if (!request.agenceId || !hasContractReference || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
     return false;
   }

@@ -1,12 +1,13 @@
 import { useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ConventionContratForm } from "../contrat-creation/ConventionContratForm";
 import { useContratCreationForm } from "../contrat-creation/useContratCreationForm";
 
 export default function ConventionContratCreationPage() {
   const { draftId } = useParams();
   const [params] = useSearchParams();
-  const form = useContratCreationForm("CONVENTION", draftId);
+  const location = useLocation();
+  const form = useContratCreationForm("CONVENTION", draftId, { prospectionMode: location.pathname.includes("/prospection") });
   const compagnieAssuranceId = params.get("compagnieAssuranceId");
   const conventionId = params.get("conventionId");
   const usageId = params.get("usageId");

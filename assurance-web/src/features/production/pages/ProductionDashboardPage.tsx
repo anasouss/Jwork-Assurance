@@ -11,17 +11,26 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
+type ProductionAction = {
+  title: string;
+  icon: typeof FilePlus2;
+  href: string;
+  permission: string;
+  primary?: boolean;
+  disabled?: boolean;
+};
+
 export default function ProductionDashboardPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
 
-  const actions = [
+  const actions: ProductionAction[] = [
     { title: "Ajouter un dossier", icon: FilePlus2, href: "/app/production/ajouter-dossier", permission: "contrat:create", primary: true },
     { title: "Ajouter un avenant", icon: Plus, href: "/app/production/contrats", permission: "contrat:update" },
     { title: "Liste des dossiers", icon: List, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Gestion des échéances", icon: CalendarDays, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Registre de production", icon: FileText, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Portefeuille client", icon: Users, href: "/app/production/contrats", permission: "client:view" },
-    { title: "Prospection", icon: Target, href: "/app/production", permission: "contrat:view", disabled: true },
+    { title: "Prospection", icon: Target, href: "/app/production/prospection", permission: "contrat:view" },
     { title: "Gestion du stock", icon: Archive, href: "/app/production/attestations-stock", permission: "contrat:view" },
   ].filter((item) => !item.permission || permissions.includes(item.permission));
 

@@ -206,6 +206,7 @@ export function ContratFormLayout({
       assistanceCategorieClientId={assistanceCategorieClientId}
       crmPartage={form.crmPartage}
       crmPartageValeur={form.crmPartageValeur}
+      prospectionMode={form.prospectionMode}
       maxRemorques={maxRemorques}
       errors={form.validationErrors}
       openSection={activeSection}
@@ -230,7 +231,7 @@ export function ContratFormLayout({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</div>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">Ajouter dossier</h1>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">{form.prospectionMode ? "Ajouter devis" : "Ajouter dossier"}</h1>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </div>
@@ -273,7 +274,7 @@ export function ContratFormLayout({
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
           {form.createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          {form.createMutation.isPending ? "Création..." : "Créer contrat"}
+          {form.createMutation.isPending ? "Création..." : form.prospectionMode ? "Créer devis" : "Créer contrat"}
         </Button>
       </div>
     </div>

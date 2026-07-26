@@ -48,6 +48,7 @@ export function ContractInfoSection({
   const showContratUsage = form.typeContrat !== "FLOTTE";
   const showNumeroContrat = !isFlotte;
   const showNumeroAttestation = !isFlotte;
+  const showFlotteNumeroPolice = isFlotte && !form.prospectionMode;
   const conventionHasFixedEcheance = readOnlyConventionContext
     && Boolean(form.request.echeance ?? form.effectiveEcheance)
     && selectedConvention?.typeEcheance === "A_ECHEANCE";
@@ -141,9 +142,15 @@ export function ContractInfoSection({
         ) : null}
         {isFlotte ? (
           <>
-            <Field label="N° police" required error={form.validationErrors.numeroPolice}>
-              <Input value={form.numeroPolice} onChange={(event) => form.setNumeroPolice(event.target.value)} />
-            </Field>
+            {showFlotteNumeroPolice ? (
+              <Field label="N° police" required error={form.validationErrors.numeroPolice}>
+                <Input value={form.numeroPolice} onChange={(event) => form.setNumeroPolice(event.target.value)} />
+              </Field>
+            ) : (
+              <Field label="N° devis">
+                <Input value={form.request.numeroDevis ?? ""} readOnly placeholder="Généré à l'enregistrement du devis" />
+              </Field>
+            )}
             <Field label="Type de contrat" required error={form.validationErrors.typeRenouvellement}>
               <Select
                 value={form.typeRenouvellement}

@@ -231,6 +231,7 @@ public class AssistanceContratService {
                 .dateEffet(assistance.getDateEffet())
                 .dateEcheance(assistance.getDateEcheance())
                 .echeanceCode(assistance.getEcheanceCode())
+                .numeroContratOuQuittance(assistance.getNumeroContratOuQuittance())
                 .trimestres(trimestres)
                 .prorataRatio(prorata.setScale(2, RoundingMode.HALF_UP))
                 .primeNette(assistance.getPrimeNette())

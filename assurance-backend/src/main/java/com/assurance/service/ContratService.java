@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -52,6 +54,7 @@ public class ContratService {
     private final CarrosserieRepository carrosserieRepository;
     private final CategorieTransportRepository categorieTransportRepository;
     private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
+    private final AssistanceContratRepository assistanceContratRepository;
     private final ClientService clientService;
     private final CalculGarantieService calculGarantieService;
     private final QuittanceCalculService quittanceCalculService;
@@ -130,16 +133,23 @@ public class ContratService {
         if (!hasText(contrat.getNumeroDossier())) {
             contrat.setNumeroDossier(nextNumeroDossier(contrat.getAgence(), contrat.getCompagnieAssurance(), contrat.getDateEffet()));
         }
-        contrat.setStatut(StatutContrat.ACTIVE);
+        boolean prospection = Boolean.TRUE.equals(request.getProspection());
+        if (prospection && !hasText(contrat.getNumeroDevis())) {
+            contrat.setNumeroDevis(nextNumeroDevis(contrat.getAgence(), contrat.getCompagnieAssurance()));
+        }
+        contrat.setProspection(prospection);
+        contrat.setStatut(prospection ? StatutContrat.DRAFT : StatutContrat.ACTIVE);
         contrat.setBrouillon(false);
         contratRepository.save(contrat);
-        mouvementContratService.creerAffaireNouvelle(
-                contrat,
-                graph.vehicules(),
-                graph.remorques(),
-                graph.garanties(),
-                graph.quittanceManuelle()
-        );
+        if (!prospection) {
+            mouvementContratService.creerAffaireNouvelle(
+                    contrat,
+                    graph.vehicules(),
+                    graph.remorques(),
+                    graph.garanties(),
+                    graph.quittanceManuelle()
+            );
+        }
         return toResponse(contrat);
     }
 
@@ -205,6 +215,9 @@ public class ContratService {
                 .crmPartageValeur(request.getCrmPartageValeur())
                 .notes(request.getNotes())
                 .build();
+        if (Boolean.TRUE.equals(contrat.getProspection()) && !hasText(contrat.getNumeroDevis())) {
+            contrat.setNumeroDevis(nextNumeroDevis(agence, compagnie));
+        }
         contrat = contratRepository.save(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), Map.of(), true);
@@ -325,7 +338,9 @@ public class ContratService {
 
         QuittanceCalculService.Resultat quittanceManuelle = buildManualQuittanceResult(request);
         if (contratOrigine == null) {
-            mouvementContratService.creerAffaireNouvelle(contrat, vehiculesCrees, remorquesCreees, garantiesCreees, quittanceManuelle);
+            if (!Boolean.TRUE.equals(contrat.getProspection())) {
+                mouvementContratService.creerAffaireNouvelle(contrat, vehiculesCrees, remorquesCreees, garantiesCreees, quittanceManuelle);
+            }
         } else {
             mouvementContratService.creerRenouvellement(contrat, contratOrigine, vehiculesCrees, remorquesCreees, garantiesCreees);
         }
@@ -442,7 +457,10 @@ public class ContratService {
         contrat.setGrilleTarifaire(grilleTarifaire);
         contrat.setTypeContrat(request.getTypeContrat());
         contrat.setNumeroContrat(blankToNull(request.getNumeroContrat()));
-        contrat.setNumeroDevis(blankToNull(request.getNumeroDevis()));
+        String numeroDevis = blankToNull(request.getNumeroDevis());
+        if (numeroDevis != null || !hasText(contrat.getNumeroDevis())) {
+            contrat.setNumeroDevis(numeroDevis);
+        }
         contrat.setNumeroPolice(blankToNull(request.getNumeroPolice()));
         contrat.setNumeroAttestation(blankToNull(request.getNumeroAttestation()));
         contrat.setDateEffet(contractDates.dateEffet());
@@ -855,17 +873,163 @@ public class ContratService {
 
     @Transactional
     public List<ContratResponse> list(Long agenceId) {
-        return contratRepository.findByAgenceIdOrderByCreatedAtDesc(agenceId).stream()
+        return contratRepository.findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(agenceId).stream()
                 .map(this::ensureNumeroDossier)
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional
+    public List<ContratResponse> listProspections(Long agenceId) {
+        return contratRepository.findByAgenceIdAndProspectionTrueAndTypeContratOrderByCreatedAtDesc(agenceId, TypeContrat.FLOTTE).stream()
+                .map(this::ensureNumeroDevis)
+                .map(this::ensureNumeroDossier)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public ContratResponse convertirProspection(Long agenceId, Long contratId, ConvertirProspectionRequest request) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (!Boolean.TRUE.equals(contrat.getProspection())) {
+            throw new BadRequestException("Ce devis est deja converti en contrat");
+        }
+        if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
+            throw new BadRequestException("La prospection est disponible uniquement pour les flottes");
+        }
+        if (contrat.getCompagnieAssurance() == null) {
+            throw new BadRequestException("La compagnie est obligatoire pour convertir le devis");
+        }
+        if (contrat.getDateEffet() == null || contrat.getDateEcheance() == null) {
+            throw new BadRequestException("Les dates du contrat sont obligatoires pour convertir le devis");
+        }
+        if ((contrat.getVehicules() == null || contrat.getVehicules().isEmpty())
+                && (contrat.getRemorques() == null || contrat.getRemorques().isEmpty())) {
+            throw new BadRequestException("Au moins un vehicule ou une remorque est obligatoire pour convertir le devis");
+        }
+        if (contrat.getGaranties() == null || contrat.getGaranties().isEmpty()) {
+            throw new BadRequestException("Au moins une garantie est obligatoire pour convertir le devis");
+        }
+        if (request == null || !hasText(request.getNumeroPolice())) {
+            throw new BadRequestException("Numero de police obligatoire pour convertir le devis");
+        }
+        contrat.setNumeroPolice(blankToNull(request.getNumeroPolice()));
+        if (!hasText(contrat.getNumeroDevis())) {
+            contrat.setNumeroDevis(nextNumeroDevis(contrat.getAgence(), contrat.getCompagnieAssurance()));
+        }
+        appliquerAttestationsProspection(contrat, request);
+        appliquerReferencesAssistanceProspection(contrat, request);
+        if (!hasText(contrat.getNumeroDossier())) {
+            contrat.setNumeroDossier(nextNumeroDossier(contrat.getAgence(), contrat.getCompagnieAssurance(), contrat.getDateEffet()));
+        }
+        contrat.setProspection(false);
+        contrat.setBrouillon(false);
+        contrat.setStatut(StatutContrat.ACTIVE);
+        contrat = contratRepository.save(contrat);
+        if (contrat.getMouvements() == null || contrat.getMouvements().isEmpty()) {
+            mouvementContratService.creerAffaireNouvelle(
+                    contrat,
+                    contrat.getVehicules(),
+                    contrat.getRemorques(),
+                    contrat.getGaranties()
+            );
+        }
+        return toResponse(contrat);
+    }
+
+    private void appliquerAttestationsProspection(Contrat contrat, ConvertirProspectionRequest request) {
+        Map<Long, String> attestationsVehicules = new HashMap<>();
+        Map<Long, String> attestationsRemorques = new HashMap<>();
+        if (request != null && request.getVehicules() != null) {
+            for (ConvertirProspectionRequest.AttestationVehicule ligne : request.getVehicules()) {
+                if (ligne.getVehiculeId() != null) {
+                    attestationsVehicules.put(ligne.getVehiculeId(), blankToNull(ligne.getNumeroAttestation()));
+                }
+            }
+        }
+        if (request != null && request.getRemorques() != null) {
+            for (ConvertirProspectionRequest.AttestationRemorque ligne : request.getRemorques()) {
+                if (ligne.getRemorqueId() != null) {
+                    attestationsRemorques.put(ligne.getRemorqueId(), blankToNull(ligne.getNumeroAttestation()));
+                }
+            }
+        }
+
+        for (Vehicule vehicule : contrat.getVehicules() == null ? List.<Vehicule>of() : contrat.getVehicules()) {
+            String numero = attestationsVehicules.containsKey(vehicule.getId())
+                    ? attestationsVehicules.get(vehicule.getId())
+                    : blankToNull(vehicule.getNumeroAttestation());
+            if (vehiculeConsommeAttestation(vehicule) && !hasText(numero)) {
+                throw new BadRequestException("Le numero d'attestation est obligatoire pour le vehicule " + libelleVehicule(vehicule));
+            }
+            vehicule.setNumeroAttestation(numero);
+        }
+
+        for (Remorque remorque : contrat.getRemorques() == null ? List.<Remorque>of() : contrat.getRemorques()) {
+            String numero = attestationsRemorques.containsKey(remorque.getId())
+                    ? attestationsRemorques.get(remorque.getId())
+                    : blankToNull(remorque.getNumeroAttestation());
+            if (remorqueConsommeAttestation(remorque) && !hasText(numero)) {
+                throw new BadRequestException("Le numero d'attestation est obligatoire pour la remorque " + libelleRemorque(remorque));
+            }
+            remorque.setNumeroAttestation(numero);
+        }
+    }
+
+    private void appliquerReferencesAssistanceProspection(Contrat contrat, ConvertirProspectionRequest request) {
+        Map<Long, String> references = new HashMap<>();
+        if (request != null && request.getAssistances() != null) {
+            for (ConvertirProspectionRequest.Assistance ligne : request.getAssistances()) {
+                if (ligne.getAssistanceId() != null) {
+                    references.put(ligne.getAssistanceId(), blankToNull(ligne.getNumeroContratOuQuittance()));
+                }
+            }
+        }
+
+        for (AssistanceContrat assistance : contrat.getAssistances() == null ? List.<AssistanceContrat>of() : contrat.getAssistances()) {
+            if (!Boolean.TRUE.equals(assistance.getActif())) {
+                continue;
+            }
+            String reference = references.containsKey(assistance.getId())
+                    ? references.get(assistance.getId())
+                    : blankToNull(assistance.getNumeroContratOuQuittance());
+            if (!hasText(reference)) {
+                throw new BadRequestException("Le numero de contrat/quittance assistance est obligatoire");
+            }
+            assistance.setNumeroContratOuQuittance(reference);
+            assistance.setNumeroPoliceContrat(contrat.getNumeroPolice());
+            assistanceContratRepository.save(assistance);
+        }
+    }
+
+    private boolean vehiculeConsommeAttestation(Vehicule vehicule) {
+        return vehicule != null && vehicule.getUsage() != null && Boolean.TRUE.equals(vehicule.getUsage().getConsommeAttestation());
+    }
+
+    private boolean remorqueConsommeAttestation(Remorque remorque) {
+        return remorque != null && remorque.getUsage() != null && Boolean.TRUE.equals(remorque.getUsage().getConsommeAttestation());
+    }
+
+    private String libelleVehicule(Vehicule vehicule) {
+        if (vehicule == null) {
+            return "";
+        }
+        return hasText(vehicule.getImmatriculation()) ? vehicule.getImmatriculation() : "#" + vehicule.getId();
+    }
+
+    private String libelleRemorque(Remorque remorque) {
+        if (remorque == null) {
+            return "";
+        }
+        return hasText(remorque.getImmatriculation()) ? remorque.getImmatriculation() : "#" + remorque.getId();
+    }
+
+    @Transactional
     public ContratResponse get(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
-        return toResponse(ensureNumeroDossier(contrat));
+        return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)));
     }
 
     @Transactional(readOnly = true)
@@ -1266,8 +1430,10 @@ public class ContratService {
         return ContratResponse.builder()
                 .id(contrat.getId())
                 .numeroContrat(contrat.getNumeroContrat())
+                .numeroDevis(contrat.getNumeroDevis())
                 .numeroDossier(contrat.getNumeroDossier())
                 .numeroPolice(contrat.getNumeroPolice())
+                .createdAt(contrat.getCreatedAt())
                 .typeContrat(contrat.getTypeContrat())
                 .statut(contrat.getStatut())
                 .agenceId(contrat.getAgence() != null ? contrat.getAgence().getId() : null)
@@ -1538,6 +1704,16 @@ public class ContratService {
         return contratRepository.save(contrat);
     }
 
+    private Contrat ensureNumeroDevis(Contrat contrat) {
+        if (contrat == null
+                || !Boolean.TRUE.equals(contrat.getProspection())
+                || hasText(contrat.getNumeroDevis())) {
+            return contrat;
+        }
+        contrat.setNumeroDevis(nextNumeroDevis(contrat.getAgence(), contrat.getCompagnieAssurance()));
+        return contratRepository.save(contrat);
+    }
+
     private synchronized String nextNumeroDossier(Agence agence, CompagnieAssurance compagnie, LocalDate dateEffet) {
         if (agence == null || agence.getId() == null) {
             throw new BadRequestException("L'agence est obligatoire pour generer le numero de dossier");
@@ -1556,6 +1732,54 @@ public class ContratService {
         } while (contratRepository.existsByAgenceIdAndNumeroDossier(agence.getId(), numeroDossier));
         numeroDossierSequenceRepository.save(sequence);
         return numeroDossier;
+    }
+
+    private synchronized String nextNumeroDevis(Agence agence, CompagnieAssurance compagnie) {
+        if (agence == null || agence.getId() == null) {
+            throw new BadRequestException("L'agence est obligatoire pour generer le numero de devis");
+        }
+        if (compagnie == null || compagnie.getId() == null) {
+            throw new BadRequestException("La compagnie est obligatoire pour generer le numero de devis");
+        }
+        LocalDate referenceDate = LocalDate.now();
+        String prefixe = extractCompagniePrefix(compagnie) +
+                String.format(Locale.ROOT, "%02d", referenceDate.getMonthValue()) +
+                String.format(Locale.ROOT, "%02d", referenceDate.getYear() % 100);
+        int previousNumber = contratRepository.findNumeroDevisByAgenceIdAndPrefix(agence.getId(), prefixe).stream()
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .filter(value -> value.startsWith(prefixe))
+                .map(value -> value.substring(prefixe.length()))
+                .filter(value -> value.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max()
+                .orElse(0);
+        String numeroDevis;
+        do {
+            previousNumber++;
+            numeroDevis = prefixe + String.format(Locale.ROOT, "%03d", previousNumber);
+        } while (contratRepository.existsByAgenceIdAndNumeroDevis(agence.getId(), numeroDevis));
+        return numeroDevis;
+    }
+
+    private String extractCompagniePrefix(CompagnieAssurance compagnie) {
+        String label = compagnie == null ? null : compagnie.getNom();
+        if (!hasText(label) && compagnie != null) {
+            label = compagnie.getCode();
+        }
+        if (!hasText(label)) {
+            return "XX";
+        }
+        String withoutAccents = Normalizer.normalize(label, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        String lettersOnly = withoutAccents.replaceAll("[^A-Za-z]", "").toUpperCase(Locale.ROOT);
+        if (lettersOnly.length() >= 2) {
+            return lettersOnly.substring(0, 2);
+        }
+        if (lettersOnly.length() == 1) {
+            return lettersOnly + "X";
+        }
+        return "XX";
     }
 
     private NumeroDossierSequence resolveNumeroDossierSequence(Agence agence, CompagnieAssurance compagnie, int annee) {

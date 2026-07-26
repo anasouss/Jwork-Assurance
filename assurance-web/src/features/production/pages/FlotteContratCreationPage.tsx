@@ -1,10 +1,11 @@
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { FlotteContratForm } from "../contrat-creation/FlotteContratForm";
 import { useContratCreationForm } from "../contrat-creation/useContratCreationForm";
 
 export default function FlotteContratCreationPage() {
   const { draftId } = useParams();
-  const form = useContratCreationForm("FLOTTE", draftId);
+  const location = useLocation();
+  const form = useContratCreationForm("FLOTTE", draftId, { prospectionMode: location.pathname.includes("/prospection") });
 
   return <FlotteContratForm form={form} />;
 }

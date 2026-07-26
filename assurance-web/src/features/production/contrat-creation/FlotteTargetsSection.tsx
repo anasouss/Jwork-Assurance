@@ -76,6 +76,7 @@ type Props = {
   assistanceCategorieClientId?: string;
   crmPartage?: boolean;
   crmPartageValeur?: string;
+  prospectionMode?: boolean;
   maxRemorques?: number | null;
   errors?: Record<string, string>;
   openSection?: ContratSectionKey;
@@ -108,6 +109,7 @@ export function FlotteTargetsSection({
   assistanceCategorieClientId,
   crmPartage = false,
   crmPartageValeur = "",
+  prospectionMode = false,
   maxRemorques,
   errors = {},
   openSection,
@@ -333,6 +335,7 @@ export function FlotteTargetsSection({
                   categoriesTransport={categoriesTransport}
                   crmPartage={crmPartage}
                   crmPartageValeur={crmPartageValeur}
+                  prospectionMode={prospectionMode}
                   errors={errors}
                 />
                 <SectionSubmitButton
@@ -461,6 +464,7 @@ export function FlotteTargetsSection({
                   setRemorques={setRemorques}
                   usages={usages}
                   marques={marques}
+                  prospectionMode={prospectionMode}
                 />
                 <SectionSubmitButton saving={saving} onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque")}>
                   Enregistrer informations
@@ -729,6 +733,7 @@ function VehicleForm({
   categoriesTransport,
   crmPartage,
   crmPartageValeur,
+  prospectionMode,
   errors,
 }: {
   index: number;
@@ -740,6 +745,7 @@ function VehicleForm({
   categoriesTransport: ReferenceOption[];
   crmPartage: boolean;
   crmPartageValeur: string;
+  prospectionMode: boolean;
   errors: Record<string, string>;
 }) {
   const usage = usages.find((item) => item.id === vehicule.usageId);
@@ -922,9 +928,11 @@ function VehicleForm({
             </Select>
           </Field>
         ) : null}
-        <Field label="N° attestation">
-          <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
-        </Field>
+        {!prospectionMode ? (
+          <Field label="N° attestation">
+            <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
+          </Field>
+        ) : null}
         <Field label="Nombre de places">
           <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
@@ -980,12 +988,14 @@ function RemorqueForm({
   setRemorques,
   usages,
   marques,
+  prospectionMode,
 }: {
   index: number;
   remorque: RemorqueInput;
   setRemorques: Dispatch<SetStateAction<RemorqueInput[]>>;
   usages: ReferenceOption[];
   marques: ReferenceOption[];
+  prospectionMode: boolean;
 }) {
   const update = (patch: Partial<RemorqueInput>) => {
     setRemorques((current) => current.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
@@ -1038,9 +1048,11 @@ function RemorqueForm({
         <Field label="CRM">
           <Input className="text-right" value={remorque.crm ?? ""} onChange={(event) => update({ crm: event.target.value })} />
         </Field>
-        <Field label="N° attestation">
-          <Input value={remorque.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
-        </Field>
+        {!prospectionMode ? (
+          <Field label="N° attestation">
+            <Input value={remorque.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
+          </Field>
+        ) : null}
         <Field label="Valeur assurée">
           <Input className="text-right" type="number" value={remorque.valeurAssuree ?? ""} onChange={(event) => update({ valeurAssuree: numberValue(event.target.value) })} />
         </Field>

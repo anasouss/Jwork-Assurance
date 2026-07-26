@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Building2, Car, FilePlus2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,12 @@ import type { TypeContrat } from "../types";
 
 export default function ContratCreationPage() {
   const navigate = useNavigate();
-  const [assurance, setAssurance] = useState("");
-  const [typeContrat, setTypeContrat] = useState<TypeContrat | "">("");
+  const location = useLocation();
+  const prospectionMode = location.pathname.includes("/prospection");
+  const [assurance, setAssurance] = useState(prospectionMode ? "automobile" : "");
+  const [typeContrat, setTypeContrat] = useState<TypeContrat | "">(prospectionMode ? "FLOTTE" : "");
   const [categorieClientId, setCategorieClientId] = useState("");
-  const form = useContratCreationForm((typeContrat || "PARTICULIER") as TypeContrat);
+  const form = useContratCreationForm((typeContrat || "PARTICULIER") as TypeContrat, undefined, { prospectionMode });
   const categoriesClient = form.refs.categoriesClient.data ?? [];
   const categoriesClientBlocked = typeContrat === "PARTICULIER" && !form.refs.categoriesClient.isLoading && !form.refs.categoriesClient.isError && categoriesClient.length === 0;
 
@@ -65,6 +67,10 @@ export default function ContratCreationPage() {
   const createDraftMutation = useMutation({
     mutationFn: productionApi.createContratDraft,
     onSuccess: (draft) => {
+      if (prospectionMode) {
+        navigate(`/app/production/prospection/devis/flotte/${draft.id}`);
+        return;
+      }
       if (typeContrat === "PARTICULIER") {
         navigate(`/app/production/ajouter-dossier/particulier/${draft.id}?categorieClientId=${encodeURIComponent(categorieClientId)}`);
         return;
@@ -85,6 +91,7 @@ export default function ContratCreationPage() {
     }
     createDraftMutation.mutate({
       ...form.request,
+      prospection: prospectionMode,
       typeContrat,
       compagnieAssuranceId: form.compagnieAssuranceId || undefined,
       conventionId: typeContrat === "CONVENTION" ? form.conventionId || undefined : undefined,
@@ -104,20 +111,20 @@ export default function ContratCreationPage() {
     <div className="mx-auto grid w-full max-w-5xl gap-6">
       <div>
         <div className="text-sm font-medium text-emerald-700">Production</div>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight">Ajouter un dossier</h1>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight">{prospectionMode ? "Ajouter devis" : "Ajouter un dossier"}</h1>
       </div>
 
       <Card className="overflow-hidden border-border/70 shadow-none">
         <CardHeader className="bg-emerald-600 text-white">
           <CardTitle className="flex items-center justify-center gap-2 text-base uppercase">
             <FilePlus2 className="size-4" />
-            Ajouter un dossier
+            {prospectionMode ? "Ajouter devis" : "Ajouter un dossier"}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-5 p-6">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Assurance">
-              <Select value={assurance} onValueChange={(value) => {
+              <Select disabled={prospectionMode} value={assurance} onValueChange={(value) => {
                 setAssurance(value);
                 setTypeContrat("");
               }}>
@@ -131,7 +138,7 @@ export default function ContratCreationPage() {
 
             {assurance === "automobile" ? (
               <Field label="Type du dossier">
-                <Select value={typeContrat} onValueChange={(value) => {
+                <Select disabled={prospectionMode} value={typeContrat} onValueChange={(value) => {
                   setTypeContrat(value as TypeContrat);
                   setCategorieClientId("");
                   form.setCompagnieAssuranceId("");
@@ -140,15 +147,19 @@ export default function ContratCreationPage() {
                 }}>
                   <SelectTrigger><SelectValue placeholder="Choisir une option" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PARTICULIER">
-                      <span className="inline-flex items-center gap-2"><Car className="size-4" /> Particulier</span>
-                    </SelectItem>
                     <SelectItem value="FLOTTE">
                       <span className="inline-flex items-center gap-2"><Users className="size-4" /> Flotte entreprise</span>
                     </SelectItem>
-                    <SelectItem value="CONVENTION">
-                      <span className="inline-flex items-center gap-2"><Building2 className="size-4" /> Convention</span>
-                    </SelectItem>
+                    {!prospectionMode ? (
+                      <>
+                        <SelectItem value="PARTICULIER">
+                          <span className="inline-flex items-center gap-2"><Car className="size-4" /> Particulier</span>
+                        </SelectItem>
+                        <SelectItem value="CONVENTION">
+                          <span className="inline-flex items-center gap-2"><Building2 className="size-4" /> Convention</span>
+                        </SelectItem>
+                      </>
+                    ) : null}
                   </SelectContent>
                 </Select>
               </Field>

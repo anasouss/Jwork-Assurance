@@ -394,6 +394,10 @@ public class ContratService {
     }
 
     private void applyDraftScalars(Contrat contrat, CreateContratRequest request) {
+        if (hasText(request.getNumeroContrat())
+                && contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(request.getAgenceId(), request.getNumeroContrat(), contrat.getId())) {
+            throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
+        }
         CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
                 compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                         .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));

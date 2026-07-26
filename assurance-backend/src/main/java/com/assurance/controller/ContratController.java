@@ -74,6 +74,24 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(contratService.updateDraft(TenantContext.getCurrentAgence(), id, request), "Brouillon enregistre"));
     }
 
+    @PutMapping("/drafts/{id}/vehicules/{index}")
+    public ResponseEntity<ApiResponse<ContratResponse>> saveDraftVehicule(
+            @PathVariable Long id,
+            @PathVariable Integer index,
+            @RequestBody CreateContratRequest.VehiculeInput request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(contratService.saveDraftVehicule(TenantContext.getCurrentAgence(), id, index, request), "Vehicule enregistre"));
+    }
+
+    @PutMapping("/drafts/{id}/vehicules/{index}/garanties")
+    public ResponseEntity<ApiResponse<ContratResponse>> saveDraftVehiculeGaranties(
+            @PathVariable Long id,
+            @PathVariable Integer index,
+            @RequestBody(required = false) List<CreateContratRequest.GarantieInput> request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(contratService.saveDraftVehiculeGaranties(TenantContext.getCurrentAgence(), id, index, request), "Garanties vehicule enregistrees"));
+    }
+
     @PostMapping("/drafts/{id}/finaliser")
     public ResponseEntity<ApiResponse<ContratResponse>> finalizeDraft(@PathVariable Long id, @Valid @RequestBody CreateContratRequest request) {
         return ResponseEntity.ok(ApiResponse.success(contratService.finalizeDraft(TenantContext.getCurrentAgence(), id, request), "Contrat cree"));

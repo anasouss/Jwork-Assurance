@@ -81,8 +81,10 @@ type Props = {
   preview?: QuittancePreview | null;
   previewing?: boolean;
   saving?: boolean;
-  onPreviewQuittance?: () => void;
+  onPreviewQuittance?: (target?: Target) => void;
   onSaveDraft?: (label: string, onSuccess?: () => void) => void;
+  onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
+  onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
   assistanceCategorieClientId?: string;
   crmPartage?: boolean;
@@ -116,6 +118,8 @@ export function FlotteTargetsSection({
   saving = false,
   onPreviewQuittance,
   onSaveDraft,
+  onSaveTargetDraft,
+  onValidateTarget,
   setAssistanceEnabled,
   assistanceCategorieClientId,
   crmPartage = false,
@@ -264,17 +268,24 @@ export function FlotteTargetsSection({
   };
 
   const saveTargetSection = (target: Target, part: "info" | "garanties", label: string, onSaved?: () => void) => {
+    if (onValidateTarget && !onValidateTarget(target, part)) {
+      return false;
+    }
     const key = `${targetKey(target)}:${part}`;
     const markSaved = () => {
       setSavedKeys((current) => (current.includes(key) ? current : [...current, key]));
       onSaved?.();
     };
+    if (onSaveTargetDraft) {
+      return onSaveTargetDraft(target, part, label, markSaved);
+    }
     if (onSaveDraft) {
       onSaveDraft(label, markSaved);
-      return;
+      return true;
     }
     markSaved();
     toast.success(`${label} enregistré`);
+    return true;
   };
 
   return (
@@ -353,7 +364,7 @@ export function FlotteTargetsSection({
                   saving={saving}
                   onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => {
                     setActiveTargetPart("garanties");
-                    onPreviewQuittance?.();
+                    onPreviewQuittance?.(activeVehiculeTarget);
                   })}
                 >
                   Enregistrer informations
@@ -369,8 +380,9 @@ export function FlotteTargetsSection({
                     type="button"
                     disabled={previewing || saving}
                     onClick={() => {
-                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
-                      onPreviewQuittance?.();
+                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule", () => {
+                        onPreviewQuittance?.(activeVehiculeTarget);
+                      });
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
@@ -491,8 +503,9 @@ export function FlotteTargetsSection({
                     type="button"
                     disabled={previewing || saving}
                     onClick={() => {
-                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
-                      onPreviewQuittance?.();
+                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque", () => {
+                        onPreviewQuittance?.(activeRemorqueTarget);
+                      });
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}

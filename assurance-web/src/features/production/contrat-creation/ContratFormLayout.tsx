@@ -199,9 +199,11 @@ export function ContratFormLayout({
       grilleSelected={Boolean(form.grilleTarifaireId)}
       preview={form.preview}
       previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
-      saving={form.saveDraftMutation.isPending}
-      onPreviewQuittance={form.handlePreview}
+      saving={form.saveDraftMutation.isPending || form.saveTargetDraftMutation.isPending}
+      onPreviewQuittance={form.handlePreviewTarget}
       onSaveDraft={form.handleSaveDraft}
+      onSaveTargetDraft={form.handleSaveTargetDraft}
+      onValidateTarget={form.validateTarget}
       setAssistanceEnabled={form.setAssistanceEnabled}
       assistanceCategorieClientId={assistanceCategorieClientId}
       crmPartage={form.crmPartage}

@@ -310,6 +310,7 @@ export type ClientResponse = ClientInput["client"] & {
 };
 
 export type VehiculeInput = {
+  vehiculeId?: string | number;
   typeVehicule: "AUTOMOBILE" | "CAMION" | "MOTO" | "BUS" | "TRACTEUR" | "AUTRE";
   usageId?: string;
   marqueId?: string;

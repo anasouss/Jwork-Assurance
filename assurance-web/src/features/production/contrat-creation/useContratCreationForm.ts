@@ -25,6 +25,7 @@ import type {
 
 export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille";
 export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorque" | "flotteTargets" | "garanties" | "quittances";
+export type ContratTargetKey = { kind: "vehicule" | "remorque"; index: number };
 
 export function useContratCreationForm(typeContrat: TypeContrat, draftId?: string, options?: { prospectionMode?: boolean }) {
   const { user } = useAuthStore();
@@ -381,6 +382,33 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
 
+  const saveTargetDraftMutation = useMutation({
+    mutationFn: ({ target, part }: { target: ContratTargetKey; part: "info" | "garanties" }) => {
+      if (!draftId) {
+        throw new Error("Brouillon introuvable pour enregistrer cette section");
+      }
+      if (target.kind !== "vehicule") {
+        return productionApi.updateContratDraft(draftId, request);
+      }
+      if (part === "info") {
+        return productionApi.saveDraftVehicule(draftId, target.index, request.vehicules[target.index]);
+      }
+      return productionApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
+    },
+    onSuccess: async (draft, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
+      if (variables.target.kind === "vehicule") {
+        const saved = draft.vehicules?.[variables.target.index];
+        if (saved?.vehiculeId != null) {
+          setVehicules((current) => current.map((vehicule, index) => (
+            index === variables.target.index ? { ...vehicule, vehiculeId: saved.vehiculeId } : vehicule
+          )));
+        }
+      }
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
+  });
+
   const validate = () => {
     const nextErrors: Record<string, string> = {};
     const result = contratSchema.safeParse(options?.prospectionMode && typeContrat === "FLOTTE"
@@ -465,6 +493,13 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     if (validate()) {
       previewMutation.mutate(request);
     }
+  };
+
+  const handlePreviewTarget = (target: ContratTargetKey) => {
+    if (!validateTarget(target, "garanties")) {
+      return;
+    }
+    previewMutation.mutate(scopedTargetRequest(request, target));
   };
 
   const handleCreate = () => {
@@ -632,6 +667,68 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     });
   };
 
+  const validateTarget = (target: ContratTargetKey, part: "info" | "garanties" = "info") => {
+    const nextErrors: Record<string, string> = {};
+    const today = dateOnly(new Date());
+    const requireField = (key: string, value: unknown, message: string) => {
+      if (value == null || (typeof value === "string" && value.trim() === "")) {
+        nextErrors[key] = message;
+      }
+    };
+    if (target.kind === "vehicule") {
+      const vehicule = request.vehicules[target.index];
+      if (!vehicule) {
+        nextErrors[`vehicules.${target.index}.immatriculation`] = "Véhicule introuvable.";
+      } else {
+        const vehiculeUsageId = vehicule.usageId || contractUsageFallback;
+        const vehiculeUsage = refs.usages.data?.find((usage) => usage.id === vehiculeUsageId);
+        requireField(`vehicules.${target.index}.typeVehicule`, vehicule.typeVehicule, "Type véhicule obligatoire.");
+        requireField(`vehicules.${target.index}.usageId`, vehiculeUsageId, "Usage véhicule obligatoire.");
+        requireField(`vehicules.${target.index}.immatriculation`, vehicule.immatriculation, "Immatriculation obligatoire.");
+        requireField(`vehicules.${target.index}.marqueId`, vehicule.marqueId || vehicule.marqueLibelle, "Marque obligatoire.");
+        requireField(`vehicules.${target.index}.carrosserieId`, vehicule.carrosserieId || vehicule.carrosserieLibelle, "Carrosserie obligatoire.");
+        if (vehiculeUsage?.byCarburantAndPf) {
+          requireField(`vehicules.${target.index}.carburant`, vehicule.carburant, "Carburant obligatoire.");
+          requireField(`vehicules.${target.index}.puissanceFiscale`, vehicule.puissanceFiscale, "Puissance fiscale obligatoire.");
+        }
+        if (vehiculeUsage?.bySousClasse) {
+          requireField(`vehicules.${target.index}.sousClasse`, vehicule.sousClasse, "Sous-classe obligatoire.");
+        }
+        if (vehiculeUsage?.byPtc) {
+          requireField(`vehicules.${target.index}.ptc`, vehicule.ptc, "PTC obligatoire.");
+        }
+        if (vehiculeUsage?.byCategorieTransport) {
+          requireField(`vehicules.${target.index}.categorieTransportId`, vehicule.categorieTransportId, "Catégorie transport obligatoire.");
+        }
+        requireField(`vehicules.${target.index}.crm`, vehicule.crm, "CRM obligatoire.");
+        requireField(`vehicules.${target.index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");
+        if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
+          nextErrors[`vehicules.${target.index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
+        }
+        const valeurVenaleError = validateValeurVenale(vehicule);
+        if (valeurVenaleError) {
+          nextErrors[`vehicules.${target.index}.valeurVenale`] = valeurVenaleError;
+        }
+      }
+    } else {
+      const remorque = request.remorques[target.index];
+      if (!remorque) {
+        nextErrors[`remorques.${target.index}.usageId`] = "Remorque introuvable.";
+      } else {
+        requireField(`remorques.${target.index}.usageId`, remorque.usageId, "Usage remorque obligatoire.");
+      }
+    }
+    if (part === "garanties" && targetGaranties(request.garanties, target).length === 0) {
+      nextErrors.garanties = "Au moins une garantie est obligatoire.";
+    }
+    setValidationErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      toast.error(Object.values(nextErrors)[0] ?? "Section incomplète");
+      return false;
+    }
+    return true;
+  };
+
   const handleSaveDraft = (label: string, onSuccess?: () => void) => {
     saveDraftMutation.mutate(request, {
       onSuccess: () => {
@@ -639,6 +736,22 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         toast.success(`${label} enregistré`);
       },
     });
+  };
+
+  const handleSaveTargetDraft = (target: ContratTargetKey, part: "info" | "garanties", label: string, onSuccess?: () => void) => {
+    if (!validateTarget(target, part)) {
+      return false;
+    }
+    saveTargetDraftMutation.mutate(
+      { target, part },
+      {
+        onSuccess: () => {
+          onSuccess?.();
+          toast.success(`${label} enregistré`);
+        },
+      }
+    );
+    return true;
   };
 
   const saveGrilleSelection = (value: string) => {
@@ -662,6 +775,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   };
 
   useEffect(() => {
+    if (typeContrat === "FLOTTE") {
+      return;
+    }
     if (!canAutoPreview(typeContrat, request)) {
       setPreview(null);
       return;
@@ -756,11 +872,15 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     autoPreviewMutation,
     createMutation,
     saveDraftMutation,
+    saveTargetDraftMutation,
     handlePreview,
+    handlePreviewTarget,
     handleCreate,
     handleSaveSection,
     handleSaveDraft,
+    handleSaveTargetDraft,
     validateSection,
+    validateTarget,
     savedSections,
     availableUsages,
     numeroContrat,
@@ -974,6 +1094,21 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
   return request.garanties.length > 0;
 }
 
+function scopedTargetRequest(request: CreateContratRequest, target: ContratTargetKey): CreateContratRequest {
+  return {
+    ...request,
+    garanties: targetGaranties(request.garanties, target),
+  };
+}
+
+function targetGaranties(garanties: GarantieInput[], target: ContratTargetKey) {
+  return garanties.filter((garantie) => (
+    target.kind === "vehicule"
+      ? garantie.vehiculeIndex === target.index
+      : garantie.remorqueIndex === target.index
+  ));
+}
+
 function sectionLabel(section: SavableContratSectionKey) {
   switch (section) {
     case "souscripteur":
@@ -1024,6 +1159,7 @@ function hydrateDraft(draft: ContratSummary) {
   const vehicules = (draft.vehicules ?? []).length > 0
     ? (draft.vehicules ?? []).map((vehicule) => ({
         ...emptyVehicule(),
+        vehiculeId: vehicule.vehiculeId,
         typeVehicule: asVehiculeType(vehicule.typeVehicule),
         usageId: nullToUndefined(vehicule.usageId),
         marqueId: nullToUndefined(vehicule.marqueId),

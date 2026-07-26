@@ -264,6 +264,24 @@ export const productionApi = {
     );
   },
 
+  async saveDraftVehicule(id: string, index: number, vehicule: CreateContratRequest["vehicules"][number]) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}/vehicules/${index}`, {
+        method: "PUT",
+        body: JSON.stringify(vehicule),
+      })
+    );
+  },
+
+  async saveDraftVehiculeGaranties(id: string, index: number, garanties: CreateContratRequest["garanties"]) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}/vehicules/${index}/garanties`, {
+        method: "PUT",
+        body: JSON.stringify(garanties),
+      })
+    );
+  },
+
   async finalizeContratDraft(id: string, request: CreateContratRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}/finaliser`, {

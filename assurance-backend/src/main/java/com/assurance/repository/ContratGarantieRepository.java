@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ContratGarantieRepository extends JpaRepository<ContratGarantie, Long> {
     void deleteByContratId(Long contratId);
+
+    void deleteByContratIdAndVehiculeId(Long contratId, Long vehiculeId);
 }

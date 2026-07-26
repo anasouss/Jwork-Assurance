@@ -111,8 +111,8 @@ export default function CompaniesPage() {
 
         <div className="overflow-x-auto rounded-md border">
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
+              <TableRow className="hover:bg-amber-600">
                 <TableHead>Code</TableHead>
                 <TableHead>Compagnie</TableHead>
                 <TableHead className="text-right">Ordre</TableHead>

@@ -252,8 +252,8 @@ export function UsagesSettingsPage() {
         <CardContent>
           <div className="overflow-x-auto rounded-md border">
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
+                <TableRow className="hover:bg-emerald-700">
                   <TableHead>Code</TableHead>
                   <TableHead>Libellé</TableHead>
                   <TableHead>Critère</TableHead>
@@ -508,8 +508,8 @@ export function GarantiesSettingsPage() {
         <CardContent>
           <div className="overflow-x-auto rounded-md border">
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
+                <TableRow className="hover:bg-emerald-700">
                   <TableHead>Ordre</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Libellé</TableHead>
@@ -1018,8 +1018,8 @@ function ReferenceTable({
       <CardContent>
         <div className="overflow-x-auto rounded-md border">
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
+              <TableRow className="hover:bg-emerald-700">
                 {columns.map((column) => <TableHead key={column}>{column}</TableHead>)}
                 <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>

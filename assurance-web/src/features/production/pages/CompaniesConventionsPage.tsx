@@ -189,8 +189,8 @@ export default function CompaniesConventionsPage() {
 
         <div className="overflow-x-auto rounded-md border">
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
+              <TableRow className="hover:bg-amber-600">
                 <TableHead>Code</TableHead>
                 <TableHead>Convention</TableHead>
                 <TableHead>Compagnie</TableHead>

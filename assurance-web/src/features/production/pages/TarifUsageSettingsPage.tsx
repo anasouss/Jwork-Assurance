@@ -315,8 +315,8 @@ export default function TarifUsageSettingsPage() {
         <CardContent>
           <div className="overflow-x-auto rounded-md border">
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
+                <TableRow className="hover:bg-emerald-700">
                   <TableHead className="w-10" />
                   <TableHead>Usage</TableHead>
                   <TableHead>Catégorie</TableHead>

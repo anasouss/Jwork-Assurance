@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
+import { MoneyInput } from "./MoneyInput";
 import { numberValue, text, toNumber } from "../utils/format";
 import type {
   ReferenceOption,
@@ -346,21 +347,21 @@ export function GrilleTarifaireConfigurator({
                       />
                     </TableCell>
                     <TableCell>
-                      <NumberCell
+                      <MoneyCell
                         disabled={!enabled || !hasFranchiseMinimale(garantie)}
                         value={draft.franchiseMinimale}
                         onChange={(value) => updateDraft(draft.localKey, { franchiseMinimale: value })}
                       />
                     </TableCell>
                     <TableCell>
-                      <NumberCell
+                      <MoneyCell
                         disabled={!enabled || rowMode !== "CAPITAL"}
                         value={draft.capital}
                         onChange={(value) => updateDraft(draft.localKey, { capital: value })}
                       />
                     </TableCell>
                     <TableCell>
-                      <NumberCell
+                      <MoneyCell
                         disabled={!enabled || (rowMode !== "CAPITAL" && rowMode !== "PRIME_FIXE")}
                         value={draft.prime}
                         onChange={(value) => updateDraft(draft.localKey, { prime: value })}
@@ -479,28 +480,28 @@ function PersonnesLinesTable({
                     />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.montantDeces} onChange={(value) => updateDraft(draft.localKey, { montantDeces: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.montantDeces} onChange={(value) => updateDraft(draft.localKey, { montantDeces: value })} />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.montantInvalidite} onChange={(value) => updateDraft(draft.localKey, { montantInvalidite: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.montantInvalidite} onChange={(value) => updateDraft(draft.localKey, { montantInvalidite: value })} />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.montantFraisMedicaux} onChange={(value) => updateDraft(draft.localKey, { montantFraisMedicaux: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.montantFraisMedicaux} onChange={(value) => updateDraft(draft.localKey, { montantFraisMedicaux: value })} />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.montantFraisHospitalisation} onChange={(value) => updateDraft(draft.localKey, { montantFraisHospitalisation: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.montantFraisHospitalisation} onChange={(value) => updateDraft(draft.localKey, { montantFraisHospitalisation: value })} />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.montantFraisFuneraires} onChange={(value) => updateDraft(draft.localKey, { montantFraisFuneraires: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.montantFraisFuneraires} onChange={(value) => updateDraft(draft.localKey, { montantFraisFuneraires: value })} />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.montantFraisChirurgie} onChange={(value) => updateDraft(draft.localKey, { montantFraisChirurgie: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.montantFraisChirurgie} onChange={(value) => updateDraft(draft.localKey, { montantFraisChirurgie: value })} />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.primeNette} onChange={(value) => updateDraft(draft.localKey, { primeNette: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.primeNette} onChange={(value) => updateDraft(draft.localKey, { primeNette: value })} />
                   </TableCell>
                   <TableCell>
-                    <NumberCell disabled={!groupEnabled} value={draft.accessoire} onChange={(value) => updateDraft(draft.localKey, { accessoire: value })} />
+                    <MoneyCell disabled={!groupEnabled} value={draft.accessoire} onChange={(value) => updateDraft(draft.localKey, { accessoire: value })} />
                   </TableCell>
                   <TableCell className="text-right">
                     {index === 0 && canAddMultipleRows(garantie) ? (
@@ -607,6 +608,25 @@ function NumberCell({
         onChange(parsedValue);
       }}
       onChange={(event) => handleChange(event.target.value)}
+    />
+  );
+}
+
+function MoneyCell({
+  value,
+  disabled,
+  onChange,
+}: {
+  value?: number;
+  disabled: boolean;
+  onChange: (value?: number) => void;
+}) {
+  return (
+    <MoneyInput
+      className="h-9 min-w-28 text-right"
+      disabled={disabled}
+      value={value}
+      onValueChange={onChange}
     />
   );
 }

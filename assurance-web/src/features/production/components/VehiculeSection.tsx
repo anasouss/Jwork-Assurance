@@ -6,9 +6,9 @@ import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
+import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
-import { numberValue } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { ReferenceOption, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
@@ -192,7 +192,7 @@ export function VehiculeSection({
                 <Field label="Date mise en circulation">
                   <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toDateOnly(date) })} />
                 </Field>
-                <Field label="Date validité CG" required error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
+                <Field label="Date validité CG" error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
                   <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toDateOnly(date) })} />
                 </Field>
                 {showAttestation ? (
@@ -201,13 +201,13 @@ export function VehiculeSection({
                   </Field>
                 ) : null}
                 <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
-                  <Input type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update(index, { valeurNeuf: numberValue(event.target.value) })} />
+                  <MoneyInput value={vehicule.valeurNeuf} onValueChange={(value) => update(index, { valeurNeuf: value })} />
                 </Field>
                 <Field label="Valeur vénale" error={errors[`vehicules.${index}.valeurVenale`] ?? validateValeurVenale(vehicule)}>
-                  <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update(index, { valeurVenale: numberValue(event.target.value) })} />
+                  <MoneyInput value={vehicule.valeurVenale} onValueChange={(value) => update(index, { valeurVenale: value })} />
                 </Field>
                 <Field label="Valeur glace">
-                  <Input type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update(index, { valeurGlace: numberValue(event.target.value) })} />
+                  <MoneyInput value={vehicule.valeurGlace} onValueChange={(value) => update(index, { valeurGlace: value })} />
                 </Field>
                 <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
                   <Input value={vehicule.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />
@@ -238,7 +238,7 @@ export function VehiculeSection({
                     <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update(index, { nomOrganismeCredit: event.target.value })} />
                   </Field>
                   <Field label="Montant de crédit">
-                    <Input type="number" value={vehicule.montantCredit ?? ""} onChange={(event) => update(index, { montantCredit: numberValue(event.target.value) })} />
+                    <MoneyInput value={vehicule.montantCredit} onValueChange={(value) => update(index, { montantCredit: value })} />
                   </Field>
                   <Field label="Date fin crédit">
                     <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update(index, { dateFinCredit: toDateOnly(date) })} />

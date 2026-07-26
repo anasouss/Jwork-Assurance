@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
+import { MoneyInput } from "./MoneyInput";
 import { numberValue, toNumber } from "../utils/format";
 import type { ReferenceOption, UpsertLigneGrilleTarifaireRequest } from "../types";
 
@@ -158,18 +159,18 @@ export function LigneGrilleTarifaireDialog({
             {mode === "TAUX" ? (
               <div className="grid gap-3 md:grid-cols-3">
                 <NumberField label="Taux (%)" value={payload.taux} onChange={(value) => update({ taux: value })} />
-                <NumberField label="Franchise min." value={payload.franchiseMinimale} onChange={(value) => update({ franchiseMinimale: value })} />
+                <MoneyField label="Franchise min." value={payload.franchiseMinimale} onChange={(value) => update({ franchiseMinimale: value })} />
                 <NumberField label="Taux franchise (%)" value={payload.tauxFranchise} onChange={(value) => update({ tauxFranchise: value })} />
               </div>
             ) : mode === "CAPITAL" ? (
               <div className="grid gap-3 md:grid-cols-3">
-                <NumberField label="Capital assuré" value={payload.capital} onChange={(value) => update({ capital: value })} />
-                <NumberField label="Prime nette" value={payload.prime} onChange={(value) => update({ prime: value })} />
+                <MoneyField label="Capital assuré" value={payload.capital} onChange={(value) => update({ capital: value })} />
+                <MoneyField label="Prime nette" value={payload.prime} onChange={(value) => update({ prime: value })} />
                 <NumberField label="Ordre" value={payload.ordreAffichage} onChange={(value) => update({ ordreAffichage: value })} />
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-3">
-                <NumberField label="Prime nette" value={payload.prime} onChange={(value) => update({ prime: value })} />
+                <MoneyField label="Prime nette" value={payload.prime} onChange={(value) => update({ prime: value })} />
                 <NumberField label="Ordre" value={payload.ordreAffichage} onChange={(value) => update({ ordreAffichage: value })} />
               </div>
             )}
@@ -214,6 +215,22 @@ function NumberField({
   return (
     <Field label={label}>
       <Input type="number" value={value ?? ""} onChange={(event) => onChange(numberValue(event.target.value))} />
+    </Field>
+  );
+}
+
+function MoneyField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value?: number;
+  onChange: (value?: number) => void;
+}) {
+  return (
+    <Field label={label}>
+      <MoneyInput value={value} onValueChange={onChange} />
     </Field>
   );
 }

@@ -615,6 +615,21 @@ export type QuittancePreview = {
     tauxFranchise?: number;
     franchiseMinimale?: number;
   }[];
+  targetSummaries?: {
+    kind?: string;
+    vehiculeIndex?: number;
+    remorqueIndex?: number;
+    primeNette?: number;
+    primeNetteHorsEvcat?: number;
+    automobilePrimeNette?: number;
+    corporelPrimeNette?: number;
+    evcatPrimeNette?: number;
+    taxe?: number;
+    taxeParafiscale?: number;
+    accessoire?: number;
+    cnpac?: number;
+    primeTotale?: number;
+  }[];
 };
 
 export type UpsertGrilleTarifaireRequest = {

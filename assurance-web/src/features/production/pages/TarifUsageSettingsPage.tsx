@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { productionApi } from "../api";
 import { bulkTarifUsageSchema, tarifUsageSchema } from "../schemas";
 import { Field } from "../components/Field";
+import { MoneyInput } from "../components/MoneyInput";
 import { money, numberValue, range, text, toNumber } from "../utils/format";
 import type { BulkUpdateTarifUsageRequest, ReferenceOption, UpsertTarifUsageRequest } from "../types";
 
@@ -221,8 +222,8 @@ export default function TarifUsageSettingsPage() {
                 </Select>
               </Field>
             ) : null}
-            <NumberField label="Prime nette" required value={payload.primeNette} onChange={(value) => update({ primeNette: value })} />
-            <NumberField label="Prime par place" value={payload.primeParPlace} onChange={(value) => update({ primeParPlace: value })} />
+            <MoneyField label="Prime nette" required value={payload.primeNette} onChange={(value) => update({ primeNette: value })} />
+            <MoneyField label="Prime par place" value={payload.primeParPlace} onChange={(value) => update({ primeParPlace: value })} />
             <Flag label="Actif" checked={payload.actif} onChange={(value) => update({ actif: value })} />
             <div className="flex items-end gap-2">
               <Button disabled={save.isPending} onClick={() => saveTarif(editing, payload, save.mutate)}>
@@ -389,6 +390,14 @@ function NumberField({ label, value, onChange, required }: { label: string; valu
   return (
     <Field label={label} required={required}>
       <Input type="number" value={value ?? ""} onChange={(event) => onChange(numberValue(event.target.value))} />
+    </Field>
+  );
+}
+
+function MoneyField({ label, value, onChange, required }: { label: string; value?: number; onChange: (value?: number) => void; required?: boolean }) {
+  return (
+    <Field label={label} required={required}>
+      <MoneyInput value={value} onValueChange={onChange} />
     </Field>
   );
 }

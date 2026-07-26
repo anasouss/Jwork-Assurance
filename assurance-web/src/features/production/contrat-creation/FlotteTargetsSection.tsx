@@ -12,11 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Field } from "../components/Field";
+import { MoneyInput } from "../components/MoneyInput";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { productionApi } from "../api";
 import { computeDateEcheanceFromCode, toDateOnly } from "../date";
-import { formatMoney, money, moneyAmount, numberValue, toNumber } from "../utils/format";
+import { formatMoney, money, moneyAmount, numberOrZero, numberValue, roundMoney, toNumber } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput, VehiculeResponse } from "../types";
 import type { ContratSectionKey } from "./useContratCreationForm";
@@ -42,6 +43,16 @@ type AssistanceDraft = {
   echeanceCode?: string;
   dateEcheance?: string;
   numeroContratOuQuittance?: string;
+};
+
+type TargetQuittanceSummary = {
+  totalNet?: number;
+  evcat?: number;
+  pta?: number;
+  accessoire?: number;
+  taxe?: number;
+  cnpac?: number;
+  totalAPayer?: number;
 };
 
 type LookupStatus = "idle" | "loading" | "found" | "new" | "error";
@@ -388,9 +399,11 @@ export function FlotteTargetsSection({
                 />
                 <QuittanceTotalsSummary
                   preview={preview}
+                  target={activeVehiculeTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeVehiculeTarget)}
-                  showAssistanceTotal={Boolean(assistances[targetKey(activeVehiculeTarget)]?.enabled || linePrimeNette(preview, "ASSISTANCE"))}
+                  showAssistanceTotal={Boolean(assistances[targetKey(activeVehiculeTarget)]?.enabled)}
+                  assistanceNet={targetAssistanceNet(assistances[targetKey(activeVehiculeTarget)], produitsAssistance)}
                 />
               </TargetSubsection>
             </div>
@@ -508,9 +521,11 @@ export function FlotteTargetsSection({
                 />
                 <QuittanceTotalsSummary
                   preview={preview}
+                  target={activeRemorqueTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeRemorqueTarget)}
-                  showAssistanceTotal={Boolean(assistances[targetKey(activeRemorqueTarget)]?.enabled || linePrimeNette(preview, "ASSISTANCE"))}
+                  showAssistanceTotal={Boolean(assistances[targetKey(activeRemorqueTarget)]?.enabled)}
+                  assistanceNet={targetAssistanceNet(assistances[targetKey(activeRemorqueTarget)], produitsAssistance)}
                 />
               </TargetSubsection>
             </div>
@@ -615,29 +630,29 @@ function TargetSubsection({
 
 function QuittanceTotalsSummary({
   preview,
+  target,
   loading,
   showPersonneTotals,
   showAssistanceTotal,
+  assistanceNet,
 }: {
   preview?: QuittancePreview | null;
+  target: Target;
   loading?: boolean;
   showPersonneTotals?: boolean;
   showAssistanceTotal?: boolean;
+  assistanceNet?: number;
 }) {
-  const evcatNet = linePrimeNette(preview, "EVCAT");
-  const pta = linePrimeNette(preview, "CORPOREL");
-  const assistanceNet = linePrimeNette(preview, "ASSISTANCE");
-  const totalNetWithoutEvcat = subtractOptional(preview?.primeNette, evcatNet);
-  const totalTax = addOptional(preview?.taxe, preview?.taxeParafiscale);
+  const scoped = targetQuittanceSummary(preview, target);
   const rows: [string, number | undefined][] = [
-    ["TOTAL NET", totalNetWithoutEvcat],
-    ["EVCAT", evcatNet],
-    ["TAXE", totalTax],
-    ["CNPAC", preview?.cnpac],
-    ["TOTAL À PAYER", preview?.primeTotale],
+    ["TOTAL NET", scoped.totalNet],
+    ["EVCAT", scoped.evcat],
+    ["TAXE", scoped.taxe],
+    ["CNPAC", scoped.cnpac],
+    ["TOTAL À PAYER", scoped.totalAPayer],
   ];
   if (showPersonneTotals) {
-    rows.splice(2, 0, ["PTA (Prime Personne)", pta], ["ACCESSOIRE", preview?.accessoire]);
+    rows.splice(2, 0, ["PTA (Prime Personne)", scoped.pta], ["ACCESSOIRE", scoped.accessoire]);
   }
   if (showAssistanceTotal) {
     rows.push(["ASSISTANCE", assistanceNet]);
@@ -657,8 +672,129 @@ function QuittanceTotalsSummary({
   );
 }
 
-function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
-  return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
+function targetQuittanceSummary(preview: QuittancePreview | null | undefined, target: Target): TargetQuittanceSummary {
+  if (!preview) {
+    return {};
+  }
+  const backendSummary = backendTargetSummary(preview, target);
+  if (backendSummary) {
+    return {
+      totalNet: backendSummary.primeNetteHorsEvcat,
+      evcat: backendSummary.evcatPrimeNette,
+      pta: backendSummary.corporelPrimeNette,
+      accessoire: backendSummary.accessoire,
+      taxe: addNumbers(backendSummary.taxe, backendSummary.taxeParafiscale),
+      cnpac: backendSummary.cnpac,
+      totalAPayer: backendSummary.primeTotale,
+    };
+  }
+  const autoLine = quittanceLine(preview, "AUTOMOBILE");
+  const corpLine = quittanceLine(preview, "CORPOREL");
+  const evcatLine = quittanceLine(preview, "EVCAT");
+  const targetLines = (preview.garanties ?? []).filter((line) => previewLineMatchesTarget(line, target));
+  const autoNet = roundMoney(sumPreviewLines(targetLines.filter((line) => !isPersonnePreviewLine(line))));
+  const pta = roundMoney(sumPreviewLines(targetLines.filter(isPersonnePreviewLine)));
+  const evcat = proportionalAmount(evcatLine?.primeNette, autoNet, autoLine?.primeNette);
+  const accessoire = proportionalAmount(corpLine?.accessoire, pta, corpLine?.primeNette);
+  const cnpac = targetHasRcPreviewLine(targetLines) ? targetCnpac(preview) : 0;
+  const taxe = roundMoney(
+    numberOrZero(proportionalAmount(lineTaxTotal(autoLine), autoNet, autoLine?.primeNette))
+      + numberOrZero(proportionalAmount(lineTaxTotal(corpLine), pta, corpLine?.primeNette))
+      + numberOrZero(proportionalAmount(lineTaxTotal(evcatLine), evcat, evcatLine?.primeNette))
+  );
+  const totalNet = roundMoney(autoNet + pta);
+  const totalAPayer = roundMoney(totalNet + numberOrZero(evcat) + taxe + cnpac + numberOrZero(accessoire));
+
+  return {
+    totalNet,
+    evcat,
+    pta,
+    accessoire,
+    taxe,
+    cnpac,
+    totalAPayer,
+  };
+}
+
+function backendTargetSummary(preview: QuittancePreview, target: Target) {
+  return preview.targetSummaries?.find((summary) => {
+    const kind = String(summary.kind ?? "").toUpperCase();
+    return target.kind === "vehicule"
+      ? kind === "VEHICULE" && summary.vehiculeIndex === target.index
+      : kind === "REMORQUE" && summary.remorqueIndex === target.index;
+  });
+}
+
+function addNumbers(left?: number, right?: number) {
+  if (left == null && right == null) {
+    return undefined;
+  }
+  return numberOrZero(left) + numberOrZero(right);
+}
+
+function quittanceLine(preview: QuittancePreview, categorie: string) {
+  return preview.lignes.find((ligne) => ligne.categorie === categorie);
+}
+
+function lineTaxTotal(line?: QuittancePreview["lignes"][number]) {
+  if (!line) {
+    return undefined;
+  }
+  return numberOrZero(line.taxe) + numberOrZero(line.taxeParafiscale);
+}
+
+function proportionalAmount(total: number | undefined, part: number | undefined, base: number | undefined) {
+  if (total == null) {
+    return undefined;
+  }
+  if (!part || !base) {
+    return 0;
+  }
+  return roundMoney(total * (part / base));
+}
+
+function sumPreviewLines(lines: NonNullable<QuittancePreview["garanties"]>) {
+  return lines.reduce((sum, line) => sum + numberOrZero(line.primeNette), 0);
+}
+
+function previewLineMatchesTarget(line: NonNullable<QuittancePreview["garanties"]>[number], target: Target) {
+  return target.kind === "vehicule"
+    ? line.vehiculeIndex === target.index
+    : line.remorqueIndex === target.index;
+}
+
+function isPersonnePreviewLine(line: NonNullable<QuittancePreview["garanties"]>[number]) {
+  const type = String(line.typeGarantie ?? "").toUpperCase();
+  const code = String(line.code ?? "").trim().toUpperCase();
+  return type === "PERSONNE" || code === "PP" || code === "PC" || code === "PTA";
+}
+
+function targetHasRcPreviewLine(lines: NonNullable<QuittancePreview["garanties"]>) {
+  return lines.some((line) => String(line.code ?? "").trim().toUpperCase() === "RC");
+}
+
+function targetCnpac(preview: QuittancePreview) {
+  const autoCnpac = numberOrZero(quittanceLine(preview, "AUTOMOBILE")?.cnpac);
+  const units = new Set<string>();
+  for (const line of preview.garanties ?? []) {
+    if (String(line.code ?? "").trim().toUpperCase() !== "RC") {
+      continue;
+    }
+    if (line.vehiculeIndex != null) {
+      units.add(`V:${line.vehiculeIndex}`);
+    } else if (line.remorqueIndex != null) {
+      units.add(`R:${line.remorqueIndex}`);
+    }
+  }
+  return units.size > 0 ? roundMoney(autoCnpac / units.size) : autoCnpac;
+}
+
+function targetAssistanceNet(assistance: AssistanceDraft | undefined, produitsAssistance: ReferenceOption[]) {
+  if (!assistance?.enabled || !assistance.produitAssistanceId) {
+    return undefined;
+  }
+  const product = produitsAssistance.find((item) => item.id === assistance.produitAssistanceId);
+  return numberValue(String(product?.montantHt ?? ""));
 }
 
 function previewGuaranteeLine(
@@ -687,20 +823,6 @@ function previewGuaranteeLine(
     }
     return true;
   });
-}
-
-function addOptional(left?: number, right?: number) {
-  if (left == null && right == null) {
-    return undefined;
-  }
-  return (left ?? 0) + (right ?? 0);
-}
-
-function subtractOptional(left?: number, right?: number) {
-  if (left == null) {
-    return undefined;
-  }
-  return left - (right ?? 0);
 }
 
 function CalculationValue({ value, loading, fallback = "Calcul auto" }: { value?: number; loading?: boolean; fallback?: string }) {
@@ -874,7 +996,7 @@ function VehicleForm({
         <Field label="Date mise en circulation">
           <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update({ datePremiereCirculation: toDateOnly(date) })} />
         </Field>
-        <Field label="Date validité CG" required error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
+        <Field label="Date validité CG" error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
           <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update({ dateExpirationCarteGrise: toDateOnly(date) })} />
         </Field>
         {needsCarburantAndPf ? (
@@ -937,13 +1059,13 @@ function VehicleForm({
           <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
         <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
-          <Input className="text-right" type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update({ valeurNeuf: numberValue(event.target.value) })} />
+          <MoneyInput className="text-right" value={vehicule.valeurNeuf} onValueChange={(value) => update({ valeurNeuf: value })} />
         </Field>
         <Field label="Valeur vénale" error={errors[`vehicules.${index}.valeurVenale`] ?? validateValeurVenale(vehicule)}>
-          <Input className="text-right" type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update({ valeurVenale: numberValue(event.target.value) })} />
+          <MoneyInput className="text-right" value={vehicule.valeurVenale} onValueChange={(value) => update({ valeurVenale: value })} />
         </Field>
         <Field label="Valeur glace">
-          <Input className="text-right" type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update({ valeurGlace: numberValue(event.target.value) })} />
+          <MoneyInput className="text-right" value={vehicule.valeurGlace} onValueChange={(value) => update({ valeurGlace: value })} />
         </Field>
         <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
           <Input
@@ -971,7 +1093,7 @@ function VehicleForm({
             <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update({ nomOrganismeCredit: event.target.value })} />
           </Field>
           <Field label="Montant de crédit">
-            <Input className="text-right" type="number" value={vehicule.montantCredit ?? ""} onChange={(event) => update({ montantCredit: numberValue(event.target.value) })} />
+            <MoneyInput className="text-right" value={vehicule.montantCredit} onValueChange={(value) => update({ montantCredit: value })} />
           </Field>
           <Field label="Date fin crédit">
             <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update({ dateFinCredit: toDateOnly(date) })} />
@@ -1054,7 +1176,7 @@ function RemorqueForm({
           </Field>
         ) : null}
         <Field label="Valeur assurée">
-          <Input className="text-right" type="number" value={remorque.valeurAssuree ?? ""} onChange={(event) => update({ valeurAssuree: numberValue(event.target.value) })} />
+          <MoneyInput className="text-right" value={remorque.valeurAssuree} onValueChange={(value) => update({ valeurAssuree: value })} />
         </Field>
       </div>
     </div>
@@ -1200,12 +1322,11 @@ function TargetGuaranteesTable({
                   </td>
                   <td className="px-3 py-2">
                     {manualValue ? (
-                      <Input
-                        type="number"
+                      <MoneyInput
                         disabled={!editable}
                         className={cn(controlClass(editable), "text-right")}
-                        value={item?.valeurAssuree ?? item?.capital ?? ""}
-                        onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
+                        value={item?.valeurAssuree ?? item?.capital}
+                        onValueChange={(value) => update(garantie.id, { valeurAssuree: value, capital: value })}
                       />
                     ) : lineOptions.length > 1 && lineMode(selectedLine) === "CAPITAL" ? (
                       <Select

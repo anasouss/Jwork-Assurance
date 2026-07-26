@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { MoneyInput } from "../components/MoneyInput";
 import { SectionCard } from "../components/SectionCard";
 import { numberValue } from "../utils/format";
 import type { GarantieInput, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
@@ -184,12 +185,11 @@ export function FlotteGarantieSection({
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <Input
-                          type="number"
+                        <MoneyInput
                           disabled={!editable}
                           className={controlClass(editable)}
-                          value={item?.valeurAssuree ?? item?.capital ?? ""}
-                          onChange={(event) => update(activeTarget, garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
+                          value={item?.valeurAssuree ?? item?.capital}
+                          onValueChange={(value) => update(activeTarget, garantie.id, { valeurAssuree: value, capital: value })}
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -199,7 +199,7 @@ export function FlotteGarantieSection({
                         <Input type="number" disabled={!editable || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(activeTarget, garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
                       </td>
                       <td className="px-3 py-2">
-                        <Input type="number" disabled={!editable || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale ?? ""} onChange={(event) => update(activeTarget, garantie.id, { franchiseMinimale: numberValue(event.target.value) })} />
+                        <MoneyInput disabled={!editable || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale} onValueChange={(value) => update(activeTarget, garantie.id, { franchiseMinimale: value })} />
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{checked ? "Calcul auto" : "-"}</td>
                     </tr>

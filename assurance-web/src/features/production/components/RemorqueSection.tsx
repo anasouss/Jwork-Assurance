@@ -4,9 +4,9 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
 import { Field } from "./Field";
+import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
-import { numberValue } from "../utils/format";
 import type { ReferenceOption, RemorqueInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -117,7 +117,7 @@ export function RemorqueSection({
                 <Input value={remorque.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
               </Field>
               <Field label="Valeur assurée">
-                <Input type="number" value={remorque.valeurAssuree ?? ""} onChange={(event) => update(index, { valeurAssuree: numberValue(event.target.value) })} />
+                <MoneyInput value={remorque.valeurAssuree} onValueChange={(value) => update(index, { valeurAssuree: value })} />
               </Field>
             </div>
           </div>

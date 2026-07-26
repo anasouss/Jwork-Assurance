@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { toDateOnly } from "../date";
 import { productionApi } from "../api";
 import { Field } from "../components/Field";
+import { MoneyInput } from "../components/MoneyInput";
 import type {
   ReferenceOption,
   UpsertProduitAssistanceRequest,
@@ -366,10 +367,10 @@ export default function AssistanceProductsSettingsPage() {
               <DatePicker date={tarifPayload.dateFin} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateFin: toDateOnly(date) }))} />
             </Field>
             <Field label="Montant HT" required>
-              <Input type="number" min={0} step="0.01" value={tarifPayload.montantHt || ""} onChange={(event) => setTarifPayload((current) => ({ ...current, montantHt: numberValue(event.target.value) }))} />
+              <MoneyInput value={tarifPayload.montantHt} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantHt: value }))} />
             </Field>
             <Field label="Montant TTC" required>
-              <Input type="number" min={0} step="0.01" value={tarifPayload.montantTtc || ""} onChange={(event) => setTarifPayload((current) => ({ ...current, montantTtc: numberValue(event.target.value) }))} />
+              <MoneyInput value={tarifPayload.montantTtc} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantTtc: value }))} />
             </Field>
             <div className="flex gap-2 md:col-span-4">
               <Button disabled={saveTarif.isPending || !tarifProduct} onClick={() => submitTarif(tarifProduct, editingTarif, tarifPayload, saveTarif.mutate)}>
@@ -595,7 +596,8 @@ function refArray(item: ReferenceOption | Record<string, unknown>, key: string) 
 }
 
 function numberValue(value: string) {
-  return value.trim() === "" ? 0 : Number(value);
+  const normalized = value.replace(/\s/g, "").replace(",", ".");
+  return normalized.trim() === "" ? 0 : Number(normalized);
 }
 
 function cleanOptional(value?: string) {

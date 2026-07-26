@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
-import { numberValue, toNumber } from "../utils/format";
+import { MoneyInput } from "./MoneyInput";
+import { toNumber } from "../utils/format";
 import type { ReferenceOption, UpsertFormuleGarantiePersonneRequest } from "../types";
 
 export function FormuleGarantiePersonneDialog({
@@ -87,28 +88,28 @@ export function FormuleGarantiePersonneDialog({
             <Input value={payload.formule ?? ""} onChange={(event) => update({ formule: event.target.value })} />
           </Field>
           <Field label="Décès">
-            <Input type="number" value={payload.montantDeces ?? ""} onChange={(event) => update({ montantDeces: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.montantDeces} onValueChange={(value) => update({ montantDeces: value })} />
           </Field>
           <Field label="Invalidité">
-            <Input type="number" value={payload.montantInvalidite ?? ""} onChange={(event) => update({ montantInvalidite: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.montantInvalidite} onValueChange={(value) => update({ montantInvalidite: value })} />
           </Field>
           <Field label="Frais médicaux">
-            <Input type="number" value={payload.montantFraisMedicaux ?? ""} onChange={(event) => update({ montantFraisMedicaux: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.montantFraisMedicaux} onValueChange={(value) => update({ montantFraisMedicaux: value })} />
           </Field>
           <Field label="Hospitalisation">
-            <Input type="number" value={payload.montantFraisHospitalisation ?? ""} onChange={(event) => update({ montantFraisHospitalisation: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.montantFraisHospitalisation} onValueChange={(value) => update({ montantFraisHospitalisation: value })} />
           </Field>
           <Field label="Frais funéraires">
-            <Input type="number" value={payload.montantFraisFuneraires ?? ""} onChange={(event) => update({ montantFraisFuneraires: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.montantFraisFuneraires} onValueChange={(value) => update({ montantFraisFuneraires: value })} />
           </Field>
           <Field label="Chirurgie">
-            <Input type="number" value={payload.montantFraisChirurgie ?? ""} onChange={(event) => update({ montantFraisChirurgie: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.montantFraisChirurgie} onValueChange={(value) => update({ montantFraisChirurgie: value })} />
           </Field>
           <Field label="Prime nette">
-            <Input type="number" value={payload.primeNette ?? ""} onChange={(event) => update({ primeNette: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.primeNette} onValueChange={(value) => update({ primeNette: value })} />
           </Field>
           <Field label="Accessoire">
-            <Input type="number" value={payload.accessoire ?? ""} onChange={(event) => update({ accessoire: numberValue(event.target.value) })} />
+            <MoneyInput value={payload.accessoire} onValueChange={(value) => update({ accessoire: value })} />
           </Field>
         </div>
         <DialogFooter>

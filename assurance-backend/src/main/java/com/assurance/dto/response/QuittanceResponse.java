@@ -31,6 +31,7 @@ public class QuittanceResponse {
     private BigDecimal primeTotale;
     private List<Ligne> lignes;
     private List<GarantieLigne> garanties;
+    private List<TargetSummary> targetSummaries;
 
     @Data
     @Builder
@@ -67,5 +68,23 @@ public class QuittanceResponse {
         private BigDecimal primeNette;
         private BigDecimal tauxFranchise;
         private BigDecimal franchiseMinimale;
+    }
+
+    @Data
+    @Builder
+    public static class TargetSummary {
+        private String kind;
+        private Integer vehiculeIndex;
+        private Integer remorqueIndex;
+        private BigDecimal primeNette;
+        private BigDecimal primeNetteHorsEvcat;
+        private BigDecimal automobilePrimeNette;
+        private BigDecimal corporelPrimeNette;
+        private BigDecimal evcatPrimeNette;
+        private BigDecimal taxe;
+        private BigDecimal taxeParafiscale;
+        private BigDecimal accessoire;
+        private BigDecimal cnpac;
+        private BigDecimal primeTotale;
     }
 }

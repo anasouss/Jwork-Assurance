@@ -1,6 +1,6 @@
-import { Input } from "@/components/ui/input";
+import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
-import { formatMoney, numberOrZero, numberValue, roundMoney } from "../utils/format";
+import { formatMoney, numberOrZero, roundMoney } from "../utils/format";
 import type { QuittanceInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -19,7 +19,9 @@ const LABELS: Record<QuittanceInput["categorie"], string> = {
   TOTAL: "Total",
 };
 
-const COLUMNS: { key: keyof QuittanceInput; label: string }[] = [
+type MoneyColumnKey = "primeNette" | "taxe" | "taxeParafiscale" | "accessoire" | "cnpac";
+
+const COLUMNS: { key: MoneyColumnKey; label: string }[] = [
   { key: "primeNette", label: "Prime nette" },
   { key: "taxe", label: "Taxe" },
   { key: "taxeParafiscale", label: "TPF" },
@@ -40,8 +42,8 @@ export function ManualQuittanceSection({ lignes, setLignes, openSection, onSecti
     { primeNette: 0, taxe: 0, taxeParafiscale: 0, accessoire: 0, cnpac: 0, primeTotale: 0 }
   );
 
-  const update = (categorie: QuittanceInput["categorie"], key: keyof QuittanceInput, value: string) => {
-    setLignes(lignes.map((ligne) => (ligne.categorie === categorie ? { ...ligne, [key]: numberValue(value) } : ligne)));
+  const update = (categorie: QuittanceInput["categorie"], key: MoneyColumnKey, value: number | undefined) => {
+    setLignes(lignes.map((ligne) => (ligne.categorie === categorie ? { ...ligne, [key]: value } : ligne)));
   };
 
   return (
@@ -70,13 +72,10 @@ export function ManualQuittanceSection({ lignes, setLignes, openSection, onSecti
                 <td className="px-3 py-2 font-medium">{LABELS[ligne.categorie]}</td>
                 {COLUMNS.map((column) => (
                   <td key={column.key} className="px-3 py-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                    <MoneyInput
                       className="border-emerald-300 bg-white shadow-sm focus-visible:border-emerald-600 focus-visible:ring-emerald-200 dark:bg-background"
-                      value={String(ligne[column.key] ?? "")}
-                      onChange={(event) => update(ligne.categorie, column.key, event.target.value)}
+                      value={ligne[column.key]}
+                      onValueChange={(value) => update(ligne.categorie, column.key, value)}
                     />
                   </td>
                 ))}

@@ -590,7 +590,6 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         if (vehiculeUsage?.byCategorieTransport) {
           requireField(`vehicules.${index}.categorieTransportId`, vehicule.categorieTransportId, "Catégorie transport obligatoire.");
         }
-        requireField(`vehicules.${index}.dateExpirationCarteGrise`, vehicule.dateExpirationCarteGrise, "Date validité CG obligatoire.");
         requireField(`vehicules.${index}.crm`, vehicule.crm, "CRM obligatoire.");
         if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
           nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";

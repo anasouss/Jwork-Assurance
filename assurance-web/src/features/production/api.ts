@@ -14,12 +14,15 @@ import type {
   UpsertGrilleUsageConfigurationRequest,
   BulkUpdateTarifUsageRequest,
   UpsertCompagnieAssuranceRequest,
+  UpsertCompagnieAssistanceRequest,
   UpsertConventionRequest,
   UpsertFormuleGarantiePersonneRequest,
   UpsertGarantieRequest,
   UpsertLigneGrilleTarifaireRequest,
+  UpsertProduitAssistanceRequest,
   UpsertCodeReferenceRequest,
   UpsertReferenceRequest,
+  UpsertTarifProduitAssistanceRequest,
   UpsertTarifUsageRequest,
   UpsertUsageRequest,
 } from "./types";
@@ -188,6 +191,90 @@ export const productionApi = {
       await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/compagnies-assurance/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createCompagnieAssistance(payload: UpsertCompagnieAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/compagnies-assistance", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateCompagnieAssistance(id: string, payload: UpsertCompagnieAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/compagnies-assistance/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async deleteCompagnieAssistance(id: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/compagnies-assistance/${id}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
+  async createProduitAssistance(payload: UpsertProduitAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/produits-assistance", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateProduitAssistance(id: string, payload: UpsertProduitAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/produits-assistance/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async deleteProduitAssistance(id: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/produits-assistance/${id}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
+  async listTarifsProduitAssistance(produitId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption[]>>(`/api/v1/referentiel/produits-assistance/${produitId}/tarifs`)
+    );
+  },
+
+  async createTarifProduitAssistance(produitId: string, payload: UpsertTarifProduitAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/produits-assistance/${produitId}/tarifs`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateTarifProduitAssistance(produitId: string, tarifId: string, payload: UpsertTarifProduitAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/produits-assistance/${produitId}/tarifs/${tarifId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async deleteTarifProduitAssistance(produitId: string, tarifId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/produits-assistance/${produitId}/tarifs/${tarifId}`, {
+        method: "DELETE",
       })
     );
   },

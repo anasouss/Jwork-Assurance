@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
+import com.assurance.dto.request.UpsertCompagnieAssistanceRequest;
 import com.assurance.dto.request.UpsertCodeReferenceRequest;
 import com.assurance.dto.request.UpsertCompagnieAssuranceRequest;
 import com.assurance.dto.request.UpsertConventionRequest;
@@ -10,7 +11,9 @@ import com.assurance.dto.request.UpsertGarantieRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertGrilleUsageConfigurationRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
+import com.assurance.dto.request.UpsertProduitAssistanceRequest;
 import com.assurance.dto.request.UpsertReferenceRequest;
+import com.assurance.dto.request.UpsertTarifProduitAssistanceRequest;
 import com.assurance.dto.request.UpsertTarifUsageRequest;
 import com.assurance.dto.request.UpsertUsageRequest;
 import com.assurance.dto.response.ApiResponse;
@@ -90,6 +93,7 @@ public class ReferentielController {
     private final ConventionRepository conventionRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final ProduitAssistanceRepository produitAssistanceRepository;
+    private final TarifProduitAssistanceRepository tarifProduitAssistanceRepository;
     private final AgenceRepository agenceRepository;
 
     @GetMapping("/usages")
@@ -327,30 +331,168 @@ public class ReferentielController {
     }
 
     @GetMapping("/compagnies-assistance")
-    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> compagniesAssistance() {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> compagniesAssistance(
+            @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
         return ResponseEntity.ok(ApiResponse.success(compagnieAssistanceRepository.findAll(Sort.by("nom")).stream()
-                .filter(compagnie -> Boolean.TRUE.equals(compagnie.getActif()))
-                .map(compagnie -> ReferenceOptionResponse.builder()
-                        .id(compagnie.getId())
-                        .code(compagnie.getCode())
-                        .libelle(compagnie.getNom())
-                        .actif(compagnie.getActif())
-                        .build())
+                .filter(compagnie -> includeInactive || Boolean.TRUE.equals(compagnie.getActif()))
+                .map(this::toCompagnieAssistanceResponse)
                 .toList()));
+    }
+
+    @PostMapping("/compagnies-assistance")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssistance(
+            @Valid @RequestBody UpsertCompagnieAssistanceRequest request
+    ) {
+        compagnieAssistanceRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code compagnie assistance deja utilise");
+        });
+        CompagnieAssistance compagnie = new CompagnieAssistance();
+        applyCompagnieAssistanceRequest(compagnie, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toCompagnieAssistanceResponse(compagnieAssistanceRepository.save(compagnie)),
+                "Compagnie d'assistance creee"
+        ));
+    }
+
+    @PutMapping("/compagnies-assistance/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertCompagnieAssistanceRequest request
+    ) {
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", id));
+        compagnieAssistanceRepository.findByCodeIgnoreCase(request.getCode())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Code compagnie assistance deja utilise");
+                });
+        applyCompagnieAssistanceRequest(compagnie, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toCompagnieAssistanceResponse(compagnieAssistanceRepository.save(compagnie)),
+                "Compagnie d'assistance modifiee"
+        ));
+    }
+
+    @DeleteMapping("/compagnies-assistance/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteCompagnieAssistance(@PathVariable Long id) {
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", id));
+        compagnie.setActif(false);
+        compagnieAssistanceRepository.save(compagnie);
+        return ResponseEntity.ok(ApiResponse.success((Void) null, "Compagnie d'assistance desactivee"));
     }
 
     @GetMapping("/produits-assistance")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> produitsAssistance(
-            @RequestParam(required = false) Long compagnieAssistanceId
+            @RequestParam(required = false) Long compagnieAssistanceId,
+            @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
         return ResponseEntity.ok(ApiResponse.success(produitAssistanceRepository.findAll(Sort.by("libelle")).stream()
-                .filter(produit -> Boolean.TRUE.equals(produit.getActif()))
+                .filter(produit -> includeInactive || Boolean.TRUE.equals(produit.getActif()))
                 .filter(produit -> compagnieAssistanceId == null
                         || (produit.getCompagnieAssistance() != null
                         && produit.getCompagnieAssistance().getId().equals(compagnieAssistanceId)))
                 .map(this::toProduitAssistanceResponse)
                 .toList()));
+    }
+
+    @PostMapping("/produits-assistance")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createProduitAssistance(
+            @Valid @RequestBody UpsertProduitAssistanceRequest request
+    ) {
+        ProduitAssistance produit = new ProduitAssistance();
+        applyProduitAssistanceRequest(produit, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toProduitAssistanceResponse(produitAssistanceRepository.save(produit)),
+                "Produit d'assistance cree"
+        ));
+    }
+
+    @PutMapping("/produits-assistance/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateProduitAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertProduitAssistanceRequest request
+    ) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        applyProduitAssistanceRequest(produit, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toProduitAssistanceResponse(produitAssistanceRepository.save(produit)),
+                "Produit d'assistance modifie"
+        ));
+    }
+
+    @DeleteMapping("/produits-assistance/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteProduitAssistance(@PathVariable Long id) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        produit.setActif(false);
+        produitAssistanceRepository.save(produit);
+        return ResponseEntity.ok(ApiResponse.success((Void) null, "Produit d'assistance desactive"));
+    }
+
+    @GetMapping("/produits-assistance/{id}/tarifs")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> tarifsProduitAssistance(@PathVariable Long id) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        return ResponseEntity.ok(ApiResponse.success(tarifProduitAssistanceRepository
+                .findByProduitAssistanceAndActifTrueOrderByDateDebutDescCreatedAtDesc(produit)
+                .stream()
+                .map(this::toTarifProduitAssistanceResponse)
+                .toList()));
+    }
+
+    @PostMapping("/produits-assistance/{id}/tarifs")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createTarifProduitAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertTarifProduitAssistanceRequest request
+    ) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        TarifProduitAssistance tarif = new TarifProduitAssistance();
+        applyTarifProduitAssistanceRequest(tarif, produit, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toTarifProduitAssistanceResponse(tarifProduitAssistanceRepository.save(tarif)),
+                "Tarif assistance cree"
+        ));
+    }
+
+    @PutMapping("/produits-assistance/{produitId}/tarifs/{tarifId}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifProduitAssistance(
+            @PathVariable Long produitId,
+            @PathVariable Long tarifId,
+            @Valid @RequestBody UpsertTarifProduitAssistanceRequest request
+    ) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(produitId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", produitId));
+        TarifProduitAssistance tarif = tarifProduitAssistanceRepository.findById(tarifId)
+                .orElseThrow(() -> new ResourceNotFoundException("TarifProduitAssistance", tarifId));
+        if (tarif.getProduitAssistance() == null || !tarif.getProduitAssistance().getId().equals(produitId)) {
+            throw new BadRequestException("Tarif incompatible avec le produit selectionne");
+        }
+        applyTarifProduitAssistanceRequest(tarif, produit, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toTarifProduitAssistanceResponse(tarifProduitAssistanceRepository.save(tarif)),
+                "Tarif assistance modifie"
+        ));
+    }
+
+    @DeleteMapping("/produits-assistance/{produitId}/tarifs/{tarifId}")
+    public ResponseEntity<ApiResponse<Void>> deleteTarifProduitAssistance(
+            @PathVariable Long produitId,
+            @PathVariable Long tarifId
+    ) {
+        TarifProduitAssistance tarif = tarifProduitAssistanceRepository.findById(tarifId)
+                .orElseThrow(() -> new ResourceNotFoundException("TarifProduitAssistance", tarifId));
+        if (tarif.getProduitAssistance() == null || !tarif.getProduitAssistance().getId().equals(produitId)) {
+            throw new BadRequestException("Tarif incompatible avec le produit selectionne");
+        }
+        tarif.setActif(false);
+        tarifProduitAssistanceRepository.save(tarif);
+        return ResponseEntity.ok(ApiResponse.success((Void) null, "Tarif assistance supprime"));
     }
 
     @GetMapping("/grilles-tarifaires")
@@ -1249,6 +1391,64 @@ public class ReferentielController {
         formule.setActif(request.getActif() == null ? true : request.getActif());
     }
 
+    private void applyCompagnieAssistanceRequest(CompagnieAssistance compagnie, UpsertCompagnieAssistanceRequest request) {
+        compagnie.setCode(request.getCode().trim().toUpperCase());
+        compagnie.setNom(request.getNom().trim());
+        compagnie.setEmail(blankToNull(request.getEmail()));
+        compagnie.setTelephone(blankToNull(request.getTelephone()));
+        compagnie.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private void applyProduitAssistanceRequest(ProduitAssistance produit, UpsertProduitAssistanceRequest request) {
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", request.getCompagnieAssistanceId()));
+        CategorieClient categorieClient = request.getCategorieClientId() == null ? null :
+                categorieClientRepository.findById(request.getCategorieClientId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
+
+        Set<Usage> usages = new LinkedHashSet<>();
+        if (request.getUsageIds() != null && !request.getUsageIds().isEmpty()) {
+            List<Usage> foundUsages = usageRepository.findAllById(request.getUsageIds());
+            if (foundUsages.size() != request.getUsageIds().size()) {
+                throw new ResourceNotFoundException("Usage", request.getUsageIds());
+            }
+            usages.addAll(foundUsages.stream()
+                    .sorted(Comparator.comparing(Usage::getCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                    .toList());
+        }
+
+        produit.setCompagnieAssistance(compagnie);
+        produit.setCategorieClient(categorieClient);
+        produit.setLibelle(request.getLibelle().trim());
+        produit.setType(blankToNull(request.getType()));
+        produit.setPrestations(blankToNull(request.getPrestations()));
+        if (produit.getUsages() == null) {
+            produit.setUsages(new LinkedHashSet<>());
+        }
+        produit.getUsages().clear();
+        produit.getUsages().addAll(usages);
+        produit.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private void applyTarifProduitAssistanceRequest(
+            TarifProduitAssistance tarif,
+            ProduitAssistance produit,
+            UpsertTarifProduitAssistanceRequest request
+    ) {
+        if (request.getDateFin() != null && request.getDateFin().isBefore(request.getDateDebut())) {
+            throw new BadRequestException("La date fin doit etre superieure ou egale a la date debut");
+        }
+        if (request.getMontantHt().compareTo(BigDecimal.ZERO) < 0 || request.getMontantTtc().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Les montants d'assistance doivent etre positifs");
+        }
+        tarif.setProduitAssistance(produit);
+        tarif.setDateDebut(request.getDateDebut());
+        tarif.setDateFin(request.getDateFin());
+        tarif.setMontantHt(request.getMontantHt());
+        tarif.setMontantTtc(request.getMontantTtc());
+        tarif.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
     private Map<String, Object> toLigneResponse(LigneGrilleTarifaire ligne) {
         return option(ligne.getId(), null, ligne.getLibelleOption() != null ? ligne.getLibelleOption() : ligne.getGarantie().getLibelle())
                 .putValue("grilleId", ligne.getGrilleTarifaire() != null ? ligne.getGrilleTarifaire().getId() : null)
@@ -1298,6 +1498,15 @@ public class ReferentielController {
                 .map();
     }
 
+    private Map<String, Object> toCompagnieAssistanceResponse(CompagnieAssistance compagnie) {
+        return option(compagnie.getId(), compagnie.getCode(), compagnie.getNom())
+                .putValue("nom", compagnie.getNom())
+                .putValue("email", compagnie.getEmail())
+                .putValue("telephone", compagnie.getTelephone())
+                .putValue("actif", compagnie.getActif())
+                .map();
+    }
+
     private Map<String, Object> toProduitAssistanceResponse(ProduitAssistance produit) {
         TarifProduitAssistance tarif = produit.getTarifs() == null ? null : produit.getTarifs().stream()
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
@@ -1311,11 +1520,23 @@ public class ReferentielController {
                 .putValue("categorieClientLibelle", produit.getCategorieClient() != null ? produit.getCategorieClient().getLibelle() : null)
                 .putValue("usageIds", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getId).toList())
                 .putValue("usageCodes", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getCode).toList())
+                .putValue("prestations", produit.getPrestations())
                 .putValue("montantHt", tarif != null ? tarif.getMontantHt() : null)
                 .putValue("montantTtc", tarif != null ? tarif.getMontantTtc() : null)
                 .putValue("dateDebutTarif", tarif != null ? tarif.getDateDebut() : null)
                 .putValue("dateFinTarif", tarif != null ? tarif.getDateFin() : null)
                 .putValue("actif", produit.getActif())
+                .map();
+    }
+
+    private Map<String, Object> toTarifProduitAssistanceResponse(TarifProduitAssistance tarif) {
+        return option(tarif.getId(), null, tarif.getProduitAssistance() != null ? tarif.getProduitAssistance().getLibelle() : null)
+                .putValue("produitAssistanceId", tarif.getProduitAssistance() != null ? tarif.getProduitAssistance().getId() : null)
+                .putValue("dateDebut", tarif.getDateDebut())
+                .putValue("dateFin", tarif.getDateFin())
+                .putValue("montantHt", tarif.getMontantHt())
+                .putValue("montantTtc", tarif.getMontantTtc())
+                .putValue("actif", tarif.getActif())
                 .map();
     }
 

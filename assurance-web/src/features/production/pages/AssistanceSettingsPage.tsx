@@ -1,0 +1,671 @@
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ambulance, CalendarDays, Edit, Plus, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { toDateOnly } from "../date";
+import { productionApi } from "../api";
+import { Field } from "../components/Field";
+import type {
+  ReferenceOption,
+  UpsertCompagnieAssistanceRequest,
+  UpsertProduitAssistanceRequest,
+  UpsertTarifProduitAssistanceRequest,
+} from "../types";
+
+const ALL = "__all__";
+const NONE = "__none__";
+
+export default function AssistanceSettingsPage() {
+  const queryClient = useQueryClient();
+  const [companySearch, setCompanySearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState(ALL);
+  const [editingCompany, setEditingCompany] = useState<ReferenceOption | null>(null);
+  const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
+  const [companyPayload, setCompanyPayload] = useState<UpsertCompagnieAssistanceRequest>(emptyCompany());
+  const [editingProduct, setEditingProduct] = useState<ReferenceOption | null>(null);
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [productPayload, setProductPayload] = useState<UpsertProduitAssistanceRequest>(emptyProduct(""));
+  const [tarifProduct, setTarifProduct] = useState<ReferenceOption | null>(null);
+  const [editingTarif, setEditingTarif] = useState<ReferenceOption | null>(null);
+  const [tarifPayload, setTarifPayload] = useState<UpsertTarifProduitAssistanceRequest>(emptyTarif());
+
+  const companies = useQuery({
+    queryKey: ["referentiel", "compagnies-assistance", "settings"],
+    queryFn: () => productionApi.referentiel("compagnies-assistance", { includeInactive: "true" }),
+    staleTime: 60_000,
+  });
+
+  const products = useQuery({
+    queryKey: ["referentiel", "produits-assistance", "settings"],
+    queryFn: () => productionApi.referentiel("produits-assistance", { includeInactive: "true" }),
+    staleTime: 60_000,
+  });
+
+  const categories = useQuery({
+    queryKey: ["referentiel", "categories-client"],
+    queryFn: () => productionApi.referentiel("categories-client"),
+    staleTime: 60_000,
+  });
+
+  const usages = useQuery({
+    queryKey: ["referentiel", "usages"],
+    queryFn: () => productionApi.referentiel("usages"),
+    staleTime: 60_000,
+  });
+
+  const tarifs = useQuery({
+    queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "tarifs"],
+    queryFn: () => tarifProduct ? productionApi.listTarifsProduitAssistance(tarifProduct.id) : Promise.resolve([]),
+    enabled: Boolean(tarifProduct),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (!companyDialogOpen) return;
+    setCompanyPayload(editingCompany ? companyToPayload(editingCompany) : emptyCompany());
+  }, [companyDialogOpen, editingCompany]);
+
+  useEffect(() => {
+    if (!productDialogOpen) return;
+    const defaultCompany = selectedCompanyId === ALL ? "" : selectedCompanyId;
+    setProductPayload(editingProduct ? productToPayload(editingProduct) : emptyProduct(defaultCompany));
+  }, [editingProduct, productDialogOpen, selectedCompanyId]);
+
+  useEffect(() => {
+    setTarifPayload(editingTarif ? tarifToPayload(editingTarif) : emptyTarif());
+  }, [editingTarif, tarifProduct]);
+
+  const filteredCompanies = useMemo(() => {
+    const term = companySearch.trim().toLowerCase();
+    return (companies.data ?? []).filter((company) => {
+      if (!term) return true;
+      return [company.code, company.libelle, refString(company, "email"), refString(company, "telephone")]
+        .some((value) => String(value ?? "").toLowerCase().includes(term));
+    });
+  }, [companies.data, companySearch]);
+
+  const filteredProducts = useMemo(() => {
+    const term = productSearch.trim().toLowerCase();
+    return (products.data ?? []).filter((product) => {
+      if (selectedCompanyId !== ALL && refString(product, "compagnieAssistanceId") !== selectedCompanyId) return false;
+      if (!term) return true;
+      return [
+        product.libelle,
+        refString(product, "type"),
+        refString(product, "compagnieAssistanceLibelle"),
+        refString(product, "categorieClientLibelle"),
+        refString(product, "prestations"),
+        refArray(product, "usageCodes").join(" "),
+      ].some((value) => String(value ?? "").toLowerCase().includes(term));
+    });
+  }, [productSearch, products.data, selectedCompanyId]);
+
+  const saveCompany = useMutation({
+    mutationFn: ({ id, value }: { id?: string; value: UpsertCompagnieAssistanceRequest }) =>
+      id ? productionApi.updateCompagnieAssistance(id, value) : productionApi.createCompagnieAssistance(value),
+    onSuccess: async () => {
+      setCompanyDialogOpen(false);
+      setEditingCompany(null);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "compagnies-assistance"] });
+      toast.success("Compagnie d'assistance enregistrée");
+    },
+    onError: showError,
+  });
+
+  const deleteCompany = useMutation({
+    mutationFn: (id: string) => productionApi.deleteCompagnieAssistance(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "compagnies-assistance"] });
+      toast.success("Compagnie d'assistance désactivée");
+    },
+    onError: showError,
+  });
+
+  const saveProduct = useMutation({
+    mutationFn: ({ id, value }: { id?: string; value: UpsertProduitAssistanceRequest }) =>
+      id ? productionApi.updateProduitAssistance(id, value) : productionApi.createProduitAssistance(value),
+    onSuccess: async () => {
+      setProductDialogOpen(false);
+      setEditingProduct(null);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
+      toast.success("Produit d'assistance enregistré");
+    },
+    onError: showError,
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: (id: string) => productionApi.deleteProduitAssistance(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
+      toast.success("Produit d'assistance désactivé");
+    },
+    onError: showError,
+  });
+
+  const saveTarif = useMutation({
+    mutationFn: ({ productId, tarifId, value }: { productId: string; tarifId?: string; value: UpsertTarifProduitAssistanceRequest }) =>
+      tarifId
+        ? productionApi.updateTarifProduitAssistance(productId, tarifId, value)
+        : productionApi.createTarifProduitAssistance(productId, value),
+    onSuccess: async () => {
+      setEditingTarif(null);
+      setTarifPayload(emptyTarif());
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "tarifs"] });
+      toast.success("Tarif assistance enregistré");
+    },
+    onError: showError,
+  });
+
+  const deleteTarif = useMutation({
+    mutationFn: ({ productId, tarifId }: { productId: string; tarifId: string }) => productionApi.deleteTarifProduitAssistance(productId, tarifId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "tarifs"] });
+      toast.success("Tarif assistance supprimé");
+    },
+    onError: showError,
+  });
+
+  return (
+    <div className="grid gap-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Compagnies</p>
+          <h1 className="text-xl font-semibold tracking-tight">Assistance</h1>
+          <p className="text-sm text-muted-foreground">Compagnies d'assistance, produits, usages couverts et périodes tarifaires.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setEditingCompany(null); setCompanyDialogOpen(true); }}>
+            <Plus className="size-4" />
+            Compagnie assistance
+          </Button>
+          <Button onClick={() => { setEditingProduct(null); setProductDialogOpen(true); }}>
+            <Plus className="size-4" />
+            Produit assistance
+          </Button>
+        </div>
+      </div>
+
+      <section className="rounded-lg border bg-card p-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold">Compagnies d'assistance</h2>
+            <p className="text-sm text-muted-foreground">Référentiel des prestataires utilisés dans la ligne assistance des contrats.</p>
+          </div>
+          <div className="relative w-full sm:w-80">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Filtrer compagnie" value={companySearch} onChange={(event) => setCompanySearch(event.target.value)} />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Code</TableHead>
+                <TableHead>Compagnie</TableHead>
+                <TableHead>Téléphone</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Actif</TableHead>
+                <TableHead className="w-24" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCompanies.map((company) => (
+                <TableRow key={company.id}>
+                  <TableCell className="font-medium">{company.code}</TableCell>
+                  <TableCell>{company.libelle}</TableCell>
+                  <TableCell>{refString(company, "telephone") || "-"}</TableCell>
+                  <TableCell>{refString(company, "email") || "-"}</TableCell>
+                  <TableCell>{company.actif === false ? "Non" : "Oui"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => { setSelectedCompanyId(company.id); setEditingProduct(null); setProductDialogOpen(true); }} aria-label="Ajouter produit">
+                      <Plus className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingCompany(company); setCompanyDialogOpen(true); }} aria-label="Modifier">
+                      <Edit className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" disabled={company.actif === false || deleteCompany.isPending} onClick={() => deleteCompany.mutate(company.id)} aria-label="Désactiver">
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!companies.isLoading && filteredCompanies.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Aucune compagnie d'assistance.</TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-card p-4">
+        <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_280px_280px]">
+          <div>
+            <h2 className="font-semibold">Produits assistance</h2>
+            <p className="text-sm text-muted-foreground">Produits par compagnie, catégorie, usages couverts et tarif courant.</p>
+          </div>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Filtrer produit" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} />
+          </div>
+          <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Toutes les compagnies</SelectItem>
+              {(companies.data ?? []).map((company) => (
+                <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Produit</TableHead>
+                <TableHead>Compagnie</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Catégorie</TableHead>
+                <TableHead>Usages</TableHead>
+                <TableHead className="text-right">HT</TableHead>
+                <TableHead className="text-right">TTC</TableHead>
+                <TableHead>Période</TableHead>
+                <TableHead>Actif</TableHead>
+                <TableHead className="w-28" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredProducts.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell>
+                    <div className="font-medium">{product.libelle}</div>
+                    <div className="line-clamp-1 text-xs text-muted-foreground">{refString(product, "prestations") || "-"}</div>
+                  </TableCell>
+                  <TableCell>{refString(product, "compagnieAssistanceLibelle") || "-"}</TableCell>
+                  <TableCell>{refString(product, "type") || "-"}</TableCell>
+                  <TableCell>{refString(product, "categorieClientLibelle") || "Toutes"}</TableCell>
+                  <TableCell className="max-w-64">
+                    <span className="line-clamp-2 text-xs text-muted-foreground">{refArray(product, "usageCodes").join(", ") || "Tous les usages"}</span>
+                  </TableCell>
+                  <TableCell className="text-right">{money(refNumber(product, "montantHt"))}</TableCell>
+                  <TableCell className="text-right font-medium">{money(refNumber(product, "montantTtc"))}</TableCell>
+                  <TableCell>{periodLabel(product)}</TableCell>
+                  <TableCell>{product.actif === false ? "Non" : "Oui"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => { setTarifProduct(product); setEditingTarif(null); }} aria-label="Tarifs">
+                      <CalendarDays className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingProduct(product); setProductDialogOpen(true); }} aria-label="Modifier">
+                      <Edit className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" disabled={product.actif === false || deleteProduct.isPending} onClick={() => deleteProduct.mutate(product.id)} aria-label="Désactiver">
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!products.isLoading && filteredProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucun produit assistance.</TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      <Dialog open={companyDialogOpen} onOpenChange={(open) => { setCompanyDialogOpen(open); if (!open) setEditingCompany(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Ambulance className="size-5 text-amber-600" />{editingCompany ? "Modifier compagnie assistance" : "Ajouter compagnie assistance"}</DialogTitle>
+            <DialogDescription>Ces compagnies alimentent le choix assistance dans les contrats.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Code" required>
+              <Input value={companyPayload.code} onChange={(event) => setCompanyPayload((current) => ({ ...current, code: event.target.value }))} />
+            </Field>
+            <Field label="Nom" required>
+              <Input value={companyPayload.nom} onChange={(event) => setCompanyPayload((current) => ({ ...current, nom: event.target.value }))} />
+            </Field>
+            <Field label="Téléphone">
+              <Input value={companyPayload.telephone ?? ""} onChange={(event) => setCompanyPayload((current) => ({ ...current, telephone: event.target.value }))} />
+            </Field>
+            <Field label="Email">
+              <Input value={companyPayload.email ?? ""} onChange={(event) => setCompanyPayload((current) => ({ ...current, email: event.target.value }))} />
+            </Field>
+            <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900">
+              <Checkbox checked={companyPayload.actif !== false} onCheckedChange={(value) => setCompanyPayload((current) => ({ ...current, actif: Boolean(value) }))} />
+              <span>Active</span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompanyDialogOpen(false)}>Annuler</Button>
+            <Button disabled={saveCompany.isPending} onClick={() => submitCompany(editingCompany, companyPayload, saveCompany.mutate)}>
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={productDialogOpen} onOpenChange={(open) => { setProductDialogOpen(open); if (!open) setEditingProduct(null); }}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{editingProduct ? "Modifier produit assistance" : "Ajouter produit assistance"}</DialogTitle>
+            <DialogDescription>Le tarif est géré séparément par périodes afin de conserver l'historique.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Compagnie assistance" required>
+              <Select value={productPayload.compagnieAssistanceId || NONE} onValueChange={(value) => setProductPayload((current) => ({ ...current, compagnieAssistanceId: value === NONE ? "" : value }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Choisir</SelectItem>
+                  {(companies.data ?? []).filter((company) => company.actif !== false || company.id === productPayload.compagnieAssistanceId).map((company) => (
+                    <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Type">
+              <Select value={productPayload.type || NONE} onValueChange={(value) => setProductPayload((current) => ({ ...current, type: value === NONE ? undefined : value }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Aucun</SelectItem>
+                  <SelectItem value="Assistance Automobile">Assistance Automobile</SelectItem>
+                  <SelectItem value="Assistance Voyage">Assistance Voyage</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Produit" required>
+              <Input value={productPayload.libelle} onChange={(event) => setProductPayload((current) => ({ ...current, libelle: event.target.value }))} />
+            </Field>
+            <Field label="Catégorie client">
+              <Select value={productPayload.categorieClientId || NONE} onValueChange={(value) => setProductPayload((current) => ({ ...current, categorieClientId: value === NONE ? undefined : value }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Toutes les catégories</SelectItem>
+                  {(categories.data ?? []).map((category) => (
+                    <SelectItem key={category.id} value={category.id}>{category.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Usages couverts">
+              <div className="max-h-44 overflow-y-auto rounded-md border p-2">
+                <label className="mb-2 flex items-center gap-2 text-sm">
+                  <Checkbox checked={(productPayload.usageIds ?? []).length === 0} onCheckedChange={() => setProductPayload((current) => ({ ...current, usageIds: [] }))} />
+                  <span>Tous les usages</span>
+                </label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(usages.data ?? []).map((usage) => {
+                    const selected = (productPayload.usageIds ?? []).includes(usage.id);
+                    return (
+                      <label key={usage.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted/60">
+                        <Checkbox checked={selected} onCheckedChange={(checked) => setProductPayload((current) => toggleUsage(current, usage.id, Boolean(checked)))} />
+                        <span>{usage.code} - {usage.libelle}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </Field>
+            <Field label="Prestations">
+              <Textarea rows={6} value={productPayload.prestations ?? ""} onChange={(event) => setProductPayload((current) => ({ ...current, prestations: event.target.value }))} />
+            </Field>
+            <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900">
+              <Checkbox checked={productPayload.actif !== false} onCheckedChange={(value) => setProductPayload((current) => ({ ...current, actif: Boolean(value) }))} />
+              <span>Actif</span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProductDialogOpen(false)}>Annuler</Button>
+            <Button disabled={saveProduct.isPending} onClick={() => submitProduct(editingProduct, productPayload, saveProduct.mutate)}>
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(tarifProduct)} onOpenChange={(open) => { if (!open) { setTarifProduct(null); setEditingTarif(null); } }}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Tarifs produit assistance</DialogTitle>
+            <DialogDescription>{tarifProduct?.libelle} - {refString(tarifProduct ?? {}, "compagnieAssistanceLibelle")}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
+            <Field label="Date début" required>
+              <DatePicker date={tarifPayload.dateDebut} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateDebut: toDateOnly(date) ?? "" }))} />
+            </Field>
+            <Field label="Date fin">
+              <DatePicker date={tarifPayload.dateFin} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateFin: toDateOnly(date) }))} />
+            </Field>
+            <Field label="Montant HT" required>
+              <Input type="number" min={0} step="0.01" value={tarifPayload.montantHt || ""} onChange={(event) => setTarifPayload((current) => ({ ...current, montantHt: numberValue(event.target.value) }))} />
+            </Field>
+            <Field label="Montant TTC" required>
+              <Input type="number" min={0} step="0.01" value={tarifPayload.montantTtc || ""} onChange={(event) => setTarifPayload((current) => ({ ...current, montantTtc: numberValue(event.target.value) }))} />
+            </Field>
+            <div className="flex gap-2 md:col-span-4">
+              <Button disabled={saveTarif.isPending || !tarifProduct} onClick={() => submitTarif(tarifProduct, editingTarif, tarifPayload, saveTarif.mutate)}>
+                {editingTarif ? "Mettre à jour" : "Ajouter période"}
+              </Button>
+              <Button variant="outline" onClick={() => { setEditingTarif(null); setTarifPayload(emptyTarif()); }}>Réinitialiser</Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Période</TableHead>
+                  <TableHead className="text-right">Montant HT</TableHead>
+                  <TableHead className="text-right">Montant TTC</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(tarifs.data ?? []).map((tarif) => (
+                  <TableRow key={tarif.id}>
+                    <TableCell>{periodLabelFromDates(refString(tarif, "dateDebut"), refString(tarif, "dateFin"))}</TableCell>
+                    <TableCell className="text-right">{money(refNumber(tarif, "montantHt"))}</TableCell>
+                    <TableCell className="text-right font-medium">{money(refNumber(tarif, "montantTtc"))}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => setEditingTarif(tarif)} aria-label="Modifier tarif"><Edit className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" disabled={!tarifProduct || deleteTarif.isPending} onClick={() => tarifProduct && deleteTarif.mutate({ productId: tarifProduct.id, tarifId: tarif.id })} aria-label="Supprimer tarif">
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!tarifs.isLoading && (tarifs.data ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Aucun tarif pour ce produit.</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function emptyCompany(): UpsertCompagnieAssistanceRequest {
+  return { code: "", nom: "", actif: true };
+}
+
+function emptyProduct(compagnieAssistanceId: string): UpsertProduitAssistanceRequest {
+  return { compagnieAssistanceId, libelle: "", type: "Assistance Automobile", usageIds: [], actif: true };
+}
+
+function emptyTarif(): UpsertTarifProduitAssistanceRequest {
+  return { dateDebut: "", montantHt: 0, montantTtc: 0, actif: true };
+}
+
+function companyToPayload(company: ReferenceOption): UpsertCompagnieAssistanceRequest {
+  return {
+    code: company.code ?? "",
+    nom: refString(company, "nom") || company.libelle,
+    email: refString(company, "email"),
+    telephone: refString(company, "telephone"),
+    actif: company.actif !== false,
+  };
+}
+
+function productToPayload(product: ReferenceOption): UpsertProduitAssistanceRequest {
+  return {
+    compagnieAssistanceId: refString(product, "compagnieAssistanceId"),
+    categorieClientId: refString(product, "categorieClientId") || undefined,
+    libelle: product.libelle,
+    type: refString(product, "type") || undefined,
+    prestations: refString(product, "prestations") || undefined,
+    usageIds: refArray(product, "usageIds"),
+    actif: product.actif !== false,
+  };
+}
+
+function tarifToPayload(tarif: ReferenceOption): UpsertTarifProduitAssistanceRequest {
+  return {
+    dateDebut: refString(tarif, "dateDebut"),
+    dateFin: refString(tarif, "dateFin") || undefined,
+    montantHt: refNumber(tarif, "montantHt") ?? 0,
+    montantTtc: refNumber(tarif, "montantTtc") ?? 0,
+    actif: tarif.actif !== false,
+  };
+}
+
+function submitCompany(
+  editing: ReferenceOption | null,
+  payload: UpsertCompagnieAssistanceRequest,
+  mutate: (variables: { id?: string; value: UpsertCompagnieAssistanceRequest }) => void
+) {
+  const value = {
+    ...payload,
+    code: payload.code.trim(),
+    nom: payload.nom.trim(),
+    email: cleanOptional(payload.email),
+    telephone: cleanOptional(payload.telephone),
+  };
+  if (!value.code || !value.nom) {
+    toast.error("Code et nom sont obligatoires.");
+    return;
+  }
+  mutate({ id: editing?.id, value });
+}
+
+function submitProduct(
+  editing: ReferenceOption | null,
+  payload: UpsertProduitAssistanceRequest,
+  mutate: (variables: { id?: string; value: UpsertProduitAssistanceRequest }) => void
+) {
+  const value = {
+    ...payload,
+    libelle: payload.libelle.trim(),
+    type: cleanOptional(payload.type),
+    prestations: cleanOptional(payload.prestations),
+    categorieClientId: cleanOptional(payload.categorieClientId),
+    usageIds: payload.usageIds ?? [],
+  };
+  if (!value.compagnieAssistanceId || !value.libelle) {
+    toast.error("Compagnie assistance et produit sont obligatoires.");
+    return;
+  }
+  mutate({ id: editing?.id, value });
+}
+
+function submitTarif(
+  product: ReferenceOption | null,
+  editing: ReferenceOption | null,
+  payload: UpsertTarifProduitAssistanceRequest,
+  mutate: (variables: { productId: string; tarifId?: string; value: UpsertTarifProduitAssistanceRequest }) => void
+) {
+  if (!product) return;
+  if (!payload.dateDebut || payload.montantHt < 0 || payload.montantTtc < 0) {
+    toast.error("Date début et montants positifs sont obligatoires.");
+    return;
+  }
+  mutate({ productId: product.id, tarifId: editing?.id, value: { ...payload, dateFin: payload.dateFin || undefined } });
+}
+
+function toggleUsage(payload: UpsertProduitAssistanceRequest, usageId: string, checked: boolean): UpsertProduitAssistanceRequest {
+  const ids = new Set(payload.usageIds ?? []);
+  if (checked) {
+    ids.add(usageId);
+  } else {
+    ids.delete(usageId);
+  }
+  return { ...payload, usageIds: Array.from(ids) };
+}
+
+function refString(item: ReferenceOption | Record<string, unknown>, key: string) {
+  const value = item[key];
+  return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
+function refNumber(item: ReferenceOption, key: string) {
+  const value = item[key];
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") return Number(value);
+  return undefined;
+}
+
+function refArray(item: ReferenceOption, key: string) {
+  const value = item[key];
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => String(entry));
+}
+
+function numberValue(value: string) {
+  return value.trim() === "" ? 0 : Number(value);
+}
+
+function cleanOptional(value?: string) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function money(value?: number) {
+  if (value == null || Number.isNaN(value)) return "-";
+  return new Intl.NumberFormat("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
+
+function periodLabel(product: ReferenceOption) {
+  return periodLabelFromDates(refString(product, "dateDebutTarif"), refString(product, "dateFinTarif"));
+}
+
+function periodLabelFromDates(start?: string, end?: string) {
+  if (!start && !end) return "-";
+  return `${formatDate(start)} -> ${end ? formatDate(end) : "ouverte"}`;
+}
+
+function formatDate(value?: string) {
+  if (!value) return "-";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function showError(error: unknown) {
+  toast.error(error instanceof Error ? error.message : "Opération impossible");
+}

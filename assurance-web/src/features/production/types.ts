@@ -15,6 +15,32 @@ export type ReferenceOption = {
   [key: string]: unknown;
 };
 
+export type UpsertCompagnieAssistanceRequest = {
+  code: string;
+  nom: string;
+  email?: string;
+  telephone?: string;
+  actif?: boolean;
+};
+
+export type UpsertProduitAssistanceRequest = {
+  compagnieAssistanceId: string;
+  categorieClientId?: string;
+  libelle: string;
+  type?: string;
+  prestations?: string;
+  usageIds?: string[];
+  actif?: boolean;
+};
+
+export type UpsertTarifProduitAssistanceRequest = {
+  dateDebut: string;
+  dateFin?: string;
+  montantHt: number;
+  montantTtc: number;
+  actif?: boolean;
+};
+
 export type LivraisonAttestation = {
   id: string;
   agenceId?: string | null;

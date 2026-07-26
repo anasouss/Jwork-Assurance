@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Building2, FileText, Handshake, Percent, Users } from "lucide-react";
+import { Ambulance, Building2, Handshake, Users } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function CompaniesDashboardPage() {
@@ -22,25 +22,16 @@ export default function CompaniesDashboardPage() {
       permission: "config:view",
     },
     {
+      title: "Assistance",
+      description: "Compagnies, produits et tarifs assistance.",
+      icon: Ambulance,
+      href: "/app/companies/assistance",
+      permission: "config:view",
+    },
+    {
       title: "Contacts",
       description: "Interlocuteurs compagnie.",
       icon: Users,
-      href: "/app/companies",
-      permission: "config:view",
-      disabled: true,
-    },
-    {
-      title: "Remises RC",
-      description: "Remises et règles commerciales.",
-      icon: Percent,
-      href: "/app/companies",
-      permission: "config:view",
-      disabled: true,
-    },
-    {
-      title: "Accessoires",
-      description: "Frais accessoires par compagnie.",
-      icon: FileText,
       href: "/app/companies",
       permission: "config:view",
       disabled: true,

@@ -338,7 +338,6 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     mutationFn: productionApi.previewQuittance,
     onSuccess: (data) => {
       setPreview(data);
-      toast.success("Prévisualisation calculée");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Prévisualisation impossible"),
   });

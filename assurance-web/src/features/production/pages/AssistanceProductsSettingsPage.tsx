@@ -367,10 +367,10 @@ export default function AssistanceProductsSettingsPage() {
               <DatePicker date={tarifPayload.dateFin} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateFin: toDateOnly(date) }))} />
             </Field>
             <Field label="Montant HT" required>
-              <MoneyInput value={tarifPayload.montantHt} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantHt: value }))} />
+              <MoneyInput value={tarifPayload.montantHt} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantHt: value ?? 0 }))} />
             </Field>
             <Field label="Montant TTC" required>
-              <MoneyInput value={tarifPayload.montantTtc} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantTtc: value }))} />
+              <MoneyInput value={tarifPayload.montantTtc} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantTtc: value ?? 0 }))} />
             </Field>
             <div className="flex gap-2 md:col-span-4">
               <Button disabled={saveTarif.isPending || !tarifProduct} onClick={() => submitTarif(tarifProduct, editingTarif, tarifPayload, saveTarif.mutate)}>
@@ -593,11 +593,6 @@ function refArray(item: ReferenceOption | Record<string, unknown>, key: string) 
   const value = item[key];
   if (!Array.isArray(value)) return [];
   return value.map((entry) => String(entry));
-}
-
-function numberValue(value: string) {
-  const normalized = value.replace(/\s/g, "").replace(",", ".");
-  return normalized.trim() === "" ? 0 : Number(normalized);
 }
 
 function cleanOptional(value?: string) {

@@ -20,7 +20,7 @@ public class ContratActionService {
     private final TypeMouvementContratRepository typeMouvementContratRepository;
 
     @Transactional(readOnly = true)
-    public ContratActionsResponse getActions(String agenceId, String contratId) {
+    public ContratActionsResponse getActions(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         boolean contratClos = contrat.getStatut() == StatutContrat.CANCELLED

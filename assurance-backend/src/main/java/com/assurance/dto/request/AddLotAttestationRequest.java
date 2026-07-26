@@ -8,9 +8,9 @@ import lombok.Setter;
 @Setter
 public class AddLotAttestationRequest {
 
-    private String usageId;
+    private Long usageId;
 
-    private String groupeUsageAttestationId;
+    private Long groupeUsageAttestationId;
 
     private String groupeUsageAttestationCode;
 

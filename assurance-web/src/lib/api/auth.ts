@@ -1,5 +1,5 @@
 import type { ApiResponse, AuthResponse } from "@/lib/types";
-import { API_BASE_URL, apiFetch } from "./base";
+import { API_BASE_URL, apiFetch, normalizeApiIds } from "./base";
 import { clearAuth, getRefreshToken, saveAuth } from "@/lib/auth";
 
 export type LoginRequest = {
@@ -24,7 +24,7 @@ export const authApi = {
       throw new Error(await loginErrorMessage(response));
     }
 
-    const result = (await response.json()) as ApiResponse<AuthResponse>;
+    const result = normalizeApiIds(await response.json()) as ApiResponse<AuthResponse>;
     if (!result.success) {
       throw new Error(result.message || "Échec de la connexion");
     }
@@ -50,7 +50,7 @@ export const authApi = {
       throw new Error(errorData.message || "Échec du rafraîchissement");
     }
 
-    const result = (await response.json()) as ApiResponse<AuthResponse>;
+    const result = normalizeApiIds(await response.json()) as ApiResponse<AuthResponse>;
     if (!result.success) {
       throw new Error(result.message || "Échec du rafraîchissement");
     }

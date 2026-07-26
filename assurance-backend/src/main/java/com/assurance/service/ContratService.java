@@ -60,13 +60,13 @@ public class ContratService {
     }
 
     @Transactional
-    public ContratResponse renouveler(String agenceId, String contratOrigineId, CreateContratRequest request) {
+    public ContratResponse renouveler(Long agenceId, Long contratOrigineId, CreateContratRequest request) {
         Contrat contratOrigine = contratRepository.findByAgenceIdAndId(agenceId, contratOrigineId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratOrigineId));
         if (Boolean.TRUE.equals(contratOrigine.getRenouvele())) {
             throw new BadRequestException("Le contrat est deja renouvele");
         }
-        if (request.getAgenceId() == null || request.getAgenceId().isBlank()) {
+        if (request.getAgenceId() == null) {
             request.setAgenceId(agenceId);
         }
         if (!agenceId.equals(request.getAgenceId())) {
@@ -278,12 +278,12 @@ public class ContratService {
     }
 
     @Transactional(readOnly = true)
-    public List<ContratResponse> list(String agenceId) {
+    public List<ContratResponse> list(Long agenceId) {
         return contratRepository.findByAgenceIdOrderByCreatedAtDesc(agenceId).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public ContratResponse get(String agenceId, String contratId) {
+    public ContratResponse get(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         return toResponse(contrat);
@@ -386,15 +386,15 @@ public class ContratService {
                 .build();
     }
 
-    private Client resolveClientForCreation(String agenceId, CreateContratRequest.ClientInput input) {
-        if (hasText(input.getClientId())) {
+    private Client resolveClientForCreation(Long agenceId, CreateContratRequest.ClientInput input) {
+        if (input.getClientId() != null) {
             return clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
         }
         if (input.getClient() == null) {
             throw new BadRequestException("Le role " + input.getRole() + " doit renseigner clientId ou client");
         }
-        if (!hasText(input.getClient().getAgenceId())) {
+        if (input.getClient().getAgenceId() == null) {
             input.getClient().setAgenceId(agenceId);
         }
         if (!agenceId.equals(input.getClient().getAgenceId())) {
@@ -403,8 +403,8 @@ public class ContratService {
         return clientService.createEntity(input.getClient());
     }
 
-    private Client resolveClientForPreview(String agenceId, CreateContratRequest.ClientInput input) {
-        if (hasText(input.getClientId())) {
+    private Client resolveClientForPreview(Long agenceId, CreateContratRequest.ClientInput input) {
+        if (input.getClientId() != null) {
             return clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
         }
@@ -723,8 +723,8 @@ public class ContratService {
                 .build();
     }
 
-    private Marque resolveMarque(String marqueId, String marqueLibelle, boolean createIfMissing) {
-        if (hasText(marqueId)) {
+    private Marque resolveMarque(Long marqueId, String marqueLibelle, boolean createIfMissing) {
+        if (marqueId != null) {
             return marqueRepository.findById(marqueId)
                     .orElseThrow(() -> new ResourceNotFoundException("Marque", marqueId));
         }
@@ -739,8 +739,8 @@ public class ContratService {
                         .build()) : Marque.builder().libelle(libelle).actif(true).build());
     }
 
-    private Carrosserie resolveCarrosserie(String carrosserieId, String carrosserieLibelle, boolean createIfMissing) {
-        if (hasText(carrosserieId)) {
+    private Carrosserie resolveCarrosserie(Long carrosserieId, String carrosserieLibelle, boolean createIfMissing) {
+        if (carrosserieId != null) {
             return carrosserieRepository.findById(carrosserieId)
                     .orElseThrow(() -> new ResourceNotFoundException("Carrosserie", carrosserieId));
         }
@@ -755,8 +755,8 @@ public class ContratService {
                         .build()) : Carrosserie.builder().libelle(libelle).actif(true).build());
     }
 
-    private CategorieTransport resolveCategorieTransport(String categorieTransportId) {
-        if (!hasText(categorieTransportId)) {
+    private CategorieTransport resolveCategorieTransport(Long categorieTransportId) {
+        if (categorieTransportId == null) {
             return null;
         }
         return categorieTransportRepository.findById(categorieTransportId)
@@ -1038,14 +1038,14 @@ public class ContratService {
         return SourceValeurGarantie.AUCUNE;
     }
 
-    private FormuleGarantiePersonne resolveFormuleGarantiePersonne(String formuleId, Contrat contrat, Garantie garantie, Usage usageCible) {
+    private FormuleGarantiePersonne resolveFormuleGarantiePersonne(Long formuleId, Contrat contrat, Garantie garantie, Usage usageCible) {
         FormuleGarantiePersonne formule;
         if (garantie.getTypeGarantie() == TypeGarantie.PERSONNE
                 && usageCible != null
                 && !Boolean.TRUE.equals(usageCible.getGarantiesPersonne())) {
             throw new BadRequestException("L'usage " + usageCible.getCode() + " n'autorise pas les garanties personne");
         }
-        if (formuleId == null || formuleId.isBlank()) {
+        if (formuleId == null) {
             if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
                     || contrat.getGrilleTarifaire() == null
                     || garantie.getTypeGarantie() != TypeGarantie.PERSONNE) {
@@ -1315,7 +1315,7 @@ public class ContratService {
             Vehicule vehicule,
             Remorque remorque
     ) {
-        if (input.getLigneGrilleTarifaireId() != null && !input.getLigneGrilleTarifaireId().isBlank()) {
+        if (input.getLigneGrilleTarifaireId() != null) {
             return ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
                     .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
         }

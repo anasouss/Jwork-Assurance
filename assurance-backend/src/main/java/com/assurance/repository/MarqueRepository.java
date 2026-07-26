@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface MarqueRepository extends JpaRepository<Marque, String> {
+public interface MarqueRepository extends JpaRepository<Marque, Long> {
     Optional<Marque> findByLibelleIgnoreCase(String libelle);
 }

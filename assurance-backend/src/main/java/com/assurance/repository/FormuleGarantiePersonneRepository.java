@@ -5,17 +5,17 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface FormuleGarantiePersonneRepository extends JpaRepository<FormuleGarantiePersonne, String> {
-    List<FormuleGarantiePersonne> findByGrilleTarifaireIdAndUsageIdAndActifTrue(String grilleTarifaireId, String usageId);
+public interface FormuleGarantiePersonneRepository extends JpaRepository<FormuleGarantiePersonne, Long> {
+    List<FormuleGarantiePersonne> findByGrilleTarifaireIdAndUsageIdAndActifTrue(Long grilleTarifaireId, Long usageId);
 
     List<FormuleGarantiePersonne> findByGrilleTarifaireIdAndUsageIdAndGarantieIdAndActifTrueOrderByOrdreAffichageAscFormuleAsc(
-            String grilleTarifaireId,
-            String usageId,
-            String garantieId
+            Long grilleTarifaireId,
+            Long usageId,
+            Long garantieId
     );
 
     List<FormuleGarantiePersonne> findByGrilleTarifaireIdAndGarantieIdAndActifTrueOrderByOrdreAffichageAscFormuleAsc(
-            String grilleTarifaireId,
-            String garantieId
+            Long grilleTarifaireId,
+            Long garantieId
     );
 }

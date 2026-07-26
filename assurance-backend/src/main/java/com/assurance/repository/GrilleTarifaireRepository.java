@@ -6,13 +6,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface GrilleTarifaireRepository extends JpaRepository<GrilleTarifaire, String> {
+public interface GrilleTarifaireRepository extends JpaRepository<GrilleTarifaire, Long> {
     @EntityGraph(attributePaths = "compagnieAssurance")
     List<GrilleTarifaire> findAllByOrderByCreatedAtDesc();
 
     @EntityGraph(attributePaths = "compagnieAssurance")
-    List<GrilleTarifaire> findByCompagnieAssuranceIdAndActifTrueOrderByCreatedAtDesc(String compagnieAssuranceId);
+    List<GrilleTarifaire> findByCompagnieAssuranceIdAndActifTrueOrderByCreatedAtDesc(Long compagnieAssuranceId);
 
     @EntityGraph(attributePaths = "compagnieAssurance")
-    List<GrilleTarifaire> findByCompagnieAssuranceIdAndActifTrueOrderByLibelleAsc(String compagnieAssuranceId);
+    List<GrilleTarifaire> findByCompagnieAssuranceIdAndActifTrueOrderByLibelleAsc(Long compagnieAssuranceId);
 }

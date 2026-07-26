@@ -10,10 +10,10 @@ import java.util.Set;
 @Data
 @Builder
 public class AdminUtilisateurResponse {
-    private String id;
-    private String agenceId;
+    private Long id;
+    private Long agenceId;
     private String agenceNom;
-    private String roleId;
+    private Long roleId;
     private String roleCode;
     private String roleNom;
     private String email;

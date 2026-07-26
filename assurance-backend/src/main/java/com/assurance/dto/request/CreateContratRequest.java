@@ -17,13 +17,13 @@ import java.util.List;
 
 @Data
 public class CreateContratRequest {
-    @NotBlank
-    private String agenceId;
+    @NotNull
+    private Long agenceId;
 
-    private String compagnieAssuranceId;
-    private String conventionId;
-    private String usageId;
-    private String grilleTarifaireId;
+    private Long compagnieAssuranceId;
+    private Long conventionId;
+    private Long usageId;
+    private Long grilleTarifaireId;
 
     @NotNull
     private TypeContrat typeContrat;
@@ -72,7 +72,7 @@ public class CreateContratRequest {
 
     @Data
     public static class ClientInput {
-        private String clientId;
+        private Long clientId;
         private CreateClientRequest client;
         @NotNull
         private RoleClientContrat role;
@@ -83,12 +83,12 @@ public class CreateContratRequest {
     public static class VehiculeInput {
         @NotNull
         private TypeVehiculeContrat typeVehicule;
-        private String usageId;
-        private String marqueId;
+        private Long usageId;
+        private Long marqueId;
         private String marqueLibelle;
-        private String carrosserieId;
+        private Long carrosserieId;
         private String carrosserieLibelle;
-        private String categorieTransportId;
+        private Long categorieTransportId;
         private String immatriculation;
         private String immatriculationProvisoire;
         private String carburant;
@@ -115,8 +115,8 @@ public class CreateContratRequest {
 
     @Data
     public static class RemorqueInput {
-        private String usageId;
-        private String marqueId;
+        private Long usageId;
+        private Long marqueId;
         private String marqueLibelle;
         private String immatriculation;
         private String ptc;
@@ -131,15 +131,15 @@ public class CreateContratRequest {
 
     @Data
     public static class GarantieInput {
-        @NotBlank
-        private String garantieId;
-        private String ligneGrilleTarifaireId;
-        private String clientId;
+        @NotNull
+        private Long garantieId;
+        private Long ligneGrilleTarifaireId;
+        private Long clientId;
         private Integer vehiculeIndex;
         private Integer remorqueIndex;
         private String modeSelectionne;
         private String sourceValeurSelectionnee;
-        private String formuleGarantiePersonneId;
+        private Long formuleGarantiePersonneId;
         private BigDecimal valeurVenale;
         private BigDecimal valeurNeuf;
         private BigDecimal valeurGlace;

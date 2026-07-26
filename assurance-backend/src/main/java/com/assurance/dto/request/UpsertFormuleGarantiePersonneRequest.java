@@ -1,18 +1,18 @@
 package com.assurance.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
 public class UpsertFormuleGarantiePersonneRequest {
-    private String id;
+    private Long id;
 
-    @NotBlank
-    private String garantieId;
+    @NotNull
+    private Long garantieId;
 
-    private String usageId;
+    private Long usageId;
     private String formule;
     private BigDecimal montantDeces;
     private BigDecimal montantInvalidite;

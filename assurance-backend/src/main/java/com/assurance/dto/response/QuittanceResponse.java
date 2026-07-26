@@ -10,13 +10,13 @@ import java.util.List;
 @Data
 @Builder
 public class QuittanceResponse {
-    private String id;
-    private String contratId;
+    private Long id;
+    private Long contratId;
     private String numeroContrat;
-    private String mouvementContratId;
+    private Long mouvementContratId;
     private String codeMouvement;
     private String typeImpactMouvement;
-    private String elementFacturableId;
+    private Long elementFacturableId;
     private String numeroQuittance;
     private String type;
     private String categorie;

@@ -2,15 +2,16 @@ package com.assurance.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class UpsertUtilisateurRequest {
-    private String agenceId;
+    private Long agenceId;
 
-    @NotBlank
-    private String roleId;
+    @NotNull
+    private Long roleId;
 
     @Email
     @NotBlank

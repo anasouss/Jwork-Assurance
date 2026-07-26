@@ -14,23 +14,23 @@ import java.util.List;
 @Data
 @Builder
 public class ContratResponse {
-    private String id;
+    private Long id;
     private String numeroContrat;
     private String numeroPolice;
     private TypeContrat typeContrat;
     private StatutContrat statut;
-    private String agenceId;
-    private String compagnieAssuranceId;
-    private String conventionId;
-    private String contratOrigineId;
+    private Long agenceId;
+    private Long compagnieAssuranceId;
+    private Long conventionId;
+    private Long contratOrigineId;
     private Boolean renouvele;
-    private String usageId;
+    private Long usageId;
     private String usageCode;
     private String usageLibelle;
     private String groupeUsageAttestationCode;
     private String groupeUsageAttestationLibelle;
     private Boolean consommeAttestation;
-    private String grilleTarifaireId;
+    private Long grilleTarifaireId;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String numeroAttestation;
@@ -60,7 +60,7 @@ public class ContratResponse {
     @Data
     @Builder
     public static class ClientLink {
-        private String clientId;
+        private Long clientId;
         private String nomAffichage;
         private String role;
         private boolean principalPourRole;
@@ -69,9 +69,9 @@ public class ContratResponse {
     @Data
     @Builder
     public static class VehiculeView {
-        private String vehiculeId;
+        private Long vehiculeId;
         private String typeVehicule;
-        private String usageId;
+        private Long usageId;
         private String usageCode;
         private String usageLibelle;
         private String groupeUsageAttestationCode;
@@ -79,11 +79,11 @@ public class ContratResponse {
         private String immatriculation;
         private String numeroAttestation;
         private Boolean remorque;
-        private String marqueId;
+        private Long marqueId;
         private String marque;
-        private String carrosserieId;
+        private Long carrosserieId;
         private String carrosserie;
-        private String categorieTransportId;
+        private Long categorieTransportId;
         private String categorieTransportCode;
         private String categorieTransportLibelle;
         private BigDecimal coefficientProrata;
@@ -99,15 +99,15 @@ public class ContratResponse {
     @Data
     @Builder
     public static class RemorqueView {
-        private String remorqueId;
-        private String usageId;
+        private Long remorqueId;
+        private Long usageId;
         private String usageCode;
         private String usageLibelle;
         private String groupeUsageAttestationCode;
         private Boolean consommeAttestation;
         private String immatriculation;
         private String numeroAttestation;
-        private String marqueId;
+        private Long marqueId;
         private String marque;
         private String ptc;
         private BigDecimal coefficientProrata;
@@ -117,18 +117,18 @@ public class ContratResponse {
     @Data
     @Builder
     public static class GarantieView {
-        private String contratGarantieId;
-        private String garantieId;
+        private Long contratGarantieId;
+        private Long garantieId;
         private String code;
         private String libelle;
         private String typeGarantie;
-        private String clientId;
-        private String vehiculeId;
-        private String remorqueId;
-        private String ligneGrilleTarifaireId;
+        private Long clientId;
+        private Long vehiculeId;
+        private Long remorqueId;
+        private Long ligneGrilleTarifaireId;
         private String modeSelectionne;
         private String sourceValeurSelectionnee;
-        private String formuleGarantiePersonneId;
+        private Long formuleGarantiePersonneId;
         private BigDecimal valeurVenale;
         private BigDecimal valeurNeuf;
         private BigDecimal valeurGlace;
@@ -151,7 +151,7 @@ public class ContratResponse {
     @Data
     @Builder
     public static class MouvementView {
-        private String id;
+        private Long id;
         private String code;
         private String libelle;
         private String categorie;
@@ -170,8 +170,8 @@ public class ContratResponse {
     @Data
     @Builder
     public static class ElementFacturableView {
-        private String id;
-        private String mouvementContratId;
+        private Long id;
+        private Long mouvementContratId;
         private String nature;
         private String statut;
         private String referenceSource;

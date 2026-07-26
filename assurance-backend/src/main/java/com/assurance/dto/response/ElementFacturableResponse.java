@@ -10,13 +10,13 @@ import java.util.List;
 @Data
 @Builder
 public class ElementFacturableResponse {
-    private String id;
-    private String contratId;
+    private Long id;
+    private Long contratId;
     private String numeroContrat;
-    private String mouvementContratId;
+    private Long mouvementContratId;
     private String codeMouvement;
     private String libelleMouvement;
-    private String compagnieAssuranceId;
+    private Long compagnieAssuranceId;
     private String fractionnement;
     private Boolean splitAllowed;
     private Integer expectedSplitCount;

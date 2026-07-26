@@ -2,25 +2,25 @@ package com.assurance.security;
 
 public final class TenantContext {
 
-    private static final ThreadLocal<String> CURRENT_AGENCY = new ThreadLocal<>();
-    private static final ThreadLocal<String> CURRENT_USER = new ThreadLocal<>();
+    private static final ThreadLocal<Long> CURRENT_AGENCY = new ThreadLocal<>();
+    private static final ThreadLocal<Long> CURRENT_USER = new ThreadLocal<>();
 
     private TenantContext() {
     }
 
-    public static void setCurrentAgence(String agenceId) {
+    public static void setCurrentAgence(Long agenceId) {
         CURRENT_AGENCY.set(agenceId);
     }
 
-    public static String getCurrentAgence() {
+    public static Long getCurrentAgence() {
         return CURRENT_AGENCY.get();
     }
 
-    public static void setCurrentUser(String userId) {
+    public static void setCurrentUser(Long userId) {
         CURRENT_USER.set(userId);
     }
 
-    public static String getCurrentUser() {
+    public static Long getCurrentUser() {
         return CURRENT_USER.get();
     }
 

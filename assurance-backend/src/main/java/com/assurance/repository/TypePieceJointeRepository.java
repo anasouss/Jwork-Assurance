@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface TypePieceJointeRepository extends JpaRepository<TypePieceJointe, String> {
+public interface TypePieceJointeRepository extends JpaRepository<TypePieceJointe, Long> {
     List<TypePieceJointe> findByActifTrueOrderByLibelleAsc();
 }

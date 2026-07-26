@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 @Builder
 public class AdminPermissionResponse {
-    private String id;
+    private Long id;
     private String code;
     private String nom;
     private String module;

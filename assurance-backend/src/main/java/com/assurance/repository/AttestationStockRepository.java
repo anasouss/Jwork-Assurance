@@ -12,7 +12,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface AttestationStockRepository extends JpaRepository<AttestationStock, String> {
+public interface AttestationStockRepository extends JpaRepository<AttestationStock, Long> {
     boolean existsByNumeroIgnoreCase(String numero);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -28,8 +28,8 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
             """)
     List<AttestationStock> findGestionnableForUpdate(
             @Param("numeros") Collection<String> numeros,
-            @Param("compagnieId") String compagnieId,
-            @Param("groupeUsageAttestationId") String groupeUsageAttestationId
+            @Param("compagnieId") Long compagnieId,
+            @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
     );
 
     @Query("""
@@ -47,8 +47,8 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
     List<String> findDisponibles(
             @Param("fragment") String fragment,
             @Param("statut") StatutAttestationStock statut,
-            @Param("compagnieId") String compagnieId,
-            @Param("groupeUsageAttestationId") String groupeUsageAttestationId
+            @Param("compagnieId") Long compagnieId,
+            @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
     );
 
     @Query("""
@@ -62,8 +62,8 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and a.groupeUsageAttestation.id = :groupeUsageAttestationId
             """)
     long countDisponibles(
-            @Param("compagnieId") String compagnieId,
-            @Param("groupeUsageAttestationId") String groupeUsageAttestationId
+            @Param("compagnieId") Long compagnieId,
+            @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
     );
 
     Optional<AttestationStock> findByNumeroIgnoreCase(String numero);

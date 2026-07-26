@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDate;
 import java.util.List;
 
-public interface TarifProduitAssistanceRepository extends JpaRepository<TarifProduitAssistance, String> {
+public interface TarifProduitAssistanceRepository extends JpaRepository<TarifProduitAssistance, Long> {
     List<TarifProduitAssistance> findByProduitAssistanceAndActifTrueOrderByDateDebutDescCreatedAtDesc(ProduitAssistance produitAssistance);
 
     List<TarifProduitAssistance> findByProduitAssistanceAndActifTrueAndDateDebutLessThanEqualOrderByDateDebutDescCreatedAtDesc(

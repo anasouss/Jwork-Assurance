@@ -1,16 +1,16 @@
 package com.assurance.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
 public class UpsertTarifUsageRequest {
-    @NotBlank
-    private String usageId;
+    @NotNull
+    private Long usageId;
 
-    private String categorieTransportId;
+    private Long categorieTransportId;
     private BigDecimal puissanceFiscaleMin;
     private BigDecimal puissanceFiscaleMax;
     private BigDecimal nombrePlacesMin;
@@ -18,7 +18,7 @@ public class UpsertTarifUsageRequest {
     private BigDecimal ptcMin;
     private BigDecimal ptcMax;
     private String sousClasse;
-    private String carburantId;
+    private Long carburantId;
     private String carburant;
     private BigDecimal primeNette;
     private BigDecimal primeParPlace;

@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 @Builder
 public class ContratActionsResponse {
-    private String contratId;
+    private Long contratId;
     private Boolean renouvelable;
     private Boolean avenantsAutorises;
     private Boolean carteVerteAutorisee;

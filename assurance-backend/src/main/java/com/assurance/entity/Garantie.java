@@ -60,7 +60,7 @@ public class Garantie extends BaseEntity {
     private Boolean defenseRecours = false;
 
     @Column(name = "remplace_par_id", length = 36)
-    private String remplaceParId;
+    private Long remplaceParId;
 
     @Builder.Default
     @Column(name = "requiert_valeur_venale", nullable = false)

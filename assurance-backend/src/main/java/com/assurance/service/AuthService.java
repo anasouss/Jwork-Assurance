@@ -72,7 +72,7 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public List<SessionResponse> getActiveSessions(String userId, String currentSessionId) {
+    public List<SessionResponse> getActiveSessions(Long userId, Long currentSessionId) {
         return refreshTokenRepository
                 .findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByLastActivityAtDesc(userId, LocalDateTime.now())
                 .stream()
@@ -89,7 +89,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void revokeSession(String userId, String sessionId) {
+    public void revokeSession(Long userId, Long sessionId) {
         RefreshSession session = refreshTokenRepository.findById(sessionId)
                 .orElseThrow(() -> new BadRequestException("Session not found"));
         if (!session.getUser().getId().equals(userId)) {
@@ -100,7 +100,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(String userId, ChangePasswordRequest request) {
+    public void changePassword(Long userId, ChangePasswordRequest request) {
         Utilisateur user = userRepository.findById(userId)
                 .orElseThrow(() -> new UnauthorizedException("Utilisateur non authentifie"));
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {

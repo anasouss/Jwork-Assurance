@@ -42,14 +42,14 @@ public class ContratController {
 
     @PostMapping("/previsualisation-quittance")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserQuittanceCreation(@RequestBody CreateContratRequest request) {
-        if (request.getAgenceId() == null || request.getAgenceId().isBlank()) {
+        if (request.getAgenceId() == null) {
             request.setAgenceId(TenantContext.getCurrentAgence());
         }
         return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserQuittance(request)));
     }
 
     @PostMapping("/{id}/renouvellements")
-    public ResponseEntity<ApiResponse<ContratResponse>> renouveler(@PathVariable String id, @Valid @RequestBody CreateContratRequest request) {
+    public ResponseEntity<ApiResponse<ContratResponse>> renouveler(@PathVariable Long id, @Valid @RequestBody CreateContratRequest request) {
         return ResponseEntity.ok(ApiResponse.success(contratService.renouveler(TenantContext.getCurrentAgence(), id, request), "Contrat renouvele"));
     }
 
@@ -59,23 +59,23 @@ public class ContratController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ContratResponse>> get(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<ContratResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(contratService.get(TenantContext.getCurrentAgence(), id)));
     }
 
     @GetMapping("/{id}/actions")
-    public ResponseEntity<ApiResponse<ContratActionsResponse>> actions(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<ContratActionsResponse>> actions(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(contratActionService.getActions(TenantContext.getCurrentAgence(), id)));
     }
 
     @GetMapping("/{id}/quittances")
-    public ResponseEntity<ApiResponse<List<QuittanceResponse>>> quittances(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<List<QuittanceResponse>>> quittances(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.listQuittances(TenantContext.getCurrentAgence(), id)));
     }
 
     @PostMapping("/{id}/mouvements/previsualisation-quittance")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserQuittance(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody MouvementContratRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.previsualiserQuittance(TenantContext.getCurrentAgence(), id, request)));
@@ -83,7 +83,7 @@ public class ContratController {
 
     @PostMapping("/{id}/mouvements")
     public ResponseEntity<ApiResponse<QuittanceResponse>> creerMouvement(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody MouvementContratRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.creerMouvement(TenantContext.getCurrentAgence(), id, request), "Mouvement cree"));
@@ -91,7 +91,7 @@ public class ContratController {
 
     @PostMapping("/{id}/assistances")
     public ResponseEntity<ApiResponse<AssistanceContratResponse>> upsertAssistance(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertAssistanceContratRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(assistanceContratService.upsert(TenantContext.getCurrentAgence(), id, request), "Assistance enregistree"));

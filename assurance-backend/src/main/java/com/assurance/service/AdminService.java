@@ -76,7 +76,7 @@ public class AdminService {
     }
 
     @Transactional
-    public AdminUtilisateurResponse updateUser(String id, UpsertUtilisateurRequest request) {
+    public AdminUtilisateurResponse updateUser(Long id, UpsertUtilisateurRequest request) {
         Utilisateur actor = currentUser();
         requireAny(actor, "user:manage", "config:manage");
         Utilisateur user = utilisateurRepository.findById(id)
@@ -101,7 +101,7 @@ public class AdminService {
     }
 
     @Transactional
-    public void deactivateUser(String id) {
+    public void deactivateUser(Long id) {
         Utilisateur actor = currentUser();
         requireAny(actor, "user:manage", "config:manage");
         if (id.equals(actor.getId())) {
@@ -115,7 +115,7 @@ public class AdminService {
     }
 
     @Transactional
-    public void resetPassword(String id, ResetUserPasswordRequest request) {
+    public void resetPassword(Long id, ResetUserPasswordRequest request) {
         Utilisateur actor = currentUser();
         requireAny(actor, "user:manage", "config:manage");
         Utilisateur user = utilisateurRepository.findById(id)
@@ -153,7 +153,7 @@ public class AdminService {
     }
 
     @Transactional
-    public AdminRoleResponse updateRole(String id, UpsertRoleRequest request) {
+    public AdminRoleResponse updateRole(Long id, UpsertRoleRequest request) {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:manage", "config:manage");
         Role role = roleRepository.findById(id)
@@ -176,7 +176,7 @@ public class AdminService {
     }
 
     @Transactional
-    public void deleteRole(String id) {
+    public void deleteRole(Long id) {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:manage", "config:manage");
         Role role = roleRepository.findById(id)
@@ -229,7 +229,7 @@ public class AdminService {
     }
 
     @Transactional
-    public AdminAgenceResponse updateAgency(String id, UpsertAgenceRequest request) {
+    public AdminAgenceResponse updateAgency(Long id, UpsertAgenceRequest request) {
         Utilisateur actor = currentUser();
         requireAny(actor, "agence:create", "config:manage");
         Agence agence = agenceRepository.findById(id)
@@ -249,8 +249,8 @@ public class AdminService {
     }
 
     private Utilisateur currentUser() {
-        String userId = TenantContext.getCurrentUser();
-        if (userId == null || userId.isBlank()) {
+        Long userId = TenantContext.getCurrentUser();
+        if (userId == null) {
             throw new UnauthorizedException("Utilisateur non authentifie");
         }
         return utilisateurRepository.findById(userId)
@@ -270,16 +270,16 @@ public class AdminService {
         return actor.getPermissions().contains(permission);
     }
 
-    private String requiredActorAgence(Utilisateur actor) {
+    private Long requiredActorAgence(Utilisateur actor) {
         if (actor.getAgence() == null) {
             throw new UnauthorizedException("Agence utilisateur manquante");
         }
         return actor.getAgence().getId();
     }
 
-    private Agence resolveManagedAgence(Utilisateur actor, String agenceId) {
-        String effectiveAgenceId = can(actor, "agence:view") ? agenceId : requiredActorAgence(actor);
-        if (effectiveAgenceId == null || effectiveAgenceId.isBlank()) {
+    private Agence resolveManagedAgence(Utilisateur actor, Long agenceId) {
+        Long effectiveAgenceId = can(actor, "agence:view") ? agenceId : requiredActorAgence(actor);
+        if (effectiveAgenceId == null) {
             throw new BadRequestException("Agence obligatoire");
         }
         Agence agence = agenceRepository.findById(effectiveAgenceId)
@@ -288,8 +288,8 @@ public class AdminService {
         return agence;
     }
 
-    private Agence resolveRoleAgence(Utilisateur actor, String agenceId) {
-        if (can(actor, "config:manage") && (agenceId == null || agenceId.isBlank())) {
+    private Agence resolveRoleAgence(Utilisateur actor, Long agenceId) {
+        if (can(actor, "config:manage") && agenceId == null) {
             return null;
         }
         return resolveManagedAgence(actor, agenceId);
@@ -304,7 +304,7 @@ public class AdminService {
         }
     }
 
-    private Role resolveAssignableRole(Utilisateur actor, String roleId, Agence agence) {
+    private Role resolveAssignableRole(Utilisateur actor, Long roleId, Agence agence) {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", roleId));
         if (role.getAgence() == null && !can(actor, "config:manage")) {
@@ -316,9 +316,9 @@ public class AdminService {
         return role;
     }
 
-    private Set<Permission> resolvePermissions(Utilisateur actor, Set<String> permissionIds) {
+    private Set<Permission> resolvePermissions(Utilisateur actor, Set<Long> permissionIds) {
         Set<Permission> permissions = new HashSet<>();
-        for (String permissionId : permissionIds == null ? Set.<String>of() : permissionIds) {
+        for (Long permissionId : permissionIds == null ? Set.<Long>of() : permissionIds) {
             Permission permission = permissionRepository.findById(permissionId)
                     .orElseThrow(() -> new ResourceNotFoundException("Permission", permissionId));
             if (Boolean.TRUE.equals(permission.getSuperAdminOnly()) && !can(actor, "config:manage")) {
@@ -329,7 +329,7 @@ public class AdminService {
         return permissions;
     }
 
-    private void ensureUniqueRoleCode(Agence agence, String code, String currentId) {
+    private void ensureUniqueRoleCode(Agence agence, String code, Long currentId) {
         boolean exists = agence == null
                 ? (currentId == null
                     ? roleRepository.existsByAgenceIsNullAndCodeIgnoreCase(code)

@@ -14,7 +14,7 @@ public class ParametreApplicationService {
 
     private final ParametreApplicationRepository parametreApplicationRepository;
 
-    public String getValeur(String agenceId, String code, String valeurParDefaut) {
+    public String getValeur(Long agenceId, String code, String valeurParDefaut) {
         Optional<ParametreApplication> parametreAgence = agenceId == null ? Optional.empty()
                 : parametreApplicationRepository.findByAgence_IdAndCodeIgnoreCaseAndActifTrue(agenceId, code);
         return parametreAgence
@@ -24,7 +24,7 @@ public class ParametreApplicationService {
                 .orElse(valeurParDefaut);
     }
 
-    public BigDecimal getDecimal(String agenceId, String code, BigDecimal valeurParDefaut) {
+    public BigDecimal getDecimal(Long agenceId, String code, BigDecimal valeurParDefaut) {
         String valeur = getValeur(agenceId, code, null);
         if (valeur == null || valeur.isBlank()) {
             return valeurParDefaut;
@@ -36,7 +36,7 @@ public class ParametreApplicationService {
         }
     }
 
-    public boolean getBoolean(String agenceId, String code, boolean valeurParDefaut) {
+    public boolean getBoolean(Long agenceId, String code, boolean valeurParDefaut) {
         String valeur = getValeur(agenceId, code, null);
         if (valeur == null || valeur.isBlank()) {
             return valeurParDefaut;

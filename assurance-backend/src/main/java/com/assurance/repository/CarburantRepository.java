@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface CarburantRepository extends JpaRepository<Carburant, String> {
+public interface CarburantRepository extends JpaRepository<Carburant, Long> {
     Optional<Carburant> findByCodeIgnoreCase(String code);
     Optional<Carburant> findByLibelleIgnoreCase(String libelle);
 }

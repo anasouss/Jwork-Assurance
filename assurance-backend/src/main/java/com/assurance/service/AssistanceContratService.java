@@ -44,7 +44,7 @@ public class AssistanceContratService {
     private final EcheanceService echeanceService;
 
     @Transactional
-    public AssistanceContratResponse upsert(String agenceId, String contratId, UpsertAssistanceContratRequest request) {
+    public AssistanceContratResponse upsert(Long agenceId, Long contratId, UpsertAssistanceContratRequest request) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         Vehicule vehicule = vehiculeRepository.findById(request.getVehiculeId())
@@ -116,7 +116,7 @@ public class AssistanceContratService {
         element.setCompagnieAssurance(contrat.getCompagnieAssurance());
         element.setNature(NatureElementFacturable.ASSISTANCE);
         element.setStatut(StatutElementFacturable.A_QUITTANCER);
-        element.setReferenceSource(assistance.getId());
+        element.setReferenceSource(String.valueOf(assistance.getId()));
         element.setLibelle("Assistance - " + produitAssistance.getLibelle());
         element.setDateDebut(dateEffet);
         element.setDateFin(dateEcheance);

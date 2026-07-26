@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 public class SessionResponse {
-    private String id;
+    private Long id;
     private String deviceName;
     private String deviceType;
     private String ipAddress;

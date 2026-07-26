@@ -55,7 +55,7 @@ public class AttestationStockController {
 
     @PostMapping("/livraisons/{id}/lots")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> ajouterLot(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody AddLotAttestationRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -65,7 +65,7 @@ public class AttestationStockController {
     }
 
     @PostMapping("/livraisons/{id}/valider")
-    public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> valider(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> valider(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 livraisonAttestationService.valider(id),
                 "Livraison d'attestations validee"
@@ -74,8 +74,8 @@ public class AttestationStockController {
 
     @GetMapping("/disponibles")
     public ResponseEntity<ApiResponse<List<String>>> disponibles(
-            @RequestParam String contratId,
-            @RequestParam String usageId,
+            @RequestParam Long contratId,
+            @RequestParam Long usageId,
             @RequestParam(defaultValue = "") String fragment
     ) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(TenantContext.getCurrentAgence(), contratId)

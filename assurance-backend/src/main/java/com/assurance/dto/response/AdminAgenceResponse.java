@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 @Builder
 public class AdminAgenceResponse {
-    private String id;
+    private Long id;
     private String code;
     private String nom;
     private String adresse;

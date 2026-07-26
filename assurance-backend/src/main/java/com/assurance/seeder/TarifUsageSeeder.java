@@ -24,6 +24,11 @@ public class TarifUsageSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        Integer existingRows = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tarifs_usage", Integer.class);
+        if (existingRows != null && existingRows > 0) {
+            return;
+        }
+
         String sql = readBundledSql("data/tarifs_usage.sql");
         if (sql == null || sql.isBlank()) {
             return;

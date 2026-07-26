@@ -7,15 +7,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ContratRepository extends JpaRepository<Contrat, String> {
-    List<Contrat> findByAgenceIdOrderByCreatedAtDesc(String agenceId);
+public interface ContratRepository extends JpaRepository<Contrat, Long> {
+    List<Contrat> findByAgenceIdOrderByCreatedAtDesc(Long agenceId);
 
     @EntityGraph(attributePaths = {
             "agence",
             "compagnieAssurance",
             "convention"
     })
-    Optional<Contrat> findByAgenceIdAndId(String agenceId, String id);
+    Optional<Contrat> findByAgenceIdAndId(Long agenceId, Long id);
 
-    boolean existsByAgenceIdAndNumeroContrat(String agenceId, String numeroContrat);
+    boolean existsByAgenceIdAndNumeroContrat(Long agenceId, String numeroContrat);
 }

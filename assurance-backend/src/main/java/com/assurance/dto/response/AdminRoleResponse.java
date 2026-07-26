@@ -11,14 +11,14 @@ import java.util.stream.Collectors;
 @Data
 @Builder
 public class AdminRoleResponse {
-    private String id;
-    private String agenceId;
+    private Long id;
+    private Long agenceId;
     private String agenceNom;
     private String code;
     private String nom;
     private String description;
     private Boolean systemRole;
-    private Set<String> permissionIds;
+    private Set<Long> permissionIds;
     private Set<String> permissionCodes;
 
     public static AdminRoleResponse from(Role role) {

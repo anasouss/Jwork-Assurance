@@ -6,21 +6,21 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface LigneGrilleTarifaireRepository extends JpaRepository<LigneGrilleTarifaire, String> {
-    List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndActifTrue(String grilleTarifaireId);
+public interface LigneGrilleTarifaireRepository extends JpaRepository<LigneGrilleTarifaire, Long> {
+    List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndActifTrue(Long grilleTarifaireId);
 
-    List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndActifTrue(String grilleTarifaireId, String usageId);
+    List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndActifTrue(Long grilleTarifaireId, Long usageId);
 
     List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndGarantieIdAndActifTrueOrderByOrdreAffichageAsc(
-            String grilleTarifaireId,
-            String usageId,
-            String garantieId
+            Long grilleTarifaireId,
+            Long usageId,
+            Long garantieId
     );
 
     List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndGarantieIdAndModeTarificationAndActifTrueOrderByOrdreAffichageAsc(
-            String grilleTarifaireId,
-            String usageId,
-            String garantieId,
+            Long grilleTarifaireId,
+            Long usageId,
+            Long garantieId,
             ModeTarificationGarantie modeTarification
     );
 }

@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface TarifUsageRepository extends JpaRepository<TarifUsage, String> {
-    List<TarifUsage> findByUsage_IdAndActifTrue(String usageId);
+public interface TarifUsageRepository extends JpaRepository<TarifUsage, Long> {
+    List<TarifUsage> findByUsage_IdAndActifTrue(Long usageId);
 }

@@ -115,7 +115,7 @@ public class CalculGarantieService {
         if (contrat != null && contrat.getTauxRc() != null && contrat.getTauxRc().compareTo(BigDecimal.ZERO) > 0) {
             return contrat.getTauxRc();
         }
-        String agenceId = contrat != null && contrat.getAgence() != null ? contrat.getAgence().getId() : null;
+        Long agenceId = contrat != null && contrat.getAgence() != null ? contrat.getAgence().getId() : null;
         if (isUsageTpv(contrat, usage)) {
             return parametreApplicationService.getDecimal(agenceId, "MULTIPLICATEUR_RC_TPV", BigDecimal.ONE);
         }
@@ -195,7 +195,7 @@ public class CalculGarantieService {
     }
 
     private BigDecimal resolveTauxRemorque(Contrat contrat) {
-        String agenceId = contrat != null && contrat.getAgence() != null ? contrat.getAgence().getId() : null;
+        Long agenceId = contrat != null && contrat.getAgence() != null ? contrat.getAgence().getId() : null;
         String usageDominant = resolveUsageDominantVehicules(contrat);
         return switch (usageDominant) {
             case "A" -> parametreApplicationService.getDecimal(agenceId, "TAUX_RC_REMORQUE_A", BigDecimal.valueOf(0.10));
@@ -311,7 +311,7 @@ public class CalculGarantieService {
         if (!sahara) {
             return BigDecimal.ONE;
         }
-        String agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
+        Long agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
         return parametreApplicationService.getDecimal(agenceId, "TAUX_RSS", BigDecimal.valueOf(0.60));
     }
 

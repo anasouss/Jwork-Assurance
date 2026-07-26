@@ -2,7 +2,6 @@ package com.assurance.dto.request;
 
 import com.assurance.enums.Fractionnement;
 import com.assurance.enums.TypeEcheanceConvention;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -11,13 +10,13 @@ import java.util.List;
 
 @Data
 public class UpsertConventionRequest {
-    @NotBlank
-    private String compagnieAssuranceId;
+    @NotNull
+    private Long compagnieAssuranceId;
 
-    @NotBlank
+    @jakarta.validation.constraints.NotBlank
     private String code;
 
-    @NotBlank
+    @jakarta.validation.constraints.NotBlank
     private String intitule;
 
     private String description;
@@ -31,12 +30,12 @@ public class UpsertConventionRequest {
     private String echeance;
     private Fractionnement fractionnement;
 
-    @NotBlank
-    private String categorieClientId;
+    @NotNull
+    private Long categorieClientId;
 
-    @NotBlank
-    private String grilleTarifaireId;
+    @NotNull
+    private Long grilleTarifaireId;
 
-    private List<String> usageIds;
+    private List<Long> usageIds;
     private Boolean actif;
 }

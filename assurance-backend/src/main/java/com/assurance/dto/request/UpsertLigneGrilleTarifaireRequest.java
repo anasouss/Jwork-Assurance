@@ -1,20 +1,20 @@
 package com.assurance.dto.request;
 
 import com.assurance.enums.ModeTarificationGarantie;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
 public class UpsertLigneGrilleTarifaireRequest {
-    private String id;
+    private Long id;
 
-    @NotBlank
-    private String garantieId;
+    @NotNull
+    private Long garantieId;
 
-    private String usageId;
-    private String categorieTransportId;
+    private Long usageId;
+    private Long categorieTransportId;
     private BigDecimal puissanceFiscaleMin;
     private BigDecimal puissanceFiscaleMax;
     private BigDecimal nombrePlacesMin;

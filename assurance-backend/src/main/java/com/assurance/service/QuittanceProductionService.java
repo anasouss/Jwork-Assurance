@@ -124,7 +124,7 @@ public class QuittanceProductionService {
 
     private String genererNumeroQuittance(Contrat contrat, MouvementContrat mouvement, TypeMouvementContrat typeMouvement) {
         String base = contrat.getNumeroContrat() == null || contrat.getNumeroContrat().isBlank() ? "CONTRAT" : contrat.getNumeroContrat();
-        String suffix = mouvement.getId() == null ? typeMouvement.getCode() : mouvement.getId().substring(0, Math.min(8, mouvement.getId().length())).toUpperCase();
+        String suffix = mouvement.getId() == null ? typeMouvement.getCode() : String.valueOf(mouvement.getId());
         return base + "-" + typeMouvement.getCode() + "-" + suffix;
     }
 }

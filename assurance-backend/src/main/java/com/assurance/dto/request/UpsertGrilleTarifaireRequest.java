@@ -1,14 +1,15 @@
 package com.assurance.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class UpsertGrilleTarifaireRequest {
-    private String agenceId;
+    private Long agenceId;
 
-    @NotBlank
-    private String compagnieAssuranceId;
+    @NotNull
+    private Long compagnieAssuranceId;
 
     @NotBlank
     private String libelle;

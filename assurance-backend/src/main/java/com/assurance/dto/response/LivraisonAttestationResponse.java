@@ -11,9 +11,9 @@ import java.util.List;
 @Getter
 @Builder
 public class LivraisonAttestationResponse {
-    private String id;
-    private String agenceId;
-    private String compagnieAssuranceId;
+    private Long id;
+    private Long agenceId;
+    private Long compagnieAssuranceId;
     private String compagnieAssuranceNom;
     private SourceLivraisonAttestation source;
     private StatutLivraisonAttestation statut;
@@ -30,10 +30,10 @@ public class LivraisonAttestationResponse {
     @Getter
     @Builder
     public static class LigneView {
-        private String id;
-        private String usageId;
+        private Long id;
+        private Long usageId;
         private String usageCode;
-        private String groupeUsageAttestationId;
+        private Long groupeUsageAttestationId;
         private String groupeUsageAttestationCode;
         private String groupeUsageAttestationLibelle;
         private Integer quantiteDemandee;
@@ -43,7 +43,7 @@ public class LivraisonAttestationResponse {
     @Getter
     @Builder
     public static class LotView {
-        private String id;
+        private Long id;
         private String groupeUsageAttestationCode;
         private String prefixe;
         private String numeroDebut;

@@ -33,7 +33,7 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenExpiration);
         return Jwts.builder()
-                .subject(user.getId())
+                .subject(String.valueOf(user.getId()))
                 .claim("email", user.getEmail())
                 .claim("role", user.getRoleCode())
                 .claim("agenceId", user.getAgence() != null ? user.getAgence().getId() : null)
@@ -48,8 +48,8 @@ public class JwtTokenProvider {
         return UUID.randomUUID().toString();
     }
 
-    public String getUserIdFromToken(String token) {
-        return getClaims(token).getSubject();
+    public Long getUserIdFromToken(String token) {
+        return Long.valueOf(getClaims(token).getSubject());
     }
 
     public Claims getClaims(String token) {

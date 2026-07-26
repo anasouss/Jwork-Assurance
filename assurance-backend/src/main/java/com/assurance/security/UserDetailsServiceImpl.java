@@ -22,7 +22,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return UserPrincipal.from(user);
     }
 
-    public UserDetails loadUserById(String userId) {
+    public UserDetails loadUserById(Long userId) {
         Utilisateur user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
         return UserPrincipal.from(user);

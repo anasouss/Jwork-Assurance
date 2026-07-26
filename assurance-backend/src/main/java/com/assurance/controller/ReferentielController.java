@@ -123,7 +123,7 @@ public class ReferentielController {
 
     @PutMapping("/usages/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateUsage(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertUsageRequest request
     ) {
         Usage usage = usageRepository.findById(id)
@@ -158,7 +158,7 @@ public class ReferentielController {
 
     @PutMapping("/marques/{id}")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateMarque(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertReferenceRequest request
     ) {
         Marque marque = marqueRepository.findById(id)
@@ -194,7 +194,7 @@ public class ReferentielController {
 
     @PutMapping("/carrosseries/{id}")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarrosserie(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertReferenceRequest request
     ) {
         Carrosserie carrosserie = carrosserieRepository.findById(id)
@@ -231,7 +231,7 @@ public class ReferentielController {
 
     @PutMapping("/carburants/{id}")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarburant(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertCodeReferenceRequest request
     ) {
         Carburant carburant = carburantRepository.findById(id)
@@ -269,7 +269,7 @@ public class ReferentielController {
 
     @PutMapping("/sous-classes/{id}")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateSousClasse(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertCodeReferenceRequest request
     ) {
         SousClasse sousClasse = sousClasseRepository.findById(id)
@@ -309,7 +309,7 @@ public class ReferentielController {
 
     @PutMapping("/compagnies-assurance/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssurance(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertCompagnieAssuranceRequest request
     ) {
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(id)
@@ -342,12 +342,11 @@ public class ReferentielController {
     @GetMapping("/produits-assistance")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> produitsAssistance(
-            @RequestParam(required = false) String compagnieAssistanceId
+            @RequestParam(required = false) Long compagnieAssistanceId
     ) {
         return ResponseEntity.ok(ApiResponse.success(produitAssistanceRepository.findAll(Sort.by("libelle")).stream()
                 .filter(produit -> Boolean.TRUE.equals(produit.getActif()))
                 .filter(produit -> compagnieAssistanceId == null
-                        || compagnieAssistanceId.isBlank()
                         || (produit.getCompagnieAssistance() != null
                         && produit.getCompagnieAssistance().getId().equals(compagnieAssistanceId)))
                 .map(this::toProduitAssistanceResponse)
@@ -357,9 +356,9 @@ public class ReferentielController {
     @GetMapping("/grilles-tarifaires")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> grillesTarifaires(
-            @RequestParam(required = false) String compagnieAssuranceId
+            @RequestParam(required = false) Long compagnieAssuranceId
     ) {
-        List<GrilleTarifaire> grilles = compagnieAssuranceId == null || compagnieAssuranceId.isBlank()
+        List<GrilleTarifaire> grilles = compagnieAssuranceId == null
                 ? grilleTarifaireRepository.findAllByOrderByCreatedAtDesc()
                 : grilleTarifaireRepository.findByCompagnieAssuranceIdAndActifTrueOrderByLibelleAsc(compagnieAssuranceId);
         return ResponseEntity.ok(ApiResponse.success(grilles.stream()
@@ -397,7 +396,7 @@ public class ReferentielController {
 
     @PutMapping("/tarifs-usage/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifUsage(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertTarifUsageRequest request
     ) {
         TarifUsage tarif = tarifUsageRepository.findById(id)
@@ -407,7 +406,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/tarifs-usage/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteTarifUsage(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> deleteTarifUsage(@PathVariable Long id) {
         TarifUsage tarif = tarifUsageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TarifUsage", id));
         tarif.setActif(false);
@@ -443,10 +442,10 @@ public class ReferentielController {
     @GetMapping("/conventions")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> conventions(
-            @RequestParam(required = false) String compagnieAssuranceId
+            @RequestParam(required = false) Long compagnieAssuranceId
     ) {
-        String agenceId = TenantContext.getCurrentAgence();
-        List<Convention> conventions = compagnieAssuranceId == null || compagnieAssuranceId.isBlank()
+        Long agenceId = TenantContext.getCurrentAgence();
+        List<Convention> conventions = compagnieAssuranceId == null
                 ? conventionRepository.findByAgenceIdAndActifTrueOrderByIntituleAsc(agenceId)
                 : conventionRepository.findByAgenceIdAndCompagnieAssuranceIdAndActifTrueOrderByIntituleAsc(agenceId, compagnieAssuranceId);
         return ResponseEntity.ok(ApiResponse.success(conventions.stream()
@@ -465,10 +464,10 @@ public class ReferentielController {
     @PutMapping("/conventions/{id}")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateConvention(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertConventionRequest request
     ) {
-        String agenceId = TenantContext.getCurrentAgence();
+        Long agenceId = TenantContext.getCurrentAgence();
         Convention convention = conventionRepository.findByAgenceIdAndId(agenceId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Convention", id));
         applyConventionRequest(convention, request);
@@ -493,7 +492,7 @@ public class ReferentielController {
 
     @PutMapping("/grilles-tarifaires/{id}")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateGrilleTarifaire(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertGrilleTarifaireRequest request
     ) {
         GrilleTarifaire grille = grilleTarifaireRepository.findById(id)
@@ -534,7 +533,7 @@ public class ReferentielController {
 
     @PutMapping("/garanties/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateGarantie(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertGarantieRequest request
     ) {
         Garantie garantie = garantieRepository.findById(id)
@@ -551,16 +550,16 @@ public class ReferentielController {
     @GetMapping("/lignes-grille-tarifaire")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> lignesGrilleTarifaire(
-            @RequestParam String grilleId,
-            @RequestParam(required = false) String usageId,
-            @RequestParam(required = false) String garantieId
+            @RequestParam Long grilleId,
+            @RequestParam(required = false) Long usageId,
+            @RequestParam(required = false) Long garantieId
     ) {
-        if (grilleId == null || grilleId.isBlank()) {
+        if (grilleId == null) {
             throw new BadRequestException("La grille tarifaire est obligatoire");
         }
         return ResponseEntity.ok(ApiResponse.success(ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndActifTrue(grilleId).stream()
-                .filter(ligne -> usageId == null || usageId.isBlank() || ligne.getUsage() == null || ligne.getUsage().getId().equals(usageId))
-                .filter(ligne -> garantieId == null || garantieId.isBlank() || ligne.getGarantie().getId().equals(garantieId))
+                .filter(ligne -> usageId == null || ligne.getUsage() == null || ligne.getUsage().getId().equals(usageId))
+                .filter(ligne -> garantieId == null || ligne.getGarantie().getId().equals(garantieId))
                 .map(ligne -> option(ligne.getId(), null, ligne.getLibelleOption() != null ? ligne.getLibelleOption() : ligne.getGarantie().getLibelle())
                         .putValue("garantieId", ligne.getGarantie().getId())
                         .putValue("garantieCode", ligne.getGarantie().getCode())
@@ -588,14 +587,14 @@ public class ReferentielController {
 
     @GetMapping("/formules-garantie-personne")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> formulesGarantiePersonne(
-            @RequestParam String grilleId,
-            @RequestParam(required = false) String usageId,
-            @RequestParam(required = false) String garantieId
+            @RequestParam Long grilleId,
+            @RequestParam(required = false) Long usageId,
+            @RequestParam(required = false) Long garantieId
     ) {
-        if (grilleId == null || grilleId.isBlank()) {
+        if (grilleId == null) {
             throw new BadRequestException("La grille tarifaire est obligatoire");
         }
-        Usage usageFilter = usageId == null || usageId.isBlank() ? null :
+        Usage usageFilter = usageId == null ? null :
                 usageRepository.findById(usageId)
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
         if (usageFilter != null && !usageAllowsGarantiesPersonne(usageFilter)) {
@@ -604,15 +603,15 @@ public class ReferentielController {
         return ResponseEntity.ok(ApiResponse.success(formuleGarantiePersonneRepository.findAll(Sort.by("ordreAffichage", "formule")).stream()
                 .filter(formule -> Boolean.TRUE.equals(formule.getActif()))
                 .filter(formule -> formule.getGrilleTarifaire() != null && formule.getGrilleTarifaire().getId().equals(grilleId))
-                .filter(formule -> usageId == null || usageId.isBlank() || formule.getUsage() == null || formule.getUsage().getId().equals(usageId))
-                .filter(formule -> garantieId == null || garantieId.isBlank() || formule.getGarantie().getId().equals(garantieId))
+                .filter(formule -> usageId == null || formule.getUsage() == null || formule.getUsage().getId().equals(usageId))
+                .filter(formule -> garantieId == null || formule.getGarantie().getId().equals(garantieId))
                 .map(this::toFormulePersonneResponse)
                 .toList()));
     }
 
     @PostMapping("/grilles-tarifaires/{grilleId}/lignes")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createLigneGrilleTarifaire(
-            @PathVariable String grilleId,
+            @PathVariable Long grilleId,
             @Valid @RequestBody UpsertLigneGrilleTarifaireRequest request
     ) {
         GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
@@ -625,7 +624,7 @@ public class ReferentielController {
 
     @PutMapping("/lignes-grille-tarifaire/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateLigneGrilleTarifaire(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertLigneGrilleTarifaireRequest request
     ) {
         LigneGrilleTarifaire ligne = ligneGrilleTarifaireRepository.findById(id)
@@ -637,8 +636,8 @@ public class ReferentielController {
     @PostMapping("/grilles-tarifaires/{grilleId}/usages/{usageId}/configuration")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> replaceGrilleUsageConfiguration(
-            @PathVariable String grilleId,
-            @PathVariable String usageId,
+            @PathVariable Long grilleId,
+            @PathVariable Long usageId,
             @Valid @RequestBody UpsertGrilleUsageConfigurationRequest request
     ) {
         GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
@@ -646,14 +645,14 @@ public class ReferentielController {
         Usage usage = usageRepository.findById(usageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
 
-        Set<String> ligneIds = new HashSet<>();
+        Set<Long> ligneIds = new HashSet<>();
         List<UpsertLigneGrilleTarifaireRequest> requestedLignes = request.getLignes() == null ? List.of() : request.getLignes();
         List<UpsertFormuleGarantiePersonneRequest> requestedFormules = request.getFormulesPersonne() == null ? List.of() : request.getFormulesPersonne();
 
         for (UpsertLigneGrilleTarifaireRequest ligneRequest : requestedLignes) {
             ligneRequest.setUsageId(usage.getId());
             ligneRequest.setActif(true);
-            LigneGrilleTarifaire ligne = ligneRequest.getId() == null || ligneRequest.getId().isBlank()
+            LigneGrilleTarifaire ligne = ligneRequest.getId() == null
                     ? new LigneGrilleTarifaire()
                     : ligneGrilleTarifaireRepository.findById(ligneRequest.getId()).orElseGet(LigneGrilleTarifaire::new);
             if (ligne.getGrilleTarifaire() != null && !ligne.getGrilleTarifaire().getId().equals(grille.getId())) {
@@ -671,11 +670,11 @@ public class ReferentielController {
         }
 
         if (request.getFormulesPersonne() != null) {
-            Set<String> formuleIds = new HashSet<>();
+            Set<Long> formuleIds = new HashSet<>();
             for (UpsertFormuleGarantiePersonneRequest formuleRequest : requestedFormules) {
                 formuleRequest.setUsageId(usage.getId());
                 formuleRequest.setActif(true);
-                FormuleGarantiePersonne formule = formuleRequest.getId() == null || formuleRequest.getId().isBlank()
+                FormuleGarantiePersonne formule = formuleRequest.getId() == null
                         ? new FormuleGarantiePersonne()
                         : formuleGarantiePersonneRepository.findById(formuleRequest.getId()).orElseGet(FormuleGarantiePersonne::new);
                 if (formule.getGrilleTarifaire() != null && !formule.getGrilleTarifaire().getId().equals(grille.getId())) {
@@ -705,7 +704,7 @@ public class ReferentielController {
 
     @PostMapping("/grilles-tarifaires/{grilleId}/formules-personne")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createFormuleGarantiePersonne(
-            @PathVariable String grilleId,
+            @PathVariable Long grilleId,
             @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
     ) {
         GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
@@ -718,7 +717,7 @@ public class ReferentielController {
 
     @PutMapping("/formules-garantie-personne/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateFormuleGarantiePersonne(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
     ) {
         FormuleGarantiePersonne formule = formuleGarantiePersonneRepository.findById(id)
@@ -787,7 +786,7 @@ public class ReferentielController {
 
     @PutMapping("/categories-transport/{id}")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCategorieTransport(
-            @PathVariable String id,
+            @PathVariable Long id,
             @Valid @RequestBody UpsertCategorieTransportRequest request
     ) {
         CategorieTransport categorie = categorieTransportRepository.findById(id)
@@ -861,7 +860,7 @@ public class ReferentielController {
     }
 
     private void applyConventionRequest(Convention convention, UpsertConventionRequest request) {
-        String agenceId = TenantContext.getCurrentAgence();
+        Long agenceId = TenantContext.getCurrentAgence();
         Agence agence = agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
@@ -874,7 +873,7 @@ public class ReferentielController {
             throw new BadRequestException("La grille tarifaire doit appartenir a la compagnie selectionnee");
         }
 
-        Set<String> usageIds = new LinkedHashSet<>(request.getUsageIds() == null ? List.of() : request.getUsageIds());
+        Set<Long> usageIds = new LinkedHashSet<>(request.getUsageIds() == null ? List.of() : request.getUsageIds());
         if (usageIds.isEmpty()) {
             throw new BadRequestException("Au moins un usage doit etre autorise pour la convention");
         }
@@ -883,7 +882,7 @@ public class ReferentielController {
             throw new BadRequestException("Un ou plusieurs usages sont introuvables");
         }
         if (categorieClient.getUsages() != null && !categorieClient.getUsages().isEmpty()) {
-            Set<String> allowedUsageIds = categorieClient.getUsages().stream()
+            Set<Long> allowedUsageIds = categorieClient.getUsages().stream()
                     .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
                     .map(Usage::getId)
                     .collect(java.util.stream.Collectors.toSet());
@@ -1059,7 +1058,7 @@ public class ReferentielController {
     }
 
     private void applyUsageRequest(Usage usage, UpsertUsageRequest request) {
-        GroupeUsageAttestation groupe = request.getGroupeUsageAttestationId() == null || request.getGroupeUsageAttestationId().isBlank() ? null :
+        GroupeUsageAttestation groupe = request.getGroupeUsageAttestationId() == null ? null :
                 groupeUsageAttestationRepository.findById(request.getGroupeUsageAttestationId())
                         .orElseThrow(() -> new ResourceNotFoundException("GroupeUsageAttestation", request.getGroupeUsageAttestationId()));
         usage.setCode(request.getCode());
@@ -1095,7 +1094,7 @@ public class ReferentielController {
     private void applyTarifUsageRequest(TarifUsage tarif, UpsertTarifUsageRequest request) {
         Usage usage = usageRepository.findById(request.getUsageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
-        CategorieTransport categorieTransport = request.getCategorieTransportId() == null || request.getCategorieTransportId().isBlank() ? null :
+        CategorieTransport categorieTransport = request.getCategorieTransportId() == null ? null :
                 categorieTransportRepository.findById(request.getCategorieTransportId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieTransport", request.getCategorieTransportId()));
         tarif.setUsage(usage);
@@ -1146,7 +1145,7 @@ public class ReferentielController {
     }
 
     private Carburant resolveTarifUsageCarburant(UpsertTarifUsageRequest request) {
-        String carburantId = blankToNull(request.getCarburantId());
+        Long carburantId = request.getCarburantId();
         if (carburantId != null) {
             return carburantRepository.findById(carburantId)
                     .orElseThrow(() -> new ResourceNotFoundException("Carburant", carburantId));
@@ -1161,8 +1160,8 @@ public class ReferentielController {
     }
 
     private List<TarifUsage> resolveBulkTarifTargets(BulkUpdateTarifUsageRequest request) {
-        Set<String> tarifIds = new HashSet<>(request.getTarifIds() == null ? List.of() : request.getTarifIds());
-        Set<String> usageIds = new HashSet<>(request.getUsageIds() == null ? List.of() : request.getUsageIds());
+        Set<Long> tarifIds = new HashSet<>(request.getTarifIds() == null ? List.of() : request.getTarifIds());
+        Set<Long> usageIds = new HashSet<>(request.getUsageIds() == null ? List.of() : request.getUsageIds());
         return tarifUsageRepository.findAll().stream()
                 .filter(tarif -> Boolean.TRUE.equals(tarif.getActif()))
                 .filter(tarif -> tarifIds.isEmpty() || tarifIds.contains(tarif.getId()))
@@ -1195,10 +1194,10 @@ public class ReferentielController {
         if (garantie.getTypeGarantie() == TypeGarantie.PERSONNE) {
             throw new BadRequestException("Les garanties personne doivent etre configurees dans les formules personne");
         }
-        Usage usage = request.getUsageId() == null || request.getUsageId().isBlank() ? null :
+        Usage usage = request.getUsageId() == null ? null :
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
-        CategorieTransport categorieTransport = request.getCategorieTransportId() == null || request.getCategorieTransportId().isBlank() ? null :
+        CategorieTransport categorieTransport = request.getCategorieTransportId() == null ? null :
                 categorieTransportRepository.findById(request.getCategorieTransportId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieTransport", request.getCategorieTransportId()));
         ligne.setGarantie(garantie);
@@ -1229,7 +1228,7 @@ public class ReferentielController {
         if (garantie.getTypeGarantie() != TypeGarantie.PERSONNE) {
             throw new BadRequestException("La garantie doit etre de type personne");
         }
-        Usage usage = request.getUsageId() == null || request.getUsageId().isBlank() ? null :
+        Usage usage = request.getUsageId() == null ? null :
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
         if (usage != null && !usageAllowsGarantiesPersonne(usage)) {
@@ -1328,7 +1327,7 @@ public class ReferentielController {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private OptionMap option(String id, String code, String libelle) {
+    private OptionMap option(Long id, String code, String libelle) {
         return new OptionMap()
                 .putValue("id", id)
                 .putValue("code", code)

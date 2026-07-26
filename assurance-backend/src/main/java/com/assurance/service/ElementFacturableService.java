@@ -22,7 +22,7 @@ public class ElementFacturableService {
     private final LigneQuittanceRepository ligneQuittanceRepository;
 
     @Transactional(readOnly = true)
-    public List<ElementFacturableResponse> list(String agenceId) {
+    public List<ElementFacturableResponse> list(Long agenceId) {
         return elementFacturableRepository.findByAgenceIdOrderByCreatedAtDesc(agenceId).stream()
                 .map(this::toResponse)
                 .toList();

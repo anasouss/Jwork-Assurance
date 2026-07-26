@@ -10,9 +10,9 @@ import java.util.List;
 @Data
 @Builder
 public class ClientResponse {
-    private String id;
-    private String agenceId;
-    private String clientParentId;
+    private Long id;
+    private Long agenceId;
+    private Long clientParentId;
     private TypeClient typeClient;
     private String codeClient;
     private String nomAffichage;
@@ -29,10 +29,10 @@ public class ClientResponse {
     private LocalDate dateValiditePermis;
     private LocalDate dateNaissance;
     private String adresse;
-    private String villeId;
+    private Long villeId;
     private String ville;
     private Boolean villeSaharienne;
-    private String categorieClientId;
+    private Long categorieClientId;
     private String categorieClientCode;
     private String categorieClientLibelle;
     private String telephone;
@@ -53,7 +53,7 @@ public class ClientResponse {
     @Data
     @Builder
     public static class TelephoneView {
-        private String id;
+        private Long id;
         private String numero;
         private Boolean whatsapp;
         private Boolean principal;

@@ -10,7 +10,7 @@ export function saveAuth(auth: AuthResponse) {
   accessToken = auth.accessToken;
   refreshToken = auth.refreshToken ?? refreshToken;
   storedUser = auth.user ?? null;
-  sessionId = auth.sessionId ?? null;
+  sessionId = auth.sessionId == null ? null : String(auth.sessionId);
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({

@@ -8,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface LotAttestationRepository extends JpaRepository<LotAttestation, String> {
+public interface LotAttestationRepository extends JpaRepository<LotAttestation, Long> {
     List<LotAttestation> findByLivraisonAndActifTrue(LivraisonAttestation livraison);
 
     @Query("select coalesce(sum(l.quantite), 0) from LotAttestation l where l.livraison = :livraison and l.actif = true")

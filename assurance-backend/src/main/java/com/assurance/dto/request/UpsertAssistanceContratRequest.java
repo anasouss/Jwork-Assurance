@@ -1,22 +1,22 @@
 package com.assurance.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDate;
 
 @Data
 public class UpsertAssistanceContratRequest {
-    private String mouvementContratId;
+    private Long mouvementContratId;
 
-    @NotBlank
-    private String vehiculeId;
+    @NotNull
+    private Long vehiculeId;
 
-    @NotBlank
-    private String compagnieAssistanceId;
+    @NotNull
+    private Long compagnieAssistanceId;
 
-    @NotBlank
-    private String produitAssistanceId;
+    @NotNull
+    private Long produitAssistanceId;
 
     private LocalDate dateSouscription;
     private LocalDate dateEffet;

@@ -56,7 +56,7 @@ public class LivraisonAttestationService {
     private final AttestationNumeroService attestationNumeroService;
 
     @Transactional
-    public LivraisonAttestationResponse creer(String agenceId, CreateLivraisonAttestationRequest request) {
+    public LivraisonAttestationResponse creer(Long agenceId, CreateLivraisonAttestationRequest request) {
         Agence agence = resolveAgence(agenceId, request.getAgenceId());
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
@@ -105,7 +105,7 @@ public class LivraisonAttestationService {
     }
 
     @Transactional
-    public LivraisonAttestationResponse ajouterLot(String livraisonId, AddLotAttestationRequest request) {
+    public LivraisonAttestationResponse ajouterLot(Long livraisonId, AddLotAttestationRequest request) {
         LivraisonAttestation livraison = findLivraison(livraisonId);
         if (Boolean.TRUE.equals(livraison.getValidee()) || livraison.getStatut() == StatutLivraisonAttestation.REFUSEE) {
             throw new BadRequestException("Livraison attestation verrouillee");
@@ -119,7 +119,7 @@ public class LivraisonAttestationService {
     }
 
     @Transactional
-    public LivraisonAttestationResponse valider(String livraisonId) {
+    public LivraisonAttestationResponse valider(Long livraisonId) {
         LivraisonAttestation livraison = findLivraison(livraisonId);
         recalculer(livraison);
         if (livraison.getQuantiteRecue() == null || livraison.getQuantiteRecue() <= 0) {
@@ -134,7 +134,7 @@ public class LivraisonAttestationService {
     }
 
     @Transactional(readOnly = true)
-    public List<LivraisonAttestationResponse> lister(String agenceId, SourceLivraisonAttestation source) {
+    public List<LivraisonAttestationResponse> lister(Long agenceId, SourceLivraisonAttestation source) {
         SourceLivraisonAttestation sourceEffective = source == null ? SourceLivraisonAttestation.COMMANDE : source;
         return livraisonAttestationRepository.findByAgenceIdAndSourceAndActifTrueOrderByCreatedAtDesc(agenceId, sourceEffective)
                 .stream()
@@ -226,8 +226,8 @@ public class LivraisonAttestationService {
     }
 
     private LigneDemandee resolveLigneDemandee(
-            String usageId,
-            String groupeUsageAttestationId,
+            Long usageId,
+            Long groupeUsageAttestationId,
             String groupeUsageAttestationCode,
             Integer quantite,
             String numeroDebut,
@@ -239,10 +239,10 @@ public class LivraisonAttestationService {
         if (quantite == null || quantite <= 0) {
             throw new BadRequestException("Quantite attestation invalide");
         }
-        Usage usage = usageId == null || usageId.isBlank() ? null : usageRepository.findById(usageId)
+        Usage usage = usageId == null ? null : usageRepository.findById(usageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
         GroupeUsageAttestation groupe = null;
-        if (hasText(groupeUsageAttestationId)) {
+        if (groupeUsageAttestationId != null) {
             groupe = groupeUsageAttestationRepository.findById(groupeUsageAttestationId)
                     .orElseThrow(() -> new ResourceNotFoundException("GroupeUsageAttestation", groupeUsageAttestationId));
         } else if (hasText(groupeUsageAttestationCode)) {
@@ -279,9 +279,9 @@ public class LivraisonAttestationService {
         int quantiteRecue = lotAttestationRepository.sumQuantiteByLivraison(livraison);
         livraison.setQuantiteRecue(Math.max(quantiteRecue, 0));
 
-        Map<String, Integer> recuParGroupe = new LinkedHashMap<>();
+        Map<Long, Integer> recuParGroupe = new LinkedHashMap<>();
         for (LotAttestation lot : lotAttestationRepository.findByLivraisonAndActifTrue(livraison)) {
-            String groupeId = lot.getGroupeUsageAttestation().getId();
+            Long groupeId = lot.getGroupeUsageAttestation().getId();
             recuParGroupe.put(groupeId, recuParGroupe.getOrDefault(groupeId, 0) + Math.max(0, lot.getQuantite()));
         }
         for (LigneLivraisonAttestation ligne : ligneLivraisonAttestationRepository.findByLivraisonAndActifTrue(livraison)) {
@@ -353,15 +353,15 @@ public class LivraisonAttestationService {
                 .build();
     }
 
-    private LivraisonAttestation findLivraison(String livraisonId) {
+    private LivraisonAttestation findLivraison(Long livraisonId) {
         return livraisonAttestationRepository.findById(livraisonId)
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
                 .orElseThrow(() -> new ResourceNotFoundException("LivraisonAttestation", livraisonId));
     }
 
-    private Agence resolveAgence(String agenceIdCourante, String agenceIdRequest) {
-        String agenceId = hasText(agenceIdRequest) ? agenceIdRequest : agenceIdCourante;
-        if (!hasText(agenceId)) {
+    private Agence resolveAgence(Long agenceIdCourante, Long agenceIdRequest) {
+        Long agenceId = agenceIdRequest != null ? agenceIdRequest : agenceIdCourante;
+        if (agenceId == null) {
             return null;
         }
         return agenceRepository.findById(agenceId)
@@ -372,7 +372,7 @@ public class LivraisonAttestationService {
         String prefix = livraison.getSource() == SourceLivraisonAttestation.RECEPTION_DIRECTE ? "REC-ATT" : "CMD-ATT";
         String date = DateTimeFormatter.BASIC_ISO_DATE.format(LocalDate.now());
         String compagnie = livraison.getCompagnieAssurance().getCode() == null ? "COMP" : livraison.getCompagnieAssurance().getCode();
-        return (prefix + "-" + date + "-" + compagnie + "-" + livraison.getId().substring(0, 8)).toUpperCase(Locale.ROOT);
+        return (prefix + "-" + date + "-" + compagnie + "-" + livraison.getId()).toUpperCase(Locale.ROOT);
     }
 
     private void validerRestrictionCompagnie(CompagnieAssurance compagnie, GroupeUsageAttestation groupe) {

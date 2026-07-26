@@ -5,8 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface ElementFacturableRepository extends JpaRepository<ElementFacturable, String> {
-    List<ElementFacturable> findByAgenceIdOrderByCreatedAtDesc(String agenceId);
+public interface ElementFacturableRepository extends JpaRepository<ElementFacturable, Long> {
+    List<ElementFacturable> findByAgenceIdOrderByCreatedAtDesc(Long agenceId);
 
-    List<ElementFacturable> findByContratIdOrderByCreatedAtDesc(String contratId);
+    List<ElementFacturable> findByContratIdOrderByCreatedAtDesc(Long contratId);
 }

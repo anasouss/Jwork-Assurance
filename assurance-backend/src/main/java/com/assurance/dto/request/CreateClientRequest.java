@@ -10,15 +10,15 @@ import java.util.List;
 
 @Data
 public class CreateClientRequest {
-    @NotBlank
-    private String agenceId;
+    @NotNull
+    private Long agenceId;
 
     @NotNull
     private TypeClient typeClient;
 
-    private String clientParentId;
-    private String villeId;
-    private String categorieClientId;
+    private Long clientParentId;
+    private Long villeId;
+    private Long categorieClientId;
     private String codeClient;
     private String civilite;
     private String prenom;

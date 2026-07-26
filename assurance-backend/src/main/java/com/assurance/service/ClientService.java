@@ -36,8 +36,8 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<ClientResponse> searchByIdentity(String agenceId, String cin, String rc) {
-        if (agenceId == null || agenceId.isBlank()) {
+    public Optional<ClientResponse> searchByIdentity(Long agenceId, String cin, String rc) {
+        if (agenceId == null) {
             throw new BadRequestException("L'agence est obligatoire");
         }
         if (cin != null && !cin.isBlank()) {
@@ -53,7 +53,7 @@ public class ClientService {
 
     @Transactional
     public Client createEntity(CreateClientRequest request) {
-        if (request.getAgenceId() == null || request.getAgenceId().isBlank()) {
+        if (request.getAgenceId() == null) {
             throw new BadRequestException("L'agence est obligatoire");
         }
         if (request.getTypeClient() == null) {

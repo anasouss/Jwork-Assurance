@@ -7,7 +7,7 @@ import java.util.Set;
 
 @Data
 public class UpsertRoleRequest {
-    private String agenceId;
+    private Long agenceId;
 
     @NotBlank
     private String code;
@@ -17,5 +17,5 @@ public class UpsertRoleRequest {
 
     private String description;
     private Boolean systemRole = false;
-    private Set<String> permissionIds = Set.of();
+    private Set<Long> permissionIds = Set.of();
 }

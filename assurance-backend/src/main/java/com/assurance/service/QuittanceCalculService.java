@@ -30,7 +30,7 @@ public class QuittanceCalculService {
             List<ContratGarantie> garanties,
             int nombreUnitesCnpac
     ) {
-        String agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
+        Long agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
         TypeImpactMouvement impact = typeMouvement == null || typeMouvement.getTypeImpact() == null ? TypeImpactMouvement.NORMAL : typeMouvement.getTypeImpact();
         if (impact == TypeImpactMouvement.ZERO) {
             return totalOnly(BigDecimal.ZERO);
@@ -149,7 +149,7 @@ public class QuittanceCalculService {
         );
     }
 
-    private BigDecimal resolveTauxEvcatRc(String agenceId, Contrat contrat, ContratGarantie contratGarantie) {
+    private BigDecimal resolveTauxEvcatRc(Long agenceId, Contrat contrat, ContratGarantie contratGarantie) {
         Usage usage = contratGarantie.getVehicule() != null ? contratGarantie.getVehicule().getUsage()
                 : contratGarantie.getRemorque() != null ? contratGarantie.getRemorque().getUsage()
                 : contrat.getUsage();
@@ -165,7 +165,7 @@ public class QuittanceCalculService {
         return primeNette.add(taxe).add(taxeParafiscale).add(accessoire).add(cnpac);
     }
 
-    private BigDecimal param(String agenceId, String code) {
+    private BigDecimal param(Long agenceId, String code) {
         return parametreApplicationService.getDecimal(agenceId, code, BigDecimal.ZERO);
     }
 

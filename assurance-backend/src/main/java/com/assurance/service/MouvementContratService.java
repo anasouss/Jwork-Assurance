@@ -93,7 +93,7 @@ public class MouvementContratService {
     }
 
     @Transactional(readOnly = true)
-    public QuittanceResponse previsualiserQuittance(String agenceId, String contratId, MouvementContratRequest request) {
+    public QuittanceResponse previsualiserQuittance(Long agenceId, Long contratId, MouvementContratRequest request) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());
         refuserPrevisualisationGeneriqueSiPayloadSpecialiseRequis(typeMouvement);
@@ -108,7 +108,7 @@ public class MouvementContratService {
     }
 
     @Transactional
-    public QuittanceResponse creerMouvement(String agenceId, String contratId, MouvementContratRequest request) {
+    public QuittanceResponse creerMouvement(Long agenceId, Long contratId, MouvementContratRequest request) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());
         refuserCreationGeneriqueSiPayloadSpecialiseRequis(typeMouvement);
@@ -169,7 +169,7 @@ public class MouvementContratService {
     }
 
     @Transactional(readOnly = true)
-    public List<QuittanceResponse> listQuittances(String agenceId, String contratId) {
+    public List<QuittanceResponse> listQuittances(Long agenceId, Long contratId) {
         resolveContrat(agenceId, contratId);
         return quittanceRepository.findByContratIdOrderByCreatedAtDesc(contratId).stream()
                 .map(this::toResponse)
@@ -295,7 +295,7 @@ public class MouvementContratService {
         return typeMouvement;
     }
 
-    private Contrat resolveContrat(String agenceId, String contratId) {
+    private Contrat resolveContrat(Long agenceId, Long contratId) {
         return contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
     }

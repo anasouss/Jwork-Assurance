@@ -42,18 +42,18 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}")
-    public ResponseEntity<ApiResponse<AdminUtilisateurResponse>> updateUser(@PathVariable String id, @Valid @RequestBody UpsertUtilisateurRequest request) {
+    public ResponseEntity<ApiResponse<AdminUtilisateurResponse>> updateUser(@PathVariable Long id, @Valid @RequestBody UpsertUtilisateurRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateUser(id, request), "Utilisateur modifie"));
     }
 
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable Long id) {
         adminService.deactivateUser(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Utilisateur desactive"));
     }
 
     @PutMapping("/users/{id}/password")
-    public ResponseEntity<ApiResponse<Void>> resetUserPassword(@PathVariable String id, @Valid @RequestBody ResetUserPasswordRequest request) {
+    public ResponseEntity<ApiResponse<Void>> resetUserPassword(@PathVariable Long id, @Valid @RequestBody ResetUserPasswordRequest request) {
         adminService.resetPassword(id, request);
         return ResponseEntity.ok(ApiResponse.success(null, "Mot de passe modifie"));
     }
@@ -69,12 +69,12 @@ public class AdminController {
     }
 
     @PutMapping("/roles/{id}")
-    public ResponseEntity<ApiResponse<AdminRoleResponse>> updateRole(@PathVariable String id, @Valid @RequestBody UpsertRoleRequest request) {
+    public ResponseEntity<ApiResponse<AdminRoleResponse>> updateRole(@PathVariable Long id, @Valid @RequestBody UpsertRoleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateRole(id, request), "Role modifie"));
     }
 
     @DeleteMapping("/roles/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteRole(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> deleteRole(@PathVariable Long id) {
         adminService.deleteRole(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Role supprime"));
     }
@@ -95,7 +95,7 @@ public class AdminController {
     }
 
     @PutMapping("/agencies/{id}")
-    public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgency(@PathVariable String id, @Valid @RequestBody UpsertAgenceRequest request) {
+    public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgency(@PathVariable Long id, @Valid @RequestBody UpsertAgenceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateAgency(id, request), "Agence modifiee"));
     }
 }

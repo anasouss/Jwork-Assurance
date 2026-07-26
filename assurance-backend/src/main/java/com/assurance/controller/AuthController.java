@@ -55,7 +55,7 @@ public class AuthController {
     }
 
     @DeleteMapping("/sessions/{sessionId}")
-    public ResponseEntity<ApiResponse<Void>> revokeSession(@PathVariable String sessionId) {
+    public ResponseEntity<ApiResponse<Void>> revokeSession(@PathVariable Long sessionId) {
         authService.revokeSession(TenantContext.getCurrentUser(), sessionId);
         return ResponseEntity.ok(ApiResponse.success(null, "Session revoquee"));
     }

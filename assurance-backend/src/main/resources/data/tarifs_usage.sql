@@ -1,5 +1,5 @@
 -- Converted from the Skay `usage_tarifs` dump for our `tarifs_usage` entity.
--- Import through reference codes/labels, not old numeric ids, so it works with create-drop UUID data.
+-- Import through reference codes/labels, not old numeric ids, so it works with generated Long ids.
 -- Old max bounds equal to 0 are converted to NULL/open-ended when the criterion is present.
 -- Legacy usage-id mapping used here:
 -- 1=A, 2=C1, 3=C2, 4=CYCLOS, 5=D1, 6=D2, 7=D3, 8=D4_SC1, 9=D4_SC2,
@@ -7,10 +7,7 @@
 -- 16=D8, 19=REMORQUE, 20=D11, 21=D12, 22=D10, 24=B1, 25=B2, 26=P, 27=F,
 -- 28=TRS D'ECOLIERS.
 
-DELETE FROM tarifs_usage WHERE id LIKE 'seed-rc-%';
-
 INSERT INTO tarifs_usage (
-    id,
     created_at,
     updated_at,
     usage_id,
@@ -27,7 +24,6 @@ INSERT INTO tarifs_usage (
     actif
 )
 SELECT
-    CONCAT('seed-rc-', LPAD(src.skay_id, 3, '0')),
     NOW(),
     NOW(),
     usage_ref.id,

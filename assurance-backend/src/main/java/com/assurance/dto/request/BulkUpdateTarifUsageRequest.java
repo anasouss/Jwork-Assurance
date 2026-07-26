@@ -10,8 +10,8 @@ import java.util.List;
 
 @Data
 public class BulkUpdateTarifUsageRequest {
-    private List<String> tarifIds;
-    private List<String> usageIds;
+    private List<Long> tarifIds;
+    private List<Long> usageIds;
 
     @NotBlank
     private String adjustmentType;

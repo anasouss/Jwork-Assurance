@@ -27,7 +27,7 @@ async function refreshAccessToken(): Promise<string> {
   if (!response.ok) {
     throw new Error("Refresh failed");
   }
-  const data = (await response.json()) as ApiResponse<AuthResponse>;
+  const data = normalizeApiIds(await response.json()) as ApiResponse<AuthResponse>;
   if (!data.success) {
     throw new Error(data.message ?? "Refresh failed");
   }
@@ -85,7 +85,7 @@ export async function apiFetch<T>(
       const errorData = await retry.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP ${retry.status}`);
     }
-    return (await retry.json()) as T;
+    return normalizeApiIds(await retry.json()) as T;
   }
 
   if (!response.ok) {
@@ -93,7 +93,7 @@ export async function apiFetch<T>(
     throw new Error(errorData.message || `HTTP ${response.status}`);
   }
 
-  return (await response.json()) as T;
+  return normalizeApiIds(await response.json()) as T;
 }
 
 export async function apiFetchBlob(
@@ -200,7 +200,33 @@ export async function apiUpload<T>(
     throw new Error(errorData.message || `HTTP ${response.status}`);
   }
 
-  return (await response.json()) as T;
+  return normalizeApiIds(await response.json()) as T;
+}
+
+export function normalizeApiIds(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeApiIds);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, normalizeApiEntry(key, entry)])
+    );
+  }
+  return value;
+}
+
+function normalizeApiEntry(key: string, entry: unknown) {
+  if (shouldNormalizeIdKey(key) && typeof entry === "number") {
+    return String(entry);
+  }
+  if (key.endsWith("Ids") && Array.isArray(entry)) {
+    return entry.map((item) => (typeof item === "number" ? String(item) : normalizeApiIds(item)));
+  }
+  return normalizeApiIds(entry);
+}
+
+function shouldNormalizeIdKey(key: string) {
+  return key === "id" || key === "sessionId" || key.endsWith("Id") || key.endsWith("Ids");
 }
 
 function toUploadNetworkError(error: unknown): Error {

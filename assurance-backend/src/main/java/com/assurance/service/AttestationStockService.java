@@ -35,7 +35,7 @@ public class AttestationStockService {
     private final ParametreApplicationService parametreApplicationService;
     private final AttestationNumeroService attestationNumeroService;
 
-    public boolean controleActif(String agenceId) {
+    public boolean controleActif(Long agenceId) {
         return parametreApplicationService.getBoolean(agenceId, PARAM_CONTROLE_STOCK_ATTESTATION, true);
     }
 

@@ -1,8 +1,8 @@
 package com.assurance.dto.request;
 
 import com.assurance.enums.SourceLivraisonAttestation;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,10 +14,10 @@ import java.util.List;
 @Setter
 public class CreateLivraisonAttestationRequest {
 
-    private String agenceId;
+    private Long agenceId;
 
-    @NotBlank
-    private String compagnieAssuranceId;
+    @NotNull
+    private Long compagnieAssuranceId;
 
     private SourceLivraisonAttestation source = SourceLivraisonAttestation.COMMANDE;
 
@@ -32,8 +32,8 @@ public class CreateLivraisonAttestationRequest {
     @Getter
     @Setter
     public static class Ligne {
-        private String usageId;
-        private String groupeUsageAttestationId;
+        private Long usageId;
+        private Long groupeUsageAttestationId;
         private String groupeUsageAttestationCode;
         private Integer quantiteDemandee;
         private String numeroDebut;

@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface LivraisonAttestationRepository extends JpaRepository<LivraisonAttestation, String> {
-    List<LivraisonAttestation> findByAgenceIdAndSourceAndActifTrueOrderByCreatedAtDesc(String agenceId, SourceLivraisonAttestation source);
+public interface LivraisonAttestationRepository extends JpaRepository<LivraisonAttestation, Long> {
+    List<LivraisonAttestation> findByAgenceIdAndSourceAndActifTrueOrderByCreatedAtDesc(Long agenceId, SourceLivraisonAttestation source);
     List<LivraisonAttestation> findByStatutAndActifTrue(StatutLivraisonAttestation statut);
 }

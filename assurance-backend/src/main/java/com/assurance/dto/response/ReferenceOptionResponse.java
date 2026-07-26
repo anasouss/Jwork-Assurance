@@ -6,11 +6,11 @@ import lombok.Data;
 @Data
 @Builder
 public class ReferenceOptionResponse {
-    private String id;
+    private Long id;
     private String code;
     private String libelle;
     private String description;
     private Boolean actif;
-    private String compagnieAssuranceId;
+    private Long compagnieAssuranceId;
     private String compagnieAssuranceLibelle;
 }

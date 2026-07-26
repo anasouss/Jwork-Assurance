@@ -12,7 +12,7 @@ public class UpsertUsageRequest {
     private String libelle;
 
     private String criteria;
-    private String groupeUsageAttestationId;
+    private Long groupeUsageAttestationId;
     private Boolean consommeAttestation;
     private Boolean byCarburantAndPf;
     private Boolean bySousClasse;

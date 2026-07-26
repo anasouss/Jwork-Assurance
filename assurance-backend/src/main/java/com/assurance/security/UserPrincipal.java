@@ -15,11 +15,11 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class UserPrincipal implements UserDetails {
 
-    private final String id;
+    private final Long id;
     private final String email;
     private final String password;
     private final String roleCode;
-    private final String agenceId;
+    private final Long agenceId;
     private final boolean active;
     private final Set<String> permissions;
 

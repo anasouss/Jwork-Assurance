@@ -7,6 +7,7 @@ import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
 import { emptyVehicule } from "../components/VehiculeSection";
 import type {
+  AssistanceDraft,
   ClientInput,
   CreateContratRequest,
   GarantieInput,
@@ -40,6 +41,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [crmPartage, setCrmPartage] = useState(false);
   const [crmPartageValeur, setCrmPartageValeur] = useState("");
   const [assistanceEnabled, setAssistanceEnabled] = useState(false);
+  const [assistanceDraft, setAssistanceDraft] = useState<AssistanceDraft>({ enabled: false });
   const [saisiePrimeNette, setSaisiePrimeNette] = useState(false);
   const [clients, setClients] = useState<ClientInput[]>([emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")]);
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([emptyVehicule()]);
@@ -169,7 +171,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     nombreVehicules: vehicules.length,
     nombreRemorques: remorques.length,
     prospection: false,
-    assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled : false,
+    assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled || assistanceDraft.enabled : false,
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     clients: clients.map((client) => ({
@@ -220,6 +222,7 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     crmPartage,
     crmPartageValeur,
     assistanceEnabled,
+    assistanceDraft.enabled,
     modeSaisieGaranties,
     saisiePrimeNette,
     vehicules,
@@ -572,6 +575,8 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setCrmPartageValeur,
     assistanceEnabled,
     setAssistanceEnabled,
+    assistanceDraft,
+    setAssistanceDraft,
     saisiePrimeNette,
     setSaisiePrimeNette,
     clients,

@@ -204,24 +204,25 @@ export function VehiculeSection({
                 <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
                   <Input value={vehicule.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />
                 </Field>
-                {showRemorqueFlag ? (
-                  <Field label="Remorque">
-                    <div className="flex h-9 items-center">
-                      <Checkbox checked={Boolean(vehicule.remorque)} onCheckedChange={(checked) => update(index, { remorque: Boolean(checked) })} />
-                    </div>
-                  </Field>
-                ) : null}
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                <Checkbox
-                  checked={Boolean(vehicule.organismeCredit)}
-                  onCheckedChange={(checked) =>
-                    update(index, Boolean(checked)
-                      ? { organismeCredit: true }
-                      : { organismeCredit: false, nomOrganismeCredit: undefined, montantCredit: undefined, dateFinCredit: undefined })
-                  }
-                />
-                <span className="text-sm">Organisme de crédit</span>
+              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+                {showRemorqueFlag ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={Boolean(vehicule.remorque)} onCheckedChange={(checked) => update(index, { remorque: Boolean(checked) })} />
+                    <span>Remorque</span>
+                  </label>
+                ) : null}
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={Boolean(vehicule.organismeCredit)}
+                    onCheckedChange={(checked) =>
+                      update(index, Boolean(checked)
+                        ? { organismeCredit: true }
+                        : { organismeCredit: false, nomOrganismeCredit: undefined, montantCredit: undefined, dateFinCredit: undefined })
+                    }
+                  />
+                  <span>Organisme de crédit</span>
+                </label>
               </div>
               {vehicule.organismeCredit ? (
                 <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-3">

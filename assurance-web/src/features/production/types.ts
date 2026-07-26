@@ -291,6 +291,17 @@ export type QuittanceInput = {
   primeTotale?: number;
 };
 
+export type AssistanceDraft = {
+  enabled: boolean;
+  compagnieAssistanceId?: string;
+  produitAssistanceId?: string;
+  dateEffet?: string;
+  dateSouscription?: string;
+  echeanceCode?: string;
+  dateEcheance?: string;
+  numeroContratOuQuittance?: string;
+};
+
 export type CreateContratRequest = {
   agenceId: string;
   compagnieAssuranceId?: string;

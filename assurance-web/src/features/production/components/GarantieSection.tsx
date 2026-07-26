@@ -1,12 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { EcheanceInput } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
+import { toDateOnly } from "../date";
 import { formatMoney, money, numberValue } from "../utils/format";
-import type { GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
+import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 
 export function GarantieSection({
   garanties,
@@ -27,6 +30,11 @@ export function GarantieSection({
   assistanceEnabled = false,
   setAssistanceEnabled,
   showAssistanceRow = false,
+  assistanceDraft,
+  setAssistanceDraft,
+  compagniesAssistance = [],
+  produitsAssistance = [],
+  assistanceUsageId,
 }: {
   garanties: ReferenceOption[];
   selected: GarantieInput[];
@@ -46,6 +54,11 @@ export function GarantieSection({
   assistanceEnabled?: boolean;
   setAssistanceEnabled?: (value: boolean) => void;
   showAssistanceRow?: boolean;
+  assistanceDraft?: AssistanceDraft;
+  setAssistanceDraft?: (value: AssistanceDraft) => void;
+  compagniesAssistance?: ReferenceOption[];
+  produitsAssistance?: ReferenceOption[];
+  assistanceUsageId?: string;
 }) {
   const byId = new Map(selected.map((item) => [item.garantieId, item]));
   const vehiculeGaranties = garanties
@@ -58,7 +71,7 @@ export function GarantieSection({
   const showPersonneTotals = selected.some((item) => personneIds.has(item.garantieId))
     || linePrimeNette(preview, "CORPOREL") != null
     || (preview?.accessoire ?? 0) > 0;
-  const showAssistanceTotal = assistanceEnabled || linePrimeNette(preview, "ASSISTANCE") != null;
+  const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || linePrimeNette(preview, "ASSISTANCE") != null;
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
   };
@@ -284,10 +297,28 @@ export function GarantieSection({
         </table>
       </div>
       {showAssistanceRow ? (
-        <div className={cn("mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold", !assistanceEnabled && "bg-muted/20 text-muted-foreground")}>
-          <Checkbox checked={assistanceEnabled} onCheckedChange={(checked) => setAssistanceEnabled?.(Boolean(checked))} />
-          <span>ASSISTANCE</span>
-        </div>
+        assistanceDraft && setAssistanceDraft ? (
+          <div className="mt-4">
+            <AssistanceTable
+              assistance={assistanceDraft}
+              onChange={(patch) => {
+                const next = { ...assistanceDraft, ...patch };
+                setAssistanceDraft(next);
+                if (patch.enabled !== undefined) {
+                  setAssistanceEnabled?.(Boolean(patch.enabled));
+                }
+              }}
+              compagniesAssistance={compagniesAssistance}
+              produitsAssistance={produitsAssistance}
+              usageId={assistanceUsageId}
+            />
+          </div>
+        ) : (
+          <div className={cn("mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold", !assistanceEnabled && "bg-muted/20 text-muted-foreground")}>
+            <Checkbox checked={assistanceEnabled} onCheckedChange={(checked) => setAssistanceEnabled?.(Boolean(checked))} />
+            <span>ASSISTANCE</span>
+          </div>
+        )
       ) : null}
       {personneGaranties.length > 0 ? (
         <div className="mt-4">
@@ -419,6 +450,113 @@ function GuaranteeTotalsSummary({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function AssistanceTable({
+  assistance,
+  onChange,
+  compagniesAssistance,
+  produitsAssistance,
+  usageId,
+}: {
+  assistance: AssistanceDraft;
+  onChange: (patch: Partial<AssistanceDraft>) => void;
+  compagniesAssistance: ReferenceOption[];
+  produitsAssistance: ReferenceOption[];
+  usageId?: string;
+}) {
+  const filteredProducts = produitsAssistance.filter((produit) => {
+    if (assistance.compagnieAssistanceId && produit.compagnieAssistanceId !== assistance.compagnieAssistanceId) {
+      return false;
+    }
+    const usageIds = Array.isArray(produit.usageIds) ? produit.usageIds.map(String) : [];
+    return usageIds.length === 0 || !usageId || usageIds.includes(usageId);
+  });
+  const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId)
+    ?? produitsAssistance.find((produit) => produit.id === assistance.produitAssistanceId);
+  const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
+        <Checkbox checked={assistance.enabled} onCheckedChange={(checked) => onChange({ enabled: Boolean(checked) })} />
+        <span>ASSISTANCE</span>
+      </div>
+      <table className="w-full min-w-[1100px] border-collapse text-sm">
+        <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+          <tr>
+            <th className="px-3 py-3 text-left">Date effet</th>
+            <th className="px-3 py-3 text-left">Date souscription</th>
+            <th className="px-3 py-3 text-left">Échéance</th>
+            <th className="px-3 py-3 text-left">Date échéance</th>
+            <th className="px-3 py-3 text-left">N° contrat</th>
+            <th className="px-3 py-3 text-left">Compagnie</th>
+            <th className="px-3 py-3 text-left">Produit</th>
+            <th className="px-3 py-3 text-right">Prime</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className={cn("border-t align-middle", !assistance.enabled && "bg-muted/20 text-muted-foreground")}>
+            <td className="px-3 py-2">
+              <DatePicker disabled={!assistance.enabled} date={assistance.dateEffet} onSelect={(date) => onChange({ dateEffet: toDateOnly(date) })} />
+            </td>
+            <td className="px-3 py-2">
+              <DatePicker disabled={!assistance.enabled} date={assistance.dateSouscription} onSelect={(date) => onChange({ dateSouscription: toDateOnly(date) })} />
+            </td>
+            <td className="px-3 py-2">
+              <EcheanceInput
+                disabled={!assistance.enabled}
+                value={assistance.echeanceCode ?? ""}
+                onValueChange={(value) => onChange({ echeanceCode: value })}
+              />
+            </td>
+            <td className="px-3 py-2">
+              <DatePicker disabled={!assistance.enabled} date={assistance.dateEcheance} onSelect={(date) => onChange({ dateEcheance: toDateOnly(date) })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input
+                disabled={!assistance.enabled}
+                value={assistance.numeroContratOuQuittance ?? ""}
+                placeholder="N° contrat"
+                onChange={(event) => onChange({ numeroContratOuQuittance: event.target.value })}
+              />
+            </td>
+            <td className="px-3 py-2">
+              <Select
+                disabled={!assistance.enabled}
+                value={assistance.compagnieAssistanceId ?? ""}
+                onValueChange={(value) => onChange({ compagnieAssistanceId: value, produitAssistanceId: undefined })}
+              >
+                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                <SelectContent>
+                  {compagniesAssistance.map((compagnie) => (
+                    <SelectItem key={compagnie.id} value={compagnie.id}>{compagnie.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </td>
+            <td className="px-3 py-2">
+              <Select
+                disabled={!assistance.enabled || filteredProducts.length === 0}
+                value={assistance.produitAssistanceId ?? ""}
+                onValueChange={(value) => onChange({ produitAssistanceId: value })}
+              >
+                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                <SelectContent>
+                  {filteredProducts.map((produit) => (
+                    <SelectItem key={produit.id} value={produit.id}>{produit.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </td>
+            <td className="px-3 py-2 text-right font-medium">
+              {assistance.enabled && prime != null ? formatMoney(prime) : "-"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -51,7 +51,7 @@ export function ContractInfoSection({
       tone="production"
       defaultOpen={false}
     >
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {showCategorieClient ? (
           <Field label="Catégorie">
             {categorieClientId ? (
@@ -124,8 +124,6 @@ export function ContractInfoSection({
         <Field label="N° contrat" required error={form.validationErrors.numeroContrat}>
           <Input value={form.numeroContrat} onChange={(event) => form.setNumeroContrat(event.target.value)} />
         </Field>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-4">
         <Field label="N° police">
           <Input value={form.numeroPolice} onChange={(event) => form.setNumeroPolice(event.target.value)} />
         </Field>
@@ -155,8 +153,6 @@ export function ContractInfoSection({
         <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
           <DatePicker disabled={form.showContractEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
         </Field>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-4">
         {showFractionnement ? (
           <Field label="Périodicité">
             <Select

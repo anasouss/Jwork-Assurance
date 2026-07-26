@@ -99,6 +99,11 @@ export function ContratFormLayout({
       assistanceEnabled={form.assistanceEnabled}
       setAssistanceEnabled={form.setAssistanceEnabled}
       showAssistanceRow={showConvention}
+      assistanceDraft={form.assistanceDraft}
+      setAssistanceDraft={form.setAssistanceDraft}
+      compagniesAssistance={form.refs.compagniesAssistance.data ?? []}
+      produitsAssistance={form.refs.produitsAssistance.data ?? []}
+      assistanceUsageId={form.usageId}
     />
   );
 

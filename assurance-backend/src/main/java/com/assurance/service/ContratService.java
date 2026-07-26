@@ -603,6 +603,12 @@ public class ContratService {
                 }
                 continue;
             }
+            if (input.getClient() != null) {
+                if (input.getClient().getAgenceId() == null) {
+                    input.getClient().setAgenceId(agenceId);
+                }
+                client = clientService.updateEntity(agenceId, client.getId(), input.getClient());
+            }
             saveClientLink(contrat, input, client);
             resolvedByRole.put(input.getRole(), client);
         }

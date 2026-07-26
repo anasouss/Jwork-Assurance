@@ -87,6 +87,7 @@ export function ContratFormLayout({
       lignes={showGrille ? form.lignesGrille.data ?? [] : []}
       formulesPersonne={showGrille ? form.formulesPersonne.data ?? [] : []}
       vehicules={form.vehicules}
+      usages={form.refs.usages.data ?? []}
       vehiculeCount={form.vehicules.length}
       showLigneGrille={false}
       automaticPricing={showGrille}

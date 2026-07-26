@@ -18,6 +18,7 @@ export function GarantieSection({
   lignes,
   formulesPersonne = [],
   vehicules = [],
+  usages = [],
   vehiculeCount,
   showLigneGrille = true,
   automaticPricing = false,
@@ -42,6 +43,7 @@ export function GarantieSection({
   lignes: ReferenceOption[];
   formulesPersonne?: ReferenceOption[];
   vehicules?: VehiculeInput[];
+  usages?: ReferenceOption[];
   vehiculeCount: number;
   showLigneGrille?: boolean;
   automaticPricing?: boolean;
@@ -153,6 +155,7 @@ export function GarantieSection({
               const manualValue = isManualValue(garantie, selectedLine);
               const displayCapital = guaranteeCapitalValue(garantie, selectedLine, selectedVehicle, item);
               const estimatedPrime = automaticPricing && checked && !isRc ? estimatePrime(selectedLine, displayCapital) : undefined;
+              const rcPrime = isRc ? resolveRcPrime(preview, selected, garanties, lignes, vehicules) : undefined;
 
               return (
                 <tr
@@ -214,7 +217,7 @@ export function GarantieSection({
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={isRc ? "Capital RC" : capitalDisplay(garantie, selectedLine, selectedVehicle, displayCapital)} />
+                          <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={isRc ? money(resolveRcCapital(selectedVehicle, usages)) : capitalDisplay(garantie, selectedLine, selectedVehicle, displayCapital)} />
                         )}
                       </td>
                       <td className="px-3 py-2">
@@ -239,8 +242,8 @@ export function GarantieSection({
                         )}
                       </td>
                       <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">{estimatedPrime == null ? "-" : money(estimatedPrime)}</td>
-                      <td className="px-3 py-2 text-right font-medium">{estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? "-" : money(estimatedPrime)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}</td>
                     </>
                   ) : (
                     <>
@@ -563,6 +566,40 @@ function AssistanceTable({
 
 function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
   return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
+}
+
+function autoPrimeDisplay(value?: number) {
+  return value == null ? "Calcul auto" : money(value);
+}
+
+function resolveRcPrime(
+  preview: QuittancePreview | null | undefined,
+  selected: GarantieInput[],
+  garanties: ReferenceOption[],
+  lignes: ReferenceOption[],
+  vehicules: VehiculeInput[]
+) {
+  const automobileNet = linePrimeNette(preview, "AUTOMOBILE");
+  if (automobileNet == null) {
+    return undefined;
+  }
+  const nonRcPrime = selected.reduce((total, item) => {
+    const garantie = garanties.find((option) => option.id === item.garantieId);
+    if (!garantie || Boolean(garantie.responsabiliteCivile) || String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE") {
+      return total;
+    }
+    const line = selectedLineFor(linesForGuarantee(lignes, garantie), item);
+    const vehicle = vehicules[item.vehiculeIndex ?? 0] ?? vehicules[0];
+    const capital = guaranteeCapitalValue(garantie, line, vehicle, item);
+    return total + (estimatePrime(line, capital) ?? 0);
+  }, 0);
+  return Math.max(0, automobileNet - nonRcPrime);
+}
+
+function resolveRcCapital(vehicule: VehiculeInput | undefined, usages: ReferenceOption[]) {
+  const usage = usages.find((item) => item.id === vehicule?.usageId);
+  const usageText = `${usage?.code ?? ""} ${usage?.libelle ?? ""}`.toUpperCase();
+  return usageText.includes("CYCLO") ? 5_000_000 : 50_000_000;
 }
 
 function defaultSource(garantie: ReferenceOption) {

@@ -151,8 +151,15 @@ export function GrilleTarifaireConfigurator({
     setPersonneDrafts((current) => current.map((draft) => draft.localKey === localKey ? { ...draft, ...patch } : draft));
   };
 
-  const setPersonneGarantieEnabled = (garantieId: string, checked: boolean) => {
-    setPersonneDrafts((current) => current.map((draft) => draft.garantieId === garantieId ? { ...draft, checked } : draft));
+  const setPersonneGarantieEnabled = (garantie: ReferenceOption, checked: boolean) => {
+    if (checked) {
+      setPersonneDrafts((current) => current.map((draft) => draft.garantieId === garantie.id ? { ...draft, checked: true } : draft));
+      return;
+    }
+    setPersonneDrafts((current) => [
+      ...current.filter((draft) => draft.garantieId !== garantie.id),
+      emptyPersonneDraft(garantie),
+    ]);
   };
 
   const addDraft = (garantie: ReferenceOption) => {
@@ -410,7 +417,7 @@ function PersonnesLinesTable({
   groups: { garantie: ReferenceOption; drafts: PersonneMatrixLine[] }[];
   activeUsage: ReferenceOption | null;
   updateDraft: (localKey: string, patch: Partial<PersonneMatrixLine>) => void;
-  setGarantieEnabled: (garantieId: string, checked: boolean) => void;
+  setGarantieEnabled: (garantie: ReferenceOption, checked: boolean) => void;
   addDraft: (garantie: ReferenceOption) => void;
   removeDraft: (draft: PersonneMatrixLine) => void;
 }) {
@@ -420,20 +427,20 @@ function PersonnesLinesTable({
         <div className="text-sm font-semibold text-blue-600">Garanties personnes</div>
         {activeUsage ? <Badge variant="outline">{activeUsage.code ? `Usage ${activeUsage.code}` : activeUsage.libelle}</Badge> : null}
       </div>
-      <Table>
+      <Table className="min-w-[1320px]">
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
-            <TableHead>Garantie</TableHead>
-            <TableHead className="min-w-32">Formule</TableHead>
-            <TableHead className="text-right">Décès</TableHead>
-            <TableHead className="text-right">Invalidité</TableHead>
-            <TableHead className="text-right">Frais médicaux</TableHead>
-            <TableHead className="text-right">Frais hospitalisation</TableHead>
-            <TableHead className="text-right">Frais funéraires</TableHead>
-            <TableHead className="text-right">Frais chirurgie</TableHead>
-            <TableHead className="text-right">Prime</TableHead>
-            <TableHead className="text-right">Accessoire</TableHead>
+            <TableHead className="w-24">Garantie</TableHead>
+            <TableHead className="w-40">Formule</TableHead>
+            <TableHead className="w-32 text-right">Décès</TableHead>
+            <TableHead className="w-32 text-right">Invalidité</TableHead>
+            <TableHead className="w-36 text-right">Frais médicaux</TableHead>
+            <TableHead className="w-44 text-right">Frais hospitalisation</TableHead>
+            <TableHead className="w-40 text-right">Frais funéraires</TableHead>
+            <TableHead className="w-40 text-right">Frais chirurgie</TableHead>
+            <TableHead className="w-28 text-right">Prime</TableHead>
+            <TableHead className="w-32 text-right">Accessoire</TableHead>
             <TableHead className="w-16 text-right"></TableHead>
           </TableRow>
         </TableHeader>
@@ -455,7 +462,7 @@ function PersonnesLinesTable({
                       <TableCell rowSpan={allDrafts.length} className="align-middle">
                         <Checkbox
                           checked={groupEnabled}
-                          onCheckedChange={(value) => setGarantieEnabled(garantie.id, value === true)}
+                          onCheckedChange={(value) => setGarantieEnabled(garantie, value === true)}
                         />
                       </TableCell>
                       <TableCell rowSpan={allDrafts.length} className="align-middle font-semibold">
@@ -464,12 +471,12 @@ function PersonnesLinesTable({
                     </>
                   ) : null}
                   <TableCell>
-                      <Input
-                        className="h-9"
-                        disabled={!groupEnabled}
-                        value={draft.formule ?? ""}
-                        onChange={(event) => updateDraft(draft.localKey, { formule: event.target.value })}
-                      />
+                    <Input
+                      className="h-9 min-w-36"
+                      disabled={!groupEnabled}
+                      value={draft.formule ?? ""}
+                      onChange={(event) => updateDraft(draft.localKey, { formule: event.target.value })}
+                    />
                   </TableCell>
                   <TableCell>
                     <NumberCell disabled={!groupEnabled} value={draft.montantDeces} onChange={(value) => updateDraft(draft.localKey, { montantDeces: value })} />
@@ -589,7 +596,7 @@ function NumberCell({
     <Input
       type="text"
       inputMode="decimal"
-      className="h-9 text-right"
+      className="h-9 min-w-28 text-right"
       disabled={disabled}
       value={draftValue}
       onFocus={() => setFocused(true)}

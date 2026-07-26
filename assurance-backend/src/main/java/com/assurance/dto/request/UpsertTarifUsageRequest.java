@@ -18,6 +18,7 @@ public class UpsertTarifUsageRequest {
     private BigDecimal ptcMin;
     private BigDecimal ptcMax;
     private String sousClasse;
+    private String carburantId;
     private String carburant;
     private BigDecimal primeNette;
     private BigDecimal primeParPlace;

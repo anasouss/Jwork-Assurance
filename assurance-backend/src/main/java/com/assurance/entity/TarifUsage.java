@@ -18,7 +18,8 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "tarifs_usage", indexes = {
         @Index(name = "idx_tarif_usage", columnList = "usage_id"),
-        @Index(name = "idx_tarif_usage_categorie_transport", columnList = "categorie_transport_id")
+        @Index(name = "idx_tarif_usage_categorie_transport", columnList = "categorie_transport_id"),
+        @Index(name = "idx_tarif_usage_carburant", columnList = "carburant_id")
 })
 @Getter
 @Setter
@@ -56,8 +57,9 @@ public class TarifUsage extends BaseEntity {
     @JoinColumn(name = "categorie_transport_id")
     private CategorieTransport categorieTransport;
 
-    @Column(length = 40)
-    private String carburant;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "carburant_id")
+    private Carburant carburant;
 
     @Column(name = "prime_nette", precision = 14, scale = 2)
     private BigDecimal primeNette;

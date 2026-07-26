@@ -1107,7 +1107,7 @@ public class ReferentielController {
         tarif.setPtcMin(request.getPtcMin());
         tarif.setPtcMax(request.getPtcMax());
         tarif.setSousClasse(blankToNull(request.getSousClasse()));
-        tarif.setCarburant(blankToNull(request.getCarburant()));
+        tarif.setCarburant(resolveTarifUsageCarburant(request));
         tarif.setPrimeNette(request.getPrimeNette());
         tarif.setPrimeParPlace(request.getPrimeParPlace());
         tarif.setActif(request.getActif() == null ? true : request.getActif());
@@ -1116,6 +1116,7 @@ public class ReferentielController {
     private Map<String, Object> toTarifUsageResponse(TarifUsage tarif) {
         Usage usage = tarif.getUsage();
         CategorieTransport categorieTransport = tarif.getCategorieTransport();
+        Carburant carburant = tarif.getCarburant();
         return option(tarif.getId(), usage != null ? usage.getCode() : null, usage != null ? usage.getLibelle() : "Tarif usage")
                 .putValue("usageId", usage != null ? usage.getId() : null)
                 .putValue("usageCode", usage != null ? usage.getCode() : null)
@@ -1134,11 +1135,29 @@ public class ReferentielController {
                 .putValue("ptcMin", tarif.getPtcMin())
                 .putValue("ptcMax", tarif.getPtcMax())
                 .putValue("sousClasse", tarif.getSousClasse())
-                .putValue("carburant", tarif.getCarburant())
+                .putValue("carburantId", carburant != null ? carburant.getId() : null)
+                .putValue("carburantCode", carburant != null ? carburant.getCode() : null)
+                .putValue("carburantLibelle", carburant != null ? carburant.getLibelle() : null)
+                .putValue("carburant", carburant != null ? carburant.getLibelle() : null)
                 .putValue("primeNette", tarif.getPrimeNette())
                 .putValue("primeParPlace", tarif.getPrimeParPlace())
                 .putValue("actif", tarif.getActif())
                 .map();
+    }
+
+    private Carburant resolveTarifUsageCarburant(UpsertTarifUsageRequest request) {
+        String carburantId = blankToNull(request.getCarburantId());
+        if (carburantId != null) {
+            return carburantRepository.findById(carburantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Carburant", carburantId));
+        }
+        String carburantValue = blankToNull(request.getCarburant());
+        if (carburantValue == null) {
+            return null;
+        }
+        return carburantRepository.findByCodeIgnoreCase(carburantValue)
+                .or(() -> carburantRepository.findByLibelleIgnoreCase(carburantValue))
+                .orElseThrow(() -> new ResourceNotFoundException("Carburant", carburantValue));
     }
 
     private List<TarifUsage> resolveBulkTarifTargets(BulkUpdateTarifUsageRequest request) {

@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.entity.CapitalResponsabiliteCivile;
+import com.assurance.entity.Carburant;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
@@ -257,19 +258,27 @@ public class CalculGarantieService {
         }
         if (Boolean.TRUE.equals(usage.getBySousClasse())) {
             return equalsIgnoreCase(tarif.getSousClasse(), vehicule.getSousClasse())
-                    && (tarif.getCarburant() == null || equalsIgnoreCase(tarif.getCarburant(), vehicule.getCarburant()));
+                    && matchesCarburant(tarif.getCarburant(), vehicule.getCarburant());
         }
         if (Boolean.TRUE.equals(usage.getByPtc())) {
             return inRange(parsePositiveDecimal(vehicule.getPtc()), tarif.getPtcMin(), tarif.getPtcMax());
         }
         if (Boolean.TRUE.equals(usage.getByCarburantAndPf())) {
             return inRange(parsePositiveDecimal(vehicule.getPuissanceFiscale()), tarif.getPuissanceFiscaleMin(), tarif.getPuissanceFiscaleMax())
-                    && (tarif.getCarburant() == null || equalsIgnoreCase(tarif.getCarburant(), vehicule.getCarburant()));
+                    && matchesCarburant(tarif.getCarburant(), vehicule.getCarburant());
         }
         if (Boolean.TRUE.equals(usage.getByPrime())) {
             return inRange(parsePositiveDecimal(vehicule.getNombrePlaces()), tarif.getNombrePlacesMin(), tarif.getNombrePlacesMax());
         }
         return true;
+    }
+
+    private boolean matchesCarburant(Carburant tarifCarburant, String vehiculeCarburant) {
+        if (tarifCarburant == null) {
+            return true;
+        }
+        return equalsIgnoreCase(tarifCarburant.getCode(), vehiculeCarburant)
+                || equalsIgnoreCase(tarifCarburant.getLibelle(), vehiculeCarburant);
     }
 
     private boolean matchesCategorieTransport(

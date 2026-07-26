@@ -32,9 +32,9 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background px-4 py-8">
+    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.14),_transparent_34%),linear-gradient(135deg,_#f8fafc_0%,_#eef2f7_48%,_#f9fafb_100%)] px-4 py-8 dark:bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_32%),linear-gradient(135deg,_#09090b_0%,_#111827_52%,_#0a0a0a_100%)]">
       <div className="w-full max-w-md">
-        <Card className="w-full border-border/70 shadow-none">
+        <Card className="w-full border-border/70 bg-background/92 shadow-lg shadow-slate-900/5 backdrop-blur dark:bg-neutral-950/88 dark:shadow-black/30">
           <CardHeader>
             <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <BadgeCheck className="size-5" />

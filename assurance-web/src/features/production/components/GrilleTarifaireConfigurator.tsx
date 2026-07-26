@@ -216,7 +216,7 @@ export function GrilleTarifaireConfigurator({
     }
     saveConfiguration.mutate({
       lignes: selected.map((draft) => cleanDraft(draft, activeUsageId, garantieById.get(draft.garantieId))),
-      formulesPersonne: activeUsage?.garantiesPersonne
+      formulesPersonne: usageAllowsGarantiesPersonne(activeUsage)
         ? personneDrafts
             .filter((draft) => draft.checked)
             .map((draft) => cleanPersonneDraft(draft, activeUsageId))
@@ -388,22 +388,22 @@ export function GrilleTarifaireConfigurator({
         </Table>
       </div>
 
-      <PersonnesLinesTable
-        groups={personneDraftGroups}
-        enabled={Boolean(activeUsageId && activeUsage?.garantiesPersonne)}
-        activeUsage={activeUsage}
-        updateDraft={updatePersonneDraft}
-        setGarantieEnabled={setPersonneGarantieEnabled}
-        addDraft={addPersonneDraft}
-        removeDraft={removePersonneDraft}
-      />
+      {usageAllowsGarantiesPersonne(activeUsage) ? (
+        <PersonnesLinesTable
+          groups={personneDraftGroups}
+          activeUsage={activeUsage}
+          updateDraft={updatePersonneDraft}
+          setGarantieEnabled={setPersonneGarantieEnabled}
+          addDraft={addPersonneDraft}
+          removeDraft={removePersonneDraft}
+        />
+      ) : null}
     </div>
   );
 }
 
 function PersonnesLinesTable({
   groups,
-  enabled,
   activeUsage,
   updateDraft,
   setGarantieEnabled,
@@ -411,7 +411,6 @@ function PersonnesLinesTable({
   removeDraft,
 }: {
   groups: { garantie: ReferenceOption; drafts: PersonneMatrixLine[] }[];
-  enabled: boolean;
   activeUsage: ReferenceOption | null;
   updateDraft: (localKey: string, patch: Partial<PersonneMatrixLine>) => void;
   setGarantieEnabled: (garantieId: string, checked: boolean) => void;
@@ -422,7 +421,7 @@ function PersonnesLinesTable({
     <div className="overflow-x-auto rounded-md border">
       <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
         <div className="text-sm font-semibold text-blue-600">Garanties personnes</div>
-        {activeUsage ? <Badge variant="outline">{enabled ? (activeUsage.code ? `Usage ${activeUsage.code}` : activeUsage.libelle) : "Non applicable"}</Badge> : null}
+        {activeUsage ? <Badge variant="outline">{activeUsage.code ? `Usage ${activeUsage.code}` : activeUsage.libelle}</Badge> : null}
       </div>
       <Table>
         <TableHeader>
@@ -450,14 +449,13 @@ function PersonnesLinesTable({
             groups.map(({ garantie, drafts: groupDrafts }) => {
               const baseDraft = groupDrafts.find((draft) => draft.baseRow) ?? emptyPersonneDraft(garantie);
               const extraDrafts = groupDrafts.filter((draft) => !draft.baseRow);
-              const groupEnabled = enabled && baseDraft.checked;
+              const groupEnabled = baseDraft.checked;
               const allDrafts = [baseDraft, ...extraDrafts];
               return (
               <TableRow key={garantie.id}>
                 <TableCell>
                   <Checkbox
                     checked={groupEnabled}
-                    disabled={!enabled}
                     onCheckedChange={(value) => setGarantieEnabled(garantie.id, value === true)}
                   />
                 </TableCell>
@@ -836,6 +834,10 @@ function defaultMode(garantie?: ReferenceOption) {
 
 function hasFranchise(garantie?: ReferenceOption) {
   return Boolean(garantie?.avecFranchise);
+}
+
+function usageAllowsGarantiesPersonne(usage?: ReferenceOption | null) {
+  return Boolean(usage?.garantiesPersonne);
 }
 
 function modeLabel(mode: string) {

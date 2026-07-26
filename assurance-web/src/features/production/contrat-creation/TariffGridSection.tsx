@@ -203,12 +203,9 @@ export function TariffGridSection({
           </div>
         </div>
 
-        <PersonnesLinesTable
-          formules={visibleFormules}
-          emptyText={!form.grilleTarifaireId ? "Aucune grille sélectionnée." : "Aucune formule personne pour cet usage."}
-          canConfigure={Boolean(selectedGrille)}
-          onConfigure={openConfigurator}
-        />
+        {visibleFormules.length > 0 ? (
+          <PersonnesLinesTable formules={visibleFormules} canConfigure={Boolean(selectedGrille)} onConfigure={openConfigurator} />
+        ) : null}
       </div>
 
       <GrilleTarifaireDialog
@@ -355,12 +352,10 @@ function CapitalLinesTable({
 
 function PersonnesLinesTable({
   formules,
-  emptyText,
   canConfigure,
   onConfigure,
 }: {
   formules: ReferenceOption[];
-  emptyText: string;
   canConfigure: boolean;
   onConfigure: () => void;
 }) {
@@ -389,28 +384,20 @@ function PersonnesLinesTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {formules.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
-                {emptyText}
-              </TableCell>
+          {formules.map((formule) => (
+            <TableRow key={formule.id}>
+              <TableCell className="font-semibold">{text(formule.garantieCode)}</TableCell>
+              <TableCell>{formule.libelle}</TableCell>
+              <TableCell className="text-right">{money(formule.montantDeces)}</TableCell>
+              <TableCell className="text-right">{money(formule.montantInvalidite)}</TableCell>
+              <TableCell className="text-right">{money(formule.montantFraisMedicaux)}</TableCell>
+              <TableCell className="text-right">{money(formule.montantFraisHospitalisation)}</TableCell>
+              <TableCell className="text-right">{money(formule.montantFraisFuneraires)}</TableCell>
+              <TableCell className="text-right">{money(formule.montantFraisChirurgie)}</TableCell>
+              <TableCell className="text-right">{money(formule.primeNette)}</TableCell>
+              <TableCell className="text-right">{money(formule.accessoire)}</TableCell>
             </TableRow>
-          ) : (
-            formules.map((formule) => (
-              <TableRow key={formule.id}>
-                <TableCell className="font-semibold">{text(formule.garantieCode)}</TableCell>
-                <TableCell>{formule.libelle}</TableCell>
-                <TableCell className="text-right">{money(formule.montantDeces)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantInvalidite)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisMedicaux)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisHospitalisation)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisFuneraires)}</TableCell>
-                <TableCell className="text-right">{money(formule.montantFraisChirurgie)}</TableCell>
-                <TableCell className="text-right">{money(formule.primeNette)}</TableCell>
-                <TableCell className="text-right">{money(formule.accessoire)}</TableCell>
-              </TableRow>
-            ))
-          )}
+          ))}
         </TableBody>
       </Table>
     </div>

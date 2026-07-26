@@ -327,7 +327,10 @@ export function FlotteTargetsSection({
                 />
                 <SectionSubmitButton
                   saving={saving}
-                  onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => setActiveTargetPart("garanties"))}
+                  onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => {
+                    setActiveTargetPart("garanties");
+                    onPreviewQuittance?.();
+                  })}
                 >
                   Enregistrer informations
                 </SectionSubmitButton>
@@ -366,6 +369,7 @@ export function FlotteTargetsSection({
                   onAssistanceChange={(patch) => updateAssistance(activeVehiculeTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
+                  preview={preview}
                 />
                 <QuittanceTotalsSummary
                   preview={preview}
@@ -631,6 +635,10 @@ function QuittanceTotalsSummary({
 
 function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
   return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
+}
+
+function autoPrimeDisplay(value?: number) {
+  return value == null ? "Calcul auto" : money(value);
 }
 
 function stringValue(value: unknown) {
@@ -986,6 +994,7 @@ function TargetGuaranteesTable({
   onAssistanceChange,
   assistanceCategorieClientId,
   grilleSelected,
+  preview,
 }: {
   target: Target;
   garanties: ReferenceOption[];
@@ -1001,6 +1010,7 @@ function TargetGuaranteesTable({
   onAssistanceChange: (patch: Partial<AssistanceDraft>) => void;
   assistanceCategorieClientId?: string;
   grilleSelected: boolean;
+  preview?: QuittancePreview | null;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected((current) => current.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item)));
@@ -1077,6 +1087,7 @@ function TargetGuaranteesTable({
               const manualValue = defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL";
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
               const estimatedPrime = checked && !isRc ? estimateTargetPrime(selectedLine, displayCapital) : undefined;
+              const rcPrime = isRc ? resolveTargetRcPrime(preview, selected, garanties, lignes, target) : undefined;
 
               return (
                 <tr
@@ -1167,7 +1178,9 @@ function TargetGuaranteesTable({
                     )}
                   </td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
-                  <td className="px-3 py-2 text-right font-medium">{estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}</td>
+                  <td className="px-3 py-2 text-right font-medium">
+                    {isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}
+                  </td>
                 </tr>
               );
             })}
@@ -1550,6 +1563,32 @@ function estimateTargetPrime(line?: ReferenceOption, capital?: number) {
     return (capital * taux) / 100;
   }
   return prime;
+}
+
+function resolveTargetRcPrime(
+  preview: QuittancePreview | null | undefined,
+  selected: GarantieInput[],
+  garanties: ReferenceOption[],
+  lignes: ReferenceOption[],
+  target: Target
+) {
+  const automobileNet = linePrimeNette(preview, "AUTOMOBILE");
+  if (automobileNet == null) {
+    return undefined;
+  }
+  const nonRcPrime = selected.reduce((total, item) => {
+    if (!sameTarget(item, target)) {
+      return total;
+    }
+    const garantie = garanties.find((option) => option.id === item.garantieId);
+    if (!garantie || Boolean(garantie.responsabiliteCivile) || String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE") {
+      return total;
+    }
+    const line = selectedLineFor(matchingLines(lignes, garantie, target), item);
+    const capital = targetGuaranteeCapitalValue(garantie, line, target, item);
+    return total + (estimateTargetPrime(line, capital) ?? 0);
+  }, 0);
+  return Math.max(0, automobileNet - nonRcPrime);
 }
 
 function resolveRcCapital(target: Target | undefined, usages: ReferenceOption[]) {

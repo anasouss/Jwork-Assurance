@@ -68,7 +68,7 @@ export default function AdminPage() {
   return (
     <div className="grid gap-5">
       <div>
-        <p className="text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-400">Admin</p>
+        <p className="text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-400">Administration</p>
         <h1 className="text-xl font-semibold tracking-tight">Administration</h1>
         <p className="text-sm text-muted-foreground">Utilisateurs, rôles, permissions et agences.</p>
       </div>

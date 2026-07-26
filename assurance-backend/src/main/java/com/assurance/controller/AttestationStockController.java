@@ -2,11 +2,18 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.AddLotAttestationRequest;
 import com.assurance.dto.request.CreateLivraisonAttestationRequest;
+import com.assurance.dto.request.UpdateAttestationStockSettingsRequest;
+import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
 import com.assurance.dto.response.ApiResponse;
+import com.assurance.dto.response.AttestationStockDashboardResponse;
+import com.assurance.dto.response.AttestationStockItemResponse;
+import com.assurance.dto.response.AttestationStockSettingsResponse;
 import com.assurance.dto.response.LivraisonAttestationResponse;
+import com.assurance.dto.response.SeuilStockAttestationResponse;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.Usage;
 import com.assurance.enums.SourceLivraisonAttestation;
+import com.assurance.enums.StatutAttestationStock;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.UsageRepository;
@@ -19,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +43,59 @@ public class AttestationStockController {
     private final AttestationStockService attestationStockService;
     private final ContratRepository contratRepository;
     private final UsageRepository usageRepository;
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<ApiResponse<AttestationStockDashboardResponse>> dashboard() {
+        return ResponseEntity.ok(ApiResponse.success(attestationStockService.dashboard(TenantContext.getCurrentAgence())));
+    }
+
+    @GetMapping("/attestations")
+    public ResponseEntity<ApiResponse<List<AttestationStockItemResponse>>> attestations(
+            @RequestParam(required = false) Long compagnieAssuranceId,
+            @RequestParam(required = false) Long groupeUsageAttestationId,
+            @RequestParam(required = false) StatutAttestationStock statut,
+            @RequestParam(required = false) String numero,
+            @RequestParam(defaultValue = "100") Integer limit
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.rechercher(compagnieAssuranceId, groupeUsageAttestationId, statut, numero, limit)
+        ));
+    }
+
+    @GetMapping("/settings")
+    public ResponseEntity<ApiResponse<AttestationStockSettingsResponse>> settings() {
+        return ResponseEntity.ok(ApiResponse.success(attestationStockService.settings(TenantContext.getCurrentAgence())));
+    }
+
+    @PutMapping("/settings")
+    public ResponseEntity<ApiResponse<AttestationStockSettingsResponse>> updateSettings(
+            @RequestBody UpdateAttestationStockSettingsRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.updateSettings(TenantContext.getCurrentAgence(), request),
+                "Parametres du stock attestations mis a jour"
+        ));
+    }
+
+    @GetMapping("/seuils")
+    public ResponseEntity<ApiResponse<List<SeuilStockAttestationResponse>>> seuils() {
+        return ResponseEntity.ok(ApiResponse.success(attestationStockService.listerSeuils()));
+    }
+
+    @PostMapping("/seuils")
+    public ResponseEntity<ApiResponse<SeuilStockAttestationResponse>> creerSeuil(
+            @Valid @RequestBody UpsertSeuilStockAttestationRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(attestationStockService.creerSeuil(request), "Seuil stock cree"));
+    }
+
+    @PutMapping("/seuils/{id}")
+    public ResponseEntity<ApiResponse<SeuilStockAttestationResponse>> modifierSeuil(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertSeuilStockAttestationRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(attestationStockService.modifierSeuil(id, request), "Seuil stock modifie"));
+    }
 
     @PostMapping("/livraisons")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> creerLivraison(

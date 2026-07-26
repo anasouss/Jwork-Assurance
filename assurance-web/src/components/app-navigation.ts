@@ -3,12 +3,14 @@ import {
   Boxes,
   Building2,
   Calculator,
+  ClipboardList,
   FilePlus2,
   Files,
   LayoutDashboard,
   LifeBuoy,
   Settings,
   ShieldCheck,
+  Truck,
   Users,
   UserCog,
 } from "lucide-react";
@@ -34,7 +36,7 @@ export const appModules: AppModule[] = [
   { title: "Compagnies", url: "/app/companies", icon: Building2, permission: "config:view" },
   { title: "CRM", url: "/app/crm", icon: Users, disabled: true },
   { title: "Compta", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
-  { title: "Admin", url: "/app/admin", icon: Settings, permission: "user:view" },
+  { title: "Administration", url: "/app/admin", icon: Settings, permission: "user:view" },
 ];
 
 export const appNavigation: AppNavigationItem[] = [
@@ -43,6 +45,8 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "production", title: "Ajouter dossier", url: "/app/production/ajouter-dossier", icon: FilePlus2, permission: "contrat:create" },
   { module: "production", title: "Contrats", url: "/app/production/contrats", icon: Files, permission: "contrat:view" },
   { module: "production", title: "Stock attestations", url: "/app/production/attestations-stock", icon: Boxes, permission: "contrat:view" },
+  { module: "production", title: "Commandes attestations", url: "/app/production/attestations-stock/commandes", icon: ClipboardList, permission: "contrat:view" },
+  { module: "production", title: "Réceptions attestations", url: "/app/production/attestations-stock/receptions", icon: Truck, permission: "contrat:view" },
   { module: "production", title: "Paramètres", url: "/app/production/parametres", icon: Settings, permission: "config:view" },
   { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permission: "config:view" },
   { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "config:view" },

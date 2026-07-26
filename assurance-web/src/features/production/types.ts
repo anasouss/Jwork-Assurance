@@ -87,6 +87,74 @@ export type LivraisonAttestationLot = {
   actif: boolean;
 };
 
+export type AttestationStockStatus = "DISPONIBLE" | "RESERVEE" | "UTILISEE" | "ANNULEE" | "DESACTIVEE";
+
+export type AttestationStockDashboard = {
+  controleStockActif: boolean;
+  summary: {
+    total: number;
+    disponible: number;
+    reservee: number;
+    utilisee: number;
+    annulee: number;
+    desactivee: number;
+  };
+  stocksParCompagnieUsage: AttestationStockCompanyUsage[];
+  seuils: SeuilStockAttestation[];
+};
+
+export type AttestationStockCompanyUsage = {
+  compagnieAssuranceId: string;
+  compagnieAssuranceNom: string;
+  groupeUsageAttestationId: string;
+  groupeUsageAttestationCode: string;
+  groupeUsageAttestationLibelle: string;
+  total: number;
+  disponible: number;
+  reservee: number;
+  utilisee: number;
+  annulee: number;
+  desactivee: number;
+  minimumStock?: number | null;
+  stockFaible?: boolean | null;
+};
+
+export type AttestationStockItem = {
+  id: string;
+  compagnieAssuranceId: string;
+  compagnieAssuranceNom: string;
+  groupeUsageAttestationId: string;
+  groupeUsageAttestationCode: string;
+  groupeUsageAttestationLibelle: string;
+  numero: string;
+  serie?: string | null;
+  statut: AttestationStockStatus;
+  dateUtilisation?: string | null;
+  numeroDossier?: string | null;
+  numeroPolice?: string | null;
+  dateReception?: string | null;
+  referenceLivraison?: string | null;
+};
+
+export type SeuilStockAttestation = {
+  id: string;
+  compagnieAssuranceId: string;
+  compagnieAssuranceNom: string;
+  groupeUsageAttestationId: string;
+  groupeUsageAttestationCode: string;
+  groupeUsageAttestationLibelle: string;
+  minimumStock: number;
+  stockDisponible: number;
+  stockFaible: boolean;
+  derniereEvaluation?: string | null;
+};
+
+export type UpsertSeuilStockAttestationRequest = {
+  compagnieAssuranceId: string;
+  groupeUsageAttestationId: string;
+  minimumStock: number;
+};
+
 export type CreateLivraisonAttestationRequest = {
   compagnieAssuranceId: string;
   source: "COMMANDE" | "RECEPTION_DIRECTE";

@@ -1,6 +1,13 @@
 package com.assurance.service;
 
+import com.assurance.dto.request.UpdateAttestationStockSettingsRequest;
+import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
+import com.assurance.dto.response.AttestationStockDashboardResponse;
+import com.assurance.dto.response.AttestationStockItemResponse;
+import com.assurance.dto.response.AttestationStockSettingsResponse;
+import com.assurance.dto.response.SeuilStockAttestationResponse;
 import com.assurance.entity.AttestationStock;
+import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.GroupeUsageAttestation;
 import com.assurance.entity.MouvementContrat;
@@ -13,15 +20,22 @@ import com.assurance.entity.Vehicule;
 import com.assurance.enums.StatutAttestationStock;
 import com.assurance.enums.TypeMouvementStockAttestation;
 import com.assurance.exception.BadRequestException;
+import com.assurance.exception.ResourceNotFoundException;
+import com.assurance.repository.CompagnieAssuranceRepository;
 import com.assurance.repository.AttestationStockRepository;
+import com.assurance.repository.GroupeUsageAttestationRepository;
 import com.assurance.repository.MouvementStockAttestationRepository;
 import com.assurance.repository.SeuilStockAttestationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +46,8 @@ public class AttestationStockService {
     private final AttestationStockRepository attestationStockRepository;
     private final MouvementStockAttestationRepository mouvementStockAttestationRepository;
     private final SeuilStockAttestationRepository seuilStockAttestationRepository;
+    private final CompagnieAssuranceRepository compagnieAssuranceRepository;
+    private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
     private final ParametreApplicationService parametreApplicationService;
     private final AttestationNumeroService attestationNumeroService;
 
@@ -60,6 +76,131 @@ public class AttestationStockService {
                 contrat.getCompagnieAssurance().getId(),
                 groupe.getId()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public AttestationStockSettingsResponse settings(Long agenceId) {
+        return AttestationStockSettingsResponse.builder()
+                .controleStockActif(controleActif(agenceId))
+                .build();
+    }
+
+    @Transactional
+    public AttestationStockSettingsResponse updateSettings(Long agenceId, UpdateAttestationStockSettingsRequest request) {
+        boolean controleActif = Boolean.TRUE.equals(request.getControleStockActif());
+        parametreApplicationService.setBoolean(
+                agenceId,
+                PARAM_CONTROLE_STOCK_ATTESTATION,
+                controleActif,
+                "Active le controle du stock des attestations pendant la production"
+        );
+        return settings(agenceId);
+    }
+
+    @Transactional(readOnly = true)
+    public AttestationStockDashboardResponse dashboard(Long agenceId) {
+        Map<StatutAttestationStock, Long> summaryByStatus = emptyStatusMap();
+        for (Object[] row : attestationStockRepository.countByStatutForDashboard()) {
+            summaryByStatus.put((StatutAttestationStock) row[0], toLong(row[1]));
+        }
+
+        Map<String, AttestationStockDashboardResponse.CompanyUsageStock.CompanyUsageStockBuilder> grouped = new LinkedHashMap<>();
+        Map<String, StatusTotals> groupedTotals = new LinkedHashMap<>();
+        for (Object[] row : attestationStockRepository.countByCompanyAndGroupForDashboard()) {
+            Long compagnieId = toLong(row[0]);
+            Long groupeId = toLong(row[2]);
+            String key = compagnieId + "|" + groupeId;
+            grouped.computeIfAbsent(key, ignored -> AttestationStockDashboardResponse.CompanyUsageStock.builder()
+                    .compagnieAssuranceId(compagnieId)
+                    .compagnieAssuranceNom((String) row[1])
+                    .groupeUsageAttestationId(groupeId)
+                    .groupeUsageAttestationCode((String) row[3])
+                    .groupeUsageAttestationLibelle((String) row[4]));
+            StatusTotals totals = groupedTotals.computeIfAbsent(key, ignored -> new StatusTotals());
+            totals.add((StatutAttestationStock) row[5], toLong(row[6]));
+        }
+
+        Map<String, SeuilStockAttestation> seuilsByKey = new LinkedHashMap<>();
+        for (SeuilStockAttestation seuil : seuilStockAttestationRepository.findByActifTrueOrderByCompagnieAssuranceNomAscGroupeUsageAttestationCodeAsc()) {
+            seuilsByKey.put(seuilKey(seuil.getCompagnieAssurance().getId(), seuil.getGroupeUsageAttestation().getId()), seuil);
+        }
+
+        List<AttestationStockDashboardResponse.CompanyUsageStock> stocks = grouped.entrySet().stream()
+                .map(entry -> {
+                    StatusTotals totals = groupedTotals.get(entry.getKey());
+                    SeuilStockAttestation seuil = seuilsByKey.get(entry.getKey());
+                    return entry.getValue()
+                            .total(totals.total())
+                            .disponible(totals.get(StatutAttestationStock.DISPONIBLE))
+                            .reservee(totals.get(StatutAttestationStock.RESERVEE))
+                            .utilisee(totals.get(StatutAttestationStock.UTILISEE))
+                            .annulee(totals.get(StatutAttestationStock.ANNULEE))
+                            .desactivee(totals.get(StatutAttestationStock.DESACTIVEE))
+                            .minimumStock(seuil != null ? seuil.getMinimumStock() : null)
+                            .stockFaible(seuil != null ? seuil.getStockFaible() : false)
+                            .build();
+                })
+                .toList();
+
+        return AttestationStockDashboardResponse.builder()
+                .controleStockActif(controleActif(agenceId))
+                .summary(toSummary(summaryByStatus))
+                .stocksParCompagnieUsage(stocks)
+                .seuils(seuilsByKey.values().stream().map(this::toSeuilResponse).toList())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttestationStockItemResponse> rechercher(Long compagnieId, Long groupeUsageAttestationId, StatutAttestationStock statut, String numero, Integer limit) {
+        int size = limit == null ? 100 : Math.max(1, Math.min(limit, 500));
+        String numeroFiltre = hasText(numero) ? numero.trim() : null;
+        return attestationStockRepository.searchGestionStock(numeroFiltre, compagnieId, groupeUsageAttestationId, statut, PageRequest.of(0, size))
+                .stream()
+                .map(this::toItemResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SeuilStockAttestationResponse> listerSeuils() {
+        return seuilStockAttestationRepository.findByActifTrueOrderByCompagnieAssuranceNomAscGroupeUsageAttestationCodeAsc()
+                .stream()
+                .map(this::toSeuilResponse)
+                .toList();
+    }
+
+    @Transactional
+    public SeuilStockAttestationResponse creerSeuil(UpsertSeuilStockAttestationRequest request) {
+        CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
+        GroupeUsageAttestation groupe = groupeUsageAttestationRepository.findById(request.getGroupeUsageAttestationId())
+                .orElseThrow(() -> new ResourceNotFoundException("GroupeUsageAttestation", request.getGroupeUsageAttestationId()));
+        SeuilStockAttestation seuil = seuilStockAttestationRepository
+                .findByCompagnieAssuranceIdAndGroupeUsageAttestationIdAndActifTrue(compagnie.getId(), groupe.getId())
+                .orElseGet(() -> SeuilStockAttestation.builder()
+                        .compagnieAssurance(compagnie)
+                        .groupeUsageAttestation(groupe)
+                        .actif(true)
+                        .build());
+        updateSeuilValues(seuil, request.getMinimumStock());
+        return toSeuilResponse(seuilStockAttestationRepository.save(seuil));
+    }
+
+    @Transactional
+    public SeuilStockAttestationResponse modifierSeuil(Long id, UpsertSeuilStockAttestationRequest request) {
+        SeuilStockAttestation seuil = seuilStockAttestationRepository.findById(id)
+                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                .orElseThrow(() -> new ResourceNotFoundException("SeuilStockAttestation", id));
+        if (!seuil.getCompagnieAssurance().getId().equals(request.getCompagnieAssuranceId())
+                || !seuil.getGroupeUsageAttestation().getId().equals(request.getGroupeUsageAttestationId())) {
+            CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
+                    .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
+            GroupeUsageAttestation groupe = groupeUsageAttestationRepository.findById(request.getGroupeUsageAttestationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("GroupeUsageAttestation", request.getGroupeUsageAttestationId()));
+            seuil.setCompagnieAssurance(compagnie);
+            seuil.setGroupeUsageAttestation(groupe);
+        }
+        updateSeuilValues(seuil, request.getMinimumStock());
+        return toSeuilResponse(seuilStockAttestationRepository.save(seuil));
     }
 
     @Transactional
@@ -195,7 +336,102 @@ public class AttestationStockService {
                 });
     }
 
+    private void updateSeuilValues(SeuilStockAttestation seuil, Integer minimumStock) {
+        int disponible = (int) attestationStockRepository.countDisponibles(
+                seuil.getCompagnieAssurance().getId(),
+                seuil.getGroupeUsageAttestation().getId()
+        );
+        seuil.setMinimumStock(Math.max(0, minimumStock == null ? 0 : minimumStock));
+        seuil.setStockDisponible(disponible);
+        seuil.setStockFaible(disponible <= seuil.getMinimumStock());
+        seuil.setDerniereEvaluation(LocalDateTime.now());
+        seuil.setActif(true);
+    }
+
+    private AttestationStockDashboardResponse.Summary toSummary(Map<StatutAttestationStock, Long> values) {
+        return AttestationStockDashboardResponse.Summary.builder()
+                .disponible(values.get(StatutAttestationStock.DISPONIBLE))
+                .reservee(values.get(StatutAttestationStock.RESERVEE))
+                .utilisee(values.get(StatutAttestationStock.UTILISEE))
+                .annulee(values.get(StatutAttestationStock.ANNULEE))
+                .desactivee(values.get(StatutAttestationStock.DESACTIVEE))
+                .total(values.values().stream().mapToLong(Long::longValue).sum())
+                .build();
+    }
+
+    private Map<StatutAttestationStock, Long> emptyStatusMap() {
+        Map<StatutAttestationStock, Long> values = new EnumMap<>(StatutAttestationStock.class);
+        for (StatutAttestationStock statut : StatutAttestationStock.values()) {
+            values.put(statut, 0L);
+        }
+        return values;
+    }
+
+    private AttestationStockItemResponse toItemResponse(AttestationStock attestation) {
+        return AttestationStockItemResponse.builder()
+                .id(attestation.getId())
+                .compagnieAssuranceId(attestation.getCompagnieAssurance().getId())
+                .compagnieAssuranceNom(attestation.getCompagnieAssurance().getNom())
+                .groupeUsageAttestationId(attestation.getGroupeUsageAttestation().getId())
+                .groupeUsageAttestationCode(attestation.getGroupeUsageAttestation().getCode())
+                .groupeUsageAttestationLibelle(attestation.getGroupeUsageAttestation().getLibelle())
+                .numero(attestation.getNumero())
+                .serie(attestation.getSerie())
+                .statut(attestation.getStatut())
+                .dateUtilisation(attestation.getDateUtilisation())
+                .numeroDossier(attestation.getNumeroDossier())
+                .numeroPolice(attestation.getNumeroPolice())
+                .dateReception(attestation.getLot().getLivraison().getDateReception())
+                .referenceLivraison(attestation.getLot().getLivraison().getReferenceCommande())
+                .build();
+    }
+
+    private SeuilStockAttestationResponse toSeuilResponse(SeuilStockAttestation seuil) {
+        return SeuilStockAttestationResponse.builder()
+                .id(seuil.getId())
+                .compagnieAssuranceId(seuil.getCompagnieAssurance().getId())
+                .compagnieAssuranceNom(seuil.getCompagnieAssurance().getNom())
+                .groupeUsageAttestationId(seuil.getGroupeUsageAttestation().getId())
+                .groupeUsageAttestationCode(seuil.getGroupeUsageAttestation().getCode())
+                .groupeUsageAttestationLibelle(seuil.getGroupeUsageAttestation().getLibelle())
+                .minimumStock(seuil.getMinimumStock())
+                .stockDisponible(seuil.getStockDisponible())
+                .stockFaible(seuil.getStockFaible())
+                .derniereEvaluation(seuil.getDerniereEvaluation())
+                .build();
+    }
+
+    private String seuilKey(Long compagnieId, Long groupeUsageAttestationId) {
+        return compagnieId + "|" + groupeUsageAttestationId;
+    }
+
+    private long toLong(Object value) {
+        return value instanceof Number number ? number.longValue() : 0L;
+    }
+
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private static class StatusTotals {
+        private final Map<StatutAttestationStock, Long> values = new EnumMap<>(StatutAttestationStock.class);
+
+        private StatusTotals() {
+            for (StatutAttestationStock statut : StatutAttestationStock.values()) {
+                values.put(statut, 0L);
+            }
+        }
+
+        private void add(StatutAttestationStock statut, long value) {
+            values.put(statut, get(statut) + value);
+        }
+
+        private long get(StatutAttestationStock statut) {
+            return values.getOrDefault(statut, 0L);
+        }
+
+        private long total() {
+            return values.values().stream().mapToLong(Long::longValue).sum();
+        }
     }
 }

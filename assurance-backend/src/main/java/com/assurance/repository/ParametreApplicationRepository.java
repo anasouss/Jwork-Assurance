@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface ParametreApplicationRepository extends JpaRepository<ParametreApplication, Long> {
     Optional<ParametreApplication> findByAgence_IdAndCodeIgnoreCaseAndActifTrue(Long agenceId, String code);
     Optional<ParametreApplication> findByAgenceIsNullAndCodeIgnoreCaseAndActifTrue(String code);
+    Optional<ParametreApplication> findByAgence_IdAndCodeIgnoreCase(Long agenceId, String code);
+    Optional<ParametreApplication> findByAgenceIsNullAndCodeIgnoreCase(String code);
 }

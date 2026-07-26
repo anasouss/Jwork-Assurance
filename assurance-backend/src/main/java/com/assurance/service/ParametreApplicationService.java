@@ -1,9 +1,13 @@
 package com.assurance.service;
 
+import com.assurance.entity.Agence;
 import com.assurance.entity.ParametreApplication;
+import com.assurance.exception.ResourceNotFoundException;
+import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.ParametreApplicationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -13,6 +17,7 @@ import java.util.Optional;
 public class ParametreApplicationService {
 
     private final ParametreApplicationRepository parametreApplicationRepository;
+    private final AgenceRepository agenceRepository;
 
     public String getValeur(Long agenceId, String code, String valeurParDefaut) {
         Optional<ParametreApplication> parametreAgence = agenceId == null ? Optional.empty()
@@ -46,5 +51,34 @@ public class ParametreApplicationService {
             case "0", "false", "no", "non", "off" -> false;
             default -> valeurParDefaut;
         };
+    }
+
+    @Transactional
+    public ParametreApplication setValeur(Long agenceId, String code, String type, String valeur, String description) {
+        Agence agence = agenceId == null ? null : agenceRepository.findById(agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+        Optional<ParametreApplication> existing = agenceId == null
+                ? parametreApplicationRepository.findByAgenceIsNullAndCodeIgnoreCase(code)
+                : parametreApplicationRepository.findByAgence_IdAndCodeIgnoreCase(agenceId, code);
+        ParametreApplication parametre = existing.orElseGet(() -> ParametreApplication.builder()
+                .agence(agence)
+                .code(code)
+                .type(type)
+                .valeur(valeur)
+                .description(description)
+                .actif(true)
+                .build());
+        parametre.setAgence(agence);
+        parametre.setCode(code);
+        parametre.setType(type);
+        parametre.setValeur(valeur);
+        parametre.setDescription(description);
+        parametre.setActif(true);
+        return parametreApplicationRepository.save(parametre);
+    }
+
+    @Transactional
+    public ParametreApplication setBoolean(Long agenceId, String code, boolean valeur, String description) {
+        return setValeur(agenceId, code, "BOOLEAN", Boolean.toString(valeur), description);
     }
 }

@@ -2,6 +2,9 @@ import { apiFetch, buildQueryString } from "@/lib/api/base";
 import type {
   ApiResponse,
   AddLotAttestationRequest,
+  AttestationStockDashboard,
+  AttestationStockItem,
+  AttestationStockStatus,
   ContratSummary,
   CreateLivraisonAttestationRequest,
   CreateContratRequest,
@@ -23,6 +26,7 @@ import type {
   UpsertProduitAssistanceRequest,
   UpsertCodeReferenceRequest,
   UpsertReferenceRequest,
+  UpsertSeuilStockAttestationRequest,
   UpsertTarifProduitAssistanceRequest,
   UpsertTarifUsageRequest,
   UpsertUsageRequest,
@@ -122,6 +126,49 @@ export const productionApi = {
   async attestationsDisponibles(params: { contratId: string; usageId: string; fragment: string }) {
     return unwrap(
       await apiFetch<ApiResponse<string[]>>(`/api/v1/attestations-stock/disponibles${buildQueryString(params)}`)
+    );
+  },
+
+  async dashboardAttestationsStock() {
+    return unwrap(await apiFetch<ApiResponse<AttestationStockDashboard>>("/api/v1/attestations-stock/dashboard"));
+  },
+
+  async searchAttestationsStock(params: {
+    compagnieAssuranceId?: string;
+    groupeUsageAttestationId?: string;
+    statut?: AttestationStockStatus | "";
+    numero?: string;
+    limit?: string;
+  }) {
+    return unwrap(
+      await apiFetch<ApiResponse<AttestationStockItem[]>>(`/api/v1/attestations-stock/attestations${buildQueryString(params)}`)
+    );
+  },
+
+  async updateAttestationsStockSettings(payload: { controleStockActif: boolean }) {
+    return unwrap(
+      await apiFetch<ApiResponse<{ controleStockActif: boolean }>>("/api/v1/attestations-stock/settings", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createSeuilStockAttestation(payload: UpsertSeuilStockAttestationRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<unknown>>("/api/v1/attestations-stock/seuils", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateSeuilStockAttestation(id: string, payload: UpsertSeuilStockAttestationRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<unknown>>(`/api/v1/attestations-stock/seuils/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
     );
   },
 

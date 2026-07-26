@@ -193,12 +193,10 @@ export function TariffGridSection({
             <TauxLinesTable
               lines={tauxLignes}
               emptyText={!form.grilleTarifaireId ? "Aucune grille sélectionnée." : "Aucune garantie par taux pour cet usage."}
-              onConfigure={openConfigurator}
             />
             <CapitalLinesTable
               lines={capitalLignes}
               emptyText={!form.grilleTarifaireId ? "Aucune grille sélectionnée." : "Aucune garantie par capital ou prime pour cet usage."}
-              onConfigure={openConfigurator}
             />
           </div>
         </div>
@@ -253,12 +251,11 @@ export function TariffGridSection({
 function TauxLinesTable({
   lines,
   emptyText,
-  onConfigure,
 }: {
   lines: ReferenceOption[];
   emptyText: string;
-  onConfigure: () => void;
 }) {
+  const groups = groupLinesByGarantie(lines);
   return (
     <div className="overflow-x-auto rounded-md border">
       <Table>
@@ -268,30 +265,30 @@ function TauxLinesTable({
             <TableHead className="text-right">Taux de valeur</TableHead>
             <TableHead className="text-right">Franchise taux</TableHead>
             <TableHead className="text-right">Franchise minimum</TableHead>
-            <TableHead className="w-12 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {lines.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+              <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                 {emptyText}
               </TableCell>
             </TableRow>
           ) : (
-            lines.map((ligne) => (
-              <TableRow key={ligne.id}>
-                <TableCell className="font-semibold">{lineLabel(ligne)}</TableCell>
-                <TableCell className="text-right">{percentValue(ligne.taux)}</TableCell>
-                <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
-                <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
-                <TableCell className="text-right">
-                  <Button type="button" variant="ghost" size="icon" onClick={onConfigure}>
-                    <Edit className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
+            groups.map((group) =>
+              group.lines.map((ligne, index) => (
+                <TableRow key={ligne.id}>
+                  {index === 0 ? (
+                    <TableCell rowSpan={group.lines.length} className="align-middle font-semibold">
+                      {lineLabel(ligne)}
+                    </TableCell>
+                  ) : null}
+                  <TableCell className="text-right">{percentValue(ligne.taux)}</TableCell>
+                  <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
+                  <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
+                </TableRow>
+              ))
+            )
           )}
         </TableBody>
       </Table>
@@ -302,12 +299,11 @@ function TauxLinesTable({
 function CapitalLinesTable({
   lines,
   emptyText,
-  onConfigure,
 }: {
   lines: ReferenceOption[];
   emptyText: string;
-  onConfigure: () => void;
 }) {
+  const groups = groupLinesByGarantie(lines);
   return (
     <div className="overflow-x-auto rounded-md border">
       <Table>
@@ -318,31 +314,31 @@ function CapitalLinesTable({
             <TableHead className="text-right">Prime</TableHead>
             <TableHead className="text-right">Franchise taux</TableHead>
             <TableHead className="text-right">Franchise minimum</TableHead>
-            <TableHead className="w-12 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {lines.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+              <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                 {emptyText}
               </TableCell>
             </TableRow>
           ) : (
-            lines.map((ligne) => (
-              <TableRow key={ligne.id}>
-                <TableCell className="font-semibold">{lineLabel(ligne)}</TableCell>
-                <TableCell className="text-right">{money(ligne.capital)}</TableCell>
-                <TableCell className="text-right">{money(ligne.prime)}</TableCell>
-                <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
-                <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
-                <TableCell className="text-right">
-                  <Button type="button" variant="ghost" size="icon" onClick={onConfigure}>
-                    <Edit className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
+            groups.map((group) =>
+              group.lines.map((ligne, index) => (
+                <TableRow key={ligne.id}>
+                  {index === 0 ? (
+                    <TableCell rowSpan={group.lines.length} className="align-middle font-semibold">
+                      {lineLabel(ligne)}
+                    </TableCell>
+                  ) : null}
+                  <TableCell className="text-right">{money(ligne.capital)}</TableCell>
+                  <TableCell className="text-right">{money(ligne.prime)}</TableCell>
+                  <TableCell className="text-right">{percentValue(ligne.tauxFranchise)}</TableCell>
+                  <TableCell className="text-right">{money(ligne.franchiseMinimale)}</TableCell>
+                </TableRow>
+              ))
+            )
           )}
         </TableBody>
       </Table>
@@ -415,6 +411,20 @@ function lineLabel(ligne: ReferenceOption) {
     return code;
   }
   return text(ligne.libelle);
+}
+
+function groupLinesByGarantie(lines: ReferenceOption[]) {
+  const groups: { key: string; lines: ReferenceOption[] }[] = [];
+  for (const ligne of lines) {
+    const key = String(ligne.garantieId ?? ligne.garantieCode ?? ligne.id);
+    const previous = groups.at(-1);
+    if (previous?.key === key) {
+      previous.lines.push(ligne);
+    } else {
+      groups.push({ key, lines: [ligne] });
+    }
+  }
+  return groups;
 }
 
 function percentValue(value: unknown) {

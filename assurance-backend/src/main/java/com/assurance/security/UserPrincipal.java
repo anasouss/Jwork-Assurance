@@ -28,7 +28,7 @@ public class UserPrincipal implements UserDetails {
                 user.getId(),
                 user.getEmail(),
                 user.getPassword(),
-                user.getProfilCode(),
+                user.getRoleCode(),
                 user.getAgence() != null ? user.getAgence().getId() : null,
                 Boolean.TRUE.equals(user.getActif()),
                 user.getPermissions()

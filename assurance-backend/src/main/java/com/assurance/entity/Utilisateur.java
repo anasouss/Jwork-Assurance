@@ -19,7 +19,7 @@ import java.util.Set;
 @Entity
 @Table(name = "users", indexes = {
         @Index(name = "idx_user_agence", columnList = "agence_id"),
-        @Index(name = "idx_user_profil", columnList = "profil_id"),
+        @Index(name = "idx_user_role", columnList = "role_id"),
         @Index(name = "idx_user_actif", columnList = "actif")
 })
 @Getter
@@ -34,8 +34,8 @@ public class Utilisateur extends BaseEntity {
     private Agence agence;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "profil_id", nullable = false)
-    private Profil role;
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
 
     @Column(nullable = false, unique = true, length = 180)
     private String email;
@@ -63,7 +63,7 @@ public class Utilisateur extends BaseEntity {
         return prenom + " " + nom;
     }
 
-    public String getProfilCode() {
+    public String getRoleCode() {
         return role == null ? null : role.getCode();
     }
 

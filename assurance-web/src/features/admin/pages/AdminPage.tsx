@@ -69,19 +69,19 @@ export default function AdminPage() {
       <div>
         <p className="text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-400">Admin</p>
         <h1 className="text-xl font-semibold tracking-tight">Administration</h1>
-        <p className="text-sm text-muted-foreground">Utilisateurs, profils, permissions et agences.</p>
+        <p className="text-sm text-muted-foreground">Utilisateurs, rôles, permissions et agences.</p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
         <SummaryCard label="Utilisateurs" value={users.data?.length ?? 0} />
-        <SummaryCard label="Profils" value={roles.data?.length ?? 0} />
+        <SummaryCard label="Rôles" value={roles.data?.length ?? 0} />
         <SummaryCard label="Permissions" value={permissionsQuery.data?.length ?? 0} />
       </div>
 
       <Tabs defaultValue="users" className="grid gap-4">
         <TabsList className="w-fit">
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="roles">Profils & permissions</TabsTrigger>
+          <TabsTrigger value="roles">Rôles & permissions</TabsTrigger>
           {canViewAgencies ? <TabsTrigger value="agencies">Agences</TabsTrigger> : null}
         </TabsList>
 
@@ -214,7 +214,7 @@ function UsersPanel({
             <TableRow>
               <TableHead>Utilisateur</TableHead>
               <TableHead>Agence</TableHead>
-              <TableHead>Profil</TableHead>
+              <TableHead>Rôle</TableHead>
               <TableHead>Téléphone</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead>Dernière connexion</TableHead>
@@ -256,7 +256,7 @@ function UsersPanel({
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier utilisateur" : "Ajouter utilisateur"}</DialogTitle>
-            <DialogDescription>Associez l'utilisateur à une agence et un profil.</DialogDescription>
+            <DialogDescription>Associez l'utilisateur à une agence et un role.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <LabeledInput label="Prénom" value={form.prenom} onChange={(value) => setForm({ ...form, prenom: value })} />
@@ -272,7 +272,7 @@ function UsersPanel({
               </Select>
             </label>
             <label className="grid gap-1.5 text-sm">
-              <span className="font-medium">Profil</span>
+              <span className="font-medium">Role</span>
               <Select value={form.roleId} onValueChange={(value) => setForm({ ...form, roleId: value })}>
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                 <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={role.id}>{role.nom}</SelectItem>)}</SelectContent>
@@ -328,7 +328,7 @@ function RolesPanel({
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });
       onChanged();
-      toast.success("Profil enregistré");
+      toast.success("Role enregistré");
     },
     onError: showError,
   });
@@ -338,7 +338,7 @@ function RolesPanel({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });
       onChanged();
-      toast.success("Profil supprimé");
+      toast.success("Role supprimé");
     },
     onError: showError,
   });
@@ -348,14 +348,14 @@ function RolesPanel({
       <div className="flex justify-end">
         <Button disabled={!canManage} onClick={() => { setEditing(null); setDialogOpen(true); }}>
           <Plus className="size-4" />
-          Ajouter profil
+          Ajouter rôle
         </Button>
       </div>
       <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Profil</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead>Agence</TableHead>
               <TableHead>Permissions</TableHead>
               <TableHead>Type</TableHead>
@@ -371,13 +371,13 @@ function RolesPanel({
                 </TableCell>
                 <TableCell>{role.agenceNom ?? "Global"}</TableCell>
                 <TableCell>{role.permissionCodes.length} permission(s)</TableCell>
-                <TableCell><Badge variant={role.profilSysteme ? "default" : "outline"}>{role.profilSysteme ? "Système" : "Custom"}</Badge></TableCell>
+                <TableCell><Badge variant={role.systemRole ? "default" : "outline"}>{role.systemRole ? "Système" : "Custom"}</Badge></TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="icon" disabled={!canManage} onClick={() => { setEditing(role); setDialogOpen(true); }}>
                       <Edit className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" disabled={!canManage || role.profilSysteme} onClick={() => remove.mutate(role.id)}>
+                    <Button variant="ghost" size="icon" disabled={!canManage || role.systemRole} onClick={() => remove.mutate(role.id)}>
                       <Trash2 className="size-4 text-red-500" />
                     </Button>
                   </div>
@@ -391,7 +391,7 @@ function RolesPanel({
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{editing ? "Modifier profil" : "Ajouter profil"}</DialogTitle>
+            <DialogTitle>{editing ? "Modifier rôle" : "Ajouter rôle"}</DialogTitle>
             <DialogDescription>Les permissions déterminent les modules visibles et les actions autorisées.</DialogDescription>
           </DialogHeader>
           <div className="grid max-h-[70vh] gap-4 overflow-y-auto pr-1">
@@ -409,8 +409,8 @@ function RolesPanel({
                 </Select>
               </label>
               <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                <Checkbox checked={form.profilSysteme} disabled={!canUseGlobal} onCheckedChange={(checked) => setForm({ ...form, profilSysteme: Boolean(checked) })} />
-                Profil système
+                <Checkbox checked={form.systemRole} disabled={!canUseGlobal} onCheckedChange={(checked) => setForm({ ...form, systemRole: Boolean(checked) })} />
+                Rôle système
               </label>
               <label className="grid gap-1.5 text-sm sm:col-span-2">
                 <span className="font-medium">Description</span>
@@ -525,7 +525,7 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier agence" : "Ajouter agence"}</DialogTitle>
-            <DialogDescription>Les agences portent les utilisateurs, profils agence et données de production.</DialogDescription>
+            <DialogDescription>Les agences portent les utilisateurs, rôles agence et données de production.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <LabeledInput label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
@@ -620,7 +620,7 @@ function userToForm(user: AdminUser): UpsertAdminUserRequest {
 }
 
 function emptyRole(agenceId?: string): UpsertAdminRoleRequest {
-  return { agenceId, code: "", nom: "", description: "", profilSysteme: false, permissionIds: [] };
+  return { agenceId, code: "", nom: "", description: "", systemRole: false, permissionIds: [] };
 }
 
 function roleToForm(role: AdminRole): UpsertAdminRoleRequest {
@@ -629,7 +629,7 @@ function roleToForm(role: AdminRole): UpsertAdminRoleRequest {
     code: role.code,
     nom: role.nom,
     description: role.description ?? "",
-    profilSysteme: role.profilSysteme,
+    systemRole: role.systemRole,
     permissionIds: role.permissionIds ?? [],
   };
 }

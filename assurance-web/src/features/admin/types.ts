@@ -22,7 +22,7 @@ export type AdminRole = {
   code: string;
   nom: string;
   description?: string | null;
-  profilSysteme: boolean;
+  systemRole: boolean;
   permissionIds: string[];
   permissionCodes: string[];
 };
@@ -64,7 +64,7 @@ export type UpsertAdminRoleRequest = {
   code: string;
   nom: string;
   description?: string;
-  profilSysteme: boolean;
+  systemRole: boolean;
   permissionIds: string[];
 };
 

@@ -35,7 +35,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(user.getId())
                 .claim("email", user.getEmail())
-                .claim("role", user.getProfilCode())
+                .claim("role", user.getRoleCode())
                 .claim("agenceId", user.getAgence() != null ? user.getAgence().getId() : null)
                 .claim("permissions", user.getPermissions())
                 .issuedAt(now)

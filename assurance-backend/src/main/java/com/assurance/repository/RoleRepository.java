@@ -1,24 +1,24 @@
 package com.assurance.repository;
 
-import com.assurance.entity.Profil;
+import com.assurance.entity.Role;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface ProfilRepository extends JpaRepository<Profil, String> {
+public interface RoleRepository extends JpaRepository<Role, String> {
     @EntityGraph(attributePaths = {"agence", "permissions"})
-    List<Profil> findAllByOrderByNomAsc();
+    List<Role> findAllByOrderByNomAsc();
 
     @EntityGraph(attributePaths = {"agence", "permissions"})
-    List<Profil> findByAgenceIdOrAgenceIsNullOrderByNomAsc(String agenceId);
+    List<Role> findByAgenceIdOrAgenceIsNullOrderByNomAsc(String agenceId);
 
     @EntityGraph(attributePaths = {"agence", "permissions"})
-    Optional<Profil> findByAgenceIdAndCode(String agenceId, String code);
+    Optional<Role> findByAgenceIdAndCode(String agenceId, String code);
 
     @EntityGraph(attributePaths = {"agence", "permissions"})
-    Optional<Profil> findByAgenceIsNullAndCode(String code);
+    Optional<Role> findByAgenceIsNullAndCode(String code);
 
     boolean existsByAgenceIdAndCodeIgnoreCase(String agenceId, String code);
 

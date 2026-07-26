@@ -2,15 +2,15 @@ package com.assurance.service;
 
 import com.assurance.dto.request.ResetUserPasswordRequest;
 import com.assurance.dto.request.UpsertAgenceRequest;
-import com.assurance.dto.request.UpsertProfilRequest;
+import com.assurance.dto.request.UpsertRoleRequest;
 import com.assurance.dto.request.UpsertUtilisateurRequest;
 import com.assurance.dto.response.AdminAgenceResponse;
 import com.assurance.dto.response.AdminPermissionResponse;
-import com.assurance.dto.response.AdminProfilResponse;
+import com.assurance.dto.response.AdminRoleResponse;
 import com.assurance.dto.response.AdminUtilisateurResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Permission;
-import com.assurance.entity.Profil;
+import com.assurance.entity.Role;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.StatutAgence;
 import com.assurance.exception.BadRequestException;
@@ -18,7 +18,7 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.exception.UnauthorizedException;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.PermissionRepository;
-import com.assurance.repository.ProfilRepository;
+import com.assurance.repository.RoleRepository;
 import com.assurance.repository.UtilisateurRepository;
 import com.assurance.security.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ import java.util.Set;
 public class AdminService {
 
     private final UtilisateurRepository utilisateurRepository;
-    private final ProfilRepository profilRepository;
+    private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final AgenceRepository agenceRepository;
     private final PasswordEncoder passwordEncoder;
@@ -61,7 +61,7 @@ public class AdminService {
             throw new BadRequestException("Email deja utilise");
         }
         Agence agence = resolveManagedAgence(actor, request.getAgenceId());
-        Profil role = resolveAssignableRole(actor, request.getRoleId(), agence);
+        Role role = resolveAssignableRole(actor, request.getRoleId(), agence);
         Utilisateur user = Utilisateur.builder()
                 .agence(agence)
                 .role(role)
@@ -86,7 +86,7 @@ public class AdminService {
             throw new BadRequestException("Email deja utilise");
         }
         Agence agence = resolveManagedAgence(actor, request.getAgenceId());
-        Profil role = resolveAssignableRole(actor, request.getRoleId(), agence);
+        Role role = resolveAssignableRole(actor, request.getRoleId(), agence);
         user.setAgence(agence);
         user.setRole(role);
         user.setEmail(request.getEmail().trim().toLowerCase());
@@ -126,41 +126,41 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminProfilResponse> listRoles() {
+    public List<AdminRoleResponse> listRoles() {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:view", "role:manage", "config:view");
-        List<Profil> roles = can(actor, "agence:view")
-                ? profilRepository.findAllByOrderByNomAsc()
-                : profilRepository.findByAgenceIdOrAgenceIsNullOrderByNomAsc(requiredActorAgence(actor));
-        return roles.stream().map(AdminProfilResponse::from).toList();
+        List<Role> roles = can(actor, "agence:view")
+                ? roleRepository.findAllByOrderByNomAsc()
+                : roleRepository.findByAgenceIdOrAgenceIsNullOrderByNomAsc(requiredActorAgence(actor));
+        return roles.stream().map(AdminRoleResponse::from).toList();
     }
 
     @Transactional
-    public AdminProfilResponse createRole(UpsertProfilRequest request) {
+    public AdminRoleResponse createRole(UpsertRoleRequest request) {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:manage", "config:manage");
         Agence agence = resolveRoleAgence(actor, request.getAgenceId());
         ensureUniqueRoleCode(agence, request.getCode(), null);
-        Profil role = Profil.builder()
+        Role role = Role.builder()
                 .agence(agence)
                 .code(request.getCode().trim().toUpperCase())
                 .nom(request.getNom().trim())
                 .description(blankToNull(request.getDescription()))
-                .profilSysteme(Boolean.TRUE.equals(request.getProfilSysteme()) && can(actor, "config:manage"))
+                .systemRole(Boolean.TRUE.equals(request.getSystemRole()) && can(actor, "config:manage"))
                 .permissions(resolvePermissions(actor, request.getPermissionIds()))
                 .build();
-        return AdminProfilResponse.from(profilRepository.save(role));
+        return AdminRoleResponse.from(roleRepository.save(role));
     }
 
     @Transactional
-    public AdminProfilResponse updateRole(String id, UpsertProfilRequest request) {
+    public AdminRoleResponse updateRole(String id, UpsertRoleRequest request) {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:manage", "config:manage");
-        Profil role = profilRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Profil", id));
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Role", id));
         ensureManagedAgence(actor, role.getAgence());
-        if (Boolean.TRUE.equals(role.getProfilSysteme()) && !can(actor, "config:manage")) {
-            throw new UnauthorizedException("Profil systeme non modifiable");
+        if (Boolean.TRUE.equals(role.getSystemRole()) && !can(actor, "config:manage")) {
+            throw new UnauthorizedException("Role systeme non modifiable");
         }
         Agence agence = resolveRoleAgence(actor, request.getAgenceId());
         ensureUniqueRoleCode(agence, request.getCode(), id);
@@ -169,26 +169,26 @@ public class AdminService {
         role.setNom(request.getNom().trim());
         role.setDescription(blankToNull(request.getDescription()));
         if (can(actor, "config:manage")) {
-            role.setProfilSysteme(Boolean.TRUE.equals(request.getProfilSysteme()));
+            role.setSystemRole(Boolean.TRUE.equals(request.getSystemRole()));
         }
         role.setPermissions(resolvePermissions(actor, request.getPermissionIds()));
-        return AdminProfilResponse.from(profilRepository.save(role));
+        return AdminRoleResponse.from(roleRepository.save(role));
     }
 
     @Transactional
     public void deleteRole(String id) {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:manage", "config:manage");
-        Profil role = profilRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Profil", id));
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Role", id));
         ensureManagedAgence(actor, role.getAgence());
-        if (Boolean.TRUE.equals(role.getProfilSysteme())) {
-            throw new BadRequestException("Profil systeme non supprimable");
+        if (Boolean.TRUE.equals(role.getSystemRole())) {
+            throw new BadRequestException("Role systeme non supprimable");
         }
         if (utilisateurRepository.existsByRoleId(id)) {
-            throw new BadRequestException("Profil utilise par des utilisateurs");
+            throw new BadRequestException("Role utilise par des utilisateurs");
         }
-        profilRepository.delete(role);
+        roleRepository.delete(role);
     }
 
     @Transactional(readOnly = true)
@@ -304,14 +304,14 @@ public class AdminService {
         }
     }
 
-    private Profil resolveAssignableRole(Utilisateur actor, String roleId, Agence agence) {
-        Profil role = profilRepository.findById(roleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Profil", roleId));
+    private Role resolveAssignableRole(Utilisateur actor, String roleId, Agence agence) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role", roleId));
         if (role.getAgence() == null && !can(actor, "config:manage")) {
-            throw new UnauthorizedException("Profil global non assignable");
+            throw new UnauthorizedException("Role global non assignable");
         }
         if (role.getAgence() != null && !role.getAgence().getId().equals(agence.getId())) {
-            throw new BadRequestException("Le profil ne correspond pas a l'agence");
+            throw new BadRequestException("Le role ne correspond pas a l'agence");
         }
         return role;
     }
@@ -332,13 +332,13 @@ public class AdminService {
     private void ensureUniqueRoleCode(Agence agence, String code, String currentId) {
         boolean exists = agence == null
                 ? (currentId == null
-                    ? profilRepository.existsByAgenceIsNullAndCodeIgnoreCase(code)
-                    : profilRepository.existsByAgenceIsNullAndCodeIgnoreCaseAndIdNot(code, currentId))
+                    ? roleRepository.existsByAgenceIsNullAndCodeIgnoreCase(code)
+                    : roleRepository.existsByAgenceIsNullAndCodeIgnoreCaseAndIdNot(code, currentId))
                 : (currentId == null
-                    ? profilRepository.existsByAgenceIdAndCodeIgnoreCase(agence.getId(), code)
-                    : profilRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agence.getId(), code, currentId));
+                    ? roleRepository.existsByAgenceIdAndCodeIgnoreCase(agence.getId(), code)
+                    : roleRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agence.getId(), code, currentId));
         if (exists) {
-            throw new BadRequestException("Code profil deja utilise");
+            throw new BadRequestException("Code role deja utilise");
         }
     }
 

@@ -21,15 +21,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Entity
-@Table(name = "profils",
-        uniqueConstraints = @UniqueConstraint(name = "uk_profil_agence_code", columnNames = {"agence_id", "code"}),
-        indexes = @Index(name = "idx_profil_agence", columnList = "agence_id"))
+@Table(name = "roles",
+        uniqueConstraints = @UniqueConstraint(name = "uk_role_agence_code", columnNames = {"agence_id", "code"}),
+        indexes = @Index(name = "idx_role_agence", columnList = "agence_id"))
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Profil extends BaseEntity {
+public class Role extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agence_id")
@@ -45,13 +45,13 @@ public class Profil extends BaseEntity {
     private String description;
 
     @Builder.Default
-    @Column(name = "profil_systeme", nullable = false)
-    private Boolean profilSysteme = false;
+    @Column(name = "system_role", nullable = false)
+    private Boolean systemRole = false;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-            name = "profil_permissions",
-            joinColumns = @JoinColumn(name = "profil_id"),
+            name = "role_permissions",
+            joinColumns = @JoinColumn(name = "role_id"),
             inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
     @Builder.Default

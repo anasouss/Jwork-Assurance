@@ -2,11 +2,11 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.ResetUserPasswordRequest;
 import com.assurance.dto.request.UpsertAgenceRequest;
-import com.assurance.dto.request.UpsertProfilRequest;
+import com.assurance.dto.request.UpsertRoleRequest;
 import com.assurance.dto.request.UpsertUtilisateurRequest;
 import com.assurance.dto.response.AdminAgenceResponse;
 import com.assurance.dto.response.AdminPermissionResponse;
-import com.assurance.dto.response.AdminProfilResponse;
+import com.assurance.dto.response.AdminRoleResponse;
 import com.assurance.dto.response.AdminUtilisateurResponse;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.service.AdminService;
@@ -59,24 +59,24 @@ public class AdminController {
     }
 
     @GetMapping("/roles")
-    public ResponseEntity<ApiResponse<List<AdminProfilResponse>>> roles() {
+    public ResponseEntity<ApiResponse<List<AdminRoleResponse>>> roles() {
         return ResponseEntity.ok(ApiResponse.success(adminService.listRoles()));
     }
 
     @PostMapping("/roles")
-    public ResponseEntity<ApiResponse<AdminProfilResponse>> createRole(@Valid @RequestBody UpsertProfilRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(adminService.createRole(request), "Profil cree"));
+    public ResponseEntity<ApiResponse<AdminRoleResponse>> createRole(@Valid @RequestBody UpsertRoleRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.createRole(request), "Role cree"));
     }
 
     @PutMapping("/roles/{id}")
-    public ResponseEntity<ApiResponse<AdminProfilResponse>> updateRole(@PathVariable String id, @Valid @RequestBody UpsertProfilRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(adminService.updateRole(id, request), "Profil modifie"));
+    public ResponseEntity<ApiResponse<AdminRoleResponse>> updateRole(@PathVariable String id, @Valid @RequestBody UpsertRoleRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.updateRole(id, request), "Role modifie"));
     }
 
     @DeleteMapping("/roles/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteRole(@PathVariable String id) {
         adminService.deleteRole(id);
-        return ResponseEntity.ok(ApiResponse.success(null, "Profil supprime"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Role supprime"));
     }
 
     @GetMapping("/permissions")

@@ -26,7 +26,7 @@ import java.util.List;
 public class DataSeeder implements CommandLineRunner {
 
     private final PermissionRepository permissionRepository;
-    private final ProfilRepository roleRepository;
+    private final RoleRepository roleRepository;
     private final AgenceRepository agenceRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
@@ -74,8 +74,8 @@ public class DataSeeder implements CommandLineRunner {
         Permission agenceCreate = seedPermission("agence:create", "Creer une agence", "agence", true);
         Permission userView = seedPermission("user:view", "Consulter les utilisateurs", "admin");
         Permission userManage = seedPermission("user:manage", "Gerer les utilisateurs", "admin");
-        Permission roleView = seedPermission("role:view", "Consulter les profils", "admin");
-        Permission roleManage = seedPermission("role:manage", "Gerer les profils", "admin");
+        Permission roleView = seedPermission("role:view", "Consulter les roles", "admin");
+        Permission roleManage = seedPermission("role:manage", "Gerer les roles", "admin");
         Permission configView = seedPermission("config:view", "Consulter la configuration", "config", true);
         Permission configManage = seedPermission("config:manage", "Gerer la configuration", "config", true);
 
@@ -220,29 +220,29 @@ public class DataSeeder implements CommandLineRunner {
         attachUsages(location, usageA, usageC1, usageCyclos);
         attachUsages(tpv, usageB1, usageB2);
 
-        Profil superAdmin = roleRepository.findByAgenceIsNullAndCode("SUPER_ADMIN").orElseGet(() -> roleRepository.save(
-                Profil.builder()
+        Role superAdmin = roleRepository.findByAgenceIsNullAndCode("SUPER_ADMIN").orElseGet(() -> roleRepository.save(
+                Role.builder()
                         .code("SUPER_ADMIN")
                         .nom("Super Admin")
-                        .profilSysteme(true)
+                        .systemRole(true)
                         .build()
         ));
         superAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, garantieManage, grilleView, grilleManage, quittanceView, quittanceCreate, agenceView, agenceCreate, userView, userManage, roleView, roleManage, configView, configManage));
         roleRepository.save(superAdmin);
 
-        Profil agenceAdmin = roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENCY_ADMIN").orElseGet(() -> roleRepository.save(
-                Profil.builder()
+        Role agenceAdmin = roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENCY_ADMIN").orElseGet(() -> roleRepository.save(
+                Role.builder()
                         .agence(agenceDefaut)
                         .code("AGENCY_ADMIN")
                         .nom("Admin Agence")
-                        .profilSysteme(true)
+                        .systemRole(true)
                         .build()
         ));
         agenceAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, grilleView, grilleManage, quittanceView, quittanceCreate, userView, userManage, roleView, roleManage));
         roleRepository.save(agenceAdmin);
 
         roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENT").orElseGet(() -> roleRepository.save(
-                Profil.builder()
+                Role.builder()
                         .agence(agenceDefaut)
                         .code("AGENT")
                         .nom("Agent")

@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.Set;
 
 @Data
-public class UpsertProfilRequest {
+public class UpsertRoleRequest {
     private String agenceId;
 
     @NotBlank
@@ -16,6 +16,6 @@ public class UpsertProfilRequest {
     private String nom;
 
     private String description;
-    private Boolean profilSysteme = false;
+    private Boolean systemRole = false;
     private Set<String> permissionIds = Set.of();
 }

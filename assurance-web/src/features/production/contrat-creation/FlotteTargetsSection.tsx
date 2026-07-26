@@ -613,21 +613,6 @@ function VehicleForm({
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
-          <AutocompleteSelect
-            value={vehicule.marqueId ?? ""}
-            customValue={vehicule.marqueLibelle}
-            allowCustomValue
-            placeholder="Marque"
-            emptyText="Aucune marque trouvée"
-            options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
-            onValueChange={(value) => update({ marqueId: value || undefined, marqueLibelle: undefined })}
-            onCustomValueChange={(value) => update({ marqueId: undefined, marqueLibelle: value })}
-          />
-        </Field>
-        <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
-          <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update({ immatriculation: event.target.value })} />
-        </Field>
         <Field label="Usage" required error={errors[`vehicules.${index}.usageId`]}>
           <AutocompleteSelect
             value={vehicule.usageId ?? ""}
@@ -651,18 +636,32 @@ function VehicleForm({
             }
           />
         </Field>
-        <Field label="Carrosserie" required error={errors[`vehicules.${index}.carrosserieId`]}>
+        <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
           <AutocompleteSelect
-            value={vehicule.carrosserieId ?? ""}
-            customValue={vehicule.carrosserieLibelle}
+            value={vehicule.marqueId ?? ""}
+            customValue={vehicule.marqueLibelle}
             allowCustomValue
-            placeholder="Carrosserie"
-            emptyText="Aucune carrosserie trouvée"
-            options={carrosseries.map((carrosserie) => ({ value: carrosserie.id, label: carrosserie.libelle, keywords: carrosserie.code }))}
-            onValueChange={(value) => update({ carrosserieId: value || undefined, carrosserieLibelle: undefined })}
-            onCustomValueChange={(value) => update({ carrosserieId: undefined, carrosserieLibelle: value })}
+            placeholder="Marque"
+            emptyText="Aucune marque trouvée"
+            options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
+            onValueChange={(value) => update({ marqueId: value || undefined, marqueLibelle: undefined })}
+            onCustomValueChange={(value) => update({ marqueId: undefined, marqueLibelle: value })}
           />
         </Field>
+        <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
+          <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update({ immatriculation: event.target.value })} />
+        </Field>
+        <Field label="Date mise en circulation">
+          <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update({ datePremiereCirculation: toDateOnly(date) })} />
+        </Field>
+        <Field label="Date validité CG" required error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
+          <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update({ dateExpirationCarteGrise: toDateOnly(date) })} />
+        </Field>
+        {needsCarburantAndPf ? (
+          <Field label="Puissance fiscale / cylindrée" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
+            <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update({ puissanceFiscale: event.target.value })} />
+          </Field>
+        ) : null}
         {needsCarburantAndPf ? (
           <Field label="Carburant" required error={errors[`vehicules.${index}.carburant`]}>
             <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update({ carburant: value })}>
@@ -677,11 +676,18 @@ function VehicleForm({
             </Select>
           </Field>
         ) : null}
-        {needsCarburantAndPf ? (
-          <Field label="Puissance fiscale / cylindrée" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
-            <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update({ puissanceFiscale: event.target.value })} />
-          </Field>
-        ) : null}
+        <Field label="Carrosserie" required error={errors[`vehicules.${index}.carrosserieId`]}>
+          <AutocompleteSelect
+            value={vehicule.carrosserieId ?? ""}
+            customValue={vehicule.carrosserieLibelle}
+            allowCustomValue
+            placeholder="Carrosserie"
+            emptyText="Aucune carrosserie trouvée"
+            options={carrosseries.map((carrosserie) => ({ value: carrosserie.id, label: carrosserie.libelle, keywords: carrosserie.code }))}
+            onValueChange={(value) => update({ carrosserieId: value || undefined, carrosserieLibelle: undefined })}
+            onCustomValueChange={(value) => update({ carrosserieId: undefined, carrosserieLibelle: value })}
+          />
+        </Field>
         {needsSousClasse ? (
           <Field label="Sous-classe" required error={errors[`vehicules.${index}.sousClasse`]}>
             <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update({ sousClasse: event.target.value })} />
@@ -702,17 +708,11 @@ function VehicleForm({
             </Select>
           </Field>
         ) : null}
-        <Field label="Nombre de places">
-          <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
-        </Field>
-        <Field label="Date mise en circulation">
-          <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update({ datePremiereCirculation: toDateOnly(date) })} />
-        </Field>
-        <Field label="Date validité CG" required error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
-          <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update({ dateExpirationCarteGrise: toDateOnly(date) })} />
-        </Field>
         <Field label="N° attestation">
           <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
+        </Field>
+        <Field label="Nombre de places">
+          <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
         <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
           <Input type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update({ valeurNeuf: numberValue(event.target.value) })} />

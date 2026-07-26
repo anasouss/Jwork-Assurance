@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
 import { formatMoney, money, numberValue } from "../utils/format";
+import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 
 export function GarantieSection({
@@ -88,6 +90,12 @@ export function GarantieSection({
       const formules = type === "PERSONNE" ? formulesForGuarantee(formulesPersonne, garantie) : [];
       const formule = formules[0];
       const line = type === "VEHICULE" ? linesForGuarantee(lignes, garantie)[0] : undefined;
+      const selectedVehicle = type === "VEHICULE" ? vehicules[0] : undefined;
+      const warning = type === "VEHICULE" ? requiredVehicleValueWarning(garantie, selectedVehicle, line) : "";
+      if (warning) {
+        toast.error(warning);
+        return;
+      }
       setSelected([
         ...selected,
         {
@@ -180,7 +188,19 @@ export function GarantieSection({
                   {vehiculeCount > 1 ? (
                     <td className="px-3 py-2">
                       {isVehicleGuarantee && !isRc ? (
-                        <Select value={String(item?.vehiculeIndex ?? 0)} disabled={rowDisabled} onValueChange={(value) => update(garantie.id, { vehiculeIndex: Number(value) })}>
+                        <Select
+                          value={String(item?.vehiculeIndex ?? 0)}
+                          disabled={rowDisabled}
+                          onValueChange={(value) => {
+                            const nextVehicle = vehicules[Number(value)];
+                            const warning = requiredVehicleValueWarning(garantie, nextVehicle, selectedLine);
+                            if (warning) {
+                              toast.error(warning);
+                              return;
+                            }
+                            update(garantie.id, { vehiculeIndex: Number(value) });
+                          }}
+                        >
                           <SelectTrigger className={controlClass(editable)}><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {Array.from({ length: vehiculeCount }).map((_, index) => <SelectItem key={index} value={String(index)}>Véhicule {index + 1}</SelectItem>)}
@@ -663,6 +683,79 @@ function isManualValue(garantie: ReferenceOption, line?: ReferenceOption) {
     return false;
   }
   return defaultSource(garantie) === "MANUEL";
+}
+
+function requiredVehicleValueWarning(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
+  if (!vehicule || lineMode(line) === "CAPITAL" || defaultSource(garantie) === "MANUEL") {
+    return "";
+  }
+  const source = effectiveVehicleValueSource(garantie);
+  if (source === "NEUF" && !vehicule.valeurNeuf) {
+    return "Renseignez la valeur à neuf avant de sélectionner cette garantie.";
+  }
+  if (source === "VENALE" && !vehicule.valeurVenale) {
+    return "Renseignez la valeur vénale avant de sélectionner cette garantie.";
+  }
+  if (source === "GLACE" && !vehicule.valeurGlace) {
+    return "Renseignez la valeur glace avant de sélectionner cette garantie.";
+  }
+  if (!source && allowedVehicleValueSources(garantie).some((allowedSource) => hasVehicleValue(vehicule, allowedSource))) {
+    return validateValeurVenale(vehicule) ?? "";
+  }
+  if (!source && allowedVehicleValueSources(garantie).length > 0) {
+    return `Renseignez ${allowedVehicleValueSources(garantie).map(sourceLabel).join(" ou ")} avant de sélectionner cette garantie.`;
+  }
+  return validateValeurVenale(vehicule) ?? "";
+}
+
+function effectiveVehicleValueSource(garantie: ReferenceOption) {
+  const source = String(garantie.sourceValeurParDefaut ?? "").toUpperCase();
+  if (["VENALE", "NEUF", "GLACE"].includes(source)) {
+    return source;
+  }
+  const allowedSources = allowedVehicleValueSources(garantie);
+  return allowedSources.length === 1 ? allowedSources[0] : "";
+}
+
+function allowedVehicleValueSources(garantie: ReferenceOption) {
+  const sources = Array.isArray(garantie.sourcesValeurAutorisees)
+    ? garantie.sourcesValeurAutorisees.map((source) => String(source).toUpperCase())
+    : [];
+  const valueSources = sources.filter((source) => ["VENALE", "NEUF", "GLACE"].includes(source));
+  if (valueSources.length > 0) {
+    return valueSources;
+  }
+  return [
+    garantie.requiertValeurVenale ? "VENALE" : "",
+    garantie.requiertValeurNeuf ? "NEUF" : "",
+    garantie.requiertValeurGlace ? "GLACE" : "",
+  ].filter(Boolean);
+}
+
+function hasVehicleValue(vehicule: VehiculeInput, source: string) {
+  if (source === "NEUF") {
+    return Boolean(vehicule.valeurNeuf);
+  }
+  if (source === "VENALE") {
+    return Boolean(vehicule.valeurVenale);
+  }
+  if (source === "GLACE") {
+    return Boolean(vehicule.valeurGlace);
+  }
+  return false;
+}
+
+function sourceLabel(source: string) {
+  if (source === "NEUF") {
+    return "la valeur à neuf";
+  }
+  if (source === "VENALE") {
+    return "la valeur vénale";
+  }
+  if (source === "GLACE") {
+    return "la valeur glace";
+  }
+  return "la valeur";
 }
 
 function guaranteeCapitalValue(garantie: ReferenceOption, line?: ReferenceOption, vehicule?: VehiculeInput, item?: GarantieInput) {

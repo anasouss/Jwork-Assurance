@@ -16,6 +16,7 @@ import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { toDateOnly } from "../date";
 import { formatMoney, money, numberValue } from "../utils/format";
+import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
@@ -670,11 +671,11 @@ function VehicleForm({
         <Field label="N° attestation">
           <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
         </Field>
-        <Field label="Valeur vénale">
-          <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update({ valeurVenale: numberValue(event.target.value) })} />
-        </Field>
         <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
           <Input type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update({ valeurNeuf: numberValue(event.target.value) })} />
+        </Field>
+        <Field label="Valeur vénale" error={errors[`vehicules.${index}.valeurVenale`] ?? validateValeurVenale(vehicule)}>
+          <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update({ valeurVenale: numberValue(event.target.value) })} />
         </Field>
         <Field label="Valeur glace">
           <Input type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update({ valeurGlace: numberValue(event.target.value) })} />
@@ -819,6 +820,13 @@ function TargetGuaranteesTable({
   const toggle = (garantie: ReferenceOption, checked: boolean) => {
     if (Boolean(garantie.responsabiliteCivile)) {
       return;
+    }
+    if (checked) {
+      const warning = valueWarning(garantie, target);
+      if (warning) {
+        toast.error(warning);
+        return;
+      }
     }
     setSelected((current) => checked
       ? [...current, targetedInput(garantie, target)]
@@ -1189,19 +1197,83 @@ function valueWarning(garantie: ReferenceOption, target?: Target) {
   if (!target) {
     return "";
   }
-  if (garantie.requiertValeurGlace && !target.valeurGlace) {
-    return "Valeur glace requise";
-  }
-  if (garantie.requiertValeurNeuf && !target.valeurNeuf) {
-    return "Valeur à neuf requise";
-  }
-  if (garantie.requiertValeurVenale && !target.valeurVenale) {
-    return "Valeur vénale requise";
+  if (target.kind === "vehicule") {
+    const source = effectiveVehicleValueSource(garantie);
+    if (source === "NEUF" && !target.valeurNeuf) {
+      return "Valeur à neuf requise";
+    }
+    if (source === "VENALE" && !target.valeurVenale) {
+      return "Valeur vénale requise";
+    }
+    if (source === "GLACE" && !target.valeurGlace) {
+      return "Valeur glace requise";
+    }
+    if (!source && allowedVehicleValueSources(garantie).some((allowedSource) => hasTargetValue(target, allowedSource))) {
+      const valeurVenaleError = validateValeurVenale(target);
+      return valeurVenaleError ?? "";
+    }
+    if (!source && allowedVehicleValueSources(garantie).length > 0) {
+      return `${allowedVehicleValueSources(garantie).map(sourceLabel).join(" ou ")} requise`;
+    }
+    const valeurVenaleError = validateValeurVenale(target);
+    if (valeurVenaleError) {
+      return valeurVenaleError;
+    }
   }
   if (target.kind === "remorque" && garantie.avecCapital && !target.valeurAssuree) {
     return "Valeur remorque requise";
   }
   return "";
+}
+
+function effectiveVehicleValueSource(garantie: ReferenceOption) {
+  const source = String(garantie.sourceValeurParDefaut ?? "").toUpperCase();
+  if (["VENALE", "NEUF", "GLACE"].includes(source)) {
+    return source;
+  }
+  const allowedSources = allowedVehicleValueSources(garantie);
+  return allowedSources.length === 1 ? allowedSources[0] : "";
+}
+
+function allowedVehicleValueSources(garantie: ReferenceOption) {
+  const sources = Array.isArray(garantie.sourcesValeurAutorisees)
+    ? garantie.sourcesValeurAutorisees.map((source) => String(source).toUpperCase())
+    : [];
+  const valueSources = sources.filter((source) => ["VENALE", "NEUF", "GLACE"].includes(source));
+  if (valueSources.length > 0) {
+    return valueSources;
+  }
+  return [
+    garantie.requiertValeurVenale ? "VENALE" : "",
+    garantie.requiertValeurNeuf ? "NEUF" : "",
+    garantie.requiertValeurGlace ? "GLACE" : "",
+  ].filter(Boolean);
+}
+
+function hasTargetValue(target: Target, source: string) {
+  if (source === "NEUF") {
+    return Boolean(target.valeurNeuf);
+  }
+  if (source === "VENALE") {
+    return Boolean(target.valeurVenale);
+  }
+  if (source === "GLACE") {
+    return Boolean(target.valeurGlace);
+  }
+  return false;
+}
+
+function sourceLabel(source: string) {
+  if (source === "NEUF") {
+    return "Valeur à neuf";
+  }
+  if (source === "VENALE") {
+    return "Valeur vénale";
+  }
+  if (source === "GLACE") {
+    return "Valeur glace";
+  }
+  return "Valeur";
 }
 
 function defaultSource(garantie: ReferenceOption) {

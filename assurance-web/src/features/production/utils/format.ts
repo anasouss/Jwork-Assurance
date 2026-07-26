@@ -17,7 +17,11 @@ export function roundMoney(value: number) {
 }
 
 export function formatMoney(value?: number | null) {
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value ?? 0);
+  const amount = new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value ?? 0);
+  return `${amount} MAD`;
 }
 
 export function formatOptionalMoney(value?: number | null) {

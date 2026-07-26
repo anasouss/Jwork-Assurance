@@ -9,6 +9,7 @@ import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
 import { numberValue } from "../utils/format";
+import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { ReferenceOption, VehiculeInput } from "../types";
 
 export function emptyVehicule(usageId?: string): VehiculeInput {
@@ -192,11 +193,11 @@ export function VehiculeSection({
                     <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
                   </Field>
                 ) : null}
-                <Field label="Valeur vénale">
-                  <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update(index, { valeurVenale: numberValue(event.target.value) })} />
-                </Field>
                 <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
                   <Input type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update(index, { valeurNeuf: numberValue(event.target.value) })} />
+                </Field>
+                <Field label="Valeur vénale" error={errors[`vehicules.${index}.valeurVenale`] ?? validateValeurVenale(vehicule)}>
+                  <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update(index, { valeurVenale: numberValue(event.target.value) })} />
                 </Field>
                 <Field label="Valeur glace">
                   <Input type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update(index, { valeurGlace: numberValue(event.target.value) })} />

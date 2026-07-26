@@ -6,6 +6,7 @@ import { productionApi } from "../api";
 import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
 import { emptyVehicule } from "../components/VehiculeSection";
+import { validateValeurVenale } from "../utils/vehicle-validation";
 import type {
   AssistanceDraft,
   ClientInput,
@@ -310,12 +311,9 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
       if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
         nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
       }
-      if (
-        vehicule.valeurNeuf !== undefined
-        && vehicule.valeurVenale !== undefined
-        && Number(vehicule.valeurNeuf) < Number(vehicule.valeurVenale)
-      ) {
-        nextErrors[`vehicules.${index}.valeurNeuf`] = "La valeur à neuf doit être supérieure ou égale à la valeur vénale.";
+      const valeurVenaleError = validateValeurVenale(vehicule);
+      if (valeurVenaleError) {
+        nextErrors[`vehicules.${index}.valeurVenale`] = valeurVenaleError;
       }
     });
     setValidationErrors(nextErrors);

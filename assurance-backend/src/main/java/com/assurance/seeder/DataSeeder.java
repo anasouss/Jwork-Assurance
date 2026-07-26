@@ -119,13 +119,16 @@ public class DataSeeder implements CommandLineRunner {
         seedCategorieTransport("GRAND_TAXIS", "Grand taxi", "Taxi interurbain");
         seedCategorieTransport("CAR_LIGNE", "Car de ligne", "Cars et autocars de ligne");
 
-        GroupeUsageAttestation groupeA = seedGroupeUsageAttestation("A", "TOURISME", "#ffff00", null);
-        GroupeUsageAttestation groupeC = seedGroupeUsageAttestation("C", "COMMERCE", "#00a2ff", null);
-        GroupeUsageAttestation groupeE = seedGroupeUsageAttestation("E", "CYCLOMOTEUR", "#60f060", null);
-        GroupeUsageAttestation groupeD = seedGroupeUsageAttestation("D", "DIVERS", null, null);
-        GroupeUsageAttestation groupeP = seedGroupeUsageAttestation("P", "PROVISOIRE", "#d1009f", null);
-        GroupeUsageAttestation groupeB = seedGroupeUsageAttestation("B", "TPV", null, "MATU & CAT");
-        GroupeUsageAttestation groupeF = seedGroupeUsageAttestation("F", "FRONTIERE", "#f58ac3", "MATU & CAT");
+        CompagnieAssurance matu = compagnieAssuranceRepository.findByCode("MATU").orElse(null);
+        CompagnieAssurance cat = compagnieAssuranceRepository.findByCode("CAT").orElse(null);
+
+        GroupeUsageAttestation groupeA = seedGroupeUsageAttestation("A", "TOURISME", "#ffff00");
+        GroupeUsageAttestation groupeC = seedGroupeUsageAttestation("C", "COMMERCE", "#00a2ff");
+        GroupeUsageAttestation groupeE = seedGroupeUsageAttestation("E", "CYCLOMOTEUR", "#60f060");
+        GroupeUsageAttestation groupeD = seedGroupeUsageAttestation("D", "DIVERS", null);
+        GroupeUsageAttestation groupeP = seedGroupeUsageAttestation("P", "PROVISOIRE", "#d1009f");
+        GroupeUsageAttestation groupeB = seedGroupeUsageAttestation("B", "TPV", null, matu, cat);
+        GroupeUsageAttestation groupeF = seedGroupeUsageAttestation("F", "FRONTIERE", "#f58ac3", matu, cat);
 
         Usage usageA = seedUsage("A", "TOURISME", "Tourisme", groupeA, true, true, false, false, false, berline);
         Usage usageC1 = seedUsage("C1", "C1", "Commerce C1", groupeC, true, true, false, false, false, utilitaire);
@@ -724,20 +727,24 @@ public class DataSeeder implements CommandLineRunner {
         return categorieTransportRepository.save(categorie);
     }
 
-    private GroupeUsageAttestation seedGroupeUsageAttestation(String code, String libelle, String couleur, String restrictionCompagnie) {
+    private GroupeUsageAttestation seedGroupeUsageAttestation(String code, String libelle, String couleur, CompagnieAssurance... compagniesRestreintes) {
         GroupeUsageAttestation groupe = groupeUsageAttestationRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 groupeUsageAttestationRepository.save(GroupeUsageAttestation.builder()
                         .code(code)
                         .libelle(libelle)
                         .couleur(couleur)
-                        .restrictionCompagnie(restrictionCompagnie)
                         .visibleStock(true)
                         .actif(true)
                         .build())
         );
         groupe.setLibelle(libelle);
         groupe.setCouleur(couleur);
-        groupe.setRestrictionCompagnie(restrictionCompagnie);
+        groupe.getCompagniesRestreintes().clear();
+        for (CompagnieAssurance compagnie : compagniesRestreintes) {
+            if (compagnie != null) {
+                groupe.getCompagniesRestreintes().add(compagnie);
+            }
+        }
         groupe.setVisibleStock(true);
         groupe.setActif(true);
         return groupeUsageAttestationRepository.save(groupe);

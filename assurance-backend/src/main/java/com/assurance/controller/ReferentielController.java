@@ -925,6 +925,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/groupes-usage-attestation")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesUsageAttestation() {
         return ResponseEntity.ok(ApiResponse.success(groupeUsageAttestationRepository.findAll(Sort.by("code")).stream()
                 .filter(groupe -> Boolean.TRUE.equals(groupe.getActif()) && Boolean.TRUE.equals(groupe.getVisibleStock()))
@@ -933,6 +934,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/groupes-usage-attestation/parametrage")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesUsageAttestationParametrage() {
         return ResponseEntity.ok(ApiResponse.success(groupeUsageAttestationRepository.findAll(Sort.by("code")).stream()
                 .map(this::toGroupeUsageAttestationResponse)
@@ -940,6 +942,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/groupes-usage-attestation")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeUsageAttestation(@Valid @RequestBody UpsertGroupeUsageAttestationRequest request) {
         groupeUsageAttestationRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code groupe usage attestation deja utilise");
@@ -953,6 +956,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/groupes-usage-attestation/{id}")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateGroupeUsageAttestation(
             @PathVariable Long id,
             @Valid @RequestBody UpsertGroupeUsageAttestationRequest request
@@ -1307,18 +1311,34 @@ public class ReferentielController {
         if (couleur != null && !couleur.matches("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")) {
             throw new BadRequestException("Couleur invalide");
         }
+        Set<CompagnieAssurance> restrictions = new LinkedHashSet<>();
+        if (request.getCompagnieRestrictionIds() != null) {
+            for (Long compagnieId : request.getCompagnieRestrictionIds()) {
+                if (compagnieId != null) {
+                    restrictions.add(compagnieAssuranceRepository.findById(compagnieId)
+                            .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", compagnieId)));
+                }
+            }
+        }
         groupe.setCode(request.getCode());
         groupe.setLibelle(request.getLibelle());
         groupe.setCouleur(couleur);
-        groupe.setRestrictionCompagnie(blankToNull(request.getRestrictionCompagnie()));
+        groupe.getCompagniesRestreintes().clear();
+        groupe.getCompagniesRestreintes().addAll(restrictions);
         groupe.setVisibleStock(request.getVisibleStock() == null ? true : request.getVisibleStock());
         groupe.setActif(request.getActif() == null ? true : request.getActif());
     }
 
     private Map<String, Object> toGroupeUsageAttestationResponse(GroupeUsageAttestation groupe) {
+        List<CompagnieAssurance> restrictions = groupe.getCompagniesRestreintes().stream()
+                .sorted(Comparator.comparing(CompagnieAssurance::getOrdreAffichage, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(CompagnieAssurance::getNom, Comparator.nullsLast(String::compareToIgnoreCase)))
+                .toList();
         return option(groupe.getId(), groupe.getCode(), groupe.getLibelle())
                 .putValue("couleur", groupe.getCouleur())
-                .putValue("restrictionCompagnie", groupe.getRestrictionCompagnie())
+                .putValue("compagnieRestrictionIds", restrictions.stream().map(CompagnieAssurance::getId).toList())
+                .putValue("compagnieRestrictionCodes", restrictions.stream().map(CompagnieAssurance::getCode).toList())
+                .putValue("compagnieRestrictionLibelles", restrictions.stream().map(CompagnieAssurance::getNom).toList())
                 .putValue("visibleStock", groupe.getVisibleStock())
                 .putValue("actif", groupe.getActif())
                 .map();

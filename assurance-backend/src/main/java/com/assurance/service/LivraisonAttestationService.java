@@ -376,16 +376,16 @@ public class LivraisonAttestationService {
     }
 
     private void validerRestrictionCompagnie(CompagnieAssurance compagnie, GroupeUsageAttestation groupe) {
-        if (groupe == null || !hasText(groupe.getRestrictionCompagnie())) {
+        if (groupe == null || groupe.getCompagniesRestreintes() == null || groupe.getCompagniesRestreintes().isEmpty()) {
             return;
         }
-        String code = groupe.getCode() == null ? "" : groupe.getCode().trim().toUpperCase(Locale.ROOT);
-        if (!"B".equals(code) && !"F".equals(code)) {
-            return;
-        }
-        String nom = compagnie != null && compagnie.getNom() != null ? compagnie.getNom().toUpperCase(Locale.ROOT) : "";
-        if (!(nom.contains("MATU") || nom.equals("CAT") || nom.startsWith("CAT ") || nom.endsWith(" CAT") || nom.contains(" CAT "))) {
-            throw new BadRequestException("Les usages B et F ne sont autorises que pour les compagnies MATU et CAT");
+        if (compagnie == null || groupe.getCompagniesRestreintes().stream().noneMatch(restriction -> restriction.getId().equals(compagnie.getId()))) {
+            String compagniesAutorisees = groupe.getCompagniesRestreintes().stream()
+                    .map(CompagnieAssurance::getNom)
+                    .filter(nom -> nom != null && !nom.isBlank())
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("les compagnies autorisees");
+            throw new BadRequestException("Le groupe " + groupe.getCode() + " est reserve a " + compagniesAutorisees);
         }
     }
 

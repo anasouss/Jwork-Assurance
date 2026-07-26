@@ -2,6 +2,9 @@ package com.assurance.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -11,7 +14,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "groupes_usage_attestation")
@@ -31,8 +36,14 @@ public class GroupeUsageAttestation extends BaseEntity {
     @Column(length = 20)
     private String couleur;
 
-    @Column(name = "restriction_compagnie", length = 160)
-    private String restrictionCompagnie;
+    @ManyToMany
+    @JoinTable(
+            name = "groupe_usage_attestation_compagnies",
+            joinColumns = @JoinColumn(name = "groupe_usage_attestation_id"),
+            inverseJoinColumns = @JoinColumn(name = "compagnie_assurance_id")
+    )
+    @Builder.Default
+    private Set<CompagnieAssurance> compagniesRestreintes = new LinkedHashSet<>();
 
     @Builder.Default
     @Column(name = "visible_stock", nullable = false)

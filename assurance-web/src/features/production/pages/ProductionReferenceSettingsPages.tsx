@@ -266,6 +266,7 @@ export function CategoriesClientSettingsPage() {
 export function GroupesUsageAttestationSettingsPage() {
   const queryClient = useQueryClient();
   const groupes = useReference("groupes-usage-attestation/parametrage");
+  const compagnies = useReference("compagnies-assurance");
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertGroupeUsageAttestationRequest>(emptyGroupeUsageAttestation());
@@ -275,7 +276,7 @@ export function GroupesUsageAttestationSettingsPage() {
       code: editing.code ?? "",
       libelle: editing.libelle,
       couleur: String(editing.couleur ?? "#059669"),
-      restrictionCompagnie: String(editing.restrictionCompagnie ?? ""),
+      compagnieRestrictionIds: refArray(editing, "compagnieRestrictionIds"),
       visibleStock: editing.visibleStock !== false,
       actif: editing.actif !== false,
     } : emptyGroupeUsageAttestation());
@@ -338,10 +339,10 @@ export function GroupesUsageAttestationSettingsPage() {
               </div>
             </Field>
             <Field label="Restriction compagnie">
-              <Input
-                value={payload.restrictionCompagnie ?? ""}
-                onChange={(event) => setPayload((current) => ({ ...current, restrictionCompagnie: event.target.value }))}
-                placeholder="Optionnel"
+              <CompanyRestrictionSelect
+                value={payload.compagnieRestrictionIds ?? []}
+                compagnies={compagnies.data ?? []}
+                onChange={(compagnieRestrictionIds) => setPayload((current) => ({ ...current, compagnieRestrictionIds }))}
               />
             </Field>
             <Flag label="Visible dans le stock" checked={payload.visibleStock !== false} onChange={(visibleStock) => setPayload((current) => ({ ...current, visibleStock }))} />
@@ -391,7 +392,7 @@ export function GroupesUsageAttestationSettingsPage() {
                         <span>{String(groupe.couleur ?? "-")}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{String(groupe.restrictionCompagnie ?? "-")}</TableCell>
+                    <TableCell>{refArray(groupe, "compagnieRestrictionLibelles").join(", ") || "Toutes"}</TableCell>
                     <TableCell>{groupe.visibleStock === false ? "Non" : "Oui"}</TableCell>
                     <TableCell>{groupe.actif === false ? "Non" : "Oui"}</TableCell>
                     <TableCell className="text-right">
@@ -427,7 +428,63 @@ function emptyCategorieClient(): UpsertCategorieClientRequest {
 }
 
 function emptyGroupeUsageAttestation(): UpsertGroupeUsageAttestationRequest {
-  return { code: "", libelle: "", couleur: "#059669", restrictionCompagnie: "", visibleStock: true, actif: true };
+  return { code: "", libelle: "", couleur: "#059669", compagnieRestrictionIds: [], visibleStock: true, actif: true };
+}
+
+function CompanyRestrictionSelect({
+  value,
+  compagnies,
+  onChange,
+}: {
+  value: string[];
+  compagnies: ReferenceOption[];
+  onChange: (value: string[]) => void;
+}) {
+  const selected = new Set(value);
+  const selectedLabels = compagnies
+    .filter((compagnie) => selected.has(String(compagnie.id)))
+    .map((compagnie) => compagnie.libelle);
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    onChange(Array.from(next));
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" className="h-10 w-full justify-between font-normal">
+          <span className="truncate">{selectedLabels.length ? selectedLabels.join(", ") : "Toutes les compagnies"}</span>
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder="Filtrer compagnie" />
+          <CommandList className="max-h-64 overflow-y-auto">
+            <CommandEmpty>Aucune compagnie.</CommandEmpty>
+            <CommandGroup>
+              {compagnies.map((compagnie) => {
+                const id = String(compagnie.id);
+                const checked = selected.has(id);
+                return (
+                  <CommandItem key={id} value={`${compagnie.code ?? ""} ${compagnie.libelle}`} onSelect={() => toggle(id)}>
+                    <Check className={cn("size-4", checked ? "opacity-100" : "opacity-0")} />
+                    <span className="truncate">{compagnie.code ? `${compagnie.code} - ` : ""}{compagnie.libelle}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function UsagesSettingsPage() {

@@ -99,7 +99,7 @@ export const groupeUsageAttestationSchema = z.object({
   code: z.string().min(1, "Code obligatoire"),
   libelle: z.string().min(2, "Libelle obligatoire"),
   couleur: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, "Couleur invalide").optional().or(z.literal("")),
-  restrictionCompagnie: z.string().optional(),
+  compagnieRestrictionIds: z.array(z.string()).optional(),
   visibleStock: z.boolean().optional(),
   actif: z.boolean().optional(),
 });

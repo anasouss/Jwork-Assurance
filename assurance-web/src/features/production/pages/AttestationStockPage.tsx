@@ -898,7 +898,9 @@ function GroupCodeSelect({
         {groupes.map((groupe) => (
           <SelectItem key={groupe.id} value={String(groupe.code ?? groupe.id)}>
             {groupe.code} · {groupe.libelle}
-            {typeof groupe.restrictionCompagnie === "string" ? ` (${groupe.restrictionCompagnie})` : ""}
+            {Array.isArray(groupe.compagnieRestrictionLibelles) && groupe.compagnieRestrictionLibelles.length > 0
+              ? ` (${groupe.compagnieRestrictionLibelles.join(", ")})`
+              : ""}
           </SelectItem>
         ))}
       </SelectContent>

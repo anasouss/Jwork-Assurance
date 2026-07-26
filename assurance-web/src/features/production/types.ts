@@ -535,7 +535,7 @@ export type UpsertGroupeUsageAttestationRequest = {
   code: string;
   libelle: string;
   couleur?: string;
-  restrictionCompagnie?: string;
+  compagnieRestrictionIds?: string[];
   visibleStock?: boolean;
   actif?: boolean;
 };

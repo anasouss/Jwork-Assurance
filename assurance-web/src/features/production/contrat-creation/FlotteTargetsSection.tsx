@@ -574,9 +574,9 @@ function TargetSubsection({
   };
 
   return (
-    <Collapsible open={open} onOpenChange={handleOpenChange} className="rounded-md border bg-card">
+    <Collapsible open={open} onOpenChange={handleOpenChange} className="overflow-hidden rounded-md border bg-card">
       <CollapsibleTrigger asChild>
-        <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+        <button type="button" className="flex w-full items-center justify-between gap-3 bg-emerald-50 px-4 py-3 text-left text-emerald-950 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-50 dark:hover:bg-emerald-950/45">
           <span className="flex min-w-0 items-center gap-2">
             <ChevronDown className={cn("size-4 shrink-0 transition-transform", !open && "-rotate-90")} />
             <span className="truncate text-sm font-semibold">{title}</span>
@@ -803,7 +803,7 @@ function VehicleForm({
         </Field>
         {needsCarburantAndPf ? (
           <Field label="Puissance fiscale / cylindrée" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
-            <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update({ puissanceFiscale: event.target.value })} />
+            <Input className="text-right" value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update({ puissanceFiscale: event.target.value })} />
           </Field>
         ) : null}
         {needsCarburantAndPf ? (
@@ -839,7 +839,7 @@ function VehicleForm({
         ) : null}
         {needsPtc ? (
           <Field label="PTC" required error={errors[`vehicules.${index}.ptc`]}>
-            <Input value={vehicule.ptc ?? ""} onChange={(event) => update({ ptc: event.target.value })} />
+            <Input className="text-right" value={vehicule.ptc ?? ""} onChange={(event) => update({ ptc: event.target.value })} />
           </Field>
         ) : null}
         {needsCategorieTransport ? (
@@ -856,22 +856,22 @@ function VehicleForm({
           <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
         </Field>
         <Field label="Nombre de places">
-          <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
+          <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
         <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
-          <Input type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update({ valeurNeuf: numberValue(event.target.value) })} />
+          <Input className="text-right" type="number" value={vehicule.valeurNeuf ?? ""} onChange={(event) => update({ valeurNeuf: numberValue(event.target.value) })} />
         </Field>
         <Field label="Valeur vénale" error={errors[`vehicules.${index}.valeurVenale`] ?? validateValeurVenale(vehicule)}>
-          <Input type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update({ valeurVenale: numberValue(event.target.value) })} />
+          <Input className="text-right" type="number" value={vehicule.valeurVenale ?? ""} onChange={(event) => update({ valeurVenale: numberValue(event.target.value) })} />
         </Field>
         <Field label="Valeur glace">
-          <Input type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update({ valeurGlace: numberValue(event.target.value) })} />
+          <Input className="text-right" type="number" value={vehicule.valeurGlace ?? ""} onChange={(event) => update({ valeurGlace: numberValue(event.target.value) })} />
         </Field>
         <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
           <Input
             value={crmPartage ? crmPartageValeur : vehicule.crm ?? ""}
             readOnly={crmPartage}
-            className={crmPartage ? "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400" : undefined}
+            className={cn("text-right", crmPartage ? "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400" : undefined)}
             onChange={(event) => update({ crm: event.target.value })}
           />
         </Field>
@@ -893,7 +893,7 @@ function VehicleForm({
             <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update({ nomOrganismeCredit: event.target.value })} />
           </Field>
           <Field label="Montant de crédit">
-            <Input type="number" value={vehicule.montantCredit ?? ""} onChange={(event) => update({ montantCredit: numberValue(event.target.value) })} />
+            <Input className="text-right" type="number" value={vehicule.montantCredit ?? ""} onChange={(event) => update({ montantCredit: numberValue(event.target.value) })} />
           </Field>
           <Field label="Date fin crédit">
             <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update({ dateFinCredit: toDateOnly(date) })} />
@@ -954,7 +954,7 @@ function RemorqueForm({
           />
         </Field>
         <Field label="PTC">
-          <Input value={remorque.ptc ?? ""} onChange={(event) => update({ ptc: event.target.value })} />
+          <Input className="text-right" value={remorque.ptc ?? ""} onChange={(event) => update({ ptc: event.target.value })} />
         </Field>
         <Field label="Date mise en circulation">
           <DatePicker date={remorque.dateMiseEnCirculation} onSelect={(date) => update({ dateMiseEnCirculation: toDateOnly(date) })} />
@@ -966,13 +966,13 @@ function RemorqueForm({
           <DatePicker date={remorque.dateEcheance} onSelect={(date) => update({ dateEcheance: toDateOnly(date) })} />
         </Field>
         <Field label="CRM">
-          <Input value={remorque.crm ?? ""} onChange={(event) => update({ crm: event.target.value })} />
+          <Input className="text-right" value={remorque.crm ?? ""} onChange={(event) => update({ crm: event.target.value })} />
         </Field>
         <Field label="N° attestation">
           <Input value={remorque.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
         </Field>
         <Field label="Valeur assurée">
-          <Input type="number" value={remorque.valeurAssuree ?? ""} onChange={(event) => update({ valeurAssuree: numberValue(event.target.value) })} />
+          <Input className="text-right" type="number" value={remorque.valeurAssuree ?? ""} onChange={(event) => update({ valeurAssuree: numberValue(event.target.value) })} />
         </Field>
       </div>
     </div>
@@ -1059,9 +1059,9 @@ function TargetGuaranteesTable({
   return (
     <div className="grid gap-4">
       <div className="overflow-x-auto rounded-md border">
-        <div className="border-b px-3 py-2 text-sm font-semibold">Garanties véhicule</div>
+        <div className="border-b bg-emerald-50/70 px-3 py-2 text-sm font-semibold text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">Garanties véhicule</div>
         <table className="w-full min-w-[860px] border-collapse text-sm">
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+          <thead className="bg-emerald-50/70 text-xs uppercase text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
             <tr>
               <th className="w-12 px-3 py-3 text-left" />
               <th className="px-3 py-3 text-left">Garantie</th>
@@ -1111,7 +1111,7 @@ function TargetGuaranteesTable({
                       <Input
                         type="number"
                         disabled={!editable}
-                        className={controlClass(editable)}
+                        className={cn(controlClass(editable), "text-right")}
                         value={item?.valeurAssuree ?? item?.capital ?? ""}
                         onChange={(event) => update(garantie.id, { valeurAssuree: numberValue(event.target.value), capital: numberValue(event.target.value) })}
                       />
@@ -1124,7 +1124,7 @@ function TargetGuaranteesTable({
                           update(garantie.id, targetLineSelectionPatch(garantie, line, target));
                         }}
                       >
-                        <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Formule" /></SelectTrigger>
+                        <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}><SelectValue placeholder="Formule" /></SelectTrigger>
                         <SelectContent>
                           {lineOptions.map((line) => <SelectItem key={line.id} value={line.id}>{capitalLineLabel(line)}</SelectItem>)}
                         </SelectContent>
@@ -1141,7 +1141,7 @@ function TargetGuaranteesTable({
                           update(garantie.id, { sourceValeurSelectionnee: value, valeurAssuree: undefined, capital: undefined });
                         }}
                       >
-                        <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Source" /></SelectTrigger>
+                        <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}><SelectValue placeholder="Source" /></SelectTrigger>
                         <SelectContent>
                           {sourceOptions.map((source) => (
                             <SelectItem key={source} value={source}>{targetSourceOptionLabel(source, target)}</SelectItem>
@@ -1149,13 +1149,13 @@ function TargetGuaranteesTable({
                         </SelectContent>
                       </Select>
                     ) : sourceOptions.length === 1 ? (
-                      <Input readOnly disabled className={controlClass(false)} value={targetSourceOptionLabel(sourceOptions[0], target)} />
+                      <Input readOnly disabled className={cn(controlClass(false), "text-right")} value={targetSourceOptionLabel(sourceOptions[0], target)} />
                     ) : isRc ? (
                       <span className="block rounded-md px-3 py-2 text-right text-muted-foreground">
                         {target.kind === "vehicule" ? money(resolveRcCapital(target, usages)) : "Capital RC"}
                       </span>
                     ) : (
-                      <Input readOnly disabled className={controlClass(false)} value={capitalDisplay(garantie, selectedLine, target, displayCapital)} />
+                      <Input readOnly disabled className={cn(controlClass(false), "text-right")} value={capitalDisplay(garantie, selectedLine, target, displayCapital)} />
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -1168,7 +1168,7 @@ function TargetGuaranteesTable({
                           update(garantie.id, targetLineSelectionPatch(garantie, line, target));
                         }}
                       >
-                        <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
+                        <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}><SelectValue placeholder="Option" /></SelectTrigger>
                         <SelectContent>
                           {lineOptions.map((line, index) => <SelectItem key={line.id} value={line.id}>{tariffLineLabel(line, index)}</SelectItem>)}
                         </SelectContent>
@@ -1190,9 +1190,9 @@ function TargetGuaranteesTable({
 
       {showPersonne ? (
         <div className="overflow-x-auto rounded-md border">
-          <div className="border-b px-3 py-2 text-sm font-semibold">Garanties personne</div>
+          <div className="border-b bg-emerald-50/70 px-3 py-2 text-sm font-semibold text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">Garanties personne</div>
           <table className="w-full min-w-[980px] border-collapse text-sm">
-            <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+            <thead className="bg-emerald-50/70 text-xs uppercase text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
               <tr>
                 <th className="w-12 px-3 py-3 text-left" />
                 <th className="px-3 py-3 text-left">Garantie</th>
@@ -1324,7 +1324,7 @@ function AssistanceTable({
         <span>Assistance</span>
       </div>
       <table className="w-full min-w-[1100px] border-collapse text-sm">
-        <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+        <thead className="bg-emerald-50/70 text-xs uppercase text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
           <tr>
             <th className="px-3 py-3 text-left">Date effet</th>
             <th className="px-3 py-3 text-left">Date souscription</th>

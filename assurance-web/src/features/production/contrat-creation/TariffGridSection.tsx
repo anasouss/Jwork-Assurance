@@ -60,7 +60,7 @@ export function TariffGridSection({
     }
     const allowed = allowedUsageIds.length ? new Set(allowedUsageIds) : null;
     const usages = usageOptions.length > 0 ? usageOptions : form.refs.usages.data ?? [];
-    const configuredUsages = usageIds.size ? usages.filter((usage) => usageIds.has(usage.id)) : usages;
+    const configuredUsages = usages.filter((usage) => usageIds.has(usage.id));
     return allowed ? configuredUsages.filter((usage) => allowed.has(usage.id)) : configuredUsages;
   }, [allowedUsageIds, form.refs.usages.data, formules.data, lignes.data, usageOptions]);
 

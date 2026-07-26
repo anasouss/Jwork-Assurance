@@ -13,7 +13,9 @@ public class AssistanceContratResponse {
     private Long contratId;
     private Long mouvementContratId;
     private Long vehiculeId;
+    private String vehiculeImmatriculation;
     private Long compagnieAssistanceId;
+    private String compagnieAssistanceLibelle;
     private Long produitAssistanceId;
     private Long tarifProduitAssistanceId;
     private String produit;

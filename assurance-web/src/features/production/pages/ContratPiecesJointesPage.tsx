@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
-import type { PieceJointe, TypePieceJointe } from "../types";
+import type { PieceJointe, TypeClient, TypeContrat, TypePieceJointe } from "../types";
 
 export default function ContratPiecesJointesPage() {
   const { contratId = "" } = useParams();
@@ -101,7 +101,7 @@ export default function ContratPiecesJointesPage() {
 
       <div className="grid gap-3 md:grid-cols-3">
         <InfoCell label="Police" value={data?.numeroPolice ?? "-"} />
-        <InfoCell label="Type contrat" value={data?.typeContrat ?? "-"} />
+        <InfoCell label="Type contrat" value={contractTypeLabel(data?.typeContrat)} />
         <InfoCell label="Obligatoires" value={`${completedRequired}/${requiredCount}`} />
       </div>
 
@@ -181,12 +181,12 @@ function DocumentSlot({
   return (
     <div className={cn("grid gap-3 p-4 lg:grid-cols-[280px_1fr_auto]", type.obligatoire && !done && "bg-amber-50/40 dark:bg-amber-950/15")}>
       <div className="grid content-start gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{type.libelle}</span>
+        <div className="flex flex-wrap items-center gap-2 pr-1">
+          <span className="min-w-0 font-medium">{type.libelle}</span>
           {type.obligatoire ? <Badge variant={done ? "default" : "destructive"}>{done ? "Reçu" : "Obligatoire"}</Badge> : <Badge variant="secondary">Optionnel</Badge>}
         </div>
         <div className="text-xs text-muted-foreground">
-          {type.typeMouvementLibelle ?? "Tous mouvements"} · {type.typeClient ?? "Tout client"}
+          {type.typeMouvementLibelle ?? "Tous mouvements"} · {clientTypeLabel(type.typeClient)}
         </div>
       </div>
 
@@ -354,4 +354,17 @@ function formatSize(value?: number | null) {
 
 function numericParam(value: string | null) {
   return value && /^\d+$/.test(value) ? value : null;
+}
+
+function clientTypeLabel(type?: TypeClient | null) {
+  if (type === "PERSONNE_MORALE") return "Personne morale";
+  if (type === "PERSONNE_PHYSIQUE") return "Personne physique";
+  return "Tout client";
+}
+
+function contractTypeLabel(type?: TypeContrat | string | null) {
+  if (type === "PARTICULIER") return "Mono";
+  if (type === "CONVENTION") return "Convention";
+  if (type === "FLOTTE") return "Flotte";
+  return "-";
 }

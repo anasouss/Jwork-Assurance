@@ -293,6 +293,8 @@ function ContratRow({
 function RowActions({ contrat, movement, child }: { contrat: ContratSummary; movement: MovementLine; child?: boolean }) {
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
+  const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
+  const editPath = editContratPath(contrat);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -301,7 +303,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem>Modifier</DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to={editPath}>Modifier</Link>
+        </DropdownMenuItem>
         {child ? null : (
           <>
             {isFlotte ? (
@@ -315,7 +319,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
             ) : (
               <DropdownMenuItem>Ajouter un avenant</DropdownMenuItem>
             )}
-            <DropdownMenuItem>Contrat assistance</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to={assistancePath}>Contrat assistance</Link>
+            </DropdownMenuItem>
             <DropdownMenuItem>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</DropdownMenuItem>
             <DropdownMenuItem>Renouvellement</DropdownMenuItem>
           </>
@@ -330,6 +336,12 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function editContratPath(contrat: ContratSummary) {
+  if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;
+  if (contrat.typeContrat === "CONVENTION") return `/app/production/ajouter-dossier/convention/${contrat.id}`;
+  return `/app/production/ajouter-dossier/particulier/${contrat.id}`;
 }
 
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {

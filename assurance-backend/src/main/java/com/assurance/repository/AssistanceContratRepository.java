@@ -9,5 +9,7 @@ import java.util.Optional;
 public interface AssistanceContratRepository extends JpaRepository<AssistanceContrat, Long> {
     List<AssistanceContrat> findByContratIdOrderByCreatedAtDesc(Long contratId);
 
+    List<AssistanceContrat> findByContratIdAndActifTrueOrderByCreatedAtDesc(Long contratId);
+
     Optional<AssistanceContrat> findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(Long contratId, Long vehiculeId);
 }

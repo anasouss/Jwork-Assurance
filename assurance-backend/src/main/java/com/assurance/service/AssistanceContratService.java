@@ -1,17 +1,23 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
+import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.entity.AssistanceContrat;
+import com.assurance.entity.CategorieClient;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.Contrat;
+import com.assurance.entity.ContratClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.ProduitAssistance;
 import com.assurance.entity.TarifProduitAssistance;
+import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.NatureElementFacturable;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutElementFacturable;
+import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AssistanceContratRepository;
@@ -28,6 +34,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +53,56 @@ public class AssistanceContratService {
     private final TarifProduitAssistanceService tarifProduitAssistanceService;
     private final EcheanceService echeanceService;
 
+    @Transactional(readOnly = true)
+    public AssistanceContratContextResponse getContext(Long agenceId, Long contratId, Long mouvementId, LocalDate dateSouscription) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        MouvementContrat mouvement = resolveMouvement(contrat, mouvementId);
+        LocalDate referenceDate = firstNonNull(dateSouscription, mouvement != null ? mouvement.getDateEffet() : null, contrat.getDateEffet(), LocalDate.now());
+        List<AssistanceContrat> activeAssistances = assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId());
+        Set<Long> vehiculesAvecAssistance = activeAssistances.stream()
+                .filter(assistance -> assistance.getVehicule() != null)
+                .map(assistance -> assistance.getVehicule().getId())
+                .collect(Collectors.toSet());
+        List<AssistanceContratContextResponse.VehiculeAssistanceOption> vehicules = vehiculeRepository
+                .findByContratIdOrderByCreatedAtAsc(contrat.getId())
+                .stream()
+                .filter(vehicule -> !vehiculesAvecAssistance.contains(vehicule.getId()))
+                .map(this::toVehiculeOption)
+                .toList();
+        Long categorieClientId = resolveAssistanceCategorieClientId(contrat);
+
+        return AssistanceContratContextResponse.builder()
+                .contratId(contrat.getId())
+                .numeroDossier(contrat.getNumeroDossier())
+                .numeroPolice(contrat.getNumeroPolice())
+                .typeContrat(contrat.getTypeContrat())
+                .dateEffet(firstNonNull(mouvement != null ? mouvement.getDateEffet() : null, contrat.getDateEffet()))
+                .dateEcheance(firstNonNull(mouvement != null ? mouvement.getDateEcheance() : null, contrat.getDateEcheance()))
+                .echeanceCode(contrat.getEcheance())
+                .mouvementContratId(mouvement != null ? mouvement.getId() : null)
+                .mouvementCode(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)
+                .mouvementLibelle(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getLibelle() : "Contrat")
+                .categorieClientId(categorieClientId)
+                .vehiculesEligibles(vehicules)
+                .assistances(activeAssistances.stream().map(this::toResponse).toList())
+                .compagnies(compagnieAssistanceRepository.findAll().stream()
+                        .filter(compagnie -> Boolean.TRUE.equals(compagnie.getActif()))
+                        .sorted(Comparator.comparing(CompagnieAssistance::getNom, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                        .map(compagnie -> AssistanceContratContextResponse.CompagnieAssistanceOption.builder()
+                                .id(compagnie.getId())
+                                .code(compagnie.getCode())
+                                .libelle(compagnie.getNom())
+                                .build())
+                        .toList())
+                .produits(produitAssistanceRepository.findAll().stream()
+                        .filter(produit -> Boolean.TRUE.equals(produit.getActif()))
+                        .sorted(Comparator.comparing(ProduitAssistance::getLibelle, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                        .map(produit -> toProduitOption(produit, referenceDate))
+                        .toList())
+                .build();
+    }
+
     @Transactional
     public AssistanceContratResponse upsert(Long agenceId, Long contratId, UpsertAssistanceContratRequest request) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
@@ -52,9 +112,7 @@ public class AssistanceContratService {
         if (vehicule.getContrat() == null || !vehicule.getContrat().getId().equals(contrat.getId())) {
             throw new BadRequestException("Le vehicule ne correspond pas au contrat");
         }
-        MouvementContrat mouvement = request.getMouvementContratId() == null ? null :
-                mouvementContratRepository.findById(request.getMouvementContratId())
-                        .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", request.getMouvementContratId()));
+        MouvementContrat mouvement = resolveMouvement(contrat, request.getMouvementContratId());
         CompagnieAssistance compagnieAssistance = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", request.getCompagnieAssistanceId()));
         ProduitAssistance produitAssistance = produitAssistanceRepository.findById(request.getProduitAssistanceId())
@@ -134,13 +192,38 @@ public class AssistanceContratService {
         return toResponse(assistance, trimestres, prorata);
     }
 
+    @Transactional
+    public void deactivate(Long agenceId, Long contratId, Long assistanceId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        AssistanceContrat assistance = assistanceContratRepository.findById(assistanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("AssistanceContrat", assistanceId));
+        if (assistance.getContrat() == null || !assistance.getContrat().getId().equals(contrat.getId())) {
+            throw new BadRequestException("L'assistance ne correspond pas au contrat");
+        }
+        assistance.setActif(false);
+        if (assistance.getElementFacturable() != null) {
+            assistance.getElementFacturable().setActif(false);
+            elementFacturableRepository.save(assistance.getElementFacturable());
+        }
+        assistanceContratRepository.save(assistance);
+    }
+
+    private AssistanceContratResponse toResponse(AssistanceContrat assistance) {
+        int trimestres = assistance.getDuree() == null ? resolveAssistanceQuarterCount(assistance.getDateEffet(), assistance.getDateEcheance()) : assistance.getDuree();
+        BigDecimal prorata = BigDecimal.valueOf(trimestres).divide(BigDecimal.valueOf(4), 8, RoundingMode.HALF_UP);
+        return toResponse(assistance, trimestres, prorata);
+    }
+
     private AssistanceContratResponse toResponse(AssistanceContrat assistance, int trimestres, BigDecimal prorata) {
         return AssistanceContratResponse.builder()
                 .id(assistance.getId())
                 .contratId(assistance.getContrat() != null ? assistance.getContrat().getId() : null)
                 .mouvementContratId(assistance.getMouvementContrat() != null ? assistance.getMouvementContrat().getId() : null)
                 .vehiculeId(assistance.getVehicule() != null ? assistance.getVehicule().getId() : null)
+                .vehiculeImmatriculation(assistance.getVehicule() != null ? assistance.getVehicule().getImmatriculation() : null)
                 .compagnieAssistanceId(assistance.getCompagnieAssistance() != null ? assistance.getCompagnieAssistance().getId() : null)
+                .compagnieAssistanceLibelle(assistance.getCompagnieAssistance() != null ? assistance.getCompagnieAssistance().getNom() : null)
                 .produitAssistanceId(assistance.getProduitAssistance() != null ? assistance.getProduitAssistance().getId() : null)
                 .tarifProduitAssistanceId(assistance.getTarifProduitAssistance() != null ? assistance.getTarifProduitAssistance().getId() : null)
                 .produit(assistance.getProduit())
@@ -154,6 +237,70 @@ public class AssistanceContratService {
                 .primeTotale(assistance.getPrimeTotale())
                 .elementFacturableId(assistance.getElementFacturable() != null ? assistance.getElementFacturable().getId() : null)
                 .build();
+    }
+
+    private MouvementContrat resolveMouvement(Contrat contrat, Long mouvementId) {
+        if (mouvementId == null) {
+            return null;
+        }
+        MouvementContrat mouvement = mouvementContratRepository.findById(mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        if (mouvement.getContrat() == null || !mouvement.getContrat().getId().equals(contrat.getId())) {
+            throw new BadRequestException("Le mouvement ne correspond pas au contrat");
+        }
+        return mouvement;
+    }
+
+    private AssistanceContratContextResponse.VehiculeAssistanceOption toVehiculeOption(Vehicule vehicule) {
+        return AssistanceContratContextResponse.VehiculeAssistanceOption.builder()
+                .id(vehicule.getId())
+                .immatriculation(vehicule.getImmatriculation())
+                .usageId(vehicule.getUsage() != null ? vehicule.getUsage().getId() : null)
+                .usageCode(vehicule.getUsage() != null ? vehicule.getUsage().getCode() : null)
+                .usageLibelle(vehicule.getUsage() != null ? vehicule.getUsage().getLibelle() : null)
+                .dateEffet(vehicule.getDateEffet())
+                .dateEcheance(vehicule.getDateEcheance())
+                .build();
+    }
+
+    private AssistanceContratContextResponse.ProduitAssistanceOption toProduitOption(ProduitAssistance produit, LocalDate referenceDate) {
+        TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveTarifForDate(produit, referenceDate);
+        return AssistanceContratContextResponse.ProduitAssistanceOption.builder()
+                .id(produit.getId())
+                .libelle(produit.getLibelle())
+                .type(produit.getType())
+                .compagnieAssistanceId(produit.getCompagnieAssistance() != null ? produit.getCompagnieAssistance().getId() : null)
+                .categorieClientId(produit.getCategorieClient() != null ? produit.getCategorieClient().getId() : null)
+                .usageIds(produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getId).toList())
+                .prestations(produit.getPrestations())
+                .tarifProduitAssistanceId(tarif != null ? tarif.getId() : null)
+                .dateDebutTarif(tarif != null ? tarif.getDateDebut() : null)
+                .dateFinTarif(tarif != null ? tarif.getDateFin() : null)
+                .montantHt(tarif != null ? tarif.getMontantHt() : null)
+                .montantTtc(tarif != null ? tarif.getMontantTtc() : null)
+                .build();
+    }
+
+    private Long resolveAssistanceCategorieClientId(Contrat contrat) {
+        RoleClientContrat preferredRole = contrat.getTypeContrat() == TypeContrat.FLOTTE
+                ? RoleClientContrat.PROPRIETAIRE
+                : RoleClientContrat.SOUSCRIPTEUR;
+        Long preferred = resolveCategorieClientId(contrat, preferredRole);
+        if (preferred != null) {
+            return preferred;
+        }
+        return resolveCategorieClientId(contrat, RoleClientContrat.SOUSCRIPTEUR);
+    }
+
+    private Long resolveCategorieClientId(Contrat contrat, RoleClientContrat role) {
+        return contrat.getClients() == null ? null : contrat.getClients().stream()
+                .filter(link -> link.getRole() == role)
+                .sorted(Comparator.comparing(ContratClient::getPrincipalPourRole, Comparator.nullsLast(Boolean::compareTo)).reversed())
+                .map(ContratClient::getClient)
+                .filter(client -> client != null && client.getCategorieClient() != null)
+                .map(client -> client.getCategorieClient().getId())
+                .findFirst()
+                .orElse(null);
     }
 
     private int resolveAssistanceQuarterCount(LocalDate dateEffet, LocalDate dateEcheance) {

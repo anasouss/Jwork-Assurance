@@ -1,6 +1,8 @@
 import { apiFetch, apiFetchBlob, apiUpload, buildQueryString } from "@/lib/api/base";
 import type {
   ApiResponse,
+  AssistanceContrat,
+  AssistanceContratContext,
   AddLotAttestationRequest,
   AttestationStockDashboard,
   AttestationStockItem,
@@ -22,6 +24,7 @@ import type {
   BulkUpdateTarifUsageRequest,
   UpsertCompagnieAssuranceRequest,
   UpsertCompagnieAssistanceRequest,
+  UpsertAssistanceContratRequest,
   UpsertCategorieClientRequest,
   UpsertConventionRequest,
   UpsertFormuleGarantiePersonneRequest,
@@ -105,6 +108,34 @@ export const productionApi = {
 
   async listContrats() {
     return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats"));
+  },
+
+  async getAssistanceContext(contratId: string, params?: { mouvementId?: string | null; dateSouscription?: string | null }) {
+    return unwrap(
+      await apiFetch<ApiResponse<AssistanceContratContext>>(
+        `/api/v1/contrats/${contratId}/assistances${buildQueryString({
+          mouvementId: params?.mouvementId ?? undefined,
+          dateSouscription: params?.dateSouscription ?? undefined,
+        })}`
+      )
+    );
+  },
+
+  async saveAssistance(contratId: string, request: UpsertAssistanceContratRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<AssistanceContrat>>(`/api/v1/contrats/${contratId}/assistances`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async deleteAssistance(contratId: string, assistanceId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}/assistances/${assistanceId}`, {
+        method: "DELETE",
+      })
+    );
   },
 
   async getContratPiecesJointes(contratId: string, mouvementId?: string | null) {

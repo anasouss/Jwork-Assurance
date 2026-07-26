@@ -418,6 +418,83 @@ export type AssistanceDraft = {
   numeroContratOuQuittance?: string;
 };
 
+export type AssistanceContrat = {
+  id: string;
+  contratId: string;
+  mouvementContratId?: string | null;
+  vehiculeId?: string | null;
+  vehiculeImmatriculation?: string | null;
+  compagnieAssistanceId?: string | null;
+  compagnieAssistanceLibelle?: string | null;
+  produitAssistanceId?: string | null;
+  tarifProduitAssistanceId?: string | null;
+  produit?: string | null;
+  dateSouscription?: string | null;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  echeanceCode?: string | null;
+  trimestres?: number | null;
+  prorataRatio?: number | null;
+  primeNette?: number | null;
+  primeTotale?: number | null;
+  elementFacturableId?: string | null;
+};
+
+export type AssistanceContratContext = {
+  contratId: string;
+  numeroDossier?: string | null;
+  numeroPolice?: string | null;
+  typeContrat: TypeContrat;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  echeanceCode?: string | null;
+  mouvementContratId?: string | null;
+  mouvementCode?: string | null;
+  mouvementLibelle?: string | null;
+  categorieClientId?: string | null;
+  vehiculesEligibles: {
+    id: string;
+    immatriculation?: string | null;
+    usageId?: string | null;
+    usageCode?: string | null;
+    usageLibelle?: string | null;
+    dateEffet?: string | null;
+    dateEcheance?: string | null;
+  }[];
+  assistances: AssistanceContrat[];
+  compagnies: {
+    id: string;
+    code?: string | null;
+    libelle: string;
+  }[];
+  produits: {
+    id: string;
+    libelle: string;
+    type?: string | null;
+    compagnieAssistanceId?: string | null;
+    categorieClientId?: string | null;
+    usageIds?: string[];
+    prestations?: string | null;
+    tarifProduitAssistanceId?: string | null;
+    dateDebutTarif?: string | null;
+    dateFinTarif?: string | null;
+    montantHt?: number | null;
+    montantTtc?: number | null;
+  }[];
+};
+
+export type UpsertAssistanceContratRequest = {
+  mouvementContratId?: string | null;
+  vehiculeId: string;
+  compagnieAssistanceId: string;
+  produitAssistanceId: string;
+  dateSouscription?: string;
+  dateEffet?: string;
+  echeanceCode?: string;
+  numeroContratOuQuittance?: string;
+  typeQuittance?: string;
+};
+
 export type CreateContratRequest = {
   agenceId: string;
   compagnieAssuranceId?: string;

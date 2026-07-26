@@ -33,6 +33,7 @@ type ContratFilters = {
 
 type MovementLine = {
   key: string;
+  mouvementId?: string | null;
   numeroMouvement: number;
   code?: string | null;
   libelle?: string | null;
@@ -291,7 +292,7 @@ function ContratRow({
 
 function RowActions({ contrat, movement, child }: { contrat: ContratSummary; movement: MovementLine; child?: boolean }) {
   const isFlotte = contrat.typeContrat === "FLOTTE";
-  const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.key && !movement.isSynthetic ? `?mouvementId=${movement.key}` : ""}`;
+  const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -382,6 +383,7 @@ function movementLines(contrat: ContratSummary): MovementLine[] {
   if (sorted.length) {
     return sorted.map((movement, index) => ({
       key: `${contrat.id}-${movement.id}`,
+      mouvementId: movement.id,
       numeroMouvement: Number(movement.numeroMouvement) || sorted.length - index,
       code: movement.code,
       libelle: movement.libelle,

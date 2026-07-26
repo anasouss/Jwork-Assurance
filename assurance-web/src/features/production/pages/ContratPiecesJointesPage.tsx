@@ -14,7 +14,7 @@ import type { PieceJointe, TypePieceJointe } from "../types";
 export default function ContratPiecesJointesPage() {
   const { contratId = "" } = useParams();
   const [searchParams] = useSearchParams();
-  const mouvementId = searchParams.get("mouvementId");
+  const mouvementId = numericParam(searchParams.get("mouvementId"));
   const queryClient = useQueryClient();
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File[]>>({});
 
@@ -220,4 +220,8 @@ function formatSize(value?: number | null) {
   if (!value) return "";
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} Ko`;
   return `${(value / 1024 / 1024).toFixed(1)} Mo`;
+}
+
+function numericParam(value: string | null) {
+  return value && /^\d+$/.test(value) ? value : null;
 }

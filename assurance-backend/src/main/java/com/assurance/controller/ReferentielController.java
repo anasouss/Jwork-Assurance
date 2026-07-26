@@ -11,6 +11,7 @@ import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
 import com.assurance.dto.request.UpsertGarantieRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertGrilleUsageConfigurationRequest;
+import com.assurance.dto.request.UpsertGroupeUsageAttestationRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertProduitAssistanceRequest;
 import com.assurance.dto.request.UpsertReferenceRequest;
@@ -927,11 +928,47 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesUsageAttestation() {
         return ResponseEntity.ok(ApiResponse.success(groupeUsageAttestationRepository.findAll(Sort.by("code")).stream()
                 .filter(groupe -> Boolean.TRUE.equals(groupe.getActif()) && Boolean.TRUE.equals(groupe.getVisibleStock()))
-                .map(groupe -> option(groupe.getId(), groupe.getCode(), groupe.getLibelle())
-                        .putValue("couleur", groupe.getCouleur())
-                        .putValue("restrictionCompagnie", groupe.getRestrictionCompagnie())
-                        .map())
+                .map(this::toGroupeUsageAttestationResponse)
                 .toList()));
+    }
+
+    @GetMapping("/groupes-usage-attestation/parametrage")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesUsageAttestationParametrage() {
+        return ResponseEntity.ok(ApiResponse.success(groupeUsageAttestationRepository.findAll(Sort.by("code")).stream()
+                .map(this::toGroupeUsageAttestationResponse)
+                .toList()));
+    }
+
+    @PostMapping("/groupes-usage-attestation")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeUsageAttestation(@Valid @RequestBody UpsertGroupeUsageAttestationRequest request) {
+        groupeUsageAttestationRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code groupe usage attestation deja utilise");
+        });
+        GroupeUsageAttestation groupe = new GroupeUsageAttestation();
+        applyGroupeUsageAttestationRequest(groupe, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toGroupeUsageAttestationResponse(groupeUsageAttestationRepository.save(groupe)),
+                "Groupe usage attestation cree"
+        ));
+    }
+
+    @PutMapping("/groupes-usage-attestation/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateGroupeUsageAttestation(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertGroupeUsageAttestationRequest request
+    ) {
+        GroupeUsageAttestation groupe = groupeUsageAttestationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("GroupeUsageAttestation", id));
+        groupeUsageAttestationRepository.findByCodeIgnoreCase(request.getCode())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Code groupe usage attestation deja utilise");
+                });
+        applyGroupeUsageAttestationRequest(groupe, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toGroupeUsageAttestationResponse(groupeUsageAttestationRepository.save(groupe)),
+                "Groupe usage attestation modifie"
+        ));
     }
 
     @GetMapping("/categories-transport")
@@ -1262,6 +1299,28 @@ public class ReferentielController {
                 .putValue("groupeUsageAttestationId", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getId() : null)
                 .putValue("groupeUsageAttestationCode", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getCode() : null)
                 .putValue("actif", usage.getActif())
+                .map();
+    }
+
+    private void applyGroupeUsageAttestationRequest(GroupeUsageAttestation groupe, UpsertGroupeUsageAttestationRequest request) {
+        String couleur = blankToNull(request.getCouleur());
+        if (couleur != null && !couleur.matches("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")) {
+            throw new BadRequestException("Couleur invalide");
+        }
+        groupe.setCode(request.getCode());
+        groupe.setLibelle(request.getLibelle());
+        groupe.setCouleur(couleur);
+        groupe.setRestrictionCompagnie(blankToNull(request.getRestrictionCompagnie()));
+        groupe.setVisibleStock(request.getVisibleStock() == null ? true : request.getVisibleStock());
+        groupe.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private Map<String, Object> toGroupeUsageAttestationResponse(GroupeUsageAttestation groupe) {
+        return option(groupe.getId(), groupe.getCode(), groupe.getLibelle())
+                .putValue("couleur", groupe.getCouleur())
+                .putValue("restrictionCompagnie", groupe.getRestrictionCompagnie())
+                .putValue("visibleStock", groupe.getVisibleStock())
+                .putValue("actif", groupe.getActif())
                 .map();
     }
 

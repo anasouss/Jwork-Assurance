@@ -15,6 +15,7 @@ import type {
   ReferenceOption,
   UpsertGrilleTarifaireRequest,
   UpsertGrilleUsageConfigurationRequest,
+  UpsertGroupeUsageAttestationRequest,
   BulkUpdateTarifUsageRequest,
   UpsertCompagnieAssuranceRequest,
   UpsertCompagnieAssistanceRequest,
@@ -375,6 +376,24 @@ export const productionApi = {
   async updateUsage(id: string, payload: UpsertUsageRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/usages/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async createGroupeUsageAttestation(payload: UpsertGroupeUsageAttestationRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>("/api/v1/referentiel/groupes-usage-attestation", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updateGroupeUsageAttestation(id: string, payload: UpsertGroupeUsageAttestationRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/groupes-usage-attestation/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       })

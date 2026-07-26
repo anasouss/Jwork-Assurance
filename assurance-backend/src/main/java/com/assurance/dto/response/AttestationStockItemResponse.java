@@ -20,8 +20,10 @@ public class AttestationStockItemResponse {
     private String serie;
     private StatutAttestationStock statut;
     private LocalDateTime dateUtilisation;
+    private String assure;
     private String numeroDossier;
     private String numeroPolice;
+    private LocalDate dateEffet;
     private LocalDate dateReception;
     private String referenceLivraison;
 }

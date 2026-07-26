@@ -380,9 +380,10 @@ function AttestationStockDashboardPage() {
                 <TableRow className="hover:bg-emerald-700">
                   <TableHead>Compagnie</TableHead>
                   <TableHead>Usage</TableHead>
+                  <TableHead>Assuré</TableHead>
+                  <TableHead className="text-center">N° police</TableHead>
                   <TableHead>N° attestation</TableHead>
-                  <TableHead>N° police</TableHead>
-                  <TableHead>Livraison</TableHead>
+                  <TableHead className="text-center">Date d’effet</TableHead>
                   <TableHead className="text-right">État</TableHead>
                 </TableRow>
               </TableHeader>
@@ -391,9 +392,10 @@ function AttestationStockDashboardPage() {
                   <TableRow key={attestation.id}>
                     <TableCell>{attestation.compagnieAssuranceNom}</TableCell>
                     <TableCell>{attestation.groupeUsageAttestationCode}</TableCell>
+                    <TableCell>{attestation.assure ?? "-"}</TableCell>
+                    <TableCell className="text-center">{attestation.numeroPolice ?? "-"}</TableCell>
                     <TableCell className="font-medium">{attestation.numero}</TableCell>
-                    <TableCell>{attestation.numeroPolice ?? "-"}</TableCell>
-                    <TableCell>{attestation.referenceLivraison ?? "-"}</TableCell>
+                    <TableCell className="text-center">{formatDate(attestation.dateEffet)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={stockStatusVariant(attestation.statut)}>{stockStatusLabel(attestation.statut)}</Badge>
                     </TableCell>
@@ -833,7 +835,7 @@ function StockPieCard({
                 {chartData.map((entry) => (
                   <Cell
                     key={`${entry.compagnieAssuranceId}-${entry.groupeUsageAttestationId}`}
-                    fill={usageColor(entry.groupeUsageAttestationCode)}
+                    fill={usageColor(entry)}
                     className="cursor-pointer"
                     onClick={() => onSelect(entry)}
                   />
@@ -852,7 +854,7 @@ function StockPieCard({
               onClick={() => onSelect(item)}
             >
               <span className="flex min-w-0 items-center gap-2">
-                <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: usageColor(item.groupeUsageAttestationCode) }} />
+                <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: usageColor(item) }} />
                 <span className="truncate">
                   {item.groupeUsageAttestationCode} · {item.groupeUsageAttestationLibelle}
                 </span>
@@ -981,9 +983,13 @@ function groupStocksByCompany(rows: AttestationStockCompanyUsage[]) {
   return [...map.values()];
 }
 
-function usageColor(code?: string | null) {
-  const value = code ?? "";
-  const index = [...value].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length;
+function usageColor(value: AttestationStockCompanyUsage | string | null | undefined) {
+  if (typeof value === "object" && value?.groupeUsageAttestationCouleur) {
+    return value.groupeUsageAttestationCouleur;
+  }
+  const code = typeof value === "string" ? value : value?.groupeUsageAttestationCode;
+  const colorKey = code ?? "";
+  const index = [...colorKey].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length;
   return palette[index];
 }
 
@@ -1002,6 +1008,17 @@ function selectedOrUndefined(value: string) {
 
 function formatInteger(value: number) {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) {
+    return value;
+  }
+  return `${day}/${month}/${year}`;
 }
 
 function toPositiveInteger(value: string) {

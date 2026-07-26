@@ -9,6 +9,7 @@ import com.assurance.dto.response.SeuilStockAttestationResponse;
 import com.assurance.entity.AttestationStock;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Contrat;
+import com.assurance.entity.ContratClient;
 import com.assurance.entity.GroupeUsageAttestation;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.MouvementStockAttestation;
@@ -18,6 +19,7 @@ import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.StatutAttestationStock;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.TypeMouvementStockAttestation;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
@@ -115,9 +117,10 @@ public class AttestationStockService {
                     .compagnieAssuranceNom((String) row[1])
                     .groupeUsageAttestationId(groupeId)
                     .groupeUsageAttestationCode((String) row[3])
-                    .groupeUsageAttestationLibelle((String) row[4]));
+                    .groupeUsageAttestationLibelle((String) row[4])
+                    .groupeUsageAttestationCouleur((String) row[5]));
             StatusTotals totals = groupedTotals.computeIfAbsent(key, ignored -> new StatusTotals());
-            totals.add((StatutAttestationStock) row[5], toLong(row[6]));
+            totals.add((StatutAttestationStock) row[6], toLong(row[7]));
         }
 
         Map<String, SeuilStockAttestation> seuilsByKey = new LinkedHashMap<>();
@@ -368,6 +371,10 @@ public class AttestationStockService {
     }
 
     private AttestationStockItemResponse toItemResponse(AttestationStock attestation) {
+        Contrat contrat = attestation.getContrat();
+        java.time.LocalDate dateEffet = attestation.getMouvementContrat() != null && attestation.getMouvementContrat().getDateEffet() != null
+                ? attestation.getMouvementContrat().getDateEffet()
+                : contrat != null ? contrat.getDateEffet() : null;
         return AttestationStockItemResponse.builder()
                 .id(attestation.getId())
                 .compagnieAssuranceId(attestation.getCompagnieAssurance().getId())
@@ -379,11 +386,28 @@ public class AttestationStockService {
                 .serie(attestation.getSerie())
                 .statut(attestation.getStatut())
                 .dateUtilisation(attestation.getDateUtilisation())
+                .assure(resolveAssure(contrat))
                 .numeroDossier(attestation.getNumeroDossier())
                 .numeroPolice(attestation.getNumeroPolice())
+                .dateEffet(dateEffet)
                 .dateReception(attestation.getLot().getLivraison().getDateReception())
                 .referenceLivraison(attestation.getLot().getLivraison().getReferenceCommande())
                 .build();
+    }
+
+    private String resolveAssure(Contrat contrat) {
+        if (contrat == null || contrat.getClients() == null) {
+            return null;
+        }
+        return contrat.getClients().stream()
+                .filter(item -> item.getRole() == RoleClientContrat.SOUSCRIPTEUR)
+                .sorted((left, right) -> Boolean.compare(Boolean.TRUE.equals(right.getPrincipalPourRole()), Boolean.TRUE.equals(left.getPrincipalPourRole())))
+                .map(ContratClient::getClient)
+                .filter(client -> client != null)
+                .map(client -> client.getNomAffichage())
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
     }
 
     private SeuilStockAttestationResponse toSeuilResponse(SeuilStockAttestation seuil) {

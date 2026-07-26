@@ -14,10 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
-import { clientCategorySchema, codeReferenceSchema, garantieSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
+import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeUsageAttestationSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { numberValue, toNumber } from "../utils/format";
-import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
+import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertGroupeUsageAttestationRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
 
 export function MarquesSettingsPage() {
   return (
@@ -263,6 +263,158 @@ export function CategoriesClientSettingsPage() {
   );
 }
 
+export function GroupesUsageAttestationSettingsPage() {
+  const queryClient = useQueryClient();
+  const groupes = useReference("groupes-usage-attestation/parametrage");
+  const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [payload, setPayload] = useState<UpsertGroupeUsageAttestationRequest>(emptyGroupeUsageAttestation());
+
+  useEffect(() => {
+    setPayload(editing ? {
+      code: editing.code ?? "",
+      libelle: editing.libelle,
+      couleur: String(editing.couleur ?? "#059669"),
+      restrictionCompagnie: String(editing.restrictionCompagnie ?? ""),
+      visibleStock: editing.visibleStock !== false,
+      actif: editing.actif !== false,
+    } : emptyGroupeUsageAttestation());
+  }, [editing]);
+
+  const save = useMutation({
+    mutationFn: ({ id, value }: { id?: string; value: UpsertGroupeUsageAttestationRequest }) =>
+      id ? productionApi.updateGroupeUsageAttestation(id, cleanTextPayload(value)) : productionApi.createGroupeUsageAttestation(cleanTextPayload(value)),
+    onSuccess: async () => {
+      setEditing(null);
+      setDialogOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["referentiel", "groupes-usage-attestation/parametrage"] }),
+        queryClient.invalidateQueries({ queryKey: ["referentiel", "groupes-usage-attestation"] }),
+        queryClient.invalidateQueries({ queryKey: ["attestations-stock", "dashboard"] }),
+      ]);
+      toast.success("Groupe stock enregistré");
+    },
+    onError: showError,
+  });
+
+  return (
+    <ReferenceShell
+      title="Groupes stock attestations"
+      description="Groupes utilisés par le stock d'attestations. La couleur pilote les segments des graphiques."
+    >
+      <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setPayload(emptyGroupeUsageAttestation()); setDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Ajouter groupe
+        </Button>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier groupe stock" : "Ajouter groupe stock"}</DialogTitle>
+            <DialogDescription>La couleur est enregistrée en base et utilisée par les graphiques de gestion du stock.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Field label="Code" required>
+              <Input value={payload.code} onChange={(event) => setPayload((current) => ({ ...current, code: event.target.value }))} />
+            </Field>
+            <Field label="Libellé" required>
+              <Input value={payload.libelle} onChange={(event) => setPayload((current) => ({ ...current, libelle: event.target.value }))} />
+            </Field>
+            <Field label="Couleur">
+              <div className="flex gap-2">
+                <Input
+                  type="color"
+                  className="h-10 w-14 shrink-0 p-1"
+                  value={normalizeColor(payload.couleur)}
+                  onChange={(event) => setPayload((current) => ({ ...current, couleur: event.target.value }))}
+                />
+                <Input
+                  value={payload.couleur ?? ""}
+                  onChange={(event) => setPayload((current) => ({ ...current, couleur: event.target.value }))}
+                  placeholder="#059669"
+                />
+              </div>
+            </Field>
+            <Field label="Restriction compagnie">
+              <Input
+                value={payload.restrictionCompagnie ?? ""}
+                onChange={(event) => setPayload((current) => ({ ...current, restrictionCompagnie: event.target.value }))}
+                placeholder="Optionnel"
+              />
+            </Field>
+            <Flag label="Visible dans le stock" checked={payload.visibleStock !== false} onChange={(visibleStock) => setPayload((current) => ({ ...current, visibleStock }))} />
+            <Flag label="Actif" checked={payload.actif !== false} onChange={(actif) => setPayload((current) => ({ ...current, actif }))} />
+            <div className="flex items-end gap-2 lg:col-span-2">
+              <Button disabled={save.isPending} onClick={() => {
+                const parsed = groupeUsageAttestationSchema.safeParse(cleanTextPayload(payload));
+                if (!parsed.success) {
+                  toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
+                  return;
+                }
+                save.mutate({ id: editing?.id, value: parsed.data });
+              }}>
+                <Plus className="size-4" />
+                {editing ? "Modifier" : "Ajouter"}
+              </Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Card className="border-border/70 shadow-none">
+        <CardHeader><CardTitle className="text-base">Liste des groupes stock</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
+                <TableRow className="hover:bg-emerald-700">
+                  <TableHead>Code</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead>Couleur</TableHead>
+                  <TableHead>Restriction</TableHead>
+                  <TableHead>Visible stock</TableHead>
+                  <TableHead>Actif</TableHead>
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(groupes.data ?? []).map((groupe) => (
+                  <TableRow key={groupe.id}>
+                    <TableCell className="font-medium">{groupe.code ?? "-"}</TableCell>
+                    <TableCell>{groupe.libelle}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="size-4 rounded-sm border" style={{ backgroundColor: normalizeColor(String(groupe.couleur ?? "")) }} />
+                        <span>{String(groupe.couleur ?? "-")}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{String(groupe.restrictionCompagnie ?? "-")}</TableCell>
+                    <TableCell>{groupe.visibleStock === false ? "Non" : "Oui"}</TableCell>
+                    <TableCell>{groupe.actif === false ? "Non" : "Oui"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" onClick={() => { setEditing(groupe); setDialogOpen(true); }} aria-label={`Modifier ${groupe.libelle}`}>
+                        <Edit className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!groupes.isLoading && (groupes.data ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Aucun groupe stock.</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </ReferenceShell>
+  );
+}
+
 type TransportCategoryPayload = {
   code: string;
   libelle: string;
@@ -272,6 +424,10 @@ type TransportCategoryPayload = {
 
 function emptyCategorieClient(): UpsertCategorieClientRequest {
   return { code: "", libelle: "", usageIds: [], actif: true };
+}
+
+function emptyGroupeUsageAttestation(): UpsertGroupeUsageAttestationRequest {
+  return { code: "", libelle: "", couleur: "#059669", restrictionCompagnie: "", visibleStock: true, actif: true };
 }
 
 export function UsagesSettingsPage() {
@@ -1483,6 +1639,10 @@ function cleanTextPayload<T extends Record<string, unknown>>(payload: T): T {
   return Object.fromEntries(
     Object.entries(payload).map(([key, value]) => [key, typeof value === "string" && value.trim() === "" ? undefined : value])
   ) as T;
+}
+
+function normalizeColor(value?: string) {
+  return value && /^#([0-9a-fA-F]{6})$/.test(value.trim()) ? value.trim() : "#059669";
 }
 
 function showError(error: unknown) {

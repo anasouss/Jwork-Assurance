@@ -84,6 +84,7 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
                    a.groupeUsageAttestation.id,
                    a.groupeUsageAttestation.code,
                    a.groupeUsageAttestation.libelle,
+                   a.groupeUsageAttestation.couleur,
                    a.statut,
                    count(a)
             from AttestationStock a
@@ -98,6 +99,7 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
                      a.groupeUsageAttestation.id,
                      a.groupeUsageAttestation.code,
                      a.groupeUsageAttestation.libelle,
+                     a.groupeUsageAttestation.couleur,
                      a.statut
             order by a.compagnieAssurance.nom asc, a.groupeUsageAttestation.code asc
             """)

@@ -32,6 +32,7 @@ public class AttestationStockDashboardResponse {
         private Long groupeUsageAttestationId;
         private String groupeUsageAttestationCode;
         private String groupeUsageAttestationLibelle;
+        private String groupeUsageAttestationCouleur;
         private Long total;
         private Long disponible;
         private Long reservee;

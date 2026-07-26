@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BadgeCheck, Car, Fuel, Layers3, ShieldCheck, Tags, Truck, UserRound, Wrench } from "lucide-react";
+import { BadgeCheck, Boxes, Car, Fuel, Layers3, ShieldCheck, Tags, Truck, UserRound, Wrench } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,12 @@ const settings = [
     description: "Critères de calcul, attestations et garanties personne.",
     href: "/app/production/parametres/usages",
     icon: BadgeCheck,
+  },
+  {
+    title: "Groupes stock attestations",
+    description: "Couleurs, visibilité et restrictions des groupes utilisés dans le stock.",
+    href: "/app/production/parametres/groupes-stock-attestations",
+    icon: Boxes,
   },
   {
     title: "Catégories client",

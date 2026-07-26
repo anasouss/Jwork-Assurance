@@ -109,6 +109,7 @@ export type AttestationStockCompanyUsage = {
   groupeUsageAttestationId: string;
   groupeUsageAttestationCode: string;
   groupeUsageAttestationLibelle: string;
+  groupeUsageAttestationCouleur?: string | null;
   total: number;
   disponible: number;
   reservee: number;
@@ -130,8 +131,10 @@ export type AttestationStockItem = {
   serie?: string | null;
   statut: AttestationStockStatus;
   dateUtilisation?: string | null;
+  assure?: string | null;
   numeroDossier?: string | null;
   numeroPolice?: string | null;
+  dateEffet?: string | null;
   dateReception?: string | null;
   referenceLivraison?: string | null;
 };
@@ -525,6 +528,15 @@ export type UpsertUsageRequest = {
   byPrime?: boolean;
   byCategorieTransport?: boolean;
   garantiesPersonne?: boolean;
+  actif?: boolean;
+};
+
+export type UpsertGroupeUsageAttestationRequest = {
+  code: string;
+  libelle: string;
+  couleur?: string;
+  restrictionCompagnie?: string;
+  visibleStock?: boolean;
   actif?: boolean;
 };
 

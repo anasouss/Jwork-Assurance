@@ -157,7 +157,7 @@ public class ContratService {
             if (input.getGarantieId() == null) {
                 continue;
             }
-            ContratGarantie contratGarantie = saveRawDraftGarantieForTarget(contrat, input, vehicule, null);
+            ContratGarantie contratGarantie = saveCalculatedDraftGarantieForTarget(contrat, input, vehicule, null);
             contrat.getGaranties().add(contratGarantie);
         }
         return toResponse(contrat);
@@ -198,7 +198,7 @@ public class ContratService {
             if (input.getGarantieId() == null) {
                 continue;
             }
-            ContratGarantie contratGarantie = saveRawDraftGarantieForTarget(contrat, input, null, remorque);
+            ContratGarantie contratGarantie = saveCalculatedDraftGarantieForTarget(contrat, input, null, remorque);
             contrat.getGaranties().add(contratGarantie);
         }
         return toResponse(contrat);
@@ -1002,7 +1002,7 @@ public class ContratService {
         return garantiesCreees;
     }
 
-    private ContratGarantie saveRawDraftGarantieForTarget(
+    private ContratGarantie saveCalculatedDraftGarantieForTarget(
             Contrat contrat,
             CreateContratRequest.GarantieInput input,
             Vehicule vehicule,
@@ -1013,39 +1013,27 @@ public class ContratService {
         Client client = input.getClientId() == null ? null :
                 clientRepository.findByAgenceIdAndId(contrat.getAgence().getId(), input.getClientId())
                         .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
-        LigneGrilleTarifaire ligne = input.getLigneGrilleTarifaireId() == null ? null :
-                ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
-                        .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
-        FormuleGarantiePersonne formule = input.getFormuleGarantiePersonneId() == null ? null :
-                formuleGarantiePersonneRepository.findById(input.getFormuleGarantiePersonneId())
-                        .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", input.getFormuleGarantiePersonneId()));
-        return contratGarantieRepository.save(ContratGarantie.builder()
-                .contrat(contrat)
-                .garantie(garantie)
-                .vehicule(vehicule)
-                .remorque(remorque)
-                .client(client)
-                .ligneGrilleTarifaire(ligne)
-                .modeSelectionne(parseMode(input.getModeSelectionne()))
-                .sourceValeurSelectionnee(parseSource(input.getSourceValeurSelectionnee()))
-                .formuleGarantiePersonne(formule)
-                .valeurVenale(input.getValeurVenale())
-                .valeurNeuf(input.getValeurNeuf())
-                .valeurGlace(input.getValeurGlace())
-                .formule(input.getFormule())
-                .montantDeces(input.getMontantDeces())
-                .montantInvalidite(input.getMontantInvalidite())
-                .montantFraisMedicaux(input.getMontantFraisMedicaux())
-                .montantFraisHospitalisation(input.getMontantFraisHospitalisation())
-                .montantFraisFuneraires(input.getMontantFraisFuneraires())
-                .montantFraisChirurgie(input.getMontantFraisChirurgie())
-                .accessoire(input.getAccessoire())
-                .capital(firstNonNull(input.getCapital(), input.getValeurAssuree()))
-                .taux(input.getTaux())
-                .prime(input.getPrime())
-                .tauxFranchise(input.getTauxFranchise())
-                .franchiseMinimale(input.getFranchiseMinimale())
-                .build());
+        Usage usageCible = resolveUsageCible(contrat, vehicule, remorque);
+        LigneGrilleTarifaire ligneGrilleTarifaire = resolveLigneGrilleTarifaire(contrat, garantie, input, usageCible, vehicule, remorque);
+        ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
+        SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
+        FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
+        GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
+        validateGarantieTarget(garantie, vehicule, remorque, client);
+        validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
+        validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
+        return saveContratGarantie(
+                contrat,
+                garantie,
+                vehicule,
+                remorque,
+                client,
+                ligneGrilleTarifaire,
+                modeSelectionne,
+                sourceValeurSelectionnee,
+                formuleGarantiePersonne,
+                montants
+        );
     }
 
     private ContratGarantie saveContratGarantie(

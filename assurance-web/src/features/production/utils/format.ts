@@ -1,11 +1,13 @@
 export function numberValue(value: string) {
-  if (!value) return undefined;
-  const parsed = Number(value);
+  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+  if (!normalized || normalized === ".") return undefined;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 export function toNumber(value: unknown) {
-  return typeof value === "number" ? value : value ? Number(value) : undefined;
+  if (typeof value === "number") return value;
+  return typeof value === "string" ? numberValue(value) : value ? Number(value) : undefined;
 }
 
 export function numberOrZero(value?: number | null) {

@@ -40,12 +40,12 @@ export function TariffGridSection({
   const allowedUsageIds = usageOptions.map((usage) => usage.id);
 
   const lignes = useQuery({
-    queryKey: ["lignes-grille-contrat", form.grilleTarifaireId],
+    queryKey: ["lignes-grille", "contrat-summary", form.grilleTarifaireId],
     queryFn: () => productionApi.lignesGrille({ grilleId: form.grilleTarifaireId }),
     enabled: Boolean(form.grilleTarifaireId),
   });
   const formules = useQuery({
-    queryKey: ["formules-garantie-personne-contrat", form.grilleTarifaireId],
+    queryKey: ["formules-garantie-personne", "contrat-summary", form.grilleTarifaireId],
     queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: form.grilleTarifaireId }),
     enabled: Boolean(form.grilleTarifaireId),
   });

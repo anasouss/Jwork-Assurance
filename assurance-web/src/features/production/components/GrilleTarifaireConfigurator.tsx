@@ -573,6 +573,15 @@ function ModeCell({
   );
 }
 
+function formatDecimalDraft(value?: number) {
+  return value === undefined || value === null ? "" : String(value);
+}
+
+function isDecimalDraft(value: string) {
+  const compactValue = value.replace(/\s/g, "");
+  return compactValue === "" || /^\d*(?:[,.]\d*)?$/.test(compactValue);
+}
+
 function NumberCell({
   value,
   disabled,
@@ -582,13 +591,38 @@ function NumberCell({
   disabled: boolean;
   onChange: (value?: number) => void;
 }) {
+  const [focused, setFocused] = useState(false);
+  const [draftValue, setDraftValue] = useState(formatDecimalDraft(value));
+
+  useEffect(() => {
+    if (!focused) {
+      setDraftValue(formatDecimalDraft(value));
+    }
+  }, [focused, value]);
+
+  const handleChange = (nextValue: string) => {
+    if (!isDecimalDraft(nextValue)) {
+      return;
+    }
+    setDraftValue(nextValue);
+    onChange(numberValue(nextValue));
+  };
+
   return (
     <Input
-      type="number"
+      type="text"
+      inputMode="decimal"
       className="h-9 text-right"
       disabled={disabled}
-      value={value ?? ""}
-      onChange={(event) => onChange(numberValue(event.target.value))}
+      value={draftValue}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        const parsedValue = numberValue(draftValue);
+        setFocused(false);
+        setDraftValue(formatDecimalDraft(parsedValue));
+        onChange(parsedValue);
+      }}
+      onChange={(event) => handleChange(event.target.value)}
     />
   );
 }

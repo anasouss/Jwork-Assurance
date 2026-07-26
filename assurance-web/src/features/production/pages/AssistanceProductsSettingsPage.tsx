@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Edit, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronsUpDown, Edit, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
@@ -16,9 +24,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { toDateOnly } from "../date";
 import { productionApi } from "../api";
 import { Field } from "../components/Field";
@@ -75,14 +85,14 @@ export default function AssistanceProductsSettingsPage() {
   });
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams();
     if (selectedCompanyId === ALL) {
       params.delete("compagnieId");
     } else {
       params.set("compagnieId", selectedCompanyId);
     }
     setSearchParams(params, { replace: true });
-  }, [searchParams, selectedCompanyId, setSearchParams]);
+  }, [selectedCompanyId, setSearchParams]);
 
   useEffect(() => {
     if (!productDialogOpen) return;
@@ -305,23 +315,11 @@ export default function AssistanceProductsSettingsPage() {
               </Select>
             </Field>
             <Field label="Usages couverts">
-              <div className="max-h-44 overflow-y-auto rounded-md border p-2">
-                <label className="mb-2 flex items-center gap-2 text-sm">
-                  <Checkbox checked={(productPayload.usageIds ?? []).length === 0} onCheckedChange={() => setProductPayload((current) => ({ ...current, usageIds: [] }))} />
-                  <span>Tous les usages</span>
-                </label>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {(usages.data ?? []).map((usage) => {
-                    const selected = (productPayload.usageIds ?? []).includes(usage.id);
-                    return (
-                      <label key={usage.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted/60">
-                        <Checkbox checked={selected} onCheckedChange={(checked) => setProductPayload((current) => toggleUsage(current, usage.id, Boolean(checked)))} />
-                        <span>{usage.code} - {usage.libelle}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              <UsagesMultiSelect
+                usages={usages.data ?? []}
+                value={productPayload.usageIds ?? []}
+                onChange={(usageIds) => setProductPayload((current) => ({ ...current, usageIds }))}
+              />
             </Field>
             <Field label="Prestations">
               <Textarea rows={6} value={productPayload.prestations ?? ""} onChange={(event) => setProductPayload((current) => ({ ...current, prestations: event.target.value }))} />
@@ -481,14 +479,73 @@ function submitTarif(
   mutate({ productId: product.id, tarifId: editing?.id, value: { ...payload, dateFin: payload.dateFin || undefined } });
 }
 
-function toggleUsage(payload: UpsertProduitAssistanceRequest, usageId: string, checked: boolean): UpsertProduitAssistanceRequest {
-  const ids = new Set(payload.usageIds ?? []);
-  if (checked) {
-    ids.add(usageId);
-  } else {
-    ids.delete(usageId);
-  }
-  return { ...payload, usageIds: Array.from(ids) };
+function UsagesMultiSelect({
+  usages,
+  value,
+  onChange,
+}: {
+  usages: ReferenceOption[];
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const selected = usages.filter((usage) => value.includes(usage.id));
+  const label = selected.length === 0
+    ? "Tous les usages"
+    : selected.length === 1
+      ? usageLabel(selected[0])
+      : `${selected.length} usages sélectionnés`;
+
+  const toggle = (usageId: string) => {
+    const ids = new Set(value);
+    if (ids.has(usageId)) {
+      ids.delete(usageId);
+    } else {
+      ids.add(usageId);
+    }
+    onChange(Array.from(ids));
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 w-full justify-between border-slate-300 bg-slate-50/70 px-3 font-normal shadow-none dark:border-neutral-700 dark:bg-neutral-950/70"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="size-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder="Rechercher usage..." />
+          <CommandList>
+            <CommandEmpty>Aucun usage.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="__all__" onSelect={() => onChange([])}>
+                <Check className={cn("size-4", value.length === 0 ? "opacity-100" : "opacity-0")} />
+                Tous les usages
+              </CommandItem>
+              {usages.map((usage) => {
+                const checked = value.includes(usage.id);
+                return (
+                  <CommandItem key={usage.id} value={usageLabel(usage)} onSelect={() => toggle(usage.id)}>
+                    <Check className={cn("size-4", checked ? "opacity-100" : "opacity-0")} />
+                    <span className="truncate">{usageLabel(usage)}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function usageLabel(usage: ReferenceOption) {
+  return `${usage.code ? `${usage.code} - ` : ""}${usage.libelle}`;
 }
 
 function refString(item: ReferenceOption | Record<string, unknown>, key: string) {

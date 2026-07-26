@@ -138,6 +138,7 @@ export function FlotteTargetsSection({
   const [activeKey, setActiveKey] = useState(targetKey(targets[0]));
   const [activeTargetPart, setActiveTargetPart] = useState<"info" | "garanties">("info");
   const [savedKeys, setSavedKeys] = useState<string[]>([]);
+  const [pendingGuaranteeKeys, setPendingGuaranteeKeys] = useState<string[]>([]);
   const [assistances, setAssistances] = useState<Record<string, AssistanceDraft>>({});
   const vehiculeGaranties = useMemo(
     () => garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE"),
@@ -154,6 +155,15 @@ export function FlotteTargetsSection({
     vehiculeTargets.find((target) => targetKey(target) === activeKey) ?? vehiculeTargets[0];
   const activeRemorqueTarget =
     remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
+
+  useEffect(() => {
+    setPendingGuaranteeKeys([]);
+  }, [preview]);
+
+  const markGuaranteePending = (target: Target, garantieId: string) => {
+    const key = guaranteeCalculationKey(target, garantieId);
+    setPendingGuaranteeKeys((current) => (current.includes(key) ? current : [...current, key]));
+  };
 
   const updateAssistance = (target: Target, patch: Partial<AssistanceDraft>) => {
     setAssistances((current) => {

@@ -240,6 +240,7 @@ export function ClientSection({
           const disabledByCopy = isProprietaire && sameAsSouscripteur;
           const showProprietaireConducteur = isProprietaire && !showProprietaireCategorie;
           const proprietorIsDriver = showProprietaireConducteur && !morale && item.client.conducteurHabituel !== false;
+          const showProprietairePermisFields = isProprietaire && !morale && (showProprietaireCategorie || proprietorIsDriver);
           const conducteur = clients
             .map((client, clientIndex) => ({ client, clientIndex }))
             .find(({ client }) => client.role === "CONDUCTEUR");
@@ -421,7 +422,7 @@ export function ClientSection({
                       </div>
                     </div>
                   ) : null}
-                  {proprietorIsDriver ? (
+                  {showProprietairePermisFields ? (
                     <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                       <Field label="Date de naissance">
                         <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })} />

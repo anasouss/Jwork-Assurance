@@ -348,7 +348,6 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       }
       if (
         item.client.typeClient !== "PERSONNE_MORALE"
-        && typeContrat !== "FLOTTE"
         && (item.role === "CONDUCTEUR" || (item.role === "PROPRIETAIRE" && item.client.conducteurHabituel !== false))
         && !item.client.dateValiditePermis
       ) {
@@ -428,7 +427,6 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         }
         if (
           client.typeClient !== "PERSONNE_MORALE"
-          && typeContrat !== "FLOTTE"
           && role === "PROPRIETAIRE"
           && client.conducteurHabituel !== false
         ) {

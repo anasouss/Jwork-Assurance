@@ -129,6 +129,7 @@ export function FlotteTargetsSection({
     [remorques, vehicules]
   );
   const [activeKey, setActiveKey] = useState(targetKey(targets[0]));
+  const [activeTargetPart, setActiveTargetPart] = useState<"info" | "garanties">("info");
   const [savedKeys, setSavedKeys] = useState<string[]>([]);
   const [assistances, setAssistances] = useState<Record<string, AssistanceDraft>>({});
   const vehiculeGaranties = useMemo(
@@ -163,6 +164,10 @@ export function FlotteTargetsSection({
       setActiveKey(targetKey(targets[0]));
     }
   }, [activeKey, targets]);
+
+  useEffect(() => {
+    setActiveTargetPart("info");
+  }, [activeKey]);
 
   useEffect(() => {
     const rcGaranties = vehiculeGaranties.filter((garantie) => Boolean(garantie.responsabiliteCivile));
@@ -228,9 +233,12 @@ export function FlotteTargetsSection({
     }
   };
 
-  const saveTargetSection = (target: Target, part: "info" | "garanties", label: string) => {
+  const saveTargetSection = (target: Target, part: "info" | "garanties", label: string, onSaved?: () => void) => {
     const key = `${targetKey(target)}:${part}`;
-    const markSaved = () => setSavedKeys((current) => (current.includes(key) ? current : [...current, key]));
+    const markSaved = () => {
+      setSavedKeys((current) => (current.includes(key) ? current : [...current, key]));
+      onSaved?.();
+    };
     if (onSaveDraft) {
       onSaveDraft(label, markSaved);
       return;
@@ -293,7 +301,11 @@ export function FlotteTargetsSection({
 
           {activeVehiculeTarget ? (
             <div className="grid gap-4">
-              <TargetSubsection title="Informations véhicule">
+              <TargetSubsection
+                title="Informations véhicule"
+                open={activeTargetPart === "info"}
+                onOpenChange={() => setActiveTargetPart("info")}
+              >
                 <VehicleForm
                   index={activeVehiculeTarget.index}
                   vehicule={vehicules[activeVehiculeTarget.index]}
@@ -306,13 +318,18 @@ export function FlotteTargetsSection({
                   crmPartageValeur={crmPartageValeur}
                   errors={errors}
                 />
-                <SectionSubmitButton saving={saving} onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule")}>
+                <SectionSubmitButton
+                  saving={saving}
+                  onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => setActiveTargetPart("garanties"))}
+                >
                   Enregistrer informations
                 </SectionSubmitButton>
               </TargetSubsection>
               <TargetSubsection
                 title="Garanties"
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length > 1 ? "s" : ""}`}
+                open={activeTargetPart === "garanties"}
+                onOpenChange={() => setActiveTargetPart("garanties")}
                 action={
                   <Button
                     type="button"
@@ -505,17 +522,28 @@ function TargetSubsection({
   action,
   children,
   defaultOpen = true,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   title: string;
   badge?: string;
   action?: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (controlledOpen === undefined) {
+      setUncontrolledOpen(nextOpen);
+    }
+    onOpenChange?.(nextOpen);
+  };
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border bg-card">
+    <Collapsible open={open} onOpenChange={handleOpenChange} className="rounded-md border bg-card">
       <CollapsibleTrigger asChild>
         <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
           <span className="flex min-w-0 items-center gap-2">

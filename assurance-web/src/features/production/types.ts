@@ -340,6 +340,18 @@ export type VehiculeInput = {
   dateFinCredit?: string;
 };
 
+export type VehiculeResponse = VehiculeInput & {
+  vehiculeId?: string | number;
+  usageCode?: string | null;
+  usageLibelle?: string | null;
+  groupeUsageAttestationCode?: string | null;
+  consommeAttestation?: boolean | null;
+  marque?: string | null;
+  carrosserie?: string | null;
+  categorieTransportCode?: string | null;
+  categorieTransportLibelle?: string | null;
+};
+
 export type RemorqueInput = {
   usageId?: string;
   marqueId?: string;

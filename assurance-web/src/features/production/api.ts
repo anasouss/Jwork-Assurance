@@ -31,6 +31,7 @@ import type {
   UpsertTarifProduitAssistanceRequest,
   UpsertTarifUsageRequest,
   UpsertUsageRequest,
+  VehiculeResponse,
 } from "./types";
 
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
@@ -66,6 +67,10 @@ export const productionApi = {
 
   async searchClient(params: { cin?: string; rc?: string }) {
     return unwrap(await apiFetch<ApiResponse<ClientResponse | null>>(`/api/v1/clients/search${buildQueryString(params)}`));
+  },
+
+  async searchVehicule(params: { immatriculation?: string }) {
+    return unwrap(await apiFetch<ApiResponse<VehiculeResponse | null>>(`/api/v1/vehicules/search${buildQueryString(params)}`));
   },
 
   async createContrat(request: CreateContratRequest) {

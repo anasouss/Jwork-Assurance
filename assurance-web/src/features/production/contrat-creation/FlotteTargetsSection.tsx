@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -135,7 +135,7 @@ export function FlotteTargetsSection({
       ...vehicules.map((vehicule, index) => ({
         kind: "vehicule" as const,
         index,
-        label: `Véhicule ${index + 1}`,
+        label: vehicleTargetLabel(vehicule, index),
         usageId: vehicule.usageId,
         categorieTransportId: vehicule.categorieTransportId,
         valeurVenale: vehicule.valeurVenale,
@@ -145,7 +145,7 @@ export function FlotteTargetsSection({
       ...remorques.map((remorque, index) => ({
         kind: "remorque" as const,
         index,
-        label: `Remorque ${index + 1}`,
+        label: remorqueTargetLabel(remorque, index),
         usageId: remorque.usageId,
         valeurAssuree: remorque.valeurAssuree,
       })),
@@ -326,7 +326,7 @@ export function FlotteTargetsSection({
               {vehiculeTargets.map((target) => {
                 const key = targetKey(target);
                 const active = key === targetKey(activeVehiculeTarget);
-                const saved = savedKeys.includes(`${key}:info`) && savedKeys.includes(`${key}:garanties`);
+                const saved = targetSaved(target, savedKeys, selectedGaranties, vehicules, remorques);
                 return (
                   <button
                     key={key}
@@ -338,9 +338,7 @@ export function FlotteTargetsSection({
                     onClick={() => setActiveKey(targetKey(target))}
                   >
                     <span className="font-medium">{target.label}</span>
-                    <Badge variant={saved ? "outline" : "secondary"}>
-                      {saved ? "Validé" : selectedGaranties.filter((item) => sameTarget(item, target)).length}
-                    </Badge>
+                    <TargetStatusBadge saved={saved} count={selectedGaranties.filter((item) => sameTarget(item, target)).length} />
                   </button>
                 );
               })}
@@ -462,7 +460,7 @@ export function FlotteTargetsSection({
                 {remorqueTargets.map((target) => {
                   const key = targetKey(target);
                   const active = key === targetKey(activeRemorqueTarget);
-                  const saved = savedKeys.includes(`${key}:info`) && savedKeys.includes(`${key}:garanties`);
+                  const saved = targetSaved(target, savedKeys, selectedGaranties, vehicules, remorques);
                   return (
                     <button
                       key={key}
@@ -474,9 +472,7 @@ export function FlotteTargetsSection({
                       onClick={() => setActiveKey(targetKey(target))}
                     >
                       <span className="font-medium">{target.label}</span>
-                      <Badge variant={saved ? "outline" : "secondary"}>
-                        {saved ? "Validé" : selectedGaranties.filter((item) => sameTarget(item, target)).length}
-                      </Badge>
+                      <TargetStatusBadge saved={saved} count={selectedGaranties.filter((item) => sameTarget(item, target)).length} />
                     </button>
                   );
                 })}
@@ -708,6 +704,20 @@ function QuittanceTotalsSummary({
       ))}
     </div>
   );
+}
+
+function TargetStatusBadge({ saved, count }: { saved: boolean; count: number }) {
+  if (saved) {
+    return (
+      <span
+        title="Validé"
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm"
+      >
+        <Check className="size-4" />
+      </span>
+    );
+  }
+  return <Badge variant="secondary">{count}</Badge>;
 }
 
 function targetQuittanceSummary(preview: QuittancePreview | null | undefined, target: Target): TargetQuittanceSummary {
@@ -1701,12 +1711,46 @@ function hasTargetPersonneGaranties(selected: GarantieInput[], personneGaranties
   return selected.some((item) => sameTarget(item, target) && personneIds.has(item.garantieId));
 }
 
+function targetSaved(
+  target: Target,
+  savedKeys: string[],
+  selected: GarantieInput[],
+  vehicules: VehiculeInput[],
+  remorques: RemorqueInput[]
+) {
+  const key = targetKey(target);
+  if (savedKeys.includes(`${key}:info`) && savedKeys.includes(`${key}:garanties`)) {
+    return true;
+  }
+  const persistedInfo = target.kind === "vehicule"
+    ? Boolean(vehicules[target.index]?.vehiculeId)
+    : Boolean(remorques[target.index]?.remorqueId);
+  if (!persistedInfo) {
+    return false;
+  }
+  const targetGaranties = selected.filter((item) => sameTarget(item, target));
+  return targetGaranties.length > 0 && targetGaranties.every((item) => item.prime != null);
+}
+
 function targetKey(target?: Target) {
   return target ? `${target.kind}:${target.index}` : "";
 }
 
 function guaranteeCalculationKey(target: Target, garantieId: string) {
   return `${targetKey(target)}:${garantieId}`;
+}
+
+function vehicleTargetLabel(vehicule: VehiculeInput, index: number) {
+  return normalizeTargetLabel(vehicule.immatriculation) ?? `Véhicule ${index + 1}`;
+}
+
+function remorqueTargetLabel(remorque: RemorqueInput, index: number) {
+  return normalizeTargetLabel(remorque.immatriculation) ?? `Remorque ${index + 1}`;
+}
+
+function normalizeTargetLabel(value?: string | null) {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
 }
 
 function matchingLines(lignes: ReferenceOption[], garantie: ReferenceOption, target?: Target) {

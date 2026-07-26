@@ -993,4 +993,5 @@ export type ContratSummary = {
     primeTotale?: number | null;
   }[];
   elementsFacturables?: ElementFacturable[];
+  targetSummaries?: QuittancePreview["targetSummaries"];
 };

@@ -60,6 +60,7 @@ public class ContratResponse {
     private List<GarantieView> garanties;
     private List<MouvementView> mouvements;
     private List<ElementFacturableView> elementsFacturables;
+    private List<QuittanceResponse.TargetSummary> targetSummaries;
     @Data
     @Builder
     public static class ClientLink {

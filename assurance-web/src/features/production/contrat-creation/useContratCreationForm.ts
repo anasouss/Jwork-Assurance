@@ -198,6 +198,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setVehicules(hydrated.vehicules);
     setRemorques(hydrated.remorques);
     setGaranties(hydrated.garanties);
+    setPreview(hydrated.preview);
     setHydratedDraftId(draftId);
   }, [draftId, draftQuery.data, hydratedDraftId]);
 
@@ -400,6 +401,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     },
     onSuccess: async (draft, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
+      const hydrated = hydrateDraft(draft);
       if (variables.target.kind === "vehicule") {
         const saved = draft.vehicules?.[variables.target.index];
         if (saved?.vehiculeId != null) {
@@ -414,6 +416,14 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
             index === variables.target.index ? { ...remorque, remorqueId: saved.remorqueId } : remorque
           )));
         }
+      }
+      if (variables.part === "garanties") {
+        const savedTargetGaranties = targetGaranties(hydrated.garanties, variables.target);
+        setGaranties((current) => [
+          ...current.filter((garantie) => !isTargetGarantie(garantie, variables.target)),
+          ...savedTargetGaranties,
+        ]);
+        setPreview(hydrated.preview);
       }
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
@@ -1119,6 +1129,12 @@ function targetGaranties(garanties: GarantieInput[], target: ContratTargetKey) {
   ));
 }
 
+function isTargetGarantie(garantie: GarantieInput, target: ContratTargetKey) {
+  return target.kind === "vehicule"
+    ? garantie.vehiculeIndex === target.index
+    : garantie.remorqueIndex === target.index;
+}
+
 function sectionLabel(section: SavableContratSectionKey) {
   switch (section) {
     case "souscripteur":
@@ -1269,6 +1285,26 @@ function hydrateDraft(draft: ContratSummary) {
     vehicules,
     remorques,
     garanties,
+    preview: savedPreviewFromDraft(draft),
+  };
+}
+
+function savedPreviewFromDraft(draft: ContratSummary): QuittancePreview | null {
+  if (!draft.targetSummaries?.length) {
+    return null;
+  }
+  return {
+    numeroContrat: draft.numeroContrat ?? draft.numeroPolice ?? draft.numeroDevis ?? undefined,
+    type: draft.typeContrat,
+    primeNette: 0,
+    taxe: 0,
+    taxeParafiscale: 0,
+    accessoire: 0,
+    cnpac: 0,
+    primeTotale: 0,
+    lignes: [],
+    garanties: [],
+    targetSummaries: draft.targetSummaries,
   };
 }
 

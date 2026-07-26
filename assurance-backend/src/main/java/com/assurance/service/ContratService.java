@@ -1081,7 +1081,7 @@ public class ContratService {
     public List<ContratResponse> list(Long agenceId) {
         return contratRepository.findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(agenceId).stream()
                 .map(this::ensureNumeroDossier)
-                .map(this::toResponse)
+                .map(this::toListResponse)
                 .toList();
     }
 
@@ -1090,7 +1090,7 @@ public class ContratService {
         return contratRepository.findByAgenceIdAndProspectionTrueAndTypeContratOrderByCreatedAtDesc(agenceId, TypeContrat.FLOTTE).stream()
                 .map(this::ensureNumeroDevis)
                 .map(this::ensureNumeroDossier)
-                .map(this::toResponse)
+                .map(this::toListResponse)
                 .toList();
     }
 
@@ -1485,6 +1485,14 @@ public class ContratService {
     }
 
     private ContratResponse toResponse(Contrat contrat) {
+        return toResponse(contrat, true);
+    }
+
+    private ContratResponse toListResponse(Contrat contrat) {
+        return toResponse(contrat, false);
+    }
+
+    private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries) {
         List<ContratResponse.ClientLink> clients = new ArrayList<>();
         for (ContratClient link : contrat.getClients()) {
             clients.add(ContratResponse.ClientLink.builder()
@@ -1634,6 +1642,9 @@ public class ContratService {
                     .primeTotale(element.getPrimeTotale())
                     .build());
         }
+        List<QuittanceResponse.TargetSummary> targetSummaries = !includeTargetSummaries || contrat.getGaranties().isEmpty()
+                ? List.of()
+                : elementFacturableCibleService.calculer(contrat, contrat.getGaranties(), contrat.getVehicules(), contrat.getRemorques());
 
         return ContratResponse.builder()
                 .id(contrat.getId())
@@ -1681,6 +1692,7 @@ public class ContratService {
                 .garanties(garanties)
                 .mouvements(mouvements)
                 .elementsFacturables(elementsFacturables)
+                .targetSummaries(targetSummaries)
                 .build();
     }
 

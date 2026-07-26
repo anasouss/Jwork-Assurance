@@ -179,7 +179,7 @@ public class DataSeeder implements CommandLineRunner {
         seedParametreApplication("TAUX_RC_REMORQUE_DEFAUT", "DECIMAL", "0.20", "Taux RC remorque par defaut");
         seedParametreApplication("DR_MODE_VARIABLE", "BOOLEAN", "false", "Autorise le mode variable pour Defense et Recours");
         seedParametreApplication("RVE_TAUX_ZERO_AUTORISE", "BOOLEAN", "false", "Autorise les lignes RVE a taux zero");
-        seedParametreApplication("ENABLE_ATTESTATION_STOCK_CHECK", "BOOLEAN", "false", "Active le controle du stock des attestations pendant la production");
+        seedParametreApplication("ENABLE_ATTESTATION_STOCK_CHECK", "BOOLEAN", "1", "Active le controle du stock des attestations pendant la production");
 
         seedTypeMouvement("AN", "Affaire nouvelle", CategorieMouvementContrat.AFFAIRE_NOUVELLE, TypeImpactMouvement.NORMAL,
                 List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION, TypeContrat.FLOTTE), false, false, true, true, false, true, true, true, true, false, false, 10);

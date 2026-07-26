@@ -16,7 +16,7 @@ import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { productionApi } from "../api";
 import { toDateOnly } from "../date";
-import { formatMoney, money, numberValue, toNumber } from "../utils/format";
+import { formatMoney, money, moneyAmount, numberValue, toNumber } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput, VehiculeResponse } from "../types";
 import type { ContratSectionKey } from "./useContratCreationForm";
@@ -708,7 +708,7 @@ function CalculationValue({ value, loading, fallback = "Calcul auto" }: { value?
       </span>
     );
   }
-  return value == null ? fallback : money(value);
+  return value == null ? fallback : moneyAmount(value);
 }
 
 function stringValue(value: unknown) {

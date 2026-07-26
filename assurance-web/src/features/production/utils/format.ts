@@ -19,15 +19,18 @@ export function roundMoney(value: number) {
 }
 
 export function formatMoney(value?: number | null) {
-  const amount = new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value ?? 0);
-  return `${amount} MAD`;
+  return `${moneyAmount(value)} MAD`;
 }
 
 export function formatOptionalMoney(value?: number | null) {
   return value == null ? "-" : formatMoney(value);
+}
+
+export function moneyAmount(value?: number | null) {
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value ?? 0);
 }
 
 export function money(value: unknown) {

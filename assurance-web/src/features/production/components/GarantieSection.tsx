@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
-import { formatMoney, money, numberValue } from "../utils/format";
+import { formatMoney, money, moneyAmount, numberValue } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
@@ -660,7 +660,7 @@ function linePrimeNette(preview: QuittancePreview | null | undefined, categorie:
 }
 
 function autoPrimeDisplay(value?: number) {
-  return value == null ? "Calcul auto" : money(value);
+  return value == null ? "Calcul auto" : moneyAmount(value);
 }
 
 function resolveRcPrime(

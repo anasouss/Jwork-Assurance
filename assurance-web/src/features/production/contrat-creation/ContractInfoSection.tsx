@@ -2,6 +2,7 @@ import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EcheanceInput } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "../components/Field";
@@ -32,12 +33,16 @@ export function ContractInfoSection({
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
   );
   const selectedUsage = (form.refs.usages.data ?? []).find((item) => item.id === form.usageId);
+  const selectedConvention = filteredConventions.find((item) => item.id === form.conventionId);
   const souscripteur = form.clients.find((client) => client.role === "SOUSCRIPTEUR");
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
   const selectedCategorie = (form.refs.categoriesClient.data ?? []).find((categorie) => categorie.id === categorieClientId);
   const showCategorieClient = form.typeContrat === "PARTICULIER";
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
   const showCrmPartage = form.typeContrat === "FLOTTE";
+  const conventionHasFixedEcheance = readOnlyConventionContext
+    && Boolean(form.request.echeance ?? form.effectiveEcheance)
+    && selectedConvention?.typeEcheance === "A_ECHEANCE";
 
   return (
     <SectionCard
@@ -127,17 +132,42 @@ export function ContractInfoSection({
         <Field label="N° attestation">
           <Input value={form.numeroAttestation} onChange={(event) => form.setNumeroAttestation(event.target.value)} />
         </Field>
+        <Field label="Type de contrat" required error={form.validationErrors.typeRenouvellement}>
+          <Select
+            value={form.typeRenouvellement}
+            onValueChange={(value) => {
+              form.setTypeRenouvellement(value as "renouvelable" | "ferme");
+              if (value === "ferme") {
+                form.setEcheance(undefined);
+              }
+            }}
+          >
+            <SelectTrigger><SelectValue placeholder="Type de contrat" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="renouvelable">Renouvelable</SelectItem>
+              <SelectItem value="ferme">Ferme</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
         <Field label="Date effet" required error={form.validationErrors.dateEffet}>
           <DatePicker date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
         </Field>
         <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
-          <DatePicker date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
+          <DatePicker disabled={form.showContractEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
         </Field>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-4">
         {showFractionnement ? (
           <Field label="Périodicité">
-            <Select value={form.fractionnement} onValueChange={(value) => form.setFractionnement(value as CreateContratRequest["fractionnement"])}>
+            <Select
+              value={form.fractionnement}
+              onValueChange={(value) => {
+                form.setFractionnement(value as CreateContratRequest["fractionnement"]);
+                if (value !== "ANNUEL") {
+                  form.setEcheance(undefined);
+                }
+              }}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ANNUEL">Annuel</SelectItem>
@@ -147,6 +177,41 @@ export function ContractInfoSection({
               </SelectContent>
             </Select>
           </Field>
+        ) : null}
+        {form.showContractEcheance ? (
+          <Field label="Échéance" required error={form.validationErrors.echeance}>
+            <EcheanceInput
+              value={form.effectiveEcheance}
+              disabled={Boolean(conventionHasFixedEcheance)}
+              onValueChange={form.setEcheance}
+            />
+          </Field>
+        ) : null}
+        {readOnlyConventionContext ? (
+          <>
+            <Field label="Mode de règlement" required error={form.validationErrors.modeReglement}>
+              <Select
+                value={form.modeReglement}
+                onValueChange={(value) => {
+                  form.setModeReglement(value);
+                  if (value !== "facture") {
+                    form.setNumeroBonCommande("");
+                  }
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Mode de règlement" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bureau">Règlement bureau</SelectItem>
+                  <SelectItem value="facture">Règlement facture</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {form.modeReglement === "facture" ? (
+              <Field label="N° bon de commande" required error={form.validationErrors.numeroBonCommande}>
+                <Input value={form.numeroBonCommande} onChange={(event) => form.setNumeroBonCommande(event.target.value)} />
+              </Field>
+            ) : null}
+          </>
         ) : null}
         {showCrmPartage ? (
           <>

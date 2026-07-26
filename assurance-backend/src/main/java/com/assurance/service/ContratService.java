@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -51,6 +52,7 @@ public class ContratService {
     private final CalculGarantieService calculGarantieService;
     private final QuittanceCalculService quittanceCalculService;
     private final MouvementContratService mouvementContratService;
+    private final EcheanceService echeanceService;
 
     @Transactional
     public ContratResponse create(CreateContratRequest request) {
@@ -103,6 +105,7 @@ public class ContratService {
         if (modeSaisieGaranties == ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE && grilleTarifaire == null) {
             throw new BadRequestException("Une grille tarifaire est obligatoire pour un contrat convention ou flotte");
         }
+        ContractDates contractDates = resolveContractDates(request);
 
         Contrat contrat = Contrat.builder()
                 .agence(agence)
@@ -117,9 +120,10 @@ public class ContratService {
                 .numeroDossier(request.getNumeroDossier())
                 .numeroPolice(request.getNumeroPolice())
                 .numeroAttestation(request.getNumeroAttestation())
-                .dateEffet(request.getDateEffet())
-                .dateEcheance(request.getDateEcheance())
-                .echeance(request.getEcheance())
+                .dateEffet(contractDates.dateEffet())
+                .dateEcheance(contractDates.dateEcheance())
+                .echeance(contractDates.echeance())
+                .typeRenouvellement(blankToNull(request.getTypeRenouvellement()))
                 .modePaiement(request.getModePaiement())
                 .modeReglement(request.getModeReglement())
                 .numeroBonCommande(request.getNumeroBonCommande())
@@ -173,8 +177,8 @@ public class ContratService {
                     .ptc(input.getPtc())
                     .datePremiereCirculation(input.getDatePremiereCirculation())
                     .dateExpirationCarteGrise(input.getDateExpirationCarteGrise())
-                    .dateEffet(input.getDateEffet())
-                    .dateEcheance(input.getDateEcheance())
+                    .dateEffet(firstNonNull(input.getDateEffet(), contractDates.dateEffet()))
+                    .dateEcheance(firstNonNull(input.getDateEcheance(), contractDates.dateEcheance()))
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .remorque(input.getRemorque() == null ? false : input.getRemorque())
@@ -203,8 +207,8 @@ public class ContratService {
                     .immatriculation(input.getImmatriculation())
                     .ptc(input.getPtc())
                     .dateMiseEnCirculation(input.getDateMiseEnCirculation())
-                    .dateEffet(input.getDateEffet())
-                    .dateEcheance(input.getDateEcheance())
+                    .dateEffet(firstNonNull(input.getDateEffet(), contractDates.dateEffet()))
+                    .dateEcheance(firstNonNull(input.getDateEcheance(), contractDates.dateEcheance()))
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .coefficientProrata(input.getCoefficientProrata())
@@ -308,6 +312,7 @@ public class ContratService {
         if (modeSaisieGaranties == ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE && grilleTarifaire == null) {
             throw new BadRequestException("Une grille tarifaire est obligatoire pour un contrat convention ou flotte");
         }
+        ContractDates contractDates = resolveContractDates(request);
 
         Contrat contrat = Contrat.builder()
                 .agence(agence)
@@ -321,9 +326,10 @@ public class ContratService {
                 .numeroDossier(request.getNumeroDossier())
                 .numeroPolice(request.getNumeroPolice())
                 .numeroAttestation(request.getNumeroAttestation())
-                .dateEffet(request.getDateEffet())
-                .dateEcheance(request.getDateEcheance())
-                .echeance(request.getEcheance())
+                .dateEffet(contractDates.dateEffet())
+                .dateEcheance(contractDates.dateEcheance())
+                .echeance(contractDates.echeance())
+                .typeRenouvellement(blankToNull(request.getTypeRenouvellement()))
                 .modePaiement(request.getModePaiement())
                 .modeReglement(request.getModeReglement())
                 .numeroBonCommande(request.getNumeroBonCommande())
@@ -439,8 +445,8 @@ public class ContratService {
                     .ptc(input.getPtc())
                     .datePremiereCirculation(input.getDatePremiereCirculation())
                     .dateExpirationCarteGrise(input.getDateExpirationCarteGrise())
-                    .dateEffet(input.getDateEffet())
-                    .dateEcheance(input.getDateEcheance())
+                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
+                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .coefficientProrata(input.getCoefficientProrata())
@@ -469,8 +475,8 @@ public class ContratService {
                     .immatriculation(input.getImmatriculation())
                     .ptc(input.getPtc())
                     .dateMiseEnCirculation(input.getDateMiseEnCirculation())
-                    .dateEffet(input.getDateEffet())
-                    .dateEcheance(input.getDateEcheance())
+                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
+                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .coefficientProrata(input.getCoefficientProrata())
@@ -693,6 +699,7 @@ public class ContratService {
                 .dateEcheance(contrat.getDateEcheance())
                 .numeroAttestation(contrat.getNumeroAttestation())
                 .echeance(contrat.getEcheance())
+                .typeRenouvellement(contrat.getTypeRenouvellement())
                 .modePaiement(contrat.getModePaiement())
                 .modeReglement(contrat.getModeReglement())
                 .numeroBonCommande(contrat.getNumeroBonCommande())
@@ -890,6 +897,10 @@ public class ContratService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private String blankToNull(String value) {
+        return hasText(value) ? value.trim() : null;
     }
 
     private ModeSaisieGarantieContrat resolveModeSaisieGaranties(CreateContratRequest request) {
@@ -1470,6 +1481,14 @@ public class ContratService {
         return sources;
     }
 
+    private ContractDates resolveContractDates(CreateContratRequest request) {
+        String normalizedEcheance = echeanceService.normalizeCode(request.getEcheance());
+        LocalDate dateEcheance = normalizedEcheance == null
+                ? request.getDateEcheance()
+                : echeanceService.resolveDateEcheance(request.getDateEffet(), normalizedEcheance, request.getDateEcheance());
+        return new ContractDates(request.getDateEffet(), dateEcheance, normalizedEcheance);
+    }
+
     @SafeVarargs
     private final <T> T firstNonNull(T... values) {
         for (T value : values) {
@@ -1497,6 +1516,13 @@ public class ContratService {
             BigDecimal prime,
             BigDecimal tauxFranchise,
             BigDecimal franchiseMinimale
+    ) {
+    }
+
+    private record ContractDates(
+            java.time.LocalDate dateEffet,
+            java.time.LocalDate dateEcheance,
+            String echeance
     ) {
     }
 }

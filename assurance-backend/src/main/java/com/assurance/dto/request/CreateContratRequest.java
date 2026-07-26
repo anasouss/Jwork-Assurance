@@ -38,6 +38,7 @@ public class CreateContratRequest {
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String echeance;
+    private String typeRenouvellement;
     private String modePaiement;
     private String modeReglement;
     private String numeroBonCommande;

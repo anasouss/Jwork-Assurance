@@ -35,6 +35,7 @@ public class ContratResponse {
     private LocalDate dateEcheance;
     private String numeroAttestation;
     private String echeance;
+    private String typeRenouvellement;
     private String modePaiement;
     private String modeReglement;
     private String numeroBonCommande;

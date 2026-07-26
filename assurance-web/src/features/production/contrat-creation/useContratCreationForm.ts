@@ -32,6 +32,10 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   const [grilleTarifaireId, setGrilleTarifaireId] = useState("");
   const [dateEffet, setDateEffet] = useState<string | undefined>();
   const [dateEcheance, setDateEcheance] = useState<string | undefined>();
+  const [typeRenouvellement, setTypeRenouvellement] = useState<"renouvelable" | "ferme">("renouvelable");
+  const [echeance, setEcheance] = useState<string | undefined>();
+  const [modeReglement, setModeReglement] = useState("bureau");
+  const [numeroBonCommande, setNumeroBonCommande] = useState("");
   const [fractionnement, setFractionnement] = useState<CreateContratRequest["fractionnement"]>("ANNUEL");
   const [crmPartage, setCrmPartage] = useState(false);
   const [crmPartageValeur, setCrmPartageValeur] = useState("");
@@ -95,6 +99,12 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
   }, [conventionUsageIds, selectedConvention, typeContrat, usageId]);
 
   const grilleUsageFilter = typeContrat === "CONVENTION" ? usageId : undefined;
+  const selectedConventionTypeEcheance = selectedConvention?.typeEcheance;
+  const selectedConventionEcheance = typeof selectedConvention?.echeance === "string" ? selectedConvention.echeance : undefined;
+  const effectiveEcheance = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "A_ECHEANCE"
+    ? selectedConventionEcheance
+    : echeance;
+  const showContractEcheance = typeRenouvellement === "renouvelable" && fractionnement === "ANNUEL";
 
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId, grilleUsageFilter],
@@ -148,6 +158,11 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     grilleTarifaireId: typeContrat === "PARTICULIER" ? undefined : emptyToUndefined(grilleTarifaireId),
     dateEffet,
     dateEcheance,
+    echeance: showContractEcheance ? effectiveEcheance : undefined,
+    typeRenouvellement,
+    periodicite: periodiciteFromFractionnement(fractionnement),
+    modeReglement: typeContrat === "CONVENTION" ? modeReglement : undefined,
+    numeroBonCommande: typeContrat === "CONVENTION" && modeReglement === "facture" ? emptyToUndefined(numeroBonCommande) : undefined,
     fractionnement,
     modeSaisieGaranties,
     saisiePrimeNette: typeContrat === "PARTICULIER" ? saisiePrimeNette : false,
@@ -196,6 +211,11 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     grilleTarifaireId,
     dateEffet,
     dateEcheance,
+    effectiveEcheance,
+    showContractEcheance,
+    typeRenouvellement,
+    modeReglement,
+    numeroBonCommande,
     fractionnement,
     crmPartage,
     crmPartageValeur,
@@ -249,6 +269,16 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     if (typeContrat !== "PARTICULIER" && !grilleTarifaireId) {
       setValidationErrors({});
       toast.error("Une grille tarifaire est obligatoire pour convention/flotte");
+      return false;
+    }
+    if (showContractEcheance && !effectiveEcheance) {
+      setValidationErrors({ echeance: "Échéance obligatoire." });
+      toast.error("Échéance obligatoire.");
+      return false;
+    }
+    if (typeContrat === "CONVENTION" && modeReglement === "facture" && !numeroBonCommande.trim()) {
+      setValidationErrors({ numeroBonCommande: "N° bon de commande obligatoire." });
+      toast.error("N° bon de commande obligatoire.");
       return false;
     }
     const today = dateOnly(new Date());
@@ -374,10 +404,18 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     if (section === "contrat") {
       requireField("compagnieAssuranceId", compagnieAssuranceId, "Compagnie obligatoire.");
       requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
+      requireField("typeRenouvellement", typeRenouvellement, "Type de contrat obligatoire.");
       requireField("dateEffet", dateEffet, "Date effet obligatoire.");
       requireField("dateEcheance", dateEcheance, "Date échéance obligatoire.");
+      if (showContractEcheance) {
+        requireField("echeance", effectiveEcheance, "Échéance obligatoire.");
+      }
       if (typeContrat === "CONVENTION") {
         requireField("conventionId", conventionId, "Convention obligatoire.");
+        requireField("modeReglement", modeReglement, "Mode de règlement obligatoire.");
+        if (modeReglement === "facture") {
+          requireField("numeroBonCommande", numeroBonCommande, "N° bon de commande obligatoire.");
+        }
       }
     }
     if (section === "grille") {
@@ -432,6 +470,10 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     if (isFractionnement(conventionFractionnement)) {
       setFractionnement(conventionFractionnement);
     }
+    const conventionEcheance = typeof convention?.echeance === "string" ? convention.echeance : "";
+    if (convention?.typeEcheance === "A_ECHEANCE" && conventionEcheance) {
+      setEcheance(conventionEcheance);
+    }
   };
 
   const applyConventionContext = (context: { compagnieAssuranceId?: string | null; conventionId?: string | null; usageId?: string | null }) => {
@@ -448,6 +490,10 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
       if (isFractionnement(conventionFractionnement)) {
         setFractionnement(conventionFractionnement);
       }
+      const conventionEcheance = typeof convention?.echeance === "string" ? convention.echeance : "";
+      if (convention?.typeEcheance === "A_ECHEANCE" && conventionEcheance) {
+        setEcheance(conventionEcheance);
+      }
       const conventionGrilleId = typeof convention?.grilleTarifaireId === "string" ? convention.grilleTarifaireId : "";
       if (conventionGrilleId) {
         setGrilleTarifaireId(conventionGrilleId);
@@ -463,6 +509,16 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setUsageId(value);
     setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: value })));
   };
+
+  useEffect(() => {
+    if (!showContractEcheance || !dateEffet || !effectiveEcheance) {
+      return;
+    }
+    const computed = computeDateEcheance(dateEffet, effectiveEcheance);
+    if (computed && computed !== dateEcheance) {
+      setDateEcheance(computed);
+    }
+  }, [dateEffet, dateEcheance, effectiveEcheance, showContractEcheance]);
 
   return {
     typeContrat,
@@ -498,6 +554,16 @@ export function useContratCreationForm(typeContrat: TypeContrat) {
     setDateEffet,
     dateEcheance,
     setDateEcheance,
+    typeRenouvellement,
+    setTypeRenouvellement,
+    echeance,
+    setEcheance,
+    effectiveEcheance,
+    showContractEcheance,
+    modeReglement,
+    setModeReglement,
+    numeroBonCommande,
+    setNumeroBonCommande,
     fractionnement,
     setFractionnement,
     crmPartage,
@@ -574,6 +640,43 @@ function roundMoney(value: number) {
 
 function isFractionnement(value: unknown): value is CreateContratRequest["fractionnement"] {
   return value === "ANNUEL" || value === "SEMESTRIEL" || value === "TRIMESTRIEL" || value === "MENSUEL";
+}
+
+function periodiciteFromFractionnement(value: CreateContratRequest["fractionnement"]) {
+  switch (value) {
+    case "MENSUEL":
+      return "1";
+    case "TRIMESTRIEL":
+      return "2";
+    case "SEMESTRIEL":
+      return "3";
+    case "ANNUEL":
+    default:
+      return "4";
+  }
+}
+
+function computeDateEcheance(dateEffet: string, echeance: string) {
+  const match = echeance.match(/^(\d{2})\/(\d{2})$/);
+  if (!match) {
+    return undefined;
+  }
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const effectiveDate = new Date(`${dateEffet}T00:00:00`);
+  if (Number.isNaN(effectiveDate.getTime()) || month < 1 || month > 12) {
+    return undefined;
+  }
+  const effectiveYear = effectiveDate.getFullYear();
+  if (day === 1 && month === 1) {
+    return `${effectiveYear}-12-31`;
+  }
+  let expiration = new Date(effectiveYear, month - 1, day);
+  if (expiration <= effectiveDate) {
+    expiration = new Date(effectiveYear + 1, month - 1, day);
+  }
+  expiration.setDate(expiration.getDate() - 1);
+  return dateOnly(expiration);
 }
 
 function dateOnly(date: Date) {

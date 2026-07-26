@@ -305,6 +305,8 @@ export type CreateContratRequest = {
   dateEffet?: string;
   dateEcheance?: string;
   echeance?: string;
+  typeRenouvellement?: "renouvelable" | "ferme";
+  periodicite?: string;
   modeReglement?: string;
   numeroBonCommande?: string;
   fractionnement?: "ANNUEL" | "SEMESTRIEL" | "TRIMESTRIEL" | "MENSUEL";
@@ -525,6 +527,7 @@ export type ContratSummary = {
   dateEcheance?: string;
   numeroAttestation?: string;
   echeance?: string | null;
+  typeRenouvellement?: string | null;
   modePaiement?: string | null;
   modeReglement?: string | null;
   numeroBonCommande?: string | null;

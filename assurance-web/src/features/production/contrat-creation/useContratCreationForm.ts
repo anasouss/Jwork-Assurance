@@ -348,6 +348,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       }
       if (
         item.client.typeClient !== "PERSONNE_MORALE"
+        && typeContrat !== "FLOTTE"
         && (item.role === "CONDUCTEUR" || (item.role === "PROPRIETAIRE" && item.client.conducteurHabituel !== false))
         && !item.client.dateValiditePermis
       ) {
@@ -427,6 +428,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         }
         if (
           client.typeClient !== "PERSONNE_MORALE"
+          && typeContrat !== "FLOTTE"
           && role === "PROPRIETAIRE"
           && client.conducteurHabituel !== false
         ) {
@@ -494,6 +496,15 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     saveDraftMutation.mutate(request, {
       onSuccess: () => {
         setSavedSections((current) => ({ ...current, [section]: true }));
+        toast.success(`${label} enregistré`);
+      },
+    });
+  };
+
+  const handleSaveDraft = (label: string, onSuccess?: () => void) => {
+    saveDraftMutation.mutate(request, {
+      onSuccess: () => {
+        onSuccess?.();
         toast.success(`${label} enregistré`);
       },
     });
@@ -597,6 +608,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     handlePreview,
     handleCreate,
     handleSaveSection,
+    handleSaveDraft,
     savedSections,
     availableUsages,
     numeroContrat,

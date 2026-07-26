@@ -1,4 +1,4 @@
-import { Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -229,9 +229,15 @@ export function ContractInfoSection({
         ) : null}
       </div>
       <div className="mt-4 flex justify-end border-t pt-3">
-        <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => form.handleSaveSection("contrat")}>
-          <Save className="size-4" />
-          Enregistrer
+        <Button
+          type="button"
+          size="sm"
+          className="bg-emerald-600 text-white hover:bg-emerald-700"
+          disabled={form.saveDraftMutation.isPending}
+          onClick={() => form.handleSaveSection("contrat")}
+        >
+          {form.saveDraftMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          {form.saveDraftMutation.isPending ? "Enregistrement..." : "Enregistrer"}
         </Button>
       </div>
     </SectionCard>

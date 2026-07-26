@@ -1,4 +1,4 @@
-import { Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClientSection } from "../components/ClientSection";
 import { GarantieSection } from "../components/GarantieSection";
@@ -56,6 +56,7 @@ export function ContratFormLayout({
       errors={form.validationErrors}
       onSaveSection={form.handleSaveSection}
       savedSections={form.savedSections}
+      saving={form.saveDraftMutation.isPending}
     />
   );
 
@@ -135,7 +136,9 @@ export function ContratFormLayout({
       grilleSelected={Boolean(form.grilleTarifaireId)}
       preview={form.preview}
       previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
+      saving={form.saveDraftMutation.isPending}
       onPreviewQuittance={form.handlePreview}
+      onSaveDraft={form.handleSaveDraft}
       setAssistanceEnabled={form.setAssistanceEnabled}
       assistanceCategorieClientId={assistanceCategorieClientId}
       maxRemorques={maxRemorques}
@@ -193,8 +196,8 @@ export function ContratFormLayout({
 
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
-          <Save className="size-4" />
-          Créer contrat
+          {form.createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          {form.createMutation.isPending ? "Création..." : "Créer contrat"}
         </Button>
       </div>
     </div>

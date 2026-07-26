@@ -40,6 +40,7 @@ export function ClientSection({
   errors = {},
   onSaveSection,
   savedSections = {},
+  saving = false,
 }: {
   clients: ClientInput[];
   setClients: (clients: ClientInput[]) => void;
@@ -50,6 +51,7 @@ export function ClientSection({
   errors?: Record<string, string>;
   onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
   savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
+  saving?: boolean;
 }) {
   const [sameAsSouscripteur, setSameAsSouscripteur] = useState(false);
   const [lookupByIndex, setLookupByIndex] = useState<Record<number, LookupState>>({});
@@ -59,7 +61,7 @@ export function ClientSection({
     const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
     const needsConducteur = Boolean(
       proprietaire && (proprietaire.client.typeClient === "PERSONNE_MORALE" || proprietaire.client.conducteurHabituel === false)
-    );
+    ) && !showProprietaireCategorie;
     const hasConducteur = clients.some((client) => client.role === "CONDUCTEUR");
     if (needsConducteur && !hasConducteur) {
       setClients([...clients, emptyClient("CONDUCTEUR")]);
@@ -68,7 +70,7 @@ export function ClientSection({
     if (!needsConducteur && hasConducteur && !showOptionalRoles) {
       setClients(clients.filter((client) => client.role !== "CONDUCTEUR"));
     }
-  }, [clients, setClients, showOptionalRoles]);
+  }, [clients, setClients, showOptionalRoles, showProprietaireCategorie]);
 
   useEffect(() => () => {
     Object.values(lookupTimers.current).forEach(clearTimeout);
@@ -236,7 +238,8 @@ export function ClientSection({
           const selectedVille = villes.find((ville) => ville.id === item.client.villeId);
           const saharaAllowed = Boolean(selectedVille?.saharienne);
           const disabledByCopy = isProprietaire && sameAsSouscripteur;
-          const proprietorIsDriver = isProprietaire && !morale && item.client.conducteurHabituel !== false;
+          const showProprietaireConducteur = isProprietaire && !showProprietaireCategorie;
+          const proprietorIsDriver = showProprietaireConducteur && !morale && item.client.conducteurHabituel !== false;
           const conducteur = clients
             .map((client, clientIndex) => ({ client, clientIndex }))
             .find(({ client }) => client.role === "CONDUCTEUR");
@@ -261,7 +264,7 @@ export function ClientSection({
                   Le propriétaire est-il lui-même le souscripteur ?
                 </label>
               ) : null}
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div className={`grid gap-3 md:grid-cols-2 ${isProprietaire && showProprietaireCategorie ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
                 <Field label="Type" required>
                   <Select
                     value={item.client.typeClient}
@@ -396,26 +399,28 @@ export function ClientSection({
                     </Field>
                     <TelephoneList client={item} updateClient={(patch) => updateClient(index, patch)} />
                   </div>
-                  <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
-                    <div className="flex items-end gap-3 pb-2 text-sm md:col-span-2">
-                      <span>Le propriétaire est-il lui-même le conducteur ?</span>
-                      <label className="flex items-center gap-1">
-                        <Checkbox
-                          checked={proprietorIsDriver}
-                          disabled={morale}
-                          onCheckedChange={(checked) => setProprietaireConducteur(index, Boolean(checked))}
-                        />
-                        Oui
-                      </label>
-                      <label className="flex items-center gap-1">
-                        <Checkbox
-                          checked={!proprietorIsDriver}
-                          onCheckedChange={(checked) => setProprietaireConducteur(index, !Boolean(checked))}
-                        />
-                        Non
-                      </label>
+                  {showProprietaireConducteur ? (
+                    <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="flex items-end gap-3 pb-2 text-sm md:col-span-2">
+                        <span>Le propriétaire est-il lui-même le conducteur ?</span>
+                        <label className="flex items-center gap-1">
+                          <Checkbox
+                            checked={proprietorIsDriver}
+                            disabled={morale}
+                            onCheckedChange={(checked) => setProprietaireConducteur(index, Boolean(checked))}
+                          />
+                          Oui
+                        </label>
+                        <label className="flex items-center gap-1">
+                          <Checkbox
+                            checked={!proprietorIsDriver}
+                            onCheckedChange={(checked) => setProprietaireConducteur(index, !Boolean(checked))}
+                          />
+                          Non
+                        </label>
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                   {proprietorIsDriver ? (
                     <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                       <Field label="Date de naissance">
@@ -500,7 +505,7 @@ export function ClientSection({
         {renderClients(["SOUSCRIPTEUR"])}
         {onSaveSection ? (
           <div className="mt-4 flex justify-end border-t pt-3">
-            <SaveSectionButton onClick={() => onSaveSection("souscripteur")} />
+            <SaveSectionButton saving={saving} onClick={() => onSaveSection("souscripteur")} />
           </div>
         ) : null}
       </SectionCard>
@@ -514,7 +519,7 @@ export function ClientSection({
         {renderClients(["PROPRIETAIRE"])}
         {onSaveSection ? (
           <div className="mt-4 flex justify-end border-t pt-3">
-            <SaveSectionButton onClick={() => onSaveSection("proprietaire")} />
+            <SaveSectionButton saving={saving} onClick={() => onSaveSection("proprietaire")} />
           </div>
         ) : null}
       </SectionCard>
@@ -539,11 +544,11 @@ export function ClientSection({
   );
 }
 
-function SaveSectionButton({ onClick }: { onClick: () => void }) {
+function SaveSectionButton({ saving, onClick }: { saving?: boolean; onClick: () => void }) {
   return (
-    <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={onClick}>
-      <Save className="size-4" />
-      Enregistrer
+    <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={saving} onClick={onClick}>
+      {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+      {saving ? "Enregistrement..." : "Enregistrer"}
     </Button>
   );
 }

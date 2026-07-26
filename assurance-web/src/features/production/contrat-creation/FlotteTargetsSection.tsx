@@ -1514,7 +1514,7 @@ function tariffLineLabel(line: ReferenceOption, index = 0) {
     const label = String(line.libelle ?? "");
     return label.toLowerCase().includes("formule") ? label : `Formule ${index + 1}`;
   }
-  return String(line.libelle ?? rateDisplay(line));
+  return taux == null ? "" : `${money(taux)} %`;
 }
 
 function rateDisplay(line?: ReferenceOption) {

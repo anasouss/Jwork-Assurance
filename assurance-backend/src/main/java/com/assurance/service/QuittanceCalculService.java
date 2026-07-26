@@ -45,7 +45,6 @@ public class QuittanceCalculService {
         BigDecimal tauxTaxeGarantie = param(agenceId, "TAUX_TAXE_2");
         BigDecimal tauxTaxePf = param(agenceId, "TAUX_TAXE_PF");
         BigDecimal tauxEvcatAutres = param(agenceId, "TAUX_EVCAT_2");
-        BigDecimal tauxEvcatPersonne = param(agenceId, "TAUX_EVCAT_3");
         BigDecimal cnpacUnitaire = param(agenceId, "CNPAC");
 
         BigDecimal netAuto = BigDecimal.ZERO;
@@ -53,6 +52,8 @@ public class QuittanceCalculService {
         BigDecimal accessoireAuto = BigDecimal.ZERO;
         BigDecimal netCorporel = BigDecimal.ZERO;
         BigDecimal taxeCorporel = BigDecimal.ZERO;
+        BigDecimal taxePfCorporel = BigDecimal.ZERO;
+        BigDecimal basePta = BigDecimal.ZERO;
         BigDecimal accessoireCorporel = BigDecimal.ZERO;
         BigDecimal netEvcat = BigDecimal.ZERO;
         BigDecimal accessoireEvcat = BigDecimal.ZERO;
@@ -65,10 +66,10 @@ public class QuittanceCalculService {
             BigDecimal accessoire = zeroIfNull(contratGarantie.getAccessoire());
             String codeGarantie = contratGarantie.getGarantie().getCode() == null ? "" : contratGarantie.getGarantie().getCode().trim().toUpperCase(Locale.ROOT);
 
-            if (contratGarantie.getGarantie().getTypeGarantie() == TypeGarantie.PERSONNE || "PC".equals(codeGarantie) || "PP".equals(codeGarantie)) {
-                BigDecimal baseCorporel = prime.multiply(tauxEvcatPersonne);
-                netCorporel = netCorporel.add(baseCorporel);
-                taxeCorporel = taxeCorporel.add(baseCorporel.multiply(tauxTaxeGarantie));
+            if (contratGarantie.getGarantie().getTypeGarantie() == TypeGarantie.PERSONNE || "PC".equals(codeGarantie) || "PP".equals(codeGarantie) || "PTA".equals(codeGarantie)) {
+                netCorporel = netCorporel.add(prime);
+                taxeCorporel = taxeCorporel.add(prime.multiply(tauxTaxeGarantie));
+                basePta = basePta.add(prime);
                 accessoireCorporel = accessoireCorporel.add(accessoire);
                 continue;
             }
@@ -88,12 +89,13 @@ public class QuittanceCalculService {
         BigDecimal taxePfAuto = netAuto.multiply(tauxTaxePf);
         BigDecimal taxeEvcat = netEvcat.multiply(tauxTaxeGarantie);
         BigDecimal taxePfEvcat = netEvcat.multiply(tauxTaxePf);
+        taxePfCorporel = basePta.multiply(tauxTaxePf);
         BigDecimal cnpac = cnpacUnitaire.multiply(BigDecimal.valueOf(Math.max(1, nombreUnitesCnpac)));
 
         BigDecimal signe = impact == TypeImpactMouvement.RETOUR_PRIME ? BigDecimal.valueOf(-1) : BigDecimal.ONE;
         List<Ligne> lignes = new ArrayList<>();
         lignes.add(new Ligne(CategorieQuittance.AUTOMOBILE, 10, false, netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac, total(netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac)));
-        lignes.add(new Ligne(CategorieQuittance.CORPOREL, 20, false, netCorporel, taxeCorporel, BigDecimal.ZERO, accessoireCorporel, BigDecimal.ZERO, total(netCorporel, taxeCorporel, BigDecimal.ZERO, accessoireCorporel, BigDecimal.ZERO)));
+        lignes.add(new Ligne(CategorieQuittance.CORPOREL, 20, false, netCorporel, taxeCorporel, taxePfCorporel, accessoireCorporel, BigDecimal.ZERO, total(netCorporel, taxeCorporel, taxePfCorporel, accessoireCorporel, BigDecimal.ZERO)));
         lignes.add(new Ligne(CategorieQuittance.EVCAT, 30, false, netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO, total(netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO)));
         return withTotal(lignes, signe);
     }

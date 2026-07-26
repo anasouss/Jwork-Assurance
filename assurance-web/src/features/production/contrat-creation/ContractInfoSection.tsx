@@ -140,19 +140,6 @@ export function ContractInfoSection({
             </Select>
           </Field>
         ) : null}
-        {form.isFlotteLocationCategory ? (
-          <Field label="Taux RC" required error={form.validationErrors.tauxRc}>
-            <Input
-              inputMode="decimal"
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.tauxRc}
-              onChange={(event) => form.setTauxRc(event.target.value)}
-              placeholder="Ex: 3.50"
-            />
-          </Field>
-        ) : null}
         {isFlotte ? (
           <>
             {showFlotteNumeroPolice ? (
@@ -228,6 +215,17 @@ export function ContractInfoSection({
                 <Input
                   value={form.crmPartageValeur}
                   onChange={(event) => form.setCrmPartageValeur(event.target.value)}
+                />
+              </Field>
+            ) : null}
+            {form.isFlotteLocationCategory ? (
+              <Field label="Taux RC" required error={form.validationErrors.tauxRc}>
+                <Input
+                  inputMode="decimal"
+                  type="text"
+                  pattern="[0-9]+([,.][0-9]+)?"
+                  value={form.tauxRc}
+                  onChange={(event) => form.setTauxRc(event.target.value)}
                 />
               </Field>
             ) : null}

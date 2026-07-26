@@ -380,7 +380,6 @@ export function FlotteTargetsSection({
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
                   preview={preview}
-                  previewing={previewing}
                   pendingCalculationKeys={pendingGuaranteeKeys}
                   onMarkCalculationPending={markGuaranteePending}
                 />
@@ -500,7 +499,6 @@ export function FlotteTargetsSection({
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
                   preview={preview}
-                  previewing={previewing}
                   pendingCalculationKeys={pendingGuaranteeKeys}
                   onMarkCalculationPending={markGuaranteePending}
                 />
@@ -1067,7 +1065,6 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId,
   grilleSelected,
   preview,
-  previewing,
   pendingCalculationKeys,
   onMarkCalculationPending,
 }: {
@@ -1086,7 +1083,6 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId?: string;
   grilleSelected: boolean;
   preview?: QuittancePreview | null;
-  previewing?: boolean;
   pendingCalculationKeys?: string[];
   onMarkCalculationPending?: (target: Target, garantieId: string) => void;
 }) {
@@ -1135,7 +1131,9 @@ function TargetGuaranteesTable({
   };
 
   const usage = target.kind === "vehicule" ? usages.find((item) => item.id === target.usageId) : undefined;
-  const showPersonne = target.kind === "vehicule" && Boolean(usage?.garantiesPersonne) && personneGaranties.length > 0;
+  const configuredGaranties = garanties.filter((garantie) => Boolean(garantie.responsabiliteCivile) || matchingLines(lignes, garantie, target).length > 0);
+  const configuredPersonneGaranties = personneGaranties.filter((garantie) => matchingPersonneFormules(formulesPersonne, garantie, target).length > 0);
+  const showPersonne = target.kind === "vehicule" && Boolean(usage?.garantiesPersonne) && configuredPersonneGaranties.length > 0;
 
   return (
     <div className="grid gap-4">
@@ -1153,7 +1151,7 @@ function TargetGuaranteesTable({
             </tr>
           </thead>
           <tbody>
-            {garanties.map((garantie) => {
+            {configuredGaranties.map((garantie) => {
               const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
               const checked = Boolean(item);
               const isRc = Boolean(garantie.responsabiliteCivile);
@@ -1266,6 +1264,13 @@ function TargetGuaranteesTable({
                 </tr>
               );
             })}
+            {configuredGaranties.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  Aucune garantie véhicule configurée pour cet usage.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
@@ -1286,7 +1291,7 @@ function TargetGuaranteesTable({
               </tr>
             </thead>
             <tbody>
-              {personneGaranties.map((garantie) => {
+              {configuredPersonneGaranties.map((garantie) => {
                 const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
                 const checked = Boolean(item);
                 const formules = matchingPersonneFormules(formulesPersonne, garantie, target);

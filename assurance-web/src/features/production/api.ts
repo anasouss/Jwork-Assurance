@@ -282,6 +282,24 @@ export const productionApi = {
     );
   },
 
+  async saveDraftRemorque(id: string, index: number, remorque: CreateContratRequest["remorques"][number]) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}/remorques/${index}`, {
+        method: "PUT",
+        body: JSON.stringify(remorque),
+      })
+    );
+  },
+
+  async saveDraftRemorqueGaranties(id: string, index: number, garanties: CreateContratRequest["garanties"]) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}/remorques/${index}/garanties`, {
+        method: "PUT",
+        body: JSON.stringify(garanties),
+      })
+    );
+  },
+
   async finalizeContratDraft(id: string, request: CreateContratRequest) {
     return unwrap(
       await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}/finaliser`, {

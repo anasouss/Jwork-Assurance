@@ -355,6 +355,7 @@ export type VehiculeResponse = VehiculeInput & {
 };
 
 export type RemorqueInput = {
+  remorqueId?: string | number;
   usageId?: string;
   marqueId?: string;
   marqueLibelle?: string;

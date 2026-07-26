@@ -7,4 +7,6 @@ public interface ContratGarantieRepository extends JpaRepository<ContratGarantie
     void deleteByContratId(Long contratId);
 
     void deleteByContratIdAndVehiculeId(Long contratId, Long vehiculeId);
+
+    void deleteByContratIdAndRemorqueId(Long contratId, Long remorqueId);
 }

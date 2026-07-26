@@ -155,7 +155,7 @@ export function FlotteTargetsSection({
   const [activeKey, setActiveKey] = useState(targetKey(targets[0]));
   const [activeTargetPart, setActiveTargetPart] = useState<"info" | "garanties">("info");
   const [savedKeys, setSavedKeys] = useState<string[]>([]);
-  const [pendingGuaranteeKeys, setPendingGuaranteeKeys] = useState<string[]>([]);
+  const [recalculationRequest, setRecalculationRequest] = useState<{ targetKey: string; seq: number } | null>(null);
   const [assistances, setAssistances] = useState<Record<string, AssistanceDraft>>({});
   const vehiculeGaranties = useMemo(
     () => garanties.filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") !== "PERSONNE"),
@@ -174,12 +174,18 @@ export function FlotteTargetsSection({
     remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
 
   useEffect(() => {
-    setPendingGuaranteeKeys([]);
-  }, [preview]);
+    if (!recalculationRequest || !onPreviewQuittance) {
+      return;
+    }
+    const target = targets.find((item) => targetKey(item) === recalculationRequest.targetKey);
+    if (target) {
+      onPreviewQuittance(target);
+    }
+  }, [recalculationRequest?.seq]);
 
-  const markGuaranteePending = (target: Target, garantieId: string) => {
-    const key = guaranteeCalculationKey(target, garantieId);
-    setPendingGuaranteeKeys((current) => (current.includes(key) ? current : [...current, key]));
+  const requestTargetCalculation = (target: Target) => {
+    const key = targetKey(target);
+    setRecalculationRequest((current) => ({ targetKey: key, seq: (current?.seq ?? 0) + 1 }));
   };
 
   const updateAssistance = (target: Target, patch: Partial<AssistanceDraft>) => {
@@ -406,8 +412,8 @@ export function FlotteTargetsSection({
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
                   preview={preview}
-                  pendingCalculationKeys={pendingGuaranteeKeys}
-                  onMarkCalculationPending={markGuaranteePending}
+                  previewing={previewing}
+                  onRequestCalculation={requestTargetCalculation}
                 />
                 <QuittanceTotalsSummary
                   preview={preview}
@@ -529,8 +535,8 @@ export function FlotteTargetsSection({
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   grilleSelected={grilleSelected}
                   preview={preview}
-                  pendingCalculationKeys={pendingGuaranteeKeys}
-                  onMarkCalculationPending={markGuaranteePending}
+                  previewing={previewing}
+                  onRequestCalculation={requestTargetCalculation}
                 />
                 <QuittanceTotalsSummary
                   preview={preview}
@@ -1212,8 +1218,8 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId,
   grilleSelected,
   preview,
-  pendingCalculationKeys,
-  onMarkCalculationPending,
+  previewing,
+  onRequestCalculation,
 }: {
   target: Target;
   garanties: ReferenceOption[];
@@ -1230,12 +1236,12 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId?: string;
   grilleSelected: boolean;
   preview?: QuittancePreview | null;
-  pendingCalculationKeys?: string[];
-  onMarkCalculationPending?: (target: Target, garantieId: string) => void;
+  previewing?: boolean;
+  onRequestCalculation?: (target: Target) => void;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
-    onMarkCalculationPending?.(target, garantieId);
     setSelected((current) => current.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item)));
+    onRequestCalculation?.(target);
   };
 
   const toggle = (garantie: ReferenceOption, checked: boolean) => {
@@ -1251,15 +1257,14 @@ function TargetGuaranteesTable({
         return;
       }
     }
-    onMarkCalculationPending?.(target, garantie.id);
     setSelected((current) => checked
       ? [...current, { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target) }]
       : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target))));
+    onRequestCalculation?.(target);
   };
 
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
     const formules = matchingPersonneFormules(formulesPersonne, garantie, target);
-    onMarkCalculationPending?.(target, garantie.id);
     setSelected((current) =>
       checked
         ? [
@@ -1275,6 +1280,7 @@ function TargetGuaranteesTable({
           ]
         : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)))
     );
+    onRequestCalculation?.(target);
   };
 
   const usage = target.kind === "vehicule" ? usages.find((item) => item.id === target.usageId) : undefined;
@@ -1314,7 +1320,7 @@ function TargetGuaranteesTable({
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
               const previewLine = previewGuaranteeLine(preview, garantie, target, item);
               const previewPrime = previewLine?.primeNette;
-              const rowCalculating = Boolean(pendingCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
+              const rowCalculating = checked && Boolean(previewing);
 
               return (
                 <tr
@@ -1444,7 +1450,7 @@ function TargetGuaranteesTable({
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
                 const disabled = !grilleSelected || formules.length === 0;
                 const previewLine = previewGuaranteeLine(preview, garantie, target, item);
-                const rowCalculating = Boolean(pendingCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
+                const rowCalculating = checked && Boolean(previewing);
 
                 return (
                   <tr
@@ -1675,10 +1681,6 @@ function hasTargetPersonneGaranties(selected: GarantieInput[], personneGaranties
 
 function targetKey(target?: Target) {
   return target ? `${target.kind}:${target.index}` : "";
-}
-
-function guaranteeCalculationKey(target: Target, garantieId: string) {
-  return `${targetKey(target)}:${garantieId}`;
 }
 
 function matchingLines(lignes: ReferenceOption[], garantie: ReferenceOption, target?: Target) {

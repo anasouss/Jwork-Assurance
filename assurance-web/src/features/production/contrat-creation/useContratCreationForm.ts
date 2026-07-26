@@ -387,13 +387,16 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
       if (!draftId) {
         throw new Error("Brouillon introuvable pour enregistrer cette section");
       }
-      if (target.kind !== "vehicule") {
-        return productionApi.updateContratDraft(draftId, request);
-      }
-      if (part === "info") {
+      if (target.kind === "vehicule" && part === "info") {
         return productionApi.saveDraftVehicule(draftId, target.index, request.vehicules[target.index]);
       }
-      return productionApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
+      if (target.kind === "vehicule") {
+        return productionApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
+      }
+      if (part === "info") {
+        return productionApi.saveDraftRemorque(draftId, target.index, request.remorques[target.index]);
+      }
+      return productionApi.saveDraftRemorqueGaranties(draftId, target.index, targetGaranties(request.garanties, target));
     },
     onSuccess: async (draft, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
@@ -402,6 +405,13 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         if (saved?.vehiculeId != null) {
           setVehicules((current) => current.map((vehicule, index) => (
             index === variables.target.index ? { ...vehicule, vehiculeId: saved.vehiculeId } : vehicule
+          )));
+        }
+      } else {
+        const saved = draft.remorques?.[variables.target.index];
+        if (saved?.remorqueId != null) {
+          setRemorques((current) => current.map((remorque, index) => (
+            index === variables.target.index ? { ...remorque, remorqueId: saved.remorqueId } : remorque
           )));
         }
       }
@@ -1192,6 +1202,7 @@ function hydrateDraft(draft: ContratSummary) {
     : [emptyVehicule()];
 
   const remorques = (draft.remorques ?? []).map((remorque) => ({
+    remorqueId: remorque.remorqueId,
     usageId: nullToUndefined(remorque.usageId),
     marqueId: nullToUndefined(remorque.marqueId),
     marqueLibelle: nullToUndefined(remorque.marque),

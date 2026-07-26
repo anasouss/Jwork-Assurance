@@ -164,6 +164,47 @@ public class ContratService {
     }
 
     @Transactional
+    public ContratResponse saveDraftRemorque(Long agenceId, Long contratId, int index, CreateContratRequest.RemorqueInput input) {
+        Contrat contrat = resolveDraft(agenceId, contratId);
+        if (index < 0) {
+            throw new BadRequestException("Index remorque invalide");
+        }
+        validateDraftRemorqueInput(input);
+        List<Remorque> existing = remorqueRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        if (index > existing.size()) {
+            throw new BadRequestException("Enregistrez les remorques dans l'ordre");
+        }
+        Remorque remorque = index < existing.size() ? existing.get(index) : new Remorque();
+        remorque.setContrat(contrat);
+        applyRemorqueInput(contrat, remorque, input);
+        remorqueRepository.save(remorque);
+        if (!contrat.getRemorques().contains(remorque)) {
+            contrat.getRemorques().add(remorque);
+        }
+        contrat.setNombreRemorques(Math.max(contrat.getNombreRemorques() == null ? 0 : contrat.getNombreRemorques(), index + 1));
+        contratRepository.save(contrat);
+        return toResponse(contrat);
+    }
+
+    @Transactional
+    public ContratResponse saveDraftRemorqueGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
+        Contrat contrat = resolveDraft(agenceId, contratId);
+        List<Remorque> existing = remorqueRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        Remorque remorque = resolveRemorque(existing, index, "Remorque");
+        contratGarantieRepository.deleteByContratIdAndRemorqueId(contrat.getId(), remorque.getId());
+        contratGarantieRepository.flush();
+        contrat.getGaranties().removeIf(garantie -> garantie.getRemorque() != null && remorque.getId().equals(garantie.getRemorque().getId()));
+        for (CreateContratRequest.GarantieInput input : inputs == null ? List.<CreateContratRequest.GarantieInput>of() : inputs) {
+            if (input.getGarantieId() == null) {
+                continue;
+            }
+            ContratGarantie contratGarantie = saveRawDraftGarantieForTarget(contrat, input, null, remorque);
+            contrat.getGaranties().add(contratGarantie);
+        }
+        return toResponse(contrat);
+    }
+
+    @Transactional
     public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveDraft(agenceId, contratId);
         request.setAgenceId(agenceId);
@@ -689,6 +730,32 @@ public class ContratService {
         vehicule.setNomOrganismeCredit(input.getNomOrganismeCredit());
         vehicule.setMontantCredit(input.getMontantCredit());
         vehicule.setDateFinCredit(input.getDateFinCredit());
+    }
+
+    private void validateDraftRemorqueInput(CreateContratRequest.RemorqueInput input) {
+        if (input == null) {
+            throw new BadRequestException("Informations remorque obligatoires");
+        }
+        if (input.getUsageId() == null) {
+            throw new BadRequestException("Usage remorque obligatoire");
+        }
+    }
+
+    private void applyRemorqueInput(Contrat contrat, Remorque remorque, CreateContratRequest.RemorqueInput input) {
+        Usage usage = input.getUsageId() == null ? contrat.getUsage() : usageRepository.findById(input.getUsageId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+        Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), false);
+        remorque.setUsage(usage);
+        remorque.setMarque(marque);
+        remorque.setImmatriculation(input.getImmatriculation());
+        remorque.setPtc(input.getPtc());
+        remorque.setDateMiseEnCirculation(input.getDateMiseEnCirculation());
+        remorque.setDateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()));
+        remorque.setDateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()));
+        remorque.setCrm(input.getCrm());
+        remorque.setNumeroAttestation(input.getNumeroAttestation());
+        remorque.setCoefficientProrata(input.getCoefficientProrata());
+        remorque.setValeurAssuree(input.getValeurAssuree());
     }
 
     private void saveClientLinks(

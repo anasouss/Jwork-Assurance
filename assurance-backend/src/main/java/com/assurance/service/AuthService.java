@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.LoginRequest;
+import com.assurance.dto.request.ChangePasswordRequest;
 import com.assurance.dto.response.AuthResponse;
 import com.assurance.dto.response.SessionResponse;
 import com.assurance.entity.RefreshSession;
@@ -96,6 +97,18 @@ public class AuthService {
         }
         session.setRevoked(true);
         refreshTokenRepository.save(session);
+    }
+
+    @Transactional
+    public void changePassword(String userId, ChangePasswordRequest request) {
+        Utilisateur user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Utilisateur non authentifie"));
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BadRequestException("Mot de passe actuel incorrect");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        refreshTokenRepository.revokeAllByUserId(userId);
     }
 
     private AuthResponse createSession(Utilisateur user, HttpServletRequest request) {

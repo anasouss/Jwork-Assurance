@@ -1,5 +1,5 @@
 import type { ApiResponse, AuthResponse } from "@/lib/types";
-import { API_BASE_URL } from "./base";
+import { API_BASE_URL, apiFetch } from "./base";
 import { clearAuth, getRefreshToken, saveAuth } from "@/lib/auth";
 
 export type LoginRequest = {
@@ -69,6 +69,16 @@ export const authApi = {
       });
     } finally {
       clearAuth();
+    }
+  },
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {
+    const result = await apiFetch<ApiResponse<void>>("/api/v1/auth/password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    if (!result.success) {
+      throw new Error(result.message || "Mot de passe impossible à modifier");
     }
   },
 };

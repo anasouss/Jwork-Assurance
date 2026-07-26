@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.LoginRequest;
 import com.assurance.dto.request.RefreshTokenRequest;
+import com.assurance.dto.request.ChangePasswordRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AuthResponse;
 import com.assurance.dto.response.SessionResponse;
@@ -57,5 +58,11 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> revokeSession(@PathVariable String sessionId) {
         authService.revokeSession(TenantContext.getCurrentUser(), sessionId);
         return ResponseEntity.ok(ApiResponse.success(null, "Session revoquee"));
+    }
+
+    @PostMapping("/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(TenantContext.getCurrentUser(), request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Mot de passe modifie"));
     }
 }

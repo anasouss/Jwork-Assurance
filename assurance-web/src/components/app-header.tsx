@@ -1,7 +1,18 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Bell, LogOut, User } from "lucide-react";
+import { useState } from "react";
+import { Bell, KeyRound, LogOut, User } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { appModules, moduleActiveClass, moduleForPath } from "@/components/app-navigation";
@@ -14,10 +25,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/store/auth-store";
+import { authApi } from "@/lib/api/auth";
 
 export function AppHeader() {
   const { pathname } = useLocation();
   const { user, logout } = useAuthStore();
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
   const permissions = user?.permissions ?? [];
   const activeModule = moduleForPath(pathname);
   const fullName = user?.fullName || user?.email || "Utilisateur";
@@ -94,6 +110,10 @@ export function AppHeader() {
                 <div className="mt-2 text-xs text-muted-foreground">{user?.agenceName ?? "Agence"} · {user?.roleName ?? user?.roleCode}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={(event) => { event.preventDefault(); setPasswordOpen(true); }}>
+                <KeyRound />
+                Changer mot de passe
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => void logout()}>
                 <LogOut className="text-red-500" />
                 Déconnexion
@@ -102,6 +122,47 @@ export function AppHeader() {
           </DropdownMenu>
         </div>
       </div>
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Changer le mot de passe</DialogTitle>
+            <DialogDescription>Vous serez déconnecté après modification.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium">Mot de passe actuel</span>
+              <Input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium">Nouveau mot de passe</span>
+              <Input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPasswordOpen(false)}>Annuler</Button>
+            <Button
+              disabled={savingPassword || currentPassword.length === 0 || newPassword.length < 8}
+              onClick={async () => {
+                setSavingPassword(true);
+                try {
+                  await authApi.changePassword({ currentPassword, newPassword });
+                  toast.success("Mot de passe modifié");
+                  setPasswordOpen(false);
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  await logout();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Mot de passe impossible à modifier");
+                } finally {
+                  setSavingPassword(false);
+                }
+              }}
+            >
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }

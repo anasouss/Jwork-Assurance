@@ -10,6 +10,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  UserCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -33,7 +34,7 @@ export const appModules: AppModule[] = [
   { title: "Compagnies", url: "/app/companies", icon: Building2, permission: "config:view" },
   { title: "CRM", url: "/app/crm", icon: Users, disabled: true },
   { title: "Compta", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
-  { title: "Admin", url: "/app/admin", icon: Settings, disabled: true, permission: "config:view" },
+  { title: "Admin", url: "/app/admin", icon: Settings, permission: "user:view" },
 ];
 
 export const appNavigation: AppNavigationItem[] = [
@@ -47,6 +48,7 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "config:view" },
   { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "config:view" },
   { module: "compta", title: "Quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
+  { module: "admin", title: "Utilisateurs & profils", url: "/app/admin", icon: UserCog, exact: true, permission: "user:view" },
 ];
 
 export function moduleForPath(pathname: string): AppNavigationItem["module"] {

@@ -1,0 +1,348 @@
+package com.assurance.service;
+
+import com.assurance.dto.request.ResetUserPasswordRequest;
+import com.assurance.dto.request.UpsertAgenceRequest;
+import com.assurance.dto.request.UpsertProfilRequest;
+import com.assurance.dto.request.UpsertUtilisateurRequest;
+import com.assurance.dto.response.AdminAgenceResponse;
+import com.assurance.dto.response.AdminPermissionResponse;
+import com.assurance.dto.response.AdminProfilResponse;
+import com.assurance.dto.response.AdminUtilisateurResponse;
+import com.assurance.entity.Agence;
+import com.assurance.entity.Permission;
+import com.assurance.entity.Profil;
+import com.assurance.entity.Utilisateur;
+import com.assurance.enums.StatutAgence;
+import com.assurance.exception.BadRequestException;
+import com.assurance.exception.ResourceNotFoundException;
+import com.assurance.exception.UnauthorizedException;
+import com.assurance.repository.AgenceRepository;
+import com.assurance.repository.PermissionRepository;
+import com.assurance.repository.ProfilRepository;
+import com.assurance.repository.UtilisateurRepository;
+import com.assurance.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Service
+@RequiredArgsConstructor
+public class AdminService {
+
+    private final UtilisateurRepository utilisateurRepository;
+    private final ProfilRepository profilRepository;
+    private final PermissionRepository permissionRepository;
+    private final AgenceRepository agenceRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Transactional(readOnly = true)
+    public List<AdminUtilisateurResponse> listUsers() {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:view", "user:manage", "config:view");
+        List<Utilisateur> users = can(actor, "agence:view")
+                ? utilisateurRepository.findAllByOrderByNomAscPrenomAsc()
+                : utilisateurRepository.findByAgenceIdOrderByNomAscPrenomAsc(requiredActorAgence(actor));
+        return users.stream().map(AdminUtilisateurResponse::from).toList();
+    }
+
+    @Transactional
+    public AdminUtilisateurResponse createUser(UpsertUtilisateurRequest request) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:manage", "config:manage");
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new BadRequestException("Mot de passe obligatoire");
+        }
+        if (utilisateurRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            throw new BadRequestException("Email deja utilise");
+        }
+        Agence agence = resolveManagedAgence(actor, request.getAgenceId());
+        Profil role = resolveAssignableRole(actor, request.getRoleId(), agence);
+        Utilisateur user = Utilisateur.builder()
+                .agence(agence)
+                .role(role)
+                .email(request.getEmail().trim().toLowerCase())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .prenom(request.getPrenom().trim())
+                .nom(request.getNom().trim())
+                .telephone(blankToNull(request.getTelephone()))
+                .actif(request.getActif() == null || request.getActif())
+                .build();
+        return AdminUtilisateurResponse.from(utilisateurRepository.save(user));
+    }
+
+    @Transactional
+    public AdminUtilisateurResponse updateUser(String id, UpsertUtilisateurRequest request) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:manage", "config:manage");
+        Utilisateur user = utilisateurRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        ensureManagedAgence(actor, user.getAgence());
+        if (utilisateurRepository.existsByEmailIgnoreCaseAndIdNot(request.getEmail(), id)) {
+            throw new BadRequestException("Email deja utilise");
+        }
+        Agence agence = resolveManagedAgence(actor, request.getAgenceId());
+        Profil role = resolveAssignableRole(actor, request.getRoleId(), agence);
+        user.setAgence(agence);
+        user.setRole(role);
+        user.setEmail(request.getEmail().trim().toLowerCase());
+        user.setPrenom(request.getPrenom().trim());
+        user.setNom(request.getNom().trim());
+        user.setTelephone(blankToNull(request.getTelephone()));
+        user.setActif(request.getActif() == null || request.getActif());
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+        return AdminUtilisateurResponse.from(utilisateurRepository.save(user));
+    }
+
+    @Transactional
+    public void deactivateUser(String id) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:manage", "config:manage");
+        if (id.equals(actor.getId())) {
+            throw new BadRequestException("Vous ne pouvez pas desactiver votre propre compte");
+        }
+        Utilisateur user = utilisateurRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        ensureManagedAgence(actor, user.getAgence());
+        user.setActif(false);
+        utilisateurRepository.save(user);
+    }
+
+    @Transactional
+    public void resetPassword(String id, ResetUserPasswordRequest request) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:manage", "config:manage");
+        Utilisateur user = utilisateurRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        ensureManagedAgence(actor, user.getAgence());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        utilisateurRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminProfilResponse> listRoles() {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "role:view", "role:manage", "config:view");
+        List<Profil> roles = can(actor, "agence:view")
+                ? profilRepository.findAllByOrderByNomAsc()
+                : profilRepository.findByAgenceIdOrAgenceIsNullOrderByNomAsc(requiredActorAgence(actor));
+        return roles.stream().map(AdminProfilResponse::from).toList();
+    }
+
+    @Transactional
+    public AdminProfilResponse createRole(UpsertProfilRequest request) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "role:manage", "config:manage");
+        Agence agence = resolveRoleAgence(actor, request.getAgenceId());
+        ensureUniqueRoleCode(agence, request.getCode(), null);
+        Profil role = Profil.builder()
+                .agence(agence)
+                .code(request.getCode().trim().toUpperCase())
+                .nom(request.getNom().trim())
+                .description(blankToNull(request.getDescription()))
+                .profilSysteme(Boolean.TRUE.equals(request.getProfilSysteme()) && can(actor, "config:manage"))
+                .permissions(resolvePermissions(actor, request.getPermissionIds()))
+                .build();
+        return AdminProfilResponse.from(profilRepository.save(role));
+    }
+
+    @Transactional
+    public AdminProfilResponse updateRole(String id, UpsertProfilRequest request) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "role:manage", "config:manage");
+        Profil role = profilRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Profil", id));
+        ensureManagedAgence(actor, role.getAgence());
+        if (Boolean.TRUE.equals(role.getProfilSysteme()) && !can(actor, "config:manage")) {
+            throw new UnauthorizedException("Profil systeme non modifiable");
+        }
+        Agence agence = resolveRoleAgence(actor, request.getAgenceId());
+        ensureUniqueRoleCode(agence, request.getCode(), id);
+        role.setAgence(agence);
+        role.setCode(request.getCode().trim().toUpperCase());
+        role.setNom(request.getNom().trim());
+        role.setDescription(blankToNull(request.getDescription()));
+        if (can(actor, "config:manage")) {
+            role.setProfilSysteme(Boolean.TRUE.equals(request.getProfilSysteme()));
+        }
+        role.setPermissions(resolvePermissions(actor, request.getPermissionIds()));
+        return AdminProfilResponse.from(profilRepository.save(role));
+    }
+
+    @Transactional
+    public void deleteRole(String id) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "role:manage", "config:manage");
+        Profil role = profilRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Profil", id));
+        ensureManagedAgence(actor, role.getAgence());
+        if (Boolean.TRUE.equals(role.getProfilSysteme())) {
+            throw new BadRequestException("Profil systeme non supprimable");
+        }
+        if (utilisateurRepository.existsByRoleId(id)) {
+            throw new BadRequestException("Profil utilise par des utilisateurs");
+        }
+        profilRepository.delete(role);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminPermissionResponse> listPermissions() {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "role:view", "role:manage", "config:view");
+        return permissionRepository.findAll().stream()
+                .filter(permission -> can(actor, "config:manage") || !Boolean.TRUE.equals(permission.getSuperAdminOnly()))
+                .map(AdminPermissionResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminAgenceResponse> listAgencies() {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "agence:view", "config:view");
+        return agenceRepository.findAllByOrderByNomAsc().stream().map(AdminAgenceResponse::from).toList();
+    }
+
+    @Transactional
+    public AdminAgenceResponse createAgency(UpsertAgenceRequest request) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "agence:create", "config:manage");
+        if (agenceRepository.existsByCodeIgnoreCase(request.getCode())) {
+            throw new BadRequestException("Code agence deja utilise");
+        }
+        Agence agence = Agence.builder()
+                .code(request.getCode().trim().toUpperCase())
+                .nom(request.getNom().trim())
+                .adresse(blankToNull(request.getAdresse()))
+                .ville(blankToNull(request.getVille()))
+                .telephone(blankToNull(request.getTelephone()))
+                .fax(blankToNull(request.getFax()))
+                .email(blankToNull(request.getEmail()))
+                .statut(request.getStatut() == null ? StatutAgence.ACTIVE : request.getStatut())
+                .build();
+        return AdminAgenceResponse.from(agenceRepository.save(agence));
+    }
+
+    @Transactional
+    public AdminAgenceResponse updateAgency(String id, UpsertAgenceRequest request) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "agence:create", "config:manage");
+        Agence agence = agenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", id));
+        if (agenceRepository.existsByCodeIgnoreCaseAndIdNot(request.getCode(), id)) {
+            throw new BadRequestException("Code agence deja utilise");
+        }
+        agence.setCode(request.getCode().trim().toUpperCase());
+        agence.setNom(request.getNom().trim());
+        agence.setAdresse(blankToNull(request.getAdresse()));
+        agence.setVille(blankToNull(request.getVille()));
+        agence.setTelephone(blankToNull(request.getTelephone()));
+        agence.setFax(blankToNull(request.getFax()));
+        agence.setEmail(blankToNull(request.getEmail()));
+        agence.setStatut(request.getStatut() == null ? StatutAgence.ACTIVE : request.getStatut());
+        return AdminAgenceResponse.from(agenceRepository.save(agence));
+    }
+
+    private Utilisateur currentUser() {
+        String userId = TenantContext.getCurrentUser();
+        if (userId == null || userId.isBlank()) {
+            throw new UnauthorizedException("Utilisateur non authentifie");
+        }
+        return utilisateurRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Utilisateur non authentifie"));
+    }
+
+    private void requireAny(Utilisateur actor, String... permissions) {
+        for (String permission : permissions) {
+            if (can(actor, permission)) {
+                return;
+            }
+        }
+        throw new UnauthorizedException("Permission insuffisante");
+    }
+
+    private boolean can(Utilisateur actor, String permission) {
+        return actor.getPermissions().contains(permission);
+    }
+
+    private String requiredActorAgence(Utilisateur actor) {
+        if (actor.getAgence() == null) {
+            throw new UnauthorizedException("Agence utilisateur manquante");
+        }
+        return actor.getAgence().getId();
+    }
+
+    private Agence resolveManagedAgence(Utilisateur actor, String agenceId) {
+        String effectiveAgenceId = can(actor, "agence:view") ? agenceId : requiredActorAgence(actor);
+        if (effectiveAgenceId == null || effectiveAgenceId.isBlank()) {
+            throw new BadRequestException("Agence obligatoire");
+        }
+        Agence agence = agenceRepository.findById(effectiveAgenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", effectiveAgenceId));
+        ensureManagedAgence(actor, agence);
+        return agence;
+    }
+
+    private Agence resolveRoleAgence(Utilisateur actor, String agenceId) {
+        if (can(actor, "config:manage") && (agenceId == null || agenceId.isBlank())) {
+            return null;
+        }
+        return resolveManagedAgence(actor, agenceId);
+    }
+
+    private void ensureManagedAgence(Utilisateur actor, Agence agence) {
+        if (can(actor, "agence:view") || can(actor, "config:manage")) {
+            return;
+        }
+        if (agence == null || actor.getAgence() == null || !agence.getId().equals(actor.getAgence().getId())) {
+            throw new UnauthorizedException("Agence non autorisee");
+        }
+    }
+
+    private Profil resolveAssignableRole(Utilisateur actor, String roleId, Agence agence) {
+        Profil role = profilRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Profil", roleId));
+        if (role.getAgence() == null && !can(actor, "config:manage")) {
+            throw new UnauthorizedException("Profil global non assignable");
+        }
+        if (role.getAgence() != null && !role.getAgence().getId().equals(agence.getId())) {
+            throw new BadRequestException("Le profil ne correspond pas a l'agence");
+        }
+        return role;
+    }
+
+    private Set<Permission> resolvePermissions(Utilisateur actor, Set<String> permissionIds) {
+        Set<Permission> permissions = new HashSet<>();
+        for (String permissionId : permissionIds == null ? Set.<String>of() : permissionIds) {
+            Permission permission = permissionRepository.findById(permissionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Permission", permissionId));
+            if (Boolean.TRUE.equals(permission.getSuperAdminOnly()) && !can(actor, "config:manage")) {
+                throw new UnauthorizedException("Permission reservee super admin");
+            }
+            permissions.add(permission);
+        }
+        return permissions;
+    }
+
+    private void ensureUniqueRoleCode(Agence agence, String code, String currentId) {
+        boolean exists = agence == null
+                ? (currentId == null
+                    ? profilRepository.existsByAgenceIsNullAndCodeIgnoreCase(code)
+                    : profilRepository.existsByAgenceIsNullAndCodeIgnoreCaseAndIdNot(code, currentId))
+                : (currentId == null
+                    ? profilRepository.existsByAgenceIdAndCodeIgnoreCase(agence.getId(), code)
+                    : profilRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agence.getId(), code, currentId));
+        if (exists) {
+            throw new BadRequestException("Code profil deja utilise");
+        }
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+}

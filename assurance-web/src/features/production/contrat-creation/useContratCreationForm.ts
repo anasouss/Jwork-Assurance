@@ -455,7 +455,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     });
     setValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      toast.error("Corrigez les champs indiqués");
+      toast.error(Object.values(nextErrors)[0] ?? "Corrigez les champs indiqués");
       return false;
     }
     return true;
@@ -593,6 +593,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
           requireField(`vehicules.${index}.categorieTransportId`, vehicule.categorieTransportId, "Catégorie transport obligatoire.");
         }
         requireField(`vehicules.${index}.crm`, vehicule.crm, "CRM obligatoire.");
+        requireField(`vehicules.${index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");
         if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
           nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
         }

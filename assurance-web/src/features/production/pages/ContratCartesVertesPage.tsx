@@ -18,17 +18,12 @@ type FormState = {
   dateEffet?: string;
 };
 
-const PAGE_SIZE_OPTIONS = ["10", "25", "50"];
-
 export default function ContratCartesVertesPage() {
   const { contratId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const mouvementId = numericParam(searchParams.get("mouvementId"));
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>({});
-  const [search, setSearch] = useState("");
-  const [pageSize, setPageSize] = useState("10");
-  const [page, setPage] = useState(1);
 
   const contextQuery = useQuery({
     queryKey: ["contrat-cartes-vertes", contratId, mouvementId],
@@ -41,17 +36,7 @@ export default function ContratCartesVertesPage() {
     [context?.vehiculesEligibles, form.vehiculeId]
   );
   const dateEcheance = selectedVehicle?.dateEcheance ?? context?.dateEcheance ?? undefined;
-  const filteredCartes = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return context?.cartesVertes ?? [];
-    return (context?.cartesVertes ?? []).filter((carte) =>
-      [carte.numero, carte.vehiculeImmatriculation, carte.numeroPoliceContrat, carte.numeroDossier]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle))
-    );
-  }, [context?.cartesVertes, search]);
-  const totalPages = Math.max(1, Math.ceil(filteredCartes.length / Number(pageSize)));
-  const visibleCartes = filteredCartes.slice((page - 1) * Number(pageSize), page * Number(pageSize));
+  const cartesVertes = context?.cartesVertes ?? [];
 
   useEffect(() => {
     if (!context) return;
@@ -62,10 +47,6 @@ export default function ContratCartesVertesPage() {
       dateEffet: current.dateEffet ?? firstVehicle?.dateEffet ?? context.dateEffet ?? undefined,
     }));
   }, [context]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search, pageSize]);
 
   const saveMutation = useMutation({
     mutationFn: (request: UpsertCarteVerteRequest) => productionApi.saveCarteVerte(contratId, request),
@@ -187,23 +168,6 @@ export default function ContratCartesVertesPage() {
           <CardTitle className="text-sm">Cartes vertes enregistrées</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <label className="flex items-center gap-2 text-sm">
-              <span>Afficher</span>
-              <Select value={pageSize} onValueChange={setPageSize}>
-                <SelectTrigger className="h-9 w-20"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZE_OPTIONS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <span>entrées</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <span>Recherche</span>
-              <Input className="h-9 w-64 max-w-full" value={search} onChange={(event) => setSearch(event.target.value)} />
-            </label>
-          </div>
-
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] border-collapse text-sm">
               <thead className="bg-emerald-600 text-xs uppercase text-white">
@@ -218,7 +182,7 @@ export default function ContratCartesVertesPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleCartes.length ? visibleCartes.map((carte) => (
+                {cartesVertes.length ? cartesVertes.map((carte) => (
                   <CarteVerteRow
                     key={carte.id}
                     carte={carte}
@@ -232,15 +196,6 @@ export default function ContratCartesVertesPage() {
                 )}
               </tbody>
             </table>
-          </div>
-
-          <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>Affichage {filteredCartes.length ? (page - 1) * Number(pageSize) + 1 : 0} à {Math.min(page * Number(pageSize), filteredCartes.length)} sur {filteredCartes.length} entrées</span>
-            <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Précédent</Button>
-              <span>Page {page} / {totalPages}</span>
-              <Button type="button" variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Suivant</Button>
-            </div>
           </div>
         </CardContent>
       </Card>

@@ -163,6 +163,7 @@ public class DataSeeder implements CommandLineRunner {
         seedCapitalResponsabiliteCivile("CYCLOS", BigDecimal.valueOf(5_000_000L));
 
         seedParametreApplication("CNPAC", "DECIMAL", "17", "Montant CNPAC utilise dans les quittances");
+        seedParametreApplication("MONTANT_CARTE_VERTE", "DECIMAL", "500.00", "Montant forfaitaire applique a une carte verte");
         seedParametreApplication("TAUX_EVCAT_1", "DECIMAL", "0.035", "Taux EVCAT applique a la RC hors TPV");
         seedParametreApplication("TAUX_EVCAT_2", "DECIMAL", "0.015", "Taux EVCAT applique aux autres garanties");
         seedParametreApplication("TAUX_EVCAT_3", "DECIMAL", "0.02", "Taux EVCAT applique aux garanties personne");

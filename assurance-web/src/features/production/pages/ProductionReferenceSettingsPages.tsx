@@ -392,7 +392,7 @@ export function GroupesUsageAttestationSettingsPage() {
                         <span>{String(groupe.couleur ?? "-")}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{refArray(groupe, "compagnieRestrictionLibelles").join(", ") || "Toutes"}</TableCell>
+                    <TableCell>{refArray(groupe, "compagnieRestrictionLibelles").join(", ") || "Aucune restriction"}</TableCell>
                     <TableCell>{groupe.visibleStock === false ? "Non" : "Oui"}</TableCell>
                     <TableCell>{groupe.actif === false ? "Non" : "Oui"}</TableCell>
                     <TableCell className="text-right">
@@ -459,7 +459,7 @@ function CompanyRestrictionSelect({
     <Popover>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" className="h-10 w-full justify-between font-normal">
-          <span className="truncate">{selectedLabels.length ? selectedLabels.join(", ") : "Toutes les compagnies"}</span>
+          <span className="truncate">{selectedLabels.length ? selectedLabels.join(", ") : "Aucune restriction"}</span>
           <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>

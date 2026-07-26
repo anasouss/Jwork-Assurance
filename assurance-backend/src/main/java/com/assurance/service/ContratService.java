@@ -1809,6 +1809,9 @@ public class ContratService {
             throw new BadRequestException("Le type de contrat est obligatoire");
         }
         if (request.getTypeContrat() == TypeContrat.FLOTTE) {
+            if (Boolean.TRUE.equals(request.getProspection())) {
+                return;
+            }
             if (!hasText(request.getNumeroPolice())) {
                 throw new BadRequestException("Numero de police obligatoire pour un contrat flotte");
             }

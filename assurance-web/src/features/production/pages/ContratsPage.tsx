@@ -294,6 +294,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
+  const carteVertePath = `/app/production/contrats/${contrat.id}/cartes-vertes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const editPath = editContratPath(contrat);
   return (
     <DropdownMenu>
@@ -322,7 +323,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
             <DropdownMenuItem asChild>
               <Link to={assistancePath}>Contrat assistance</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to={carteVertePath}>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</Link>
+            </DropdownMenuItem>
             <DropdownMenuItem>Renouvellement</DropdownMenuItem>
           </>
         )}

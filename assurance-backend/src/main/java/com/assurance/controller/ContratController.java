@@ -3,14 +3,18 @@ package com.assurance.controller;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
+import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
+import com.assurance.dto.response.CarteVerteContextResponse;
+import com.assurance.dto.response.CarteVerteResponse;
 import com.assurance.dto.response.ContratActionsResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
+import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
 import com.assurance.service.MouvementContratService;
@@ -38,6 +42,7 @@ public class ContratController {
     private final ContratService contratService;
     private final ContratActionService contratActionService;
     private final AssistanceContratService assistanceContratService;
+    private final CarteVerteService carteVerteService;
     private final MouvementContratService mouvementContratService;
 
     @PostMapping
@@ -138,5 +143,27 @@ public class ContratController {
     public ResponseEntity<ApiResponse<Void>> deleteAssistance(@PathVariable Long id, @PathVariable Long assistanceId) {
         assistanceContratService.deactivate(TenantContext.getCurrentAgence(), id, assistanceId);
         return ResponseEntity.ok(ApiResponse.success(null, "Assistance supprimee"));
+    }
+
+    @GetMapping("/{id}/cartes-vertes")
+    public ResponseEntity<ApiResponse<CarteVerteContextResponse>> carteVerteContext(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long mouvementId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(carteVerteService.getContext(TenantContext.getCurrentAgence(), id, mouvementId)));
+    }
+
+    @PostMapping("/{id}/cartes-vertes")
+    public ResponseEntity<ApiResponse<CarteVerteResponse>> upsertCarteVerte(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertCarteVerteRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(carteVerteService.upsert(TenantContext.getCurrentAgence(), id, request), "Carte verte enregistree"));
+    }
+
+    @DeleteMapping("/{id}/cartes-vertes/{carteVerteId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCarteVerte(@PathVariable Long id, @PathVariable Long carteVerteId) {
+        carteVerteService.deactivate(TenantContext.getCurrentAgence(), id, carteVerteId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Carte verte supprimee"));
     }
 }

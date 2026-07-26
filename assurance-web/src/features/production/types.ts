@@ -495,6 +495,50 @@ export type UpsertAssistanceContratRequest = {
   typeQuittance?: string;
 };
 
+export type CarteVerte = {
+  id: string;
+  contratId: string;
+  mouvementContratId?: string | null;
+  vehiculeId?: string | null;
+  vehiculeImmatriculation?: string | null;
+  numero?: string | null;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  numeroPoliceContrat?: string | null;
+  numeroDossier?: string | null;
+  montant?: number | null;
+  elementFacturableId?: string | null;
+};
+
+export type CarteVerteContext = {
+  contratId: string;
+  numeroDossier?: string | null;
+  numeroPolice?: string | null;
+  typeContrat: TypeContrat;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  mouvementContratId?: string | null;
+  mouvementCode?: string | null;
+  mouvementLibelle?: string | null;
+  montant?: number | null;
+  vehiculesEligibles: {
+    id: string;
+    immatriculation?: string | null;
+    usageCode?: string | null;
+    usageLibelle?: string | null;
+    dateEffet?: string | null;
+    dateEcheance?: string | null;
+  }[];
+  cartesVertes: CarteVerte[];
+};
+
+export type UpsertCarteVerteRequest = {
+  mouvementContratId?: string | null;
+  vehiculeId: string;
+  numero: string;
+  dateEffet?: string;
+};
+
 export type CreateContratRequest = {
   agenceId: string;
   compagnieAssuranceId?: string;

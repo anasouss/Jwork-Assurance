@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "../api";
+import { computeDateEcheanceFromCode } from "../date";
 import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
 import { emptyVehicule } from "../components/VehiculeSection";
@@ -705,7 +706,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     if (!showContractEcheance || !dateEffet || !effectiveEcheance) {
       return;
     }
-    const computed = computeDateEcheance(dateEffet, effectiveEcheance);
+    const computed = computeDateEcheanceFromCode(dateEffet, effectiveEcheance);
     if (computed && computed !== dateEcheance) {
       setDateEcheance(computed);
     }
@@ -856,29 +857,6 @@ function periodiciteFromFractionnement(value: CreateContratRequest["fractionneme
     default:
       return "4";
   }
-}
-
-function computeDateEcheance(dateEffet: string, echeance: string) {
-  const match = echeance.match(/^(\d{2})\/(\d{2})$/);
-  if (!match) {
-    return undefined;
-  }
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const effectiveDate = new Date(`${dateEffet}T00:00:00`);
-  if (Number.isNaN(effectiveDate.getTime()) || month < 1 || month > 12) {
-    return undefined;
-  }
-  const effectiveYear = effectiveDate.getFullYear();
-  if (day === 1 && month === 1) {
-    return `${effectiveYear}-12-31`;
-  }
-  let expiration = new Date(effectiveYear, month - 1, day);
-  if (expiration <= effectiveDate) {
-    expiration = new Date(effectiveYear + 1, month - 1, day);
-  }
-  expiration.setDate(expiration.getDate() - 1);
-  return dateOnly(expiration);
 }
 
 function dateOnly(date: Date) {

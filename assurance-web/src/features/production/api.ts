@@ -22,9 +22,12 @@ import type {
   UpsertGrilleUsageConfigurationRequest,
   UpsertGroupeUsageAttestationRequest,
   BulkUpdateTarifUsageRequest,
+  CarteVerte,
+  CarteVerteContext,
   UpsertCompagnieAssuranceRequest,
   UpsertCompagnieAssistanceRequest,
   UpsertAssistanceContratRequest,
+  UpsertCarteVerteRequest,
   UpsertCategorieClientRequest,
   UpsertConventionRequest,
   UpsertFormuleGarantiePersonneRequest,
@@ -133,6 +136,31 @@ export const productionApi = {
   async deleteAssistance(contratId: string, assistanceId: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}/assistances/${assistanceId}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
+  async getCarteVerteContext(contratId: string, params?: { mouvementId?: string | null }) {
+    return unwrap(
+      await apiFetch<ApiResponse<CarteVerteContext>>(
+        `/api/v1/contrats/${contratId}/cartes-vertes${buildQueryString({ mouvementId: params?.mouvementId ?? undefined })}`
+      )
+    );
+  },
+
+  async saveCarteVerte(contratId: string, request: UpsertCarteVerteRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<CarteVerte>>(`/api/v1/contrats/${contratId}/cartes-vertes`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async deleteCarteVerte(contratId: string, carteVerteId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}/cartes-vertes/${carteVerteId}`, {
         method: "DELETE",
       })
     );

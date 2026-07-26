@@ -10,7 +10,7 @@ import { EcheanceInput } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { productionApi } from "../api";
-import { toDateOnly } from "../date";
+import { computeDateEcheanceFromCode, toDateOnly } from "../date";
 import type { AssistanceContratContext, UpsertAssistanceContratRequest } from "../types";
 
 type FormState = {
@@ -51,7 +51,7 @@ export default function ContratAssistancePage() {
     });
   }, [context?.categorieClientId, context?.produits, form.compagnieAssistanceId, selectedVehicle?.usageId]);
   const selectedProduct = filteredProducts.find((product) => product.id === form.produitAssistanceId);
-  const computedDateEcheance = computeDateEcheance(form.dateEffet, form.echeanceCode, context?.dateEcheance);
+  const computedDateEcheance = computeDateEcheanceFromCode(form.dateEffet, form.echeanceCode, context?.dateEcheance);
 
   useEffect(() => {
     if (!context) return;
@@ -285,23 +285,6 @@ function numericParam(value: string | null) {
 
 function vehicleLabel(vehicule: AssistanceContratContext["vehiculesEligibles"][number]) {
   return [vehicule.immatriculation || `Véhicule #${vehicule.id}`, vehicule.usageCode].filter(Boolean).join(" · ");
-}
-
-function computeDateEcheance(dateEffet?: string | null, echeance?: string | null, fallback?: string | null) {
-  if (!dateEffet || !echeance) return fallback ?? "";
-  const match = echeance.match(/^(\d{2})\/(\d{2})$/);
-  if (!match) return fallback ?? "";
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const start = new Date(`${dateEffet}T00:00:00`);
-  if (Number.isNaN(start.getTime())) return fallback ?? "";
-  let year = start.getFullYear();
-  let candidate = new Date(year, month - 1, day);
-  if (candidate < start) {
-    candidate = new Date(year + 1, month - 1, day);
-  }
-  candidate.setDate(candidate.getDate() - 1);
-  return candidate.toISOString().slice(0, 10);
 }
 
 function formatDate(value?: string | null) {

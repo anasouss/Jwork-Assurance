@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SectionCard } from "./SectionCard";
-import { toDateOnly } from "../date";
+import { computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberValue } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
@@ -565,6 +565,18 @@ function AssistanceTable({
   const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
   const selectedProductId = selectedProduct?.id ?? "";
   const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+  const updateDateEffet = (dateEffet?: string) => {
+    onChange({
+      dateEffet,
+      dateEcheance: computeDateEcheanceFromCode(dateEffet, assistance.echeanceCode, assistance.dateEcheance),
+    });
+  };
+  const updateEcheance = (echeanceCode?: string) => {
+    onChange({
+      echeanceCode,
+      dateEcheance: computeDateEcheanceFromCode(assistance.dateEffet, echeanceCode, assistance.dateEcheance),
+    });
+  };
 
   useEffect(() => {
     if (assistance.produitAssistanceId && !selectedProductId) {
@@ -594,7 +606,7 @@ function AssistanceTable({
         <tbody>
           <tr className={cn("border-t align-middle", !assistance.enabled && "bg-muted/20 text-muted-foreground")}>
             <td className="px-3 py-2">
-              <DatePicker disabled={!assistance.enabled} date={assistance.dateEffet} onSelect={(date) => onChange({ dateEffet: toDateOnly(date) })} />
+              <DatePicker disabled={!assistance.enabled} date={assistance.dateEffet} onSelect={(date) => updateDateEffet(toDateOnly(date))} />
             </td>
             <td className="px-3 py-2">
               <DatePicker disabled={!assistance.enabled} date={assistance.dateSouscription} onSelect={(date) => onChange({ dateSouscription: toDateOnly(date) })} />
@@ -603,7 +615,7 @@ function AssistanceTable({
               <EcheanceInput
                 disabled={!assistance.enabled}
                 value={assistance.echeanceCode ?? ""}
-                onValueChange={(value) => onChange({ echeanceCode: value })}
+                onValueChange={updateEcheance}
               />
             </td>
             <td className="px-3 py-2">

@@ -50,6 +50,7 @@ public class ContratResponse {
     private Boolean saisiePrimeNette;
     private Integer nombreVehicules;
     private Integer nombreRemorques;
+    private Boolean brouillon;
     private Boolean prospection;
     private Boolean assistance;
     private Boolean crmPartage;

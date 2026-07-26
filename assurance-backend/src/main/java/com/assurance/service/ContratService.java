@@ -125,6 +125,10 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftVehicule(Long agenceId, Long contratId, int index, CreateContratRequest.VehiculeInput input) {
         Contrat contrat = resolveDraft(agenceId, contratId);
+        return saveVehiculeTarget(contrat, index, input);
+    }
+
+    private ContratResponse saveVehiculeTarget(Contrat contrat, int index, CreateContratRequest.VehiculeInput input) {
         if (index < 0) {
             throw new BadRequestException("Index vehicule invalide");
         }
@@ -148,6 +152,10 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftVehiculeGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
         Contrat contrat = resolveDraft(agenceId, contratId);
+        return saveVehiculeGarantiesTarget(contrat, index, inputs);
+    }
+
+    private ContratResponse saveVehiculeGarantiesTarget(Contrat contrat, int index, List<CreateContratRequest.GarantieInput> inputs) {
         List<Vehicule> existing = vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
         Vehicule vehicule = resolveVehicule(existing, index, "Vehicule");
         contratGarantieRepository.deleteByContratIdAndVehiculeId(contrat.getId(), vehicule.getId());
@@ -166,6 +174,10 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftRemorque(Long agenceId, Long contratId, int index, CreateContratRequest.RemorqueInput input) {
         Contrat contrat = resolveDraft(agenceId, contratId);
+        return saveRemorqueTarget(contrat, index, input);
+    }
+
+    private ContratResponse saveRemorqueTarget(Contrat contrat, int index, CreateContratRequest.RemorqueInput input) {
         if (index < 0) {
             throw new BadRequestException("Index remorque invalide");
         }
@@ -189,6 +201,10 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftRemorqueGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
         Contrat contrat = resolveDraft(agenceId, contratId);
+        return saveRemorqueGarantiesTarget(contrat, index, inputs);
+    }
+
+    private ContratResponse saveRemorqueGarantiesTarget(Contrat contrat, int index, List<CreateContratRequest.GarantieInput> inputs) {
         List<Remorque> existing = remorqueRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
         Remorque remorque = resolveRemorque(existing, index, "Remorque");
         contratGarantieRepository.deleteByContratIdAndRemorqueId(contrat.getId(), remorque.getId());
@@ -434,7 +450,11 @@ public class ContratService {
     private Contrat resolveDraft(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
-        if (!Boolean.TRUE.equals(contrat.getBrouillon()) || contrat.getStatut() != StatutContrat.DRAFT) {
+        boolean editableProspection = Boolean.TRUE.equals(contrat.getProspection())
+                && contrat.getTypeContrat() == TypeContrat.FLOTTE
+                && contrat.getStatut() == StatutContrat.DRAFT;
+        if ((!Boolean.TRUE.equals(contrat.getBrouillon()) && !editableProspection)
+                || contrat.getStatut() != StatutContrat.DRAFT) {
             throw new BadRequestException("Ce contrat n'est pas un brouillon modifiable");
         }
         return contrat;
@@ -1683,6 +1703,7 @@ public class ContratService {
                 .saisiePrimeNette(contrat.getSaisiePrimeNette())
                 .nombreVehicules(contrat.getNombreVehicules())
                 .nombreRemorques(contrat.getNombreRemorques())
+                .brouillon(contrat.getBrouillon())
                 .prospection(contrat.getProspection())
                 .assistance(contrat.getAssistance())
                 .crmPartage(contrat.getCrmPartage())

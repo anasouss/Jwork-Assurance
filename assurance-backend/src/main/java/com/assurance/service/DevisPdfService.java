@@ -81,25 +81,26 @@ public class DevisPdfService {
     }
 
     private void writeHeader(Writer writer) throws IOException {
-        float width = 430;
+        float width = 500;
         float x = (writer.pageWidth() - width) / 2;
-        writer.rect(x, writer.y() - 34, width, 34, new Color(245, 248, 252), ACCENT);
-        writer.center("PROPOSITION D'ASSURANCE", x, writer.y() - 14, width, PDType1Font.HELVETICA_BOLD, 13, ACCENT);
-        writer.center("FLOTTE AUTOMOBILE", x, writer.y() - 28, width, PDType1Font.HELVETICA_BOLD, 13, ACCENT);
-        writer.moveDown(48);
+        writer.rect(x, writer.y() - 52, width, 52, new Color(245, 248, 252), ACCENT);
+        writer.center("PROPOSITION D'ASSURANCE", x, writer.y() - 19, width, PDType1Font.HELVETICA_BOLD, 15, ACCENT);
+        writer.center("FLOTTE AUTOMOBILE", x, writer.y() - 39, width, PDType1Font.HELVETICA_BOLD, 15, ACCENT);
+        writer.moveDown(70);
     }
 
     private void writeContext(Writer writer, Contrat contrat) throws IOException {
         float y = writer.y();
-        float leftW = 510;
+        float leftW = (writer.pageWidth() - writer.margin() * 2) * 0.69f;
         float rightW = writer.pageWidth() - writer.margin() * 2 - leftW;
         writer.rect(writer.margin(), y - 50, leftW, 50, null, SOFT_BORDER);
-        writer.text("Assure : " + resolveAssure(contrat), writer.margin() + 8, y - 15, PDType1Font.HELVETICA_BOLD, 10, ACCENT, leftW - 16);
-        writer.text("Adresse : " + resolveAddress(contrat), writer.margin() + 8, y - 32, PDType1Font.HELVETICA, 9, Color.BLACK, leftW - 16);
+        writer.text("Assure : " + resolveAssure(contrat), writer.margin() + 8, y - 17, PDType1Font.HELVETICA_BOLD, 10, ACCENT, leftW - 16);
+        writer.text("Adresse : " + resolveAddress(contrat), writer.margin() + 8, y - 33, PDType1Font.HELVETICA_BOLD, 9.4f, ACCENT, leftW - 16);
         writer.rect(writer.margin() + leftW, y - 50, rightW, 50, null, SOFT_BORDER);
-        writer.text("Devis N " + value(contrat.getNumeroDevis(), value(contrat.getNumeroPolice(), "DEV-" + contrat.getId())),
-                writer.margin() + leftW + 8, y - 15, PDType1Font.HELVETICA_BOLD, 10, ACCENT, rightW - 16);
-        writer.text(formatDateTime(contrat.getCreatedAt()), writer.margin() + leftW + 8, y - 32, PDType1Font.HELVETICA, 9, Color.BLACK, rightW - 16);
+        writer.right("Devis N° " + value(contrat.getNumeroDevis(), value(contrat.getNumeroPolice(), "DEV-" + contrat.getId())),
+                writer.margin() + leftW + 8, y - 17, rightW - 16, PDType1Font.HELVETICA_BOLD, 10, ACCENT);
+        writer.right(value(contrat.getAgence() == null ? null : contrat.getAgence().getVille(), "Agadir") + " le " + formatDateTime(contrat.getCreatedAt()),
+                writer.margin() + leftW + 8, y - 33, rightW - 16, PDType1Font.HELVETICA_BOLD, 9.4f, Color.BLACK);
         writer.moveDown(62);
 
         y = writer.y();
@@ -125,79 +126,80 @@ public class DevisPdfService {
         int totalColumns = fixedColumns + codes.size();
         float tableWidth = writer.pageWidth() - writer.margin() * 2;
         float[] widths = new float[totalColumns];
-        widths[0] = 46;
-        widths[1] = 55;
-        widths[2] = 70;
-        widths[3] = 58;
-        widths[4] = 42;
-        widths[5] = 45;
-        widths[6] = 60;
-        widths[7] = 60;
-        widths[8] = 60;
-        widths[totalColumns - 1] = 70;
-        float used = 566;
-        float garantieWidth = Math.max(28, (tableWidth - used) / codes.size());
-        for (int i = 9; i < totalColumns - 1; i++) {
-            widths[i] = garantieWidth;
+        widths[0] = 72;
+        widths[1] = 48;
+        widths[2] = 58;
+        widths[3] = 56;
+        widths[4] = 40;
+        widths[5] = 50;
+        widths[6] = 44;
+        widths[7] = 44;
+        widths[8] = 44;
+        widths[totalColumns - 1] = 62;
+        for (int i = 0; i < codes.size(); i++) {
+            widths[9 + i] = preferredGarantieWidth(codes.get(i));
         }
-        widths[totalColumns - 1] = Math.max(58, tableWidth - sum(widths, 0, totalColumns - 1));
+        float diff = tableWidth - sum(widths, 0, totalColumns);
+        widths[totalColumns - 1] = Math.max(54, widths[totalColumns - 1] + diff);
 
-        writer.ensureRows(2 + vehicules.size() + 2, 20);
+        writer.ensureRows(2 + vehicules.size() + 2, 18);
         float x = writer.margin();
         float y = writer.y();
-        writer.cell(x, y, widths[0], 36, "Usage", true, HEADER_BG);
-        writer.cell(x += widths[0], y, widths[1], 36, "Marque", true, HEADER_BG);
-        writer.cell(x += widths[1], y, widths[2], 36, "N d'immatric", true, HEADER_BG);
-        writer.cell(x += widths[2], y, widths[3], 36, "Date de MC", true, HEADER_BG);
-        writer.cell(x += widths[3], y, widths[4], 36, "PF/PTC", true, HEADER_BG);
-        writer.cell(x += widths[4], y, widths[5], 36, "Energie", true, HEADER_BG);
+        writer.cell(x, y, widths[0], 48, "Usage", true, HEADER_BG);
+        writer.cell(x += widths[0], y, widths[1], 48, "Marque", true, HEADER_BG);
+        writer.cell(x += widths[1], y, widths[2], 48, "Nº d'immatric", true, HEADER_BG);
+        writer.cell(x += widths[2], y, widths[3], 48, "Date de MC", true, HEADER_BG);
+        writer.cell(x += widths[3], y, widths[4], 48, "PF/PTC", true, HEADER_BG);
+        writer.cell(x += widths[4], y, widths[5], 48, "ENERGIE", true, HEADER_BG);
         writer.cell(x += widths[5], y, widths[6] + widths[7] + widths[8], 18, "VALEURS", true, HEADER_BG);
         float garantieGroupX = x + widths[6] + widths[7] + widths[8];
         writer.cell(garantieGroupX, y, sum(widths, 9, totalColumns - 1), 18, "GARANTIES A ASSURER", true, new Color(236, 242, 250));
-        writer.cell(writer.margin() + sum(widths, 0, totalColumns - 1), y, widths[totalColumns - 1], 36, "Montant total", true, HEADER_BG);
-        y -= 18;
+        writer.cell(writer.margin() + sum(widths, 0, totalColumns - 1), y, widths[totalColumns - 1], 48, "Montant total", true, HEADER_BG);
+        y -= 24;
         x += widths[5];
-        writer.cell(x, y, widths[6], 18, "Valeur a neuf", true, HEADER_BG);
-        writer.cell(x += widths[6], y, widths[7], 18, "Valeur venale", true, HEADER_BG);
-        writer.cell(x += widths[7], y, widths[8], 18, "Valeur glaces", true, HEADER_BG);
+        writer.cell(x, y, widths[6], 24, "Valeur a Neuf", true, HEADER_BG);
+        writer.cell(x += widths[6], y, widths[7], 24, "Valeur Venale", true, HEADER_BG);
+        writer.cell(x += widths[7], y, widths[8], 24, "Valeur des glaces", true, HEADER_BG);
         x += widths[8];
-        for (String code : codes) {
-            writer.cell(x, y, widths[9], 18, code, true, "ASSISTANCE".equals(code) ? ASSISTANCE_BG : new Color(242, 246, 252));
-            x += widths[9];
+        for (int i = 0; i < codes.size(); i++) {
+            String code = codes.get(i);
+            writer.cell(x, y, widths[9 + i], 24, code, true, "ASSISTANCE".equals(code) ? ASSISTANCE_BG : new Color(242, 246, 252));
+            x += widths[9 + i];
         }
-        writer.moveDown(36);
+        writer.moveDown(48);
 
         BigDecimal grandTotal = BigDecimal.ZERO;
         int rowIndex = 0;
         for (Vehicule vehicule : vehicules) {
-            Color bg = rowIndex % 2 == 0 ? null : ALT_ROW_BG;
+            Color bg = null;
             BigDecimal vehicleTotal = totalVehicule(contrat, vehicule).add(totalAssistance(assistances, vehicule));
             grandTotal = grandTotal.add(vehicleTotal);
             Map<String, List<ContratGarantie>> garanties = garantiesByCode(contrat, vehicule);
             x = writer.margin();
             y = writer.y();
-            writer.cell(x, y, widths[0], 22, usageLabel(vehicule), false, bg);
-            writer.cell(x += widths[0], y, widths[1], 22, vehicule.getMarque() != null ? value(vehicule.getMarque().getLibelle(), "") : "", false, bg);
-            writer.cell(x += widths[1], y, widths[2], 22, value(vehicule.getImmatriculation(), ""), false, bg);
-            writer.cell(x += widths[2], y, widths[3], 22, formatDate(vehicule.getDatePremiereCirculation()), false, bg);
-            writer.cell(x += widths[3], y, widths[4], 22, pfOrPtc(vehicule), false, bg);
-            writer.cell(x += widths[4], y, widths[5], 22, value(vehicule.getCarburant(), ""), false, bg);
-            writer.cell(x += widths[5], y, widths[6], 22, moneyOrEmpty(vehicule.getValeurNeuf()), false, bg);
-            writer.cell(x += widths[6], y, widths[7], 22, moneyOrEmpty(vehicule.getValeurVenale()), false, bg);
-            writer.cell(x += widths[7], y, widths[8], 22, moneyOrEmpty(vehicule.getValeurGlace()), false, bg);
+            writer.cell(x, y, widths[0], 20, usageLabel(vehicule), false, bg);
+            writer.cell(x += widths[0], y, widths[1], 20, vehicule.getMarque() != null ? value(vehicule.getMarque().getLibelle(), "") : "", false, bg);
+            writer.cell(x += widths[1], y, widths[2], 20, value(vehicule.getImmatriculation(), ""), false, bg);
+            writer.cell(x += widths[2], y, widths[3], 20, formatDate(vehicule.getDatePremiereCirculation()), false, bg);
+            writer.cell(x += widths[3], y, widths[4], 20, pfOrPtc(vehicule), false, bg);
+            writer.cell(x += widths[4], y, widths[5], 20, value(vehicule.getCarburant(), "").toUpperCase(Locale.ROOT), false, bg);
+            writer.cell(x += widths[5], y, widths[6], 20, amountOrEmpty(vehicule.getValeurNeuf()), false, bg);
+            writer.cell(x += widths[6], y, widths[7], 20, amountOrEmpty(vehicule.getValeurVenale()), false, bg);
+            writer.cell(x += widths[7], y, widths[8], 20, amountOrEmpty(vehicule.getValeurGlace()), false, bg);
             x += widths[8];
-            for (String code : codes) {
+            for (int i = 0; i < codes.size(); i++) {
+                String code = codes.get(i);
                 String marker = "-".equals(code) ? "-" : markerFor(code, garanties, assistances, vehicule);
-                writer.cell(x, y, widths[9], 22, marker, false, marker.isBlank() ? bg : ("ASSISTANCE".equals(code) ? ASSISTANCE_BG : SELECTED_BG));
-                x += widths[9];
+                writer.cell(x, y, widths[9 + i], 20, marker, true, marker.isBlank() ? bg : ("ASSISTANCE".equals(code) ? ASSISTANCE_BG : SELECTED_BG));
+                x += widths[9 + i];
             }
-            writer.cell(writer.margin() + sum(widths, 0, totalColumns - 1), y, widths[totalColumns - 1], 22, money(vehicleTotal), false, bg);
-            writer.moveDown(22);
+            writer.cellRight(writer.margin() + sum(widths, 0, totalColumns - 1), y, widths[totalColumns - 1], 20, amount(vehicleTotal), true, bg);
+            writer.moveDown(20);
             rowIndex++;
         }
 
         writer.cell(writer.margin(), writer.y(), tableWidth - widths[totalColumns - 1], 22, "TOTAL", true, null);
-        writer.cell(writer.margin() + tableWidth - widths[totalColumns - 1], writer.y(), widths[totalColumns - 1], 22, money(grandTotal), true, null);
+        writer.cellRight(writer.margin() + tableWidth - widths[totalColumns - 1], writer.y(), widths[totalColumns - 1], 22, amount(grandTotal), true, null);
         writer.moveDown(36);
     }
 
@@ -423,7 +425,15 @@ public class DevisPdfService {
 
     private String resolveAddress(Contrat contrat) {
         Client client = resolveClient(contrat);
-        return client == null ? "-" : value(client.getAdresse(), "-");
+        if (client == null) {
+            return "-";
+        }
+        String address = value(client.getAdresse(), "");
+        String city = client.getVille() == null ? "" : value(client.getVille().getNom(), "");
+        if (!address.isBlank() && !city.isBlank()) {
+            return address + ", " + city;
+        }
+        return !address.isBlank() ? address : value(city, "-");
     }
 
     private Client resolveClient(Contrat contrat) {
@@ -448,7 +458,14 @@ public class DevisPdfService {
         if (vehicule == null || vehicule.getUsage() == null) {
             return "";
         }
-        return value(vehicule.getUsage().getCode(), vehicule.getUsage().getLibelle());
+        String code = value(vehicule.getUsage().getCode(), "");
+        if (!code.isBlank() && resolveClient(vehicule.getContrat()) != null && resolveClient(vehicule.getContrat()).getCategorieClient() != null) {
+            String categoryCode = value(resolveClient(vehicule.getContrat()).getCategorieClient().getCode(), "");
+            if ("LOCATION".equalsIgnoreCase(categoryCode)) {
+                return "LOCATION - " + code;
+            }
+        }
+        return value(code, vehicule.getUsage().getLibelle());
     }
 
     private String pfOrPtc(Vehicule vehicule) {
@@ -493,6 +510,18 @@ public class DevisPdfService {
 
     private static String formatDateTime(java.time.LocalDateTime date) {
         return date == null ? "" : date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+    }
+
+    private static float preferredGarantieWidth(String code) {
+        return "ASSISTANCE".equals(code) ? 108 : 30;
+    }
+
+    private static String amountOrEmpty(BigDecimal value) {
+        return value == null || value.compareTo(BigDecimal.ZERO) == 0 ? "" : amount(value);
+    }
+
+    private static String amount(BigDecimal value) {
+        return number(value);
     }
 
     private static String moneyOrEmpty(BigDecimal value) {
@@ -561,7 +590,13 @@ public class DevisPdfService {
         private void cell(float x, float topY, float width, float height, String text, boolean bold, Color fill) throws IOException {
             ensureRows(1, height);
             rect(x, topY - height, width, height, fill, TABLE_BORDER);
-            center(text, x + 2, topY - height + 6, width - 4, bold ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA, 7.4f, Color.BLACK);
+            center(text, x + 3, topY - height + 6, width - 6, bold ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA, 8.5f, Color.BLACK);
+        }
+
+        private void cellRight(float x, float topY, float width, float height, String text, boolean bold, Color fill) throws IOException {
+            ensureRows(1, height);
+            rect(x, topY - height, width, height, fill, TABLE_BORDER);
+            right(text, x + 3, topY - height + 6, width - 6, bold ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA, 8.5f, Color.BLACK);
         }
 
         private void text(String text, float x, float y, PDType1Font font, float size, Color color, float maxWidth) throws IOException {
@@ -577,6 +612,12 @@ public class DevisPdfService {
             String fitted = fit(text, font, size, width);
             float textWidth = font.getStringWidth(safe(fitted)) / 1000 * size;
             text(fitted, x + Math.max(0, (width - textWidth) / 2), y, font, size, color, width);
+        }
+
+        private void right(String text, float x, float y, float width, PDType1Font font, float size, Color color) throws IOException {
+            String fitted = fit(text, font, size, width);
+            float textWidth = font.getStringWidth(safe(fitted)) / 1000 * size;
+            text(fitted, x + Math.max(0, width - textWidth), y, font, size, color, width);
         }
 
         private void moveDown(float value) {
@@ -636,14 +677,12 @@ public class DevisPdfService {
                     .replace('–', '-')
                     .replace('—', '-')
                     .replace('−', '-')
-                    .replace("°", "")
                     .replace("œ", "oe")
                     .replace("Œ", "OE")
                     .trim();
             return clean
                     .replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", " ")
                     .replaceAll("[^\\u0020-\\u00FF]", " ")
-                    .replace("°", "")
                     .trim();
         }
     }

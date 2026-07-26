@@ -888,6 +888,7 @@ export type ContratSummary = {
   saisiePrimeNette?: boolean | null;
   nombreVehicules?: number | null;
   nombreRemorques?: number | null;
+  brouillon?: boolean | null;
   prospection?: boolean | null;
   assistance?: boolean | null;
   crmPartage?: boolean | null;

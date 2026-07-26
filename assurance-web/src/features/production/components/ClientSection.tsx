@@ -76,10 +76,38 @@ export function ClientSection({
     Object.values(lookupTimers.current).forEach(clearTimeout);
   }, []);
 
+  useEffect(() => {
+    const souscripteur = clients.find((client) => client.role === "SOUSCRIPTEUR");
+    const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
+    const sameClient = Boolean(
+      proprietaire?.sameAsRole === "SOUSCRIPTEUR"
+      || (souscripteur?.clientId && proprietaire?.clientId && souscripteur.clientId === proprietaire.clientId)
+    );
+    setSameAsSouscripteur(sameClient);
+  }, [clients]);
+
   const updateClient = (index: number, patch: Partial<ClientInput["client"]>) => {
+    const target = clients[index];
+    if (sameAsSouscripteur && (target?.role === "SOUSCRIPTEUR" || target?.role === "PROPRIETAIRE")) {
+      const sharedClientId = clients.find((client) => client.role === "SOUSCRIPTEUR")?.clientId
+        ?? clients.find((client) => client.role === "PROPRIETAIRE")?.clientId;
+      setClients(
+        clients.map((client) =>
+          client.role === "SOUSCRIPTEUR" || client.role === "PROPRIETAIRE"
+            ? {
+                ...client,
+                clientId: sharedClientId,
+                sameAsRole: client.role === "PROPRIETAIRE" ? "SOUSCRIPTEUR" : undefined,
+                client: { ...client.client, ...patch },
+              }
+            : client
+        )
+      );
+      return;
+    }
     setClients(
       clients.map((client, idx) =>
-        idx === index || (sameAsSouscripteur && clients[index]?.role === "SOUSCRIPTEUR" && client.role === "PROPRIETAIRE")
+        idx === index
           ? { ...client, client: { ...client.client, ...patch } }
           : client
       )
@@ -88,22 +116,40 @@ export function ClientSection({
 
   const updateIdentity = (index: number, patch: Partial<ClientInput["client"]>) => {
     setLookupByIndex((current) => ({ ...current, [index]: { status: "idle" } }));
+    const target = clients[index];
+    if (sameAsSouscripteur && (target?.role === "SOUSCRIPTEUR" || target?.role === "PROPRIETAIRE")) {
+      setClients(
+        clients.map((client) =>
+          client.role === "SOUSCRIPTEUR" || client.role === "PROPRIETAIRE"
+            ? {
+                ...client,
+                clientId: undefined,
+                sameAsRole: client.role === "PROPRIETAIRE" ? "SOUSCRIPTEUR" : undefined,
+                client: { ...client.client, ...patch },
+              }
+            : client
+        )
+      );
+      return;
+    }
     setClients(
-      clients.map((client, idx) => {
-        const shouldPatch = idx === index || (sameAsSouscripteur && clients[index]?.role === "SOUSCRIPTEUR" && client.role === "PROPRIETAIRE");
-        return shouldPatch ? { ...client, clientId: undefined, client: { ...client.client, ...patch } } : client;
-      })
+      clients.map((client, idx) =>
+        idx === index ? { ...client, clientId: undefined, client: { ...client.client, ...patch } } : client
+      )
     );
   };
 
   const fillExistingClient = (index: number, found: ClientResponse) => {
+    const target = clients[index];
+    const shouldFillSameAsPair = sameAsSouscripteur && (target?.role === "SOUSCRIPTEUR" || target?.role === "PROPRIETAIRE");
     setClients(
       clients.map((client, idx) => {
-        const shouldFill = idx === index || (sameAsSouscripteur && clients[index]?.role === "SOUSCRIPTEUR" && client.role === "PROPRIETAIRE");
+        const shouldFill = idx === index || (shouldFillSameAsPair && (client.role === "SOUSCRIPTEUR" || client.role === "PROPRIETAIRE"));
         return shouldFill
           ? {
               ...client,
               clientId: found.id,
+              sameAsRole: client.role === "PROPRIETAIRE" && shouldFillSameAsPair ? "SOUSCRIPTEUR" : client.sameAsRole,
               client: {
                 ...client.client,
                 typeClient: found.typeClient,
@@ -184,43 +230,69 @@ export function ClientSection({
   };
 
   const setProprietaireConducteur = (index: number, value: boolean) => {
-    setClients(
-      clients
-        .filter((client) => value || client.role !== "CONDUCTEUR" || showOptionalRoles)
-        .map((client, idx) =>
-          idx === index
-            ? { ...client, client: { ...client.client, conducteurHabituel: value } }
+    const nextClients = clients.filter((client) => value || client.role !== "CONDUCTEUR" || showOptionalRoles);
+    if (sameAsSouscripteur) {
+      setClients(
+        nextClients.map((client) =>
+          client.role === "SOUSCRIPTEUR" || client.role === "PROPRIETAIRE"
+            ? {
+                ...client,
+                sameAsRole: client.role === "PROPRIETAIRE" ? "SOUSCRIPTEUR" : undefined,
+                client: { ...client.client, conducteurHabituel: value },
+              }
             : client
         )
+      );
+      return;
+    }
+    setClients(
+      nextClients.map((client, idx) =>
+        idx === index
+          ? { ...client, client: { ...client.client, conducteurHabituel: value } }
+          : client
+      )
     );
   };
 
   const copySouscripteurToProprietaire = (checked: boolean) => {
     setSameAsSouscripteur(checked);
     if (!checked) {
+      setClients(
+        clients.map((client) =>
+          client.role === "PROPRIETAIRE"
+            ? { ...client, clientId: undefined, sameAsRole: undefined }
+            : client
+        )
+      );
       return;
     }
     const souscripteur = clients.find((client) => client.role === "SOUSCRIPTEUR");
-    if (!souscripteur) {
+    const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
+    if (!souscripteur || !proprietaire) {
       return;
     }
+    const sharedClient = {
+      ...souscripteur.client,
+      categorieClientId: proprietaire.client.categorieClientId ?? souscripteur.client.categorieClientId,
+      telephone: proprietaire.client.telephone ?? souscripteur.client.telephone,
+      telephones: proprietaire.client.telephones?.length ? proprietaire.client.telephones : souscripteur.client.telephones,
+      email: proprietaire.client.email ?? souscripteur.client.email,
+      conducteurHabituel: proprietaire.client.conducteurHabituel,
+      sahara: proprietaire.client.sahara,
+      justificatifSahara: proprietaire.client.justificatifSahara,
+    };
     setClients(
       clients.map((client) =>
-        client.role === "PROPRIETAIRE"
-          ? {
-              ...client,
-              client: {
-                ...client.client,
-                ...souscripteur.client,
-                telephone: client.client.telephone,
-                telephones: client.client.telephones,
-                email: client.client.email,
-                conducteurHabituel: client.client.conducteurHabituel,
-                sahara: client.client.sahara,
-                justificatifSahara: client.client.justificatifSahara,
-              },
-            }
-          : client
+        client.role === "SOUSCRIPTEUR"
+          ? { ...client, client: sharedClient }
+          : client.role === "PROPRIETAIRE"
+            ? {
+                ...client,
+                clientId: souscripteur.clientId,
+                sameAsRole: "SOUSCRIPTEUR",
+                client: sharedClient,
+              }
+            : client
       )
     );
   };

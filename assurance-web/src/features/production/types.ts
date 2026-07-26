@@ -265,6 +265,7 @@ export type RoleClientContrat = "SOUSCRIPTEUR" | "PROPRIETAIRE" | "CONDUCTEUR" |
 
 export type ClientInput = {
   clientId?: string;
+  sameAsRole?: RoleClientContrat;
   role: RoleClientContrat;
   principalPourRole: boolean;
   client: {

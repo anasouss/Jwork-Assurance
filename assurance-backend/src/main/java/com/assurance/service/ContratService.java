@@ -201,16 +201,7 @@ public class ContratService {
                 .build();
         contrat = contratRepository.save(contrat);
 
-        for (CreateContratRequest.ClientInput input : request.getClients() == null ? List.<CreateContratRequest.ClientInput>of() : request.getClients()) {
-            Client client = resolveClientForCreation(request.getAgenceId(), input);
-            ContratClient link = contratClientRepository.save(ContratClient.builder()
-                    .contrat(contrat)
-                    .client(client)
-                    .role(input.getRole())
-                    .principalPourRole(input.isPrincipalPourRole())
-                    .build());
-            contrat.getClients().add(link);
-        }
+        saveClientLinks(contrat, request.getClients(), request.getAgenceId(), Map.of(), true);
 
         List<Vehicule> vehiculesCrees = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
@@ -476,19 +467,7 @@ public class ContratService {
         }
         clearDraftChildren(contrat);
 
-        for (CreateContratRequest.ClientInput input : request.getClients() == null ? List.<CreateContratRequest.ClientInput>of() : request.getClients()) {
-            Client client = resolveClientForDraft(request.getAgenceId(), input, existingClients, finalMode);
-            if (client == null) {
-                continue;
-            }
-            ContratClient link = contratClientRepository.save(ContratClient.builder()
-                    .contrat(contrat)
-                    .client(client)
-                    .role(input.getRole())
-                    .principalPourRole(input.isPrincipalPourRole())
-                    .build());
-            contrat.getClients().add(link);
-        }
+        saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
 
         Usage usageContrat = contrat.getUsage();
         List<Vehicule> vehiculesCrees = new ArrayList<>();
@@ -583,6 +562,96 @@ public class ContratService {
         contrat.getVehicules().clear();
     }
 
+    private void saveClientLinks(
+            Contrat contrat,
+            List<CreateContratRequest.ClientInput> inputs,
+            Long agenceId,
+            Map<String, Client> existingClients,
+            boolean finalMode
+    ) {
+        Map<com.assurance.enums.RoleClientContrat, Client> resolvedByRole = new HashMap<>();
+        List<CreateContratRequest.ClientInput> aliasInputs = new ArrayList<>();
+        for (CreateContratRequest.ClientInput input : inputs == null ? List.<CreateContratRequest.ClientInput>of() : inputs) {
+            if (input.getRole() == null) {
+                if (finalMode) {
+                    throw new BadRequestException("Le role client est obligatoire");
+                }
+                continue;
+            }
+            if (input.getSameAsRole() != null) {
+                aliasInputs.add(input);
+                continue;
+            }
+            Client client = resolveClientForDraft(agenceId, input, existingClients, finalMode);
+            if (client == null) {
+                continue;
+            }
+            saveClientLink(contrat, input, client);
+            resolvedByRole.put(input.getRole(), client);
+        }
+        for (CreateContratRequest.ClientInput input : aliasInputs) {
+            Client client = resolvedByRole.get(input.getSameAsRole());
+            if (client == null) {
+                client = existingClientForRole(existingClients, input.getSameAsRole());
+            }
+            if (client == null) {
+                if (finalMode) {
+                    throw new BadRequestException("Le role " + input.getRole() + " reference un client non resolu: " + input.getSameAsRole());
+                }
+                continue;
+            }
+            saveClientLink(contrat, input, client);
+            resolvedByRole.put(input.getRole(), client);
+        }
+    }
+
+    private void saveClientLink(Contrat contrat, CreateContratRequest.ClientInput input, Client client) {
+        ContratClient link = contratClientRepository.save(ContratClient.builder()
+                .contrat(contrat)
+                .client(client)
+                .role(input.getRole())
+                .principalPourRole(input.isPrincipalPourRole())
+                .build());
+        contrat.getClients().add(link);
+    }
+
+    private void buildPreviewClientLinks(Contrat contrat, List<CreateContratRequest.ClientInput> inputs, Long agenceId) {
+        Map<com.assurance.enums.RoleClientContrat, Client> resolvedByRole = new HashMap<>();
+        List<CreateContratRequest.ClientInput> aliasInputs = new ArrayList<>();
+        for (CreateContratRequest.ClientInput input : inputs == null ? List.<CreateContratRequest.ClientInput>of() : inputs) {
+            if (input.getRole() == null) {
+                continue;
+            }
+            if (input.getSameAsRole() != null) {
+                aliasInputs.add(input);
+                continue;
+            }
+            Client client = resolveClientForPreview(agenceId, input);
+            if (client == null) {
+                continue;
+            }
+            addPreviewClientLink(contrat, input, client);
+            resolvedByRole.put(input.getRole(), client);
+        }
+        for (CreateContratRequest.ClientInput input : aliasInputs) {
+            Client client = resolvedByRole.get(input.getSameAsRole());
+            if (client == null) {
+                continue;
+            }
+            addPreviewClientLink(contrat, input, client);
+            resolvedByRole.put(input.getRole(), client);
+        }
+    }
+
+    private void addPreviewClientLink(Contrat contrat, CreateContratRequest.ClientInput input, Client client) {
+        contrat.getClients().add(ContratClient.builder()
+                .contrat(contrat)
+                .client(client)
+                .role(input.getRole())
+                .principalPourRole(input.isPrincipalPourRole())
+                .build());
+    }
+
     private Client resolveClientForDraft(
             Long agenceId,
             CreateContratRequest.ClientInput input,
@@ -620,6 +689,14 @@ public class ContratService {
 
     private String clientDraftKey(com.assurance.enums.RoleClientContrat role, boolean principal) {
         return role.name() + ":" + principal;
+    }
+
+    private Client existingClientForRole(Map<String, Client> existingClients, com.assurance.enums.RoleClientContrat role) {
+        Client principal = existingClients.get(clientDraftKey(role, true));
+        if (principal != null) {
+            return principal;
+        }
+        return existingClients.get(clientDraftKey(role, false));
     }
 
     private List<ContratGarantie> replaceFinalGaranties(
@@ -834,15 +911,7 @@ public class ContratService {
                 .notes(request.getNotes())
                 .build();
 
-        for (CreateContratRequest.ClientInput input : request.getClients() == null ? List.<CreateContratRequest.ClientInput>of() : request.getClients()) {
-            Client client = resolveClientForPreview(request.getAgenceId(), input);
-            contrat.getClients().add(ContratClient.builder()
-                    .contrat(contrat)
-                    .client(client)
-                    .role(input.getRole())
-                    .principalPourRole(input.isPrincipalPourRole())
-                    .build());
-        }
+        buildPreviewClientLinks(contrat, request.getClients(), request.getAgenceId());
 
         List<Vehicule> vehicules = buildVehiculesPreview(request, contrat, usageContrat);
         contrat.getVehicules().addAll(vehicules);

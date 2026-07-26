@@ -73,6 +73,7 @@ public class CreateContratRequest {
     @Data
     public static class ClientInput {
         private Long clientId;
+        private RoleClientContrat sameAsRole;
         private CreateClientRequest client;
         @NotNull
         private RoleClientContrat role;

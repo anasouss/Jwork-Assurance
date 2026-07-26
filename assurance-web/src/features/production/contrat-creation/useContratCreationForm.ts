@@ -865,7 +865,7 @@ function sectionLabel(section: ContratSectionKey) {
 function hydrateDraft(draft: ContratSummary) {
   const vehicleIdToIndex = new Map((draft.vehicules ?? []).map((vehicule, index) => [vehicule.vehiculeId, index]));
   const remorqueIdToIndex = new Map((draft.remorques ?? []).map((remorque, index) => [remorque.remorqueId, index]));
-  const clients = (draft.clients ?? []).length > 0
+  let clients = (draft.clients ?? []).length > 0
     ? (draft.clients ?? []).map((link) => {
         const role = asRole(link.role);
         return {
@@ -886,6 +886,15 @@ function hydrateDraft(draft: ContratSummary) {
         } satisfies ClientInput;
       })
     : [emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")];
+  const souscripteur = clients.find((client) => client.role === "SOUSCRIPTEUR");
+  const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
+  if (souscripteur?.clientId && proprietaire?.clientId && souscripteur.clientId === proprietaire.clientId) {
+    clients = clients.map((client) =>
+      client.role === "PROPRIETAIRE"
+        ? { ...client, sameAsRole: "SOUSCRIPTEUR" }
+        : client
+    );
+  }
 
   const vehicules = (draft.vehicules ?? []).length > 0
     ? (draft.vehicules ?? []).map((vehicule) => ({

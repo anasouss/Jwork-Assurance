@@ -147,10 +147,13 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const grilleUsageFilter = typeContrat === "CONVENTION" ? usageId : undefined;
   const selectedConventionTypeEcheance = selectedConvention?.typeEcheance;
   const selectedConventionEcheance = typeof selectedConvention?.echeance === "string" ? selectedConvention.echeance : undefined;
+  const conventionHasFixedEcheance = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "A_ECHEANCE";
   const effectiveEcheance = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "A_ECHEANCE"
     ? selectedConventionEcheance
     : echeance;
-  const showContractEcheance = typeRenouvellement === "renouvelable" && fractionnement === "ANNUEL";
+  const showContractEcheance = typeRenouvellement === "renouvelable"
+    && fractionnement === "ANNUEL"
+    && (typeContrat !== "CONVENTION" || conventionHasFixedEcheance);
 
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId, grilleUsageFilter],

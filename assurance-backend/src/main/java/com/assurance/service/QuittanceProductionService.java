@@ -53,7 +53,7 @@ public class QuittanceProductionService {
         return genererPourMouvement(contrat, mouvement, typeMouvement, calcul, List.of(), List.of(), List.of());
     }
 
-    private Quittance genererPourMouvement(
+    public Quittance genererPourMouvement(
             Contrat contrat,
             MouvementContrat mouvement,
             TypeMouvementContrat typeMouvement,

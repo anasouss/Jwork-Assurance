@@ -1264,6 +1264,18 @@ public class ContratService {
 
     @Transactional(readOnly = true)
     public QuittanceResponse previsualiserAvenantFlotte(Long agenceId, Long contratId, FlotteAvenantRequest request) {
+        if (isModificationGarantiesFlotte(request)) {
+            FlotteAvenantModificationGraph graph = resolveModificationGarantiesFlotte(agenceId, contratId, request, false);
+            return mouvementContratService.previsualiserMouvementSpecialise(
+                    graph.contrat(),
+                    graph.typeMouvement(),
+                    toMouvementRequest(request, graph.contrat()),
+                    graph.nouvellesGaranties(),
+                    graph.vehicules(),
+                    graph.remorques(),
+                    graph.differentiel()
+            );
+        }
         FlotteAvenantGraph graph = resolveFlotteAvenantGraph(agenceId, contratId, request, false);
         return mouvementContratService.previsualiserMouvementSpecialise(
                 graph.contrat(),
@@ -1277,6 +1289,19 @@ public class ContratService {
 
     @Transactional
     public QuittanceResponse creerAvenantFlotte(Long agenceId, Long contratId, FlotteAvenantRequest request) {
+        if (isModificationGarantiesFlotte(request)) {
+            FlotteAvenantModificationGraph graph = resolveModificationGarantiesFlotte(agenceId, contratId, request, true);
+            return mouvementContratService.creerMouvementSpecialise(
+                    graph.contrat(),
+                    graph.typeMouvement(),
+                    toMouvementRequest(request, graph.contrat()),
+                    graph.nouvellesGaranties(),
+                    graph.vehicules(),
+                    graph.remorques(),
+                    NatureSnapshotMouvement.COURANT,
+                    graph.differentiel()
+            );
+        }
         FlotteAvenantGraph graph = resolveFlotteAvenantGraph(agenceId, contratId, request, true);
         QuittanceResponse quittance = mouvementContratService.creerMouvementSpecialise(
                 graph.contrat(),
@@ -1312,7 +1337,9 @@ public class ContratService {
         return switch (code) {
             case "INC_F" -> resolveIncorporationFlotte(contrat, typeMouvement, request, persistIncorporation);
             case "RET_F" -> resolveRetraitFlotte(contrat, typeMouvement, request);
+            case "EXR_F" -> resolveExtensionRemorqueFlotte(contrat, typeMouvement, request);
             case "RES_F" -> resolveResiliationFlotte(contrat, typeMouvement);
+            case "RCH_F" -> resolveResiliationEcheanceFlotte(contrat, typeMouvement);
             case "PRI_F" -> resolvePrecisionFlotte(contrat, typeMouvement, request);
             case "DUP_F" -> resolveDuplicataFlotte(contrat, typeMouvement, request);
             default -> throw new BadRequestException("Le type d'avenant " + typeMouvement.getCode() + " n'est pas pris en charge pour les flottes");
@@ -1343,11 +1370,24 @@ public class ContratService {
         return new FlotteAvenantGraph(contrat, typeMouvement, vehicules, remorques, garanties, NatureSnapshotMouvement.RETRAIT);
     }
 
+    private FlotteAvenantGraph resolveExtensionRemorqueFlotte(Contrat contrat, TypeMouvementContrat typeMouvement, FlotteAvenantRequest request) {
+        List<Remorque> remorques = selectedActiveRemorques(contrat, request.getRemorqueIds(), false);
+        if (remorques.isEmpty()) {
+            throw new BadRequestException("Selectionnez au moins une remorque pour l'extension");
+        }
+        List<ContratGarantie> garanties = activeGarantiesForTargets(contrat, List.of(), remorques);
+        return new FlotteAvenantGraph(contrat, typeMouvement, List.of(), remorques, garanties, NatureSnapshotMouvement.COURANT);
+    }
+
     private FlotteAvenantGraph resolveResiliationFlotte(Contrat contrat, TypeMouvementContrat typeMouvement) {
         List<Vehicule> vehicules = activeVehicules(contrat);
         List<Remorque> remorques = activeRemorques(contrat);
         List<ContratGarantie> garanties = activeGaranties(contrat);
         return new FlotteAvenantGraph(contrat, typeMouvement, vehicules, remorques, garanties, NatureSnapshotMouvement.RETRAIT);
+    }
+
+    private FlotteAvenantGraph resolveResiliationEcheanceFlotte(Contrat contrat, TypeMouvementContrat typeMouvement) {
+        return new FlotteAvenantGraph(contrat, typeMouvement, activeVehicules(contrat), activeRemorques(contrat), List.of(), NatureSnapshotMouvement.COURANT);
     }
 
     private FlotteAvenantGraph resolvePrecisionFlotte(Contrat contrat, TypeMouvementContrat typeMouvement, FlotteAvenantRequest request) {
@@ -1395,6 +1435,65 @@ public class ContratService {
         if (contrat.getDateEcheance() != null && dateEffet.isAfter(contrat.getDateEcheance())) {
             throw new BadRequestException("La date d'effet de l'avenant ne peut pas etre apres l'echeance du contrat");
         }
+    }
+
+    private boolean isModificationGarantiesFlotte(FlotteAvenantRequest request) {
+        return request != null
+                && hasText(request.getCodeTypeMouvement())
+                && "MOG_F".equals(request.getCodeTypeMouvement().trim().toUpperCase(Locale.ROOT));
+    }
+
+    private FlotteAvenantModificationGraph resolveModificationGarantiesFlotte(Long agenceId, Long contratId, FlotteAvenantRequest request, boolean persist) {
+        if (request == null || request.getDateEffet() == null) {
+            throw new BadRequestException("La date d'effet de l'avenant est obligatoire");
+        }
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
+            throw new BadRequestException("Les avenants flotte sont autorises uniquement pour les contrats flotte");
+        }
+        if (Boolean.TRUE.equals(contrat.getBrouillon()) || Boolean.TRUE.equals(contrat.getProspection()) || contrat.getStatut() != StatutContrat.ACTIVE) {
+            throw new BadRequestException("Le contrat doit etre actif pour creer un avenant");
+        }
+        validateAvenantDates(contrat, request);
+        TypeMouvementContrat typeMouvement = mouvementContratService.resolveTypeMouvementPourContrat(request.getCodeTypeMouvement(), contrat.getTypeContrat());
+        if (!"MOG_F".equalsIgnoreCase(typeMouvement.getCode())) {
+            throw new BadRequestException("Le type d'avenant doit etre MOG_F");
+        }
+        if (request.getGaranties() == null || request.getGaranties().isEmpty()) {
+            throw new BadRequestException("Au moins une garantie est obligatoire pour la modification");
+        }
+        List<Vehicule> vehicules = activeVehicules(contrat);
+        List<Remorque> remorques = activeRemorques(contrat);
+        List<ContratGarantie> anciennesGaranties = activeGaranties(contrat);
+        CreateContratRequest createRequest = avenantCreateRequest(contrat, request);
+        List<ContratGarantie> nouvellesGaranties = buildGarantiesPreview(createRequest, contrat, vehicules, remorques);
+        if (nouvellesGaranties.isEmpty()) {
+            throw new BadRequestException("Au moins une garantie est obligatoire pour la modification");
+        }
+        QuittanceCalculService.Resultat avant = calculerMontantsAvenant(contrat, typeMouvement, anciennesGaranties, vehicules, remorques);
+        QuittanceCalculService.Resultat apres = calculerMontantsAvenant(contrat, typeMouvement, nouvellesGaranties, vehicules, remorques);
+        QuittanceCalculService.Resultat differentiel = quittanceCalculService.difference(apres, avant);
+        if (persist) {
+            for (ContratGarantie garantie : anciennesGaranties) {
+                garantie.setActif(false);
+            }
+            contratGarantieRepository.saveAll(anciennesGaranties);
+            nouvellesGaranties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques);
+        }
+        return new FlotteAvenantModificationGraph(contrat, typeMouvement, vehicules, remorques, anciennesGaranties, nouvellesGaranties, differentiel);
+    }
+
+    private QuittanceCalculService.Resultat calculerMontantsAvenant(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
+        int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
+        return quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
     }
 
     private MouvementContratRequest toMouvementRequest(FlotteAvenantRequest request, Contrat contrat) {
@@ -3219,6 +3318,17 @@ public class ContratService {
             List<Remorque> remorques,
             List<ContratGarantie> garanties,
             NatureSnapshotMouvement snapshotNature
+    ) {
+    }
+
+    private record FlotteAvenantModificationGraph(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> anciennesGaranties,
+            List<ContratGarantie> nouvellesGaranties,
+            QuittanceCalculService.Resultat differentiel
     ) {
     }
 

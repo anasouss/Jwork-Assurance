@@ -312,8 +312,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
             {isFlotte ? (
               <>
                 <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
               </>

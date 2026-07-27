@@ -13,9 +13,11 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -100,6 +102,35 @@ public class QuittanceCalculService {
         return withTotal(lignes, signe);
     }
 
+    public Resultat difference(Resultat apres, Resultat avant) {
+        Map<CategorieQuittance, Ligne> apresParCategorie = lignesParCategorie(apres);
+        Map<CategorieQuittance, Ligne> avantParCategorie = lignesParCategorie(avant);
+        Set<CategorieQuittance> categories = new LinkedHashSet<>();
+        categories.addAll(apresParCategorie.keySet());
+        categories.addAll(avantParCategorie.keySet());
+
+        List<Ligne> lignes = new ArrayList<>();
+        for (CategorieQuittance categorie : categories) {
+            if (categorie == CategorieQuittance.TOTAL) {
+                continue;
+            }
+            Ligne ligneApres = apresParCategorie.get(categorie);
+            Ligne ligneAvant = avantParCategorie.get(categorie);
+            lignes.add(new Ligne(
+                    categorie,
+                    ligneApres != null ? ligneApres.ordre() : ligneAvant != null ? ligneAvant.ordre() : 99,
+                    false,
+                    moins(ligneApres != null ? ligneApres.primeNette() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.primeNette() : BigDecimal.ZERO),
+                    moins(ligneApres != null ? ligneApres.taxe() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.taxe() : BigDecimal.ZERO),
+                    moins(ligneApres != null ? ligneApres.taxeParafiscale() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.taxeParafiscale() : BigDecimal.ZERO),
+                    moins(ligneApres != null ? ligneApres.accessoire() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.accessoire() : BigDecimal.ZERO),
+                    moins(ligneApres != null ? ligneApres.cnpac() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.cnpac() : BigDecimal.ZERO),
+                    moins(ligneApres != null ? ligneApres.primeTotale() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.primeTotale() : BigDecimal.ZERO)
+            ));
+        }
+        return withTotal(lignes, BigDecimal.ONE);
+    }
+
     public int compterUnitesCnpac(List<ContratGarantie> garanties, int fallback) {
         Set<String> cibles = new LinkedHashSet<>();
         for (ContratGarantie contratGarantie : garanties == null ? List.<ContratGarantie>of() : garanties) {
@@ -125,6 +156,23 @@ public class QuittanceCalculService {
     private Resultat totalOnly(BigDecimal montant) {
         Ligne total = new Ligne(CategorieQuittance.TOTAL, 99, true, montant, montant, montant, montant, montant, montant);
         return new Resultat(List.of(total), montant, montant, montant, montant, montant, montant);
+    }
+
+    private Map<CategorieQuittance, Ligne> lignesParCategorie(Resultat resultat) {
+        Map<CategorieQuittance, Ligne> lignes = new EnumMap<>(CategorieQuittance.class);
+        if (resultat == null || resultat.lignes() == null) {
+            return lignes;
+        }
+        for (Ligne ligne : resultat.lignes()) {
+            if (ligne != null && ligne.categorie() != null) {
+                lignes.put(ligne.categorie(), ligne);
+            }
+        }
+        return lignes;
+    }
+
+    private BigDecimal moins(BigDecimal apres, BigDecimal avant) {
+        return scale(zeroIfNull(apres).subtract(zeroIfNull(avant)));
     }
 
     private Resultat withTotal(List<Ligne> source, BigDecimal signe) {

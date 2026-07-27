@@ -129,6 +129,19 @@ public class MouvementContratService {
         return toPreviewResponse(contrat, typeMouvement, request, calcul, garanties, vehicules, remorques);
     }
 
+    @Transactional(readOnly = true)
+    public QuittanceResponse previsualiserMouvementSpecialise(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            QuittanceCalculService.Resultat calcul
+    ) {
+        return toPreviewResponse(contrat, typeMouvement, request, calcul, garanties, vehicules, remorques);
+    }
+
     @Transactional
     public QuittanceResponse creerMouvementSpecialise(
             Contrat contrat,
@@ -140,6 +153,20 @@ public class MouvementContratService {
             NatureSnapshotMouvement snapshotNature
     ) {
         QuittanceCalculService.Resultat montants = calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
+        return creerMouvementSpecialise(contrat, typeMouvement, request, garanties, vehicules, remorques, snapshotNature, montants);
+    }
+
+    @Transactional
+    public QuittanceResponse creerMouvementSpecialise(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            NatureSnapshotMouvement snapshotNature,
+            QuittanceCalculService.Resultat montants
+    ) {
         LocalDate dateEffet = request.getDateEffet() != null ? request.getDateEffet() : contrat.getDateEffet();
         LocalDate dateEcheance = request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance();
 
@@ -176,6 +203,7 @@ public class MouvementContratService {
                     contrat,
                     mouvement,
                     typeMouvement,
+                    montants,
                     garanties,
                     vehicules,
                     remorques

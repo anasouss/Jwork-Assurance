@@ -87,6 +87,9 @@ type Props = {
   onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
   onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
+  showAssistance?: boolean;
+  showInfoSections?: boolean;
+  allowTargetChanges?: boolean;
   assistanceCategorieClientId?: string;
   crmPartage?: boolean;
   crmPartageValeur?: string;
@@ -123,6 +126,9 @@ export function FlotteTargetsSection({
   onSaveTargetDraft,
   onValidateTarget,
   setAssistanceEnabled,
+  showAssistance = true,
+  showInfoSections = true,
+  allowTargetChanges = true,
   assistanceCategorieClientId,
   crmPartage = false,
   crmPartageValeur = "",
@@ -229,6 +235,12 @@ export function FlotteTargetsSection({
   useEffect(() => {
     setActiveTargetPart("info");
   }, [activeKey]);
+
+  useEffect(() => {
+    if (!showInfoSections) {
+      setActiveTargetPart("garanties");
+    }
+  }, [showInfoSections]);
 
   useEffect(() => {
     const rcGaranties = vehiculeGaranties.filter((garantie) => Boolean(garantie.responsabiliteCivile));
@@ -347,58 +359,62 @@ export function FlotteTargetsSection({
                 );
               })}
             </div>
-            <div className="grid gap-2 border-t pt-3">
-              <Button type="button" variant="outline" size="sm" onClick={addVehicle}>
-                <Plus className="size-4" />
-                Véhicule
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={!activeVehiculeTarget || vehicules.length === 1}
-                onClick={() => removeTarget(activeVehiculeTarget)}
-              >
-                <Trash2 className="size-4" />
-                Retirer
-              </Button>
-            </div>
+            {allowTargetChanges ? (
+              <div className="grid gap-2 border-t pt-3">
+                <Button type="button" variant="outline" size="sm" onClick={addVehicle}>
+                  <Plus className="size-4" />
+                  Véhicule
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={!activeVehiculeTarget || vehicules.length === 1}
+                  onClick={() => removeTarget(activeVehiculeTarget)}
+                >
+                  <Trash2 className="size-4" />
+                  Retirer
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {activeVehiculeTarget ? (
             <div className="grid gap-4">
-              <TargetSubsection
-                title="Informations véhicule"
-                open={activeTargetPart === "info"}
-                onOpenChange={() => setActiveTargetPart("info")}
-              >
-                <VehicleForm
-                  index={activeVehiculeTarget.index}
-                  vehicule={vehicules[activeVehiculeTarget.index]}
-                  setVehicules={setVehicules}
-                  usages={usages}
-                  marques={marques}
-                  carrosseries={carrosseries}
-                  categoriesTransport={categoriesTransport}
-                  crmPartage={crmPartage}
-                  crmPartageValeur={crmPartageValeur}
-                  prospectionMode={prospectionMode}
-                  errors={errors}
-                />
-                <SectionSubmitButton
-                  saving={saving}
-                  onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => {
-                    setActiveTargetPart("garanties");
-                    onPreviewQuittance?.(activeVehiculeTarget);
-                  })}
+              {showInfoSections ? (
+                <TargetSubsection
+                  title="Informations véhicule"
+                  open={activeTargetPart === "info"}
+                  onOpenChange={() => setActiveTargetPart("info")}
                 >
-                  Enregistrer informations
-                </SectionSubmitButton>
-              </TargetSubsection>
+                  <VehicleForm
+                    index={activeVehiculeTarget.index}
+                    vehicule={vehicules[activeVehiculeTarget.index]}
+                    setVehicules={setVehicules}
+                    usages={usages}
+                    marques={marques}
+                    carrosseries={carrosseries}
+                    categoriesTransport={categoriesTransport}
+                    crmPartage={crmPartage}
+                    crmPartageValeur={crmPartageValeur}
+                    prospectionMode={prospectionMode}
+                    errors={errors}
+                  />
+                  <SectionSubmitButton
+                    saving={saving}
+                    onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => {
+                      setActiveTargetPart("garanties");
+                      onPreviewQuittance?.(activeVehiculeTarget);
+                    })}
+                  >
+                    Enregistrer informations
+                  </SectionSubmitButton>
+                </TargetSubsection>
+              ) : null}
               <TargetSubsection
                 title="Garanties"
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length > 1 ? "s" : ""}`}
-                open={activeTargetPart === "garanties"}
+                open={!showInfoSections || activeTargetPart === "garanties"}
                 onOpenChange={() => setActiveTargetPart("garanties")}
                 action={
                   <Button
@@ -427,6 +443,7 @@ export function FlotteTargetsSection({
                   assistance={assistances[targetKey(activeVehiculeTarget)] ?? { enabled: false }}
                   onAssistanceChange={(patch) => updateAssistance(activeVehiculeTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
+                  showAssistance={showAssistance}
                   grilleSelected={grilleSelected}
                   preview={activeVehiculePreview}
                   previewing={previewing}
@@ -438,7 +455,7 @@ export function FlotteTargetsSection({
                   target={activeVehiculeTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeVehiculeTarget)}
-                  showAssistanceTotal={Boolean(assistances[targetKey(activeVehiculeTarget)]?.enabled)}
+                  showAssistanceTotal={showAssistance && Boolean(assistances[targetKey(activeVehiculeTarget)]?.enabled)}
                   assistanceNet={targetAssistanceNet(assistances[targetKey(activeVehiculeTarget)], produitsAssistance)}
                 />
               </TargetSubsection>
@@ -484,39 +501,43 @@ export function FlotteTargetsSection({
                 Aucune remorque ajoutée.
               </div>
             )}
-            <div className="grid gap-2 border-t pt-3">
-              <Button type="button" variant="outline" size="sm" disabled={!canAddRemorque} onClick={addRemorque}>
-                <Plus className="size-4" />
-                Remorque
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={!activeRemorqueTarget}
-                onClick={() => removeTarget(activeRemorqueTarget)}
-              >
-                <Trash2 className="size-4" />
-                Retirer
-              </Button>
-            </div>
+            {allowTargetChanges ? (
+              <div className="grid gap-2 border-t pt-3">
+                <Button type="button" variant="outline" size="sm" disabled={!canAddRemorque} onClick={addRemorque}>
+                  <Plus className="size-4" />
+                  Remorque
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={!activeRemorqueTarget}
+                  onClick={() => removeTarget(activeRemorqueTarget)}
+                >
+                  <Trash2 className="size-4" />
+                  Retirer
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {activeRemorqueTarget ? (
             <div className="grid gap-4">
-              <TargetSubsection title="Informations remorque">
-                <RemorqueForm
-                  index={activeRemorqueTarget.index}
-                  remorque={remorques[activeRemorqueTarget.index]}
-                  setRemorques={setRemorques}
-                  usages={usages}
-                  marques={marques}
-                  prospectionMode={prospectionMode}
-                />
-                <SectionSubmitButton saving={saving} onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque")}>
-                  Enregistrer informations
-                </SectionSubmitButton>
-              </TargetSubsection>
+              {showInfoSections ? (
+                <TargetSubsection title="Informations remorque">
+                  <RemorqueForm
+                    index={activeRemorqueTarget.index}
+                    remorque={remorques[activeRemorqueTarget.index]}
+                    setRemorques={setRemorques}
+                    usages={usages}
+                    marques={marques}
+                    prospectionMode={prospectionMode}
+                  />
+                  <SectionSubmitButton saving={saving} onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque")}>
+                    Enregistrer informations
+                  </SectionSubmitButton>
+                </TargetSubsection>
+              ) : null}
               <TargetSubsection
                 title="Garanties"
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length > 1 ? "s" : ""}`}
@@ -547,6 +568,7 @@ export function FlotteTargetsSection({
                   assistance={assistances[targetKey(activeRemorqueTarget)] ?? { enabled: false }}
                   onAssistanceChange={(patch) => updateAssistance(activeRemorqueTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
+                  showAssistance={showAssistance}
                   grilleSelected={grilleSelected}
                   preview={activeRemorquePreview}
                   previewing={previewing}
@@ -558,7 +580,7 @@ export function FlotteTargetsSection({
                   target={activeRemorqueTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeRemorqueTarget)}
-                  showAssistanceTotal={Boolean(assistances[targetKey(activeRemorqueTarget)]?.enabled)}
+                  showAssistanceTotal={showAssistance && Boolean(assistances[targetKey(activeRemorqueTarget)]?.enabled)}
                   assistanceNet={targetAssistanceNet(assistances[targetKey(activeRemorqueTarget)], produitsAssistance)}
                 />
               </TargetSubsection>
@@ -1262,6 +1284,7 @@ function TargetGuaranteesTable({
   assistance,
   onAssistanceChange,
   assistanceCategorieClientId,
+  showAssistance,
   grilleSelected,
   preview,
   previewing,
@@ -1281,6 +1304,7 @@ function TargetGuaranteesTable({
   assistance: AssistanceDraft;
   onAssistanceChange: (patch: Partial<AssistanceDraft>) => void;
   assistanceCategorieClientId?: string;
+  showAssistance?: boolean;
   grilleSelected: boolean;
   preview?: QuittancePreview | null;
   previewing?: boolean;
@@ -1551,7 +1575,7 @@ function TargetGuaranteesTable({
         </div>
       ) : null}
 
-      {target.kind === "vehicule" ? (
+      {showAssistance && target.kind === "vehicule" ? (
         <AssistanceTable
           target={target}
           assistance={assistance}

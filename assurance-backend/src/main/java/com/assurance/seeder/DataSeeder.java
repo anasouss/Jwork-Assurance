@@ -210,10 +210,16 @@ public class DataSeeder implements CommandLineRunner {
 
         seedTypeMouvement("INC_F", "Incorporation flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
                 List.of(TypeContrat.FLOTTE), true, true, true, true, false, true, true, true, true, false, false, 310);
+        seedTypeMouvement("MOG_F", "Modification garanties flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
+                List.of(TypeContrat.FLOTTE), true, true, true, true, false, true, true, false, false, false, false, 315);
         seedTypeMouvement("RET_F", "Retrait flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.RETOUR_PRIME,
                 List.of(TypeContrat.FLOTTE), true, false, true, true, false, true, false, false, false, false, false, 320);
+        seedTypeMouvement("EXR_F", "Extension remorque flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
+                List.of(TypeContrat.FLOTTE), false, false, false, true, false, true, false, false, false, false, false, 325);
         seedTypeMouvement("RES_F", "Resiliation flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.RETOUR_PRIME,
                 List.of(TypeContrat.FLOTTE), false, false, false, false, false, true, false, false, false, true, false, 330);
+        seedTypeMouvement("RCH_F", "Resiliation a l'echeance flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.ZERO,
+                List.of(TypeContrat.FLOTTE), false, false, false, false, false, true, false, false, false, false, false, 335);
         seedTypeMouvement("PRI_F", "Precision immatriculation flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.CNPAC_SEUL,
                 List.of(TypeContrat.FLOTTE), false, false, true, false, true, true, false, false, true, false, false, 340);
         seedTypeMouvement("DUP_F", "Duplicata flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.CNPAC_SEUL,

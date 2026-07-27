@@ -52,6 +52,7 @@ export function ContractInfoSection({
   const conventionHasFixedEcheance = readOnlyConventionContext
     && Boolean(form.request.echeance ?? form.effectiveEcheance)
     && selectedConvention?.typeEcheance === "A_ECHEANCE";
+  const showConventionDateToDateFractionnement = readOnlyConventionContext && selectedConvention?.typeEcheance === "DATE_A_DATE";
 
   return (
     <SectionCard
@@ -266,9 +267,9 @@ export function ContractInfoSection({
               <DatePicker date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
             </Field>
             <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
-              <DatePicker disabled={form.showContractEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
+              <DatePicker disabled={form.lockDateEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
             </Field>
-            {showFractionnement && !readOnlyConventionContext ? (
+            {showFractionnement && (!readOnlyConventionContext || showConventionDateToDateFractionnement) ? (
               <Field label="Périodicité">
                 <Select
                   value={form.fractionnement}

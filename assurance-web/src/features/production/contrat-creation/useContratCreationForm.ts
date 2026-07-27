@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "../api";
-import { computeDateEcheanceFromCode } from "../date";
+import { computeDateEcheanceFromCode, computeDateEcheanceFromMonths } from "../date";
 import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
 import { emptyVehicule } from "../components/VehiculeSection";
@@ -148,12 +148,14 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const selectedConventionTypeEcheance = selectedConvention?.typeEcheance;
   const selectedConventionEcheance = typeof selectedConvention?.echeance === "string" ? selectedConvention.echeance : undefined;
   const conventionHasFixedEcheance = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "A_ECHEANCE";
+  const conventionUsesPeriodicite = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "DATE_A_DATE";
   const effectiveEcheance = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "A_ECHEANCE"
     ? selectedConventionEcheance
     : echeance;
   const showContractEcheance = typeRenouvellement === "renouvelable"
     && fractionnement === "ANNUEL"
     && (typeContrat !== "CONVENTION" || conventionHasFixedEcheance);
+  const lockDateEcheance = showContractEcheance || conventionUsesPeriodicite;
 
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId, grilleUsageFilter],
@@ -903,6 +905,16 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     }
   }, [dateEffet, dateEcheance, effectiveEcheance, showContractEcheance]);
 
+  useEffect(() => {
+    if (!conventionUsesPeriodicite || !dateEffet) {
+      return;
+    }
+    const computed = computeDateEcheanceFromMonths(dateEffet, monthsFromFractionnement(fractionnement));
+    if (computed && computed !== dateEcheance) {
+      setDateEcheance(computed);
+    }
+  }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement]);
+
   return {
     typeContrat,
     refs,
@@ -954,6 +966,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setEcheance,
     effectiveEcheance,
     showContractEcheance,
+    lockDateEcheance,
     modeReglement,
     setModeReglement,
     numeroBonCommande,
@@ -1063,6 +1076,20 @@ function periodiciteFromFractionnement(value: CreateContratRequest["fractionneme
     case "ANNUEL":
     default:
       return "4";
+  }
+}
+
+function monthsFromFractionnement(value: CreateContratRequest["fractionnement"]) {
+  switch (value) {
+    case "MENSUEL":
+      return 1;
+    case "TRIMESTRIEL":
+      return 3;
+    case "SEMESTRIEL":
+      return 6;
+    case "ANNUEL":
+    default:
+      return 12;
   }
 }
 

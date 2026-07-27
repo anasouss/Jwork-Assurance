@@ -1156,7 +1156,7 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
   if (typeContrat === "PARTICULIER") {
     return false;
   }
-  const hasContractReference = Boolean(request.prospection) || (typeContrat === "PARTICULIER" ? Boolean(request.numeroContrat) : Boolean(request.numeroPolice));
+  const hasContractReference = Boolean(request.prospection) || Boolean(request.numeroPolice);
   if (!request.agenceId || !hasContractReference || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
     return false;
   }

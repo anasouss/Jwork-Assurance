@@ -311,11 +311,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           <>
             {isFlotte ? (
               <>
-                <DropdownMenuItem>Incorporation</DropdownMenuItem>
-                <DropdownMenuItem>Retrait</DropdownMenuItem>
-                <DropdownMenuItem>Précision</DropdownMenuItem>
-                <DropdownMenuItem>Duplicata</DropdownMenuItem>
-                <DropdownMenuItem>Autre avenant</DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
               </>
             ) : (
               <DropdownMenuItem>Ajouter un avenant</DropdownMenuItem>
@@ -345,6 +345,10 @@ function editContratPath(contrat: ContratSummary) {
   if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;
   if (contrat.typeContrat === "CONVENTION") return `/app/production/ajouter-dossier/convention/${contrat.id}`;
   return `/app/production/ajouter-dossier/particulier/${contrat.id}`;
+}
+
+function flotteAvenantPath(contrat: ContratSummary, code: string) {
+  return `/app/production/contrats/${contrat.id}/avenants/${code}`;
 }
 
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {

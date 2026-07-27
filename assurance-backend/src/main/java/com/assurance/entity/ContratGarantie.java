@@ -72,6 +72,10 @@ public class ContratGarantie extends BaseEntity {
     @JoinColumn(name = "formule_garantie_personne_id")
     private FormuleGarantiePersonne formuleGarantiePersonne;
 
+    @Builder.Default
+    @Column
+    private Boolean actif = true;
+
     @Column(name = "valeur_venale", precision = 14, scale = 2)
     private BigDecimal valeurVenale;
 

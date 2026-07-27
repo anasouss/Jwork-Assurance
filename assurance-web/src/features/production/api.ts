@@ -13,6 +13,8 @@ import type {
   ClientResponse,
   ElementFacturable,
   EcheanceAutomobileResponse,
+  FlotteAvenantContext,
+  FlotteAvenantRequest,
   LivraisonAttestation,
   PieceJointe,
   PiecesJointesContrat,
@@ -168,6 +170,28 @@ export const productionApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(filter ?? {}),
     });
+  },
+
+  async getFlotteAvenantContext(contratId: string) {
+    return unwrap(await apiFetch<ApiResponse<FlotteAvenantContext>>(`/api/v1/contrats/${contratId}/avenants/flotte`));
+  },
+
+  async previewFlotteAvenant(contratId: string, request: FlotteAvenantRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/flotte/previsualisation-quittance`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async createFlotteAvenant(contratId: string, request: FlotteAvenantRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/flotte`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
   },
 
   async getAssistanceContext(contratId: string, params?: { mouvementId?: string | null; dateSouscription?: string | null }) {

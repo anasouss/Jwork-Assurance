@@ -2,12 +2,15 @@ package com.assurance.service;
 
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
+import com.assurance.dto.request.FlotteAvenantRequest;
+import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeTarificationGarantie;
+import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.StatutContrat;
@@ -1260,6 +1263,338 @@ public class ContratService {
     }
 
     @Transactional(readOnly = true)
+    public QuittanceResponse previsualiserAvenantFlotte(Long agenceId, Long contratId, FlotteAvenantRequest request) {
+        FlotteAvenantGraph graph = resolveFlotteAvenantGraph(agenceId, contratId, request, false);
+        return mouvementContratService.previsualiserMouvementSpecialise(
+                graph.contrat(),
+                graph.typeMouvement(),
+                toMouvementRequest(request, graph.contrat()),
+                graph.garanties(),
+                graph.vehicules(),
+                graph.remorques()
+        );
+    }
+
+    @Transactional
+    public QuittanceResponse creerAvenantFlotte(Long agenceId, Long contratId, FlotteAvenantRequest request) {
+        FlotteAvenantGraph graph = resolveFlotteAvenantGraph(agenceId, contratId, request, true);
+        QuittanceResponse quittance = mouvementContratService.creerMouvementSpecialise(
+                graph.contrat(),
+                graph.typeMouvement(),
+                toMouvementRequest(request, graph.contrat()),
+                graph.garanties(),
+                graph.vehicules(),
+                graph.remorques(),
+                graph.snapshotNature()
+        );
+        applyFlotteAvenantCurrentState(graph, request);
+        return quittance;
+    }
+
+    private FlotteAvenantGraph resolveFlotteAvenantGraph(Long agenceId, Long contratId, FlotteAvenantRequest request, boolean persistIncorporation) {
+        if (request == null || !hasText(request.getCodeTypeMouvement())) {
+            throw new BadRequestException("Le type d'avenant est obligatoire");
+        }
+        if (request.getDateEffet() == null) {
+            throw new BadRequestException("La date d'effet de l'avenant est obligatoire");
+        }
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
+            throw new BadRequestException("Les avenants flotte sont autorises uniquement pour les contrats flotte");
+        }
+        if (Boolean.TRUE.equals(contrat.getBrouillon()) || Boolean.TRUE.equals(contrat.getProspection()) || contrat.getStatut() != StatutContrat.ACTIVE) {
+            throw new BadRequestException("Le contrat doit etre actif pour creer un avenant");
+        }
+        validateAvenantDates(contrat, request);
+        TypeMouvementContrat typeMouvement = mouvementContratService.resolveTypeMouvementPourContrat(request.getCodeTypeMouvement(), contrat.getTypeContrat());
+        String code = typeMouvement.getCode() == null ? "" : typeMouvement.getCode().trim().toUpperCase(Locale.ROOT);
+        return switch (code) {
+            case "INC_F" -> resolveIncorporationFlotte(contrat, typeMouvement, request, persistIncorporation);
+            case "RET_F" -> resolveRetraitFlotte(contrat, typeMouvement, request);
+            case "RES_F" -> resolveResiliationFlotte(contrat, typeMouvement);
+            case "PRI_F" -> resolvePrecisionFlotte(contrat, typeMouvement, request);
+            case "DUP_F" -> resolveDuplicataFlotte(contrat, typeMouvement, request);
+            default -> throw new BadRequestException("Le type d'avenant " + typeMouvement.getCode() + " n'est pas pris en charge pour les flottes");
+        };
+    }
+
+    private FlotteAvenantGraph resolveIncorporationFlotte(Contrat contrat, TypeMouvementContrat typeMouvement, FlotteAvenantRequest request, boolean persist) {
+        if ((request.getVehicules() == null || request.getVehicules().isEmpty())
+                && (request.getRemorques() == null || request.getRemorques().isEmpty())) {
+            throw new BadRequestException("Au moins un vehicule ou une remorque est obligatoire pour l'incorporation");
+        }
+        FlotteAvenantTargets targets = persist
+                ? persistAvenantTargets(contrat, request)
+                : buildAvenantTargetsPreview(contrat, request);
+        if (targets.garanties().isEmpty()) {
+            throw new BadRequestException("Au moins une garantie est obligatoire pour l'incorporation");
+        }
+        return new FlotteAvenantGraph(contrat, typeMouvement, targets.vehicules(), targets.remorques(), targets.garanties(), NatureSnapshotMouvement.AJOUT);
+    }
+
+    private FlotteAvenantGraph resolveRetraitFlotte(Contrat contrat, TypeMouvementContrat typeMouvement, FlotteAvenantRequest request) {
+        List<Vehicule> vehicules = selectedActiveVehicules(contrat, request.getVehiculeIds(), false);
+        List<Remorque> remorques = selectedActiveRemorques(contrat, request.getRemorqueIds(), false);
+        if (vehicules.isEmpty() && remorques.isEmpty()) {
+            throw new BadRequestException("Selectionnez au moins un vehicule ou une remorque a retirer");
+        }
+        List<ContratGarantie> garanties = activeGarantiesForTargets(contrat, vehicules, remorques);
+        return new FlotteAvenantGraph(contrat, typeMouvement, vehicules, remorques, garanties, NatureSnapshotMouvement.RETRAIT);
+    }
+
+    private FlotteAvenantGraph resolveResiliationFlotte(Contrat contrat, TypeMouvementContrat typeMouvement) {
+        List<Vehicule> vehicules = activeVehicules(contrat);
+        List<Remorque> remorques = activeRemorques(contrat);
+        List<ContratGarantie> garanties = activeGaranties(contrat);
+        return new FlotteAvenantGraph(contrat, typeMouvement, vehicules, remorques, garanties, NatureSnapshotMouvement.RETRAIT);
+    }
+
+    private FlotteAvenantGraph resolvePrecisionFlotte(Contrat contrat, TypeMouvementContrat typeMouvement, FlotteAvenantRequest request) {
+        SelectionIds ids = precisionSelectionIds(request);
+        List<Vehicule> vehicules = selectedActiveVehicules(contrat, ids.vehiculeIds(), false);
+        List<Remorque> remorques = selectedActiveRemorques(contrat, ids.remorqueIds(), false);
+        if (vehicules.isEmpty() && remorques.isEmpty()) {
+            throw new BadRequestException("Selectionnez au moins un vehicule ou une remorque pour la precision");
+        }
+        return new FlotteAvenantGraph(contrat, typeMouvement, vehicules, remorques, List.of(), NatureSnapshotMouvement.COURANT);
+    }
+
+    private FlotteAvenantGraph resolveDuplicataFlotte(Contrat contrat, TypeMouvementContrat typeMouvement, FlotteAvenantRequest request) {
+        List<Vehicule> vehicules = selectedActiveVehicules(contrat, request.getVehiculeIds(), true);
+        List<Remorque> remorques = selectedActiveRemorques(contrat, request.getRemorqueIds(), true);
+        return new FlotteAvenantGraph(contrat, typeMouvement, vehicules, remorques, List.of(), NatureSnapshotMouvement.COURANT);
+    }
+
+    private void applyFlotteAvenantCurrentState(FlotteAvenantGraph graph, FlotteAvenantRequest request) {
+        String code = graph.typeMouvement().getCode() == null ? "" : graph.typeMouvement().getCode().trim().toUpperCase(Locale.ROOT);
+        if ("RET_F".equals(code)) {
+            desactiverTargets(graph.contrat(), graph.vehicules(), graph.remorques(), graph.garanties());
+            return;
+        }
+        if ("RES_F".equals(code)) {
+            desactiverTargets(graph.contrat(), graph.vehicules(), graph.remorques(), graph.garanties());
+            graph.contrat().setStatut(StatutContrat.CANCELLED);
+            contratRepository.save(graph.contrat());
+            return;
+        }
+        if ("PRI_F".equals(code)) {
+            appliquerPrecisionFlotte(graph.contrat(), request);
+        }
+    }
+
+    private void validateAvenantDates(Contrat contrat, FlotteAvenantRequest request) {
+        LocalDate dateEffet = request.getDateEffet();
+        LocalDate dateEcheance = request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance();
+        if (dateEcheance != null && dateEffet.isAfter(dateEcheance)) {
+            throw new BadRequestException("La date d'effet de l'avenant doit etre inferieure ou egale a sa date d'echeance");
+        }
+        if (contrat.getDateEffet() != null && dateEffet.isBefore(contrat.getDateEffet())) {
+            throw new BadRequestException("La date d'effet de l'avenant ne peut pas etre avant la date d'effet du contrat");
+        }
+        if (contrat.getDateEcheance() != null && dateEffet.isAfter(contrat.getDateEcheance())) {
+            throw new BadRequestException("La date d'effet de l'avenant ne peut pas etre apres l'echeance du contrat");
+        }
+    }
+
+    private MouvementContratRequest toMouvementRequest(FlotteAvenantRequest request, Contrat contrat) {
+        MouvementContratRequest mouvementRequest = new MouvementContratRequest();
+        mouvementRequest.setCodeTypeMouvement(request.getCodeTypeMouvement());
+        mouvementRequest.setNumeroMouvement(request.getNumeroMouvement());
+        mouvementRequest.setDateEffet(request.getDateEffet());
+        mouvementRequest.setDateEcheance(request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance());
+        mouvementRequest.setNotes(request.getNotes());
+        return mouvementRequest;
+    }
+
+    private FlotteAvenantTargets buildAvenantTargetsPreview(Contrat contrat, FlotteAvenantRequest request) {
+        CreateContratRequest previewRequest = avenantCreateRequest(contrat, request);
+        List<Vehicule> vehicules = buildVehiculesPreview(previewRequest, contrat, contrat.getUsage());
+        List<Remorque> remorques = buildRemorquesPreview(previewRequest, contrat, contrat.getUsage());
+        List<ContratGarantie> garanties = buildGarantiesPreview(previewRequest, contrat, vehicules, remorques);
+        return new FlotteAvenantTargets(vehicules, remorques, garanties);
+    }
+
+    private FlotteAvenantTargets persistAvenantTargets(Contrat contrat, FlotteAvenantRequest request) {
+        List<Vehicule> vehicules = new ArrayList<>();
+        for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
+            validateDraftVehiculeInput(contrat, input);
+            Vehicule vehicule = new Vehicule();
+            vehicule.setContrat(contrat);
+            applyVehiculeInput(contrat, vehicule, input);
+            vehicule.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+            vehicule.setDateEcheance(firstNonNull(input.getDateEcheance(), firstNonNull(request.getDateEcheance(), contrat.getDateEcheance())));
+            vehicule.setActif(true);
+            vehicule = vehiculeRepository.save(vehicule);
+            vehicules.add(vehicule);
+            contrat.getVehicules().add(vehicule);
+        }
+
+        List<Remorque> remorques = new ArrayList<>();
+        for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
+            validateDraftRemorqueInput(input);
+            Remorque remorque = new Remorque();
+            remorque.setContrat(contrat);
+            applyRemorqueInput(contrat, remorque, input);
+            remorque.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+            remorque.setDateEcheance(firstNonNull(input.getDateEcheance(), firstNonNull(request.getDateEcheance(), contrat.getDateEcheance())));
+            remorque.setActif(true);
+            remorque = remorqueRepository.save(remorque);
+            remorques.add(remorque);
+            contrat.getRemorques().add(remorque);
+        }
+
+        CreateContratRequest createRequest = avenantCreateRequest(contrat, request);
+        List<ContratGarantie> garanties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques);
+        updateTargetCounts(contrat);
+        return new FlotteAvenantTargets(vehicules, remorques, garanties);
+    }
+
+    private CreateContratRequest avenantCreateRequest(Contrat contrat, FlotteAvenantRequest request) {
+        CreateContratRequest createRequest = new CreateContratRequest();
+        createRequest.setAgenceId(contrat.getAgence().getId());
+        createRequest.setTypeContrat(contrat.getTypeContrat());
+        createRequest.setCompagnieAssuranceId(contrat.getCompagnieAssurance() != null ? contrat.getCompagnieAssurance().getId() : null);
+        createRequest.setGrilleTarifaireId(contrat.getGrilleTarifaire() != null ? contrat.getGrilleTarifaire().getId() : null);
+        createRequest.setUsageId(contrat.getUsage() != null ? contrat.getUsage().getId() : null);
+        createRequest.setDateEffet(request.getDateEffet());
+        createRequest.setDateEcheance(request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance());
+        createRequest.setModeSaisieGaranties(contrat.getModeSaisieGaranties());
+        createRequest.setSaisiePrimeNette(contrat.getSaisiePrimeNette());
+        createRequest.setTauxRc(contrat.getTauxRc());
+        createRequest.setCrmPartage(contrat.getCrmPartage());
+        createRequest.setCrmPartageValeur(contrat.getCrmPartageValeur());
+        createRequest.setVehicules(request.getVehicules());
+        createRequest.setRemorques(request.getRemorques());
+        createRequest.setGaranties(request.getGaranties());
+        return createRequest;
+    }
+
+    private List<Vehicule> selectedActiveVehicules(Contrat contrat, List<Long> ids, boolean defaultAllWhenEmpty) {
+        if ((ids == null || ids.isEmpty()) && defaultAllWhenEmpty) {
+            return activeVehicules(contrat);
+        }
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> expected = new LinkedHashSet<>(ids);
+        List<Vehicule> selected = vehiculeRepository.findByContratIdAndIdIn(contrat.getId(), ids).stream()
+                .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                .toList();
+        Set<Long> found = selected.stream().map(Vehicule::getId).collect(java.util.stream.Collectors.toSet());
+        if (!found.containsAll(expected)) {
+            throw new BadRequestException("Un ou plusieurs vehicules selectionnes sont invalides ou deja retires");
+        }
+        return selected;
+    }
+
+    private List<Remorque> selectedActiveRemorques(Contrat contrat, List<Long> ids, boolean defaultAllWhenEmpty) {
+        if ((ids == null || ids.isEmpty()) && defaultAllWhenEmpty) {
+            return activeRemorques(contrat);
+        }
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> expected = new LinkedHashSet<>(ids);
+        List<Remorque> selected = remorqueRepository.findByContratIdAndIdIn(contrat.getId(), ids).stream()
+                .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                .toList();
+        Set<Long> found = selected.stream().map(Remorque::getId).collect(java.util.stream.Collectors.toSet());
+        if (!found.containsAll(expected)) {
+            throw new BadRequestException("Une ou plusieurs remorques selectionnees sont invalides ou deja retirees");
+        }
+        return selected;
+    }
+
+    private List<ContratGarantie> activeGarantiesForTargets(Contrat contrat, List<Vehicule> vehicules, List<Remorque> remorques) {
+        Set<Long> vehiculeIds = vehicules.stream().map(Vehicule::getId).collect(java.util.stream.Collectors.toSet());
+        Set<Long> remorqueIds = remorques.stream().map(Remorque::getId).collect(java.util.stream.Collectors.toSet());
+        return activeGaranties(contrat).stream()
+                .filter(garantie -> (garantie.getVehicule() != null && vehiculeIds.contains(garantie.getVehicule().getId()))
+                        || (garantie.getRemorque() != null && remorqueIds.contains(garantie.getRemorque().getId())))
+                .toList();
+    }
+
+    private void desactiverTargets(Contrat contrat, List<Vehicule> vehicules, List<Remorque> remorques, List<ContratGarantie> garanties) {
+        for (ContratGarantie garantie : garanties) {
+            garantie.setActif(false);
+        }
+        contratGarantieRepository.saveAll(garanties);
+        for (Vehicule vehicule : vehicules) {
+            vehicule.setActif(false);
+        }
+        vehiculeRepository.saveAll(vehicules);
+        for (Remorque remorque : remorques) {
+            remorque.setActif(false);
+        }
+        remorqueRepository.saveAll(remorques);
+        updateTargetCounts(contrat);
+    }
+
+    private void appliquerPrecisionFlotte(Contrat contrat, FlotteAvenantRequest request) {
+        if (request.getPrecisions() == null || request.getPrecisions().isEmpty()) {
+            return;
+        }
+        for (FlotteAvenantRequest.TargetPrecision precision : request.getPrecisions()) {
+            if (precision.getVehiculeId() != null) {
+                Vehicule vehicule = selectedActiveVehicules(contrat, List.of(precision.getVehiculeId()), false).get(0);
+                if (hasText(precision.getImmatriculation())) {
+                    vehicule.setImmatriculation(precision.getImmatriculation());
+                }
+                if (hasText(precision.getImmatriculationProvisoire())) {
+                    vehicule.setImmatriculationProvisoire(precision.getImmatriculationProvisoire());
+                }
+                if (hasText(precision.getNumeroAttestation())) {
+                    vehicule.setNumeroAttestation(precision.getNumeroAttestation());
+                }
+                vehiculeRepository.save(vehicule);
+            }
+            if (precision.getRemorqueId() != null) {
+                Remorque remorque = selectedActiveRemorques(contrat, List.of(precision.getRemorqueId()), false).get(0);
+                if (hasText(precision.getImmatriculation())) {
+                    remorque.setImmatriculation(precision.getImmatriculation());
+                }
+                if (hasText(precision.getNumeroAttestation())) {
+                    remorque.setNumeroAttestation(precision.getNumeroAttestation());
+                }
+                remorqueRepository.save(remorque);
+            }
+        }
+    }
+
+    private SelectionIds precisionSelectionIds(FlotteAvenantRequest request) {
+        Set<Long> vehiculeIds = new LinkedHashSet<>(request.getVehiculeIds() == null ? List.of() : request.getVehiculeIds());
+        Set<Long> remorqueIds = new LinkedHashSet<>(request.getRemorqueIds() == null ? List.of() : request.getRemorqueIds());
+        for (FlotteAvenantRequest.TargetPrecision precision : request.getPrecisions() == null ? List.<FlotteAvenantRequest.TargetPrecision>of() : request.getPrecisions()) {
+            if (precision.getVehiculeId() != null) {
+                vehiculeIds.add(precision.getVehiculeId());
+            }
+            if (precision.getRemorqueId() != null) {
+                remorqueIds.add(precision.getRemorqueId());
+            }
+        }
+        return new SelectionIds(new ArrayList<>(vehiculeIds), new ArrayList<>(remorqueIds));
+    }
+
+    private List<Vehicule> activeVehicules(Contrat contrat) {
+        return vehiculeRepository.findActiveByContratIdOrderByCreatedAtAsc(contrat.getId());
+    }
+
+    private List<Remorque> activeRemorques(Contrat contrat) {
+        return remorqueRepository.findActiveByContratIdOrderByCreatedAtAsc(contrat.getId());
+    }
+
+    private List<ContratGarantie> activeGaranties(Contrat contrat) {
+        return contratGarantieRepository.findActiveByContratId(contrat.getId());
+    }
+
+    private void updateTargetCounts(Contrat contrat) {
+        contrat.setNombreVehicules(activeVehicules(contrat).size());
+        contrat.setNombreRemorques(activeRemorques(contrat).size());
+        contratRepository.save(contrat);
+    }
+
+    @Transactional(readOnly = true)
     public QuittanceResponse previsualiserQuittance(CreateContratRequest request) {
         Agence agence = agenceRepository.findById(request.getAgenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", request.getAgenceId()));
@@ -1526,7 +1861,11 @@ public class ContratService {
         }
 
         List<ContratResponse.VehiculeView> vehicules = new ArrayList<>();
-        for (Vehicule vehicule : contrat.getVehicules()) {
+        List<Vehicule> vehiculesActifs = activeVehiculesForView(contrat);
+        List<Remorque> remorquesActives = activeRemorquesForView(contrat);
+        List<ContratGarantie> garantiesActives = activeGarantiesForView(contrat);
+
+        for (Vehicule vehicule : vehiculesActifs) {
             vehicules.add(ContratResponse.VehiculeView.builder()
                     .vehiculeId(vehicule.getId())
                     .typeVehicule(vehicule.getTypeVehicule().name())
@@ -1567,7 +1906,7 @@ public class ContratService {
         }
 
         List<ContratResponse.RemorqueView> remorques = new ArrayList<>();
-        for (Remorque remorque : contrat.getRemorques()) {
+        for (Remorque remorque : remorquesActives) {
             remorques.add(ContratResponse.RemorqueView.builder()
                     .remorqueId(remorque.getId())
                     .usageId(remorque.getUsage() != null ? remorque.getUsage().getId() : null)
@@ -1590,7 +1929,7 @@ public class ContratService {
         }
 
         List<ContratResponse.GarantieView> garanties = new ArrayList<>();
-        for (ContratGarantie contratGarantie : contrat.getGaranties()) {
+        for (ContratGarantie contratGarantie : garantiesActives) {
             garanties.add(ContratResponse.GarantieView.builder()
                     .contratGarantieId(contratGarantie.getId())
                     .garantieId(contratGarantie.getGarantie().getId())
@@ -1728,16 +2067,19 @@ public class ContratService {
         if (saved != null) {
             return saved;
         }
-        if (contrat.getGaranties().isEmpty()) {
+        List<Vehicule> vehiculesActifs = activeVehiculesForView(contrat);
+        List<Remorque> remorquesActives = activeRemorquesForView(contrat);
+        List<ContratGarantie> garantiesActives = activeGarantiesForView(contrat);
+        if (garantiesActives.isEmpty()) {
             return null;
         }
-        int unitesCnpac = countCnpacUnits(contrat.getGaranties(), contrat.getVehicules(), contrat.getRemorques());
-        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, null, contrat.getGaranties(), unitesCnpac);
+        int unitesCnpac = countCnpacUnits(garantiesActives, vehiculesActifs, remorquesActives);
+        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, null, garantiesActives, unitesCnpac);
         List<QuittanceResponse.TargetSummary> targetSummaries = elementFacturableCibleService.calculer(
                 contrat,
-                contrat.getGaranties(),
-                contrat.getVehicules(),
-                contrat.getRemorques()
+                garantiesActives,
+                vehiculesActifs,
+                remorquesActives
         );
         return QuittanceResponse.builder()
                 .numeroContrat(contrat.getNumeroContrat())
@@ -1753,8 +2095,8 @@ public class ContratService {
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
-                .garanties(contrat.getGaranties().stream()
-                        .map(garantie -> toQuittanceGarantieResponse(garantie, contrat.getVehicules(), contrat.getRemorques()))
+                .garanties(garantiesActives.stream()
+                        .map(garantie -> toQuittanceGarantieResponse(garantie, vehiculesActifs, remorquesActives))
                         .toList())
                 .targetSummaries(targetSummaries)
                 .build();
@@ -2808,6 +3150,33 @@ public class ContratService {
         return null;
     }
 
+    private List<Vehicule> activeVehiculesForView(Contrat contrat) {
+        if (contrat.getId() == null) {
+            return (contrat.getVehicules() == null ? List.<Vehicule>of() : contrat.getVehicules()).stream()
+                    .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                    .toList();
+        }
+        return activeVehicules(contrat);
+    }
+
+    private List<Remorque> activeRemorquesForView(Contrat contrat) {
+        if (contrat.getId() == null) {
+            return (contrat.getRemorques() == null ? List.<Remorque>of() : contrat.getRemorques()).stream()
+                    .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                    .toList();
+        }
+        return activeRemorques(contrat);
+    }
+
+    private List<ContratGarantie> activeGarantiesForView(Contrat contrat) {
+        if (contrat.getId() == null) {
+            return (contrat.getGaranties() == null ? List.<ContratGarantie>of() : contrat.getGaranties()).stream()
+                    .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                    .toList();
+        }
+        return activeGaranties(contrat);
+    }
+
     private record GarantieMontants(
             BigDecimal valeurVenale,
             BigDecimal valeurNeuf,
@@ -2840,6 +3209,29 @@ public class ContratService {
             List<Remorque> remorques,
             List<ContratGarantie> garanties,
             QuittanceCalculService.Resultat quittanceManuelle
+    ) {
+    }
+
+    private record FlotteAvenantGraph(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> garanties,
+            NatureSnapshotMouvement snapshotNature
+    ) {
+    }
+
+    private record FlotteAvenantTargets(
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> garanties
+    ) {
+    }
+
+    private record SelectionIds(
+            List<Long> vehiculeIds,
+            List<Long> remorqueIds
     ) {
     }
 }

@@ -246,6 +246,31 @@ export type MouvementContratRequest = {
   notes?: string;
 };
 
+export type FlotteAvenantRequest = {
+  codeTypeMouvement: string;
+  numeroMouvement?: string;
+  dateEffet?: string;
+  dateEcheance?: string;
+  notes?: string;
+  vehiculeIds?: string[];
+  remorqueIds?: string[];
+  precisions?: {
+    vehiculeId?: string;
+    remorqueId?: string;
+    immatriculation?: string;
+    immatriculationProvisoire?: string;
+    numeroAttestation?: string;
+  }[];
+  vehicules?: VehiculeInput[];
+  remorques?: RemorqueInput[];
+  garanties?: GarantieInput[];
+};
+
+export type FlotteAvenantContext = {
+  contrat: ContratSummary;
+  mouvementsDisponibles: MouvementDisponible[];
+};
+
 export type Quittance = QuittancePreview & {
   id?: string;
   contratId?: string;

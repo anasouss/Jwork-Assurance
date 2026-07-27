@@ -58,6 +58,10 @@ public class Remorque extends BaseEntity {
     @Column(name = "numero_attestation", length = 80)
     private String numeroAttestation;
 
+    @Builder.Default
+    @Column
+    private Boolean actif = true;
+
     @Column(name = "coefficient_prorata", precision = 14, scale = 6)
     private BigDecimal coefficientProrata;
 

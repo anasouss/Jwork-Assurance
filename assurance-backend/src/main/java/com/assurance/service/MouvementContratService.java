@@ -98,14 +98,95 @@ public class MouvementContratService {
         Contrat contrat = resolveContrat(agenceId, contratId);
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());
         refuserPrevisualisationGeneriqueSiPayloadSpecialiseRequis(typeMouvement);
+        List<ContratGarantie> garantiesActives = activeGaranties(contrat);
+        List<Vehicule> vehiculesActifs = activeVehicules(contrat);
+        List<Remorque> remorquesActives = activeRemorques(contrat);
         QuittanceCalculService.Resultat calcul = calculerMontants(
                 contrat,
                 typeMouvement,
-                contrat.getGaranties(),
-                contrat.getVehicules(),
-                contrat.getRemorques()
+                garantiesActives,
+                vehiculesActifs,
+                remorquesActives
         );
-        return toPreviewResponse(contrat, typeMouvement, request, calcul);
+        return toPreviewResponse(contrat, typeMouvement, request, calcul, garantiesActives, vehiculesActifs, remorquesActives);
+    }
+
+    @Transactional(readOnly = true)
+    public TypeMouvementContrat resolveTypeMouvementPourContrat(String code, TypeContrat typeContrat) {
+        return resolveTypeMouvement(code, typeContrat);
+    }
+
+    @Transactional(readOnly = true)
+    public QuittanceResponse previsualiserMouvementSpecialise(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        QuittanceCalculService.Resultat calcul = calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
+        return toPreviewResponse(contrat, typeMouvement, request, calcul, garanties, vehicules, remorques);
+    }
+
+    @Transactional
+    public QuittanceResponse creerMouvementSpecialise(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            NatureSnapshotMouvement snapshotNature
+    ) {
+        QuittanceCalculService.Resultat montants = calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
+        LocalDate dateEffet = request.getDateEffet() != null ? request.getDateEffet() : contrat.getDateEffet();
+        LocalDate dateEcheance = request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance();
+
+        MouvementContrat mouvement = mouvementContratRepository.save(MouvementContrat.builder()
+                .agence(contrat.getAgence())
+                .contrat(contrat)
+                .typeMouvement(typeMouvement)
+                .statut(StatutMouvementContrat.VALIDE)
+                .numeroMouvement(hasText(request.getNumeroMouvement()) ? request.getNumeroMouvement() : contrat.getNumeroContrat() + "-" + typeMouvement.getCode())
+                .dateEffet(dateEffet)
+                .dateEcheance(dateEcheance)
+                .dateValidation(LocalDate.now())
+                .primeNette(montants.primeNette())
+                .taxe(montants.taxe())
+                .taxeParafiscale(montants.taxeParafiscale())
+                .accessoire(montants.accessoire())
+                .cnpac(montants.cnpac())
+                .primeTotale(montants.primeTotale())
+                .notes(request.getNotes())
+                .build());
+        contrat.getMouvements().add(mouvement);
+
+        snapshotVehicules(mouvement, vehicules, snapshotNature);
+        snapshotRemorques(mouvement, remorques, snapshotNature);
+        snapshotGaranties(mouvement, garanties, snapshotNature);
+
+        if (Boolean.TRUE.equals(typeMouvement.getConsommeAttestation())) {
+            consommerAttestations(contrat, mouvement, vehicules, remorques);
+        }
+
+        Quittance quittance = null;
+        if (Boolean.TRUE.equals(typeMouvement.getGenereQuittance())) {
+            quittance = quittanceProductionService.genererPourMouvement(
+                    contrat,
+                    mouvement,
+                    typeMouvement,
+                    garanties,
+                    vehicules,
+                    remorques
+            );
+        }
+
+        if (Boolean.TRUE.equals(typeMouvement.getClotureContrat())) {
+            contrat.setStatut(StatutContrat.CANCELLED);
+            contratRepository.save(contrat);
+        }
+        return quittance == null ? toPreviewResponse(contrat, typeMouvement, request, montants, garanties, vehicules, remorques) : toResponse(quittance);
     }
 
     @Transactional
@@ -117,9 +198,9 @@ public class MouvementContratService {
         QuittanceCalculService.Resultat montants = calculerMontants(
                 contrat,
                 typeMouvement,
-                contrat.getGaranties(),
-                contrat.getVehicules(),
-                contrat.getRemorques()
+                activeGaranties(contrat),
+                activeVehicules(contrat),
+                activeRemorques(contrat)
         );
         LocalDate dateEffet = request.getDateEffet() != null ? request.getDateEffet() : contrat.getDateEffet();
         LocalDate dateEcheance = request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance();
@@ -146,9 +227,12 @@ public class MouvementContratService {
         NatureSnapshotMouvement snapshotNature = typeMouvement.getTypeImpact() == TypeImpactMouvement.RETOUR_PRIME
                 ? NatureSnapshotMouvement.RETRAIT
                 : NatureSnapshotMouvement.COURANT;
-        snapshotVehicules(mouvement, contrat.getVehicules(), snapshotNature);
-        snapshotRemorques(mouvement, contrat.getRemorques(), snapshotNature);
-        snapshotGaranties(mouvement, contrat.getGaranties(), snapshotNature);
+        List<Vehicule> vehiculesActifs = activeVehicules(contrat);
+        List<Remorque> remorquesActives = activeRemorques(contrat);
+        List<ContratGarantie> garantiesActives = activeGaranties(contrat);
+        snapshotVehicules(mouvement, vehiculesActifs, snapshotNature);
+        snapshotRemorques(mouvement, remorquesActives, snapshotNature);
+        snapshotGaranties(mouvement, garantiesActives, snapshotNature);
 
         Quittance quittance = null;
         if (Boolean.TRUE.equals(typeMouvement.getGenereQuittance())) {
@@ -156,9 +240,9 @@ public class MouvementContratService {
                     contrat,
                     mouvement,
                     typeMouvement,
-                    contrat.getGaranties(),
-                    contrat.getVehicules(),
-                    contrat.getRemorques()
+                    garantiesActives,
+                    vehiculesActifs,
+                    remorquesActives
             );
         }
 
@@ -166,7 +250,7 @@ public class MouvementContratService {
             contrat.setStatut(StatutContrat.CANCELLED);
             contratRepository.save(contrat);
         }
-        return quittance == null ? toPreviewResponse(contrat, typeMouvement, request, montants) : toResponse(quittance);
+        return quittance == null ? toPreviewResponse(contrat, typeMouvement, request, montants, garantiesActives, vehiculesActifs, remorquesActives) : toResponse(quittance);
     }
 
     @Transactional(readOnly = true)
@@ -501,7 +585,10 @@ public class MouvementContratService {
             Contrat contrat,
             TypeMouvementContrat typeMouvement,
             MouvementContratRequest request,
-            QuittanceCalculService.Resultat calcul
+            QuittanceCalculService.Resultat calcul,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
     ) {
         return QuittanceResponse.builder()
                 .contratId(contrat.getId())
@@ -522,11 +609,29 @@ public class MouvementContratService {
                 .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
                 .targetSummaries(elementFacturableCibleService.calculer(
                         contrat,
-                        contrat.getGaranties(),
-                        contrat.getVehicules(),
-                        contrat.getRemorques()
+                        garanties,
+                        vehicules,
+                        remorques
                 ))
                 .build();
+    }
+
+    private List<Vehicule> activeVehicules(Contrat contrat) {
+        return (contrat.getVehicules() == null ? List.<Vehicule>of() : contrat.getVehicules()).stream()
+                .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                .toList();
+    }
+
+    private List<Remorque> activeRemorques(Contrat contrat) {
+        return (contrat.getRemorques() == null ? List.<Remorque>of() : contrat.getRemorques()).stream()
+                .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                .toList();
+    }
+
+    private List<ContratGarantie> activeGaranties(Contrat contrat) {
+        return (contrat.getGaranties() == null ? List.<ContratGarantie>of() : contrat.getGaranties()).stream()
+                .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
+                .toList();
     }
 
     private QuittanceResponse.Ligne toLigneResponse(LigneQuittance ligne) {

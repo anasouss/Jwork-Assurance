@@ -92,6 +92,10 @@ public class Vehicule extends BaseEntity {
     private String numeroAttestation;
 
     @Builder.Default
+    @Column
+    private Boolean actif = true;
+
+    @Builder.Default
     @Column(name = "remorque", nullable = false)
     private Boolean remorque = false;
 

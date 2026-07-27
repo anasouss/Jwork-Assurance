@@ -1277,6 +1277,18 @@ public class ContratService {
             );
         }
         FlotteAvenantGraph graph = resolveFlotteAvenantGraph(agenceId, contratId, request, false);
+        QuittanceCalculService.Resultat retourPrime = calculerRetourPrimeFlotte(graph, request);
+        if (retourPrime != null) {
+            return mouvementContratService.previsualiserMouvementSpecialise(
+                    graph.contrat(),
+                    graph.typeMouvement(),
+                    toMouvementRequest(request, graph.contrat()),
+                    graph.garanties(),
+                    graph.vehicules(),
+                    graph.remorques(),
+                    retourPrime
+            );
+        }
         return mouvementContratService.previsualiserMouvementSpecialise(
                 graph.contrat(),
                 graph.typeMouvement(),
@@ -1303,15 +1315,27 @@ public class ContratService {
             );
         }
         FlotteAvenantGraph graph = resolveFlotteAvenantGraph(agenceId, contratId, request, true);
-        QuittanceResponse quittance = mouvementContratService.creerMouvementSpecialise(
-                graph.contrat(),
-                graph.typeMouvement(),
-                toMouvementRequest(request, graph.contrat()),
-                graph.garanties(),
-                graph.vehicules(),
-                graph.remorques(),
-                graph.snapshotNature()
-        );
+        QuittanceCalculService.Resultat retourPrime = calculerRetourPrimeFlotte(graph, request);
+        QuittanceResponse quittance = retourPrime == null
+                ? mouvementContratService.creerMouvementSpecialise(
+                        graph.contrat(),
+                        graph.typeMouvement(),
+                        toMouvementRequest(request, graph.contrat()),
+                        graph.garanties(),
+                        graph.vehicules(),
+                        graph.remorques(),
+                        graph.snapshotNature()
+                )
+                : mouvementContratService.creerMouvementSpecialise(
+                        graph.contrat(),
+                        graph.typeMouvement(),
+                        toMouvementRequest(request, graph.contrat()),
+                        graph.garanties(),
+                        graph.vehicules(),
+                        graph.remorques(),
+                        graph.snapshotNature(),
+                        retourPrime
+                );
         applyFlotteAvenantCurrentState(graph, request);
         return quittance;
     }
@@ -1494,6 +1518,87 @@ public class ContratService {
         int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
         int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
         return quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
+    }
+
+    private QuittanceCalculService.Resultat calculerRetourPrimeFlotte(FlotteAvenantGraph graph, FlotteAvenantRequest request) {
+        String code = graph.typeMouvement().getCode() == null ? "" : graph.typeMouvement().getCode().trim().toUpperCase(Locale.ROOT);
+        if (!"RET_F".equals(code) && !"RES_F".equals(code)) {
+            return null;
+        }
+        List<ContratGarantie> garantiesRetour = graph.garanties().stream()
+                .map(garantie -> garantieRetourPrime(graph.contrat(), request, garantie))
+                .toList();
+        return calculerMontantsAvenant(graph.contrat(), graph.typeMouvement(), garantiesRetour, graph.vehicules(), graph.remorques());
+    }
+
+    private ContratGarantie garantieRetourPrime(Contrat contrat, FlotteAvenantRequest request, ContratGarantie source) {
+        BigDecimal primeRetour = primeRetourPrime(contrat, request, source);
+        return ContratGarantie.builder()
+                .contrat(source.getContrat())
+                .garantie(source.getGarantie())
+                .vehicule(source.getVehicule())
+                .remorque(source.getRemorque())
+                .client(source.getClient())
+                .ligneGrilleTarifaire(source.getLigneGrilleTarifaire())
+                .modeSelectionne(source.getModeSelectionne())
+                .sourceValeurSelectionnee(source.getSourceValeurSelectionnee())
+                .formuleGarantiePersonne(source.getFormuleGarantiePersonne())
+                .actif(source.getActif())
+                .valeurVenale(source.getValeurVenale())
+                .valeurNeuf(source.getValeurNeuf())
+                .valeurGlace(source.getValeurGlace())
+                .formule(source.getFormule())
+                .montantDeces(source.getMontantDeces())
+                .montantInvalidite(source.getMontantInvalidite())
+                .montantFraisMedicaux(source.getMontantFraisMedicaux())
+                .montantFraisHospitalisation(source.getMontantFraisHospitalisation())
+                .montantFraisFuneraires(source.getMontantFraisFuneraires())
+                .montantFraisChirurgie(source.getMontantFraisChirurgie())
+                .accessoire(source.getAccessoire())
+                .capital(source.getCapital())
+                .taux(source.getTaux())
+                .prime(primeRetour)
+                .tauxFranchise(source.getTauxFranchise())
+                .franchiseMinimale(source.getFranchiseMinimale())
+                .build();
+    }
+
+    private BigDecimal primeRetourPrime(Contrat contrat, FlotteAvenantRequest request, ContratGarantie garantie) {
+        BigDecimal primeContrat = zeroIfNull(garantie.getPrime());
+        BigDecimal prorataOrigine = resolveProrataOrigine(contrat, garantie);
+        BigDecimal primeAnnuelle = prorataOrigine.compareTo(BigDecimal.ZERO) > 0
+                ? primeContrat.divide(prorataOrigine, 8, RoundingMode.HALF_UP)
+                : primeContrat;
+        BigDecimal prorataRestant = resolveProrataRestant(contrat, request, garantie);
+        return scale(primeAnnuelle.multiply(prorataRestant));
+    }
+
+    private BigDecimal resolveProrataOrigine(Contrat contrat, ContratGarantie garantie) {
+        BigDecimal coefficient = garantie.getVehicule() != null ? garantie.getVehicule().getCoefficientProrata()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getCoefficientProrata() : null;
+        if (coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0) {
+            return coefficient;
+        }
+        LocalDate dateEffet = garantie.getVehicule() != null ? garantie.getVehicule().getDateEffet()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEffet()
+                : contrat.getDateEffet();
+        LocalDate dateEcheance = garantie.getVehicule() != null ? garantie.getVehicule().getDateEcheance()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEcheance()
+                : contrat.getDateEcheance();
+        return calculGarantieService.calculerProrata(dateEffet, dateEcheance);
+    }
+
+    private BigDecimal resolveProrataRestant(Contrat contrat, FlotteAvenantRequest request, ContratGarantie garantie) {
+        LocalDate dateDebutCible = garantie.getVehicule() != null ? garantie.getVehicule().getDateEffet()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEffet()
+                : contrat.getDateEffet();
+        LocalDate dateEffetAvenant = firstNonNull(request.getDateEffet(), dateDebutCible, contrat.getDateEffet());
+        LocalDate dateDebutRetour = dateDebutCible != null && dateDebutCible.isAfter(dateEffetAvenant) ? dateDebutCible : dateEffetAvenant;
+        LocalDate dateEcheance = firstNonNull(request.getDateEcheance(), contrat.getDateEcheance());
+        if (dateEcheance == null || dateDebutRetour == null || dateDebutRetour.isAfter(dateEcheance)) {
+            return BigDecimal.ZERO;
+        }
+        return calculGarantieService.calculerProrata(dateDebutRetour, dateEcheance);
     }
 
     private MouvementContratRequest toMouvementRequest(FlotteAvenantRequest request, Contrat contrat) {

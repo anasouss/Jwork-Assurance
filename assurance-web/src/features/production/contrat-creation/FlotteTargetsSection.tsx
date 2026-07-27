@@ -333,7 +333,7 @@ export function FlotteTargetsSection({
         title="Véhicules"
         badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`}
         tone="production"
-        open={openSection === "flotteTargets"}
+        open={openSection === undefined ? undefined : openSection === "flotteTargets"}
         onOpenChange={(open) => onSectionOpenChange?.("flotteTargets", open)}
       >
         <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
@@ -469,7 +469,7 @@ export function FlotteTargetsSection({
         badge={`${remorques.length} remorque${remorques.length > 1 ? "s" : ""}`}
         tone="production"
         defaultOpen={false}
-        open={openSection === "remorque"}
+        open={openSection === undefined ? undefined : openSection === "remorque"}
         onOpenChange={(open) => onSectionOpenChange?.("remorque", open)}
       >
         <div className="grid gap-4 lg:grid-cols-[230px_1fr]">

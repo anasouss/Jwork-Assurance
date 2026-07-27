@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Calculator, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,7 @@ export default function FlotteAvenantPage() {
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof productionApi.previewFlotteAvenant>> | null>(null);
+  const autoPreviewKeyRef = useRef("");
 
   const contextQuery = useQuery({
     queryKey: ["flotte-avenant-context", contratId],
@@ -308,10 +309,41 @@ export default function FlotteAvenantPage() {
     return request;
   };
 
-  const runPreview = (silent = false) => {
-    const request = buildRequest(silent);
-    if (request) previewMutation.mutate(request);
-  };
+  useEffect(() => {
+    if (contextQuery.isLoading || saveMutation.isPending) {
+      return;
+    }
+    const request = buildRequest(true);
+    if (!request) {
+      autoPreviewKeyRef.current = "";
+      setPreview(null);
+      return;
+    }
+    const key = JSON.stringify({ ...request, numeroMouvement: undefined, notes: undefined });
+    if (autoPreviewKeyRef.current === key) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      autoPreviewKeyRef.current = key;
+      previewMutation.mutate(request);
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [
+    contextQuery.isLoading,
+    saveMutation.isPending,
+    movementCode,
+    contratId,
+    contrat?.dateEcheance,
+    dateEffet,
+    dateEcheance,
+    targets,
+    selectedTargetIds,
+    precisionDrafts,
+    vehicules,
+    remorques,
+    selectedGaranties,
+  ]);
+
   const save = () => {
     const request = buildRequest();
     if (request) saveMutation.mutate(request);
@@ -328,9 +360,6 @@ export default function FlotteAvenantPage() {
           <p className="text-sm text-muted-foreground">{contrat?.numeroDossier ?? contrat?.numeroContrat ?? contratId}</p>
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={() => runPreview()} disabled={previewMutation.isPending || contextQuery.isLoading}>
-            <Calculator className="size-4" />Prévisualiser quittance
-          </Button>
           <Button type="button" onClick={save} disabled={saveMutation.isPending || contextQuery.isLoading}>
             <Save className="size-4" />Enregistrer
           </Button>
@@ -397,7 +426,6 @@ export default function FlotteAvenantPage() {
           showAssistance={false}
           showInfoSections={movementCode === "INC_F"}
           allowTargetChanges={movementCode === "INC_F"}
-          onPreviewQuittance={() => runPreview(true)}
         />
       ) : movementCode !== "RES_F" && movementCode !== "RCH_F" ? (
         <TargetsSection

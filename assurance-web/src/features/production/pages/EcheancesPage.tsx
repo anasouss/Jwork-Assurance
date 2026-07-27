@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownAZ, Download, Eye, MoreHorizontal, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
@@ -47,12 +54,16 @@ const DEFAULT_FILTERS: EcheanceFilters = {
   typeContrat: "ALL",
   search: "",
 };
+const PAGE_SIZE = 25;
 
 export default function EcheancesPage() {
-  const [nature, setNature] = useState<NatureEcheance | null>(null);
-  const [filters, setFilters] = useState<EcheanceFilters>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<EcheanceFilters>(DEFAULT_FILTERS);
-  const [searched, setSearched] = useState(false);
+  const [urlParams] = useSearchParams();
+  const initialState = useMemo(() => initialEcheanceState(urlParams), [urlParams]);
+  const [nature, setNature] = useState<NatureEcheance | null>(initialState.nature);
+  const [filters, setFilters] = useState<EcheanceFilters>(initialState.filters);
+  const [appliedFilters, setAppliedFilters] = useState<EcheanceFilters>(initialState.filters);
+  const [searched, setSearched] = useState(initialState.searched);
+  const [page, setPage] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
     key: "dateEcheance",
@@ -68,8 +79,8 @@ export default function EcheancesPage() {
     if (!searched || nature !== "AUTOMOBILE" || !appliedFilters.dateDu || !appliedFilters.dateAu) {
       return null;
     }
-    return toSearchParams(appliedFilters);
-  }, [appliedFilters, nature, searched]);
+    return { ...toSearchParams(appliedFilters), page, size: PAGE_SIZE };
+  }, [appliedFilters, nature, page, searched]);
 
   const echeances = useQuery({
     queryKey: ["echeances", "automobile", searchParams],
@@ -91,12 +102,14 @@ export default function EcheancesPage() {
       return;
     }
     setAppliedFilters(filters);
+    setPage(0);
     setSearched(true);
   }
 
   function resetSearch() {
     setFilters(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
+    setPage(0);
     setSearched(false);
   }
 
@@ -113,7 +126,7 @@ export default function EcheancesPage() {
     }
     setExporting(true);
     try {
-      const blob = await productionApi.exportEcheancesAutomobile(searchParams);
+      const blob = await productionApi.exportEcheancesAutomobile(toSearchParams(appliedFilters));
       downloadBlob(blob, `echeances-automobile-${searchParams.dateDu}-${searchParams.dateAu}.xls`);
     } catch (error) {
       console.error("Export des echeances impossible", error);
@@ -121,6 +134,10 @@ export default function EcheancesPage() {
       setExporting(false);
     }
   }
+
+  const pageInfo = echeances.data?.page;
+  const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
+  const currentPage = Math.min(pageInfo?.number ?? page, totalPages - 1);
 
   return (
     <div className="grid gap-5">
@@ -292,6 +309,42 @@ export default function EcheancesPage() {
                 </tbody>
               </table>
             </div>
+            <div className="flex flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-muted-foreground">
+                Page {currentPage + 1} / {totalPages}
+              </div>
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((current) => Math.max(0, current - 1));
+                      }}
+                      aria-disabled={currentPage <= 0 || echeances.isLoading}
+                      className={currentPage <= 0 || echeances.isLoading ? "pointer-events-none opacity-50" : undefined}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <span className="flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium">
+                      {currentPage + 1}
+                    </span>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((current) => Math.min(totalPages - 1, current + 1));
+                      }}
+                      aria-disabled={currentPage >= totalPages - 1 || echeances.isLoading}
+                      className={currentPage >= totalPages - 1 || echeances.isLoading ? "pointer-events-none opacity-50" : undefined}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -390,6 +443,30 @@ function toSearchParams(filters: EcheanceFilters): EcheanceSearchParams {
     typeContrat: filters.typeContrat === "ALL" ? undefined : filters.typeContrat,
     search: filters.search.trim() || undefined,
   };
+}
+
+function initialEcheanceState(params: URLSearchParams): {
+  nature: NatureEcheance | null;
+  filters: EcheanceFilters;
+  searched: boolean;
+} {
+  const nature = params.get("nature") === "AUTOMOBILE" ? "AUTOMOBILE" : null;
+  const filters: EcheanceFilters = {
+    dateDu: params.get("dateDu") ?? undefined,
+    dateAu: params.get("dateAu") ?? undefined,
+    compagnieId: params.get("compagnieId") || "ALL",
+    typeContrat: toTypeContratFilter(params.get("typeContrat")),
+    search: params.get("search") ?? "",
+  };
+  return {
+    nature,
+    filters,
+    searched: nature === "AUTOMOBILE" && Boolean(filters.dateDu && filters.dateAu),
+  };
+}
+
+function toTypeContratFilter(value: string | null): EcheanceFilters["typeContrat"] {
+  return value === "PARTICULIER" || value === "CONVENTION" || value === "FLOTTE" ? value : "ALL";
 }
 
 function sortRows(rows: EcheanceAutomobileRow[], sort: { key: SortKey; direction: "asc" | "desc" }) {

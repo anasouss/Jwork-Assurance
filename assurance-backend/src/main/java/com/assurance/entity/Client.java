@@ -16,6 +16,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -101,6 +102,7 @@ public class Client extends BaseEntity {
 
     @OneToMany(mappedBy = "client", orphanRemoval = true)
     @Builder.Default
+    @BatchSize(size = 100)
     private List<ClientTelephone> telephones = new ArrayList<>();
 
     @Column(length = 150)

@@ -11,23 +11,32 @@ import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.ContratRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class EcheanceProductionService {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final int DEFAULT_PAGE_SIZE = 25;
+    private static final int MAX_PAGE_SIZE = 200;
+    private static final int EXPORT_PAGE_SIZE = 500;
 
     private final ContratRepository contratRepository;
 
@@ -37,26 +46,29 @@ public class EcheanceProductionService {
             LocalDate dateAu,
             Long compagnieId,
             TypeContrat typeContrat,
-            String search
+            String search,
+            Integer page,
+            Integer size
     ) {
         validateDates(dateDu, dateAu);
-        String normalizedSearch = normalize(search);
-        List<EcheanceAutomobileResponse.Row> rows = contratRepository
-                .findAutomobileEcheances(agenceId, dateDu, dateAu, compagnieId, typeContrat)
-                .stream()
-                .filter(contrat -> normalizedSearch.isBlank() || matchesSearch(contrat, normalizedSearch))
-                .map(this::toRow)
-                .sorted(Comparator
-                        .comparing(EcheanceAutomobileResponse.Row::getDateEcheance, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(row -> safe(row.getDossier()), String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        Page<Long> idsPage = contratRepository.findAutomobileEcheanceIds(
+                agenceId,
+                dateDu,
+                dateAu,
+                compagnieId,
+                typeContrat,
+                searchFilter(search),
+                PageRequest.of(safePage(page), safeSize(size))
+        );
+        List<EcheanceAutomobileResponse.Row> rows = toRows(agenceId, idsPage.getContent());
         return EcheanceAutomobileResponse.builder()
                 .dateDu(dateDu)
                 .dateAu(dateAu)
                 .compagnieId(compagnieId)
                 .typeContrat(typeContrat)
                 .search(safe(search))
-                .summary(summary(rows))
+                .summary(summary(rows, idsPage.getTotalElements()))
+                .page(pageInfo(idsPage))
                 .rows(rows)
                 .build();
     }
@@ -69,7 +81,8 @@ public class EcheanceProductionService {
             TypeContrat typeContrat,
             String search
     ) {
-        EcheanceAutomobileResponse response = searchAutomobile(agenceId, dateDu, dateAu, compagnieId, typeContrat, search);
+        validateDates(dateDu, dateAu);
+        String searchFilter = searchFilter(search);
         StringBuilder html = new StringBuilder();
         html.append("<!doctype html><html><head><meta charset=\"utf-8\"></head><body>");
         html.append("<table>");
@@ -86,21 +99,35 @@ public class EcheanceProductionService {
                 "Telephone",
                 "Observation"
         ), true);
-        for (EcheanceAutomobileResponse.Row row : response.getRows()) {
-            appendRow(html, List.of(
-                    row.getDossier(),
-                    row.getClient(),
-                    row.getCodeClient(),
-                    row.getPolice(),
-                    row.getMarque(),
-                    row.getMatricule(),
-                    formatDate(row.getDateEcheance()),
-                    row.getTypeContratLabel(),
-                    row.getCompagnie(),
-                    row.getTelephone(),
-                    row.getObservation()
-            ), false);
-        }
+        int page = 0;
+        Page<Long> idsPage;
+        do {
+            idsPage = contratRepository.findAutomobileEcheanceIds(
+                    agenceId,
+                    dateDu,
+                    dateAu,
+                    compagnieId,
+                    typeContrat,
+                    searchFilter,
+                    PageRequest.of(page, EXPORT_PAGE_SIZE)
+            );
+            for (EcheanceAutomobileResponse.Row row : toRows(agenceId, idsPage.getContent())) {
+                appendRow(html, List.of(
+                        row.getDossier(),
+                        row.getClient(),
+                        row.getCodeClient(),
+                        row.getPolice(),
+                        row.getMarque(),
+                        row.getMatricule(),
+                        formatDate(row.getDateEcheance()),
+                        row.getTypeContratLabel(),
+                        row.getCompagnie(),
+                        row.getTelephone(),
+                        row.getObservation()
+                ), false);
+            }
+            page++;
+        } while (idsPage.hasNext());
         html.append("</table></body></html>");
         return html.toString().getBytes(StandardCharsets.UTF_8);
     }
@@ -144,6 +171,21 @@ public class EcheanceProductionService {
                 .telephone(primaryPhone(client))
                 .observation(observation(client, vehicule))
                 .build();
+    }
+
+    private List<EcheanceAutomobileResponse.Row> toRows(Long agenceId, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<Long, Contrat> contratsById = new HashMap<>();
+        for (Contrat contrat : contratRepository.findByAgenceIdAndIdIn(agenceId, ids)) {
+            contratsById.put(contrat.getId(), contrat);
+        }
+        return ids.stream()
+                .map(contratsById::get)
+                .filter(contrat -> contrat != null)
+                .map(this::toRow)
+                .toList();
     }
 
     private ContratClient souscripteur(Contrat contrat) {
@@ -200,30 +242,7 @@ public class EcheanceProductionService {
         return "-";
     }
 
-    private boolean matchesSearch(Contrat contrat, String normalizedSearch) {
-        ContratClient link = souscripteur(contrat);
-        Client client = link == null ? null : link.getClient();
-        Vehicule vehicule = firstVehicule(contrat);
-        String haystack = normalize(String.join(" ",
-                safe(contrat.getNumeroDossier()),
-                safe(contrat.getNumeroContrat()),
-                safe(contrat.getNumeroPolice()),
-                safe(client == null ? null : client.getNomAffichage()),
-                safe(client == null ? null : client.getCodeClient()),
-                safe(client == null ? null : client.getRc()),
-                safe(client == null ? null : client.getCin()),
-                safe(client == null ? null : client.getIce()),
-                safe(client == null ? null : client.getTelephone()),
-                safe(primaryPhone(client)),
-                safe(vehicule == null ? null : vehicule.getImmatriculation()),
-                safe(vehicule == null || vehicule.getMarque() == null ? null : vehicule.getMarque().getLibelle()),
-                safe(contrat.getCompagnieAssurance() == null ? null : contrat.getCompagnieAssurance().getNom()),
-                safe(contrat.getCompagnieAssurance() == null ? null : contrat.getCompagnieAssurance().getCode())
-        ));
-        return haystack.contains(normalizedSearch);
-    }
-
-    private EcheanceAutomobileResponse.Summary summary(List<EcheanceAutomobileResponse.Row> rows) {
+    private EcheanceAutomobileResponse.Summary summary(List<EcheanceAutomobileResponse.Row> rows, long totalElements) {
         Set<String> compagnies = new LinkedHashSet<>();
         for (EcheanceAutomobileResponse.Row row : rows) {
             if (hasText(row.getCompagnie()) && !"-".equals(row.getCompagnie())) {
@@ -231,8 +250,19 @@ public class EcheanceProductionService {
             }
         }
         return EcheanceAutomobileResponse.Summary.builder()
-                .contratCount(rows.size())
+                .contratCount(totalElements)
                 .compagnieCount(compagnies.size())
+                .build();
+    }
+
+    private EcheanceAutomobileResponse.PageInfo pageInfo(Page<Long> page) {
+        return EcheanceAutomobileResponse.PageInfo.builder()
+                .number(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .first(page.isFirst())
+                .last(page.isLast())
                 .build();
     }
 
@@ -274,6 +304,18 @@ public class EcheanceProductionService {
         return Normalizer.normalize(safe(value).toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .trim();
+    }
+
+    private String searchFilter(String value) {
+        return hasText(value) ? normalize(value) : null;
+    }
+
+    private int safePage(Integer page) {
+        return page == null ? 0 : Math.max(0, page);
+    }
+
+    private int safeSize(Integer size) {
+        return size == null ? DEFAULT_PAGE_SIZE : Math.max(1, Math.min(size, MAX_PAGE_SIZE));
     }
 
     private boolean hasText(String value) {

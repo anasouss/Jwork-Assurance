@@ -16,13 +16,25 @@ public class EcheanceAutomobileResponse {
     private TypeContrat typeContrat;
     private String search;
     private Summary summary;
+    private PageInfo page;
     private List<Row> rows;
 
     @Data
     @Builder
     public static class Summary {
-        private int contratCount;
+        private long contratCount;
         private int compagnieCount;
+    }
+
+    @Data
+    @Builder
+    public static class PageInfo {
+        private int number;
+        private int size;
+        private long totalElements;
+        private int totalPages;
+        private boolean first;
+        private boolean last;
     }
 
     @Data

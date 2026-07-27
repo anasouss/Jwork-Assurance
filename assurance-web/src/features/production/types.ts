@@ -662,6 +662,14 @@ export type EcheanceAutomobileResponse = {
     contratCount: number;
     compagnieCount: number;
   };
+  page: {
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
+  };
   rows: EcheanceAutomobileRow[];
 };
 

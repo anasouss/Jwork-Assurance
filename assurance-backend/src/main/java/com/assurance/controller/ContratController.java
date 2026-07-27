@@ -148,7 +148,9 @@ public class ContratController {
             @RequestParam LocalDate dateAu,
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) TypeContrat typeContrat,
-            @RequestParam(required = false) String search
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "25") Integer size
     ) {
         return ResponseEntity.ok(ApiResponse.success(echeanceProductionService.searchAutomobile(
                 TenantContext.getCurrentAgence(),
@@ -156,7 +158,9 @@ public class ContratController {
                 dateAu,
                 compagnieId,
                 typeContrat,
-                search
+                search,
+                page,
+                size
         )));
     }
 

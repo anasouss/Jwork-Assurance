@@ -121,6 +121,8 @@ export const productionApi = {
     compagnieId?: string;
     typeContrat?: TypeContrat;
     search?: string;
+    page?: number;
+    size?: number;
   }) {
     return unwrap(
       await apiFetch<ApiResponse<EcheanceAutomobileResponse>>(

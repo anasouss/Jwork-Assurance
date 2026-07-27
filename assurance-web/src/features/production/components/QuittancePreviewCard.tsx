@@ -9,7 +9,7 @@ export function QuittancePreviewCard({
   preview?: QuittancePreview | null;
   loading?: boolean;
 }) {
-  const rows = preview?.lignes.length ? preview.lignes : emptyRows();
+  const rows = preview?.lignes.length ? visibleRows(preview) : emptyRows();
 
   return (
     <div className="grid gap-3">
@@ -49,6 +49,19 @@ function emptyRows(): QuittancePreview["lignes"] {
     emptyRow("EVCAT", 30),
     emptyRow("TOTAL", 999, true),
   ];
+}
+
+function visibleRows(preview: QuittancePreview) {
+  const showCorporel = hasPersonneGuarantee(preview);
+  return preview.lignes.filter((ligne) => String(ligne.categorie ?? "").toUpperCase() !== "CORPOREL" || showCorporel);
+}
+
+function hasPersonneGuarantee(preview: QuittancePreview) {
+  return (preview.garanties ?? []).some((garantie) => {
+    const type = String(garantie.typeGarantie ?? "").toUpperCase();
+    const code = String(garantie.code ?? "").toUpperCase();
+    return type === "PERSONNE" || code === "PP" || code === "PC" || code === "PTA";
+  });
 }
 
 function emptyRow(categorie: string, ordre: number, globale = false): QuittancePreview["lignes"][number] {

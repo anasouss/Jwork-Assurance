@@ -1543,7 +1543,7 @@ function TargetGuaranteesTable({
                         value={item?.prime}
                         onValueChange={(value) => update(garantie.id, { prime: value })}
                       />
-                    ) : checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
+                    ) : checked || previewLine ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
                   </td>
                 </tr>
               );
@@ -1644,7 +1644,7 @@ function TargetGuaranteesTable({
                     <td className="px-3 py-2 text-right">
                       {primeInputEnabled ? (
                         <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
-                      ) : checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
+                      ) : checked || previewLine ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
                     </td>
                   </tr>
                 );

@@ -23,7 +23,7 @@ import type {
   VehiculeInput,
 } from "../types";
 
-export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille";
+export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille" | "vehicule";
 export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorque" | "flotteTargets" | "garanties" | "quittances";
 export type ContratTargetKey = { kind: "vehicule" | "remorque"; index: number };
 
@@ -629,6 +629,8 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         }
       } else if (typeContrat === "PARTICULIER") {
         requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
+      } else if (typeContrat === "CONVENTION") {
+        requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
       }
       requireField("typeRenouvellement", typeRenouvellement, "Type de contrat obligatoire.");
       requireField("dateEffet", dateEffet, "Date effet obligatoire.");
@@ -1154,7 +1156,7 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
   if (typeContrat === "PARTICULIER") {
     return false;
   }
-  const hasContractReference = Boolean(request.prospection) || (typeContrat === "FLOTTE" ? Boolean(request.numeroPolice) : Boolean(request.numeroContrat));
+  const hasContractReference = Boolean(request.prospection) || (typeContrat === "PARTICULIER" ? Boolean(request.numeroContrat) : Boolean(request.numeroPolice));
   if (!request.agenceId || !hasContractReference || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
     return false;
   }
@@ -1198,6 +1200,8 @@ function sectionLabel(section: SavableContratSectionKey) {
       return "Contrat";
     case "grille":
       return "Grille tarifaire";
+    case "vehicule":
+      return "Véhicule";
   }
 }
 

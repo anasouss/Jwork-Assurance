@@ -238,7 +238,7 @@ export function ContractInfoSection({
                 <Input value={form.numeroContrat} onChange={(event) => form.setNumeroContrat(event.target.value)} />
               </Field>
             ) : null}
-            <Field label="N° police" error={form.validationErrors.numeroPolice}>
+            <Field label="N° police" required={readOnlyConventionContext} error={form.validationErrors.numeroPolice}>
               <Input value={form.numeroPolice} onChange={(event) => form.setNumeroPolice(event.target.value)} />
             </Field>
             {showNumeroAttestation ? (

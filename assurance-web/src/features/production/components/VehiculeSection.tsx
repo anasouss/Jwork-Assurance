@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field } from "./Field";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
+import { productionApi } from "../api";
 import { toDateOnly } from "../date";
 import { validateValeurVenale } from "../utils/vehicle-validation";
-import type { ReferenceOption, VehiculeInput } from "../types";
+import type { ReferenceOption, VehiculeInput, VehiculeResponse } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 export function emptyVehicule(usageId?: string): VehiculeInput {
@@ -34,6 +35,9 @@ export function VehiculeSection({
   showAttestation = true,
   showRemorqueFlag = false,
   errors = {},
+  onSaveSection,
+  savedSections = {},
+  saving = false,
   openSection,
   onSectionOpenChange,
 }: {
@@ -48,6 +52,9 @@ export function VehiculeSection({
   showAttestation?: boolean;
   showRemorqueFlag?: boolean;
   errors?: Record<string, string>;
+  onSaveSection?: (section: "vehicule") => void;
+  savedSections?: Partial<Record<"vehicule", boolean>>;
+  saving?: boolean;
   openSection?: ContratSectionKey;
   onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
@@ -55,10 +62,56 @@ export function VehiculeSection({
     setVehicules(vehicules.map((vehicule, idx) => (idx === index ? { ...vehicule, ...patch } : vehicule)));
   };
 
+  const fillExistingVehicule = (index: number, found: VehiculeResponse) => {
+    const current = vehicules[index];
+    if (!current) {
+      return;
+    }
+    const usageId = stringValue(found.usageId);
+    const marqueId = stringValue(found.marqueId);
+    const carrosserieId = stringValue(found.carrosserieId);
+    const categorieTransportId = stringValue(found.categorieTransportId);
+    const usageAllowed = usageId && usages.some((item) => item.id === usageId);
+    update(index, {
+      usageId: usageAllowed ? usageId : current.usageId,
+      marqueId: marqueId || undefined,
+      marqueLibelle: marqueId ? undefined : found.marque ?? undefined,
+      carrosserieId: carrosserieId || undefined,
+      carrosserieLibelle: carrosserieId ? undefined : found.carrosserie ?? undefined,
+      categorieTransportId: categorieTransportId || undefined,
+      carburant: found.carburant ?? undefined,
+      puissanceFiscale: found.puissanceFiscale ?? undefined,
+      nombrePlaces: found.nombrePlaces ?? undefined,
+      sousClasse: found.sousClasse ?? undefined,
+      ptc: found.ptc ?? undefined,
+      datePremiereCirculation: found.datePremiereCirculation ?? undefined,
+      dateExpirationCarteGrise: found.dateExpirationCarteGrise ?? undefined,
+      crm: found.crm ?? undefined,
+      valeurVenale: toOptionalNumber(found.valeurVenale),
+      valeurNeuf: toOptionalNumber(found.valeurNeuf),
+      valeurGlace: toOptionalNumber(found.valeurGlace),
+    });
+  };
+
+  const searchVehicule = async (index: number, immatriculation?: string) => {
+    const value = immatriculation?.trim();
+    if (!value) {
+      return;
+    }
+    try {
+      const found = await productionApi.searchVehicule({ immatriculation: value });
+      if (found) {
+        fillExistingVehicule(index, found);
+      }
+    } catch {
+      // Non-blocking lookup: users can still enter a new vehicle manually.
+    }
+  };
+
   return (
     <SectionCard
       title="Véhicule"
-      badge={`${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`}
+      badge={savedSections.vehicule ? "Validé" : `${vehicules.length} véhicule${vehicules.length > 1 ? "s" : ""}`}
       tone="production"
       open={openSection === "vehicule"}
       onOpenChange={(open) => onSectionOpenChange?.("vehicule", open)}
@@ -121,7 +174,11 @@ export function VehiculeSection({
                   </Field>
                 ) : null}
                 <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
-                  <Input value={vehicule.immatriculation ?? ""} onChange={(event) => update(index, { immatriculation: event.target.value })} />
+                  <Input
+                    value={vehicule.immatriculation ?? ""}
+                    onBlur={() => searchVehicule(index, vehicule.immatriculation)}
+                    onChange={(event) => update(index, { immatriculation: event.target.value })}
+                  />
                 </Field>
                 <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
                   <AutocompleteSelect
@@ -248,7 +305,29 @@ export function VehiculeSection({
             </div>
           );
         })}
+        {onSaveSection ? (
+          <div className="flex justify-end border-t pt-3">
+            <Button
+              type="button"
+              size="sm"
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={saving}
+              onClick={() => onSaveSection("vehicule")}
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {saving ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </div>
+        ) : null}
       </div>
     </SectionCard>
   );
+}
+
+function stringValue(value: unknown) {
+  return value === undefined || value === null ? undefined : String(value);
+}
+
+function toOptionalNumber(value: unknown) {
+  return typeof value === "number" ? value : value === undefined || value === null || value === "" ? undefined : Number(value);
 }

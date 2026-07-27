@@ -24,7 +24,7 @@ export const contratSchema = z.object({
   remorques: z.array(z.any()),
   garanties: z.array(z.any()),
 }).superRefine((value, ctx) => {
-  if (value.typeContrat === "FLOTTE") {
+  if (value.typeContrat === "FLOTTE" || value.typeContrat === "CONVENTION") {
     if (!value.numeroPolice?.trim()) {
       ctx.addIssue({ code: "custom", path: ["numeroPolice"], message: "Numero police obligatoire" });
     }

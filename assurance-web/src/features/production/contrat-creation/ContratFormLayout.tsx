@@ -142,6 +142,9 @@ export function ContratFormLayout({
       showAttestation={!showConvention}
       showRemorqueFlag={showConvention}
       errors={form.validationErrors}
+      onSaveSection={form.handleSaveSection}
+      savedSections={form.savedSections}
+      saving={form.saveDraftMutation.isPending}
       openSection={activeSection}
       onSectionOpenChange={handleSectionOpenChange}
     />

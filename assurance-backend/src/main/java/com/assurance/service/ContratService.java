@@ -8,6 +8,7 @@ import com.assurance.entity.*;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeTarificationGarantie;
+import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
@@ -1343,8 +1344,8 @@ public class ContratService {
                 .accessoire(calcul.accessoire())
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
-                .lignes(calcul.lignes().stream().map(this::toLignePreviewResponse).toList())
-                .garanties(garanties.stream().map(garantie -> toGarantiePreviewResponse(garantie, vehicules, remorques)).toList())
+                .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
+                .garanties(garanties.stream().map(garantie -> toQuittanceGarantieResponse(garantie, vehicules, remorques)).toList())
                 .targetSummaries(quittanceManuelle ? List.of() : elementFacturableCibleService.calculer(contrat, garanties, vehicules, remorques))
                 .build();
     }
@@ -1662,10 +1663,10 @@ public class ContratService {
                     .primeTotale(element.getPrimeTotale())
                     .build());
         }
-        QuittanceResponse quittancePreview = buildSavedQuittancePreview(contrat, includeTargetSummaries);
-        List<QuittanceResponse.TargetSummary> targetSummaries = quittancePreview == null
+        QuittanceResponse quittanceGenerale = buildQuittanceGenerale(contrat, includeTargetSummaries);
+        List<QuittanceResponse.TargetSummary> targetSummaries = quittanceGenerale == null
                 ? List.of()
-                : quittancePreview.getTargetSummaries();
+                : quittanceGenerale.getTargetSummaries();
 
         return ContratResponse.builder()
                 .id(contrat.getId())
@@ -1715,12 +1716,19 @@ public class ContratService {
                 .mouvements(mouvements)
                 .elementsFacturables(elementsFacturables)
                 .targetSummaries(targetSummaries)
-                .quittancePreview(quittancePreview)
+                .quittanceGenerale(quittanceGenerale)
                 .build();
     }
 
-    private QuittanceResponse buildSavedQuittancePreview(Contrat contrat, boolean include) {
-        if (!include || contrat.getGaranties().isEmpty()) {
+    private QuittanceResponse buildQuittanceGenerale(Contrat contrat, boolean include) {
+        if (!include) {
+            return null;
+        }
+        QuittanceResponse saved = buildSavedQuittanceGenerale(contrat);
+        if (saved != null) {
+            return saved;
+        }
+        if (contrat.getGaranties().isEmpty()) {
             return null;
         }
         int unitesCnpac = countCnpacUnits(contrat.getGaranties(), contrat.getVehicules(), contrat.getRemorques());
@@ -1744,12 +1752,57 @@ public class ContratService {
                 .accessoire(calcul.accessoire())
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
-                .lignes(calcul.lignes().stream().map(this::toLignePreviewResponse).toList())
+                .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
                 .garanties(contrat.getGaranties().stream()
-                        .map(garantie -> toGarantiePreviewResponse(garantie, contrat.getVehicules(), contrat.getRemorques()))
+                        .map(garantie -> toQuittanceGarantieResponse(garantie, contrat.getVehicules(), contrat.getRemorques()))
                         .toList())
                 .targetSummaries(targetSummaries)
                 .build();
+    }
+
+    private QuittanceResponse buildSavedQuittanceGenerale(Contrat contrat) {
+        Quittance quittance = (contrat.getQuittances() == null ? List.<Quittance>of() : contrat.getQuittances()).stream()
+                .filter(item -> Boolean.TRUE.equals(item.getGlobale()))
+                .filter(this::isContratQuittanceGenerale)
+                .max(Comparator.comparing(Quittance::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .orElse(null);
+        if (quittance == null) {
+            return null;
+        }
+        ElementFacturable elementFacturable = quittance.getElementFacturable();
+        Long elementFacturableId = elementFacturable == null ? null : elementFacturable.getId();
+        List<QuittanceResponse.TargetSummary> targetSummaries = elementFacturableId == null
+                ? List.of()
+                : elementFacturableCibleService.listByElementFacturable(elementFacturableId);
+        return QuittanceResponse.builder()
+                .contratId(contrat.getId())
+                .numeroContrat(contrat.getNumeroContrat())
+                .elementFacturableId(elementFacturableId)
+                .type(quittance.getType())
+                .categorie(quittance.getCategorie())
+                .globale(quittance.getGlobale())
+                .dateDebut(quittance.getDateDebut())
+                .dateFin(quittance.getDateFin())
+                .primeNette(quittance.getPrimeNette())
+                .taxe(quittance.getTaxe())
+                .taxeParafiscale(quittance.getTaxeParafiscale())
+                .accessoire(quittance.getAccessoire())
+                .cnpac(quittance.getCnpac())
+                .primeTotale(quittance.getPrimeTotale())
+                .lignes((quittance.getLignes() == null ? List.<LigneQuittance>of() : quittance.getLignes()).stream()
+                        .sorted(Comparator.comparing(LigneQuittance::getOrdre, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .map(this::toSavedQuittanceLigneResponse)
+                        .toList())
+                .targetSummaries(targetSummaries)
+                .build();
+    }
+
+    private boolean isContratQuittanceGenerale(Quittance quittance) {
+        ElementFacturable elementFacturable = quittance.getElementFacturable();
+        if (elementFacturable == null) {
+            return quittance.getMouvementContrat() == null;
+        }
+        return elementFacturable.getNature() == NatureElementFacturable.CONTRAT;
     }
 
     private int countCnpacUnits(List<ContratGarantie> garanties, List<Vehicule> vehicules, List<Remorque> remorques) {
@@ -1946,7 +1999,7 @@ public class ContratService {
         return value.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private QuittanceResponse.Ligne toLignePreviewResponse(QuittanceCalculService.Ligne ligne) {
+    private QuittanceResponse.Ligne toQuittanceLigneResponse(QuittanceCalculService.Ligne ligne) {
         return QuittanceResponse.Ligne.builder()
                 .categorie(ligne.categorie().name())
                 .ordre(ligne.ordre())
@@ -1960,7 +2013,21 @@ public class ContratService {
                 .build();
     }
 
-    private QuittanceResponse.GarantieLigne toGarantiePreviewResponse(
+    private QuittanceResponse.Ligne toSavedQuittanceLigneResponse(LigneQuittance ligne) {
+        return QuittanceResponse.Ligne.builder()
+                .categorie(ligne.getCategorie() == null ? null : ligne.getCategorie().name())
+                .ordre(ligne.getOrdre())
+                .globale(ligne.getGlobale())
+                .primeNette(ligne.getPrimeNette())
+                .taxe(ligne.getTaxe())
+                .taxeParafiscale(ligne.getTaxeParafiscale())
+                .accessoire(ligne.getAccessoire())
+                .cnpac(ligne.getCnpac())
+                .primeTotale(ligne.getPrimeTotale())
+                .build();
+    }
+
+    private QuittanceResponse.GarantieLigne toQuittanceGarantieResponse(
             ContratGarantie contratGarantie,
             List<Vehicule> vehicules,
             List<Remorque> remorques

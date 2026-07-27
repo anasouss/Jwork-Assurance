@@ -1300,21 +1300,21 @@ function hydrateDraft(draft: ContratSummary) {
     vehicules,
     remorques,
     garanties,
-    preview: savedPreviewFromDraft(draft),
-    targetPreview: savedTargetPreviewFromDraft(draft),
+    preview: quittanceGeneraleFromDraft(draft),
+    targetPreview: targetQuittanceGeneraleFromDraft(draft),
   };
 }
 
-function savedPreviewFromDraft(draft: ContratSummary): QuittancePreview | null {
-  if (draft.quittancePreview) {
-    return draft.quittancePreview;
+function quittanceGeneraleFromDraft(draft: ContratSummary): QuittancePreview | null {
+  if (draft.quittanceGenerale) {
+    return draft.quittanceGenerale;
   }
   return null;
 }
 
-function savedTargetPreviewFromDraft(draft: ContratSummary): QuittancePreview | null {
-  if (draft.quittancePreview) {
-    return draft.quittancePreview;
+function targetQuittanceGeneraleFromDraft(draft: ContratSummary): QuittancePreview | null {
+  if (draft.quittanceGenerale) {
+    return draft.quittanceGenerale;
   }
   if (!draft.targetSummaries?.length) {
     return null;

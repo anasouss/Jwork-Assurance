@@ -263,7 +263,7 @@ export function ContratFormLayout({
       />
     ) : (
       <SectionCard
-        title="Quittances"
+        title="Quittance générale"
         badge={form.preview ? "Calculée" : "Non calculée"}
         tone="production"
         defaultOpen={false}

@@ -62,7 +62,7 @@ public class ContratResponse {
     private List<MouvementView> mouvements;
     private List<ElementFacturableView> elementsFacturables;
     private List<QuittanceResponse.TargetSummary> targetSummaries;
-    private QuittanceResponse quittancePreview;
+    private QuittanceResponse quittanceGenerale;
     @Data
     @Builder
     public static class ClientLink {

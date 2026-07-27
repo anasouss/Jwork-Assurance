@@ -519,7 +519,7 @@ public class MouvementContratService {
                 .accessoire(calcul.accessoire())
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
-                .lignes(calcul.lignes().stream().map(this::toLignePreviewResponse).toList())
+                .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
                 .targetSummaries(elementFacturableCibleService.calculer(
                         contrat,
                         contrat.getGaranties(),
@@ -543,7 +543,7 @@ public class MouvementContratService {
                 .build();
     }
 
-    private QuittanceResponse.Ligne toLignePreviewResponse(QuittanceCalculService.Ligne ligne) {
+    private QuittanceResponse.Ligne toQuittanceLigneResponse(QuittanceCalculService.Ligne ligne) {
         return QuittanceResponse.Ligne.builder()
                 .categorie(ligne.categorie().name())
                 .ordre(ligne.ordre())

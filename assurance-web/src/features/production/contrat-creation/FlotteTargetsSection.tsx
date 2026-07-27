@@ -60,6 +60,7 @@ type LookupState = {
   status: LookupStatus;
   message?: string;
 };
+type PricingMode = "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE";
 
 type Props = {
   vehicules: VehiculeInput[];
@@ -78,6 +79,7 @@ type Props = {
   compagniesAssistance: ReferenceOption[];
   produitsAssistance: ReferenceOption[];
   grilleSelected: boolean;
+  pricingMode?: PricingMode | string | null;
   preview?: QuittancePreview | null;
   targetPreview?: QuittancePreview | null;
   previewing?: boolean;
@@ -117,6 +119,7 @@ export function FlotteTargetsSection({
   compagniesAssistance,
   produitsAssistance,
   grilleSelected,
+  pricingMode = "AUTOMATIQUE_GRILLE",
   preview,
   targetPreview,
   previewing = false,
@@ -177,6 +180,7 @@ export function FlotteTargetsSection({
     [garanties]
   );
   const canAddRemorque = maxRemorques == null || remorques.length < maxRemorques;
+  const normalizedPricingMode = normalizePricingMode(pricingMode);
   const vehiculeTargets = targets.filter((target) => target.kind === "vehicule");
   const remorqueTargets = targets.filter((target) => target.kind === "remorque");
   const activeVehiculeTarget =
@@ -445,6 +449,7 @@ export function FlotteTargetsSection({
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   showAssistance={showAssistance}
                   grilleSelected={grilleSelected}
+                  pricingMode={normalizedPricingMode}
                   preview={activeVehiculePreview}
                   previewing={previewing}
                   dirtyCalculationKeys={dirtyCalculationKeys}
@@ -570,6 +575,7 @@ export function FlotteTargetsSection({
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   showAssistance={showAssistance}
                   grilleSelected={grilleSelected}
+                  pricingMode={normalizedPricingMode}
                   preview={activeRemorquePreview}
                   previewing={previewing}
                   dirtyCalculationKeys={dirtyCalculationKeys}
@@ -1299,6 +1305,7 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId,
   showAssistance,
   grilleSelected,
+  pricingMode,
   preview,
   previewing,
   dirtyCalculationKeys,
@@ -1319,6 +1326,7 @@ function TargetGuaranteesTable({
   assistanceCategorieClientId?: string;
   showAssistance?: boolean;
   grilleSelected: boolean;
+  pricingMode: PricingMode;
   preview?: QuittancePreview | null;
   previewing?: boolean;
   dirtyCalculationKeys?: string[];
@@ -1328,14 +1336,16 @@ function TargetGuaranteesTable({
     setSelected((current) => current.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item)));
     onRequestCalculation?.(target, garantieId);
   };
+  const automaticPricing = pricingMode === "AUTOMATIQUE_GRILLE";
+  const primeInputEnabled = pricingMode === "MANUELLE_AVEC_PRIME_NETTE";
 
   const toggle = (garantie: ReferenceOption, checked: boolean) => {
     if (Boolean(garantie.responsabiliteCivile)) {
       return;
     }
-    const lineOptions = matchingLines(lignes, garantie, target);
+    const lineOptions = automaticPricing ? matchingLines(lignes, garantie, target) : [];
     const selectedLine = selectedLineFor(lineOptions);
-    if (checked) {
+    if (automaticPricing && checked) {
       const warning = valueWarning(garantie, target, selectedLine);
       if (warning) {
         toast.error(warning);
@@ -1343,13 +1353,13 @@ function TargetGuaranteesTable({
       }
     }
     setSelected((current) => checked
-      ? [...current, { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target) }]
+      ? [...current, { ...targetedInput(garantie, target, pricingMode), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
       : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target))));
     onRequestCalculation?.(target, garantie.id);
   };
 
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
-    const formules = matchingPersonneFormules(formulesPersonne, garantie, target);
+    const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
     setSelected((current) =>
       checked
         ? [
@@ -1369,8 +1379,12 @@ function TargetGuaranteesTable({
   };
 
   const usage = target.kind === "vehicule" ? usages.find((item) => item.id === target.usageId) : undefined;
-  const configuredGaranties = garanties.filter((garantie) => Boolean(garantie.responsabiliteCivile) || matchingLines(lignes, garantie, target).length > 0);
-  const configuredPersonneGaranties = personneGaranties.filter((garantie) => matchingPersonneFormules(formulesPersonne, garantie, target).length > 0);
+  const configuredGaranties = automaticPricing
+    ? garanties.filter((garantie) => Boolean(garantie.responsabiliteCivile) || matchingLines(lignes, garantie, target).length > 0)
+    : garanties;
+  const configuredPersonneGaranties = automaticPricing
+    ? personneGaranties.filter((garantie) => matchingPersonneFormules(formulesPersonne, garantie, target).length > 0)
+    : primeInputEnabled ? personneGaranties : [];
   const showPersonne = target.kind === "vehicule" && Boolean(usage?.garantiesPersonne) && configuredPersonneGaranties.length > 0;
 
   return (
@@ -1393,15 +1407,15 @@ function TargetGuaranteesTable({
               const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
               const checked = Boolean(item);
               const isRc = Boolean(garantie.responsabiliteCivile);
-              const lineOptions = matchingLines(lignes, garantie, target);
+              const lineOptions = automaticPricing ? matchingLines(lignes, garantie, target) : [];
               const selectedLine = selectedLineFor(lineOptions, item);
               const hasLine = isRc || lineOptions.length > 0;
-              const disabled = isRc || !grilleSelected || !hasLine;
+              const disabled = isRc || (automaticPricing && (!grilleSelected || !hasLine));
               const editable = checked && !isRc;
-              const warning = checked ? valueWarning(garantie, target, selectedLine) : "";
+              const warning = automaticPricing && checked ? valueWarning(garantie, target, selectedLine) : "";
               const sourceOptions = target.kind === "vehicule" ? availableTargetValueSources(garantie, target, selectedLine) : [];
               const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target, selectedLine) : "";
-              const manualValue = defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL";
+              const manualValue = !automaticPricing || (defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL");
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
               const previewLine = previewGuaranteeLine(preview, garantie, target, item);
               const calculatedPrime = previewLine?.primeNette ?? item?.prime;
@@ -1425,12 +1439,12 @@ function TargetGuaranteesTable({
                     {warning ? <div className="mt-1 text-xs text-destructive">{warning}</div> : null}
                   </td>
                   <td className="px-3 py-2">
-                    {manualValue ? (
+                    {manualValue && !isRc ? (
                       <MoneyInput
                         disabled={!editable}
                         className={cn(controlClass(editable), "text-right")}
                         value={item?.valeurAssuree ?? item?.capital}
-                        onValueChange={(value) => update(garantie.id, { valeurAssuree: value, capital: value })}
+                        onValueChange={(value) => update(garantie.id, { sourceValeurSelectionnee: "MANUEL", valeurAssuree: value, capital: value })}
                       />
                     ) : lineOptions.length > 1 && lineMode(selectedLine) === "CAPITAL" ? (
                       <Select
@@ -1476,7 +1490,15 @@ function TargetGuaranteesTable({
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    {!isRc && lineOptions.length > 1 ? (
+                    {!automaticPricing && !isRc ? (
+                      <Input
+                        type="number"
+                        disabled={!editable}
+                        className={cn(controlClass(editable), "text-right")}
+                        value={item?.taux ?? ""}
+                        onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })}
+                      />
+                    ) : !isRc && lineOptions.length > 1 ? (
                       <Select
                         value={selectedLine?.id ?? ""}
                         disabled={!editable}
@@ -1494,9 +1516,34 @@ function TargetGuaranteesTable({
                       <span className="block rounded-md px-3 py-2 text-right text-muted-foreground">{isRc ? "-" : rateDisplay(selectedLine)}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">
+                    {!automaticPricing && !isRc ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          type="number"
+                          disabled={!editable || !garantie.avecFranchise}
+                          className={cn(controlClass(editable && Boolean(garantie.avecFranchise)), "text-right")}
+                          value={item?.tauxFranchise ?? ""}
+                          onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })}
+                        />
+                        <MoneyInput
+                          disabled={!editable || !garantie.avecFranchise}
+                          className={cn(controlClass(editable && Boolean(garantie.avecFranchise)), "text-right")}
+                          value={item?.franchiseMinimale}
+                          onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })}
+                        />
+                      </div>
+                    ) : franchiseDisplay(selectedLine)}
+                  </td>
                   <td className="px-3 py-2 text-right font-medium">
-                    {checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
+                    {primeInputEnabled && !isRc ? (
+                      <MoneyInput
+                        disabled={!editable}
+                        className={cn(controlClass(editable), "text-right")}
+                        value={item?.prime}
+                        onValueChange={(value) => update(garantie.id, { prime: value })}
+                      />
+                    ) : checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
                   </td>
                 </tr>
               );
@@ -1515,7 +1562,7 @@ function TargetGuaranteesTable({
       {showPersonne ? (
         <div className="overflow-x-auto rounded-md border">
           <div className="border-b px-3 py-2 text-sm font-semibold">Garanties personne</div>
-          <table className="w-full min-w-[980px] border-collapse text-sm">
+          <table className="w-full min-w-[1320px] border-collapse text-sm">
             <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="w-12 px-3 py-3 text-left" />
@@ -1524,6 +1571,9 @@ function TargetGuaranteesTable({
                 <th className="w-32 px-3 py-3 text-left">Décès</th>
                 <th className="w-32 px-3 py-3 text-left">Invalidité</th>
                 <th className="w-32 px-3 py-3 text-left">Frais médicaux</th>
+                <th className="w-40 px-3 py-3 text-left">Hospitalisation</th>
+                <th className="w-40 px-3 py-3 text-left">Frais funéraires</th>
+                <th className="w-48 px-3 py-3 text-left">Chirurgie</th>
                 <th className="w-32 px-3 py-3 text-right">Prime nette</th>
               </tr>
             </thead>
@@ -1531,9 +1581,9 @@ function TargetGuaranteesTable({
               {configuredPersonneGaranties.map((garantie) => {
                 const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
                 const checked = Boolean(item);
-                const formules = matchingPersonneFormules(formulesPersonne, garantie, target);
+                const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
-                const disabled = !grilleSelected || formules.length === 0;
+                const disabled = automaticPricing && (!grilleSelected || formules.length === 0);
                 const previewLine = previewGuaranteeLine(preview, garantie, target, item);
                 const calculatedPrime = previewLine?.primeNette ?? item?.prime;
                 const rowCalculating = checked && Boolean(previewing) && Boolean(dirtyCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
@@ -1554,32 +1604,48 @@ function TargetGuaranteesTable({
                       <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                     </td>
                     <td className="px-3 py-2">
-                      <Select
-                        value={item?.formuleGarantiePersonneId ?? selectedFormule?.id ?? ""}
-                        disabled={!checked || formules.length <= 1}
-                        onValueChange={(value) => {
-                          const formule = formules.find((option) => option.id === value);
-                          update(garantie.id, {
-                            formuleGarantiePersonneId: value,
-                            formule: String(formule?.libelle ?? ""),
-                            prime: numberValue(String(formule?.primeNette ?? "")),
-                          });
-                        }}
-                      >
-                        <SelectTrigger className={controlClass(checked)}>
-                          <SelectValue placeholder="Formule" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {formules.map((formule) => (
-                            <SelectItem key={formule.id} value={formule.id}>{formule.libelle}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {automaticPricing ? (
+                        <Select
+                          value={item?.formuleGarantiePersonneId ?? selectedFormule?.id ?? ""}
+                          disabled={!checked || formules.length <= 1}
+                          onValueChange={(value) => {
+                            const formule = formules.find((option) => option.id === value);
+                            update(garantie.id, {
+                              formuleGarantiePersonneId: value,
+                              formule: String(formule?.libelle ?? ""),
+                              prime: numberValue(String(formule?.primeNette ?? "")),
+                            });
+                          }}
+                        >
+                          <SelectTrigger className={controlClass(checked)}>
+                            <SelectValue placeholder="Formule" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {formules.map((formule) => (
+                              <SelectItem key={formule.id} value={formule.id}>{formule.libelle}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          disabled={!checked}
+                          className={controlClass(checked)}
+                          value={item?.formule ?? ""}
+                          onChange={(event) => update(garantie.id, { formule: event.target.value })}
+                        />
+                      )}
                     </td>
-                    <td className="px-3 py-2">{money(selectedFormule?.montantDeces)}</td>
-                    <td className="px-3 py-2">{money(selectedFormule?.montantInvalidite)}</td>
-                    <td className="px-3 py-2">{money(selectedFormule?.montantFraisMedicaux)}</td>
-                    <td className="px-3 py-2 text-right">{checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}</td>
+                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantDeces) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantDeces} onValueChange={(value) => update(garantie.id, { montantDeces: value })} />}</td>
+                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantInvalidite} onValueChange={(value) => update(garantie.id, { montantInvalidite: value })} />}</td>
+                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisMedicaux} onValueChange={(value) => update(garantie.id, { montantFraisMedicaux: value })} />}</td>
+                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</td>
+                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</td>
+                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</td>
+                    <td className="px-3 py-2 text-right">
+                      {primeInputEnabled ? (
+                        <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
+                      ) : checked ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
+                    </td>
                   </tr>
                 );
               })}
@@ -1740,13 +1806,14 @@ function AssistanceTable({
   );
 }
 
-function targetedInput(garantie: ReferenceOption, target: Target): GarantieInput {
+function targetedInput(garantie: ReferenceOption, target: Target, pricingMode: PricingMode = "AUTOMATIQUE_GRILLE"): GarantieInput {
+  const manualPricing = pricingMode !== "AUTOMATIQUE_GRILLE";
   return {
     garantieId: garantie.id,
     vehiculeIndex: target.kind === "vehicule" ? target.index : undefined,
     remorqueIndex: target.kind === "remorque" ? target.index : undefined,
     modeSelectionne: String(garantie.modeParDefaut ?? "TAUX"),
-    sourceValeurSelectionnee: defaultTargetSource(garantie, target),
+    sourceValeurSelectionnee: manualPricing ? "MANUEL" : defaultTargetSource(garantie, target),
   };
 }
 
@@ -1834,21 +1901,24 @@ function selectedLineFor(lines: ReferenceOption[], item?: GarantieInput) {
   return lines.find((line) => line.id === item?.ligneGrilleTarifaireId) ?? lines[0];
 }
 
-function targetLineSelectionPatch(garantie: ReferenceOption, line: ReferenceOption | undefined, target?: Target): Partial<GarantieInput> {
+function targetLineSelectionPatch(garantie: ReferenceOption, line: ReferenceOption | undefined, target?: Target, pricingMode: PricingMode = "AUTOMATIQUE_GRILLE"): Partial<GarantieInput> {
+  const manualPricing = pricingMode !== "AUTOMATIQUE_GRILLE";
   const mode = lineMode(line) || String(garantie.modeParDefaut ?? "TAUX");
-  const source = mode === "CAPITAL"
+  const source = manualPricing
+    ? "MANUEL"
+    : mode === "CAPITAL"
     ? "AUCUNE"
     : target ? defaultTargetSource(garantie, target, line) : defaultSource(garantie);
   return {
-    ligneGrilleTarifaireId: line?.id,
+    ligneGrilleTarifaireId: manualPricing ? undefined : line?.id,
     modeSelectionne: mode,
     sourceValeurSelectionnee: source,
     valeurAssuree: undefined,
     capital: undefined,
-    taux: toNumber(line?.taux),
-    prime: toNumber(line?.prime),
-    tauxFranchise: toNumber(line?.tauxFranchise),
-    franchiseMinimale: toNumber(line?.franchiseMinimale),
+    taux: manualPricing ? undefined : toNumber(line?.taux),
+    prime: manualPricing ? undefined : toNumber(line?.prime),
+    tauxFranchise: manualPricing ? undefined : toNumber(line?.tauxFranchise),
+    franchiseMinimale: manualPricing ? undefined : toNumber(line?.franchiseMinimale),
   };
 }
 
@@ -2102,4 +2172,12 @@ function controlClass(active: boolean) {
   return active
     ? "border-slate-300 bg-slate-50/70 shadow-none focus-visible:border-ring focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-input/30"
     : "border-transparent bg-muted/40 text-muted-foreground shadow-none";
+}
+
+function normalizePricingMode(value?: string | null): PricingMode {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  if (normalized === "MANUELLE" || normalized === "MANUELLE_AVEC_PRIME_NETTE" || normalized === "AUTOMATIQUE_GRILLE") {
+    return normalized;
+  }
+  return "AUTOMATIQUE_GRILLE";
 }

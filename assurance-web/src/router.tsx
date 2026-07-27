@@ -70,7 +70,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "production/contrats/:contratId/avenants/:code",
-        lazy: lazyRoute(() => import("@/features/production/pages/FlotteAvenantPage")),
+        lazy: lazyRoute(() => import("@/features/production/pages/AvenantContratPage")),
       },
       {
         path: "production/echeances",

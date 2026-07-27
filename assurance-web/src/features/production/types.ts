@@ -246,7 +246,7 @@ export type MouvementContratRequest = {
   notes?: string;
 };
 
-export type FlotteAvenantRequest = {
+export type AvenantRequest = {
   codeTypeMouvement: string;
   numeroMouvement?: string;
   dateEffet?: string;
@@ -266,7 +266,7 @@ export type FlotteAvenantRequest = {
   garanties?: GarantieInput[];
 };
 
-export type FlotteAvenantContext = {
+export type AvenantContext = {
   contrat: ContratSummary;
   mouvementsDisponibles: MouvementDisponible[];
 };

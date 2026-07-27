@@ -314,17 +314,26 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           <>
             {isFlotte ? (
               <>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={flotteAvenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
               </>
             ) : (
-              <DropdownMenuItem>Ajouter un avenant</DropdownMenuItem>
+              <>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXG_M")}>Extension garanties</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_M")}>Modification garanties</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_M")}>Extension remorque</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_M")}>Précision</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_M")}>Duplicata</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_M")}>Résiliation</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_M")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "ANN_M")}>Annulation</Link></DropdownMenuItem>
+              </>
             )}
             <DropdownMenuItem asChild>
               <Link to={assistancePath}>Contrat assistance</Link>
@@ -363,7 +372,7 @@ function isActiveContrat(contrat: ContratSummary) {
   return String(contrat.statut ?? "").toUpperCase() === "ACTIVE" && !contrat.prospection && !contrat.brouillon;
 }
 
-function flotteAvenantPath(contrat: ContratSummary, code: string) {
+function avenantPath(contrat: ContratSummary, code: string) {
   return `/app/production/contrats/${contrat.id}/avenants/${code}`;
 }
 

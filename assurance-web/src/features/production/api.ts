@@ -13,8 +13,8 @@ import type {
   ClientResponse,
   ElementFacturable,
   EcheanceAutomobileResponse,
-  FlotteAvenantContext,
-  FlotteAvenantRequest,
+  AvenantContext,
+  AvenantRequest,
   LivraisonAttestation,
   PieceJointe,
   PiecesJointesContrat,
@@ -174,22 +174,22 @@ export const productionApi = {
     });
   },
 
-  async getFlotteAvenantContext(contratId: string) {
-    return unwrap(await apiFetch<ApiResponse<FlotteAvenantContext>>(`/api/v1/contrats/${contratId}/avenants/flotte`));
+  async getAvenantContext(contratId: string) {
+    return unwrap(await apiFetch<ApiResponse<AvenantContext>>(`/api/v1/contrats/${contratId}/avenants`));
   },
 
-  async previewFlotteAvenant(contratId: string, request: FlotteAvenantRequest) {
+  async previewAvenant(contratId: string, request: AvenantRequest) {
     return unwrap(
-      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/flotte/previsualisation-quittance`, {
+      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/previsualisation-quittance`, {
         method: "POST",
         body: JSON.stringify(request),
       })
     );
   },
 
-  async createFlotteAvenant(contratId: string, request: FlotteAvenantRequest) {
+  async createAvenant(contratId: string, request: AvenantRequest) {
     return unwrap(
-      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/flotte`, {
+      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants`, {
         method: "POST",
         body: JSON.stringify(request),
       })

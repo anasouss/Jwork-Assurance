@@ -3,7 +3,7 @@ package com.assurance.controller;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.DevisPdfFilterRequest;
-import com.assurance.dto.request.FlotteAvenantRequest;
+import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.request.UpsertCarteVerteRequest;
@@ -15,7 +15,7 @@ import com.assurance.dto.response.CarteVerteResponse;
 import com.assurance.dto.response.ContratActionsResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.EcheanceAutomobileResponse;
-import com.assurance.dto.response.FlotteAvenantContextResponse;
+import com.assurance.dto.response.AvenantContextResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
@@ -236,29 +236,29 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.creerMouvement(TenantContext.getCurrentAgence(), id, request), "Mouvement cree"));
     }
 
-    @GetMapping("/{id}/avenants/flotte")
-    public ResponseEntity<ApiResponse<FlotteAvenantContextResponse>> contexteAvenantFlotte(@PathVariable Long id) {
+    @GetMapping("/{id}/avenants")
+    public ResponseEntity<ApiResponse<AvenantContextResponse>> contexteAvenant(@PathVariable Long id) {
         ContratActionsResponse actions = contratActionService.getActions(TenantContext.getCurrentAgence(), id);
-        return ResponseEntity.ok(ApiResponse.success(FlotteAvenantContextResponse.builder()
+        return ResponseEntity.ok(ApiResponse.success(AvenantContextResponse.builder()
                 .contrat(contratService.get(TenantContext.getCurrentAgence(), id))
                 .mouvementsDisponibles(actions.getMouvementsDisponibles())
                 .build()));
     }
 
-    @PostMapping("/{id}/avenants/flotte/previsualisation-quittance")
-    public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserAvenantFlotte(
+    @PostMapping("/{id}/avenants/previsualisation-quittance")
+    public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserAvenant(
             @PathVariable Long id,
-            @Valid @RequestBody FlotteAvenantRequest request
+            @Valid @RequestBody AvenantRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserAvenantFlotte(TenantContext.getCurrentAgence(), id, request)));
+        return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserAvenant(TenantContext.getCurrentAgence(), id, request)));
     }
 
-    @PostMapping("/{id}/avenants/flotte")
-    public ResponseEntity<ApiResponse<QuittanceResponse>> creerAvenantFlotte(
+    @PostMapping("/{id}/avenants")
+    public ResponseEntity<ApiResponse<QuittanceResponse>> creerAvenant(
             @PathVariable Long id,
-            @Valid @RequestBody FlotteAvenantRequest request
+            @Valid @RequestBody AvenantRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.creerAvenantFlotte(TenantContext.getCurrentAgence(), id, request), "Avenant flotte cree"));
+        return ResponseEntity.ok(ApiResponse.success(contratService.creerAvenant(TenantContext.getCurrentAgence(), id, request), "Avenant cree"));
     }
 
     @PostMapping("/{id}/assistances")

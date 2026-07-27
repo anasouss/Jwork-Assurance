@@ -15,7 +15,7 @@ import { productionApi } from "../api";
 import { FlotteTargetsSection } from "../contrat-creation/FlotteTargetsSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { toDateOnly } from "../date";
-import type { ContratSummary, FlotteAvenantRequest, GarantieInput, RemorqueInput, VehiculeInput } from "../types";
+import type { AvenantRequest, ContratSummary, GarantieInput, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
   kind: "vehicule" | "remorque";
@@ -33,6 +33,14 @@ type PrecisionDraft = {
 };
 
 const MOVEMENT_LABELS: Record<string, string> = {
+  EXG_M: "Extension garanties",
+  MOG_M: "Modification garanties",
+  EXR_M: "Extension remorque",
+  PRI_M: "Précision immatriculation",
+  DUP_M: "Duplicata",
+  RES_M: "Résiliation",
+  RCH_M: "Résiliation à l'échéance",
+  ANN_M: "Annulation",
   INC_F: "Incorporation",
   MOG_F: "Modification garanties",
   RET_F: "Retrait",
@@ -55,7 +63,7 @@ const DEFAULT_VEHICLE: VehiculeInput = {
   valeurGlace: undefined,
 };
 
-export default function FlotteAvenantPage() {
+export default function AvenantContratPage() {
   const { contratId = "", code = "INC_F" } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -67,27 +75,30 @@ export default function FlotteAvenantPage() {
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
-  const [preview, setPreview] = useState<Awaited<ReturnType<typeof productionApi.previewFlotteAvenant>> | null>(null);
+  const [preview, setPreview] = useState<Awaited<ReturnType<typeof productionApi.previewAvenant>> | null>(null);
   const autoPreviewKeyRef = useRef("");
 
   const contextQuery = useQuery({
-    queryKey: ["flotte-avenant-context", contratId],
-    queryFn: () => productionApi.getFlotteAvenantContext(contratId),
+    queryKey: ["avenant-context", contratId],
+    queryFn: () => productionApi.getAvenantContext(contratId),
     enabled: Boolean(contratId),
   });
-  const usages = useQuery({ queryKey: ["referentiel", "usages", "avenant-flotte"], queryFn: () => productionApi.referentiel("usages") });
-  const marques = useQuery({ queryKey: ["referentiel", "marques", "avenant-flotte"], queryFn: () => productionApi.referentiel("marques") });
-  const carrosseries = useQuery({ queryKey: ["referentiel", "carrosseries", "avenant-flotte"], queryFn: () => productionApi.referentiel("carrosseries") });
-  const garanties = useQuery({ queryKey: ["referentiel", "garanties", "avenant-flotte"], queryFn: productionApi.garantiesParametrage });
-  const categoriesTransport = useQuery({ queryKey: ["referentiel", "categories-transport", "avenant-flotte"], queryFn: () => productionApi.referentiel("categories-transport") });
-  const compagniesAssistance = useQuery({ queryKey: ["referentiel", "compagnies-assistance", "avenant-flotte"], queryFn: () => productionApi.referentiel("compagnies-assistance") });
-  const produitsAssistance = useQuery({ queryKey: ["referentiel", "produits-assistance", "avenant-flotte"], queryFn: () => productionApi.referentiel("produits-assistance") });
+  const usages = useQuery({ queryKey: ["referentiel", "usages", "avenant-contrat"], queryFn: () => productionApi.referentiel("usages") });
+  const marques = useQuery({ queryKey: ["referentiel", "marques", "avenant-contrat"], queryFn: () => productionApi.referentiel("marques") });
+  const carrosseries = useQuery({ queryKey: ["referentiel", "carrosseries", "avenant-contrat"], queryFn: () => productionApi.referentiel("carrosseries") });
+  const garanties = useQuery({ queryKey: ["referentiel", "garanties", "avenant-contrat"], queryFn: productionApi.garantiesParametrage });
+  const categoriesTransport = useQuery({ queryKey: ["referentiel", "categories-transport", "avenant-contrat"], queryFn: () => productionApi.referentiel("categories-transport") });
+  const compagniesAssistance = useQuery({ queryKey: ["referentiel", "compagnies-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assistance") });
+  const produitsAssistance = useQuery({ queryKey: ["referentiel", "produits-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("produits-assistance") });
 
   const contrat = contextQuery.data?.contrat;
   const availableMovements = useMemo(
-    () => (contextQuery.data?.mouvementsDisponibles ?? []).filter((item) => item.code?.toUpperCase().endsWith("_F")),
+    () => (contextQuery.data?.mouvementsDisponibles ?? [])
+      .filter((item) => supportedAvenantCodes.has(normalizeCode(item.code)))
+      .filter((item) => !Boolean(item.renouvelleContrat)),
     [contextQuery.data?.mouvementsDisponibles]
   );
+  const contratKindLabel = contrat?.typeContrat === "FLOTTE" ? "flotte" : contrat?.typeContrat === "CONVENTION" ? "convention" : "mono";
   const targets = useMemo<Target[]>(() => [
     ...(contrat?.vehicules ?? []).map((item, index) => ({
       kind: "vehicule" as const,
@@ -108,12 +119,12 @@ export default function FlotteAvenantPage() {
   ], [contrat?.remorques, contrat?.vehicules]);
   const grilleTarifaireId = contrat?.grilleTarifaireId ? String(contrat.grilleTarifaireId) : undefined;
   const lignesGrille = useQuery({
-    queryKey: ["lignes-grille", grilleTarifaireId, "avenant-flotte"],
+    queryKey: ["lignes-grille", grilleTarifaireId, "avenant-contrat"],
     queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId }),
     enabled: Boolean(grilleTarifaireId),
   });
   const formulesPersonne = useQuery({
-    queryKey: ["formules-garantie-personne", grilleTarifaireId, "avenant-flotte"],
+    queryKey: ["formules-garantie-personne", grilleTarifaireId, "avenant-contrat"],
     queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: grilleTarifaireId }),
     enabled: Boolean(grilleTarifaireId),
   });
@@ -153,10 +164,15 @@ export default function FlotteAvenantPage() {
       setRemorques([]);
       setSelectedGaranties([]);
     }
+    if (movementCode === "EXR_M") {
+      setVehicules([]);
+      setRemorques([{}]);
+      setSelectedGaranties([]);
+    }
   }, [movementCode]);
 
   useEffect(() => {
-    if (movementCode !== "MOG_F" || !contrat) return;
+    if (!isGuaranteeModificationCode(movementCode) || !contrat) return;
     const mappedVehicules = (contrat.vehicules ?? []).map<VehiculeInput>((item) => ({
       vehiculeId: item.vehiculeId,
       typeVehicule: item.typeVehicule as VehiculeInput["typeVehicule"],
@@ -209,22 +225,22 @@ export default function FlotteAvenantPage() {
   }, [contrat, movementCode]);
 
   const previewMutation = useMutation({
-    mutationFn: (request: FlotteAvenantRequest) => productionApi.previewFlotteAvenant(contratId, request),
+    mutationFn: (request: AvenantRequest) => productionApi.previewAvenant(contratId, request),
     onSuccess: setPreview,
     onError: (error) => toast.error(errorMessage(error)),
   });
   const saveMutation = useMutation({
-    mutationFn: (request: FlotteAvenantRequest) => productionApi.createFlotteAvenant(contratId, request),
+    mutationFn: (request: AvenantRequest) => productionApi.createAvenant(contratId, request),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
-      await queryClient.invalidateQueries({ queryKey: ["flotte-avenant-context", contratId] });
-      toast.success("Avenant flotte enregistré");
+      await queryClient.invalidateQueries({ queryKey: ["avenant-context", contratId] });
+      toast.success("Avenant enregistré");
       navigate("/app/production/contrats");
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
 
-  const buildRequest = (silent = false): FlotteAvenantRequest | null => {
+  const buildRequest = (silent = false): AvenantRequest | null => {
     const notify = (message: string) => {
       if (!silent) {
         toast.error(message);
@@ -234,7 +250,7 @@ export default function FlotteAvenantPage() {
       notify("La date d'effet est obligatoire");
       return null;
     }
-    const request: FlotteAvenantRequest = {
+    const request: AvenantRequest = {
       codeTypeMouvement: movementCode,
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
@@ -255,11 +271,25 @@ export default function FlotteAvenantPage() {
       request.remorques = normalizedRemorques;
       request.garanties = selectedGaranties;
     }
-    if (movementCode === "MOG_F") {
+    if (isGuaranteeModificationCode(movementCode)) {
       if (selectedGaranties.length === 0) {
         notify("Sélectionnez au moins une garantie");
         return null;
       }
+      request.garanties = selectedGaranties;
+    }
+    if (movementCode === "EXR_M") {
+      const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
+      const invalidRemorque = normalizedRemorques.some((item) => !item.usageId || !item.marqueId || !item.immatriculation || !item.ptc);
+      if (invalidRemorque) {
+        notify("Usage, marque, immatriculation et PTC sont obligatoires pour chaque remorque");
+        return null;
+      }
+      if (selectedGaranties.length === 0) {
+        notify("Sélectionnez au moins une garantie");
+        return null;
+      }
+      request.remorques = normalizedRemorques;
       request.garanties = selectedGaranties;
     }
     if (movementCode === "RET_F") {
@@ -271,9 +301,9 @@ export default function FlotteAvenantPage() {
       request.vehiculeIds = selected.vehiculeIds;
       request.remorqueIds = selected.remorqueIds;
     }
-    if (movementCode === "PRI_F") {
+    if (isPrecisionCode(movementCode)) {
       const selected = splitTargets(targets, selectedTargetIds);
-      const precisions: NonNullable<FlotteAvenantRequest["precisions"]> = [];
+      const precisions: NonNullable<AvenantRequest["precisions"]> = [];
       selectedTargetIds.forEach((targetId) => {
         const target = targets.find((item) => targetKey(item) === targetId);
         if (!target) return;
@@ -296,7 +326,7 @@ export default function FlotteAvenantPage() {
       }
       request.remorqueIds = selected.remorqueIds;
     }
-    if (movementCode === "DUP_F") {
+    if (movementCode === "DUP_F" || movementCode === "DUP_M") {
       const selected = splitTargets(targets, selectedTargetIds);
       request.vehiculeIds = selected.vehiculeIds;
       request.remorqueIds = selected.remorqueIds;
@@ -351,7 +381,7 @@ export default function FlotteAvenantPage() {
           <Button asChild variant="ghost" size="sm" className="-ml-2">
             <Link to="/app/production/contrats"><ArrowLeft className="size-4" />Retour liste</Link>
           </Button>
-          <h1 className="mt-1 text-xl font-semibold">Avenant flotte - {MOVEMENT_LABELS[movementCode] ?? movementCode}</h1>
+          <h1 className="mt-1 text-xl font-semibold">Avenant {contratKindLabel} - {MOVEMENT_LABELS[movementCode] ?? movementCode}</h1>
           <p className="text-sm text-muted-foreground">{contrat?.numeroDossier ?? contrat?.numeroContrat ?? contratId}</p>
         </div>
         <div className="flex gap-2">
@@ -371,7 +401,7 @@ export default function FlotteAvenantPage() {
             <Select value={movementCode} onValueChange={(value) => navigate(`/app/production/contrats/${contratId}/avenants/${value}`)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(availableMovements.length ? availableMovements : Object.entries(MOVEMENT_LABELS).map(([code, libelle]) => ({ code, libelle }))).map((item) => (
+                {(availableMovements.length ? availableMovements : supportedAvenantOptions()).map((item) => (
                   <SelectItem key={item.code} value={item.code}>{item.libelle ?? MOVEMENT_LABELS[item.code] ?? item.code}</SelectItem>
                 ))}
               </SelectContent>
@@ -386,7 +416,7 @@ export default function FlotteAvenantPage() {
         </CardContent>
       </Card>
 
-      {movementCode === "INC_F" || movementCode === "MOG_F" ? (
+      {movementCode === "INC_F" || movementCode === "EXR_M" || isGuaranteeModificationCode(movementCode) ? (
         <FlotteTargetsSection
           vehicules={vehicules}
           setVehicules={setVehicules}
@@ -404,6 +434,7 @@ export default function FlotteAvenantPage() {
           compagniesAssistance={compagniesAssistance.data ?? []}
           produitsAssistance={produitsAssistance.data ?? []}
           grilleSelected={Boolean(grilleTarifaireId)}
+          pricingMode={contrat?.modeSaisieGaranties ?? "AUTOMATIQUE_GRILLE"}
           preview={preview}
           previewing={previewMutation.isPending}
           saving={saveMutation.isPending}
@@ -411,10 +442,10 @@ export default function FlotteAvenantPage() {
           crmPartageValeur={contrat?.crmPartageValeur ?? ""}
           maxRemorques={null}
           showAssistance={false}
-          showInfoSections={movementCode === "INC_F"}
-          allowTargetChanges={movementCode === "INC_F"}
+          showInfoSections={movementCode === "INC_F" || movementCode === "EXR_M"}
+          allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
         />
-      ) : movementCode !== "RES_F" && movementCode !== "RCH_F" ? (
+      ) : !isClosureCode(movementCode) ? (
         <TargetsSection
           movementCode={movementCode}
           targets={targets}
@@ -427,7 +458,7 @@ export default function FlotteAvenantPage() {
         <Card className="border-border/70 shadow-none">
           <CardHeader>
             <CardTitle>Cibles concernées</CardTitle>
-            <CardDescription>{movementCode === "RCH_F" ? "La résiliation à l'échéance conserve les cibles actives jusqu'à la date d'échéance." : "La résiliation portera sur toutes les cibles actives du contrat."}</CardDescription>
+            <CardDescription>{isEcheanceClosureCode(movementCode) ? "La résiliation à l'échéance conserve les cibles actives jusqu'à la date d'échéance." : "La résiliation portera sur toutes les cibles actives du contrat."}</CardDescription>
           </CardHeader>
           <CardContent><Badge variant="secondary">{targets.length} cible(s) active(s)</Badge></CardContent>
         </Card>
@@ -462,7 +493,7 @@ function TargetsSection({
     <Card className="border-border/70 shadow-none">
       <CardHeader>
         <CardTitle>Cibles concernées</CardTitle>
-        <CardDescription>{movementCode === "DUP_F" ? "Sans sélection, le duplicata concerne toutes les cibles actives." : "Sélectionnez les véhicules ou remorques concernés."}</CardDescription>
+        <CardDescription>{movementCode === "DUP_F" || movementCode === "DUP_M" ? "Sans sélection, le duplicata concerne toutes les cibles actives." : "Sélectionnez les véhicules ou remorques concernés."}</CardDescription>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <table className="w-full min-w-[820px] border-collapse text-sm">
@@ -471,7 +502,7 @@ function TargetsSection({
               <th className="w-12 px-3 py-3" />
               <th className="px-3 py-3 text-left">Cible</th>
               <th className="px-3 py-3 text-left">Usage</th>
-              {movementCode === "PRI_F" ? <th className="px-3 py-3 text-left">Nouvelle immatriculation / attestation</th> : null}
+              {isPrecisionCode(movementCode) ? <th className="px-3 py-3 text-left">Nouvelle immatriculation / attestation</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -486,7 +517,7 @@ function TargetsSection({
                     <div className="text-xs text-muted-foreground">{target.sublabel || target.kind}</div>
                   </td>
                   <td className="px-3 py-2">{target.usage ?? "-"}</td>
-                  {movementCode === "PRI_F" ? (
+                  {isPrecisionCode(movementCode) ? (
                     <td className="px-3 py-2">
                       <div className="grid gap-2 md:grid-cols-3">
                         <Input disabled={!checked} placeholder="Immatriculation" value={precisionDrafts[key]?.immatriculation ?? ""} onChange={(event) => updatePrecision(key, { immatriculation: event.target.value }, setPrecisionDrafts)} />
@@ -585,6 +616,49 @@ function updatePrecision(
   setter: (value: Record<string, PrecisionDraft> | ((current: Record<string, PrecisionDraft>) => Record<string, PrecisionDraft>)) => void
 ) {
   setter((current) => ({ ...current, [key]: { ...(current[key] ?? {}), ...patch } }));
+}
+
+const supportedAvenantCodes = new Set([
+  "EXG_M",
+  "MOG_M",
+  "EXR_M",
+  "PRI_M",
+  "DUP_M",
+  "RES_M",
+  "RCH_M",
+  "ANN_M",
+  "INC_F",
+  "MOG_F",
+  "RET_F",
+  "EXR_F",
+  "RES_F",
+  "RCH_F",
+  "PRI_F",
+  "DUP_F",
+]);
+
+function supportedAvenantOptions() {
+  return Array.from(supportedAvenantCodes).map((code) => ({ code, libelle: MOVEMENT_LABELS[code] ?? code }));
+}
+
+function normalizeCode(code?: string | null) {
+  return (code ?? "").trim().toUpperCase();
+}
+
+function isGuaranteeModificationCode(code: string) {
+  return code === "MOG_F" || code === "MOG_M" || code === "EXG_M";
+}
+
+function isPrecisionCode(code: string) {
+  return code === "PRI_F" || code === "PRI_M";
+}
+
+function isEcheanceClosureCode(code: string) {
+  return code === "RCH_F" || code === "RCH_M";
+}
+
+function isClosureCode(code: string) {
+  return code === "RES_F" || code === "RES_M" || code === "RCH_F" || code === "RCH_M" || code === "ANN_M";
 }
 
 function errorMessage(error: unknown) {

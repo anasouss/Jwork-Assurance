@@ -26,8 +26,6 @@ import { productionApi } from "../api";
 import { toDateOnly } from "../date";
 import type { EcheanceAutomobileRow, TypeContrat } from "../types";
 
-type NatureEcheance = "AUTOMOBILE" | "RISQUES_DIVERS" | "ASSISTANCE";
-
 type EcheanceFilters = {
   dateDu?: string;
   dateAu?: string;
@@ -59,7 +57,6 @@ const PAGE_SIZE = 25;
 export default function EcheancesPage() {
   const [urlParams] = useSearchParams();
   const initialState = useMemo(() => initialEcheanceState(urlParams), [urlParams]);
-  const [nature, setNature] = useState<NatureEcheance | null>(initialState.nature);
   const [filters, setFilters] = useState<EcheanceFilters>(initialState.filters);
   const [appliedFilters, setAppliedFilters] = useState<EcheanceFilters>(initialState.filters);
   const [searched, setSearched] = useState(initialState.searched);
@@ -76,11 +73,11 @@ export default function EcheancesPage() {
   });
 
   const searchParams = useMemo(() => {
-    if (!searched || nature !== "AUTOMOBILE" || !appliedFilters.dateDu || !appliedFilters.dateAu) {
+    if (!searched || !appliedFilters.dateDu || !appliedFilters.dateAu) {
       return null;
     }
     return { ...toSearchParams(appliedFilters), page, size: PAGE_SIZE };
-  }, [appliedFilters, nature, page, searched]);
+  }, [appliedFilters, page, searched]);
 
   const echeances = useQuery({
     queryKey: ["echeances", "automobile", searchParams],
@@ -94,7 +91,7 @@ export default function EcheancesPage() {
   });
 
   const rows = useMemo(() => sortRows(echeances.data?.rows ?? [], sort), [echeances.data?.rows, sort]);
-  const canSearch = nature === "AUTOMOBILE" && Boolean(filters.dateDu && filters.dateAu);
+  const canSearch = Boolean(filters.dateDu && filters.dateAu);
   const hasDateError = Boolean(filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu);
 
   function applySearch() {
@@ -146,98 +143,81 @@ export default function EcheancesPage() {
           Gestion des échéances
         </div>
         <CardContent className="grid gap-4 p-5">
-          <div className="grid gap-3 md:grid-cols-3">
-            <NatureCard
-              title="Automobile"
-              status="Actif"
-              active={nature === "AUTOMOBILE"}
-              onClick={() => setNature("AUTOMOBILE")}
-            />
-            <NatureCard title="Risques divers" status="À venir" disabled />
-            <NatureCard title="Assistance" status="À venir" disabled />
+          <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_1.3fr_auto_auto]">
+            <FilterField label="Date du">
+              <DatePicker
+                date={filters.dateDu}
+                onSelect={(date) => setFilters((current) => ({ ...current, dateDu: toDateOnly(date) }))}
+              />
+            </FilterField>
+            <FilterField label="Date au">
+              <DatePicker
+                date={filters.dateAu}
+                onSelect={(date) => setFilters((current) => ({ ...current, dateAu: toDateOnly(date) }))}
+              />
+            </FilterField>
+            <FilterField label="Compagnie">
+              <Select
+                value={filters.compagnieId}
+                onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Toutes les compagnies</SelectItem>
+                  {(companies.data ?? []).map((company) => (
+                    <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Type contrat">
+              <Select
+                value={filters.typeContrat}
+                onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as EcheanceFilters["typeContrat"] }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous les types</SelectItem>
+                  <SelectItem value="PARTICULIER">Mono</SelectItem>
+                  <SelectItem value="CONVENTION">Convention</SelectItem>
+                  <SelectItem value="FLOTTE">Flotte</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="RC / CIN / Nom">
+              <Input
+                value={filters.search}
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                placeholder="Rechercher par RC, CIN ou nom"
+              />
+            </FilterField>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                className="h-10 w-full bg-green-600 hover:bg-green-700"
+                disabled={!canSearch || hasDateError}
+                onClick={applySearch}
+              >
+                <Search className="size-4" />
+                Lancer la recherche
+              </Button>
+            </div>
+            <div className="flex items-end">
+              <Button type="button" variant="outline" className="h-10 w-full" onClick={resetSearch}>
+                <RotateCcw className="size-4" />
+                Réinitialiser
+              </Button>
+            </div>
+            {hasDateError ? (
+              <p className="text-sm font-medium text-red-600 md:col-span-2 xl:col-span-7">
+                La date du doit être inférieure ou égale à la date au.
+              </p>
+            ) : null}
           </div>
-
-          {nature === "AUTOMOBILE" ? (
-            <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_1.3fr_auto_auto]">
-              <FilterField label="Date du">
-                <DatePicker
-                  date={filters.dateDu}
-                  onSelect={(date) => setFilters((current) => ({ ...current, dateDu: toDateOnly(date) }))}
-                />
-              </FilterField>
-              <FilterField label="Date au">
-                <DatePicker
-                  date={filters.dateAu}
-                  onSelect={(date) => setFilters((current) => ({ ...current, dateAu: toDateOnly(date) }))}
-                />
-              </FilterField>
-              <FilterField label="Compagnie">
-                <Select
-                  value={filters.compagnieId}
-                  onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Toutes les compagnies</SelectItem>
-                    {(companies.data ?? []).map((company) => (
-                      <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FilterField>
-              <FilterField label="Type contrat">
-                <Select
-                  value={filters.typeContrat}
-                  onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as EcheanceFilters["typeContrat"] }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Tous les types</SelectItem>
-                    <SelectItem value="PARTICULIER">Mono</SelectItem>
-                    <SelectItem value="CONVENTION">Convention</SelectItem>
-                    <SelectItem value="FLOTTE">Flotte</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FilterField>
-              <FilterField label="RC / CIN / Nom">
-                <Input
-                  value={filters.search}
-                  onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-                  placeholder="Rechercher par RC, CIN ou nom"
-                />
-              </FilterField>
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  className="h-10 w-full bg-green-600 hover:bg-green-700"
-                  disabled={!canSearch || hasDateError}
-                  onClick={applySearch}
-                >
-                  <Search className="size-4" />
-                  Lancer la recherche
-                </Button>
-              </div>
-              <div className="flex items-end">
-                <Button type="button" variant="outline" className="h-10 w-full" onClick={resetSearch}>
-                  <RotateCcw className="size-4" />
-                  Réinitialiser
-                </Button>
-              </div>
-              {hasDateError ? (
-                <p className="text-sm font-medium text-red-600 md:col-span-2 xl:col-span-7">
-                  La date du doit être inférieure ou égale à la date au.
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <div className="rounded-md border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-              Sélectionnez Automobile pour renseigner une période et afficher le tableau des contrats à échéance.
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {searched && nature === "AUTOMOBILE" ? (
+      {searched ? (
         <Card className="border-border/70 shadow-none">
           <CardContent className="p-0">
             <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
@@ -352,29 +332,6 @@ export default function EcheancesPage() {
   );
 }
 
-function NatureCard({ title, status, active, disabled, onClick }: { title: string; status: string; active?: boolean; disabled?: boolean; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "flex min-h-20 items-start justify-between rounded-md border p-4 text-left transition-colors",
-        active && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30",
-        disabled ? "cursor-not-allowed border-dashed bg-muted/20 text-muted-foreground" : "hover:border-emerald-400 hover:bg-emerald-50/70"
-      )}
-    >
-      <span className="flex items-center gap-2">
-        <span className={cn("size-3 rounded-full border", active && "border-emerald-600 bg-emerald-600")} />
-        <span className="font-semibold">{title}</span>
-      </span>
-      <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", disabled ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700")}>
-        {status}
-      </span>
-    </button>
-  );
-}
-
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="grid gap-1.5 text-xs font-semibold uppercase text-emerald-950 dark:text-emerald-100">
@@ -446,11 +403,9 @@ function toSearchParams(filters: EcheanceFilters): EcheanceSearchParams {
 }
 
 function initialEcheanceState(params: URLSearchParams): {
-  nature: NatureEcheance | null;
   filters: EcheanceFilters;
   searched: boolean;
 } {
-  const nature = params.get("nature") === "AUTOMOBILE" ? "AUTOMOBILE" : null;
   const filters: EcheanceFilters = {
     dateDu: params.get("dateDu") ?? undefined,
     dateAu: params.get("dateAu") ?? undefined,
@@ -459,9 +414,8 @@ function initialEcheanceState(params: URLSearchParams): {
     search: params.get("search") ?? "",
   };
   return {
-    nature,
     filters,
-    searched: nature === "AUTOMOBILE" && Boolean(filters.dateDu && filters.dateAu),
+    searched: Boolean(filters.dateDu && filters.dateAu),
   };
 }
 

@@ -710,6 +710,10 @@ function addNumbers(left?: number, right?: number) {
   return roundMoney((left ?? 0) + (right ?? 0));
 }
 
+function positiveOrDefined(value?: number) {
+  return value != null && value > 0 ? value : undefined;
+}
+
 function autoPrimeDisplay(value?: number) {
   return value == null ? "Calcul auto" : moneyAmount(value);
 }

@@ -27,7 +27,7 @@ export default function ProductionDashboardPage() {
     { title: "Ajouter un dossier", icon: FilePlus2, href: "/app/production/ajouter-dossier", permission: "contrat:create", primary: true },
     { title: "Ajouter un avenant", icon: Plus, href: "/app/production/contrats", permission: "contrat:update" },
     { title: "Liste des dossiers", icon: List, href: "/app/production/contrats", permission: "contrat:view" },
-    { title: "Gestion des échéances", icon: CalendarDays, href: "/app/production/contrats", permission: "contrat:view" },
+    { title: "Gestion des échéances", icon: CalendarDays, href: "/app/production/echeances", permission: "contrat:view" },
     { title: "Registre de production", icon: FileText, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Portefeuille client", icon: Users, href: "/app/production/contrats", permission: "client:view" },
     { title: "Prospection", icon: Target, href: "/app/production/prospection", permission: "contrat:view" },

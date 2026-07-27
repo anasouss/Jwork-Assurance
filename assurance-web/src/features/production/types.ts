@@ -635,6 +635,36 @@ export type QuittancePreview = {
   }[];
 };
 
+export type EcheanceAutomobileRow = {
+  contratId: string;
+  dossier?: string | null;
+  client?: string | null;
+  codeClient?: string | null;
+  police?: string | null;
+  marque?: string | null;
+  matricule?: string | null;
+  dateEcheance?: string | null;
+  typeContrat: TypeContrat;
+  typeContratLabel?: string | null;
+  compagnieId?: string | null;
+  compagnie?: string | null;
+  telephone?: string | null;
+  observation?: string | null;
+};
+
+export type EcheanceAutomobileResponse = {
+  dateDu: string;
+  dateAu: string;
+  compagnieId?: string | null;
+  typeContrat?: TypeContrat | null;
+  search?: string | null;
+  summary: {
+    contratCount: number;
+    compagnieCount: number;
+  };
+  rows: EcheanceAutomobileRow[];
+};
+
 export type UpsertGrilleTarifaireRequest = {
   compagnieAssuranceId: string;
   libelle: string;

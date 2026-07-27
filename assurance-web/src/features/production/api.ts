@@ -12,11 +12,13 @@ import type {
   CreateContratRequest,
   ClientResponse,
   ElementFacturable,
+  EcheanceAutomobileResponse,
   LivraisonAttestation,
   PieceJointe,
   PiecesJointesContrat,
   QuittancePreview,
   ReferenceOption,
+  TypeContrat,
   TypePieceJointe,
   UpsertGrilleTarifaireRequest,
   UpsertGrilleUsageConfigurationRequest,
@@ -111,6 +113,30 @@ export const productionApi = {
 
   async listContrats() {
     return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats"));
+  },
+
+  async searchEcheancesAutomobile(params: {
+    dateDu: string;
+    dateAu: string;
+    compagnieId?: string;
+    typeContrat?: TypeContrat;
+    search?: string;
+  }) {
+    return unwrap(
+      await apiFetch<ApiResponse<EcheanceAutomobileResponse>>(
+        `/api/v1/contrats/echeances/automobile${buildQueryString(params)}`
+      )
+    );
+  },
+
+  async exportEcheancesAutomobile(params: {
+    dateDu: string;
+    dateAu: string;
+    compagnieId?: string;
+    typeContrat?: TypeContrat;
+    search?: string;
+  }) {
+    return apiFetchBlob(`/api/v1/contrats/echeances/automobile/export${buildQueryString(params)}`);
   },
 
   async listProspections() {

@@ -13,13 +13,16 @@ import com.assurance.dto.response.CarteVerteContextResponse;
 import com.assurance.dto.response.CarteVerteResponse;
 import com.assurance.dto.response.ContratActionsResponse;
 import com.assurance.dto.response.ContratResponse;
+import com.assurance.dto.response.EcheanceAutomobileResponse;
 import com.assurance.dto.response.QuittanceResponse;
+import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
 import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
 import com.assurance.service.DevisPdfService;
+import com.assurance.service.EcheanceProductionService;
 import com.assurance.service.MouvementContratService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +53,7 @@ public class ContratController {
     private final CarteVerteService carteVerteService;
     private final DevisPdfService devisPdfService;
     private final MouvementContratService mouvementContratService;
+    private final EcheanceProductionService echeanceProductionService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<ContratResponse>> create(@Valid @RequestBody CreateContratRequest request) {
@@ -136,6 +140,46 @@ public class ContratController {
     @GetMapping("/prospections")
     public ResponseEntity<ApiResponse<List<ContratResponse>>> listProspections() {
         return ResponseEntity.ok(ApiResponse.success(contratService.listProspections(TenantContext.getCurrentAgence())));
+    }
+
+    @GetMapping("/echeances/automobile")
+    public ResponseEntity<ApiResponse<EcheanceAutomobileResponse>> echeancesAutomobile(
+            @RequestParam LocalDate dateDu,
+            @RequestParam LocalDate dateAu,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(required = false) String search
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(echeanceProductionService.searchAutomobile(
+                TenantContext.getCurrentAgence(),
+                dateDu,
+                dateAu,
+                compagnieId,
+                typeContrat,
+                search
+        )));
+    }
+
+    @GetMapping("/echeances/automobile/export")
+    public ResponseEntity<byte[]> exportEcheancesAutomobile(
+            @RequestParam LocalDate dateDu,
+            @RequestParam LocalDate dateAu,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(required = false) String search
+    ) {
+        byte[] export = echeanceProductionService.exportAutomobile(
+                TenantContext.getCurrentAgence(),
+                dateDu,
+                dateAu,
+                compagnieId,
+                typeContrat,
+                search
+        );
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=echeances-automobile-" + dateDu + "-" + dateAu + ".xls")
+                .contentType(MediaType.parseMediaType("application/vnd.ms-excel"))
+                .body(export);
     }
 
     @GetMapping("/{id}")

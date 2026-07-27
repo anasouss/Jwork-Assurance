@@ -258,13 +258,13 @@ export function VehiculeSection({
                   </Field>
                 ) : null}
                 <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
-                  <MoneyInput value={vehicule.valeurNeuf} onValueChange={(value) => update(index, { valeurNeuf: value })} />
+                  <MoneyInput className="text-right" value={vehicule.valeurNeuf} onValueChange={(value) => update(index, { valeurNeuf: value })} />
                 </Field>
                 <Field label="Valeur vénale" error={errors[`vehicules.${index}.valeurVenale`] ?? validateValeurVenale(vehicule)}>
-                  <MoneyInput value={vehicule.valeurVenale} onValueChange={(value) => update(index, { valeurVenale: value })} />
+                  <MoneyInput className="text-right" value={vehicule.valeurVenale} onValueChange={(value) => update(index, { valeurVenale: value })} />
                 </Field>
                 <Field label="Valeur glace">
-                  <MoneyInput value={vehicule.valeurGlace} onValueChange={(value) => update(index, { valeurGlace: value })} />
+                  <MoneyInput className="text-right" value={vehicule.valeurGlace} onValueChange={(value) => update(index, { valeurGlace: value })} />
                 </Field>
                 <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
                   <Input value={vehicule.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />

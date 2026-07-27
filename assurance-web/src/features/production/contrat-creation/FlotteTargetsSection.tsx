@@ -748,11 +748,12 @@ function targetQuittanceSummary(preview: QuittancePreview | null | undefined, ta
   }
   const backendSummary = backendTargetSummary(preview, target);
   if (backendSummary) {
+    const pta = positiveOrUndefined(backendSummary.corporelPrimeNette);
     return {
-      totalNet: backendSummary.primeNetteHorsEvcat,
+      totalNet: backendSummary.automobilePrimeNette ?? subtractNumbers(backendSummary.primeNetteHorsEvcat, pta),
       evcat: backendSummary.evcatPrimeNette,
-      pta: backendSummary.corporelPrimeNette,
-      accessoire: backendSummary.accessoire,
+      pta,
+      accessoire: pta == null ? undefined : backendSummary.accessoire,
       taxe: addNumbers(backendSummary.taxe, backendSummary.taxeParafiscale),
       cnpac: backendSummary.cnpac,
       totalAPayer: backendSummary.primeTotale,
@@ -772,14 +773,15 @@ function targetQuittanceSummary(preview: QuittancePreview | null | undefined, ta
       + numberOrZero(proportionalAmount(lineTaxTotal(corpLine), pta, corpLine?.primeNette))
       + numberOrZero(proportionalAmount(lineTaxTotal(evcatLine), evcat, evcatLine?.primeNette))
   );
-  const totalNet = roundMoney(autoNet + pta);
-  const totalAPayer = roundMoney(totalNet + numberOrZero(evcat) + taxe + cnpac + numberOrZero(accessoire));
+  const visiblePta = positiveOrUndefined(pta);
+  const totalNet = roundMoney(autoNet);
+  const totalAPayer = roundMoney(totalNet + numberOrZero(visiblePta) + numberOrZero(evcat) + taxe + cnpac + numberOrZero(accessoire));
 
   return {
     totalNet,
     evcat,
-    pta,
-    accessoire,
+    pta: visiblePta,
+    accessoire: visiblePta == null ? undefined : accessoire,
     taxe,
     cnpac,
     totalAPayer,
@@ -817,6 +819,17 @@ function addNumbers(left?: number, right?: number) {
     return undefined;
   }
   return numberOrZero(left) + numberOrZero(right);
+}
+
+function subtractNumbers(left?: number, right?: number) {
+  if (left == null) {
+    return undefined;
+  }
+  return roundMoney(left - numberOrZero(right));
+}
+
+function positiveOrUndefined(value?: number) {
+  return value != null && value > 0 ? value : undefined;
 }
 
 function quittanceLine(preview: QuittancePreview, categorie: string) {

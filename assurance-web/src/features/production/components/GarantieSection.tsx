@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { EcheanceInput } from "@/components/ui/echeance-input";
@@ -11,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
 import { computeDateEcheanceFromCode, toDateOnly } from "../date";
-import { formatMoney, money, moneyAmount, numberValue } from "../utils/format";
+import { formatMoney, money, moneyAmount, numberValue, roundMoney } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
@@ -42,6 +44,9 @@ export function GarantieSection({
   produitsAssistance = [],
   assistanceUsageId,
   assistanceCategorieClientId,
+  onSaveSection,
+  savedSections = {},
+  saving = false,
   openSection,
   onSectionOpenChange,
 }: {
@@ -70,6 +75,9 @@ export function GarantieSection({
   produitsAssistance?: ReferenceOption[];
   assistanceUsageId?: string;
   assistanceCategorieClientId?: string;
+  onSaveSection?: (section: "garanties") => void;
+  savedSections?: Partial<Record<"garanties", boolean>>;
+  saving?: boolean;
   openSection?: ContratSectionKey;
   onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
@@ -82,8 +90,7 @@ export function GarantieSection({
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
   const personneIds = new Set(personneGaranties.map((garantie) => garantie.id));
   const showPersonneTotals = selected.some((item) => personneIds.has(item.garantieId))
-    || linePrimeNette(preview, "CORPOREL") != null
-    || (preview?.accessoire ?? 0) > 0;
+    || linePrimeNette(preview, "CORPOREL") != null;
   const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || linePrimeNette(preview, "ASSISTANCE") != null;
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
@@ -129,7 +136,7 @@ export function GarantieSection({
   return (
     <SectionCard
       title="Garanties"
-      badge={`${selected.length} sélectionnée${selected.length > 1 ? "s" : ""}`}
+      badge={savedSections.garanties ? "Validé" : `${selected.length} sélectionnée${selected.length > 1 ? "s" : ""}`}
       tone="production"
       open={openSection === "garanties"}
       onOpenChange={(open) => onSectionOpenChange?.("garanties", open)}
@@ -493,6 +500,20 @@ export function GarantieSection({
           showAssistanceTotal={showAssistanceTotal}
         />
       ) : null}
+      {onSaveSection ? (
+        <div className="mt-4 flex justify-end border-t pt-3">
+          <Button
+            type="button"
+            size="sm"
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+            disabled={saving}
+            onClick={() => onSaveSection("garanties")}
+          >
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {saving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      ) : null}
     </SectionCard>
   );
 }
@@ -508,10 +529,14 @@ function GuaranteeTotalsSummary({
   showPersonneTotals?: boolean;
   showAssistanceTotal?: boolean;
 }) {
+  const automobileNet = linePrimeNette(preview, "AUTOMOBILE");
+  const corporelNet = linePrimeNette(preview, "CORPOREL");
+  const totalNet = showPersonneTotals ? automobileNet : addNumbers(automobileNet, corporelNet);
+  const taxeTotal = addNumbers(preview?.taxe, preview?.taxeParafiscale);
   const rows: [string, number | undefined][] = [
-    ["TOTAL NET", preview?.primeNette],
+    ["TOTAL NET", totalNet],
     ["EVCAT", linePrimeNette(preview, "EVCAT")],
-    ["TAXE", preview?.taxe],
+    ["TAXE", taxeTotal],
     ["CNPAC", preview?.cnpac],
     ["TOTAL À PAYER", preview?.primeTotale],
   ];
@@ -668,6 +693,13 @@ function AssistanceTable({
 
 function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
   return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
+}
+
+function addNumbers(left?: number, right?: number) {
+  if (left == null && right == null) {
+    return undefined;
+  }
+  return roundMoney((left ?? 0) + (right ?? 0));
 }
 
 function autoPrimeDisplay(value?: number) {

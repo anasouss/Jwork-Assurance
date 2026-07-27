@@ -23,7 +23,7 @@ import type {
   VehiculeInput,
 } from "../types";
 
-export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille" | "vehicule";
+export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille" | "vehicule" | "garanties";
 export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorque" | "flotteTargets" | "garanties" | "quittances";
 export type ContratTargetKey = { kind: "vehicule" | "remorque"; index: number };
 
@@ -1202,6 +1202,8 @@ function sectionLabel(section: SavableContratSectionKey) {
       return "Grille tarifaire";
     case "vehicule":
       return "Véhicule";
+    case "garanties":
+      return "Garanties";
   }
 }
 

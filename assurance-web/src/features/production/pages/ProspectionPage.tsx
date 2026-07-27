@@ -126,7 +126,11 @@ export default function ProspectionPage() {
       toast.error("Sélectionnez au moins un usage");
       return;
     }
-    const previewWindow = window.open("", "_blank", "noopener,noreferrer");
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les popups pour ouvrir le PDF dans un nouvel onglet");
+      return;
+    }
     setGeneratingPdf(true);
     try {
       const blob = await productionApi.downloadDevisPdf(pdfTarget.id, {
@@ -134,11 +138,7 @@ export default function ProspectionPage() {
         usageIds: pdfScope === "usages" ? selectedUsages : undefined,
       });
       const url = URL.createObjectURL(blob);
-      if (previewWindow) {
-        previewWindow.location.href = url;
-      } else {
-        window.location.href = url;
-      }
+      previewWindow.location.href = url;
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       toast.success("PDF ouvert");
     } catch (error) {

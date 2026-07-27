@@ -34,9 +34,9 @@ export default function AppLayout() {
   return (
     <SidebarProvider defaultOpen={false} data-active-module={activeModule}>
       <AppSidebar variant="floating" />
-      <SidebarInset>
+      <SidebarInset className="min-w-0 overflow-x-hidden">
         <AppHeader />
-        <main className="flex flex-1 flex-col gap-4 px-4 py-4">
+        <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden px-4 py-4">
           <Outlet />
         </main>
       </SidebarInset>

@@ -172,6 +172,13 @@ export default function AvenantContratPage() {
   }, [movementCode]);
 
   useEffect(() => {
+    if (!isDuplicataCode(movementCode) || targets.length === 0) {
+      return;
+    }
+    setSelectedTargetIds((current) => current.length === 0 ? targets.map(targetKey) : current);
+  }, [movementCode, targets]);
+
+  useEffect(() => {
     if (!isGuaranteeModificationCode(movementCode) || !contrat) return;
     const mappedVehicules = (contrat.vehicules ?? []).map<VehiculeInput>((item) => ({
       vehiculeId: item.vehiculeId,
@@ -651,6 +658,10 @@ function isGuaranteeModificationCode(code: string) {
 
 function isPrecisionCode(code: string) {
   return code === "PRI_F" || code === "PRI_M";
+}
+
+function isDuplicataCode(code: string) {
+  return code === "DUP_F" || code === "DUP_M";
 }
 
 function isEcheanceClosureCode(code: string) {

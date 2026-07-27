@@ -75,8 +75,8 @@ export default function ContratsPage() {
   );
 
   return (
-    <div className="grid gap-4">
-      <Card className="border-border/70 shadow-none">
+    <div className="grid min-w-0 gap-4 overflow-x-hidden">
+      <Card className="min-w-0 border-border/70 shadow-none">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Liste des dossiers</CardTitle>
           {canCreateContrat ? (
@@ -154,9 +154,9 @@ export default function ContratsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 shadow-none">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto p-4">
+      <Card className="min-w-0 border-border/70 shadow-none">
+        <CardContent className="min-w-0 p-0">
+          <div className="max-w-full overflow-x-auto p-4">
             <table className="w-full min-w-[1320px] border-collapse text-sm">
               <thead className="bg-emerald-600 text-xs uppercase leading-tight text-white dark:bg-emerald-700">
                 <tr>
@@ -454,7 +454,9 @@ function sortedMouvements(contrat: ContratSummary) {
   return [...(contrat.mouvements ?? [])].sort((a, b) => {
     const dateDiff = dateRank(b.dateEffet) - dateRank(a.dateEffet);
     if (dateDiff !== 0) return dateDiff;
-    return (Number(b.numeroMouvement) || 0) - (Number(a.numeroMouvement) || 0);
+    const numeroDiff = numericRank(b.numeroMouvement) - numericRank(a.numeroMouvement);
+    if (numeroDiff !== 0) return numeroDiff;
+    return numericRank(b.id) - numericRank(a.id);
   });
 }
 
@@ -558,6 +560,11 @@ function formatDate(value?: string | null) {
 function dateRank(value?: string | null) {
   if (!value) return 0;
   const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function numericRank(value?: string | number | null) {
+  const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 

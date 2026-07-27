@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -1299,8 +1300,21 @@ public class ContratService {
     public List<ContratResponse> list(Long agenceId) {
         return contratRepository.findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(agenceId).stream()
                 .map(this::ensureNumeroDossier)
+                .sorted(Comparator.comparing(this::latestContratActivityAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .map(this::toListResponse)
                 .toList();
+    }
+
+    private LocalDateTime latestContratActivityAt(Contrat contrat) {
+        LocalDateTime latestMouvement = (contrat.getMouvements() == null ? List.<MouvementContrat>of() : contrat.getMouvements()).stream()
+                .map(MouvementContrat::getCreatedAt)
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        if (latestMouvement != null) {
+            return latestMouvement;
+        }
+        return contrat.getCreatedAt();
     }
 
     @Transactional

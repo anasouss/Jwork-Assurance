@@ -150,20 +150,6 @@ export function ContratFormLayout({
       showAttestation={!showConvention}
       showRemorqueFlag={showConvention}
       errors={form.validationErrors}
-      extraAction={
-        showConvention ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="border-white/50 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-            onClick={() => setGrilleConfiguratorOpen(true)}
-          >
-            <Settings2 className="size-4" />
-            Grille tarifaire
-          </Button>
-        ) : null
-      }
       onSaveSection={form.handleSaveSection}
       savedSections={form.savedSections}
       saving={form.saveDraftMutation.isPending}
@@ -199,6 +185,20 @@ export function ContratFormLayout({
       produitsAssistance={form.refs.produitsAssistance.data ?? []}
       assistanceUsageId={form.usageId}
       assistanceCategorieClientId={assistanceCategorieClientId}
+      extraAction={
+        showConvention ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-white/50 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+            onClick={() => setGrilleConfiguratorOpen(true)}
+          >
+            <Settings2 className="size-4" />
+            Grille tarifaire
+          </Button>
+        ) : null
+      }
       onSaveSection={form.handleSaveSection}
       savedSections={form.savedSections}
       saving={form.saveDraftMutation.isPending}

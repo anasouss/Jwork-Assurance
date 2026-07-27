@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { ReactNode } from "react";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ export function GarantieSection({
   produitsAssistance = [],
   assistanceUsageId,
   assistanceCategorieClientId,
+  extraAction,
   onSaveSection,
   savedSections = {},
   saving = false,
@@ -75,6 +77,7 @@ export function GarantieSection({
   produitsAssistance?: ReferenceOption[];
   assistanceUsageId?: string;
   assistanceCategorieClientId?: string;
+  extraAction?: ReactNode;
   onSaveSection?: (section: "garanties") => void;
   savedSections?: Partial<Record<"garanties", boolean>>;
   saving?: boolean;
@@ -137,6 +140,7 @@ export function GarantieSection({
       tone="production"
       open={openSection === "garanties"}
       onOpenChange={(open) => onSectionOpenChange?.("garanties", open)}
+      action={extraAction}
     >
       {allowPrimeColumn ? (
         <div className="mb-4 flex items-center gap-2 text-sm">

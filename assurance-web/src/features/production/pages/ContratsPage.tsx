@@ -11,6 +11,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -296,7 +299,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const carteVertePath = `/app/production/contrats/${contrat.id}/cartes-vertes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const editPath = editContratPath(contrat);
-  const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat)) && !child;
+  const terminal = isTerminalContratRow(contrat, movement);
+  const canCreateMovement = !child && !terminal && !Boolean(contrat.renouvele) && isActiveContrat(contrat);
+  const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat)) && !child && !terminal;
+  const canDownload = !isTerminalMovementCode(movement.code);
+  const hasPrimaryActions = canEditDirectly || canCreateMovement;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -310,30 +317,38 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
             <Link to={editPath}>Modifier</Link>
           </DropdownMenuItem>
         ) : null}
-        {child ? null : (
+        {canCreateMovement ? (
           <>
             {isFlotte ? (
               <>
                 <DropdownMenuItem asChild><Link to={avenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Autre avenant</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-56">
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
               </>
             ) : (
-              <>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXG_M")}>Extension garanties</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_M")}>Modification garanties</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_M")}>Extension remorque</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_M")}>Précision</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_M")}>Duplicata</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_M")}>Résiliation</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_M")}>Résiliation à l'échéance</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "ANN_M")}>Annulation</Link></DropdownMenuItem>
-              </>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>Ajouter avenant</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXG_M")}>Extension garanties</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_M")}>Modification garanties</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_M")}>Extension remorque</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_M")}>Précision</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_M")}>Duplicata</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_M")}>Résiliation</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_M")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "ANN_M")}>Annulation</Link></DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             )}
             <DropdownMenuItem asChild>
               <Link to={assistancePath}>Contrat assistance</Link>
@@ -343,9 +358,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
             </DropdownMenuItem>
             <DropdownMenuItem>Renouvellement</DropdownMenuItem>
           </>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>Télécharger</DropdownMenuItem>
+        ) : null}
+        {hasPrimaryActions ? <DropdownMenuSeparator /> : null}
+        {canDownload ? <DropdownMenuItem>Télécharger</DropdownMenuItem> : null}
         <DropdownMenuItem asChild>
           <Link to={piecesPath}>Les pièces jointes</Link>
         </DropdownMenuItem>
@@ -370,6 +385,16 @@ function isDirectlyEditable(contrat: ContratSummary) {
 
 function isActiveContrat(contrat: ContratSummary) {
   return String(contrat.statut ?? "").toUpperCase() === "ACTIVE" && !contrat.prospection && !contrat.brouillon;
+}
+
+function isTerminalContratRow(contrat: ContratSummary, movement: MovementLine) {
+  const statut = String(contrat.statut ?? "").toUpperCase();
+  return statut.includes("RESILI") || statut.includes("ANNU") || isTerminalMovementCode(movement.code);
+}
+
+function isTerminalMovementCode(code?: string | null) {
+  const normalized = String(code ?? "").trim().toUpperCase();
+  return ["RES_F", "RES_M", "RCH_F", "RCH_M", "ANN_M"].includes(normalized);
 }
 
 function avenantPath(contrat: ContratSummary, code: string) {

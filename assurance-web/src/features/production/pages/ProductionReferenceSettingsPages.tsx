@@ -705,7 +705,7 @@ export function GarantiesSettingsPage() {
       if (!(current.modesAutorises ?? []).includes(mode)) {
         return current;
       }
-      const modesTarificationMultiple = toggleArray(current.modesTarificationMultiple ?? [], mode, checked);
+      const modesTarificationMultiple = checked ? [mode] : [];
       return {
         ...current,
         tarificationMultiple: modesTarificationMultiple.length > 0,
@@ -954,10 +954,13 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
   const modes = (payload.modesAutorises?.length ? payload.modesAutorises : [payload.modeParDefaut || allowed[0]])
     .filter((mode) => allowed.includes(mode));
   const mode = modes.includes(payload.modeParDefaut ?? "") ? payload.modeParDefaut! : modes[0] ?? allowed[0] ?? "TAUX";
-  const multiple = Boolean(payload.tarificationMultiple);
+  const multipleModes = (payload.modesTarificationMultiple ?? []).filter((item) => modes.includes(item));
+  const multiple = multipleModes.length > 0;
   const [enabled, setEnabled] = useState(true);
   const [vehicleRows, setVehicleRows] = useState<PreviewVehicleRow[]>(() => [emptyPreviewVehicleRow(mode)]);
   const [personneRows, setPersonneRows] = useState<PreviewPersonneRow[]>(() => [emptyPreviewPersonneRow()]);
+  const vehicleMode = vehicleRows[0]?.mode ?? mode;
+  const canAddVehicleRow = multipleModes.includes(vehicleMode);
 
   useEffect(() => {
     setEnabled(true);
@@ -1085,9 +1088,9 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
               <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="capital" disabledFor={(row) => row.mode !== "CAPITAL"} updateRow={updateVehicleRow} /></TableCell>
               <TableCell className="align-top"><PreviewVehicleNumberStack rows={vehicleRows} enabled={enabled} field="prime" disabledFor={(row) => row.mode !== "CAPITAL" && row.mode !== "PRIME_FIXE"} updateRow={updateVehicleRow} /></TableCell>
               <TableCell className="align-top">
-                {multiple ? (
+                {canAddVehicleRow ? (
                   <div className="grid gap-2 pt-1">
-                    <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => setVehicleRows((rows) => [...rows, emptyPreviewVehicleRow(mode)])}>
+                    <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => setVehicleRows((rows) => [...rows, emptyPreviewVehicleRow(vehicleMode)])}>
                       <Plus className="size-4" />
                     </Button>
                     {vehicleRows.slice(1).map((row) => (
@@ -1615,6 +1618,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
   const normalizedModes = modesAutorises.length ? modesAutorises : [allowedModes[0]];
   const modeParDefaut = normalizedModes.includes(payload.modeParDefaut ?? "") ? payload.modeParDefaut : normalizedModes[0];
   const modesTarificationMultiple = (payload.modesTarificationMultiple ?? []).filter((mode) => normalizedModes.includes(mode));
+  const normalizedMultipleModes = modesTarificationMultiple.slice(0, 1);
 
   if (typeGarantie === "PERSONNE") {
     return {
@@ -1646,8 +1650,8 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     modesAutorises: normalizedModes,
     modeParDefaut,
     avecFranchiseMinimale: Boolean(payload.avecFranchise && payload.avecFranchiseMinimale),
-    tarificationMultiple: modesTarificationMultiple.length > 0,
-    modesTarificationMultiple,
+    tarificationMultiple: normalizedMultipleModes.length > 0,
+    modesTarificationMultiple: normalizedMultipleModes,
     sourcesValeurAutorisees,
     sourceValeurParDefaut,
   };

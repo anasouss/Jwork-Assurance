@@ -1210,6 +1210,9 @@ public class ReferentielController {
                 request.getModesTarificationMultiple() == null ? Set.of() : request.getModesTarificationMultiple()
         );
         modesTarificationMultiple.removeIf(mode -> !modes.contains(mode));
+        if (modesTarificationMultiple.size() > 1) {
+            throw new BadRequestException("Un seul mode multiple est autorise");
+        }
         if (Boolean.TRUE.equals(request.getTarificationMultiple()) && modesTarificationMultiple.isEmpty() && typeGarantie == TypeGarantie.VEHICULE) {
             modesTarificationMultiple.add(modeParDefaut);
         }

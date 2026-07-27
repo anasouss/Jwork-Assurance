@@ -163,7 +163,7 @@ export function GrilleTarifaireConfigurator({
     ]);
   };
 
-  const addDraft = (garantie: ReferenceOption) => {
+  const addDraft = (garantie: ReferenceOption, modeTarification?: string) => {
     setDrafts((current) => [
       ...current,
       {
@@ -172,7 +172,7 @@ export function GrilleTarifaireConfigurator({
         baseRow: false,
         garantieId: garantie.id,
         usageId: activeUsageId,
-        modeTarification: defaultMode(garantie),
+        modeTarification: modeTarification || defaultMode(garantie),
         ordreAffichage: nextOrder(current, garantie.id),
       },
     ]);
@@ -226,7 +226,17 @@ export function GrilleTarifaireConfigurator({
       toast.error("Usage obligatoire");
       return;
     }
-    const selected = drafts.filter((draft) => draft.checked);
+    const selected = draftGroups.flatMap(({ garantie, drafts: groupDrafts }) => {
+      const baseDraft = groupDrafts.find((draft) => draft.baseRow) ?? emptyDraft(garantie);
+      if (!baseDraft.checked) {
+        return [];
+      }
+      const mode = baseDraft.modeTarification || defaultMode(garantie);
+      const extraDrafts = canAddMultipleRows(garantie, mode)
+        ? groupDrafts.filter((draft) => !draft.baseRow && (draft.modeTarification || defaultMode(garantie)) === mode)
+        : [];
+      return [baseDraft, ...extraDrafts].filter((draft) => draft.checked);
+    });
     const invalid = selected.find((draft) => !hasRequiredPricing(draft, garantieById.get(draft.garantieId)));
     if (invalid) {
       const garantie = garantieById.get(invalid.garantieId);
@@ -300,10 +310,12 @@ export function GrilleTarifaireConfigurator({
           <TableBody>
             {draftGroups.map(({ garantie, drafts: groupDrafts }) => {
               const baseDraft = groupDrafts.find((draft) => draft.baseRow) ?? emptyDraft(garantie);
-              const extraDrafts = groupDrafts.filter((draft) => !draft.baseRow);
               const mode = baseDraft.modeTarification || defaultMode(garantie);
               const enabled = baseDraft.checked;
               const multiEntry = canAddMultipleRows(garantie, mode);
+              const extraDrafts = multiEntry
+                ? groupDrafts.filter((draft) => !draft.baseRow && (draft.modeTarification || defaultMode(garantie)) === mode)
+                : [];
               const allDrafts = [baseDraft, ...extraDrafts];
               return allDrafts.map((draft, index) => {
                 const rowMode = draft.modeTarification || defaultMode(garantie);
@@ -323,7 +335,7 @@ export function GrilleTarifaireConfigurator({
                       <ModeCell
                         garantie={garantie}
                         value={rowMode}
-                        disabled={!enabled}
+                        disabled={!enabled || index > 0}
                         onChange={(value) => {
                           updateDraft(draft.localKey, normalizeModePatch(value));
                           if (draft.baseRow && !canAddMultipleRows(garantie, value)) {
@@ -369,7 +381,7 @@ export function GrilleTarifaireConfigurator({
                     </TableCell>
                     <TableCell className="text-right">
                       {index === 0 && multiEntry ? (
-                        <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => addDraft(garantie)}>
+                        <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => addDraft(garantie, rowMode)}>
                           <Plus className="size-4" />
                         </Button>
                       ) : null}

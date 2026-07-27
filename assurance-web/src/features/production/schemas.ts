@@ -154,6 +154,9 @@ export const garantieSchema = z.object({
   if (invalidMultipleMode) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["modesTarificationMultiple"], message: "Les modes multiples doivent faire partie des modes autorisés" });
   }
+  if ((value.modesTarificationMultiple ?? []).length > 1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["modesTarificationMultiple"], message: "Un seul mode multiple est autorisé" });
+  }
   if (value.sourceValeurParDefaut !== "AUCUNE" && !(value.sourcesValeurAutorisees ?? []).includes(value.sourceValeurParDefaut)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["sourceValeurParDefaut"], message: "La source par défaut doit être autorisée" });
   }

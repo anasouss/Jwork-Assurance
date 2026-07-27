@@ -10,7 +10,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
 import { FlotteTargetsSection } from "../contrat-creation/FlotteTargetsSection";
@@ -63,8 +62,6 @@ export default function FlotteAvenantPage() {
   const movementCode = code.toUpperCase();
   const [dateEffet, setDateEffet] = useState<string>();
   const [dateEcheance, setDateEcheance] = useState<string>();
-  const [numeroMouvement, setNumeroMouvement] = useState("");
-  const [notes, setNotes] = useState("");
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [precisionDrafts, setPrecisionDrafts] = useState<Record<string, PrecisionDraft>>({});
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
@@ -239,10 +236,8 @@ export default function FlotteAvenantPage() {
     }
     const request: FlotteAvenantRequest = {
       codeTypeMouvement: movementCode,
-      numeroMouvement: numeroMouvement.trim() || undefined,
       dateEffet,
       dateEcheance: dateEcheance || contrat?.dateEcheance || undefined,
-      notes: notes.trim() || undefined,
     };
     if (movementCode === "INC_F") {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
@@ -319,7 +314,7 @@ export default function FlotteAvenantPage() {
       setPreview(null);
       return;
     }
-    const key = JSON.stringify({ ...request, numeroMouvement: undefined, notes: undefined });
+    const key = JSON.stringify(request);
     if (autoPreviewKeyRef.current === key) {
       return;
     }
@@ -371,7 +366,7 @@ export default function FlotteAvenantPage() {
           <CardTitle>Paramètres de l'avenant</CardTitle>
           <CardDescription>La quittance est calculée sur les cibles de cet avenant, puis sauvegardée avec le mouvement.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-4">
+        <CardContent className="grid gap-4 md:grid-cols-3">
           <Field label="Type">
             <Select value={movementCode} onValueChange={(value) => navigate(`/app/production/contrats/${contratId}/avenants/${value}`)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -388,14 +383,6 @@ export default function FlotteAvenantPage() {
           <Field label="Date d'échéance">
             <DatePicker date={dateEcheance} onSelect={(date) => setDateEcheance(toDateOnly(date))} />
           </Field>
-          <Field label="N° mouvement">
-            <Input value={numeroMouvement} onChange={(event) => setNumeroMouvement(event.target.value)} />
-          </Field>
-          <div className="md:col-span-4">
-            <Field label="Notes">
-              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
-            </Field>
-          </div>
         </CardContent>
       </Card>
 

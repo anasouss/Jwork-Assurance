@@ -296,6 +296,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const carteVertePath = `/app/production/contrats/${contrat.id}/cartes-vertes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const editPath = editContratPath(contrat);
+  const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat)) && !child;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -304,9 +305,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem asChild>
-          <Link to={editPath}>Modifier</Link>
-        </DropdownMenuItem>
+        {canEditDirectly ? (
+          <DropdownMenuItem asChild>
+            <Link to={editPath}>Modifier</Link>
+          </DropdownMenuItem>
+        ) : null}
         {child ? null : (
           <>
             {isFlotte ? (
@@ -345,9 +348,19 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
 }
 
 function editContratPath(contrat: ContratSummary) {
+  if (contrat.prospection && contrat.typeContrat === "FLOTTE") return `/app/production/prospection/devis/flotte/${contrat.id}`;
   if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;
   if (contrat.typeContrat === "CONVENTION") return `/app/production/ajouter-dossier/convention/${contrat.id}`;
   return `/app/production/ajouter-dossier/particulier/${contrat.id}`;
+}
+
+function isDirectlyEditable(contrat: ContratSummary) {
+  const statut = String(contrat.statut ?? "").toUpperCase();
+  return statut.includes("DRAFT") && (Boolean(contrat.brouillon) || Boolean(contrat.prospection));
+}
+
+function isActiveContrat(contrat: ContratSummary) {
+  return String(contrat.statut ?? "").toUpperCase() === "ACTIVE" && !contrat.prospection && !contrat.brouillon;
 }
 
 function flotteAvenantPath(contrat: ContratSummary, code: string) {

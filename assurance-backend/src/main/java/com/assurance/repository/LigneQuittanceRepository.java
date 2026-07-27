@@ -9,4 +9,6 @@ public interface LigneQuittanceRepository extends JpaRepository<LigneQuittance, 
     List<LigneQuittance> findByQuittanceIdOrderByOrdreAsc(Long quittanceId);
 
     List<LigneQuittance> findByQuittance_ElementFacturable_IdOrderByOrdreAsc(Long elementFacturableId);
+
+    void deleteByQuittanceId(Long quittanceId);
 }

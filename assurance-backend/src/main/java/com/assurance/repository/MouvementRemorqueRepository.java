@@ -4,4 +4,5 @@ import com.assurance.entity.MouvementRemorque;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MouvementRemorqueRepository extends JpaRepository<MouvementRemorque, Long> {
+    void deleteByMouvementContratId(Long mouvementContratId);
 }

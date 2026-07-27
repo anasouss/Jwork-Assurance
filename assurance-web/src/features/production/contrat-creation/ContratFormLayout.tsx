@@ -277,7 +277,9 @@ export function ContratFormLayout({
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
           {form.createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          {form.createMutation.isPending ? "Création..." : form.prospectionMode ? "Créer devis" : "Créer contrat"}
+          {form.createMutation.isPending
+            ? form.correctionMode ? "Enregistrement..." : "Création..."
+            : form.correctionMode ? "Enregistrer" : form.prospectionMode ? "Créer devis" : "Créer contrat"}
         </Button>
       </div>
     </div>

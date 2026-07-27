@@ -169,6 +169,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     queryFn: () => productionApi.getContratDraft(draftId ?? ""),
     enabled: Boolean(draftId),
   });
+  const correctionMode = String(draftQuery.data?.statut ?? "").toUpperCase() === "ACTIVE"
+    && !draftQuery.data?.prospection
+    && !draftQuery.data?.brouillon;
 
   useEffect(() => {
     const draft = draftQuery.data;
@@ -376,10 +379,15 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         navigate("/app/production/prospection");
         return;
       }
+      if (correctionMode) {
+        toast.success("Contrat modifié");
+        navigate("/app/production/contrats");
+        return;
+      }
       toast.success("Contrat créé");
       navigate(`/app/production/contrats/${contrat.id}/pieces-jointes`);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : correctionMode ? "Modification impossible" : "Création impossible"),
   });
 
   const saveDraftMutation = useMutation({
@@ -974,6 +982,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setQuittances,
     validationErrors,
     prospectionMode: Boolean(options?.prospectionMode),
+    correctionMode,
   };
 }
 

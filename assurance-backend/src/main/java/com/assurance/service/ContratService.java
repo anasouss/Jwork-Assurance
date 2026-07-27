@@ -114,22 +114,27 @@ public class ContratService {
 
     @Transactional(readOnly = true)
     public ContratResponse getDraft(Long agenceId, Long contratId) {
-        Contrat contrat = resolveDraft(agenceId, contratId);
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
         return toResponse(contrat);
     }
 
     @Transactional
     public ContratResponse updateDraft(Long agenceId, Long contratId, CreateContratRequest request) {
-        Contrat contrat = resolveDraft(agenceId, contratId);
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
         request.setAgenceId(agenceId);
+        if (isCorrectionAffaireNouvelle(contrat)) {
+            return appliquerCorrectionAffaireNouvelle(contrat, request);
+        }
         applyDraftRequest(contrat, request);
         return toResponse(contrat);
     }
 
     @Transactional
     public ContratResponse saveDraftVehicule(Long agenceId, Long contratId, int index, CreateContratRequest.VehiculeInput input) {
-        Contrat contrat = resolveDraft(agenceId, contratId);
-        return saveVehiculeTarget(contrat, index, input);
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        saveVehiculeTarget(contrat, index, input);
+        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
+        return toResponse(contrat);
     }
 
     private ContratResponse saveVehiculeTarget(Contrat contrat, int index, CreateContratRequest.VehiculeInput input) {
@@ -144,6 +149,7 @@ public class ContratService {
         Vehicule vehicule = index < existing.size() ? existing.get(index) : new Vehicule();
         vehicule.setContrat(contrat);
         applyVehiculeInput(contrat, vehicule, input);
+        vehicule.setActif(true);
         vehiculeRepository.save(vehicule);
         if (!contrat.getVehicules().contains(vehicule)) {
             contrat.getVehicules().add(vehicule);
@@ -155,8 +161,11 @@ public class ContratService {
 
     @Transactional
     public ContratResponse saveDraftVehiculeGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
-        Contrat contrat = resolveDraft(agenceId, contratId);
-        return saveVehiculeGarantiesTarget(contrat, index, inputs);
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
+        saveVehiculeGarantiesTarget(contrat, index, inputs);
+        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, mouvementInitial);
+        return toResponse(contrat);
     }
 
     private ContratResponse saveVehiculeGarantiesTarget(Contrat contrat, int index, List<CreateContratRequest.GarantieInput> inputs) {
@@ -177,8 +186,10 @@ public class ContratService {
 
     @Transactional
     public ContratResponse saveDraftRemorque(Long agenceId, Long contratId, int index, CreateContratRequest.RemorqueInput input) {
-        Contrat contrat = resolveDraft(agenceId, contratId);
-        return saveRemorqueTarget(contrat, index, input);
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        saveRemorqueTarget(contrat, index, input);
+        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
+        return toResponse(contrat);
     }
 
     private ContratResponse saveRemorqueTarget(Contrat contrat, int index, CreateContratRequest.RemorqueInput input) {
@@ -193,6 +204,7 @@ public class ContratService {
         Remorque remorque = index < existing.size() ? existing.get(index) : new Remorque();
         remorque.setContrat(contrat);
         applyRemorqueInput(contrat, remorque, input);
+        remorque.setActif(true);
         remorqueRepository.save(remorque);
         if (!contrat.getRemorques().contains(remorque)) {
             contrat.getRemorques().add(remorque);
@@ -204,8 +216,11 @@ public class ContratService {
 
     @Transactional
     public ContratResponse saveDraftRemorqueGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
-        Contrat contrat = resolveDraft(agenceId, contratId);
-        return saveRemorqueGarantiesTarget(contrat, index, inputs);
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
+        saveRemorqueGarantiesTarget(contrat, index, inputs);
+        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, mouvementInitial);
+        return toResponse(contrat);
     }
 
     private ContratResponse saveRemorqueGarantiesTarget(Contrat contrat, int index, List<CreateContratRequest.GarantieInput> inputs) {
@@ -226,11 +241,14 @@ public class ContratService {
 
     @Transactional
     public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
-        Contrat contrat = resolveDraft(agenceId, contratId);
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
         request.setAgenceId(agenceId);
         if (hasText(request.getNumeroContrat())
                 && contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(agenceId, request.getNumeroContrat(), contrat.getId())) {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
+        }
+        if (isCorrectionAffaireNouvelle(contrat)) {
+            return appliquerCorrectionAffaireNouvelle(contrat, request);
         }
         PersistedDraftGraph graph = applyFinalRequestToExistingContrat(contrat, request);
         if (!hasText(contrat.getNumeroDossier())) {
@@ -462,6 +480,182 @@ public class ContratService {
             throw new BadRequestException("Ce contrat n'est pas un brouillon modifiable");
         }
         return contrat;
+    }
+
+    private Contrat resolveEditableContrat(Long agenceId, Long contratId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        boolean editableProspection = Boolean.TRUE.equals(contrat.getProspection())
+                && contrat.getTypeContrat() == TypeContrat.FLOTTE
+                && contrat.getStatut() == StatutContrat.DRAFT;
+        boolean editableDraft = contrat.getStatut() == StatutContrat.DRAFT
+                && (Boolean.TRUE.equals(contrat.getBrouillon()) || editableProspection);
+        if (editableDraft) {
+            return contrat;
+        }
+        if (isCorrectionAffaireNouvelle(contrat)) {
+            mouvementContratService.assertCorrectionInitialeAutorisee(contrat);
+            return contrat;
+        }
+        throw new BadRequestException("Ce contrat n'est pas modifiable directement");
+    }
+
+    private boolean isCorrectionAffaireNouvelle(Contrat contrat) {
+        return contrat.getStatut() == StatutContrat.ACTIVE
+                && !Boolean.TRUE.equals(contrat.getBrouillon())
+                && !Boolean.TRUE.equals(contrat.getProspection());
+    }
+
+    private ContratResponse appliquerCorrectionAffaireNouvelle(Contrat contrat, CreateContratRequest request) {
+        request.setProspection(false);
+        if (hasText(request.getNumeroContrat())
+                && contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(request.getAgenceId(), request.getNumeroContrat(), contrat.getId())) {
+            throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
+        }
+        appliquerScalairesFinaux(contrat, request);
+        contrat.setStatut(StatutContrat.ACTIVE);
+        contrat.setBrouillon(false);
+        contrat.setProspection(false);
+        contratRepository.save(contrat);
+
+        MouvementContrat mouvementInitial = mouvementContratService.preparerCorrectionInitiale(contrat);
+        remplacerLiensClientsCorrection(contrat, request);
+        List<Vehicule> vehiculesActifs = remplacerVehiculesCorrection(contrat, request);
+        List<Remorque> remorquesActives = remplacerRemorquesCorrection(contrat, request);
+        contratGarantieRepository.deleteByContratId(contrat.getId());
+        contratGarantieRepository.flush();
+        contrat.getGaranties().clear();
+        List<ContratGarantie> garantiesActives = replaceFinalGaranties(contrat, request, vehiculesActifs, remorquesActives);
+        updateTargetCounts(contrat);
+        mouvementContratService.rafraichirCorrectionInitiale(
+                contrat,
+                mouvementInitial,
+                vehiculesActifs,
+                remorquesActives,
+                garantiesActives,
+                buildManualQuittanceResult(request)
+        );
+        return toResponse(contrat);
+    }
+
+    private void appliquerScalairesFinaux(Contrat contrat, CreateContratRequest request) {
+        if (request.getAgenceId() == null) {
+            throw new BadRequestException("L'agence est obligatoire");
+        }
+        if (request.getTypeContrat() == null) {
+            throw new BadRequestException("Le type de contrat est obligatoire");
+        }
+        validateContractReference(request);
+        CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
+                compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
+        Convention convention = request.getConventionId() == null ? null :
+                conventionRepository.findByAgenceIdAndId(request.getAgenceId(), request.getConventionId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Convention", request.getConventionId()));
+        Usage usageContrat = request.getUsageId() == null ? null :
+                usageRepository.findById(request.getUsageId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
+        GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
+                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
+                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+        ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
+        boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
+                || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
+        validateModeSaisiePourTypeContrat(request, modeSaisieGaranties, convention);
+        if (modeSaisieGaranties == ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE && grilleTarifaire == null) {
+            throw new BadRequestException("Une grille tarifaire est obligatoire pour un contrat convention ou flotte");
+        }
+        applyContratScalars(
+                contrat,
+                request,
+                compagnie,
+                convention,
+                usageContrat,
+                grilleTarifaire,
+                modeSaisieGaranties,
+                saisiePrimeNette,
+                resolveContractDates(request)
+        );
+    }
+
+    private void remplacerLiensClientsCorrection(Contrat contrat, CreateContratRequest request) {
+        Map<String, Client> existingClients = new HashMap<>();
+        for (ContratClient link : contrat.getClients()) {
+            existingClients.put(clientDraftKey(link.getRole(), Boolean.TRUE.equals(link.getPrincipalPourRole())), link.getClient());
+        }
+        contratClientRepository.deleteByContratId(contrat.getId());
+        contratClientRepository.flush();
+        contrat.getClients().clear();
+        saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, true);
+    }
+
+    private List<Vehicule> remplacerVehiculesCorrection(Contrat contrat, CreateContratRequest request) {
+        List<Vehicule> existing = vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        List<Vehicule> actifs = new ArrayList<>();
+        List<CreateContratRequest.VehiculeInput> inputs = request.getVehicules() == null ? List.of() : request.getVehicules();
+        for (int index = 0; index < inputs.size(); index++) {
+            CreateContratRequest.VehiculeInput input = inputs.get(index);
+            validateDraftVehiculeInput(contrat, input);
+            Vehicule vehicule = index < existing.size() ? existing.get(index) : new Vehicule();
+            vehicule.setContrat(contrat);
+            applyVehiculeInput(contrat, vehicule, input);
+            vehicule.setActif(true);
+            vehiculeRepository.save(vehicule);
+            actifs.add(vehicule);
+            if (!contrat.getVehicules().contains(vehicule)) {
+                contrat.getVehicules().add(vehicule);
+            }
+        }
+        for (int index = inputs.size(); index < existing.size(); index++) {
+            Vehicule vehicule = existing.get(index);
+            vehicule.setActif(false);
+            vehiculeRepository.save(vehicule);
+        }
+        return actifs;
+    }
+
+    private List<Remorque> remplacerRemorquesCorrection(Contrat contrat, CreateContratRequest request) {
+        List<Remorque> existing = remorqueRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        List<Remorque> actifs = new ArrayList<>();
+        List<CreateContratRequest.RemorqueInput> inputs = request.getRemorques() == null ? List.of() : request.getRemorques();
+        for (int index = 0; index < inputs.size(); index++) {
+            CreateContratRequest.RemorqueInput input = inputs.get(index);
+            validateDraftRemorqueInput(input);
+            Remorque remorque = index < existing.size() ? existing.get(index) : new Remorque();
+            remorque.setContrat(contrat);
+            applyRemorqueInput(contrat, remorque, input);
+            remorque.setActif(true);
+            remorqueRepository.save(remorque);
+            actifs.add(remorque);
+            if (!contrat.getRemorques().contains(remorque)) {
+                contrat.getRemorques().add(remorque);
+            }
+        }
+        for (int index = inputs.size(); index < existing.size(); index++) {
+            Remorque remorque = existing.get(index);
+            remorque.setActif(false);
+            remorqueRepository.save(remorque);
+        }
+        return actifs;
+    }
+
+    private MouvementContrat preparerCorrectionAffaireNouvelleSiNecessaire(Contrat contrat) {
+        return isCorrectionAffaireNouvelle(contrat) ? mouvementContratService.preparerCorrectionInitiale(contrat) : null;
+    }
+
+    private void rafraichirCorrectionAffaireNouvelleSiNecessaire(Contrat contrat, MouvementContrat mouvementInitial) {
+        if (!isCorrectionAffaireNouvelle(contrat)) {
+            return;
+        }
+        MouvementContrat mouvement = mouvementInitial == null ? mouvementContratService.preparerCorrectionInitiale(contrat) : mouvementInitial;
+        mouvementContratService.rafraichirCorrectionInitiale(
+                contrat,
+                mouvement,
+                activeVehicules(contrat),
+                activeRemorques(contrat),
+                activeGaranties(contrat),
+                null
+        );
     }
 
     private void applyDraftRequest(Contrat contrat, CreateContratRequest request) {

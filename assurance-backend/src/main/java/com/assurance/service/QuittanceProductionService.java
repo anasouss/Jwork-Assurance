@@ -13,6 +13,7 @@ import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.repository.ElementFacturableRepository;
+import com.assurance.repository.ElementFacturableCibleRepository;
 import com.assurance.repository.LigneQuittanceRepository;
 import com.assurance.repository.QuittanceRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class QuittanceProductionService {
 
     private final QuittanceCalculService quittanceCalculService;
     private final ElementFacturableRepository elementFacturableRepository;
+    private final ElementFacturableCibleRepository elementFacturableCibleRepository;
     private final QuittanceRepository quittanceRepository;
     private final LigneQuittanceRepository ligneQuittanceRepository;
     private final ElementFacturableCibleService elementFacturableCibleService;
@@ -123,6 +125,75 @@ public class QuittanceProductionService {
         elementFacturableCibleService.generer(element, contrat, garanties, vehicules, remorques);
         contrat.getElementsFacturables().add(element);
         contrat.getQuittances().add(quittance);
+        return quittance;
+    }
+
+    public Quittance remplacerPourMouvement(
+            Contrat contrat,
+            MouvementContrat mouvement,
+            TypeMouvementContrat typeMouvement,
+            QuittanceCalculService.Resultat calcul,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        Quittance quittance = quittanceRepository.findFirstByMouvementContratIdOrderByCreatedAtAsc(mouvement.getId())
+                .orElse(null);
+        if (quittance == null || quittance.getElementFacturable() == null) {
+            return genererPourMouvement(contrat, mouvement, typeMouvement, calcul, garanties, vehicules, remorques);
+        }
+
+        ElementFacturable element = quittance.getElementFacturable();
+        element.setCompagnieAssurance(contrat.getCompagnieAssurance());
+        element.setNature(resolveNature(typeMouvement));
+        element.setReferenceSource(contrat.getNumeroContrat());
+        element.setLibelle(typeMouvement.getLibelle());
+        element.setDateDebut(mouvement.getDateEffet());
+        element.setDateFin(mouvement.getDateEcheance());
+        element.setPrimeNette(calcul.primeNette());
+        element.setTaxe(calcul.taxe());
+        element.setTaxeParafiscale(calcul.taxeParafiscale());
+        element.setAccessoire(calcul.accessoire());
+        element.setCnpac(calcul.cnpac());
+        element.setPrimeTotale(calcul.primeTotale());
+        elementFacturableRepository.save(element);
+
+        quittance.setCompagnieAssurance(contrat.getCompagnieAssurance());
+        quittance.setNumeroQuittance(genererNumeroQuittance(contrat, mouvement, typeMouvement));
+        quittance.setType(typeMouvement.getCode());
+        quittance.setCategorie(CategorieQuittance.TOTAL.name());
+        quittance.setDateDebut(mouvement.getDateEffet());
+        quittance.setDateFin(mouvement.getDateEcheance());
+        quittance.setPrimeNette(calcul.primeNette());
+        quittance.setTaxe(calcul.taxe());
+        quittance.setTaxeParafiscale(calcul.taxeParafiscale());
+        quittance.setAccessoire(calcul.accessoire());
+        quittance.setCnpac(calcul.cnpac());
+        quittance.setPrimeTotale(calcul.primeTotale());
+        quittance = quittanceRepository.save(quittance);
+
+        ligneQuittanceRepository.deleteByQuittanceId(quittance.getId());
+        ligneQuittanceRepository.flush();
+        quittance.getLignes().clear();
+        for (QuittanceCalculService.Ligne ligne : calcul.lignes()) {
+            LigneQuittance ligneQuittance = ligneQuittanceRepository.save(LigneQuittance.builder()
+                    .quittance(quittance)
+                    .categorie(ligne.categorie())
+                    .ordre(ligne.ordre())
+                    .globale(ligne.globale())
+                    .primeNette(ligne.primeNette())
+                    .taxe(ligne.taxe())
+                    .taxeParafiscale(ligne.taxeParafiscale())
+                    .accessoire(ligne.accessoire())
+                    .cnpac(ligne.cnpac())
+                    .primeTotale(ligne.primeTotale())
+                    .build());
+            quittance.getLignes().add(ligneQuittance);
+        }
+
+        elementFacturableCibleRepository.deleteByElementFacturableId(element.getId());
+        elementFacturableCibleRepository.flush();
+        elementFacturableCibleService.generer(element, contrat, garanties, vehicules, remorques);
         return quittance;
     }
 

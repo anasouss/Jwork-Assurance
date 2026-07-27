@@ -82,6 +82,67 @@ public class MouvementContratService {
         return creerMouvementInitial(contrat, null, CODE_AFFAIRE_NOUVELLE, vehicules, remorques, garanties, quittanceManuelle);
     }
 
+    @Transactional(readOnly = true)
+    public void assertCorrectionInitialeAutorisee(Contrat contrat) {
+        resolveMouvementInitialCorrigeable(contrat);
+    }
+
+    @Transactional
+    public MouvementContrat preparerCorrectionInitiale(Contrat contrat) {
+        MouvementContrat mouvement = resolveMouvementInitialCorrigeable(contrat);
+        if (mouvement == null) {
+            return null;
+        }
+        mouvementVehiculeRepository.deleteByMouvementContratId(mouvement.getId());
+        mouvementRemorqueRepository.deleteByMouvementContratId(mouvement.getId());
+        mouvementGarantieRepository.deleteByMouvementContratId(mouvement.getId());
+        mouvementVehiculeRepository.flush();
+        mouvementRemorqueRepository.flush();
+        mouvementGarantieRepository.flush();
+        mouvement.getVehicules().clear();
+        mouvement.getRemorques().clear();
+        mouvement.getGaranties().clear();
+        return mouvement;
+    }
+
+    @Transactional
+    public MouvementContrat rafraichirCorrectionInitiale(
+            Contrat contrat,
+            MouvementContrat mouvement,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> garanties,
+            QuittanceCalculService.Resultat quittanceManuelle
+    ) {
+        if (mouvement == null) {
+            return creerAffaireNouvelle(contrat, vehicules, remorques, garanties, quittanceManuelle);
+        }
+        TypeMouvementContrat typeMouvement = mouvement.getTypeMouvement();
+        QuittanceCalculService.Resultat montants = quittanceManuelle != null
+                ? quittanceManuelle
+                : calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
+
+        mouvement.setNumeroMouvement(contrat.getNumeroContrat());
+        mouvement.setDateEffet(contrat.getDateEffet());
+        mouvement.setDateEcheance(contrat.getDateEcheance());
+        mouvement.setPrimeNette(montants.primeNette());
+        mouvement.setTaxe(montants.taxe());
+        mouvement.setTaxeParafiscale(montants.taxeParafiscale());
+        mouvement.setAccessoire(montants.accessoire());
+        mouvement.setCnpac(montants.cnpac());
+        mouvement.setPrimeTotale(montants.primeTotale());
+        mouvement = mouvementContratRepository.save(mouvement);
+
+        snapshotVehicules(mouvement, vehicules, NatureSnapshotMouvement.AJOUT);
+        snapshotRemorques(mouvement, remorques, NatureSnapshotMouvement.AJOUT);
+        snapshotGaranties(mouvement, garanties, NatureSnapshotMouvement.AJOUT);
+
+        if (Boolean.TRUE.equals(typeMouvement.getGenereQuittance())) {
+            quittanceProductionService.remplacerPourMouvement(contrat, mouvement, typeMouvement, montants, garanties, vehicules, remorques);
+        }
+        return mouvement;
+    }
+
     @Transactional
     public MouvementContrat creerRenouvellement(
             Contrat contrat,
@@ -411,6 +472,27 @@ public class MouvementContratService {
     private Contrat resolveContrat(Long agenceId, Long contratId) {
         return contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+    }
+
+    private MouvementContrat resolveMouvementInitialCorrigeable(Contrat contrat) {
+        List<MouvementContrat> mouvementsValides = mouvementContratRepository.findByContratIdOrderByCreatedAtDesc(contrat.getId()).stream()
+                .filter(mouvement -> mouvement.getStatut() == StatutMouvementContrat.VALIDE)
+                .toList();
+        if (mouvementsValides.isEmpty()) {
+            return null;
+        }
+        for (MouvementContrat mouvement : mouvementsValides) {
+            String code = mouvement.getTypeMouvement() == null || mouvement.getTypeMouvement().getCode() == null
+                    ? ""
+                    : mouvement.getTypeMouvement().getCode().trim().toUpperCase(Locale.ROOT);
+            if (!CODE_AFFAIRE_NOUVELLE.equals(code) && !CODE_RENOUVELLEMENT.equals(code)) {
+                throw new BadRequestException("Ce contrat a deja des mouvements. Supprimez ou annulez les avenants/mouvements avant de corriger l'affaire nouvelle.");
+            }
+        }
+        if (mouvementsValides.size() > 1) {
+            throw new BadRequestException("Ce contrat a plusieurs mouvements initiaux. Corrigez-le via avenant ou annulez les mouvements excedentaires.");
+        }
+        return mouvementsValides.get(0);
     }
 
     private void refuserCreationGeneriqueSiPayloadSpecialiseRequis(TypeMouvementContrat typeMouvement) {

@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface ElementFacturableCibleRepository extends JpaRepository<ElementFacturableCible, Long> {
     List<ElementFacturableCible> findByElementFacturableIdOrderByTargetIndexAscIdAsc(Long elementFacturableId);
+
+    void deleteByElementFacturableId(Long elementFacturableId);
 }

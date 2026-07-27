@@ -205,6 +205,20 @@ public class MouvementContratService {
         return toPreviewResponse(contrat, typeMouvement, request, calcul, garanties, vehicules, remorques);
     }
 
+    @Transactional(readOnly = true)
+    public QuittanceResponse previsualiserMouvementSpecialise(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            QuittanceCalculService.Resultat calcul,
+            List<ContratGarantie> garantiesAffichees
+    ) {
+        return toPreviewResponse(contrat, typeMouvement, request, calcul, garanties, vehicules, remorques, garantiesAffichees);
+    }
+
     @Transactional
     public QuittanceResponse creerMouvementSpecialise(
             Contrat contrat,
@@ -702,6 +716,20 @@ public class MouvementContratService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
+        return toPreviewResponse(contrat, typeMouvement, request, calcul, garanties, vehicules, remorques, null);
+    }
+
+    private QuittanceResponse toPreviewResponse(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            QuittanceCalculService.Resultat calcul,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> garantiesAffichees
+    ) {
+        List<ContratGarantie> garantiesBreakdown = garantiesAffichees != null ? garantiesAffichees : garanties;
         return QuittanceResponse.builder()
                 .contratId(contrat.getId())
                 .numeroContrat(contrat.getNumeroContrat())
@@ -719,8 +747,8 @@ public class MouvementContratService {
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
-                .garanties(shouldExposeFullBreakdown(typeMouvement)
-                        ? garanties.stream()
+                .garanties(garantiesAffichees != null || shouldExposeFullBreakdown(typeMouvement)
+                        ? garantiesBreakdown.stream()
                                 .map(garantie -> toQuittanceGarantieResponse(garantie, vehicules, remorques))
                                 .toList()
                         : List.of())

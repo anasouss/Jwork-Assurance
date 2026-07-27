@@ -1467,7 +1467,8 @@ public class ContratService {
                     graph.nouvellesGaranties(),
                     graph.vehicules(),
                     graph.remorques(),
-                    graph.differentiel()
+                    graph.differentiel(),
+                    graph.garantiesDifferentielles()
             );
         }
         AvenantGraph graph = resolveAvenantGraph(agenceId, contratId, request, false);
@@ -1692,6 +1693,7 @@ public class ContratService {
         QuittanceCalculService.Resultat avant = calculerMontantsAvenant(contrat, typeMouvement, anciennesGaranties, vehicules, remorques);
         QuittanceCalculService.Resultat apres = calculerMontantsAvenant(contrat, typeMouvement, nouvellesGaranties, vehicules, remorques);
         QuittanceCalculService.Resultat differentiel = quittanceCalculService.difference(apres, avant);
+        List<ContratGarantie> garantiesDifferentielles = garantiesDifferentielles(anciennesGaranties, nouvellesGaranties);
         if (persist) {
             for (ContratGarantie garantie : anciennesGaranties) {
                 garantie.setActif(false);
@@ -1699,7 +1701,91 @@ public class ContratService {
             contratGarantieRepository.saveAll(anciennesGaranties);
             nouvellesGaranties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques);
         }
-        return new AvenantModificationGraph(contrat, typeMouvement, vehicules, remorques, anciennesGaranties, nouvellesGaranties, differentiel);
+        return new AvenantModificationGraph(contrat, typeMouvement, vehicules, remorques, anciennesGaranties, nouvellesGaranties, differentiel, garantiesDifferentielles);
+    }
+
+    private List<ContratGarantie> garantiesDifferentielles(
+            List<ContratGarantie> anciennesGaranties,
+            List<ContratGarantie> nouvellesGaranties
+    ) {
+        List<ContratGarantie> result = new ArrayList<>();
+        Set<ContratGarantie> anciennesConsommees = new LinkedHashSet<>();
+        for (ContratGarantie nouvelle : nouvellesGaranties == null ? List.<ContratGarantie>of() : nouvellesGaranties) {
+            ContratGarantie ancienne = findMatchingGarantie(anciennesGaranties, nouvelle, anciennesConsommees);
+            if (ancienne != null) {
+                anciennesConsommees.add(ancienne);
+            }
+            BigDecimal prime = zeroIfNull(nouvelle.getPrime()).subtract(zeroIfNull(ancienne == null ? null : ancienne.getPrime()));
+            result.add(copierGarantieAvecPrime(nouvelle, scale(prime)));
+        }
+        for (ContratGarantie ancienne : anciennesGaranties == null ? List.<ContratGarantie>of() : anciennesGaranties) {
+            if (!anciennesConsommees.contains(ancienne)) {
+                result.add(copierGarantieAvecPrime(ancienne, scale(zeroIfNull(ancienne.getPrime()).negate())));
+            }
+        }
+        return result;
+    }
+
+    private ContratGarantie findMatchingGarantie(
+            List<ContratGarantie> garanties,
+            ContratGarantie cible,
+            Set<ContratGarantie> exclude
+    ) {
+        for (ContratGarantie garantie : garanties == null ? List.<ContratGarantie>of() : garanties) {
+            if (exclude.contains(garantie)) {
+                continue;
+            }
+            if (sameGarantieCible(garantie, cible)) {
+                return garantie;
+            }
+        }
+        return null;
+    }
+
+    private boolean sameGarantieCible(ContratGarantie left, ContratGarantie right) {
+        Long leftGarantieId = left.getGarantie() == null ? null : left.getGarantie().getId();
+        Long rightGarantieId = right.getGarantie() == null ? null : right.getGarantie().getId();
+        Long leftVehiculeId = left.getVehicule() == null ? null : left.getVehicule().getId();
+        Long rightVehiculeId = right.getVehicule() == null ? null : right.getVehicule().getId();
+        Long leftRemorqueId = left.getRemorque() == null ? null : left.getRemorque().getId();
+        Long rightRemorqueId = right.getRemorque() == null ? null : right.getRemorque().getId();
+        Long leftClientId = left.getClient() == null ? null : left.getClient().getId();
+        Long rightClientId = right.getClient() == null ? null : right.getClient().getId();
+        return java.util.Objects.equals(leftGarantieId, rightGarantieId)
+                && java.util.Objects.equals(leftVehiculeId, rightVehiculeId)
+                && java.util.Objects.equals(leftRemorqueId, rightRemorqueId)
+                && java.util.Objects.equals(leftClientId, rightClientId);
+    }
+
+    private ContratGarantie copierGarantieAvecPrime(ContratGarantie source, BigDecimal prime) {
+        return ContratGarantie.builder()
+                .contrat(source.getContrat())
+                .garantie(source.getGarantie())
+                .vehicule(source.getVehicule())
+                .remorque(source.getRemorque())
+                .client(source.getClient())
+                .ligneGrilleTarifaire(source.getLigneGrilleTarifaire())
+                .modeSelectionne(source.getModeSelectionne())
+                .sourceValeurSelectionnee(source.getSourceValeurSelectionnee())
+                .formuleGarantiePersonne(source.getFormuleGarantiePersonne())
+                .actif(source.getActif())
+                .valeurVenale(source.getValeurVenale())
+                .valeurNeuf(source.getValeurNeuf())
+                .valeurGlace(source.getValeurGlace())
+                .formule(source.getFormule())
+                .montantDeces(source.getMontantDeces())
+                .montantInvalidite(source.getMontantInvalidite())
+                .montantFraisMedicaux(source.getMontantFraisMedicaux())
+                .montantFraisHospitalisation(source.getMontantFraisHospitalisation())
+                .montantFraisFuneraires(source.getMontantFraisFuneraires())
+                .montantFraisChirurgie(source.getMontantFraisChirurgie())
+                .accessoire(source.getAccessoire())
+                .capital(source.getCapital())
+                .taux(source.getTaux())
+                .prime(prime)
+                .tauxFranchise(source.getTauxFranchise())
+                .franchiseMinimale(source.getFranchiseMinimale())
+                .build();
     }
 
     private QuittanceCalculService.Resultat calculerMontantsAvenant(
@@ -3660,7 +3746,8 @@ public class ContratService {
             List<Remorque> remorques,
             List<ContratGarantie> anciennesGaranties,
             List<ContratGarantie> nouvellesGaranties,
-            QuittanceCalculService.Resultat differentiel
+            QuittanceCalculService.Resultat differentiel,
+            List<ContratGarantie> garantiesDifferentielles
     ) {
     }
 

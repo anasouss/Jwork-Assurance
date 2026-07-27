@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/app-header";
+import { moduleForPath } from "@/components/app-navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { LoadingPage } from "@/components/shared";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -8,7 +9,9 @@ import { useAuthStore } from "@/store/auth-store";
 
 export default function AppLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { hydrate, isAuthenticated, isHydrated, user } = useAuthStore();
+  const activeModule = moduleForPath(location.pathname);
 
   useEffect(() => {
     void hydrate();
@@ -29,7 +32,7 @@ export default function AppLayout() {
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={false} data-active-module={activeModule}>
       <AppSidebar variant="floating" />
       <SidebarInset>
         <AppHeader />

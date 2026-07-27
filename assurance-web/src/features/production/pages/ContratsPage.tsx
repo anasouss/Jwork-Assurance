@@ -8,6 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -296,6 +306,7 @@ function ContratRow({
 
 function RowActions({ contrat, movement, child }: { contrat: ContratSummary; movement: MovementLine; child?: boolean }) {
   const queryClient = useQueryClient();
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -320,96 +331,124 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
+      setConfirmDeleteOpen(false);
       toast.success(deleteMode === "CONTRAT" ? "Contrat supprime" : "Mouvement annule");
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Suppression impossible");
     },
   });
-  const handleDelete = () => {
-    if (!deleteMode || deleteMutation.isPending) return;
-    const message = deleteMode === "CONTRAT"
-      ? "Supprimer definitivement ce brouillon ?"
-      : "Annuler ce mouvement ? Les mouvements plus anciens ne seront pas modifies.";
-    if (window.confirm(message)) {
-      deleteMutation.mutate();
-    }
-  };
+  const deleteTitle = deleteMode === "CONTRAT" ? "Supprimer le contrat ?" : "Annuler le mouvement ?";
+  const deleteDescription = deleteMode === "CONTRAT"
+    ? "Cette action supprimera definitivement ce brouillon. Elle ne peut pas etre annulee."
+    : "Cette action annulera uniquement le dernier mouvement actif. Les mouvements plus anciens ne seront pas modifies.";
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" size="icon" className="size-8 bg-sky-600 hover:bg-sky-700" title="Actions">
-          <MoreHorizontal className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        {canEditDirectly ? (
-          <DropdownMenuItem asChild>
-            <Link to={editPath}>Modifier</Link>
-          </DropdownMenuItem>
-        ) : null}
-        {avenantEditPath ? (
-          <DropdownMenuItem asChild>
-            <Link to={avenantEditPath}>Modifier l'avenant</Link>
-          </DropdownMenuItem>
-        ) : null}
-        {canCreateMovement ? (
-          <>
-            {isFlotte ? (
-              <>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" size="icon" className="size-8 bg-sky-600 hover:bg-sky-700" title="Actions">
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          {canEditDirectly ? (
+            <DropdownMenuItem asChild>
+              <Link to={editPath}>Modifier</Link>
+            </DropdownMenuItem>
+          ) : null}
+          {avenantEditPath ? (
+            <DropdownMenuItem asChild>
+              <Link to={avenantEditPath}>Modifier l'avenant</Link>
+            </DropdownMenuItem>
+          ) : null}
+          {canCreateMovement ? (
+            <>
+              {isFlotte ? (
+                <>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Autre avenant</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-56">
+                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              ) : (
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Autre avenant</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger>Ajouter avenant</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-56">
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXG_M")}>Extension garanties</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_M")}>Modification garanties</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_M")}>Extension remorque</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_M")}>Précision</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_M")}>Duplicata</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_M")}>Résiliation</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_M")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "ANN_M")}>Annulation</Link></DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
-              </>
-            ) : (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Ajouter avenant</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-56">
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXG_M")}>Extension garanties</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_M")}>Modification garanties</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_M")}>Extension remorque</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_M")}>Précision</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_M")}>Duplicata</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_M")}>Résiliation</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_M")}>Résiliation à l'échéance</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "ANN_M")}>Annulation</Link></DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
-            <DropdownMenuItem asChild>
-              <Link to={assistancePath}>Contrat assistance</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to={carteVertePath}>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>Renouvellement</DropdownMenuItem>
-          </>
-        ) : null}
-        {hasPrimaryActions ? <DropdownMenuSeparator /> : null}
-        {canDownload ? <DropdownMenuItem>Télécharger</DropdownMenuItem> : null}
-        <DropdownMenuItem asChild>
-          <Link to={piecesPath}>Les pièces jointes</Link>
-        </DropdownMenuItem>
-        {deleteMode ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" disabled={deleteMutation.isPending} onSelect={handleDelete}>
-              {deleteMode === "CONTRAT" ? "Supprimer" : "Annuler le mouvement"}
-            </DropdownMenuItem>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+              )}
+              <DropdownMenuItem asChild>
+                <Link to={assistancePath}>Contrat assistance</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to={carteVertePath}>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>Renouvellement</DropdownMenuItem>
+            </>
+          ) : null}
+          {hasPrimaryActions ? <DropdownMenuSeparator /> : null}
+          {canDownload ? <DropdownMenuItem>Télécharger</DropdownMenuItem> : null}
+          <DropdownMenuItem asChild>
+            <Link to={piecesPath}>Les pièces jointes</Link>
+          </DropdownMenuItem>
+          {deleteMode ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={deleteMutation.isPending}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setConfirmDeleteOpen(true);
+                }}
+              >
+                {deleteMode === "CONTRAT" ? "Supprimer" : "Annuler le mouvement"}
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleteTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{deleteDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (deleteMode) {
+                  deleteMutation.mutate();
+                }
+              }}
+            >
+              {deleteMutation.isPending ? "Traitement..." : "Confirmer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

@@ -1449,7 +1449,7 @@ public class ContratService {
 
     private void validateAvenantDates(Contrat contrat, FlotteAvenantRequest request) {
         LocalDate dateEffet = request.getDateEffet();
-        LocalDate dateEcheance = request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance();
+        LocalDate dateEcheance = contrat.getDateEcheance();
         if (dateEcheance != null && dateEffet.isAfter(dateEcheance)) {
             throw new BadRequestException("La date d'effet de l'avenant doit etre inferieure ou egale a sa date d'echeance");
         }
@@ -1594,7 +1594,7 @@ public class ContratService {
                 : contrat.getDateEffet();
         LocalDate dateEffetAvenant = firstNonNull(request.getDateEffet(), dateDebutCible, contrat.getDateEffet());
         LocalDate dateDebutRetour = dateDebutCible != null && dateDebutCible.isAfter(dateEffetAvenant) ? dateDebutCible : dateEffetAvenant;
-        LocalDate dateEcheance = firstNonNull(request.getDateEcheance(), contrat.getDateEcheance());
+        LocalDate dateEcheance = contrat.getDateEcheance();
         if (dateEcheance == null || dateDebutRetour == null || dateDebutRetour.isAfter(dateEcheance)) {
             return BigDecimal.ZERO;
         }
@@ -1606,7 +1606,7 @@ public class ContratService {
         mouvementRequest.setCodeTypeMouvement(request.getCodeTypeMouvement());
         mouvementRequest.setNumeroMouvement(request.getNumeroMouvement());
         mouvementRequest.setDateEffet(request.getDateEffet());
-        mouvementRequest.setDateEcheance(request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance());
+        mouvementRequest.setDateEcheance(contrat.getDateEcheance());
         mouvementRequest.setNotes(request.getNotes());
         return mouvementRequest;
     }
@@ -1627,7 +1627,7 @@ public class ContratService {
             vehicule.setContrat(contrat);
             applyVehiculeInput(contrat, vehicule, input);
             vehicule.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
-            vehicule.setDateEcheance(firstNonNull(input.getDateEcheance(), firstNonNull(request.getDateEcheance(), contrat.getDateEcheance())));
+            vehicule.setDateEcheance(contrat.getDateEcheance());
             vehicule.setActif(true);
             vehicule = vehiculeRepository.save(vehicule);
             vehicules.add(vehicule);
@@ -1641,7 +1641,7 @@ public class ContratService {
             remorque.setContrat(contrat);
             applyRemorqueInput(contrat, remorque, input);
             remorque.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
-            remorque.setDateEcheance(firstNonNull(input.getDateEcheance(), firstNonNull(request.getDateEcheance(), contrat.getDateEcheance())));
+            remorque.setDateEcheance(contrat.getDateEcheance());
             remorque.setActif(true);
             remorque = remorqueRepository.save(remorque);
             remorques.add(remorque);
@@ -1662,16 +1662,27 @@ public class ContratService {
         createRequest.setGrilleTarifaireId(contrat.getGrilleTarifaire() != null ? contrat.getGrilleTarifaire().getId() : null);
         createRequest.setUsageId(contrat.getUsage() != null ? contrat.getUsage().getId() : null);
         createRequest.setDateEffet(request.getDateEffet());
-        createRequest.setDateEcheance(request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance());
+        createRequest.setDateEcheance(contrat.getDateEcheance());
         createRequest.setModeSaisieGaranties(contrat.getModeSaisieGaranties());
         createRequest.setSaisiePrimeNette(contrat.getSaisiePrimeNette());
         createRequest.setTauxRc(contrat.getTauxRc());
         createRequest.setCrmPartage(contrat.getCrmPartage());
         createRequest.setCrmPartageValeur(contrat.getCrmPartageValeur());
+        normalizeAvenantTargetEcheances(contrat, request);
         createRequest.setVehicules(request.getVehicules());
         createRequest.setRemorques(request.getRemorques());
         createRequest.setGaranties(request.getGaranties());
         return createRequest;
+    }
+
+    private void normalizeAvenantTargetEcheances(Contrat contrat, FlotteAvenantRequest request) {
+        LocalDate dateEcheance = contrat.getDateEcheance();
+        for (CreateContratRequest.VehiculeInput vehicule : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
+            vehicule.setDateEcheance(dateEcheance);
+        }
+        for (CreateContratRequest.RemorqueInput remorque : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
+            remorque.setDateEcheance(dateEcheance);
+        }
     }
 
     private List<Vehicule> selectedActiveVehicules(Contrat contrat, List<Long> ids, boolean defaultAllWhenEmpty) {

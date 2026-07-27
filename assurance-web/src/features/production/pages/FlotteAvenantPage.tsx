@@ -237,7 +237,7 @@ export default function FlotteAvenantPage() {
     const request: FlotteAvenantRequest = {
       codeTypeMouvement: movementCode,
       dateEffet,
-      dateEcheance: dateEcheance || contrat?.dateEcheance || undefined,
+      dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
     };
     if (movementCode === "INC_F") {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
@@ -381,7 +381,7 @@ export default function FlotteAvenantPage() {
             <DatePicker date={dateEffet} onSelect={(date) => setDateEffet(toDateOnly(date))} />
           </Field>
           <Field label="Date d'échéance">
-            <DatePicker date={dateEcheance} onSelect={(date) => setDateEcheance(toDateOnly(date))} />
+            <DatePicker date={dateEcheance} disabled />
           </Field>
         </CardContent>
       </Card>

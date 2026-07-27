@@ -931,7 +931,7 @@ function previewGuaranteeLine(
   });
 }
 
-function CalculationValue({ value, loading, fallback = "Calcul auto" }: { value?: number; loading?: boolean; fallback?: string }) {
+function CalculationValue({ value, loading, fallback = "-" }: { value?: number; loading?: boolean; fallback?: string }) {
   if (loading) {
     return (
       <span className="inline-flex items-center justify-end gap-1 text-muted-foreground">
@@ -1418,7 +1418,7 @@ function TargetGuaranteesTable({
               const manualValue = !automaticPricing || (defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL");
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
               const previewLine = previewGuaranteeLine(preview, garantie, target, item);
-              const calculatedPrime = previewLine?.primeNette ?? item?.prime;
+              const calculatedPrime = previewLine?.primeNette;
               const rowCalculating = checked && Boolean(previewing) && Boolean(dirtyCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
 
               return (
@@ -1585,7 +1585,7 @@ function TargetGuaranteesTable({
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
                 const disabled = automaticPricing && (!grilleSelected || formules.length === 0);
                 const previewLine = previewGuaranteeLine(preview, garantie, target, item);
-                const calculatedPrime = previewLine?.primeNette ?? item?.prime;
+                const calculatedPrime = previewLine?.primeNette;
                 const rowCalculating = checked && Boolean(previewing) && Boolean(dirtyCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
 
                 return (

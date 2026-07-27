@@ -4,6 +4,8 @@ import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratGarantie;
+import com.assurance.entity.Garantie;
+import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.entity.LigneQuittance;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.MouvementGarantie;
@@ -717,13 +719,68 @@ public class MouvementContratService {
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
-                .targetSummaries(elementFacturableCibleService.calculer(
-                        contrat,
-                        garanties,
-                        vehicules,
-                        remorques
-                ))
+                .garanties(shouldExposeFullBreakdown(typeMouvement)
+                        ? garanties.stream()
+                                .map(garantie -> toQuittanceGarantieResponse(garantie, vehicules, remorques))
+                                .toList()
+                        : List.of())
+                .targetSummaries(shouldExposeFullBreakdown(typeMouvement)
+                        ? elementFacturableCibleService.calculer(
+                                contrat,
+                                garanties,
+                                vehicules,
+                                remorques
+                        )
+                        : List.of())
                 .build();
+    }
+
+    private boolean shouldExposeFullBreakdown(TypeMouvementContrat typeMouvement) {
+        TypeImpactMouvement impact = typeMouvement == null || typeMouvement.getTypeImpact() == null
+                ? TypeImpactMouvement.NORMAL
+                : typeMouvement.getTypeImpact();
+        return impact == TypeImpactMouvement.NORMAL;
+    }
+
+    private QuittanceResponse.GarantieLigne toQuittanceGarantieResponse(
+            ContratGarantie contratGarantie,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        Garantie garantie = contratGarantie.getGarantie();
+        LigneGrilleTarifaire ligne = contratGarantie.getLigneGrilleTarifaire();
+        return QuittanceResponse.GarantieLigne.builder()
+                .garantieId(garantie == null ? null : garantie.getId())
+                .code(garantie == null ? null : garantie.getCode())
+                .libelle(garantie == null ? null : garantie.getLibelle())
+                .typeGarantie(garantie == null || garantie.getTypeGarantie() == null ? null : garantie.getTypeGarantie().name())
+                .vehiculeIndex(indexOfIdentity(vehicules, contratGarantie.getVehicule()))
+                .remorqueIndex(indexOfIdentity(remorques, contratGarantie.getRemorque()))
+                .ligneGrilleTarifaireId(ligne == null ? null : ligne.getId())
+                .modeSelectionne(contratGarantie.getModeSelectionne() == null ? null : contratGarantie.getModeSelectionne().name())
+                .sourceValeurSelectionnee(contratGarantie.getSourceValeurSelectionnee() == null ? null : contratGarantie.getSourceValeurSelectionnee().name())
+                .formuleGarantiePersonneId(contratGarantie.getFormuleGarantiePersonne() == null ? null : contratGarantie.getFormuleGarantiePersonne().getId())
+                .capital(contratGarantie.getCapital())
+                .valeurVenale(contratGarantie.getValeurVenale())
+                .valeurNeuf(contratGarantie.getValeurNeuf())
+                .valeurGlace(contratGarantie.getValeurGlace())
+                .taux(contratGarantie.getTaux())
+                .primeNette(contratGarantie.getPrime())
+                .tauxFranchise(contratGarantie.getTauxFranchise())
+                .franchiseMinimale(contratGarantie.getFranchiseMinimale())
+                .build();
+    }
+
+    private <T> Integer indexOfIdentity(List<T> source, T target) {
+        if (target == null) {
+            return null;
+        }
+        for (int index = 0; index < source.size(); index++) {
+            if (source.get(index) == target) {
+                return index;
+            }
+        }
+        return null;
     }
 
     private List<Vehicule> activeVehicules(Contrat contrat) {

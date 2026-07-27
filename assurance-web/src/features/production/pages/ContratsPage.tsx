@@ -289,8 +289,8 @@ function ContratRow({
       <TableCell className="text-center"><StatusBadge statut={statusLabel(contrat, movement)} /></TableCell>
       <td className="px-2 py-2">
         <div className="flex items-center justify-center gap-2">
-          <Button type="button" variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Visualiser">
-            <Eye className="size-4" />
+          <Button asChild type="button" variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Visualiser">
+            <Link to={`/app/production/contrats/${contrat.id}`}><Eye className="size-4" /></Link>
           </Button>
           <RowActions contrat={contrat} movement={movement} child={child} />
           {canExpand ? (

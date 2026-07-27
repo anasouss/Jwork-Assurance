@@ -119,6 +119,10 @@ export const productionApi = {
     return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats"));
   },
 
+  async getContrat(contratId: string) {
+    return unwrap(await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/${contratId}`));
+  },
+
   async deleteContrat(contratId: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}`, {

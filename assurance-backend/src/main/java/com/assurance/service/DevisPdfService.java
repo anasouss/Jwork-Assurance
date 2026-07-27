@@ -326,7 +326,7 @@ public class DevisPdfService {
         }
 
         document.add(new Paragraph(toRoman(sectionIndex) + ". Les franchises").setBold().setFontSize(11));
-        Table table = new Table(new float[]{1.5f, 5.5f}).setWidth(UnitValue.createPercentValue(52));
+        Table table = new Table(new float[]{1.5f, 5.5f}).setWidth(UnitValue.createPercentValue(35));
         table.addCell(headerCell("Garanties", 1, 1));
         table.addCell(headerCell("Franchises par usage", 1, 1));
 

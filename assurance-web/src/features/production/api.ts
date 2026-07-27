@@ -52,27 +52,29 @@ const unwrap = <T>(response: ApiResponse<T>) => response.data;
 
 export const productionApi = {
   async referentiel(path: string, params?: Record<string, string | undefined>): Promise<ReferenceOption[]> {
-    return unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>(`/api/v1/referentiel/${path}${buildQueryString(params ?? {})}`));
+    return normalizeReferenceOptions(
+      unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>(`/api/v1/referentiel/${path}${buildQueryString(params ?? {})}`))
+    );
   },
 
   async lignesGrille(params: { grilleId?: string; usageId?: string; garantieId?: string }) {
-    return unwrap(
+    return normalizeReferenceOptions(unwrap(
       await apiFetch<ApiResponse<ReferenceOption[]>>(
         `/api/v1/referentiel/lignes-grille-tarifaire${buildQueryString(params)}`
       )
-    );
+    ));
   },
 
   async formulesGarantiePersonne(params: { grilleId?: string; usageId?: string; garantieId?: string }) {
-    return unwrap(
+    return normalizeReferenceOptions(unwrap(
       await apiFetch<ApiResponse<ReferenceOption[]>>(
         `/api/v1/referentiel/formules-garantie-personne${buildQueryString(params)}`
       )
-    );
+    ));
   },
 
   async garantiesParametrage() {
-    return unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/garanties/parametrage"));
+    return normalizeReferenceOptions(unwrap(await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/garanties/parametrage")));
   },
 
   async listTypesPieceJointe(includeInactive = false) {
@@ -840,3 +842,26 @@ export const productionApi = {
     );
   },
 };
+
+function normalizeReferenceOptions(options: ReferenceOption[]) {
+  return options.map(normalizeReferenceOption);
+}
+
+function normalizeReferenceOption(option: ReferenceOption): ReferenceOption {
+  return Object.fromEntries(
+    Object.entries(option).map(([key, value]) => [key, normalizeReferenceValue(key, value)])
+  ) as ReferenceOption;
+}
+
+function normalizeReferenceValue(key: string, value: unknown): unknown {
+  if (value == null) {
+    return value;
+  }
+  if (key === "id" || key.endsWith("Id")) {
+    return String(value);
+  }
+  if (key.endsWith("Ids") && Array.isArray(value)) {
+    return value.map((item) => String(item));
+  }
+  return value;
+}

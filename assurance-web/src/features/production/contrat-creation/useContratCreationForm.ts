@@ -153,8 +153,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     ? selectedConventionEcheance
     : echeance;
   const showContractEcheance = typeRenouvellement === "renouvelable"
-    && fractionnement === "ANNUEL"
-    && (typeContrat !== "CONVENTION" || conventionHasFixedEcheance);
+    && (typeContrat === "CONVENTION" ? conventionHasFixedEcheance : fractionnement === "ANNUEL");
   const lockDateEcheance = showContractEcheance || conventionUsesPeriodicite;
 
   const lignesGrille = useQuery({
@@ -1319,10 +1318,10 @@ function hydrateDraft(draft: ContratSummary) {
     numeroContrat: draft.numeroContrat ?? "",
     numeroPolice: draft.numeroPolice ?? "",
     numeroAttestation: draft.numeroAttestation ?? "",
-    compagnieAssuranceId: draft.compagnieAssuranceId ?? "",
-    conventionId: draft.conventionId ?? "",
-    usageId: draft.usageId ?? "",
-    grilleTarifaireId: draft.grilleTarifaireId ?? "",
+    compagnieAssuranceId: idString(draft.compagnieAssuranceId),
+    conventionId: idString(draft.conventionId),
+    usageId: idString(draft.usageId),
+    grilleTarifaireId: idString(draft.grilleTarifaireId),
     dateEffet: draft.dateEffet,
     dateEcheance: draft.dateEcheance,
     typeRenouvellement: draft.typeRenouvellement === "ferme" ? "ferme" as const : "renouvelable" as const,
@@ -1375,6 +1374,10 @@ function targetQuittanceGeneraleFromDraft(draft: ContratSummary): QuittancePrevi
 
 function nullToUndefined<T>(value: T | null | undefined): T | undefined {
   return value == null ? undefined : value;
+}
+
+function idString(value: string | number | null | undefined) {
+  return value == null ? "" : String(value);
 }
 
 function asRole(value: string): ClientInput["role"] {

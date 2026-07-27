@@ -414,8 +414,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
               <DropdownMenuItem
                 variant="destructive"
                 disabled={deleteMutation.isPending}
-                onSelect={(event) => {
-                  event.preventDefault();
+                onSelect={() => {
                   setConfirmDeleteOpen(true);
                 }}
               >

@@ -94,12 +94,14 @@ public class QuittanceCalculService {
         taxePfCorporel = basePta.multiply(tauxTaxePf);
         BigDecimal cnpac = cnpacUnitaire.multiply(BigDecimal.valueOf(Math.max(1, nombreUnitesCnpac)));
 
-        BigDecimal signe = impact == TypeImpactMouvement.RETOUR_PRIME ? BigDecimal.valueOf(-1) : BigDecimal.ONE;
         List<Ligne> lignes = new ArrayList<>();
         lignes.add(new Ligne(CategorieQuittance.AUTOMOBILE, 10, false, netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac, total(netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac)));
         lignes.add(new Ligne(CategorieQuittance.CORPOREL, 20, false, netCorporel, taxeCorporel, taxePfCorporel, accessoireCorporel, BigDecimal.ZERO, total(netCorporel, taxeCorporel, taxePfCorporel, accessoireCorporel, BigDecimal.ZERO)));
         lignes.add(new Ligne(CategorieQuittance.EVCAT, 30, false, netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO, total(netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO)));
-        return withTotal(lignes, signe);
+        if (impact == TypeImpactMouvement.RETOUR_PRIME) {
+            return withRetourPrime(lignes);
+        }
+        return withTotal(lignes, BigDecimal.ONE);
     }
 
     public Resultat difference(Resultat apres, Resultat avant) {
@@ -116,10 +118,9 @@ public class QuittanceCalculService {
             }
             Ligne ligneApres = apresParCategorie.get(categorie);
             Ligne ligneAvant = avantParCategorie.get(categorie);
-            lignes.add(new Ligne(
+            lignes.add(differenceLine(
                     categorie,
                     ligneApres != null ? ligneApres.ordre() : ligneAvant != null ? ligneAvant.ordre() : 99,
-                    false,
                     moins(ligneApres != null ? ligneApres.primeNette() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.primeNette() : BigDecimal.ZERO),
                     moins(ligneApres != null ? ligneApres.taxe() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.taxe() : BigDecimal.ZERO),
                     moins(ligneApres != null ? ligneApres.taxeParafiscale() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.taxeParafiscale() : BigDecimal.ZERO),
@@ -129,6 +130,22 @@ public class QuittanceCalculService {
             ));
         }
         return withTotal(lignes, BigDecimal.ONE);
+    }
+
+    private Ligne differenceLine(
+            CategorieQuittance categorie,
+            int ordre,
+            BigDecimal primeNette,
+            BigDecimal taxe,
+            BigDecimal taxeParafiscale,
+            BigDecimal accessoire,
+            BigDecimal cnpac,
+            BigDecimal primeTotale
+    ) {
+        if (primeNette.compareTo(BigDecimal.ZERO) < 0) {
+            return new Ligne(categorie, ordre, false, primeNette, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, primeNette);
+        }
+        return new Ligne(categorie, ordre, false, primeNette, taxe, taxeParafiscale, accessoire, cnpac, primeTotale);
     }
 
     public int compterUnitesCnpac(List<ContratGarantie> garanties, int fallback) {
@@ -179,6 +196,17 @@ public class QuittanceCalculService {
         List<Ligne> lignes = source.stream()
                 .map(ligne -> ligne.multiplier(signe))
                 .toList();
+        return buildResult(lignes);
+    }
+
+    private Resultat withRetourPrime(List<Ligne> source) {
+        List<Ligne> lignes = source.stream()
+                .map(Ligne::retourPrime)
+                .toList();
+        return buildResult(lignes);
+    }
+
+    private Resultat buildResult(List<Ligne> lignes) {
         BigDecimal primeNette = lignes.stream().map(Ligne::primeNette).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal taxe = lignes.stream().map(Ligne::taxe).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal taxeParafiscale = lignes.stream().map(Ligne::taxeParafiscale).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -260,6 +288,21 @@ public class QuittanceCalculService {
                     scale(accessoire.multiply(signe)),
                     scale(cnpac.multiply(signe)),
                     scale(primeTotale.multiply(signe))
+            );
+        }
+
+        private Ligne retourPrime() {
+            BigDecimal retour = scale(primeNette.multiply(BigDecimal.valueOf(-1)));
+            return new Ligne(
+                    categorie,
+                    ordre,
+                    globale,
+                    retour,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    retour
             );
         }
     }

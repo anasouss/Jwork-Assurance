@@ -39,7 +39,7 @@ export default function ProductionDashboardPage() {
   const [echeanceDialogOpen, setEcheanceDialogOpen] = useState(false);
   const [echeanceFilters, setEcheanceFilters] = useState<{ dateDu?: string; dateAu?: string }>({});
 
-  const actions: ProductionAction[] = [
+  const actions = ([
     { title: "Ajouter un dossier", icon: FilePlus2, href: "/app/production/ajouter-dossier", permission: "contrat:create", primary: true },
     { title: "Ajouter un avenant", icon: Plus, href: "/app/production/contrats", permission: "contrat:update" },
     { title: "Liste des dossiers", icon: List, href: "/app/production/contrats", permission: "contrat:view" },
@@ -48,7 +48,7 @@ export default function ProductionDashboardPage() {
     { title: "Portefeuille client", icon: Users, href: "/app/production/contrats", permission: "client:view" },
     { title: "Prospection", icon: Target, href: "/app/production/prospection", permission: "contrat:view" },
     { title: "Gestion du stock", icon: Archive, href: "/app/production/attestations-stock", permission: "contrat:view" },
-  ].filter((item) => !item.permission || permissions.includes(item.permission));
+  ] satisfies ProductionAction[]).filter((item) => !item.permission || permissions.includes(item.permission));
 
   const hasDateError = Boolean(echeanceFilters.dateDu && echeanceFilters.dateAu && echeanceFilters.dateDu > echeanceFilters.dateAu);
   const canOpenEcheances = Boolean(echeanceFilters.dateDu && echeanceFilters.dateAu && !hasDateError);

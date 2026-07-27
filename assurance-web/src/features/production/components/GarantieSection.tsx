@@ -626,7 +626,17 @@ function AssistanceTable({
         <Checkbox checked={assistance.enabled} onCheckedChange={(checked) => onChange({ enabled: Boolean(checked) })} />
         <span>ASSISTANCE</span>
       </div>
-      <table className="w-full min-w-[1100px] border-collapse text-sm">
+      <table className="w-full min-w-[1120px] table-fixed border-collapse text-sm">
+        <colgroup>
+          <col className="w-[150px]" />
+          <col className="w-[150px]" />
+          <col className="w-[120px]" />
+          <col className="w-[150px]" />
+          <col className="w-[170px]" />
+          <col className="w-[230px]" />
+          <col className="w-[230px]" />
+          <col className="w-[90px]" />
+        </colgroup>
         <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-3 py-3 text-left">Date effet</th>
@@ -671,7 +681,7 @@ function AssistanceTable({
                 value={assistance.compagnieAssistanceId ?? ""}
                 onValueChange={(value) => onChange({ compagnieAssistanceId: value, produitAssistanceId: undefined })}
               >
-                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir" /></SelectTrigger>
                 <SelectContent>
                   {compagniesAssistance.map((compagnie) => (
                     <SelectItem key={compagnie.id} value={compagnie.id}>{compagnie.libelle}</SelectItem>
@@ -685,7 +695,7 @@ function AssistanceTable({
                 value={selectedProductId}
                 onValueChange={(value) => onChange({ produitAssistanceId: value })}
               >
-                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir" /></SelectTrigger>
                 <SelectContent>
                   {filteredProducts.map((produit) => (
                     <SelectItem key={produit.id} value={produit.id}>{produit.libelle}</SelectItem>

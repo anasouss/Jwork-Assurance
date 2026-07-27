@@ -8,11 +8,9 @@ import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { RemorqueSection } from "../components/RemorqueSection";
 import { SectionCard } from "../components/SectionCard";
 import { VehiculeSection } from "../components/VehiculeSection";
-import { formatMoney, roundMoney } from "../utils/format";
 import { ContractInfoSection } from "./ContractInfoSection";
 import { FlotteTargetsSection } from "./FlotteTargetsSection";
 import { TariffGridSection } from "./TariffGridSection";
-import type { QuittancePreview } from "../types";
 import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
 type Props = {
@@ -169,6 +167,7 @@ export function ContratFormLayout({
       setPrimeColumnEnabled={form.setSaisiePrimeNette}
       preview={form.preview}
       previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
+      showTotalsSummary={showConvention}
       assistanceEnabled={form.assistanceEnabled}
       setAssistanceEnabled={form.setAssistanceEnabled}
       showAssistanceRow={showConvention}
@@ -258,12 +257,6 @@ export function ContratFormLayout({
           {vehicleSection}
           {allowRemorques ? remorqueSection : null}
           {guaranteeSection}
-          {form.typeContrat !== "PARTICULIER" ? (
-            <VehicleCalculationSummary
-              preview={form.preview}
-              loading={form.previewMutation.isPending || form.autoPreviewMutation.isPending}
-            />
-          ) : null}
         </>
       )}
 
@@ -297,103 +290,4 @@ export function ContratFormLayout({
       </div>
     </div>
   );
-}
-
-type VehicleSummary = {
-  label: string;
-  totalNet?: number;
-  evcat?: number;
-  pta?: number;
-  accessoire?: number;
-  taxe?: number;
-  cnpac?: number;
-  totalAPayer?: number;
-};
-
-function VehicleCalculationSummary({ preview, loading }: { preview?: QuittancePreview | null; loading?: boolean }) {
-  const summaries = vehicleSummaries(preview);
-  const calculated = Boolean(preview);
-
-  return (
-    <SectionCard
-      title="Résumé véhicule"
-      badge={calculated ? "Calculé" : "Non calculé"}
-      tone="production"
-      defaultOpen
-    >
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {(summaries.length > 0 ? summaries : [emptyVehicleSummary()]).map((summary, index) => {
-          const rows: [string, number | undefined][] = [
-            ["TOTAL NET", summary.totalNet],
-            ["EVCAT", summary.evcat],
-            ["TAXE", summary.taxe],
-            ["CNPAC", summary.cnpac],
-            ["TOTAL À PAYER", summary.totalAPayer],
-          ];
-          if (summary.pta != null) {
-            rows.splice(2, 0, ["PTA (Prime Personne)", summary.pta], ["ACCESSOIRE", summary.accessoire]);
-          }
-
-          return (
-            <div key={`${summary.label}-${index}`} className="overflow-hidden rounded-md border">
-              {summaries.length > 1 ? (
-                <div className="border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase">{summary.label}</div>
-              ) : null}
-              {rows.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[1fr_140px] border-b last:border-b-0">
-                  <div className="bg-muted/20 px-3 py-2 text-right text-xs font-semibold uppercase">{label}</div>
-                  <div className="px-3 py-2 text-right text-xs font-semibold">
-                    {loading ? "Calcul..." : value == null ? "-" : formatMoney(value)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    </SectionCard>
-  );
-}
-
-function vehicleSummaries(preview?: QuittancePreview | null): VehicleSummary[] {
-  if (!preview) {
-    return [];
-  }
-  return (preview.targetSummaries ?? [])
-    .filter((summary) => String(summary.kind ?? "").toUpperCase() === "VEHICULE")
-    .map((summary) => {
-      const pta = positiveOrDefined(summary.corporelPrimeNette);
-      return {
-        label: summary.vehiculeIndex == null ? "Véhicule" : `Véhicule ${summary.vehiculeIndex + 1}`,
-        totalNet: summary.automobilePrimeNette ?? subtractMoney(summary.primeNetteHorsEvcat, pta),
-        evcat: summary.evcatPrimeNette,
-        pta,
-        accessoire: pta == null ? undefined : summary.accessoire,
-        taxe: addMoney(summary.taxe, summary.taxeParafiscale),
-        cnpac: summary.cnpac,
-        totalAPayer: summary.primeTotale,
-      };
-    });
-}
-
-function emptyVehicleSummary(): VehicleSummary {
-  return { label: "Véhicule" };
-}
-
-function positiveOrDefined(value?: number) {
-  return value != null && value > 0 ? value : undefined;
-}
-
-function addMoney(left?: number, right?: number) {
-  if (left == null && right == null) {
-    return undefined;
-  }
-  return roundMoney((left ?? 0) + (right ?? 0));
-}
-
-function subtractMoney(left?: number, right?: number) {
-  if (left == null) {
-    return undefined;
-  }
-  return roundMoney(left - (right ?? 0));
 }

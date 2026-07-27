@@ -88,9 +88,6 @@ export function GarantieSection({
   const personneGaranties = garanties
     .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE")
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
-  const personneIds = new Set(personneGaranties.map((garantie) => garantie.id));
-  const showPersonneTotals = selected.some((item) => personneIds.has(item.garantieId))
-    || linePrimeNette(preview, "CORPOREL") != null;
   const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || linePrimeNette(preview, "ASSISTANCE") != null;
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
@@ -496,7 +493,6 @@ export function GarantieSection({
         <GuaranteeTotalsSummary
           preview={preview}
           loading={previewing}
-          showPersonneTotals={showPersonneTotals}
           showAssistanceTotal={showAssistanceTotal}
         />
       ) : null}
@@ -521,27 +517,22 @@ export function GarantieSection({
 function GuaranteeTotalsSummary({
   preview,
   loading,
-  showPersonneTotals,
   showAssistanceTotal,
 }: {
   preview?: QuittancePreview | null;
   loading?: boolean;
-  showPersonneTotals?: boolean;
   showAssistanceTotal?: boolean;
 }) {
-  const automobileNet = linePrimeNette(preview, "AUTOMOBILE");
-  const corporelNet = linePrimeNette(preview, "CORPOREL");
-  const totalNet = showPersonneTotals ? automobileNet : addNumbers(automobileNet, corporelNet);
-  const taxeTotal = addNumbers(preview?.taxe, preview?.taxeParafiscale);
+  const summary = vehicleSummary(preview);
   const rows: [string, number | undefined][] = [
-    ["TOTAL NET", totalNet],
-    ["EVCAT", linePrimeNette(preview, "EVCAT")],
-    ["TAXE", taxeTotal],
-    ["CNPAC", preview?.cnpac],
-    ["TOTAL À PAYER", preview?.primeTotale],
+    ["TOTAL NET", summary?.totalNet],
+    ["EVCAT", summary?.evcat],
+    ["TAXE", summary?.taxe],
+    ["CNPAC", summary?.cnpac],
+    ["TOTAL À PAYER", summary?.totalAPayer],
   ];
-  if (showPersonneTotals) {
-    rows.splice(2, 0, ["PTA (Prime Personne)", linePrimeNette(preview, "CORPOREL")], ["ACCESSOIRE", preview?.accessoire]);
+  if (summary?.pta != null) {
+    rows.splice(2, 0, ["PTA (Prime Personne)", summary.pta], ["ACCESSOIRE", summary.accessoire]);
   }
   if (showAssistanceTotal) {
     rows.push(["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")]);
@@ -559,6 +550,23 @@ function GuaranteeTotalsSummary({
       ))}
     </div>
   );
+}
+
+function vehicleSummary(preview: QuittancePreview | null | undefined) {
+  const summary = preview?.targetSummaries?.find((item) => String(item.kind ?? "").toUpperCase() === "VEHICULE");
+  if (!summary) {
+    return undefined;
+  }
+  const pta = positiveOrDefined(summary.corporelPrimeNette);
+  return {
+    totalNet: summary.automobilePrimeNette,
+    evcat: summary.evcatPrimeNette,
+    pta,
+    accessoire: pta == null ? undefined : summary.accessoire,
+    taxe: addNumbers(summary.taxe, summary.taxeParafiscale),
+    cnpac: summary.cnpac,
+    totalAPayer: summary.primeTotale,
+  };
 }
 
 function AssistanceTable({

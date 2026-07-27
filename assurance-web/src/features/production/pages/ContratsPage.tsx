@@ -332,16 +332,16 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
       setConfirmDeleteOpen(false);
-      toast.success(deleteMode === "CONTRAT" ? "Contrat supprime" : "Mouvement annule");
+      toast.success(deleteMode === "CONTRAT" ? "Contrat supprime" : "Avenant supprime");
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Suppression impossible");
     },
   });
-  const deleteTitle = deleteMode === "CONTRAT" ? "Supprimer le contrat ?" : "Annuler le mouvement ?";
+  const deleteTitle = deleteMode === "CONTRAT" ? "Supprimer le contrat ?" : "Supprimer l'avenant ?";
   const deleteDescription = deleteMode === "CONTRAT"
     ? "Cette action supprimera definitivement ce brouillon. Elle ne peut pas etre annulee."
-    : "Cette action annulera uniquement le dernier mouvement actif. Les mouvements plus anciens ne seront pas modifies.";
+    : "Cette action supprimera uniquement le dernier avenant actif avec sa quittance generee. Les mouvements plus anciens ne seront pas modifies.";
   return (
     <>
       <DropdownMenu>
@@ -418,7 +418,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
                   setConfirmDeleteOpen(true);
                 }}
               >
-                {deleteMode === "CONTRAT" ? "Supprimer" : "Annuler le mouvement"}
+                {deleteMode === "CONTRAT" ? "Supprimer" : "Supprimer l'avenant"}
               </DropdownMenuItem>
             </>
           ) : null}
@@ -578,15 +578,17 @@ function movementLines(contrat: ContratSummary): MovementLine[] {
 }
 
 function sortedMouvements(contrat: ContratSummary) {
-  return [...(contrat.mouvements ?? [])].sort((a, b) => {
-    const statusDiff = movementStatusRank(a.statut) - movementStatusRank(b.statut);
-    if (statusDiff !== 0) return statusDiff;
-    const dateDiff = dateRank(b.dateEffet) - dateRank(a.dateEffet);
-    if (dateDiff !== 0) return dateDiff;
-    const numeroDiff = numericRank(b.numeroMouvement) - numericRank(a.numeroMouvement);
-    if (numeroDiff !== 0) return numeroDiff;
-    return numericRank(b.id) - numericRank(a.id);
-  });
+  return [...(contrat.mouvements ?? [])]
+    .filter((movement) => String(movement.statut ?? "").toUpperCase() !== "ANNULE")
+    .sort((a, b) => {
+      const statusDiff = movementStatusRank(a.statut) - movementStatusRank(b.statut);
+      if (statusDiff !== 0) return statusDiff;
+      const dateDiff = dateRank(b.dateEffet) - dateRank(a.dateEffet);
+      if (dateDiff !== 0) return dateDiff;
+      const numeroDiff = numericRank(b.numeroMouvement) - numericRank(a.numeroMouvement);
+      if (numeroDiff !== 0) return numeroDiff;
+      return numericRank(b.id) - numericRank(a.id);
+    });
 }
 
 function movementStatusRank(statut?: string | null) {

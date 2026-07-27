@@ -202,7 +202,7 @@ public class ContratController {
     @DeleteMapping("/{id}/mouvements/{mouvementId}")
     public ResponseEntity<ApiResponse<Void>> deleteMouvement(@PathVariable Long id, @PathVariable Long mouvementId) {
         contratService.deleteMouvement(TenantContext.getCurrentAgence(), id, mouvementId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Mouvement annule"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Mouvement supprime"));
     }
 
     @PostMapping("/{id}/convertir-prospection")

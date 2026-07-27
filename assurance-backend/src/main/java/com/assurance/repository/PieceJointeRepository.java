@@ -10,5 +10,7 @@ public interface PieceJointeRepository extends JpaRepository<PieceJointe, Long> 
 
     List<PieceJointe> findByContratIdAndMouvementContratIdOrderByCreatedAtDesc(Long contratId, Long mouvementContratId);
 
+    long countByMouvementContratId(Long mouvementContratId);
+
     List<PieceJointe> findByContratIdAndMouvementContratIsNullOrderByCreatedAtDesc(Long contratId);
 }

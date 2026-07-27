@@ -68,6 +68,16 @@ public class ContratService {
     private final ElementFacturableCibleService elementFacturableCibleService;
     private final MouvementContratService mouvementContratService;
     private final MouvementContratRepository mouvementContratRepository;
+    private final MouvementVehiculeRepository mouvementVehiculeRepository;
+    private final MouvementRemorqueRepository mouvementRemorqueRepository;
+    private final MouvementGarantieRepository mouvementGarantieRepository;
+    private final QuittanceRepository quittanceRepository;
+    private final LigneQuittanceRepository ligneQuittanceRepository;
+    private final ElementFacturableRepository elementFacturableRepository;
+    private final ElementFacturableCibleRepository elementFacturableCibleRepository;
+    private final PieceJointeRepository pieceJointeRepository;
+    private final CarteVerteRepository carteVerteRepository;
+    private final MouvementStockAttestationRepository mouvementStockAttestationRepository;
     private final EcheanceService echeanceService;
 
     @Transactional
@@ -1495,9 +1505,6 @@ public class ContratService {
         if (mouvement.getAgence() == null || !agenceId.equals(mouvement.getAgence().getId())) {
             throw new ResourceNotFoundException("MouvementContrat", mouvementId);
         }
-        if (mouvement.getStatut() == StatutMouvementContrat.ANNULE) {
-            return;
-        }
         List<MouvementContrat> mouvements = mouvementsActifsChronologiquesDesc(contrat);
         if (mouvements.isEmpty() || !mouvement.getId().equals(mouvements.get(0).getId())) {
             throw new BadRequestException("Impossible de supprimer ce mouvement: supprimez d'abord les mouvements plus recents.");
@@ -1505,10 +1512,11 @@ public class ContratService {
         if (mouvement.getTypeMouvement() == null || mouvement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.AFFAIRE_NOUVELLE) {
             throw new BadRequestException("L'affaire nouvelle ne se supprime pas depuis les actions. Supprimez le contrat brouillon ou creez un avenant d'annulation.");
         }
-        mouvement.setStatut(StatutMouvementContrat.ANNULE);
-        mouvement.setNotes(appendSystemNote(mouvement.getNotes(), "Mouvement annule depuis la liste des contrats."));
-        mouvementContratRepository.save(mouvement);
-        refreshContratStatusAfterMovementCancellation(contrat);
+        assertNoBlockingMovementReferences(mouvement.getId());
+        deleteMovementGeneratedData(mouvement.getId());
+        contrat.getMouvements().removeIf(item -> mouvement.getId().equals(item.getId()));
+        mouvementContratRepository.delete(mouvement);
+        refreshContratStatusAfterMovementDeletion(contrat);
     }
 
     private List<MouvementContrat> mouvementsChronologiquesDesc(Contrat contrat) {
@@ -1529,11 +1537,36 @@ public class ContratService {
         return contrat.getStatut() == StatutContrat.DRAFT || Boolean.TRUE.equals(contrat.getBrouillon()) || Boolean.TRUE.equals(contrat.getProspection());
     }
 
-    private String appendSystemNote(String notes, String note) {
-        return hasText(notes) ? notes + "\n" + note : note;
+    private void assertNoBlockingMovementReferences(Long mouvementId) {
+        if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement: des pieces jointes y sont liees.");
+        }
+        if (assistanceContratRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement: un contrat assistance y est lie.");
+        }
+        if (carteVerteRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement: une carte verte y est liee.");
+        }
+        if (mouvementStockAttestationRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement: des attestations ont ete consommees.");
+        }
     }
 
-    private void refreshContratStatusAfterMovementCancellation(Contrat contrat) {
+    private void deleteMovementGeneratedData(Long mouvementId) {
+        for (Quittance quittance : quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId)) {
+            ligneQuittanceRepository.deleteByQuittanceId(quittance.getId());
+            quittanceRepository.delete(quittance);
+        }
+        for (ElementFacturable element : elementFacturableRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId)) {
+            elementFacturableCibleRepository.deleteByElementFacturableId(element.getId());
+            elementFacturableRepository.delete(element);
+        }
+        mouvementGarantieRepository.deleteByMouvementContratId(mouvementId);
+        mouvementRemorqueRepository.deleteByMouvementContratId(mouvementId);
+        mouvementVehiculeRepository.deleteByMouvementContratId(mouvementId);
+    }
+
+    private void refreshContratStatusAfterMovementDeletion(Contrat contrat) {
         List<MouvementContrat> actifs = (contrat.getMouvements() == null ? List.<MouvementContrat>of() : contrat.getMouvements()).stream()
                 .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
                 .sorted(Comparator.comparing(MouvementContrat::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
@@ -2551,6 +2584,9 @@ public class ContratService {
 
         List<ContratResponse.MouvementView> mouvements = new ArrayList<>();
         for (MouvementContrat mouvement : contrat.getMouvements()) {
+            if (mouvement.getStatut() == StatutMouvementContrat.ANNULE) {
+                continue;
+            }
             mouvements.add(ContratResponse.MouvementView.builder()
                     .id(mouvement.getId())
                     .code(mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)

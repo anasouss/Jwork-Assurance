@@ -11,5 +11,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
 
     List<Quittance> findByContrat_IdAndElementFacturable_IdOrderByCreatedAtDesc(Long contratId, Long elementFacturableId);
 
+    List<Quittance> findByMouvementContratIdOrderByCreatedAtDesc(Long mouvementContratId);
+
     Optional<Quittance> findFirstByMouvementContratIdOrderByCreatedAtAsc(Long mouvementContratId);
 }

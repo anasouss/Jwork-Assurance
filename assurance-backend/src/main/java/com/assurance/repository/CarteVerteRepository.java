@@ -11,5 +11,7 @@ public interface CarteVerteRepository extends JpaRepository<CarteVerte, Long> {
 
     List<CarteVerte> findByContratIdAndActifTrueOrderByCreatedAtDesc(Long contratId);
 
+    long countByMouvementContratId(Long mouvementContratId);
+
     Optional<CarteVerte> findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(Long contratId, Long vehiculeId);
 }

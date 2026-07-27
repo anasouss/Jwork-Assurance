@@ -11,5 +11,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
 
     List<ElementFacturable> findByContratIdOrderByCreatedAtDesc(Long contratId);
 
+    List<ElementFacturable> findByMouvementContratIdOrderByCreatedAtDesc(Long mouvementContratId);
+
     Optional<ElementFacturable> findFirstByMouvementContratIdOrderByCreatedAtAsc(Long mouvementContratId);
 }

@@ -42,7 +42,7 @@ const SelectTrigger = React.forwardRef<
       ref={triggerRef}
       data-slot="select-trigger"
       className={cn(
-        "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-slate-300 bg-slate-50/70 px-3 py-2 text-sm shadow-none ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/20 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 [&>span]:line-clamp-1 transition-colors cursor-pointer dark:border-neutral-700 dark:bg-neutral-950/70 dark:text-neutral-100 dark:data-[placeholder]:text-neutral-500 dark:focus:border-neutral-400 dark:focus:ring-neutral-400/20 dark:disabled:border-neutral-800 dark:disabled:bg-neutral-950 dark:disabled:text-neutral-500",
+        "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-slate-300 bg-slate-50/70 px-3 py-2 text-sm shadow-none ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:border-[var(--module-focus-border)] focus:ring-2 focus:ring-[var(--module-focus-ring)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-100 [&>span]:line-clamp-1 transition-colors cursor-pointer dark:border-neutral-700 dark:bg-neutral-950/70 dark:text-neutral-100 dark:data-[placeholder]:text-neutral-500 dark:disabled:border-neutral-800 dark:disabled:bg-neutral-950 dark:disabled:text-neutral-500",
         className
       )}
       {...props}

@@ -6,7 +6,6 @@ import {
   FilePlus2,
   FileText,
   List,
-  Plus,
   Target,
   Users,
 } from "lucide-react";
@@ -41,7 +40,6 @@ export default function ProductionDashboardPage() {
 
   const allActions: ProductionAction[] = [
     { title: "Ajouter un dossier", icon: FilePlus2, href: "/app/production/ajouter-dossier", permission: "contrat:create", primary: true },
-    { title: "Ajouter un avenant", icon: Plus, href: "/app/production/contrats", permission: "contrat:update" },
     { title: "Liste des dossiers", icon: List, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Gestion des échéances", icon: CalendarDays, permission: "contrat:view", modal: "echeances" },
     { title: "Registre de production", icon: FileText, href: "/app/production/contrats", permission: "contrat:view" },

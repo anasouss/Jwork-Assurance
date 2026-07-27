@@ -942,6 +942,8 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     validateTarget,
     savedSections,
     availableUsages,
+    selectedConvention,
+    conventionUsageIds,
     numeroContrat,
     setNumeroContrat,
     numeroPolice,

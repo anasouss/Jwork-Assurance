@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,6 +36,7 @@ export function VehiculeSection({
   showAttestation = true,
   showRemorqueFlag = false,
   errors = {},
+  extraAction,
   onSaveSection,
   savedSections = {},
   saving = false,
@@ -52,6 +54,7 @@ export function VehiculeSection({
   showAttestation?: boolean;
   showRemorqueFlag?: boolean;
   errors?: Record<string, string>;
+  extraAction?: ReactNode;
   onSaveSection?: (section: "vehicule") => void;
   savedSections?: Partial<Record<"vehicule", boolean>>;
   saving?: boolean;
@@ -107,6 +110,23 @@ export function VehiculeSection({
       // Non-blocking lookup: users can still enter a new vehicle manually.
     }
   };
+  const headerActions = (
+    <>
+      {extraAction}
+      {allowMultipleVehicules ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-white/50 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+          onClick={() => setVehicules([...vehicules, emptyVehicule()])}
+        >
+          <Plus className="size-4" />
+          Véhicule
+        </Button>
+      ) : null}
+    </>
+  );
 
   return (
     <SectionCard
@@ -115,20 +135,7 @@ export function VehiculeSection({
       tone="production"
       open={openSection === "vehicule"}
       onOpenChange={(open) => onSectionOpenChange?.("vehicule", open)}
-      action={
-        allowMultipleVehicules ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="border-white/50 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-            onClick={() => setVehicules([...vehicules, emptyVehicule()])}
-          >
-            <Plus className="size-4" />
-            Véhicule
-          </Button>
-        ) : null
-      }
+      action={extraAction || allowMultipleVehicules ? headerActions : null}
     >
       <div className="grid gap-4">
         {vehicules.map((vehicule, index) => {

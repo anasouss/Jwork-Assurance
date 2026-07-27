@@ -1,7 +1,8 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -294,6 +295,7 @@ function ContratRow({
 }
 
 function RowActions({ contrat, movement, child }: { contrat: ContratSummary; movement: MovementLine; child?: boolean }) {
+  const queryClient = useQueryClient();
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -302,8 +304,37 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const terminal = isTerminalContratRow(contrat, movement);
   const canCreateMovement = !child && !terminal && !Boolean(contrat.renouvele) && isActiveContrat(contrat);
   const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat)) && !child && !terminal;
+  const avenantEditPath = editAvenantPath(contrat, movement, child);
   const canDownload = !isTerminalMovementCode(movement.code);
   const hasPrimaryActions = canEditDirectly || canCreateMovement;
+  const deleteMode = resolveDeleteMode(contrat, movement, child);
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (deleteMode === "CONTRAT") {
+        return productionApi.deleteContrat(contrat.id);
+      }
+      if (deleteMode === "MOUVEMENT" && movement.mouvementId) {
+        return productionApi.deleteMouvement(contrat.id, movement.mouvementId);
+      }
+      return Promise.resolve();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["contrats"] });
+      toast.success(deleteMode === "CONTRAT" ? "Contrat supprime" : "Mouvement annule");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Suppression impossible");
+    },
+  });
+  const handleDelete = () => {
+    if (!deleteMode || deleteMutation.isPending) return;
+    const message = deleteMode === "CONTRAT"
+      ? "Supprimer definitivement ce brouillon ?"
+      : "Annuler ce mouvement ? Les mouvements plus anciens ne seront pas modifies.";
+    if (window.confirm(message)) {
+      deleteMutation.mutate();
+    }
+  };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -315,6 +346,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
         {canEditDirectly ? (
           <DropdownMenuItem asChild>
             <Link to={editPath}>Modifier</Link>
+          </DropdownMenuItem>
+        ) : null}
+        {avenantEditPath ? (
+          <DropdownMenuItem asChild>
+            <Link to={avenantEditPath}>Modifier l'avenant</Link>
           </DropdownMenuItem>
         ) : null}
         {canCreateMovement ? (
@@ -364,8 +400,14 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
         <DropdownMenuItem asChild>
           <Link to={piecesPath}>Les pièces jointes</Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive">Supprimer</DropdownMenuItem>
+        {deleteMode ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" disabled={deleteMutation.isPending} onSelect={handleDelete}>
+              {deleteMode === "CONTRAT" ? "Supprimer" : "Annuler le mouvement"}
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -395,6 +437,28 @@ function isTerminalContratRow(contrat: ContratSummary, movement: MovementLine) {
 function isTerminalMovementCode(code?: string | null) {
   const normalized = String(code ?? "").trim().toUpperCase();
   return ["RES_F", "RES_M", "RCH_F", "RCH_M", "ANN_M"].includes(normalized);
+}
+
+function editAvenantPath(contrat: ContratSummary, movement: MovementLine, child?: boolean) {
+  if (child || movement.isSynthetic || !movement.mouvementId) return null;
+  const code = String(movement.code ?? "").trim().toUpperCase();
+  if (!code || code === "AN" || isTerminalMovementCode(code)) return null;
+  if (String(movement.statut ?? "").toUpperCase() === "ANNULE") return null;
+  if (!isActiveContrat(contrat)) return null;
+  return `/app/production/contrats/${contrat.id}/avenants/${code}?mouvementId=${movement.mouvementId}`;
+}
+
+function resolveDeleteMode(contrat: ContratSummary, movement: MovementLine, child?: boolean): "CONTRAT" | "MOUVEMENT" | null {
+  if (child) return null;
+  if (String(movement.statut ?? "").toUpperCase() === "ANNULE") return null;
+  if (movement.mouvementId && !movement.isSynthetic && movement.code !== "AN") return "MOUVEMENT";
+  const hasMovements = (contrat.mouvements?.length ?? 0) > 0;
+  if (!hasMovements && isDraftLikeSummary(contrat)) return "CONTRAT";
+  return null;
+}
+
+function isDraftLikeSummary(contrat: ContratSummary) {
+  return String(contrat.statut ?? "").toUpperCase().includes("DRAFT") || Boolean(contrat.brouillon) || Boolean(contrat.prospection);
 }
 
 function avenantPath(contrat: ContratSummary, code: string) {
@@ -477,12 +541,18 @@ function movementLines(contrat: ContratSummary): MovementLine[] {
 
 function sortedMouvements(contrat: ContratSummary) {
   return [...(contrat.mouvements ?? [])].sort((a, b) => {
+    const statusDiff = movementStatusRank(a.statut) - movementStatusRank(b.statut);
+    if (statusDiff !== 0) return statusDiff;
     const dateDiff = dateRank(b.dateEffet) - dateRank(a.dateEffet);
     if (dateDiff !== 0) return dateDiff;
     const numeroDiff = numericRank(b.numeroMouvement) - numericRank(a.numeroMouvement);
     if (numeroDiff !== 0) return numeroDiff;
     return numericRank(b.id) - numericRank(a.id);
   });
+}
+
+function movementStatusRank(statut?: string | null) {
+  return String(statut ?? "").toUpperCase() === "ANNULE" ? 1 : 0;
 }
 
 function optionMap(options?: ReferenceOption[]) {

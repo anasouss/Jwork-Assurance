@@ -193,6 +193,18 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(contratService.get(TenantContext.getCurrentAgence(), id)));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        contratService.deleteContrat(TenantContext.getCurrentAgence(), id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Contrat supprime"));
+    }
+
+    @DeleteMapping("/{id}/mouvements/{mouvementId}")
+    public ResponseEntity<ApiResponse<Void>> deleteMouvement(@PathVariable Long id, @PathVariable Long mouvementId) {
+        contratService.deleteMouvement(TenantContext.getCurrentAgence(), id, mouvementId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Mouvement annule"));
+    }
+
     @PostMapping("/{id}/convertir-prospection")
     public ResponseEntity<ApiResponse<ContratResponse>> convertirProspection(
             @PathVariable Long id,

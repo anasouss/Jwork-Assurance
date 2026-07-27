@@ -7,6 +7,7 @@ import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
+import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeTarificationGarantie;
@@ -14,6 +15,7 @@ import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.StatutContrat;
+import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.exception.BadRequestException;
@@ -65,6 +67,7 @@ public class ContratService {
     private final QuittanceCalculService quittanceCalculService;
     private final ElementFacturableCibleService elementFacturableCibleService;
     private final MouvementContratService mouvementContratService;
+    private final MouvementContratRepository mouvementContratRepository;
     private final EcheanceService echeanceService;
 
     @Transactional
@@ -1468,6 +1471,80 @@ public class ContratService {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)));
+    }
+
+    @Transactional
+    public void deleteContrat(Long agenceId, Long contratId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (!mouvementsChronologiquesDesc(contrat).isEmpty()) {
+            throw new BadRequestException("Impossible de supprimer ce contrat: supprimez ou annulez d'abord ses mouvements.");
+        }
+        if (!isDraftLike(contrat)) {
+            throw new BadRequestException("Impossible de supprimer un contrat valide. Utilisez un avenant d'annulation ou de resiliation.");
+        }
+        contratRepository.delete(contrat);
+    }
+
+    @Transactional
+    public void deleteMouvement(Long agenceId, Long contratId, Long mouvementId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        MouvementContrat mouvement = mouvementContratRepository.findByContratIdAndId(contrat.getId(), mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        if (mouvement.getAgence() == null || !agenceId.equals(mouvement.getAgence().getId())) {
+            throw new ResourceNotFoundException("MouvementContrat", mouvementId);
+        }
+        if (mouvement.getStatut() == StatutMouvementContrat.ANNULE) {
+            return;
+        }
+        List<MouvementContrat> mouvements = mouvementsActifsChronologiquesDesc(contrat);
+        if (mouvements.isEmpty() || !mouvement.getId().equals(mouvements.get(0).getId())) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement: supprimez d'abord les mouvements plus recents.");
+        }
+        if (mouvement.getTypeMouvement() == null || mouvement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.AFFAIRE_NOUVELLE) {
+            throw new BadRequestException("L'affaire nouvelle ne se supprime pas depuis les actions. Supprimez le contrat brouillon ou creez un avenant d'annulation.");
+        }
+        mouvement.setStatut(StatutMouvementContrat.ANNULE);
+        mouvement.setNotes(appendSystemNote(mouvement.getNotes(), "Mouvement annule depuis la liste des contrats."));
+        mouvementContratRepository.save(mouvement);
+        refreshContratStatusAfterMovementCancellation(contrat);
+    }
+
+    private List<MouvementContrat> mouvementsChronologiquesDesc(Contrat contrat) {
+        return (contrat.getMouvements() == null ? List.<MouvementContrat>of() : contrat.getMouvements()).stream()
+                .sorted(Comparator.comparing(MouvementContrat::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(MouvementContrat::getId, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .reversed())
+                .toList();
+    }
+
+    private List<MouvementContrat> mouvementsActifsChronologiquesDesc(Contrat contrat) {
+        return mouvementsChronologiquesDesc(contrat).stream()
+                .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
+                .toList();
+    }
+
+    private boolean isDraftLike(Contrat contrat) {
+        return contrat.getStatut() == StatutContrat.DRAFT || Boolean.TRUE.equals(contrat.getBrouillon()) || Boolean.TRUE.equals(contrat.getProspection());
+    }
+
+    private String appendSystemNote(String notes, String note) {
+        return hasText(notes) ? notes + "\n" + note : note;
+    }
+
+    private void refreshContratStatusAfterMovementCancellation(Contrat contrat) {
+        List<MouvementContrat> actifs = (contrat.getMouvements() == null ? List.<MouvementContrat>of() : contrat.getMouvements()).stream()
+                .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
+                .sorted(Comparator.comparing(MouvementContrat::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .toList();
+        MouvementContrat latest = actifs.isEmpty() ? null : actifs.get(0);
+        if (latest != null && latest.getTypeMouvement() != null && Boolean.TRUE.equals(latest.getTypeMouvement().getClotureContrat())) {
+            contrat.setStatut(StatutContrat.CANCELLED);
+        } else if (!Boolean.TRUE.equals(contrat.getBrouillon()) && !Boolean.TRUE.equals(contrat.getProspection())) {
+            contrat.setStatut(StatutContrat.ACTIVE);
+        }
+        contratRepository.save(contrat);
     }
 
     @Transactional(readOnly = true)

@@ -119,6 +119,22 @@ export const productionApi = {
     return unwrap(await apiFetch<ApiResponse<ContratSummary[]>>("/api/v1/contrats"));
   },
 
+  async deleteContrat(contratId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
+  async deleteMouvement(contratId: string, mouvementId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}/mouvements/${mouvementId}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
   async searchEcheancesAutomobile(params: {
     dateDu: string;
     dateAu: string;

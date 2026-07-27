@@ -3800,7 +3800,8 @@ public class ContratService {
                     .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
                     .toList();
         }
-        return activeVehicules(contrat);
+        List<Vehicule> active = activeVehicules(contrat);
+        return active.isEmpty() ? vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId()) : active;
     }
 
     private List<Remorque> activeRemorquesForView(Contrat contrat) {
@@ -3809,7 +3810,8 @@ public class ContratService {
                     .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
                     .toList();
         }
-        return activeRemorques(contrat);
+        List<Remorque> active = activeRemorques(contrat);
+        return active.isEmpty() ? remorqueRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId()) : active;
     }
 
     private List<ContratGarantie> activeGarantiesForView(Contrat contrat) {
@@ -3818,7 +3820,8 @@ public class ContratService {
                     .filter(item -> item.getActif() == null || Boolean.TRUE.equals(item.getActif()))
                     .toList();
         }
-        return activeGaranties(contrat);
+        List<ContratGarantie> active = activeGaranties(contrat);
+        return active.isEmpty() ? contratGarantieRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId()) : active;
     }
 
     private record GarantieMontants(

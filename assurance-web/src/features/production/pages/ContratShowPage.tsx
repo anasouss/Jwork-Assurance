@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Car, FileText, UserRound } from "lucide-react";
+import { ArrowLeft, Car, FileText, Printer, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,19 +42,26 @@ export default function ContratShowPage() {
   const dossier = contrat.numeroDossier ?? contrat.numeroContrat ?? `#${contrat.id}`;
   const souscripteur = clientByRole(contrat, "SOUSCRIPTEUR");
   const proprietaire = clientByRole(contrat, "PROPRIETAIRE") ?? souscripteur;
+  const sameClient = sameClientIdentity(souscripteur, proprietaire);
   const compagnie = optionLabel(compagniesQuery.data, contrat.compagnieAssuranceId);
   const convention = optionLabel(conventionsQuery.data, contrat.conventionId);
 
   return (
     <div className="grid min-w-0 gap-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 print:hidden">
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link to="/app/production/contrats"><ArrowLeft className="size-4" />Retour liste</Link>
         </Button>
-        <Badge className="bg-emerald-600">{statusLabel(contrat.statut)}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-emerald-600">{statusLabel(contrat.statut)}</Badge>
+          <Button type="button" onClick={() => window.print()}>
+            <Printer className="size-4" />
+            Télécharger PDF
+          </Button>
+        </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:shadow-none">
+      <div className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <header className="border-b-2 border-slate-900 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -88,10 +95,14 @@ export default function ContratShowPage() {
           </Section>
 
           <Section title="Clients" icon={<UserRound className="size-4" />}>
-            <div className="grid gap-3 md:grid-cols-2">
-              <ClientCard title="Souscripteur" client={souscripteur} />
-              <ClientCard title="Propriétaire" client={proprietaire} />
-            </div>
+            {sameClient ? (
+              <ClientCard title="Souscripteur et propriétaire" client={souscripteur} />
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                <ClientCard title="Souscripteur" client={souscripteur} />
+                <ClientCard title="Propriétaire" client={proprietaire} />
+              </div>
+            )}
           </Section>
 
           {(contrat.vehicules ?? []).map((vehicule, index) => (
@@ -306,6 +317,11 @@ function ClientCard({ title, client }: { title: string; client?: ClientResponse 
 
 function clientByRole(contrat: ContratSummary, role: string) {
   return contrat.clients?.find((item) => item.role === role)?.client ?? null;
+}
+
+function sameClientIdentity(left?: ClientResponse | null, right?: ClientResponse | null) {
+  if (!left || !right) return false;
+  return String(left.id ?? "") === String(right.id ?? "") && Boolean(left.id);
 }
 
 function clientName(client?: ClientResponse | null) {

@@ -14,6 +14,8 @@ public interface ContratGarantieRepository extends JpaRepository<ContratGarantie
 
     void deleteByContratIdAndRemorqueId(Long contratId, Long remorqueId);
 
+    List<ContratGarantie> findByContratIdOrderByCreatedAtAsc(Long contratId);
+
     @Query("""
             select g
             from ContratGarantie g

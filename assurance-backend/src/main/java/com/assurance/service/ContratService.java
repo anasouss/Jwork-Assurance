@@ -2958,7 +2958,7 @@ public class ContratService {
             }
             return;
         }
-        if (!hasText(request.getNumeroContrat())) {
+        if (request.getTypeContrat() == TypeContrat.PARTICULIER && !hasText(request.getNumeroContrat())) {
             throw new BadRequestException("Numero de contrat obligatoire");
         }
     }

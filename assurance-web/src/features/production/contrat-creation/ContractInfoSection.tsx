@@ -46,7 +46,7 @@ export function ContractInfoSection({
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
   const isFlotte = form.typeContrat === "FLOTTE";
   const showContratUsage = form.typeContrat !== "FLOTTE";
-  const showNumeroContrat = !isFlotte;
+  const showNumeroContrat = form.typeContrat === "PARTICULIER";
   const showNumeroAttestation = !isFlotte;
   const showFlotteNumeroPolice = isFlotte && !form.prospectionMode;
   const conventionHasFixedEcheance = readOnlyConventionContext
@@ -268,7 +268,7 @@ export function ContractInfoSection({
             <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
               <DatePicker disabled={form.showContractEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
             </Field>
-            {showFractionnement ? (
+            {showFractionnement && !readOnlyConventionContext ? (
               <Field label="Périodicité">
                 <Select
                   value={form.fractionnement}

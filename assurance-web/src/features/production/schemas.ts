@@ -30,7 +30,7 @@ export const contratSchema = z.object({
     }
     return;
   }
-  if (!value.numeroContrat?.trim()) {
+  if (value.typeContrat === "PARTICULIER" && !value.numeroContrat?.trim()) {
     ctx.addIssue({ code: "custom", path: ["numeroContrat"], message: "Numero contrat obligatoire" });
   }
 });

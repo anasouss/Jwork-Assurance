@@ -245,7 +245,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const request = useMemo<CreateContratRequest>(() => ({
     agenceId: user?.agenceId ?? "",
     typeContrat,
-    numeroContrat: typeContrat === "FLOTTE" ? undefined : numeroContrat,
+    numeroContrat: typeContrat === "PARTICULIER" ? numeroContrat : undefined,
     numeroPolice,
     numeroAttestation: typeContrat === "FLOTTE" ? undefined : numeroAttestation,
     compagnieAssuranceId: emptyToUndefined(compagnieAssuranceId),
@@ -623,7 +623,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         if (!options?.prospectionMode) {
           requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
         }
-      } else {
+      } else if (typeContrat === "PARTICULIER") {
         requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
       }
       requireField("typeRenouvellement", typeRenouvellement, "Type de contrat obligatoire.");

@@ -134,18 +134,13 @@ export default function ProspectionPage() {
         usageIds: pdfScope === "usages" ? selectedUsages : undefined,
       });
       const url = URL.createObjectURL(blob);
-      const fileName = `devis-${pdfTarget.numeroDevis ?? pdfTarget.id}.pdf`;
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
       if (previewWindow) {
         previewWindow.location.href = url;
+      } else {
+        window.location.href = url;
       }
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast.success("PDF généré");
+      toast.success("PDF ouvert");
     } catch (error) {
       previewWindow?.close();
       toast.error(error instanceof Error ? error.message : "Génération du PDF impossible");

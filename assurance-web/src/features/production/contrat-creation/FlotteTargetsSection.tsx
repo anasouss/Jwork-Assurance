@@ -1075,7 +1075,7 @@ function VehicleForm({
       ptc: found.ptc ?? undefined,
       datePremiereCirculation: found.datePremiereCirculation ?? undefined,
       dateExpirationCarteGrise: found.dateExpirationCarteGrise ?? undefined,
-      crm: crmPartage ? vehicule.crm : found.crm ?? undefined,
+      crm: crmPartage ? crmPartageValeur || undefined : found.crm ?? undefined,
       valeurVenale: toOptionalNumber(found.valeurVenale),
       valeurNeuf: toOptionalNumber(found.valeurNeuf),
       valeurGlace: toOptionalNumber(found.valeurGlace),

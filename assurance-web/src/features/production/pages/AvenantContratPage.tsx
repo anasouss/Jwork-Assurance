@@ -117,6 +117,9 @@ export default function AvenantContratPage() {
   const grilles = useQuery({ queryKey: ["referentiel", "grilles-tarifaires", "avenant-contrat"], queryFn: () => productionApi.referentiel("grilles-tarifaires") });
 
   const contrat = contextQuery.data?.contrat;
+  const sharedCrm = contrat?.crmPartage
+    ? contrat.crmPartageValeur?.trim() || undefined
+    : undefined;
   const availableMovements = useMemo(
     () => (contextQuery.data?.mouvementsDisponibles ?? [])
       .filter((item) => supportedAvenantCodes.has(normalizeCode(item.code)))
@@ -360,7 +363,7 @@ export default function AvenantContratPage() {
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
     };
     if (movementCode === "INC_F") {
-      request.vehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
+      request.vehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
       request.remorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
       request.garanties = ensureRcGaranties(
         draftGaranties,
@@ -406,7 +409,7 @@ export default function AvenantContratPage() {
     }
     const request = buildDraftRequest();
     if (movementCode === "INC_F") {
-      const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
+      const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
       const garantiesRequest = ensureRcGaranties(selectedGaranties, normalizedVehicules.length, normalizedRemorques.length, garanties.data ?? []);
       const invalidVehicule = normalizedVehicules
@@ -514,7 +517,7 @@ export default function AvenantContratPage() {
     const previewGaranties = guaranteesOverride ?? selectedGaranties;
     if (movementCode === "INC_F") {
       const normalizedVehicules = target.kind === "vehicule"
-        ? [normalizeVehicle(vehicules[target.index], dateEffet, request.dateEcheance)]
+        ? [normalizeVehicle(vehicules[target.index], dateEffet, request.dateEcheance, sharedCrm)]
         : [];
       const normalizedRemorques = target.kind === "remorque"
         ? [normalizeRemorque(remorques[target.index], dateEffet, request.dateEcheance)]
@@ -627,7 +630,12 @@ export default function AvenantContratPage() {
       return true;
     }
     if (target.kind === "vehicule") {
-      const vehicule = vehicules[target.index];
+      const vehicule = normalizeVehicle(
+        vehicules[target.index],
+        dateEffet,
+        contrat?.dateEcheance || dateEcheance,
+        sharedCrm
+      );
       const validationMessage = vehicleValidationMessage(vehicule, flotteTargetUsages);
       if (validationMessage) {
         toast.error(validationMessage);
@@ -976,8 +984,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="grid gap-1.5 text-xs font-semibold uppercase text-slate-700 dark:text-neutral-300"><span>{label}</span>{children}</label>;
 }
 
-function normalizeVehicle(vehicle: VehiculeInput, dateEffet?: string, dateEcheance?: string): VehiculeInput {
-  return { ...vehicle, typeVehicule: vehicle.typeVehicule ?? "AUTOMOBILE", dateEffet, dateEcheance };
+function normalizeVehicle(
+  vehicle: VehiculeInput,
+  dateEffet?: string,
+  dateEcheance?: string,
+  sharedCrm?: string
+): VehiculeInput {
+  return {
+    ...vehicle,
+    typeVehicule: vehicle.typeVehicule ?? "AUTOMOBILE",
+    crm: vehicle.crm?.trim() || sharedCrm?.trim() || undefined,
+    dateEffet,
+    dateEcheance,
+  };
 }
 
 function normalizeRemorque(remorque: RemorqueInput, dateEffet?: string, dateEcheance?: string): RemorqueInput {

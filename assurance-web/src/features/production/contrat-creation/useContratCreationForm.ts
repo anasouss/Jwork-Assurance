@@ -67,6 +67,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     marques: useReference("marques"),
     carrosseries: useReference("carrosseries"),
     categoriesTransport: useReference("categories-transport"),
+    sousClasses: useReference("sous-classes"),
     garanties: useReference("garanties"),
     compagnies: useReference("compagnies-assurance"),
     compagniesAssistance: useReference("compagnies-assistance"),

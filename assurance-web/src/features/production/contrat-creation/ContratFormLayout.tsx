@@ -147,6 +147,7 @@ export function ContratFormLayout({
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
+      sousClasses={form.refs.sousClasses.data ?? []}
       allowMultipleVehicules={allowMultipleVehicules}
       showUsage={!showConvention}
       showAttestation={!showConvention}
@@ -226,6 +227,7 @@ export function ContratFormLayout({
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
+      sousClasses={form.refs.sousClasses.data ?? []}
       compagniesAssistance={form.refs.compagniesAssistance.data ?? []}
       produitsAssistance={form.refs.produitsAssistance.data ?? []}
       grilleSelected={Boolean(form.grilleTarifaireId)}

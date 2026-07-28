@@ -34,6 +34,7 @@ export function VehiculeSection({
   marques,
   carrosseries,
   categoriesTransport,
+  sousClasses,
   allowMultipleVehicules = true,
   showUsage = true,
   showAttestation = true,
@@ -54,6 +55,7 @@ export function VehiculeSection({
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
+  sousClasses: ReferenceOption[];
   allowMultipleVehicules?: boolean;
   showUsage?: boolean;
   showAttestation?: boolean;
@@ -237,7 +239,18 @@ export function VehiculeSection({
                 ) : null}
                 {needsSousClasse ? (
                   <Field label="Sous-classe" required error={errors[`vehicules.${index}.sousClasse`]}>
-                    <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update(index, { sousClasse: event.target.value })} />
+                    <AutocompleteSelect
+                      value={vehicule.sousClasse ?? ""}
+                      placeholder="Sous-classe"
+                      emptyText="Aucune sous-classe trouvée"
+                      invalidText="Sous-classe invalide : choisissez une option existante."
+                      options={sousClasses.filter(isActiveReference).map((sousClasse) => ({
+                        value: sousClasse.code ?? sousClasse.libelle,
+                        label: sousClasse.code ? `${sousClasse.code} - ${sousClasse.libelle}` : sousClasse.libelle,
+                        keywords: sousClasse.libelle,
+                      }))}
+                      onValueChange={(value) => update(index, { sousClasse: value || undefined })}
+                    />
                   </Field>
                 ) : null}
                 {needsPtc ? (
@@ -350,4 +363,8 @@ function stringValue(value: unknown) {
 
 function toOptionalNumber(value: unknown) {
   return typeof value === "number" ? value : value === undefined || value === null || value === "" ? undefined : Number(value);
+}
+
+function isActiveReference(option: ReferenceOption) {
+  return option.actif !== false;
 }

@@ -79,6 +79,7 @@ type Props = {
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
+  sousClasses: ReferenceOption[];
   compagniesAssistance: ReferenceOption[];
   produitsAssistance: ReferenceOption[];
   grilleSelected: boolean;
@@ -121,6 +122,7 @@ export function FlotteTargetsSection({
   marques,
   carrosseries,
   categoriesTransport,
+  sousClasses,
   compagniesAssistance,
   produitsAssistance,
   grilleSelected,
@@ -406,6 +408,7 @@ export function FlotteTargetsSection({
                     marques={marques}
                     carrosseries={carrosseries}
                     categoriesTransport={categoriesTransport}
+                    sousClasses={sousClasses}
                     crmPartage={crmPartage}
                     crmPartageValeur={crmPartageValeur}
                     prospectionMode={prospectionMode}
@@ -956,6 +959,10 @@ function stringValue(value: unknown) {
   return value === undefined || value === null ? undefined : String(value);
 }
 
+function isActiveReference(option: ReferenceOption) {
+  return option.actif !== false;
+}
+
 function toOptionalNumber(value: unknown) {
   return typeof value === "number" ? value : value === undefined || value === null || value === "" ? undefined : Number(value);
 }
@@ -970,6 +977,7 @@ function VehicleForm({
   marques,
   carrosseries,
   categoriesTransport,
+  sousClasses,
   crmPartage,
   crmPartageValeur,
   prospectionMode,
@@ -984,6 +992,7 @@ function VehicleForm({
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
+  sousClasses: ReferenceOption[];
   crmPartage: boolean;
   crmPartageValeur: string;
   prospectionMode: boolean;
@@ -1151,7 +1160,18 @@ function VehicleForm({
         </Field>
         {needsSousClasse ? (
           <Field label="Sous-classe" required error={errors[`vehicules.${index}.sousClasse`]}>
-            <Input value={vehicule.sousClasse ?? ""} onChange={(event) => update({ sousClasse: event.target.value })} />
+            <AutocompleteSelect
+              value={vehicule.sousClasse ?? ""}
+              placeholder="Sous-classe"
+              emptyText="Aucune sous-classe trouvée"
+              invalidText="Sous-classe invalide : choisissez une option existante."
+              options={sousClasses.filter(isActiveReference).map((sousClasse) => ({
+                value: sousClasse.code ?? sousClasse.libelle,
+                label: sousClasse.code ? `${sousClasse.code} - ${sousClasse.libelle}` : sousClasse.libelle,
+                keywords: sousClasse.libelle,
+              }))}
+              onValueChange={(value) => update({ sousClasse: value || undefined })}
+            />
           </Field>
         ) : null}
         {needsPtc ? (

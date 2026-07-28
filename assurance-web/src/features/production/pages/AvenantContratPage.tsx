@@ -90,6 +90,7 @@ export default function AvenantContratPage() {
   const compagnies = useQuery({ queryKey: ["referentiel", "compagnies-assurance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assurance") });
   const marques = useQuery({ queryKey: ["referentiel", "marques", "avenant-contrat"], queryFn: () => productionApi.referentiel("marques") });
   const carrosseries = useQuery({ queryKey: ["referentiel", "carrosseries", "avenant-contrat"], queryFn: () => productionApi.referentiel("carrosseries") });
+  const sousClasses = useQuery({ queryKey: ["referentiel", "sous-classes", "avenant-contrat"], queryFn: () => productionApi.referentiel("sous-classes") });
   const garanties = useQuery({ queryKey: ["referentiel", "garanties", "avenant-contrat"], queryFn: productionApi.garantiesParametrage });
   const categoriesTransport = useQuery({ queryKey: ["referentiel", "categories-transport", "avenant-contrat"], queryFn: () => productionApi.referentiel("categories-transport") });
   const compagniesAssistance = useQuery({ queryKey: ["referentiel", "compagnies-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assistance") });
@@ -460,6 +461,7 @@ export default function AvenantContratPage() {
           marques={marques.data ?? []}
           carrosseries={carrosseries.data ?? []}
           categoriesTransport={categoriesTransport.data ?? []}
+          sousClasses={sousClasses.data ?? []}
           compagniesAssistance={compagniesAssistance.data ?? []}
           produitsAssistance={produitsAssistance.data ?? []}
           grilleSelected={Boolean(grilleTarifaireId)}

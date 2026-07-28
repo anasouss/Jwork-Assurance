@@ -412,6 +412,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/produits-assistance")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createProduitAssistance(
             @Valid @RequestBody UpsertProduitAssistanceRequest request
     ) {
@@ -424,6 +425,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/produits-assistance/{id}")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateProduitAssistance(
             @PathVariable Long id,
             @Valid @RequestBody UpsertProduitAssistanceRequest request
@@ -1531,7 +1533,7 @@ public class ReferentielController {
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", request.getCompagnieAssistanceId()));
         CategorieClient categorieClient = request.getCategorieClientId() == null ? null :
-                categorieClientRepository.findById(request.getCategorieClientId())
+                categorieClientRepository.findByIdWithUsages(request.getCategorieClientId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
 
         Set<Usage> usages = new LinkedHashSet<>();

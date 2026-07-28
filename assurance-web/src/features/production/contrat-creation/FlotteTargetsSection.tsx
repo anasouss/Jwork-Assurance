@@ -17,7 +17,7 @@ import { MoneyInput } from "../components/MoneyInput";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { productionApi } from "../api";
-import { computeDateEcheanceFromCode, toDateOnly } from "../date";
+import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberOrZero, numberValue, roundMoney, toNumber } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput, VehiculeResponse } from "../types";
@@ -1749,6 +1749,7 @@ function AssistanceTable({
   const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
   const selectedProductId = selectedProduct?.id ?? "";
   const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+  const trimestres = assistance.enabled ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance) : undefined;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({
       dateEffet,
@@ -1850,9 +1851,9 @@ function AssistanceTable({
           </tr>
         </tbody>
       </table>
-      {assistance.enabled ? (
-        <div className="border-t px-3 py-2 text-xs text-muted-foreground">
-          Le prorata et la prime totale restent calculés par le service assistance lors de l'enregistrement sur le contrat créé.
+      {trimestres ? (
+        <div className="border-t px-3 py-2 text-xs font-medium text-muted-foreground">
+          Trimestres: {trimestres}/4
         </div>
       ) : null}
     </div>

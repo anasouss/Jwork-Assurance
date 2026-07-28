@@ -47,6 +47,26 @@ export function computeDateEcheanceFromMonths(dateEffet?: string | null, monthsT
   return toDateOnly(expiration);
 }
 
+export function computeAssistanceQuarterCount(dateEffet?: string | null, dateEcheance?: string | null) {
+  const start = parseDateValue(dateEffet);
+  const end = parseDateValue(dateEcheance);
+  if (!start || !end) {
+    return undefined;
+  }
+  if (end < start) {
+    return 4;
+  }
+  const endExclusive = new Date(end);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+  let months = (endExclusive.getFullYear() - start.getFullYear()) * 12 + (endExclusive.getMonth() - start.getMonth());
+  const startPlusMonths = new Date(start);
+  startPlusMonths.setMonth(startPlusMonths.getMonth() + months);
+  if (startPlusMonths < endExclusive) {
+    months += 1;
+  }
+  return Math.max(1, Math.min(4, Math.ceil(Math.max(1, months) / 3)));
+}
+
 function addMonthsClamped(date: Date, monthsToAdd: number) {
   const targetMonthIndex = date.getMonth() + monthsToAdd;
   const targetYear = date.getFullYear() + Math.floor(targetMonthIndex / 12);
@@ -70,4 +90,28 @@ function normalizeEcheanceCode(echeance: string) {
     return undefined;
   }
   return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
+}
+
+function parseDateValue(value?: string | null) {
+  const text = value?.trim();
+  if (!text) {
+    return undefined;
+  }
+  let match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    return buildLocalDate(Number(match[1]), Number(match[2]), Number(match[3]));
+  }
+  match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (match) {
+    return buildLocalDate(Number(match[3]), Number(match[2]), Number(match[1]));
+  }
+  return undefined;
+}
+
+function buildLocalDate(year: number, month: number, day: number) {
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return undefined;
+  }
+  return date;
 }

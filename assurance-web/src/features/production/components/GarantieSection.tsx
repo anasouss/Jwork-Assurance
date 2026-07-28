@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
-import { computeDateEcheanceFromCode, toDateOnly } from "../date";
+import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberValue, roundMoney } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
@@ -601,6 +601,7 @@ function AssistanceTable({
   const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
   const selectedProductId = selectedProduct?.id ?? "";
   const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+  const trimestres = assistance.enabled ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance) : undefined;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({
       dateEffet,
@@ -709,6 +710,11 @@ function AssistanceTable({
           </tr>
         </tbody>
       </table>
+      {trimestres ? (
+        <div className="border-t px-3 py-2 text-xs font-medium text-muted-foreground">
+          Trimestres: {trimestres}/4
+        </div>
+      ) : null}
     </div>
   );
 }

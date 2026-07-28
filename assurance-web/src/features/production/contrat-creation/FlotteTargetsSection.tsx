@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Calculator, Check, ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,7 @@ type Props = {
   onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
   onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;
   garantiesExtraAction?: ReactNode;
+  targetActionMode?: "save" | "calculate";
   targetAssistances?: Record<string, AssistanceDraft>;
   setTargetAssistances?: Dispatch<SetStateAction<Record<string, AssistanceDraft>>>;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
@@ -130,6 +131,7 @@ export function FlotteTargetsSection({
   onSaveTargetDraft,
   onValidateTarget,
   garantiesExtraAction,
+  targetActionMode = "save",
   targetAssistances,
   setTargetAssistances,
   setAssistanceEnabled,
@@ -213,6 +215,17 @@ export function FlotteTargetsSection({
   });
   const activeVehiculeAssistanceNet = targetAssistanceNet(activeVehiculeAssistance, produitsAssistance, activeVehiculeAssistanceTarifs.data);
   const activeRemorqueAssistanceNet = targetAssistanceNet(activeRemorqueAssistance, produitsAssistance, activeRemorqueAssistanceTarifs.data);
+  const targetActionText = targetActionMode === "calculate"
+    ? {
+        info: "Enregistrer informations",
+        garanties: "Calculer garanties",
+        loading: "Enregistrement...",
+      }
+    : {
+        info: "Enregistrer informations",
+        garanties: "Enregistrer garanties",
+        loading: "Enregistrement...",
+      };
 
   useEffect(() => {
     if (!recalculationRequest || !onPreviewQuittance) {
@@ -432,13 +445,15 @@ export function FlotteTargetsSection({
                     errors={errors}
                   />
                   <SectionSubmitButton
+                    icon="save"
                     saving={saving}
+                    loadingText={targetActionText.loading}
                     onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => {
                       setActiveTargetPart("garanties");
                       onPreviewQuittance?.(activeVehiculeTarget);
                     })}
                   >
-                    Enregistrer informations
+                    {targetActionText.info}
                   </SectionSubmitButton>
                 </TargetSubsection>
               ) : null}
@@ -457,7 +472,7 @@ export function FlotteTargetsSection({
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
+                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : targetActionText.garanties}
                   </Button>
                 }
               >
@@ -568,8 +583,15 @@ export function FlotteTargetsSection({
                     marques={marques}
                     prospectionMode={prospectionMode}
                   />
-                  <SectionSubmitButton saving={saving} onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque")}>
-                    Enregistrer informations
+                  <SectionSubmitButton
+                    icon="save"
+                    saving={saving}
+                    loadingText={targetActionText.loading}
+                    onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque", () => {
+                      onPreviewQuittance?.(activeRemorqueTarget);
+                    })}
+                  >
+                    {targetActionText.info}
                   </SectionSubmitButton>
                 </TargetSubsection>
               ) : null}
@@ -586,7 +608,7 @@ export function FlotteTargetsSection({
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
+                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : targetActionText.garanties}
                   </Button>
                 }
               >
@@ -636,19 +658,23 @@ export function FlotteTargetsSection({
 function SectionSubmitButton({
   children,
   disabled,
+  icon = "save",
   saving,
+  loadingText = "Enregistrement...",
   onClick,
 }: {
   children: ReactNode;
   disabled?: boolean;
+  icon?: "save" | "calculate";
   saving?: boolean;
+  loadingText?: string;
   onClick: () => void;
 }) {
   return (
     <div className="mt-5 flex justify-end border-t pt-4">
       <Button type="button" disabled={disabled || saving} onClick={onClick}>
-        {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-        {saving ? "Enregistrement..." : children}
+        {saving ? <Loader2 className="size-4 animate-spin" /> : icon === "calculate" ? <Calculator className="size-4" /> : <Save className="size-4" />}
+        {saving ? loadingText : children}
       </Button>
     </div>
   );

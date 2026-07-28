@@ -604,6 +604,7 @@ export default function AvenantContratPage() {
           allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
           onValidateTarget={isTargetCreationCode(movementCode) ? validateTargetCreation : undefined}
           onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
+          targetActionMode={isTargetCreationCode(movementCode) ? "calculate" : "save"}
           garantiesExtraAction={movementCode === "INC_F" ? (
             <Button
               type="button"

@@ -16,6 +16,7 @@ import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.StatutContrat;
+import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
@@ -277,6 +278,7 @@ public class ContratService {
         contrat.setStatut(prospection ? StatutContrat.DRAFT : StatutContrat.ACTIVE);
         contrat.setBrouillon(false);
         contratRepository.save(contrat);
+        refreshDraftAssistanceReferences(contrat, graph.assistances());
         if (!prospection) {
             mouvementContratService.creerAffaireNouvelle(
                     contrat,
@@ -805,6 +807,7 @@ public class ContratService {
         for (ContratClient link : contrat.getClients()) {
             existingClients.put(clientDraftKey(link.getRole(), Boolean.TRUE.equals(link.getPrincipalPourRole())), link.getClient());
         }
+        List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(contrat);
         clearDraftChildren(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
@@ -884,10 +887,22 @@ public class ContratService {
         List<ContratGarantie> garantiesCreees = finalMode
                 ? replaceFinalGaranties(contrat, request, vehiculesCrees, remorquesCreees)
                 : replaceRawDraftGaranties(contrat, request, vehiculesCrees, remorquesCreees);
-        return new PersistedDraftGraph(vehiculesCrees, remorquesCreees, garantiesCreees, buildManualQuittanceResult(request));
+        List<AssistanceContrat> assistancesCreees = restoreDraftAssistances(contrat, vehiculesCrees, assistanceSnapshots);
+        return new PersistedDraftGraph(vehiculesCrees, remorquesCreees, garantiesCreees, assistancesCreees, buildManualQuittanceResult(request));
     }
 
     private void clearDraftChildren(Contrat contrat) {
+        List<AssistanceContrat> assistances = assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(contrat.getId());
+        List<ElementFacturable> assistanceElements = assistances.stream()
+                .map(AssistanceContrat::getElementFacturable)
+                .filter(element -> element != null)
+                .toList();
+        assistanceContratRepository.deleteAll(assistances);
+        assistanceContratRepository.flush();
+        if (!assistanceElements.isEmpty()) {
+            elementFacturableRepository.deleteAll(assistanceElements);
+            elementFacturableRepository.flush();
+        }
         contratGarantieRepository.deleteByContratId(contrat.getId());
         contratClientRepository.deleteByContratId(contrat.getId());
         remorqueRepository.deleteByContratId(contrat.getId());
@@ -900,6 +915,128 @@ public class ContratService {
         contrat.getClients().clear();
         contrat.getRemorques().clear();
         contrat.getVehicules().clear();
+        contrat.getAssistances().clear();
+        contrat.getElementsFacturables().removeAll(assistanceElements);
+    }
+
+    private List<DraftAssistanceSnapshot> snapshotDraftAssistances(Contrat contrat) {
+        List<Vehicule> vehicules = vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        Map<Long, Integer> vehiculeIndexById = new HashMap<>();
+        for (int index = 0; index < vehicules.size(); index++) {
+            vehiculeIndexById.put(vehicules.get(index).getId(), index);
+        }
+        List<DraftAssistanceSnapshot> snapshots = new ArrayList<>();
+        for (AssistanceContrat assistance : assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())) {
+            Long vehiculeId = assistance.getVehicule() == null ? null : assistance.getVehicule().getId();
+            Integer vehiculeIndex = vehiculeId == null ? null : vehiculeIndexById.get(vehiculeId);
+            if (vehiculeIndex == null) {
+                continue;
+            }
+            snapshots.add(new DraftAssistanceSnapshot(
+                    vehiculeIndex,
+                    assistance.getCompagnieAssuranceContrat(),
+                    assistance.getCompagnieAssistance(),
+                    assistance.getProduitAssistance(),
+                    assistance.getTarifProduitAssistance(),
+                    assistance.getProduit(),
+                    assistance.getDateSouscription(),
+                    assistance.getDateEffet(),
+                    assistance.getDateEcheance(),
+                    assistance.getEcheanceCode(),
+                    assistance.getDuree(),
+                    assistance.getUnite(),
+                    assistance.getNumeroContratOuQuittance(),
+                    assistance.getTypeQuittance(),
+                    assistance.getPrimeNette(),
+                    assistance.getPrimeTotale()
+            ));
+        }
+        return snapshots;
+    }
+
+    private List<AssistanceContrat> restoreDraftAssistances(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            List<DraftAssistanceSnapshot> snapshots
+    ) {
+        List<AssistanceContrat> restored = new ArrayList<>();
+        for (DraftAssistanceSnapshot snapshot : snapshots) {
+            if (snapshot.vehiculeIndex() < 0 || snapshot.vehiculeIndex() >= vehicules.size()) {
+                continue;
+            }
+            Vehicule vehicule = vehicules.get(snapshot.vehiculeIndex());
+            AssistanceContrat assistance = AssistanceContrat.builder()
+                    .contrat(contrat)
+                    .vehicule(vehicule)
+                    .compagnieAssuranceContrat(firstNonNull(snapshot.compagnieAssuranceContrat(), contrat.getCompagnieAssurance()))
+                    .compagnieAssistance(snapshot.compagnieAssistance())
+                    .produitAssistance(snapshot.produitAssistance())
+                    .tarifProduitAssistance(snapshot.tarifProduitAssistance())
+                    .produit(snapshot.produit())
+                    .dateSouscription(snapshot.dateSouscription())
+                    .dateEffet(snapshot.dateEffet())
+                    .dateEcheance(snapshot.dateEcheance())
+                    .echeanceCode(snapshot.echeanceCode())
+                    .duree(snapshot.duree())
+                    .unite(snapshot.unite())
+                    .numeroDossier(contrat.getNumeroDossier())
+                    .numeroPoliceContrat(contrat.getNumeroPolice())
+                    .numeroContratOuQuittance(snapshot.numeroContratOuQuittance())
+                    .typeQuittance(snapshot.typeQuittance())
+                    .primeNette(snapshot.primeNette())
+                    .primeTotale(snapshot.primeTotale())
+                    .actif(true)
+                    .build();
+            assistance = assistanceContratRepository.save(assistance);
+            ElementFacturable element = ElementFacturable.builder()
+                    .agence(contrat.getAgence())
+                    .contrat(contrat)
+                    .compagnieAssurance(contrat.getCompagnieAssurance())
+                    .nature(NatureElementFacturable.ASSISTANCE)
+                    .statut(StatutElementFacturable.A_QUITTANCER)
+                    .referenceSource(String.valueOf(assistance.getId()))
+                    .libelle("Assistance - " + firstNonNull(snapshot.produit(), ""))
+                    .dateDebut(snapshot.dateEffet())
+                    .dateFin(snapshot.dateEcheance())
+                    .primeNette(zeroIfNull(snapshot.primeNette()))
+                    .taxe(zeroIfNull(snapshot.primeTotale()).subtract(zeroIfNull(snapshot.primeNette())).max(BigDecimal.ZERO))
+                    .taxeParafiscale(BigDecimal.ZERO)
+                    .accessoire(BigDecimal.ZERO)
+                    .cnpac(BigDecimal.ZERO)
+                    .primeTotale(zeroIfNull(snapshot.primeTotale()))
+                    .actif(true)
+                    .build();
+            element = elementFacturableRepository.save(element);
+            assistance.setElementFacturable(element);
+            assistance = assistanceContratRepository.save(assistance);
+            restored.add(assistance);
+            contrat.getAssistances().add(assistance);
+            contrat.getElementsFacturables().add(element);
+        }
+        contrat.setAssistance(!restored.isEmpty());
+        contratRepository.save(contrat);
+        return restored;
+    }
+
+    private void refreshDraftAssistanceReferences(Contrat contrat, List<AssistanceContrat> assistances) {
+        if (assistances == null || assistances.isEmpty()) {
+            contrat.setAssistance(false);
+            contratRepository.save(contrat);
+            return;
+        }
+        for (AssistanceContrat assistance : assistances) {
+            assistance.setNumeroDossier(contrat.getNumeroDossier());
+            assistance.setNumeroPoliceContrat(contrat.getNumeroPolice());
+            ElementFacturable element = assistance.getElementFacturable();
+            if (element != null) {
+                element.setContrat(contrat);
+                element.setCompagnieAssurance(contrat.getCompagnieAssurance());
+                elementFacturableRepository.save(element);
+            }
+        }
+        assistanceContratRepository.saveAll(assistances);
+        contrat.setAssistance(true);
+        contratRepository.save(contrat);
     }
 
     private void validateDraftVehiculeInput(Contrat contrat, CreateContratRequest.VehiculeInput input) {
@@ -4000,7 +4137,28 @@ public class ContratService {
             List<Vehicule> vehicules,
             List<Remorque> remorques,
             List<ContratGarantie> garanties,
+            List<AssistanceContrat> assistances,
             QuittanceCalculService.Resultat quittanceManuelle
+    ) {
+    }
+
+    private record DraftAssistanceSnapshot(
+            int vehiculeIndex,
+            CompagnieAssurance compagnieAssuranceContrat,
+            CompagnieAssistance compagnieAssistance,
+            ProduitAssistance produitAssistance,
+            TarifProduitAssistance tarifProduitAssistance,
+            String produit,
+            LocalDate dateSouscription,
+            LocalDate dateEffet,
+            LocalDate dateEcheance,
+            String echeanceCode,
+            Integer duree,
+            String unite,
+            String numeroContratOuQuittance,
+            String typeQuittance,
+            BigDecimal primeNette,
+            BigDecimal primeTotale
     ) {
     }
 

@@ -230,7 +230,6 @@ export default function AssistanceProductsSettingsPage() {
                 <TableRow key={product.id}>
                   <TableCell>
                     <div className="font-medium">{product.libelle}</div>
-                    <div className="line-clamp-1 text-xs text-muted-foreground">{refString(product, "prestations") || "-"}</div>
                   </TableCell>
                   <TableCell>{refString(product, "compagnieAssistanceLibelle") || "-"}</TableCell>
                   <TableCell>{refString(product, "type") || "-"}</TableCell>

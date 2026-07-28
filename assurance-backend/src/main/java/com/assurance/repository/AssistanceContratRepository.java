@@ -13,5 +13,7 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
 
     long countByMouvementContratId(Long mouvementContratId);
 
+    long countByContratIdAndActifTrue(Long contratId);
+
     Optional<AssistanceContrat> findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(Long contratId, Long vehiculeId);
 }

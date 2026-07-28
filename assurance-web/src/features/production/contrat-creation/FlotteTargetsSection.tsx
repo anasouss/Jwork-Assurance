@@ -22,7 +22,7 @@ import { resolveAssistanceTariffAmount } from "../assistance-pricing";
 import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberOrZero, numberValue, roundMoney, toNumber } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
-import type { GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput, VehiculeResponse } from "../types";
+import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput, VehiculeResponse } from "../types";
 import type { ContratSectionKey } from "./useContratCreationForm";
 
 type Target = {
@@ -35,17 +35,6 @@ type Target = {
   valeurNeuf?: number;
   valeurGlace?: number;
   valeurAssuree?: number;
-};
-
-type AssistanceDraft = {
-  enabled: boolean;
-  compagnieAssistanceId?: string;
-  produitAssistanceId?: string;
-  dateEffet?: string;
-  dateSouscription?: string;
-  echeanceCode?: string;
-  dateEcheance?: string;
-  numeroContratOuQuittance?: string;
 };
 
 type TargetQuittanceSummary = {
@@ -94,6 +83,8 @@ type Props = {
   onSaveDraft?: (label: string, onSuccess?: () => void) => void;
   onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
   onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;
+  targetAssistances?: Record<string, AssistanceDraft>;
+  setTargetAssistances?: Dispatch<SetStateAction<Record<string, AssistanceDraft>>>;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
   showAssistance?: boolean;
   showInfoSections?: boolean;
@@ -137,6 +128,8 @@ export function FlotteTargetsSection({
   onSaveDraft,
   onSaveTargetDraft,
   onValidateTarget,
+  targetAssistances,
+  setTargetAssistances,
   setAssistanceEnabled,
   showAssistance = true,
   showInfoSections = true,
@@ -177,7 +170,9 @@ export function FlotteTargetsSection({
   const [savedKeys, setSavedKeys] = useState<string[]>([]);
   const [recalculationRequest, setRecalculationRequest] = useState<{ targetKey: string; seq: number } | null>(null);
   const [dirtyCalculationKeys, setDirtyCalculationKeys] = useState<string[]>([]);
-  const [assistances, setAssistances] = useState<Record<string, AssistanceDraft>>({});
+  const [localAssistances, setLocalAssistances] = useState<Record<string, AssistanceDraft>>({});
+  const assistances = targetAssistances ?? localAssistances;
+  const setAssistances = setTargetAssistances ?? setLocalAssistances;
   const calculationTargetKeyRef = useRef("");
   const wasPreviewingRef = useRef(false);
   const vehiculeGaranties = useMemo(

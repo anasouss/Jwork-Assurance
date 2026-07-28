@@ -448,6 +448,7 @@ export type QuittanceInput = {
 };
 
 export type AssistanceDraft = {
+  assistanceId?: string;
   enabled: boolean;
   compagnieAssistanceId?: string;
   produitAssistanceId?: string;
@@ -612,6 +613,7 @@ export type CreateContratRequest = {
   vehicules: VehiculeInput[];
   remorques: RemorqueInput[];
   garanties: GarantieInput[];
+  assistances?: AssistanceDraft[];
   quittances?: QuittanceInput[];
 };
 
@@ -655,6 +657,7 @@ export type QuittancePreview = {
     tauxFranchise?: number;
     franchiseMinimale?: number;
   }[];
+  assistances?: AssistanceContrat[];
   targetSummaries?: {
     kind?: string;
     vehiculeIndex?: number;
@@ -1057,6 +1060,7 @@ export type ContratSummary = {
     tauxFranchise?: number | null;
     franchiseMinimale?: number | null;
   }[];
+  assistances?: AssistanceContrat[];
   mouvements?: {
     id: string;
     code?: string | null;

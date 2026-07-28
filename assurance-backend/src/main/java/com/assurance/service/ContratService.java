@@ -4,6 +4,7 @@ import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.MouvementContratRequest;
+import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
@@ -2713,6 +2714,11 @@ public class ContratService {
                     .primeTotale(element.getPrimeTotale())
                     .build());
         }
+        List<AssistanceContratResponse> assistances = assistanceContratRepository
+                .findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
+                .stream()
+                .map(this::toAssistanceResponse)
+                .toList();
         QuittanceResponse quittanceGenerale = selectedMouvementId == null
                 ? buildQuittanceGenerale(contrat, includeTargetSummaries)
                 : buildSavedQuittanceMouvement(contrat, selectedMouvementId);
@@ -2758,17 +2764,47 @@ public class ContratService {
                 .nombreRemorques(contrat.getNombreRemorques())
                 .brouillon(contrat.getBrouillon())
                 .prospection(contrat.getProspection())
-                .assistance(contrat.getAssistance())
+                .assistance(Boolean.TRUE.equals(contrat.getAssistance()) || !assistances.isEmpty())
                 .crmPartage(contrat.getCrmPartage())
                 .crmPartageValeur(contrat.getCrmPartageValeur())
                 .clients(clients)
                 .vehicules(vehicules)
                 .remorques(remorques)
                 .garanties(garanties)
+                .assistances(assistances)
                 .mouvements(mouvements)
                 .elementsFacturables(elementsFacturables)
                 .targetSummaries(targetSummaries)
                 .quittanceGenerale(quittanceGenerale)
+                .build();
+    }
+
+    private AssistanceContratResponse toAssistanceResponse(AssistanceContrat assistance) {
+        int trimestres = assistance.getDuree() == null
+                ? AssistanceContratService.resolveAssistanceQuarterCount(assistance.getDateEffet(), assistance.getDateEcheance())
+                : assistance.getDuree();
+        BigDecimal prorata = BigDecimal.valueOf(trimestres).divide(BigDecimal.valueOf(4), 8, RoundingMode.HALF_UP);
+        return AssistanceContratResponse.builder()
+                .id(assistance.getId())
+                .contratId(assistance.getContrat() != null ? assistance.getContrat().getId() : null)
+                .mouvementContratId(assistance.getMouvementContrat() != null ? assistance.getMouvementContrat().getId() : null)
+                .vehiculeId(assistance.getVehicule() != null ? assistance.getVehicule().getId() : null)
+                .vehiculeImmatriculation(assistance.getVehicule() != null ? assistance.getVehicule().getImmatriculation() : null)
+                .compagnieAssistanceId(assistance.getCompagnieAssistance() != null ? assistance.getCompagnieAssistance().getId() : null)
+                .compagnieAssistanceLibelle(assistance.getCompagnieAssistance() != null ? assistance.getCompagnieAssistance().getNom() : null)
+                .produitAssistanceId(assistance.getProduitAssistance() != null ? assistance.getProduitAssistance().getId() : null)
+                .tarifProduitAssistanceId(assistance.getTarifProduitAssistance() != null ? assistance.getTarifProduitAssistance().getId() : null)
+                .produit(assistance.getProduit())
+                .dateSouscription(assistance.getDateSouscription())
+                .dateEffet(assistance.getDateEffet())
+                .dateEcheance(assistance.getDateEcheance())
+                .echeanceCode(assistance.getEcheanceCode())
+                .numeroContratOuQuittance(assistance.getNumeroContratOuQuittance())
+                .trimestres(trimestres)
+                .prorataRatio(prorata.setScale(2, RoundingMode.HALF_UP))
+                .primeNette(assistance.getPrimeNette())
+                .primeTotale(assistance.getPrimeTotale())
+                .elementFacturableId(assistance.getElementFacturable() != null ? assistance.getElementFacturable().getId() : null)
                 .build();
     }
 

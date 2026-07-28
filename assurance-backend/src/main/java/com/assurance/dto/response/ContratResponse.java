@@ -59,6 +59,7 @@ public class ContratResponse {
     private List<VehiculeView> vehicules;
     private List<RemorqueView> remorques;
     private List<GarantieView> garanties;
+    private List<AssistanceContratResponse> assistances;
     private List<MouvementView> mouvements;
     private List<ElementFacturableView> elementsFacturables;
     private List<QuittanceResponse.TargetSummary> targetSummaries;

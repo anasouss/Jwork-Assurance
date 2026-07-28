@@ -50,6 +50,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const [tauxRc, setTauxRc] = useState("");
   const [assistanceEnabled, setAssistanceEnabled] = useState(false);
   const [assistanceDraft, setAssistanceDraft] = useState<AssistanceDraft>({ enabled: false });
+  const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [saisiePrimeNette, setSaisiePrimeNette] = useState(false);
   const [clients, setClients] = useState<ClientInput[]>([emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")]);
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([emptyVehicule()]);
@@ -202,6 +203,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setCrmPartageValeur(hydrated.crmPartageValeur);
     setTauxRc(hydrated.tauxRc);
     setAssistanceEnabled(hydrated.assistanceEnabled);
+    setTargetAssistances(hydrated.targetAssistances);
     setSaisiePrimeNette(hydrated.saisiePrimeNette);
     setClients(hydrated.clients);
     setVehicules(hydrated.vehicules);
@@ -409,7 +411,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   });
 
   const saveTargetDraftMutation = useMutation({
-    mutationFn: ({ target, part }: { target: ContratTargetKey; part: "info" | "garanties" }) => {
+    mutationFn: async ({ target, part }: { target: ContratTargetKey; part: "info" | "garanties" }) => {
       if (!draftId) {
         throw new Error("Brouillon introuvable pour enregistrer cette section");
       }
@@ -417,7 +419,8 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         return productionApi.saveDraftVehicule(draftId, target.index, request.vehicules[target.index]);
       }
       if (target.kind === "vehicule") {
-        return productionApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
+        const draft = await productionApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
+        return syncDraftVehiculeAssistance(draftId, draft, target, targetAssistances[targetKey(target)]);
       }
       if (part === "info") {
         return productionApi.saveDraftRemorque(draftId, target.index, request.remorques[target.index]);
@@ -427,6 +430,9 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     onSuccess: async (draft, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
       const hydrated = hydrateDraft(draft);
+      if (variables.part === "garanties") {
+        setTargetAssistances(hydrated.targetAssistances);
+      }
       if (variables.target.kind === "vehicule") {
         const saved = draft.vehicules?.[variables.target.index];
         if (saved?.vehiculeId != null) {
@@ -769,6 +775,14 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     if (part === "garanties" && targetGaranties(request.garanties, target).length === 0) {
       nextErrors.garanties = "Au moins une garantie est obligatoire.";
     }
+    const assistance = targetAssistances[targetKey(target)];
+    if (part === "garanties" && target.kind === "vehicule" && assistance?.enabled) {
+      if (!assistance.compagnieAssistanceId) {
+        nextErrors.garanties = "Compagnie assistance obligatoire.";
+      } else if (!assistance.produitAssistanceId) {
+        nextErrors.garanties = "Produit assistance obligatoire.";
+      }
+    }
     setValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       toast.error(Object.values(nextErrors)[0] ?? "Section incomplète");
@@ -988,6 +1002,8 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setAssistanceEnabled,
     assistanceDraft,
     setAssistanceDraft,
+    targetAssistances,
+    setTargetAssistances,
     saisiePrimeNette,
     setSaisiePrimeNette,
     clients,
@@ -1179,12 +1195,57 @@ function scopedTargetRequest(request: CreateContratRequest, target: ContratTarge
   };
 }
 
+function targetKey(target: ContratTargetKey) {
+  return `${target.kind}:${target.index}`;
+}
+
 function targetGaranties(garanties: GarantieInput[], target: ContratTargetKey) {
   return garanties.filter((garantie) => (
     target.kind === "vehicule"
       ? garantie.vehiculeIndex === target.index
       : garantie.remorqueIndex === target.index
   ));
+}
+
+async function syncDraftVehiculeAssistance(
+  draftId: string,
+  draft: ContratSummary,
+  target: ContratTargetKey,
+  assistance?: AssistanceDraft
+) {
+  const vehiculeId = draft.vehicules?.[target.index]?.vehiculeId;
+  const existing = findDraftAssistanceForVehicule(draft, vehiculeId);
+  if (!assistance?.enabled) {
+    const assistanceId = assistance?.assistanceId ?? existing?.id;
+    if (!assistanceId) {
+      return draft;
+    }
+    await productionApi.deleteAssistance(draftId, String(assistanceId));
+    return productionApi.getContratDraft(draftId);
+  }
+  if (!vehiculeId) {
+    throw new Error("Enregistrez les informations véhicule avant l'assistance.");
+  }
+  if (!assistance.compagnieAssistanceId || !assistance.produitAssistanceId) {
+    throw new Error("Compagnie et produit assistance obligatoires.");
+  }
+  await productionApi.saveAssistance(draftId, {
+    vehiculeId: String(vehiculeId),
+    compagnieAssistanceId: assistance.compagnieAssistanceId,
+    produitAssistanceId: assistance.produitAssistanceId,
+    dateSouscription: emptyToUndefined(assistance.dateSouscription ?? ""),
+    dateEffet: emptyToUndefined(assistance.dateEffet ?? ""),
+    echeanceCode: emptyToUndefined(assistance.echeanceCode ?? ""),
+    numeroContratOuQuittance: emptyToUndefined(assistance.numeroContratOuQuittance ?? ""),
+  });
+  return productionApi.getContratDraft(draftId);
+}
+
+function findDraftAssistanceForVehicule(draft: ContratSummary, vehiculeId?: string | number | null) {
+  if (vehiculeId == null) {
+    return undefined;
+  }
+  return (draft.assistances ?? []).find((assistance) => String(assistance.vehiculeId ?? "") === String(vehiculeId));
 }
 
 function isTargetGarantie(garantie: GarantieInput, target: ContratTargetKey) {
@@ -1323,6 +1384,25 @@ function hydrateDraft(draft: ContratSummary) {
     franchiseMinimale: nullToUndefined(garantie.franchiseMinimale),
   } satisfies GarantieInput));
 
+  const targetAssistances: Record<string, AssistanceDraft> = {};
+  for (const assistance of draft.assistances ?? []) {
+    const vehiculeIndex = assistance.vehiculeId ? vehicleIdToIndex.get(assistance.vehiculeId) : undefined;
+    if (vehiculeIndex == null) {
+      continue;
+    }
+    targetAssistances[`vehicule:${vehiculeIndex}`] = {
+      assistanceId: idString(assistance.id),
+      enabled: true,
+      compagnieAssistanceId: idString(assistance.compagnieAssistanceId),
+      produitAssistanceId: idString(assistance.produitAssistanceId),
+      dateEffet: nullToUndefined(assistance.dateEffet),
+      dateSouscription: nullToUndefined(assistance.dateSouscription),
+      echeanceCode: nullToUndefined(assistance.echeanceCode),
+      dateEcheance: nullToUndefined(assistance.dateEcheance),
+      numeroContratOuQuittance: nullToUndefined(assistance.numeroContratOuQuittance),
+    };
+  }
+
   return {
     numeroContrat: draft.numeroContrat ?? "",
     numeroPolice: draft.numeroPolice ?? "",
@@ -1341,12 +1421,13 @@ function hydrateDraft(draft: ContratSummary) {
     crmPartage: Boolean(draft.crmPartage),
     crmPartageValeur: draft.crmPartageValeur ?? "",
     tauxRc: draft.tauxRc == null ? "" : String(draft.tauxRc),
-    assistanceEnabled: Boolean(draft.assistance),
+    assistanceEnabled: Boolean(draft.assistance) || Object.values(targetAssistances).some((assistance) => assistance.enabled),
     saisiePrimeNette: Boolean(draft.saisiePrimeNette),
     clients,
     vehicules,
     remorques,
     garanties,
+    targetAssistances,
     preview: quittanceGeneraleFromDraft(draft),
     targetPreview: targetQuittanceGeneraleFromDraft(draft),
   };

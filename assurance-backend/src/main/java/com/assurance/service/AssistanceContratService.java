@@ -163,6 +163,8 @@ public class AssistanceContratService {
         assistance.setPrimeTotale(primeTotale);
         assistance.setActif(true);
         assistance = assistanceContratRepository.save(assistance);
+        contrat.setAssistance(true);
+        contratRepository.save(contrat);
 
         ElementFacturable element = assistance.getElementFacturable();
         if (element == null) {
@@ -207,6 +209,8 @@ public class AssistanceContratService {
             elementFacturableRepository.save(assistance.getElementFacturable());
         }
         assistanceContratRepository.save(assistance);
+        contrat.setAssistance(assistanceContratRepository.countByContratIdAndActifTrue(contrat.getId()) > 0);
+        contratRepository.save(contrat);
     }
 
     private AssistanceContratResponse toResponse(AssistanceContrat assistance) {
@@ -304,7 +308,7 @@ public class AssistanceContratService {
                 .orElse(null);
     }
 
-    private int resolveAssistanceQuarterCount(LocalDate dateEffet, LocalDate dateEcheance) {
+    public static int resolveAssistanceQuarterCount(LocalDate dateEffet, LocalDate dateEcheance) {
         if (dateEffet == null || dateEcheance == null || dateEcheance.isBefore(dateEffet)) {
             return 4;
         }

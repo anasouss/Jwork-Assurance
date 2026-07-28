@@ -239,6 +239,8 @@ export function ContratFormLayout({
       onSaveDraft={form.handleSaveDraft}
       onSaveTargetDraft={form.handleSaveTargetDraft}
       onValidateTarget={form.validateTarget}
+      targetAssistances={form.targetAssistances}
+      setTargetAssistances={form.setTargetAssistances}
       setAssistanceEnabled={form.setAssistanceEnabled}
       assistanceCategorieClientId={assistanceCategorieClientId}
       crmPartage={form.crmPartage}

@@ -461,6 +461,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/produits-assistance/{id}/tarifs")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createTarifProduitAssistance(
             @PathVariable Long id,
             @Valid @RequestBody UpsertTarifProduitAssistanceRequest request
@@ -476,6 +477,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/produits-assistance/{produitId}/tarifs/{tarifId}")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifProduitAssistance(
             @PathVariable Long produitId,
             @PathVariable Long tarifId,
@@ -496,6 +498,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/produits-assistance/{produitId}/tarifs/{tarifId}")
+    @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteTarifProduitAssistance(
             @PathVariable Long produitId,
             @PathVariable Long tarifId

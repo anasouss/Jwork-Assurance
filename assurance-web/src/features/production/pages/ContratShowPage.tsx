@@ -426,7 +426,7 @@ async function openElementAsPdf(element: HTMLElement, filename: string) {
   ]);
   const canvas = await html2canvas(element, {
     backgroundColor: "#ffffff",
-    onclone: (_document, clonedElement) => sanitizePdfClone(clonedElement as HTMLElement),
+    onclone: (clonedDocument, clonedElement) => sanitizePdfClone(clonedDocument, clonedElement as HTMLElement),
     scale: 2,
     useCORS: true,
   });
@@ -466,8 +466,77 @@ async function openElementAsPdf(element: HTMLElement, filename: string) {
   }
 }
 
-function sanitizePdfClone(root: HTMLElement) {
-  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))];
+function sanitizePdfClone(document: Document, root: HTMLElement) {
+  const style = document.createElement("style");
+  style.textContent = `
+    :root, html, body, [data-pdf-sheet="true"] {
+      background: #ffffff !important;
+      color: #020617 !important;
+      color-scheme: light !important;
+      --background: #ffffff !important;
+      --foreground: #020617 !important;
+      --card: #ffffff !important;
+      --card-foreground: #020617 !important;
+      --popover: #ffffff !important;
+      --popover-foreground: #020617 !important;
+      --primary: #059669 !important;
+      --primary-foreground: #ffffff !important;
+      --secondary: #f1f5f9 !important;
+      --secondary-foreground: #020617 !important;
+      --muted: #f1f5f9 !important;
+      --muted-foreground: #475569 !important;
+      --accent: #f1f5f9 !important;
+      --accent-foreground: #020617 !important;
+      --destructive: #dc2626 !important;
+      --border: #e2e8f0 !important;
+      --input: #cbd5e1 !important;
+      --ring: #94a3b8 !important;
+    }
+    *, *::before, *::after {
+      border-color: #e2e8f0 !important;
+      box-shadow: none !important;
+      outline-color: #94a3b8 !important;
+      text-decoration-color: #020617 !important;
+      text-shadow: none !important;
+      --tw-ring-color: #94a3b8 !important;
+      --tw-ring-offset-color: #ffffff !important;
+      --tw-shadow-color: transparent !important;
+      --tw-shadow: 0 0 transparent !important;
+      --tw-ring-shadow: 0 0 transparent !important;
+      --tw-inset-shadow: 0 0 transparent !important;
+    }
+    [data-pdf-sheet="true"], [data-pdf-sheet="true"] .bg-white {
+      background-color: #ffffff !important;
+    }
+    [data-pdf-sheet="true"] .bg-slate-100,
+    [data-pdf-sheet="true"] thead,
+    [data-pdf-sheet="true"] thead * {
+      background-color: #f1f5f9 !important;
+    }
+    [data-pdf-sheet="true"] .text-slate-500 {
+      color: #64748b !important;
+    }
+    [data-pdf-sheet="true"] .text-slate-600,
+    [data-pdf-sheet="true"] .text-slate-700 {
+      color: #475569 !important;
+    }
+    [data-pdf-sheet="true"] .text-emerald-700 {
+      color: #047857 !important;
+    }
+    [data-pdf-sheet="true"] .border-slate-900 {
+      border-color: #0f172a !important;
+    }
+    [data-pdf-sheet="true"] .border-emerald-600 {
+      border-left-color: #059669 !important;
+    }
+  `;
+  document.head.appendChild(style);
+  document.documentElement.style.backgroundColor = "#ffffff";
+  document.documentElement.style.color = "#020617";
+  document.body.style.backgroundColor = "#ffffff";
+  document.body.style.color = "#020617";
+
+  const elements = [document.documentElement, document.body, root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))];
   for (const element of elements) {
     const className = typeof element.className === "string" ? element.className : "";
     element.style.color = "#020617";

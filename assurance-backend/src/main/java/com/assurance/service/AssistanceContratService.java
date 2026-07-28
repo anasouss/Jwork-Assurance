@@ -140,7 +140,22 @@ public class AssistanceContratService {
 
         AssistanceContrat assistance = assistanceContratRepository
                 .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contrat.getId(), vehicule.getId())
-                .orElseGet(AssistanceContrat::new);
+                .orElse(null);
+        if (assistance != null
+                && mouvement != null
+                && (assistance.getMouvementContrat() == null
+                    || !mouvement.getId().equals(assistance.getMouvementContrat().getId()))) {
+            assistance.setActif(false);
+            if (assistance.getElementFacturable() != null) {
+                assistance.getElementFacturable().setActif(false);
+                elementFacturableRepository.save(assistance.getElementFacturable());
+            }
+            assistanceContratRepository.save(assistance);
+            assistance = null;
+        }
+        if (assistance == null) {
+            assistance = new AssistanceContrat();
+        }
         assistance.setContrat(contrat);
         assistance.setMouvementContrat(mouvement);
         assistance.setVehicule(vehicule);

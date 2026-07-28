@@ -2,6 +2,8 @@ package com.assurance.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -33,6 +35,9 @@ public class AvenantRequest {
     @Valid
     private List<CreateContratRequest.GarantieInput> garanties;
 
+    @Valid
+    private List<AssistanceInput> assistances;
+
     @Data
     public static class TargetPrecision {
         private Long vehiculeId;
@@ -40,5 +45,25 @@ public class AvenantRequest {
         private String immatriculation;
         private String immatriculationProvisoire;
         private String numeroAttestation;
+    }
+
+    @Data
+    public static class AssistanceInput {
+        private Long assistanceId;
+
+        @NotNull
+        @PositiveOrZero
+        private Integer vehiculeIndex;
+
+        private Boolean enabled = true;
+        private Long compagnieAssistanceId;
+
+        private Long produitAssistanceId;
+
+        private LocalDate dateSouscription;
+        private LocalDate dateEffet;
+        private String echeanceCode;
+        private String numeroContratOuQuittance;
+        private String typeQuittance;
     }
 }

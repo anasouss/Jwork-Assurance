@@ -276,6 +276,18 @@ export type AvenantRequest = {
   vehicules?: VehiculeInput[];
   remorques?: RemorqueInput[];
   garanties?: GarantieInput[];
+  assistances?: {
+    assistanceId?: string;
+    vehiculeIndex: number;
+    enabled?: boolean;
+    compagnieAssistanceId?: string;
+    produitAssistanceId?: string;
+    dateSouscription?: string;
+    dateEffet?: string;
+    echeanceCode?: string;
+    numeroContratOuQuittance?: string;
+    typeQuittance?: string;
+  }[];
 };
 
 export type AvenantDraft = {
@@ -458,6 +470,7 @@ export type QuittanceInput = {
 export type AssistanceDraft = {
   assistanceId?: string;
   enabled: boolean;
+  modified?: boolean;
   compagnieAssistanceId?: string;
   produitAssistanceId?: string;
   dateEffet?: string;

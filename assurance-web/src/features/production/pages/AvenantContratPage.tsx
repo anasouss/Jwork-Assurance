@@ -18,7 +18,7 @@ import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfig
 import { FlotteTargetsSection } from "../contrat-creation/FlotteTargetsSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { toDateOnly } from "../date";
-import type { AvenantRequest, ContratSummary, GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
+import type { AssistanceDraft, AvenantRequest, ContratSummary, GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
   kind: "vehicule" | "remorque";
@@ -85,6 +85,7 @@ export default function AvenantContratPage() {
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
+  const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof productionApi.previewAvenant>> | null>(null);
   const [targetPreview, setTargetPreview] = useState<Awaited<ReturnType<typeof productionApi.previewAvenant>> | null>(null);
   const [grilleConfiguratorOpen, setGrilleConfiguratorOpen] = useState(false);
@@ -131,8 +132,14 @@ export default function AvenantContratPage() {
       .filter((item) => !Boolean(item.renouvelleContrat)),
     [contextQuery.data?.mouvementsDisponibles]
   );
+  const movementDefinition = availableMovements.find((item) => normalizeCode(item.code) === movementCode);
   const movementAvailable = availableMovements.some((item) => normalizeCode(item.code) === movementCode);
+  const showAvenantAssistance = Boolean(movementDefinition?.autoriseAssistance);
   const contratKindLabel = contrat?.typeContrat === "FLOTTE" ? "flotte" : contrat?.typeContrat === "CONVENTION" ? "convention" : "mono";
+  const assistanceCategorieClientId = useMemo(
+    () => resolveAssistanceCategorieClientId(contrat),
+    [contrat]
+  );
   const targets = useMemo<Target[]>(() => [
     ...(contrat?.vehicules ?? []).map((item, index) => ({
       kind: "vehicule" as const,
@@ -210,6 +217,7 @@ export default function AvenantContratPage() {
       setVehicules([{ ...DEFAULT_VEHICLE }]);
       setRemorques([]);
       setSelectedGaranties([]);
+      setTargetAssistances({});
     }
     if (movementCode === "EXR_M") {
       setVehicules([]);
@@ -276,6 +284,7 @@ export default function AvenantContratPage() {
     setVehicules(mappedVehicules.length ? mappedVehicules : [{ ...DEFAULT_VEHICLE }]);
     setRemorques(mappedRemorques);
     setSelectedGaranties(mapCurrentGaranties(contrat.garanties ?? [], mappedVehicules, mappedRemorques));
+    setTargetAssistances(mapCurrentAssistances(contrat.assistances ?? [], mappedVehicules));
   }, [contrat, movementCode]);
 
   useEffect(() => {
@@ -292,6 +301,16 @@ export default function AvenantContratPage() {
     setVehicules(request.vehicules?.length ? request.vehicules : movementCode === "EXR_M" ? [] : [{ ...DEFAULT_VEHICLE }]);
     setRemorques(request.remorques?.length ? request.remorques : movementCode === "EXR_M" ? [{}] : []);
     setSelectedGaranties(request.garanties ?? []);
+    const currentAssistances = isGuaranteeModificationCode(movementCode)
+      ? mapCurrentAssistances(
+          contrat?.assistances ?? [],
+          (contrat?.vehicules ?? []).map((vehicule) => ({ vehiculeId: vehicule.vehiculeId }))
+        )
+      : {};
+    setTargetAssistances({
+      ...currentAssistances,
+      ...hydrateAvenantAssistances(request.assistances),
+    });
     setSelectedTargetIds([
       ...(request.vehiculeIds ?? []).map((id) => `vehicule:${id}`),
       ...(request.remorqueIds ?? []).map((id) => `remorque:${id}`),
@@ -376,9 +395,14 @@ export default function AvenantContratPage() {
         request.remorques.length,
         garanties.data ?? []
       );
+      request.assistances = buildAvenantAssistances(targetAssistances);
     }
     if (isGuaranteeModificationCode(movementCode)) {
       request.garanties = draftGaranties;
+      request.assistances = buildAvenantAssistances(targetAssistances, {
+        includeDisabled: true,
+        onlyModified: true,
+      });
     }
     if (movementCode === "EXR_M") {
       request.remorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
@@ -432,6 +456,12 @@ export default function AvenantContratPage() {
       request.vehicules = normalizedVehicules;
       request.remorques = normalizedRemorques;
       request.garanties = garantiesRequest;
+      const assistanceError = assistanceValidationMessage(targetAssistances);
+      if (assistanceError) {
+        notify(assistanceError);
+        return null;
+      }
+      request.assistances = buildAvenantAssistances(targetAssistances);
     }
     if (isGuaranteeModificationCode(movementCode)) {
       if (!hasActiveTargets) {
@@ -443,6 +473,10 @@ export default function AvenantContratPage() {
         return null;
       }
       request.garanties = currentGaranties;
+      request.assistances = buildAvenantAssistances(targetAssistances, {
+        includeDisabled: true,
+        onlyModified: true,
+      });
     }
     if (movementCode === "EXR_M") {
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
@@ -537,6 +571,9 @@ export default function AvenantContratPage() {
       request.vehicules = normalizedVehicules;
       request.remorques = normalizedRemorques;
       request.garanties = garantiesRequest;
+      request.assistances = target.kind === "vehicule"
+        ? buildAvenantAssistancesForTarget(targetAssistances, target.index)
+        : [];
       return request;
     }
     if (movementCode === "EXR_M") {
@@ -558,7 +595,7 @@ export default function AvenantContratPage() {
     if (isTargetCreationCode(movementCode)) {
       const key = request
         ? JSON.stringify(request)
-        : JSON.stringify({ movementCode, dateEffet, dateEcheance, vehicules, remorques, selectedGaranties });
+        : JSON.stringify({ movementCode, dateEffet, dateEcheance, vehicules, remorques, selectedGaranties, targetAssistances });
       if (manualPreviewKeyRef.current && manualPreviewKeyRef.current !== key) {
         setPreview(null);
       }
@@ -594,6 +631,7 @@ export default function AvenantContratPage() {
     vehicules,
     remorques,
     selectedGaranties,
+    targetAssistances,
   ]);
 
   useEffect(() => {
@@ -618,6 +656,7 @@ export default function AvenantContratPage() {
     vehicules,
     remorques,
     selectedGaranties,
+    targetAssistances,
   ]);
 
   const save = () => {
@@ -663,6 +702,15 @@ export default function AvenantContratPage() {
       if (!hasSelectedGarantie) {
         toast.error("Sélectionnez au moins une garantie pour cette cible");
         return false;
+      }
+      if (target.kind === "vehicule") {
+        const assistanceError = assistanceValidationMessage({
+          [`vehicule:${target.index}`]: targetAssistances[`vehicule:${target.index}`] ?? { enabled: false },
+        });
+        if (assistanceError) {
+          toast.error(assistanceError);
+          return false;
+        }
       }
     }
     return true;
@@ -835,7 +883,10 @@ export default function AvenantContratPage() {
           crmPartage={Boolean(contrat?.crmPartage)}
           crmPartageValeur={contrat?.crmPartageValeur ?? ""}
           maxRemorques={null}
-          showAssistance={false}
+          targetAssistances={targetAssistances}
+          setTargetAssistances={setTargetAssistances}
+          showAssistance={showAvenantAssistance}
+          assistanceCategorieClientId={assistanceCategorieClientId}
           showInfoSections={movementCode === "INC_F" || movementCode === "EXR_M"}
           allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
           onValidateTarget={isTargetCreationCode(movementCode) ? validateTargetCreation : undefined}
@@ -1012,6 +1063,115 @@ function normalizeVehicle(
 
 function normalizeRemorque(remorque: RemorqueInput, dateEffet?: string, dateEcheance?: string): RemorqueInput {
   return { ...remorque, dateEffet, dateEcheance };
+}
+
+function buildAvenantAssistances(
+  assistances: Record<string, AssistanceDraft>,
+  options: { includeDisabled?: boolean; onlyModified?: boolean } = {}
+): NonNullable<AvenantRequest["assistances"]> {
+  return Object.entries(assistances).flatMap(([key, assistance]) => {
+    const match = key.match(/^vehicule:(\d+)$/);
+    if (!match
+        || (!options.includeDisabled && !assistance.enabled)
+        || (options.onlyModified && !assistance.modified)) {
+      return [];
+    }
+    return [{
+      assistanceId: assistance.assistanceId,
+      vehiculeIndex: Number(match[1]),
+      enabled: assistance.enabled,
+      compagnieAssistanceId: assistance.compagnieAssistanceId,
+      produitAssistanceId: assistance.produitAssistanceId,
+      dateSouscription: assistance.dateSouscription,
+      dateEffet: assistance.dateEffet,
+      echeanceCode: assistance.echeanceCode,
+      numeroContratOuQuittance: assistance.numeroContratOuQuittance,
+      typeQuittance: "AVENANT",
+    }];
+  });
+}
+
+function buildAvenantAssistancesForTarget(
+  assistances: Record<string, AssistanceDraft>,
+  vehiculeIndex: number
+): NonNullable<AvenantRequest["assistances"]> {
+  return buildAvenantAssistances({
+    "vehicule:0": assistances[`vehicule:${vehiculeIndex}`] ?? { enabled: false },
+  }).filter((assistance) => assistance.compagnieAssistanceId && assistance.produitAssistanceId);
+}
+
+function hydrateAvenantAssistances(
+  assistances?: AvenantRequest["assistances"]
+): Record<string, AssistanceDraft> {
+  const hydrated: Record<string, AssistanceDraft> = {};
+  for (const assistance of assistances ?? []) {
+    hydrated[`vehicule:${assistance.vehiculeIndex}`] = {
+      assistanceId: assistance.assistanceId,
+      enabled: assistance.enabled !== false,
+      modified: true,
+      compagnieAssistanceId: assistance.compagnieAssistanceId,
+      produitAssistanceId: assistance.produitAssistanceId,
+      dateSouscription: assistance.dateSouscription,
+      dateEffet: assistance.dateEffet,
+      echeanceCode: assistance.echeanceCode,
+      numeroContratOuQuittance: assistance.numeroContratOuQuittance,
+    };
+  }
+  return hydrated;
+}
+
+function mapCurrentAssistances(
+  assistances: NonNullable<ContratSummary["assistances"]>,
+  vehicules: VehiculeInput[]
+): Record<string, AssistanceDraft> {
+  const mapped: Record<string, AssistanceDraft> = {};
+  for (const assistance of assistances) {
+    const vehiculeIndex = assistance.vehiculeId
+      ? vehicules.findIndex((vehicule) => String(vehicule.vehiculeId) === String(assistance.vehiculeId))
+      : -1;
+    if (vehiculeIndex < 0) {
+      continue;
+    }
+    mapped[`vehicule:${vehiculeIndex}`] = {
+      assistanceId: assistance.id,
+      enabled: true,
+      modified: false,
+      compagnieAssistanceId: assistance.compagnieAssistanceId ?? undefined,
+      produitAssistanceId: assistance.produitAssistanceId ?? undefined,
+      dateSouscription: assistance.dateSouscription ?? undefined,
+      dateEffet: assistance.dateEffet ?? undefined,
+      echeanceCode: assistance.echeanceCode ?? undefined,
+      dateEcheance: assistance.dateEcheance ?? undefined,
+      numeroContratOuQuittance: assistance.numeroContratOuQuittance ?? undefined,
+    };
+  }
+  return mapped;
+}
+
+function assistanceValidationMessage(assistances: Record<string, AssistanceDraft>) {
+  for (const assistance of Object.values(assistances)) {
+    if (!assistance.enabled || (assistance.modified === false && assistance.assistanceId)) {
+      continue;
+    }
+    if (!assistance.compagnieAssistanceId) {
+      return "La compagnie d'assistance est obligatoire";
+    }
+    if (!assistance.produitAssistanceId) {
+      return "Le produit d'assistance est obligatoire";
+    }
+  }
+  return null;
+}
+
+function resolveAssistanceCategorieClientId(contrat?: ContratSummary) {
+  const clients = contrat?.clients ?? [];
+  const preferredRole = contrat?.typeContrat === "FLOTTE" ? "PROPRIETAIRE" : "SOUSCRIPTEUR";
+  const preferred = clients
+    .filter((link) => link.role === preferredRole)
+    .sort((left, right) => Number(Boolean(right.principalPourRole)) - Number(Boolean(left.principalPourRole)))
+    .find((link) => link.client?.categorieClientId);
+  const fallback = clients.find((link) => link.role === "SOUSCRIPTEUR" && link.client?.categorieClientId);
+  return preferred?.client?.categorieClientId ?? fallback?.client?.categorieClientId;
 }
 
 function vehicleValidationMessage(vehicle: VehiculeInput | undefined, usages: ReferenceOption[]) {

@@ -31,6 +31,7 @@ public class QuittanceResponse {
     private BigDecimal primeTotale;
     private List<Ligne> lignes;
     private List<GarantieLigne> garanties;
+    private List<AssistanceContratResponse> assistances;
     private List<TargetSummary> targetSummaries;
 
     @Data

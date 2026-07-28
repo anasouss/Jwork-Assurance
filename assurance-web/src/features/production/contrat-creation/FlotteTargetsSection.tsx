@@ -251,7 +251,7 @@ export function FlotteTargetsSection({
     setAssistances((current) => {
       const key = targetKey(target);
       const draft = current[key] ?? { enabled: false };
-      const nextForTarget = { ...draft, ...patch };
+      const nextForTarget = { ...draft, ...patch, modified: true };
       const next = { ...current, [key]: nextForTarget };
       setAssistanceEnabled?.(Object.values(next).some((item) => item.enabled));
       return next;
@@ -323,6 +323,11 @@ export function FlotteTargetsSection({
               : item
           )
       );
+      setAssistances((current) => {
+        const next = remapAssistancesAfterVehicleRemoval(current, target.index);
+        setAssistanceEnabled?.(Object.values(next).some((item) => item.enabled));
+        return next;
+      });
     }
     if (target.kind === "remorque") {
       setRemorques((current) => current.filter((_, index) => index !== target.index));
@@ -956,6 +961,26 @@ function targetAssistanceNet(assistance: AssistanceDraft | undefined, produitsAs
   }
   const product = produitsAssistance.find((item) => item.id === assistance.produitAssistanceId);
   return resolveAssistanceTariffAmount(product, tarifs, assistance.dateSouscription, "montantTtc");
+}
+
+function remapAssistancesAfterVehicleRemoval(
+  assistances: Record<string, AssistanceDraft>,
+  removedIndex: number
+) {
+  const next: Record<string, AssistanceDraft> = {};
+  for (const [key, assistance] of Object.entries(assistances)) {
+    const match = key.match(/^vehicule:(\d+)$/);
+    if (!match) {
+      next[key] = assistance;
+      continue;
+    }
+    const index = Number(match[1]);
+    if (index === removedIndex) {
+      continue;
+    }
+    next[`vehicule:${index > removedIndex ? index - 1 : index}`] = assistance;
+  }
+  return next;
 }
 
 function previewGuaranteeLine(

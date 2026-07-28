@@ -4,6 +4,7 @@ import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.MouvementContratRequest;
+import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
@@ -64,6 +65,7 @@ public class ContratService {
     private final CategorieTransportRepository categorieTransportRepository;
     private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
     private final AssistanceContratRepository assistanceContratRepository;
+    private final AssistanceContratService assistanceContratService;
     private final ClientService clientService;
     private final CalculGarantieService calculGarantieService;
     private final QuittanceCalculService quittanceCalculService;
@@ -1859,6 +1861,7 @@ public class ContratService {
     public QuittanceResponse creerAvenant(Long agenceId, Long contratId, AvenantRequest request) {
         if (isModificationGarantiesAvenant(request)) {
             AvenantModificationGraph graph = resolveModificationGarantiesAvenant(agenceId, contratId, request, true);
+            validateAvenantAssistances(request, graph.vehicules());
             QuittanceResponse quittance = mouvementContratService.creerMouvementSpecialise(
                     graph.contrat(),
                     graph.typeMouvement(),
@@ -1869,6 +1872,12 @@ public class ContratService {
                     NatureSnapshotMouvement.COURANT,
                     graph.differentiel()
             );
+            quittance.setAssistances(persistAvenantAssistances(
+                    graph.contrat(),
+                    graph.vehicules(),
+                    request,
+                    quittance.getMouvementContratId()
+            ));
             deleteAvenantDraft(contratId, request);
             return quittance;
         }
@@ -1894,6 +1903,12 @@ public class ContratService {
                         graph.snapshotNature(),
                         retourPrime
                 );
+        quittance.setAssistances(persistAvenantAssistances(
+                graph.contrat(),
+                graph.vehicules(),
+                request,
+                quittance.getMouvementContratId()
+        ));
         applyAvenantCurrentState(graph, request);
         deleteAvenantDraft(contratId, request);
         return quittance;
@@ -1951,7 +1966,79 @@ public class ContratService {
         if (targets.garanties().isEmpty()) {
             throw new BadRequestException("Au moins une garantie est obligatoire pour l'incorporation");
         }
+        validateAvenantAssistances(request, targets.vehicules());
         return new AvenantGraph(contrat, typeMouvement, targets.vehicules(), targets.remorques(), targets.garanties(), NatureSnapshotMouvement.AJOUT);
+    }
+
+    private void validateAvenantAssistances(AvenantRequest request, List<Vehicule> vehicules) {
+        for (AvenantRequest.AssistanceInput input : request.getAssistances() == null
+                ? List.<AvenantRequest.AssistanceInput>of()
+                : request.getAssistances()) {
+            if (input.getVehiculeIndex() == null
+                    || input.getVehiculeIndex() < 0
+                    || input.getVehiculeIndex() >= vehicules.size()) {
+                throw new BadRequestException("L'assistance cible un vehicule invalide");
+            }
+            if (!Boolean.FALSE.equals(input.getEnabled())
+                    && (input.getCompagnieAssistanceId() == null || input.getProduitAssistanceId() == null)) {
+                throw new BadRequestException("La compagnie et le produit d'assistance sont obligatoires");
+            }
+        }
+    }
+
+    private List<AssistanceContratResponse> persistAvenantAssistances(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            AvenantRequest request,
+            Long mouvementContratId
+    ) {
+        List<AvenantRequest.AssistanceInput> inputs = request.getAssistances() == null
+                ? List.of()
+                : request.getAssistances();
+        if (inputs.isEmpty()) {
+            return List.of();
+        }
+        if (mouvementContratId == null) {
+            throw new BadRequestException("Le mouvement de l'avenant est requis pour enregistrer l'assistance");
+        }
+        List<AssistanceContratResponse> responses = new ArrayList<>();
+        for (AvenantRequest.AssistanceInput input : inputs) {
+            if (input.getVehiculeIndex() == null
+                    || input.getVehiculeIndex() < 0
+                    || input.getVehiculeIndex() >= vehicules.size()) {
+                throw new BadRequestException("L'assistance cible un vehicule invalide");
+            }
+            Vehicule vehicule = vehicules.get(input.getVehiculeIndex());
+            if (Boolean.FALSE.equals(input.getEnabled())) {
+                if (input.getAssistanceId() != null) {
+                    assistanceContratService.deactivate(
+                            contrat.getAgence().getId(),
+                            contrat.getId(),
+                            input.getAssistanceId()
+                    );
+                }
+                continue;
+            }
+            if (input.getCompagnieAssistanceId() == null || input.getProduitAssistanceId() == null) {
+                throw new BadRequestException("La compagnie et le produit d'assistance sont obligatoires");
+            }
+            UpsertAssistanceContratRequest assistanceRequest = new UpsertAssistanceContratRequest();
+            assistanceRequest.setMouvementContratId(mouvementContratId);
+            assistanceRequest.setVehiculeId(vehicule.getId());
+            assistanceRequest.setCompagnieAssistanceId(input.getCompagnieAssistanceId());
+            assistanceRequest.setProduitAssistanceId(input.getProduitAssistanceId());
+            assistanceRequest.setDateSouscription(input.getDateSouscription());
+            assistanceRequest.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+            assistanceRequest.setEcheanceCode(input.getEcheanceCode());
+            assistanceRequest.setNumeroContratOuQuittance(input.getNumeroContratOuQuittance());
+            assistanceRequest.setTypeQuittance(hasText(input.getTypeQuittance()) ? input.getTypeQuittance() : "AVENANT");
+            responses.add(assistanceContratService.upsert(
+                    contrat.getAgence().getId(),
+                    contrat.getId(),
+                    assistanceRequest
+            ));
+        }
+        return responses;
     }
 
     private AvenantGraph resolveRetraitAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request) {

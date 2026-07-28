@@ -76,7 +76,7 @@ export default function ContratShowPage() {
         </div>
       </div>
 
-      <div ref={sheetRef} className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      <div ref={sheetRef} data-pdf-sheet="true" className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <header className="border-b-2 border-slate-900 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -426,6 +426,7 @@ async function openElementAsPdf(element: HTMLElement, filename: string) {
   ]);
   const canvas = await html2canvas(element, {
     backgroundColor: "#ffffff",
+    onclone: (_document, clonedElement) => sanitizePdfClone(clonedElement as HTMLElement),
     scale: 2,
     useCORS: true,
   });
@@ -462,6 +463,52 @@ async function openElementAsPdf(element: HTMLElement, filename: string) {
     URL.revokeObjectURL(blobUrl);
   } else {
     window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  }
+}
+
+function sanitizePdfClone(root: HTMLElement) {
+  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))];
+  for (const element of elements) {
+    const className = typeof element.className === "string" ? element.className : "";
+    element.style.color = "#020617";
+    element.style.backgroundColor = "transparent";
+    element.style.borderColor = "#e2e8f0";
+    element.style.borderTopColor = "#e2e8f0";
+    element.style.borderRightColor = "#e2e8f0";
+    element.style.borderBottomColor = "#e2e8f0";
+    element.style.borderLeftColor = "#e2e8f0";
+    element.style.boxShadow = "none";
+    element.style.caretColor = "#020617";
+    element.style.outlineColor = "#94a3b8";
+    element.style.textDecorationColor = "#020617";
+
+    if (element === root || className.includes("bg-white")) {
+      element.style.backgroundColor = "#ffffff";
+    }
+    if (className.includes("bg-slate-100") || element.tagName === "THEAD" || Boolean(element.closest("thead"))) {
+      element.style.backgroundColor = "#f1f5f9";
+    }
+    if (className.includes("text-slate-500")) {
+      element.style.color = "#64748b";
+    }
+    if (className.includes("text-slate-600") || className.includes("text-slate-700")) {
+      element.style.color = "#475569";
+    }
+    if (className.includes("text-emerald-700")) {
+      element.style.color = "#047857";
+    }
+    if (className.includes("border-slate-900")) {
+      element.style.borderColor = "#0f172a";
+      element.style.borderBottomColor = "#0f172a";
+    }
+    if (className.includes("border-emerald-600")) {
+      element.style.borderLeftColor = "#059669";
+    }
+  }
+
+  for (const svg of root.querySelectorAll<SVGElement>("svg")) {
+    svg.style.color = "#020617";
+    svg.style.setProperty("stroke", "#020617");
   }
 }
 

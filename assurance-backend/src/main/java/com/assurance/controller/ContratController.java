@@ -255,7 +255,7 @@ public class ContratController {
     public ResponseEntity<ApiResponse<AvenantContextResponse>> contexteAvenant(@PathVariable Long id) {
         ContratActionsResponse actions = contratActionService.getActions(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(AvenantContextResponse.builder()
-                .contrat(contratService.get(TenantContext.getCurrentAgence(), id))
+                .contrat(contratService.getAvenantContext(TenantContext.getCurrentAgence(), id))
                 .mouvementsDisponibles(actions.getMouvementsDisponibles())
                 .build()));
     }

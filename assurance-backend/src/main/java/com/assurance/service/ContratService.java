@@ -1489,6 +1489,13 @@ public class ContratService {
     }
 
     @Transactional
+    public ContratResponse getAvenantContext(Long agenceId, Long contratId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)), true, null, false);
+    }
+
+    @Transactional
     public void deleteContrat(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
@@ -1518,6 +1525,7 @@ public class ContratService {
             throw new BadRequestException("L'affaire nouvelle ne se supprime pas depuis les actions. Supprimez le contrat brouillon ou creez un avenant d'annulation.");
         }
         assertNoBlockingMovementReferences(mouvement.getId());
+        rollbackCurrentStateForMovementDeletion(mouvement);
         deleteMovementGeneratedData(mouvement.getId());
         contrat.getMouvements().removeIf(item -> mouvement.getId().equals(item.getId()));
         mouvementContratRepository.delete(mouvement);
@@ -1569,6 +1577,71 @@ public class ContratService {
         mouvementGarantieRepository.deleteByMouvementContratId(mouvementId);
         mouvementRemorqueRepository.deleteByMouvementContratId(mouvementId);
         mouvementVehiculeRepository.deleteByMouvementContratId(mouvementId);
+    }
+
+    private void rollbackCurrentStateForMovementDeletion(MouvementContrat mouvement) {
+        if (mouvement == null || mouvement.getId() == null) {
+            return;
+        }
+        List<MouvementVehicule> vehiculeSnapshots = mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId());
+        List<MouvementRemorque> remorqueSnapshots = mouvementRemorqueRepository.findByMouvementContratId(mouvement.getId());
+        List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository.findByMouvementContratId(mouvement.getId());
+
+        List<Vehicule> vehiculesToSave = new ArrayList<>();
+        for (MouvementVehicule snapshot : vehiculeSnapshots) {
+            if (snapshot.getVehicule() == null) {
+                continue;
+            }
+            Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
+            if (actif != null) {
+                snapshot.getVehicule().setActif(actif);
+                vehiculesToSave.add(snapshot.getVehicule());
+            }
+        }
+        if (!vehiculesToSave.isEmpty()) {
+            vehiculeRepository.saveAll(vehiculesToSave);
+        }
+
+        List<Remorque> remorquesToSave = new ArrayList<>();
+        for (MouvementRemorque snapshot : remorqueSnapshots) {
+            if (snapshot.getRemorque() == null) {
+                continue;
+            }
+            Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
+            if (actif != null) {
+                snapshot.getRemorque().setActif(actif);
+                remorquesToSave.add(snapshot.getRemorque());
+            }
+        }
+        if (!remorquesToSave.isEmpty()) {
+            remorqueRepository.saveAll(remorquesToSave);
+        }
+
+        List<ContratGarantie> garantiesToSave = new ArrayList<>();
+        for (MouvementGarantie snapshot : garantieSnapshots) {
+            if (snapshot.getContratGarantie() == null) {
+                continue;
+            }
+            Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
+            if (actif != null) {
+                snapshot.getContratGarantie().setActif(actif);
+                garantiesToSave.add(snapshot.getContratGarantie());
+            }
+        }
+        if (!garantiesToSave.isEmpty()) {
+            contratGarantieRepository.saveAll(garantiesToSave);
+        }
+        updateTargetCounts(mouvement.getContrat());
+    }
+
+    private Boolean actifApresSuppressionSnapshot(NatureSnapshotMouvement nature) {
+        if (nature == NatureSnapshotMouvement.RETRAIT) {
+            return true;
+        }
+        if (nature == NatureSnapshotMouvement.AJOUT) {
+            return false;
+        }
+        return null;
     }
 
     private void refreshContratStatusAfterMovementDeletion(Contrat contrat) {
@@ -1814,6 +1887,9 @@ public class ContratService {
         List<Vehicule> vehicules = activeVehicules(contrat);
         List<Remorque> remorques = activeRemorques(contrat);
         List<ContratGarantie> anciennesGaranties = activeGaranties(contrat);
+        if (vehicules.isEmpty() && remorques.isEmpty()) {
+            throw new BadRequestException("Aucune cible active disponible pour cet avenant");
+        }
         CreateContratRequest createRequest = avenantCreateRequest(contrat, request);
         List<ContratGarantie> nouvellesGaranties = buildGarantiesPreview(createRequest, contrat, vehicules, remorques);
         if (nouvellesGaranties.isEmpty()) {
@@ -2473,10 +2549,14 @@ public class ContratService {
     }
 
     private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries) {
-        return toResponse(contrat, includeTargetSummaries, null);
+        return toResponse(contrat, includeTargetSummaries, null, true);
     }
 
     private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries, Long selectedMouvementId) {
+        return toResponse(contrat, includeTargetSummaries, selectedMouvementId, true);
+    }
+
+    private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries, Long selectedMouvementId, boolean fallbackInactiveForView) {
         List<ContratResponse.ClientLink> clients = new ArrayList<>();
         for (ContratClient link : contrat.getClients()) {
             clients.add(ContratResponse.ClientLink.builder()
@@ -2489,9 +2569,9 @@ public class ContratService {
         }
 
         List<ContratResponse.VehiculeView> vehicules = new ArrayList<>();
-        List<Vehicule> vehiculesActifs = activeVehiculesForView(contrat);
-        List<Remorque> remorquesActives = activeRemorquesForView(contrat);
-        List<ContratGarantie> garantiesActives = activeGarantiesForView(contrat);
+        List<Vehicule> vehiculesActifs = fallbackInactiveForView ? activeVehiculesForView(contrat) : activeVehicules(contrat);
+        List<Remorque> remorquesActives = fallbackInactiveForView ? activeRemorquesForView(contrat) : activeRemorques(contrat);
+        List<ContratGarantie> garantiesActives = fallbackInactiveForView ? activeGarantiesForView(contrat) : activeGaranties(contrat);
 
         for (Vehicule vehicule : vehiculesActifs) {
             vehicules.add(ContratResponse.VehiculeView.builder()

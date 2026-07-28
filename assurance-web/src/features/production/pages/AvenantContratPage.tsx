@@ -117,6 +117,7 @@ export default function AvenantContratPage() {
       usage: item.usageLibelle ?? item.usageCode,
     })),
   ], [contrat?.remorques, contrat?.vehicules]);
+  const hasActiveTargets = targets.length > 0;
   const grilleTarifaireId = contrat?.grilleTarifaireId ? String(contrat.grilleTarifaireId) : undefined;
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId, "avenant-contrat"],
@@ -279,6 +280,10 @@ export default function AvenantContratPage() {
       request.garanties = selectedGaranties;
     }
     if (isGuaranteeModificationCode(movementCode)) {
+      if (!hasActiveTargets) {
+        notify("Aucune cible active disponible pour cet avenant");
+        return null;
+      }
       if (selectedGaranties.length === 0) {
         notify("Sélectionnez au moins une garantie");
         return null;
@@ -392,7 +397,7 @@ export default function AvenantContratPage() {
           <p className="text-sm text-muted-foreground">{contrat?.numeroDossier ?? contrat?.numeroContrat ?? contratId}</p>
         </div>
         <div className="flex gap-2">
-          <Button type="button" onClick={save} disabled={saveMutation.isPending || contextQuery.isLoading}>
+          <Button type="button" onClick={save} disabled={saveMutation.isPending || contextQuery.isLoading || (isGuaranteeModificationCode(movementCode) && !hasActiveTargets)}>
             <Save className="size-4" />Enregistrer
           </Button>
         </div>
@@ -423,7 +428,14 @@ export default function AvenantContratPage() {
         </CardContent>
       </Card>
 
-      {movementCode === "INC_F" || movementCode === "EXR_M" || isGuaranteeModificationCode(movementCode) ? (
+      {isGuaranteeModificationCode(movementCode) && !hasActiveTargets ? (
+        <Card className="border-border/70 shadow-none">
+          <CardHeader>
+            <CardTitle>Cibles concernées</CardTitle>
+            <CardDescription>Aucune cible active n'est disponible pour cet avenant. Supprimez d'abord le dernier avenant de clôture si celui-ci a été créé par erreur.</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : movementCode === "INC_F" || movementCode === "EXR_M" || isGuaranteeModificationCode(movementCode) ? (
         <FlotteTargetsSection
           vehicules={vehicules}
           setVehicules={setVehicules}

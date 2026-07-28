@@ -87,6 +87,14 @@ export default function ContratShowPage() {
         </div>
       </div>
 
+      {contrat.typeContrat === "FLOTTE" ? (
+        <FlottePolicySheet
+          contrat={contrat}
+          dossier={dossier}
+          souscripteur={souscripteur}
+          mouvement={selectedMouvement}
+        />
+      ) : (
       <div className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <header className="border-b-2 border-slate-900 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -152,6 +160,118 @@ export default function ContratShowPage() {
           <PersonnesSection garanties={personneGaranties(contrat)} />
           <QuittanceSection contrat={contrat} movementLabel={selectedMouvement?.libelle} />
         </main>
+      </div>
+      )}
+    </div>
+  );
+}
+
+function FlottePolicySheet({
+  contrat,
+  dossier,
+  souscripteur,
+  mouvement,
+}: {
+  contrat: ContratSummary;
+  dossier: string;
+  souscripteur?: ClientResponse | null;
+  mouvement?: Mouvement | null;
+}) {
+  const vehicles = contrat.vehicules ?? [];
+  const vehicleGuarantees = (contrat.garanties ?? []).filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
+  const guaranteeCodes = flotteGuaranteeCodes(vehicleGuarantees);
+  const hasDcCapital = vehicleGuarantees.some((garantie) => String(garantie.code ?? "").toUpperCase() === "DC");
+  const showAssistance = Boolean(contrat.assistance);
+  const totals = contrat.quittanceGenerale;
+  const totalAmount = totals?.primeTotale ?? totals?.lignes?.find((ligne) => ligne.globale)?.primeTotale;
+  const targetSummaries = contrat.targetSummaries ?? contrat.quittanceGenerale?.targetSummaries ?? [];
+  const actLabel = mouvement?.libelle ?? latestEvent(contrat);
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <div className="mx-auto min-w-[1180px] max-w-[1320px] border bg-white p-4 text-[11px] leading-tight text-slate-950 shadow-sm">
+        <div className="mx-auto w-[470px] border border-slate-900 bg-slate-100 px-3 py-2 text-center text-slate-900">
+          <div className="text-lg font-bold uppercase tracking-wide">Police flotte automobile</div>
+          <div className="text-sm font-semibold">ACTE N {text(mouvement?.numeroMouvement ?? "1")} : {text(actLabel)}</div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-[1fr_360px] border border-slate-300">
+          <div className="space-y-1 p-2">
+            <div><span className="font-bold text-blue-950">Assure : </span>{clientName(souscripteur)}</div>
+            <div><span className="font-bold text-blue-950">Adresse : </span>{text(souscripteur?.adresse)}{souscripteur?.ville ? `, ${souscripteur.ville}` : ""}</div>
+          </div>
+          <div className="space-y-1 p-2 text-right">
+            <div className="font-bold text-blue-950">Police N {text(contrat.numeroPolice)}</div>
+            <div>Date d'effet {formatDate(mouvement?.dateEffet ?? contrat.dateEffet)} Date d'expiration {formatDate(mouvement?.dateEcheance ?? contrat.dateEcheance)}</div>
+          </div>
+        </div>
+
+        <div className="mt-2 flex items-end justify-between">
+          <h2 className="text-sm font-bold">I. Le tarif</h2>
+          <div className="text-[10px] font-semibold text-blue-950">{dossier}</div>
+        </div>
+
+        <table className="mt-2 w-full border-collapse text-[11px]">
+          <thead>
+            <tr className="bg-slate-100 text-center font-bold text-blue-950">
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Usage</th>
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Marque</th>
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>N<br />d'immatric</th>
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Date de<br />MC</th>
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>PF/PTC</th>
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>ENERGIE</th>
+              <th className="border border-slate-700 px-1 py-1" colSpan={hasDcCapital ? 4 : 3}>VALEURS</th>
+              <th className="border border-slate-700 px-1 py-1" colSpan={guaranteeCodes.length + (showAssistance ? 1 : 0)}>GARANTIES A ASSURER</th>
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Montant total</th>
+            </tr>
+            <tr className="bg-slate-100 text-center font-bold text-blue-950">
+              <th className="border border-slate-700 px-1 py-1">Valeur a<br />Neuf</th>
+              <th className="border border-slate-700 px-1 py-1">Valeur<br />Venale</th>
+              <th className="border border-slate-700 px-1 py-1">Valeur des<br />glaces</th>
+              {hasDcCapital ? <th className="border border-slate-700 px-1 py-1">Capital<br />DC</th> : null}
+              {guaranteeCodes.map((code) => <th key={code} className="border border-slate-700 px-1 py-1">{code}</th>)}
+              {showAssistance ? <th className="border border-slate-700 bg-amber-50 px-1 py-1">ASSISTANCE</th> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {vehicles.map((vehicule, index) => {
+              const garanties = vehicleGuarantees.filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
+              const summary = targetSummaries.find((item) => item.kind === "VEHICULE" && item.vehiculeIndex === index);
+              return (
+                <tr key={vehicule.vehiculeId ?? index} className="align-middle">
+                  <td className="border border-slate-700 px-1 py-1">{text(vehicule.usageCode)}</td>
+                  <td className="border border-slate-700 px-1 py-1">{text(vehicule.marque)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center">{text(vehicule.immatriculation)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center">{formatDate(vehicule.datePremiereCirculation)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center">{text(vehicule.puissanceFiscale ?? vehicule.ptc)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center uppercase">{text(vehicule.carburant)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(vehicule.valeurNeuf)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(vehicule.valeurVenale)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(vehicule.valeurGlace)}</td>
+                  {hasDcCapital ? <td className="border border-slate-700 px-1 py-1 text-right">{capitalForCode(garanties, "DC")}</td> : null}
+                  {guaranteeCodes.map((code) => (
+                    <td key={code} className="border border-slate-700 bg-emerald-50 px-1 py-1 text-center font-bold">
+                      {flotteGuaranteeCell(garanties, code)}
+                    </td>
+                  ))}
+                  {showAssistance ? <td className="border border-slate-700 bg-amber-50 px-1 py-1 text-center">{assistanceCell(garanties)}</td> : null}
+                  <td className="border border-slate-700 px-1 py-1 text-right font-semibold">{formatMoney(summary?.primeTotale ?? summary?.primeNette)}</td>
+                </tr>
+              );
+            })}
+            <tr className="font-bold">
+              <td className="border border-slate-700 px-1 py-1 text-center" colSpan={6 + 3 + (hasDcCapital ? 1 : 0) + guaranteeCodes.length + (showAssistance ? 1 : 0)}>TOTAL</td>
+              <td className="border border-slate-700 px-1 py-1 text-right">{formatMoney(totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="mt-2 text-[9px] text-blue-950">
+          {guaranteeCodes.map((code) => `${code}: ${guaranteeFullLabel(vehicleGuarantees, code)}`).join("  |  ")}
+        </div>
+
+        <FlotteFranchiseTable vehicles={vehicles} garanties={vehicleGuarantees} />
+        <FlotteQuittanceTable contrat={contrat} />
       </div>
     </div>
   );
@@ -339,6 +459,117 @@ function ClientCard({ title, client }: { title: string; client?: ClientResponse 
       </div>
     </div>
   );
+}
+
+function FlotteFranchiseTable({ vehicles, garanties }: { vehicles: Vehicule[]; garanties: Garantie[] }) {
+  const usages = Array.from(new Map(vehicles.map((vehicule) => [vehicule.usageCode ?? vehicule.usageLibelle ?? "-", vehicule.usageCode ?? vehicule.usageLibelle ?? "-"])).values());
+  const rows = flotteFranchiseRows(vehicles, garanties, usages);
+  if (!rows.length) return null;
+  return (
+    <>
+      <h2 className="mt-2 text-sm font-bold">II. Les franchises</h2>
+      <table className="mt-1 w-auto border-collapse text-[11px]">
+        <thead>
+          <tr className="bg-slate-100 text-center font-bold text-blue-950">
+            <th className="border border-slate-700 px-2 py-1">Garanties</th>
+            {usages.map((usage) => <th key={usage} className="border border-slate-700 px-3 py-1">Usage {usage}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.code}>
+              <td className="border border-slate-700 px-2 py-1 font-bold">{row.code}</td>
+              {usages.map((usage) => <td key={usage} className="border border-slate-700 px-2 py-1">{row.byUsage[usage] ?? "-"}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function FlotteQuittanceTable({ contrat }: { contrat: ContratSummary }) {
+  const lignes = contrat.quittanceGenerale?.lignes?.filter((ligne) => ligne.globale || moneyAmount(ligne.primeTotale) !== "0,00") ?? [];
+  if (!lignes.length) return null;
+  return (
+    <>
+      <h2 className="mt-2 text-sm font-bold">III. Quittance</h2>
+      <table className="mt-1 w-full border-collapse text-[11px]">
+        <thead>
+          <tr className="bg-slate-100 text-center font-bold text-blue-950">
+            <th className="border border-slate-700 px-2 py-1 text-left">Catégorie</th>
+            <th className="border border-slate-700 px-2 py-1">Prime nette</th>
+            <th className="border border-slate-700 px-2 py-1">Taxe</th>
+            <th className="border border-slate-700 px-2 py-1">TPF</th>
+            <th className="border border-slate-700 px-2 py-1">ACC</th>
+            <th className="border border-slate-700 px-2 py-1">CNPAC</th>
+            <th className="border border-slate-700 px-2 py-1">Total à payer</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map((ligne) => (
+            <tr key={`${ligne.categorie}-${ligne.ordre}`} className={ligne.globale ? "font-bold" : ""}>
+              <td className="border border-slate-700 px-2 py-1">{ligne.globale ? "TOTAL" : ligne.categorie}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.primeNette)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.taxe)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.taxeParafiscale)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.accessoire)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.cnpac)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.primeTotale)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function flotteGuaranteeCodes(garanties: Garantie[]) {
+  const preferred = ["RC", "DR", "V", "I", "BG", "DC", "RF", "DV", "RVE", "BOR", "BTP", "VOR"];
+  const present = new Set(garanties.map((garantie) => String(garantie.code ?? "").toUpperCase()).filter(Boolean));
+  const ordered = preferred.filter((code) => present.has(code));
+  const extra = Array.from(present).filter((code) => !preferred.includes(code)).sort();
+  return [...ordered, ...extra];
+}
+
+function flotteGuaranteeCell(garanties: Garantie[], code: string) {
+  const garantie = garanties.find((item) => String(item.code ?? "").toUpperCase() === code);
+  if (!garantie) return "";
+  if (code === "DV" && garantie.tauxFranchise != null) return `FR${moneyAmount(garantie.tauxFranchise)}%`;
+  return "X";
+}
+
+function guaranteeFullLabel(garanties: Garantie[], code: string) {
+  return text(garanties.find((garantie) => String(garantie.code ?? "").toUpperCase() === code)?.libelle);
+}
+
+function capitalForCode(garanties: Garantie[], code: string) {
+  const garantie = garanties.find((item) => String(item.code ?? "").toUpperCase() === code);
+  return amountNoCurrency(garantie?.capital ?? garantie?.valeurAssuree);
+}
+
+function assistanceCell(_garanties: Garantie[]) {
+  return "";
+}
+
+function flotteFranchiseRows(vehicles: Vehicule[], garanties: Garantie[], usages: string[]) {
+  const rows = new Map<string, { code: string; byUsage: Record<string, string> }>();
+  for (const code of flotteGuaranteeCodes(garanties)) {
+    const garantiesForCode = garanties.filter((garantie) => String(garantie.code ?? "").toUpperCase() === code && (garantie.tauxFranchise != null || garantie.franchiseMinimale != null));
+    if (!garantiesForCode.length) continue;
+    const row = { code, byUsage: {} as Record<string, string> };
+    for (const usage of usages) {
+      const vehicleIds = new Set(vehicles.filter((vehicule) => (vehicule.usageCode ?? vehicule.usageLibelle ?? "-") === usage).map((vehicule) => String(vehicule.vehiculeId)));
+      const garantie = garantiesForCode.find((item) => vehicleIds.has(String(item.vehiculeId ?? "")));
+      row.byUsage[usage] = franchiseLabel(garantie ?? garantiesForCode[0]);
+    }
+    rows.set(code, row);
+  }
+  return Array.from(rows.values());
+}
+
+function amountNoCurrency(value?: number | null) {
+  return value == null ? "" : moneyAmount(value);
 }
 
 function clientByRole(contrat: ContratSummary, role: string) {
@@ -572,7 +803,6 @@ function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossi
 function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
   ensurePdfSpace(ctx, 22);
   const { pdf } = ctx;
-  const startY = ctx.y;
   pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(226, 232, 240);
   pdf.rect(ctx.x, ctx.y, ctx.width, 9, "FD");
@@ -585,49 +815,69 @@ function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
   ctx.y += 12;
   draw();
   pdf.setDrawColor(226, 232, 240);
-  pdf.roundedRect(ctx.x, startY, ctx.width, ctx.y - startY + 2, 1.5, 1.5, "S");
+  pdf.line(ctx.x, ctx.y, ctx.x + ctx.width, ctx.y);
   ctx.y += 7;
 }
 
 function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
-  const columnWidth = ctx.width / 3;
-  for (let index = 0; index < items.length; index += 1) {
-    const column = index % 3;
-    if (column === 0 && index > 0) ctx.y += 8;
-    ensurePdfSpace(ctx, 12);
-    const x = ctx.x + column * columnWidth + 3;
-    const [label, value] = items[index];
-    ctx.pdf.setDrawColor(226, 232, 240);
-    ctx.pdf.line(x, ctx.y + 5.5, x + columnWidth - 8, ctx.y + 5.5);
-    ctx.pdf.setFont("helvetica", "bold");
-    ctx.pdf.setFontSize(7);
-    ctx.pdf.setTextColor(100, 116, 139);
-    ctx.pdf.text(pdfSafe(label.toUpperCase()), x, ctx.y);
-    ctx.pdf.setFontSize(8);
-    ctx.pdf.setTextColor(2, 6, 23);
-    ctx.pdf.text(wrapPdfText(ctx, valueToPdfText(value), columnWidth - 30), x + 23, ctx.y, { maxWidth: columnWidth - 30 });
+  const columnGap = 6;
+  const columnWidth = (ctx.width - 6 - columnGap) / 2;
+  const rowGap = 2.5;
+  for (let index = 0; index < items.length; index += 2) {
+    const left = items[index];
+    const right = items[index + 1];
+    const leftLines = wrapPdfText(ctx, valueToPdfText(left[1]), columnWidth - 4);
+    const rightLines = right ? wrapPdfText(ctx, valueToPdfText(right[1]), columnWidth - 4) : [];
+    const rowHeight = Math.max(9, 6 + Math.max(leftLines.length, rightLines.length) * 3.4);
+    ensurePdfSpace(ctx, rowHeight + rowGap);
+    drawPdfInfoCell(ctx, left[0], leftLines, ctx.x + 3, ctx.y, columnWidth, rowHeight);
+    if (right) {
+      drawPdfInfoCell(ctx, right[0], rightLines, ctx.x + 3 + columnWidth + columnGap, ctx.y, columnWidth, rowHeight);
+    }
+    ctx.y += rowHeight + rowGap;
   }
-  ctx.y += 9;
+}
+
+function drawPdfInfoCell(ctx: PdfContext, label: string, lines: string[], x: number, y: number, width: number, height: number) {
+  ctx.pdf.setDrawColor(226, 232, 240);
+  ctx.pdf.line(x, y + height - 1, x + width, y + height - 1);
+  ctx.pdf.setFont("helvetica", "bold");
+  ctx.pdf.setFontSize(7);
+  ctx.pdf.setTextColor(100, 116, 139);
+  ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 3);
+  ctx.pdf.setFontSize(8);
+  ctx.pdf.setTextColor(2, 6, 23);
+  ctx.pdf.text(lines.length ? lines : ["-"], x, y + 7, { maxWidth: width - 4 });
 }
 
 function drawPdfClient(ctx: PdfContext, title: string, client: ClientResponse | null | undefined, x: number, width: number) {
-  ensurePdfSpace(ctx, 24);
+  const nameLines = wrapPdfText(ctx, clientName(client), width - 6);
+  const identityLines = wrapPdfText(ctx, clientIdentity(client), width - 6);
+  const addressLines = wrapPdfText(ctx, `${text(client?.adresse)}${client?.ville ? `, ${client.ville}` : ""}`, width - 6);
+  const phoneLines = wrapPdfText(ctx, `Tél: ${text(client?.telephone ?? client?.telephones?.find((tel) => tel.principal)?.numero)}`, width - 6);
+  const height = 11 + nameLines.length * 4 + identityLines.length * 3.5 + addressLines.length * 3.5 + phoneLines.length * 3.5;
+  ensurePdfSpace(ctx, height + 2);
   const startY = ctx.y;
   ctx.pdf.setDrawColor(226, 232, 240);
-  ctx.pdf.roundedRect(x, startY, width, 23, 1.5, 1.5, "S");
+  ctx.pdf.roundedRect(x, startY, width, height, 1.5, 1.5, "S");
   ctx.pdf.setFont("helvetica", "bold");
   ctx.pdf.setFontSize(7);
   ctx.pdf.setTextColor(4, 120, 87);
   ctx.pdf.text(pdfSafe(title.toUpperCase()), x + 3, startY + 5);
   ctx.pdf.setFontSize(10);
   ctx.pdf.setTextColor(2, 6, 23);
-  ctx.pdf.text(wrapPdfText(ctx, clientName(client), width - 6), x + 3, startY + 11, { maxWidth: width - 6 });
+  let y = startY + 11;
+  ctx.pdf.text(nameLines, x + 3, y, { maxWidth: width - 6 });
+  y += nameLines.length * 4;
   ctx.pdf.setFont("helvetica", "normal");
   ctx.pdf.setFontSize(7.5);
   ctx.pdf.setTextColor(51, 65, 85);
-  ctx.pdf.text(wrapPdfText(ctx, clientIdentity(client), width - 6), x + 3, startY + 16, { maxWidth: width - 6 });
-  ctx.pdf.text(wrapPdfText(ctx, `${text(client?.adresse)}${client?.ville ? `, ${client.ville}` : ""}`, width - 6), x + 3, startY + 20, { maxWidth: width - 6 });
-  ctx.y = startY + 25;
+  ctx.pdf.text(identityLines, x + 3, y, { maxWidth: width - 6 });
+  y += identityLines.length * 3.5;
+  ctx.pdf.text(addressLines, x + 3, y, { maxWidth: width - 6 });
+  y += addressLines.length * 3.5;
+  ctx.pdf.text(phoneLines, x + 3, y, { maxWidth: width - 6 });
+  ctx.y = startY + height + 2;
 }
 
 function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[]) {
@@ -639,7 +889,7 @@ function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[]) {
     garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`,
     franchiseLabel(garantie),
     formatMoney(garantie.prime),
-  ]), [55, 35, 24, 42, 30]);
+  ]), [58, 32, 22, 42, 26]);
 }
 
 function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
@@ -650,7 +900,7 @@ function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
     amountOrDash(garantie.montantInvalidite),
     amountOrDash(garantie.montantFraisMedicaux),
     formatMoney(garantie.prime),
-  ]), [48, 28, 25, 25, 30, 30]);
+  ]), [45, 28, 24, 24, 31, 28]);
 }
 
 function drawPdfQuittance(ctx: PdfContext, contrat: ContratSummary) {
@@ -666,43 +916,50 @@ function drawPdfQuittance(ctx: PdfContext, contrat: ContratSummary) {
     formatMoney(ligne.accessoire),
     formatMoney(ligne.cnpac),
     formatMoney(ligne.primeTotale),
-  ]), [30, 27, 27, 25, 30, 25, 22]);
+  ]), [28, 27, 27, 22, 30, 24, 22]);
 }
 
 function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widths: number[]) {
   if (!rows.length) return;
-  const rowHeight = 8;
-  ensurePdfSpace(ctx, rowHeight * 2);
+  const tableX = ctx.x + 3;
+  const tableWidth = ctx.width - 6;
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+  const actualWidths = widths.map((width) => (width / totalWidth) * tableWidth);
+  const headerHeight = 8;
+  ensurePdfSpace(ctx, headerHeight * 2);
   ctx.pdf.setFillColor(241, 245, 249);
   ctx.pdf.setDrawColor(226, 232, 240);
-  ctx.pdf.rect(ctx.x + 3, ctx.y, ctx.width - 6, rowHeight, "FD");
-  let cursorX = ctx.x + 4;
+  ctx.pdf.rect(tableX, ctx.y, tableWidth, headerHeight, "FD");
+  let cursorX = tableX + 1.5;
   ctx.pdf.setFont("helvetica", "bold");
   ctx.pdf.setFontSize(7);
   ctx.pdf.setTextColor(51, 65, 85);
   headers.forEach((header, index) => {
     ctx.pdf.text(pdfSafe(header), cursorX, ctx.y + 5);
-    cursorX += widths[index];
+    cursorX += actualWidths[index];
   });
-  ctx.y += rowHeight;
+  ctx.y += headerHeight;
 
   for (const row of rows) {
+    const wrapped = row.map((cell, index) => wrapPdfText(ctx, cell, actualWidths[index] - 3));
+    const rowHeight = Math.max(8, 4 + Math.max(...wrapped.map((lines) => lines.length)) * 3.5);
     ensurePdfSpace(ctx, rowHeight + 3);
-    cursorX = ctx.x + 4;
+    cursorX = tableX + 1.5;
     ctx.pdf.setDrawColor(226, 232, 240);
-    ctx.pdf.line(ctx.x + 3, ctx.y, ctx.x + ctx.width - 3, ctx.y);
-    row.forEach((cell, index) => {
+    ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
+    row.forEach((_cell, index) => {
       const isLast = index === row.length - 1;
       ctx.pdf.setFont("helvetica", isLast ? "bold" : "normal");
       ctx.pdf.setFontSize(7.5);
       ctx.pdf.setTextColor(2, 6, 23);
       const align = index === 0 ? "left" : "right";
-      const textX = align === "right" ? cursorX + widths[index] - 2 : cursorX;
-      ctx.pdf.text(wrapPdfText(ctx, cell, widths[index] - 4), textX, ctx.y + 5, { align, maxWidth: widths[index] - 4 });
-      cursorX += widths[index];
+      const textX = align === "right" ? cursorX + actualWidths[index] - 2 : cursorX;
+      ctx.pdf.text(wrapped[index], textX, ctx.y + 5, { align, maxWidth: actualWidths[index] - 3 });
+      cursorX += actualWidths[index];
     });
     ctx.y += rowHeight;
   }
+  ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
   ctx.y += 3;
 }
 
@@ -725,6 +982,7 @@ function pdfSafe(value: string) {
   return String(value ?? "")
     .replace(/\u202f/g, " ")
     .replace(/\u00a0/g, " ")
+    .replace(/·/g, "-")
     .replace(/[–—]/g, "-");
 }
 

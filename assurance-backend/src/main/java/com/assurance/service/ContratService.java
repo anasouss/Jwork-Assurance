@@ -1823,7 +1823,8 @@ public class ContratService {
     public QuittanceResponse previsualiserAvenant(Long agenceId, Long contratId, AvenantRequest request) {
         if (isModificationGarantiesAvenant(request)) {
             AvenantModificationGraph graph = resolveModificationGarantiesAvenant(agenceId, contratId, request, false);
-            return mouvementContratService.previsualiserMouvementSpecialise(
+            validateAvenantAssistances(request, graph.vehicules());
+            QuittanceResponse quittance = mouvementContratService.previsualiserMouvementSpecialise(
                     graph.contrat(),
                     graph.typeMouvement(),
                     toMouvementRequest(request, graph.contrat()),
@@ -1833,11 +1834,14 @@ public class ContratService {
                     graph.differentiel(),
                     graph.garantiesDifferentielles()
             );
+            quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
+            return quittance;
         }
         AvenantGraph graph = resolveAvenantGraph(agenceId, contratId, request, false);
+        validateAvenantAssistances(request, graph.vehicules());
         QuittanceCalculService.Resultat retourPrime = calculerRetourPrime(graph, request);
         if (retourPrime != null) {
-            return mouvementContratService.previsualiserMouvementSpecialise(
+            QuittanceResponse quittance = mouvementContratService.previsualiserMouvementSpecialise(
                     graph.contrat(),
                     graph.typeMouvement(),
                     toMouvementRequest(request, graph.contrat()),
@@ -1846,8 +1850,10 @@ public class ContratService {
                     graph.remorques(),
                     retourPrime
             );
+            quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
+            return quittance;
         }
-        return mouvementContratService.previsualiserMouvementSpecialise(
+        QuittanceResponse quittance = mouvementContratService.previsualiserMouvementSpecialise(
                 graph.contrat(),
                 graph.typeMouvement(),
                 toMouvementRequest(request, graph.contrat()),
@@ -1855,6 +1861,8 @@ public class ContratService {
                 graph.vehicules(),
                 graph.remorques()
         );
+        quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
+        return quittance;
     }
 
     @Transactional
@@ -1882,6 +1890,7 @@ public class ContratService {
             return quittance;
         }
         AvenantGraph graph = resolveAvenantGraph(agenceId, contratId, request, true);
+        validateAvenantAssistances(request, graph.vehicules());
         QuittanceCalculService.Resultat retourPrime = calculerRetourPrime(graph, request);
         QuittanceResponse quittance = retourPrime == null
                 ? mouvementContratService.creerMouvementSpecialise(
@@ -1986,6 +1995,28 @@ public class ContratService {
         }
     }
 
+    private List<AssistanceContratResponse> previewAvenantAssistances(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            AvenantRequest request
+    ) {
+        List<AssistanceContratResponse> responses = new ArrayList<>();
+        for (AvenantRequest.AssistanceInput input : request.getAssistances() == null
+                ? List.<AvenantRequest.AssistanceInput>of()
+                : request.getAssistances()) {
+            if (Boolean.FALSE.equals(input.getEnabled())) {
+                continue;
+            }
+            Vehicule vehicule = vehicules.get(input.getVehiculeIndex());
+            responses.add(assistanceContratService.preview(
+                    contrat,
+                    vehicule,
+                    toAssistanceUpsertRequest(input, request, vehicule.getId(), null)
+            ));
+        }
+        return responses;
+    }
+
     private List<AssistanceContratResponse> persistAvenantAssistances(
             Contrat contrat,
             List<Vehicule> vehicules,
@@ -2022,23 +2053,32 @@ public class ContratService {
             if (input.getCompagnieAssistanceId() == null || input.getProduitAssistanceId() == null) {
                 throw new BadRequestException("La compagnie et le produit d'assistance sont obligatoires");
             }
-            UpsertAssistanceContratRequest assistanceRequest = new UpsertAssistanceContratRequest();
-            assistanceRequest.setMouvementContratId(mouvementContratId);
-            assistanceRequest.setVehiculeId(vehicule.getId());
-            assistanceRequest.setCompagnieAssistanceId(input.getCompagnieAssistanceId());
-            assistanceRequest.setProduitAssistanceId(input.getProduitAssistanceId());
-            assistanceRequest.setDateSouscription(input.getDateSouscription());
-            assistanceRequest.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
-            assistanceRequest.setEcheanceCode(input.getEcheanceCode());
-            assistanceRequest.setNumeroContratOuQuittance(input.getNumeroContratOuQuittance());
-            assistanceRequest.setTypeQuittance(hasText(input.getTypeQuittance()) ? input.getTypeQuittance() : "AVENANT");
             responses.add(assistanceContratService.upsert(
                     contrat.getAgence().getId(),
                     contrat.getId(),
-                    assistanceRequest
+                    toAssistanceUpsertRequest(input, request, vehicule.getId(), mouvementContratId)
             ));
         }
         return responses;
+    }
+
+    private UpsertAssistanceContratRequest toAssistanceUpsertRequest(
+            AvenantRequest.AssistanceInput input,
+            AvenantRequest request,
+            Long vehiculeId,
+            Long mouvementContratId
+    ) {
+        UpsertAssistanceContratRequest assistanceRequest = new UpsertAssistanceContratRequest();
+        assistanceRequest.setMouvementContratId(mouvementContratId);
+        assistanceRequest.setVehiculeId(vehiculeId);
+        assistanceRequest.setCompagnieAssistanceId(input.getCompagnieAssistanceId());
+        assistanceRequest.setProduitAssistanceId(input.getProduitAssistanceId());
+        assistanceRequest.setDateSouscription(input.getDateSouscription());
+        assistanceRequest.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+        assistanceRequest.setEcheanceCode(input.getEcheanceCode());
+        assistanceRequest.setNumeroContratOuQuittance(input.getNumeroContratOuQuittance());
+        assistanceRequest.setTypeQuittance(hasText(input.getTypeQuittance()) ? input.getTypeQuittance() : "AVENANT");
+        return assistanceRequest;
     }
 
     private AvenantGraph resolveRetraitAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request) {

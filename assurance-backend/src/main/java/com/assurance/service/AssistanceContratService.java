@@ -113,30 +113,7 @@ public class AssistanceContratService {
             throw new BadRequestException("Le vehicule ne correspond pas au contrat");
         }
         MouvementContrat mouvement = resolveMouvement(contrat, request.getMouvementContratId());
-        CompagnieAssistance compagnieAssistance = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
-                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", request.getCompagnieAssistanceId()));
-        ProduitAssistance produitAssistance = produitAssistanceRepository.findById(request.getProduitAssistanceId())
-                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", request.getProduitAssistanceId()));
-        if (!produitAssistance.getCompagnieAssistance().getId().equals(compagnieAssistance.getId())) {
-            throw new BadRequestException("Le produit d'assistance ne correspond pas a la compagnie selectionnee");
-        }
-        if (produitAssistance.getUsages() != null && !produitAssistance.getUsages().isEmpty()
-                && vehicule.getUsage() != null
-                && produitAssistance.getUsages().stream().noneMatch(usage -> usage.getId().equals(vehicule.getUsage().getId()))) {
-            throw new BadRequestException("Produit d'assistance incompatible avec l'usage du vehicule");
-        }
-
-        LocalDate dateSouscription = firstNonNull(request.getDateSouscription(), request.getDateEffet(), vehicule.getDateEffet(), contrat.getDateEffet(), LocalDate.now());
-        LocalDate dateEffet = firstNonNull(request.getDateEffet(), dateSouscription);
-        String echeanceCode = echeanceService.normalizeCode(firstNonNull(request.getEcheanceCode(), contrat.getEcheance()));
-        LocalDate dateEcheance = echeanceService.resolveDateEcheance(dateEffet, echeanceCode, contrat.getDateEcheance());
-        int trimestres = resolveAssistanceQuarterCount(dateEffet, dateEcheance);
-        BigDecimal prorata = BigDecimal.valueOf(trimestres).divide(BigDecimal.valueOf(4), 8, RoundingMode.HALF_UP);
-        TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveTarifForDate(produitAssistance, dateSouscription);
-        BigDecimal montantHt = tarif == null ? BigDecimal.ZERO : tarif.getMontantHt();
-        BigDecimal montantTtc = tarif == null ? BigDecimal.ZERO : tarif.getMontantTtc();
-        BigDecimal primeNette = montantHt.multiply(prorata).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal primeTotale = montantTtc.multiply(prorata).setScale(2, RoundingMode.HALF_UP);
+        AssistancePricing pricing = resolvePricing(contrat, vehicule, request);
 
         AssistanceContrat assistance = assistanceContratRepository
                 .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contrat.getId(), vehicule.getId())
@@ -160,22 +137,22 @@ public class AssistanceContratService {
         assistance.setMouvementContrat(mouvement);
         assistance.setVehicule(vehicule);
         assistance.setCompagnieAssuranceContrat(contrat.getCompagnieAssurance());
-        assistance.setCompagnieAssistance(compagnieAssistance);
-        assistance.setProduitAssistance(produitAssistance);
-        assistance.setTarifProduitAssistance(tarif);
-        assistance.setProduit(produitAssistance.getLibelle());
-        assistance.setDateSouscription(dateSouscription);
-        assistance.setDateEffet(dateEffet);
-        assistance.setDateEcheance(dateEcheance);
-        assistance.setEcheanceCode(echeanceCode);
-        assistance.setDuree(trimestres);
+        assistance.setCompagnieAssistance(pricing.compagnie());
+        assistance.setProduitAssistance(pricing.produit());
+        assistance.setTarifProduitAssistance(pricing.tarif());
+        assistance.setProduit(pricing.produit().getLibelle());
+        assistance.setDateSouscription(pricing.dateSouscription());
+        assistance.setDateEffet(pricing.dateEffet());
+        assistance.setDateEcheance(pricing.dateEcheance());
+        assistance.setEcheanceCode(pricing.echeanceCode());
+        assistance.setDuree(pricing.trimestres());
         assistance.setUnite("TRIMESTRE");
         assistance.setNumeroDossier(contrat.getNumeroDossier());
         assistance.setNumeroPoliceContrat(contrat.getNumeroPolice());
         assistance.setNumeroContratOuQuittance(request.getNumeroContratOuQuittance());
         assistance.setTypeQuittance(request.getTypeQuittance());
-        assistance.setPrimeNette(primeNette);
-        assistance.setPrimeTotale(primeTotale);
+        assistance.setPrimeNette(pricing.primeNette());
+        assistance.setPrimeTotale(pricing.primeTotale());
         assistance.setActif(true);
         assistance = assistanceContratRepository.save(assistance);
         contrat.setAssistance(true);
@@ -192,21 +169,103 @@ public class AssistanceContratService {
         element.setNature(NatureElementFacturable.ASSISTANCE);
         element.setStatut(StatutElementFacturable.A_QUITTANCER);
         element.setReferenceSource(String.valueOf(assistance.getId()));
-        element.setLibelle("Assistance - " + produitAssistance.getLibelle());
-        element.setDateDebut(dateEffet);
-        element.setDateFin(dateEcheance);
-        element.setPrimeNette(primeNette);
-        element.setTaxe(primeTotale.subtract(primeNette).max(BigDecimal.ZERO));
+        element.setLibelle("Assistance - " + pricing.produit().getLibelle());
+        element.setDateDebut(pricing.dateEffet());
+        element.setDateFin(pricing.dateEcheance());
+        element.setPrimeNette(pricing.primeNette());
+        element.setTaxe(pricing.primeTotale().subtract(pricing.primeNette()).max(BigDecimal.ZERO));
         element.setTaxeParafiscale(BigDecimal.ZERO);
         element.setAccessoire(BigDecimal.ZERO);
         element.setCnpac(BigDecimal.ZERO);
-        element.setPrimeTotale(primeTotale);
+        element.setPrimeTotale(pricing.primeTotale());
         element.setActif(true);
         element = elementFacturableRepository.save(element);
         assistance.setElementFacturable(element);
         assistance = assistanceContratRepository.save(assistance);
 
-        return toResponse(assistance, trimestres, prorata);
+        return toResponse(assistance, pricing.trimestres(), pricing.prorata());
+    }
+
+    @Transactional(readOnly = true)
+    public AssistanceContratResponse preview(
+            Contrat contrat,
+            Vehicule vehicule,
+            UpsertAssistanceContratRequest request
+    ) {
+        AssistancePricing pricing = resolvePricing(contrat, vehicule, request);
+        return AssistanceContratResponse.builder()
+                .contratId(contrat.getId())
+                .vehiculeId(vehicule.getId())
+                .vehiculeImmatriculation(vehicule.getImmatriculation())
+                .compagnieAssistanceId(pricing.compagnie().getId())
+                .compagnieAssistanceLibelle(pricing.compagnie().getNom())
+                .produitAssistanceId(pricing.produit().getId())
+                .tarifProduitAssistanceId(pricing.tarif() != null ? pricing.tarif().getId() : null)
+                .produit(pricing.produit().getLibelle())
+                .dateSouscription(pricing.dateSouscription())
+                .dateEffet(pricing.dateEffet())
+                .dateEcheance(pricing.dateEcheance())
+                .echeanceCode(pricing.echeanceCode())
+                .numeroContratOuQuittance(request.getNumeroContratOuQuittance())
+                .trimestres(pricing.trimestres())
+                .prorataRatio(pricing.prorata().setScale(2, RoundingMode.HALF_UP))
+                .primeNette(pricing.primeNette())
+                .primeTotale(pricing.primeTotale())
+                .build();
+    }
+
+    private AssistancePricing resolvePricing(
+            Contrat contrat,
+            Vehicule vehicule,
+            UpsertAssistanceContratRequest request
+    ) {
+        if (request.getCompagnieAssistanceId() == null || request.getProduitAssistanceId() == null) {
+            throw new BadRequestException("La compagnie et le produit d'assistance sont obligatoires");
+        }
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", request.getCompagnieAssistanceId()));
+        ProduitAssistance produit = produitAssistanceRepository.findById(request.getProduitAssistanceId())
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", request.getProduitAssistanceId()));
+        if (produit.getCompagnieAssistance() == null
+                || !produit.getCompagnieAssistance().getId().equals(compagnie.getId())) {
+            throw new BadRequestException("Le produit d'assistance ne correspond pas a la compagnie selectionnee");
+        }
+        if (produit.getUsages() != null && !produit.getUsages().isEmpty()
+                && vehicule.getUsage() != null
+                && produit.getUsages().stream().noneMatch(usage -> usage.getId().equals(vehicule.getUsage().getId()))) {
+            throw new BadRequestException("Produit d'assistance incompatible avec l'usage du vehicule");
+        }
+
+        LocalDate dateSouscription = firstNonNull(
+                request.getDateSouscription(),
+                request.getDateEffet(),
+                vehicule.getDateEffet(),
+                contrat.getDateEffet(),
+                LocalDate.now()
+        );
+        LocalDate dateEffet = firstNonNull(request.getDateEffet(), dateSouscription);
+        String echeanceCode = echeanceService.normalizeCode(firstNonNull(request.getEcheanceCode(), contrat.getEcheance()));
+        LocalDate dateEcheance = echeanceService.resolveDateEcheance(dateEffet, echeanceCode, contrat.getDateEcheance());
+        int trimestres = resolveAssistanceQuarterCount(dateEffet, dateEcheance);
+        BigDecimal prorata = BigDecimal.valueOf(trimestres).divide(BigDecimal.valueOf(4), 8, RoundingMode.HALF_UP);
+        TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveTarifForDate(produit, dateSouscription);
+        BigDecimal montantHt = tarif == null ? BigDecimal.ZERO : tarif.getMontantHt();
+        BigDecimal montantTtc = tarif == null ? BigDecimal.ZERO : tarif.getMontantTtc();
+        BigDecimal primeNette = montantHt.multiply(prorata).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal primeTotale = montantTtc.multiply(prorata).setScale(2, RoundingMode.HALF_UP);
+        return new AssistancePricing(
+                compagnie,
+                produit,
+                tarif,
+                dateSouscription,
+                dateEffet,
+                dateEcheance,
+                echeanceCode,
+                trimestres,
+                prorata,
+                primeNette,
+                primeTotale
+        );
     }
 
     @Transactional
@@ -345,5 +404,20 @@ public class AssistanceContratService {
             }
         }
         return null;
+    }
+
+    private record AssistancePricing(
+            CompagnieAssistance compagnie,
+            ProduitAssistance produit,
+            TarifProduitAssistance tarif,
+            LocalDate dateSouscription,
+            LocalDate dateEffet,
+            LocalDate dateEcheance,
+            String echeanceCode,
+            int trimestres,
+            BigDecimal prorata,
+            BigDecimal primeNette,
+            BigDecimal primeTotale
+    ) {
     }
 }

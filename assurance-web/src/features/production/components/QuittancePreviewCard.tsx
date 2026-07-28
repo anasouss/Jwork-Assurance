@@ -53,7 +53,29 @@ function emptyRows(): QuittancePreview["lignes"] {
 
 function visibleRows(preview: QuittancePreview) {
   const showCorporel = hasPersonneGuarantee(preview);
-  return preview.lignes.filter((ligne) => String(ligne.categorie ?? "").toUpperCase() !== "CORPOREL" || showCorporel);
+  const rows = preview.lignes.filter((ligne) => String(ligne.categorie ?? "").toUpperCase() !== "CORPOREL" || showCorporel);
+  const alreadyIncludesAssistance = rows.some((ligne) => String(ligne.categorie ?? "").toUpperCase() === "ASSISTANCE");
+  const assistance = alreadyIncludesAssistance ? null : assistanceRow(preview);
+  return assistance ? [...rows, assistance] : rows;
+}
+
+function assistanceRow(preview: QuittancePreview): QuittancePreview["lignes"][number] | null {
+  if (!preview.assistances?.length) {
+    return null;
+  }
+  const primeNette = preview.assistances.reduce((total, assistance) => total + Number(assistance.primeNette ?? 0), 0);
+  const primeTotale = preview.assistances.reduce((total, assistance) => total + Number(assistance.primeTotale ?? 0), 0);
+  return {
+    categorie: "ASSISTANCE",
+    ordre: 110,
+    globale: false,
+    primeNette,
+    taxe: Math.max(0, primeTotale - primeNette),
+    taxeParafiscale: 0,
+    accessoire: 0,
+    cnpac: 0,
+    primeTotale,
+  };
 }
 
 function hasPersonneGuarantee(preview: QuittancePreview) {

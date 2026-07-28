@@ -802,19 +802,6 @@ export default function AvenantContratPage() {
           >
             <Save className="size-4" />Enregistrer brouillon
           </Button>
-          <Button
-            type="button"
-            onClick={save}
-            disabled={
-              saveMutation.isPending
-              || draftMutation.isPending
-              || contextQuery.isLoading
-              || !movementAvailable
-              || (isGuaranteeModificationCode(movementCode) && !hasActiveTargets)
-            }
-          >
-            <Save className="size-4" />Valider l'avenant
-          </Button>
         </div>
       </div>
 
@@ -934,6 +921,22 @@ export default function AvenantContratPage() {
           <QuittancePreviewCard preview={preview} loading={previewMutation.isPending} />
         </CardContent>
       </Card>
+
+      <div className="flex justify-end border-t pt-4">
+        <Button
+          type="button"
+          onClick={save}
+          disabled={
+            saveMutation.isPending
+            || draftMutation.isPending
+            || contextQuery.isLoading
+            || !movementAvailable
+            || (isGuaranteeModificationCode(movementCode) && !hasActiveTargets)
+          }
+        >
+          <Save className="size-4" />Valider l'avenant
+        </Button>
+      </div>
 
       <Sheet open={grilleConfiguratorOpen} onOpenChange={setGrilleConfiguratorOpen}>
         <SheetContent side="right" className="w-[min(96vw,1180px)] overflow-y-auto sm:max-w-none">

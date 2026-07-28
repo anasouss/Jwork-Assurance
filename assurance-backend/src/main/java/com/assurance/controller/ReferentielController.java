@@ -118,6 +118,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/usages")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createUsage(@Valid @RequestBody UpsertUsageRequest request) {
         usageRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code usage deja utilise");
@@ -128,6 +129,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/usages/{id}")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateUsage(
             @PathVariable Long id,
             @Valid @RequestBody UpsertUsageRequest request

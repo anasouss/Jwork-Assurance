@@ -298,6 +298,16 @@ export type AvenantDraft = {
   request: AvenantRequest;
 };
 
+export type AvenantDraftSummary = {
+  id: string;
+  contratId: string;
+  codeTypeMouvement: string;
+  libelleTypeMouvement?: string | null;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  updatedAt?: string | null;
+};
+
 export type AvenantContext = {
   contrat: ContratSummary;
   mouvementsDisponibles: MouvementDisponible[];
@@ -1093,6 +1103,7 @@ export type ContratSummary = {
     dateEcheance?: string | null;
     primeTotale?: number | null;
   }[];
+  avenantDrafts?: AvenantDraftSummary[];
   elementsFacturables?: ElementFacturable[];
   targetSummaries?: QuittancePreview["targetSummaries"];
   quittanceGenerale?: QuittancePreview | null;

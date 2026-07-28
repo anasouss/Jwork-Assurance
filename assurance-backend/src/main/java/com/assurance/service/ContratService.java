@@ -6,6 +6,7 @@ import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.response.AssistanceContratResponse;
+import com.assurance.dto.response.AvenantDraftSummaryResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
@@ -73,6 +74,7 @@ public class ContratService {
     private final MouvementContratService mouvementContratService;
     private final MouvementContratRepository mouvementContratRepository;
     private final AvenantDraftRepository avenantDraftRepository;
+    private final AvenantDraftService avenantDraftService;
     private final MouvementVehiculeRepository mouvementVehiculeRepository;
     private final MouvementRemorqueRepository mouvementRemorqueRepository;
     private final MouvementGarantieRepository mouvementGarantieRepository;
@@ -1472,23 +1474,40 @@ public class ContratService {
 
     @Transactional
     public List<ContratResponse> list(Long agenceId) {
+        Map<Long, List<AvenantDraftSummaryResponse>> draftsByContrat = avenantDraftService.listSummaries(agenceId).stream()
+                .collect(java.util.stream.Collectors.groupingBy(AvenantDraftSummaryResponse::getContratId));
         return contratRepository.findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(agenceId).stream()
                 .map(this::ensureNumeroDossier)
-                .sorted(Comparator.comparing(this::latestContratActivityAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-                .map(this::toListResponse)
+                .sorted(Comparator.comparing(
+                        contrat -> latestContratActivityAt(contrat, draftsByContrat.getOrDefault(contrat.getId(), List.of())),
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed())
+                .map(contrat -> {
+                    ContratResponse response = toListResponse(contrat);
+                    response.setAvenantDrafts(draftsByContrat.getOrDefault(contrat.getId(), List.of()));
+                    return response;
+                })
                 .toList();
     }
 
-    private LocalDateTime latestContratActivityAt(Contrat contrat) {
+    private LocalDateTime latestContratActivityAt(
+            Contrat contrat,
+            List<AvenantDraftSummaryResponse> drafts
+    ) {
         LocalDateTime latestMouvement = (contrat.getMouvements() == null ? List.<MouvementContrat>of() : contrat.getMouvements()).stream()
                 .map(MouvementContrat::getCreatedAt)
                 .filter(java.util.Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
-        if (latestMouvement != null) {
-            return latestMouvement;
-        }
-        return contrat.getCreatedAt();
+        LocalDateTime latestDraft = drafts.stream()
+                .map(AvenantDraftSummaryResponse::getUpdatedAt)
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        return java.util.stream.Stream.of(contrat.getCreatedAt(), latestMouvement, latestDraft)
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     @Transactional
@@ -1886,7 +1905,7 @@ public class ContratService {
                     request,
                     quittance.getMouvementContratId()
             ));
-            deleteAvenantDraft(contratId, request);
+            deleteAvenantDraft(graph.contrat(), request);
             return quittance;
         }
         AvenantGraph graph = resolveAvenantGraph(agenceId, contratId, request, true);
@@ -1919,14 +1938,21 @@ public class ContratService {
                 quittance.getMouvementContratId()
         ));
         applyAvenantCurrentState(graph, request);
-        deleteAvenantDraft(contratId, request);
+        deleteAvenantDraft(graph.contrat(), request);
         return quittance;
     }
 
-    private void deleteAvenantDraft(Long contratId, AvenantRequest request) {
+    private void deleteAvenantDraft(Contrat contrat, AvenantRequest request) {
+        if (contrat == null) {
+            return;
+        }
+        if (contrat.getStatut() != StatutContrat.ACTIVE) {
+            avenantDraftRepository.deleteByContratId(contrat.getId());
+            return;
+        }
         if (request != null && hasText(request.getCodeTypeMouvement())) {
             avenantDraftRepository.deleteByContratIdAndTypeMouvementCodeIgnoreCase(
-                    contratId,
+                    contrat.getId(),
                     request.getCodeTypeMouvement().trim()
             );
         }

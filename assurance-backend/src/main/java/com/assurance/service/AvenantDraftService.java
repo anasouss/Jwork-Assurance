@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.response.AvenantDraftResponse;
+import com.assurance.dto.response.AvenantDraftSummaryResponse;
 import com.assurance.entity.AvenantDraft;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.TypeMouvementContrat;
@@ -15,6 +16,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,13 @@ public class AvenantDraftService {
                 .findByAgenceIdAndContratIdAndTypeMouvementCodeIgnoreCase(agenceId, contratId, codeTypeMouvement)
                 .map(this::toResponse)
                 .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvenantDraftSummaryResponse> listSummaries(Long agenceId) {
+        return avenantDraftRepository.findByAgenceIdOrderByUpdatedAtDesc(agenceId).stream()
+                .map(this::toSummaryResponse)
+                .toList();
     }
 
     @Transactional
@@ -106,6 +116,19 @@ public class AvenantDraftService {
                 .codeTypeMouvement(draft.getTypeMouvement().getCode())
                 .updatedAt(draft.getUpdatedAt())
                 .request(read(draft.getPayloadJson()))
+                .build();
+    }
+
+    private AvenantDraftSummaryResponse toSummaryResponse(AvenantDraft draft) {
+        AvenantRequest request = read(draft.getPayloadJson());
+        return AvenantDraftSummaryResponse.builder()
+                .id(draft.getId())
+                .contratId(draft.getContrat().getId())
+                .codeTypeMouvement(draft.getTypeMouvement().getCode())
+                .libelleTypeMouvement(draft.getTypeMouvement().getLibelle())
+                .dateEffet(request.getDateEffet())
+                .dateEcheance(request.getDateEcheance())
+                .updatedAt(draft.getUpdatedAt())
                 .build();
     }
 }

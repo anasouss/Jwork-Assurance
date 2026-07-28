@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
+import { ChevronDown, Eye, FilePenLine, FilePlus2, MoreHorizontal, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "../api";
 import { toDateOnly } from "../date";
-import type { ContratSummary, ReferenceOption, TypeContrat } from "../types";
+import type { AvenantDraftSummary, ContratSummary, ReferenceOption, TypeContrat } from "../types";
 
 type ContratFilters = {
   typeContrat: "ALL" | TypeContrat;
@@ -200,6 +200,7 @@ export default function ContratsPage() {
                     const movements = movementLines(contrat);
                     const current = movements[0];
                     const olderMovements = movements.slice(1);
+                    const drafts = sortedAvenantDrafts(contrat);
                     const isExpanded = Boolean(expanded[contrat.id]);
                     return (
                       <Fragment key={contrat.id}>
@@ -213,6 +214,15 @@ export default function ContratsPage() {
                           canExpand={olderMovements.length > 0}
                           onToggle={() => setExpanded((currentExpanded) => ({ ...currentExpanded, [contrat.id]: !isExpanded }))}
                         />
+                        {drafts.map((draft) => (
+                          <AvenantDraftRow
+                            key={`draft-${draft.id}`}
+                            contrat={contrat}
+                            draft={draft}
+                            companyLabel={companyLabel(contrat, companyMap)}
+                            conventionLabel={conventionLabel(contrat, conventionMap)}
+                          />
+                        ))}
                         {isExpanded ? olderMovements.map((movement) => (
                           <ContratRow
                             key={movement.key}
@@ -238,6 +248,105 @@ export default function ContratsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function AvenantDraftRow({
+  contrat,
+  draft,
+  companyLabel,
+  conventionLabel,
+}: {
+  contrat: ContratSummary;
+  draft: AvenantDraftSummary;
+  companyLabel: string;
+  conventionLabel?: string;
+}) {
+  const queryClient = useQueryClient();
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const deleteMutation = useMutation({
+    mutationFn: () => productionApi.deleteAvenantDraft(contrat.id, draft.codeTypeMouvement),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["contrats"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["avenant-draft", contrat.id, draft.codeTypeMouvement],
+        }),
+      ]);
+      setConfirmDeleteOpen(false);
+      toast.success("Brouillon d'avenant supprimé");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Suppression impossible");
+    },
+  });
+  const resumePath = `/app/production/contrats/${contrat.id}/avenants/${draft.codeTypeMouvement}`;
+
+  return (
+    <>
+      <tr className="border-b bg-amber-50/80 transition-colors hover:bg-amber-50 dark:bg-amber-950/20 dark:hover:bg-amber-950/30">
+        <TableCellStrong>{dossierNumber(contrat)}</TableCellStrong>
+        <td className="px-2 py-2 text-center"><TypeBadge type={contrat.typeContrat} /></td>
+        <TableCell>{clientCode(contrat)}</TableCell>
+        <TableCell className="font-medium uppercase">{mainClient(contrat)}</TableCell>
+        <TableCell className="uppercase">{branchLabel(contrat)}</TableCell>
+        <TableCell>
+          <div className="flex flex-col items-center text-center">
+            <span>{productLabel(contrat)}</span>
+            {conventionLabel ? <span className="text-xs text-muted-foreground">{conventionLabel}</span> : null}
+          </div>
+        </TableCell>
+        <TableCell className="text-center text-muted-foreground">-</TableCell>
+        <TableCell className="text-center uppercase">{contrat.numeroPolice ?? "-"}</TableCell>
+        <TableCell className="text-center">{companyLabel}</TableCell>
+        <TableCell className="text-center font-semibold">
+          {draft.libelleTypeMouvement || draft.codeTypeMouvement}
+        </TableCell>
+        <TableCell className="text-center">{formatDate(draft.dateEffet)}</TableCell>
+        <TableCell className="text-center">{formatDate(draft.dateEcheance ?? contrat.dateEcheance)}</TableCell>
+        <TableCell className="text-center"><StatusBadge statut="BROUILLON" /></TableCell>
+        <td className="px-2 py-2">
+          <div className="flex items-center justify-center gap-2">
+            <Button asChild variant="outline" size="icon" className="size-8" title="Continuer le brouillon">
+              <Link to={resumePath}><FilePenLine className="size-4" /></Link>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 text-destructive hover:text-destructive"
+              title="Supprimer le brouillon"
+              onClick={() => setConfirmDeleteOpen(true)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce brouillon d'avenant ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Les informations saisies dans ce brouillon seront définitivement supprimées. Le contrat et ses mouvements validés ne seront pas modifiés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                deleteMutation.mutate();
+              }}
+            >
+              {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -596,6 +705,11 @@ function sortedMouvements(contrat: ContratSummary) {
     });
 }
 
+function sortedAvenantDrafts(contrat: ContratSummary) {
+  return [...(contrat.avenantDrafts ?? [])]
+    .sort((a, b) => dateRank(b.updatedAt) - dateRank(a.updatedAt));
+}
+
 function movementStatusRank(statut?: string | null) {
   return String(statut ?? "").toUpperCase() === "ANNULE" ? 1 : 0;
 }
@@ -678,7 +792,7 @@ function StatusBadge({ statut }: { statut?: string | null }) {
 function statusText(statut?: string | null) {
   const normalized = normalize(statut);
   if (normalized.includes("RESIL")) return "Résilié";
-  if (normalized.includes("DRAFT")) return "Brouillon";
+  if (normalized.includes("DRAFT") || normalized.includes("BROUILLON")) return "Brouillon";
   if (!statut) return "-";
   if (normalized === "EN_COURS" || normalized === "EN COURS" || normalized === "ACTIF") return "En cours";
   return titleCaseMovement(String(statut).replace(/_/g, " "));

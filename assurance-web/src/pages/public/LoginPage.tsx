@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, BadgeCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, PasswordInput } from "@/components/ui/input";
+import skayLogo from "@/assets/logo.webp";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function LoginPage() {
@@ -36,8 +37,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <Card className="w-full border-border/70 bg-background/92 shadow-lg shadow-slate-900/5 backdrop-blur dark:bg-neutral-950/88 dark:shadow-black/30">
           <CardHeader>
-            <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <BadgeCheck className="size-5" />
+            <div className="mb-3 flex justify-center">
+              <img src={skayLogo} alt="Skay Assurance" className="h-20 w-auto max-w-[280px] object-contain" />
             </div>
             <CardTitle>Connexion</CardTitle>
             <p className="text-sm text-muted-foreground">Accès à l’espace production.</p>

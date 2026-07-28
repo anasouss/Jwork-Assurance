@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { BadgeCheck } from "lucide-react";
 import { appNavigation, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
+import skayMark from "@/assets/skay-mark.webp";
 import {
   Sidebar,
   SidebarContent,
@@ -27,11 +27,9 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
     <Sidebar collapsible="icon" data-tour="sidebar" {...props}>
       <SidebarHeader className="border-b border-sidebar-border/70">
         <div className="flex min-h-14 items-center gap-2 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BadgeCheck className="size-5" />
-          </span>
+          <img src={skayMark} alt="Skay Assurance" className="size-9 shrink-0 object-contain" />
           <span className="grid min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-sm font-semibold">Assurance</span>
+            <span className="truncate text-sm font-semibold">Skay Assurance</span>
             <span className="truncate text-xs text-muted-foreground">Plateforme agence</span>
           </span>
         </div>

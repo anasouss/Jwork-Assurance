@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Bell, KeyRound, LogOut, User } from "lucide-react";
+import { Bell, Download, KeyRound, LogOut, User } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -26,10 +26,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/store/auth-store";
 import { authApi } from "@/lib/api/auth";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 
 export function AppHeader() {
   const { pathname } = useLocation();
   const { user, logout } = useAuthStore();
+  const { canInstall, install } = usePwaInstall();
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -92,6 +94,18 @@ export function AppHeader() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          {canInstall ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              title="Installer l'application"
+              aria-label="Installer l'application"
+              onClick={() => void install()}
+            >
+              <Download className="size-4" />
+            </Button>
+          ) : null}
           <Button type="button" variant="ghost" size="icon" className="relative">
             <Bell className="size-4" />
             <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500" />

@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
 import { queryClient } from "./lib/query-client";
+import { registerServiceWorker } from "./pwa";
 import "./styles/globals.css";
 
 // PWA support is production-only. Remove any service worker left behind by a
@@ -12,6 +13,8 @@ if (import.meta.env.DEV && "serviceWorker" in navigator) {
     registrations.forEach((registration) => void registration.unregister());
   });
 }
+
+registerServiceWorker();
 
 const root = document.getElementById("root");
 

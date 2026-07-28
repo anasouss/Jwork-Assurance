@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useRef, useState, type ReactNode } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Car, FileText, Printer, UserRound } from "lucide-react";
+import { ArrowLeft, Car, FileText, FileTextIcon, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,9 +16,13 @@ type Remorque = NonNullable<ContratSummary["remorques"]>[number];
 
 export default function ContratShowPage() {
   const { contratId = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const mouvementId = searchParams.get("mouvementId");
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const contratQuery = useQuery({
-    queryKey: ["contrat", contratId],
-    queryFn: () => productionApi.getContrat(contratId),
+    queryKey: ["contrat", contratId, mouvementId],
+    queryFn: () => productionApi.getContrat(contratId, { mouvementId }),
     enabled: Boolean(contratId),
   });
   const compagniesQuery = useQuery({
@@ -45,6 +49,17 @@ export default function ContratShowPage() {
   const sameClient = sameClientIdentity(souscripteur, proprietaire);
   const compagnie = optionLabel(compagniesQuery.data, contrat.compagnieAssuranceId);
   const convention = optionLabel(conventionsQuery.data, contrat.conventionId);
+  const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
+  const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement?.numeroMouvement ? `-mvt-${selectedMouvement.numeroMouvement}` : ""}.pdf`;
+  const openPdf = async () => {
+    if (!sheetRef.current || generatingPdf) return;
+    setGeneratingPdf(true);
+    try {
+      await openElementAsPdf(sheetRef.current, pdfName);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -54,14 +69,14 @@ export default function ContratShowPage() {
         </Button>
         <div className="flex items-center gap-2">
           <Badge className="bg-emerald-600">{statusLabel(contrat.statut)}</Badge>
-          <Button type="button" onClick={() => window.print()}>
-            <Printer className="size-4" />
-            Télécharger PDF
+          <Button type="button" onClick={openPdf} disabled={generatingPdf}>
+            <FileTextIcon className="size-4" />
+            {generatingPdf ? "Génération..." : "Ouvrir PDF"}
           </Button>
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      <div ref={sheetRef} className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <header className="border-b-2 border-slate-900 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -80,14 +95,14 @@ export default function ContratShowPage() {
           <Section title="Contrat" icon={<FileText className="size-4" />}>
             <InfoGrid
               items={[
-                ["Nature", latestEvent(contrat)],
+                ["Nature", selectedMouvement?.libelle ?? latestEvent(contrat)],
                 ["Produit", productLabel(contrat)],
                 ["Compagnie", compagnie],
                 ...(contrat.typeContrat === "CONVENTION" ? [["Convention", convention] as [string, ReactNode]] : []),
                 ["N° police", text(contrat.numeroPolice)],
                 ["N° attestation", firstAttestation(contrat)],
-                ["Date d'effet", formatDate(contrat.dateEffet)],
-                ["Date d'échéance", formatDate(contrat.dateEcheance)],
+                ["Date d'effet", formatDate(selectedMouvement?.dateEffet ?? contrat.dateEffet)],
+                ["Date d'échéance", formatDate(selectedMouvement?.dateEcheance ?? contrat.dateEcheance)],
                 ["Type client", clientTypeLabel(souscripteur)],
                 ["Fractionnement", text(contrat.fractionnement)],
               ]}
@@ -124,7 +139,7 @@ export default function ContratShowPage() {
           ))}
 
           <PersonnesSection garanties={personneGaranties(contrat)} />
-          <QuittanceSection contrat={contrat} />
+          <QuittanceSection contrat={contrat} movementLabel={selectedMouvement?.libelle} />
         </main>
       </div>
     </div>
@@ -238,14 +253,14 @@ function GarantiesTable({ garanties }: { garanties: Garantie[] }) {
   );
 }
 
-function QuittanceSection({ contrat }: { contrat: ContratSummary }) {
+function QuittanceSection({ contrat, movementLabel }: { contrat: ContratSummary; movementLabel?: string | null }) {
   const lignes = (contrat.quittanceGenerale?.lignes ?? []).filter((ligne) => {
     const categorie = String(ligne.categorie ?? "").toUpperCase();
     return categorie !== "CORPOREL" || personneGaranties(contrat).length > 0;
   });
   if (!lignes.length) return null;
   return (
-    <Section title="Quittance générale">
+    <Section title={movementLabel ? `Quittance - ${movementLabel}` : "Quittance générale"}>
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-100">
@@ -402,4 +417,54 @@ function statusLabel(statut?: string | null) {
   if (normalized === "CANCELLED") return "Résilié";
   if (normalized === "RENEWED") return "Renouvelé";
   return text(statut);
+}
+
+async function openElementAsPdf(element: HTMLElement, filename: string) {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import("html2canvas"),
+    import("jspdf"),
+  ]);
+  const canvas = await html2canvas(element, {
+    backgroundColor: "#ffffff",
+    scale: 2,
+    useCORS: true,
+  });
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 8;
+  const contentWidth = pageWidth - margin * 2;
+  const contentHeight = pageHeight - margin * 2;
+  const sliceHeight = Math.floor((contentHeight * canvas.width) / contentWidth);
+  let offset = 0;
+  let page = 0;
+
+  while (offset < canvas.height) {
+    const height = Math.min(sliceHeight, canvas.height - offset);
+    const slice = document.createElement("canvas");
+    slice.width = canvas.width;
+    slice.height = height;
+    const context = slice.getContext("2d");
+    if (!context) break;
+    context.drawImage(canvas, 0, offset, canvas.width, height, 0, 0, canvas.width, height);
+    const image = slice.toDataURL("image/png");
+    const imageHeight = (height * contentWidth) / canvas.width;
+    if (page > 0) pdf.addPage();
+    pdf.addImage(image, "PNG", margin, margin, contentWidth, imageHeight);
+    offset += height;
+    page += 1;
+  }
+
+  const blobUrl = URL.createObjectURL(pdf.output("blob"));
+  const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    pdf.save(filename);
+    URL.revokeObjectURL(blobUrl);
+  } else {
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  }
+}
+
+function sanitizeFilename(value: string) {
+  return value.replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "dossier";
 }

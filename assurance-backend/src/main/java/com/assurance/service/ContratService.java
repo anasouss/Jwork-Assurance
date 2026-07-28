@@ -1478,9 +1478,14 @@ public class ContratService {
 
     @Transactional
     public ContratResponse get(Long agenceId, Long contratId) {
+        return get(agenceId, contratId, null);
+    }
+
+    @Transactional
+    public ContratResponse get(Long agenceId, Long contratId, Long mouvementId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
-        return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)));
+        return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)), true, mouvementId);
     }
 
     @Transactional
@@ -2468,6 +2473,10 @@ public class ContratService {
     }
 
     private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries) {
+        return toResponse(contrat, includeTargetSummaries, null);
+    }
+
+    private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries, Long selectedMouvementId) {
         List<ContratResponse.ClientLink> clients = new ArrayList<>();
         for (ContratClient link : contrat.getClients()) {
             clients.add(ContratResponse.ClientLink.builder()
@@ -2624,7 +2633,9 @@ public class ContratService {
                     .primeTotale(element.getPrimeTotale())
                     .build());
         }
-        QuittanceResponse quittanceGenerale = buildQuittanceGenerale(contrat, includeTargetSummaries);
+        QuittanceResponse quittanceGenerale = selectedMouvementId == null
+                ? buildQuittanceGenerale(contrat, includeTargetSummaries)
+                : buildSavedQuittanceMouvement(contrat, selectedMouvementId);
         List<QuittanceResponse.TargetSummary> targetSummaries = quittanceGenerale == null
                 ? List.of()
                 : quittanceGenerale.getTargetSummaries();
@@ -2733,15 +2744,33 @@ public class ContratService {
         if (quittance == null) {
             return null;
         }
+        return buildSavedQuittanceResponse(contrat, quittance);
+    }
+
+    private QuittanceResponse buildSavedQuittanceMouvement(Contrat contrat, Long mouvementId) {
+        MouvementContrat mouvement = mouvementContratRepository.findByContratIdAndId(contrat.getId(), mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        return quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvement.getId()).stream()
+                .findFirst()
+                .map(quittance -> buildSavedQuittanceResponse(contrat, quittance))
+                .orElse(null);
+    }
+
+    private QuittanceResponse buildSavedQuittanceResponse(Contrat contrat, Quittance quittance) {
         ElementFacturable elementFacturable = quittance.getElementFacturable();
         Long elementFacturableId = elementFacturable == null ? null : elementFacturable.getId();
         List<QuittanceResponse.TargetSummary> targetSummaries = elementFacturableId == null
                 ? List.of()
                 : elementFacturableCibleService.listByElementFacturable(elementFacturableId);
         return QuittanceResponse.builder()
+                .id(quittance.getId())
                 .contratId(contrat.getId())
                 .numeroContrat(contrat.getNumeroContrat())
+                .mouvementContratId(quittance.getMouvementContrat() == null ? null : quittance.getMouvementContrat().getId())
+                .codeMouvement(quittance.getMouvementContrat() != null && quittance.getMouvementContrat().getTypeMouvement() != null ? quittance.getMouvementContrat().getTypeMouvement().getCode() : null)
+                .typeImpactMouvement(quittance.getMouvementContrat() != null && quittance.getMouvementContrat().getTypeMouvement() != null && quittance.getMouvementContrat().getTypeMouvement().getTypeImpact() != null ? quittance.getMouvementContrat().getTypeMouvement().getTypeImpact().name() : null)
                 .elementFacturableId(elementFacturableId)
+                .numeroQuittance(quittance.getNumeroQuittance())
                 .type(quittance.getType())
                 .categorie(quittance.getCategorie())
                 .globale(quittance.getGlobale())

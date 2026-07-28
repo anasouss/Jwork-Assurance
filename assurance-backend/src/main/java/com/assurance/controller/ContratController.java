@@ -189,8 +189,11 @@ public class ContratController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ContratResponse>> get(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.get(TenantContext.getCurrentAgence(), id)));
+    public ResponseEntity<ApiResponse<ContratResponse>> get(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long mouvementId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(contratService.get(TenantContext.getCurrentAgence(), id, mouvementId)));
     }
 
     @DeleteMapping("/{id}")

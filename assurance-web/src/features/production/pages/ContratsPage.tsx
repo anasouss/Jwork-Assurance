@@ -290,7 +290,7 @@ function ContratRow({
       <td className="px-2 py-2">
         <div className="flex items-center justify-center gap-2">
           <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Visualiser">
-            <Link to={`/app/production/contrats/${contrat.id}`}><Eye className="size-4" /></Link>
+            <Link to={showContratPath(contrat, movement)}><Eye className="size-4" /></Link>
           </Button>
           <RowActions contrat={contrat} movement={movement} child={child} />
           {canExpand ? (
@@ -449,6 +449,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
       </AlertDialog>
     </>
   );
+}
+
+function showContratPath(contrat: ContratSummary, movement: MovementLine) {
+  const query = movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : "";
+  return `/app/production/contrats/${contrat.id}${query}`;
 }
 
 function editContratPath(contrat: ContratSummary) {

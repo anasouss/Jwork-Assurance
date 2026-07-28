@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { MoneyInput } from "../components/MoneyInput";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { productionApi } from "../api";
+import { resolveAssistanceTariffAmount } from "../assistance-pricing";
 import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberOrZero, numberValue, roundMoney, toNumber } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
@@ -196,6 +198,24 @@ export function FlotteTargetsSection({
     remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
   const activeVehiculePreview = previewForTarget(preview, targetPreview, activeVehiculeTarget);
   const activeRemorquePreview = previewForTarget(preview, targetPreview, activeRemorqueTarget);
+  const activeVehiculeAssistance = activeVehiculeTarget ? assistances[targetKey(activeVehiculeTarget)] : undefined;
+  const activeRemorqueAssistance = activeRemorqueTarget ? assistances[targetKey(activeRemorqueTarget)] : undefined;
+  const activeVehiculeAssistanceProductId = activeVehiculeAssistance?.enabled ? activeVehiculeAssistance.produitAssistanceId ?? "" : "";
+  const activeRemorqueAssistanceProductId = activeRemorqueAssistance?.enabled ? activeRemorqueAssistance.produitAssistanceId ?? "" : "";
+  const activeVehiculeAssistanceTarifs = useQuery({
+    queryKey: ["referentiel", "produits-assistance", activeVehiculeAssistanceProductId, "tarifs"],
+    queryFn: () => productionApi.listTarifsProduitAssistance(activeVehiculeAssistanceProductId),
+    enabled: Boolean(activeVehiculeAssistanceProductId),
+    staleTime: 60_000,
+  });
+  const activeRemorqueAssistanceTarifs = useQuery({
+    queryKey: ["referentiel", "produits-assistance", activeRemorqueAssistanceProductId, "tarifs"],
+    queryFn: () => productionApi.listTarifsProduitAssistance(activeRemorqueAssistanceProductId),
+    enabled: Boolean(activeRemorqueAssistanceProductId),
+    staleTime: 60_000,
+  });
+  const activeVehiculeAssistanceNet = targetAssistanceNet(activeVehiculeAssistance, produitsAssistance, activeVehiculeAssistanceTarifs.data);
+  const activeRemorqueAssistanceNet = targetAssistanceNet(activeRemorqueAssistance, produitsAssistance, activeRemorqueAssistanceTarifs.data);
 
   useEffect(() => {
     if (!recalculationRequest || !onPreviewQuittance) {
@@ -471,7 +491,7 @@ export function FlotteTargetsSection({
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeVehiculeTarget)}
                   showAssistanceTotal={showAssistance && Boolean(assistances[targetKey(activeVehiculeTarget)]?.enabled)}
-                  assistanceNet={targetAssistanceNet(assistances[targetKey(activeVehiculeTarget)], produitsAssistance)}
+                  assistanceNet={activeVehiculeAssistanceNet}
                 />
               </TargetSubsection>
             </div>
@@ -599,7 +619,7 @@ export function FlotteTargetsSection({
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeRemorqueTarget)}
                   showAssistanceTotal={showAssistance && Boolean(assistances[targetKey(activeRemorqueTarget)]?.enabled)}
-                  assistanceNet={targetAssistanceNet(assistances[targetKey(activeRemorqueTarget)], produitsAssistance)}
+                  assistanceNet={activeRemorqueAssistanceNet}
                 />
               </TargetSubsection>
             </div>
@@ -907,12 +927,12 @@ function targetCnpac(preview: QuittancePreview) {
   return units.size > 0 ? roundMoney(autoCnpac / units.size) : autoCnpac;
 }
 
-function targetAssistanceNet(assistance: AssistanceDraft | undefined, produitsAssistance: ReferenceOption[]) {
+function targetAssistanceNet(assistance: AssistanceDraft | undefined, produitsAssistance: ReferenceOption[], tarifs?: ReferenceOption[]) {
   if (!assistance?.enabled || !assistance.produitAssistanceId) {
     return undefined;
   }
   const product = produitsAssistance.find((item) => item.id === assistance.produitAssistanceId);
-  return numberValue(String(product?.montantHt ?? ""));
+  return resolveAssistanceTariffAmount(product, tarifs, assistance.dateSouscription);
 }
 
 function previewGuaranteeLine(
@@ -1748,7 +1768,13 @@ function AssistanceTable({
   });
   const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
   const selectedProductId = selectedProduct?.id ?? "";
-  const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+  const tarifsQuery = useQuery({
+    queryKey: ["referentiel", "produits-assistance", selectedProductId, "tarifs"],
+    queryFn: () => productionApi.listTarifsProduitAssistance(selectedProductId),
+    enabled: assistance.enabled && Boolean(selectedProductId),
+    staleTime: 60_000,
+  });
+  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription);
   const trimestres = assistance.enabled ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance) : undefined;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({
@@ -1807,7 +1833,7 @@ function AssistanceTable({
               />
             </td>
             <td className="px-3 py-2">
-              <DatePicker disabled={!assistance.enabled} date={assistance.dateEcheance} onSelect={(date) => onChange({ dateEcheance: toDateOnly(date) })} />
+              <DatePicker disabled date={assistance.dateEcheance} onSelect={() => undefined} />
             </td>
             <td className="px-3 py-2">
               <Input

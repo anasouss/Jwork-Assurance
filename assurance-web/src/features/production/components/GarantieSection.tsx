@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
+import { productionApi } from "../api";
+import { resolveAssistanceTariffAmount } from "../assistance-pricing";
 import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberValue, roundMoney } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
@@ -600,7 +603,13 @@ function AssistanceTable({
   });
   const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
   const selectedProductId = selectedProduct?.id ?? "";
-  const prime = numberValue(String(selectedProduct?.montantHt ?? ""));
+  const tarifsQuery = useQuery({
+    queryKey: ["referentiel", "produits-assistance", selectedProductId, "tarifs"],
+    queryFn: () => productionApi.listTarifsProduitAssistance(selectedProductId),
+    enabled: assistance.enabled && Boolean(selectedProductId),
+    staleTime: 60_000,
+  });
+  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription);
   const trimestres = assistance.enabled ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance) : undefined;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({
@@ -666,7 +675,7 @@ function AssistanceTable({
               />
             </td>
             <td className="px-3 py-2">
-              <DatePicker disabled={!assistance.enabled} date={assistance.dateEcheance} onSelect={(date) => onChange({ dateEcheance: toDateOnly(date) })} />
+              <DatePicker disabled date={assistance.dateEcheance} onSelect={() => undefined} />
             </td>
             <td className="px-3 py-2">
               <Input

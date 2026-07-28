@@ -1122,7 +1122,7 @@ function hydrateAvenantAssistances(
 
 function mapCurrentAssistances(
   assistances: NonNullable<ContratSummary["assistances"]>,
-  vehicules: Array<{ vehiculeId?: string | null }>
+  vehicules: Array<{ vehiculeId?: string | number | null }>
 ): Record<string, AssistanceDraft> {
   const mapped: Record<string, AssistanceDraft> = {};
   for (const assistance of assistances) {

@@ -932,7 +932,7 @@ function targetAssistanceNet(assistance: AssistanceDraft | undefined, produitsAs
     return undefined;
   }
   const product = produitsAssistance.find((item) => item.id === assistance.produitAssistanceId);
-  return resolveAssistanceTariffAmount(product, tarifs, assistance.dateSouscription);
+  return resolveAssistanceTariffAmount(product, tarifs, assistance.dateSouscription, "montantTtc");
 }
 
 function previewGuaranteeLine(
@@ -1774,7 +1774,7 @@ function AssistanceTable({
     enabled: assistance.enabled && Boolean(selectedProductId),
     staleTime: 60_000,
   });
-  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription);
+  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription, "montantTtc");
   const trimestres = assistance.enabled ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance) : undefined;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({

@@ -609,7 +609,7 @@ function AssistanceTable({
     enabled: assistance.enabled && Boolean(selectedProductId),
     staleTime: 60_000,
   });
-  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription);
+  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription, "montantTtc");
   const trimestres = assistance.enabled ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance) : undefined;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({

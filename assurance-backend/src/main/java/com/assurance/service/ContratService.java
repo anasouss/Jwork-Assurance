@@ -70,6 +70,7 @@ public class ContratService {
     private final ElementFacturableCibleService elementFacturableCibleService;
     private final MouvementContratService mouvementContratService;
     private final MouvementContratRepository mouvementContratRepository;
+    private final AvenantDraftRepository avenantDraftRepository;
     private final MouvementVehiculeRepository mouvementVehiculeRepository;
     private final MouvementRemorqueRepository mouvementRemorqueRepository;
     private final MouvementGarantieRepository mouvementGarantieRepository;
@@ -1064,6 +1065,26 @@ public class ContratService {
         if (!hasText(input.getCrm())) {
             throw new BadRequestException("CRM obligatoire");
         }
+        Usage usage = input.getUsageId() == null
+                ? contrat.getUsage()
+                : usageRepository.findById(input.getUsageId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+        if (usage == null) {
+            throw new BadRequestException("Usage vehicule obligatoire");
+        }
+        if (Boolean.TRUE.equals(usage.getByCarburantAndPf())
+                && (!hasText(input.getCarburant()) || !hasText(input.getPuissanceFiscale()))) {
+            throw new BadRequestException("Carburant et puissance fiscale obligatoires pour cet usage");
+        }
+        if (Boolean.TRUE.equals(usage.getBySousClasse()) && !hasText(input.getSousClasse())) {
+            throw new BadRequestException("Sous-classe obligatoire pour cet usage");
+        }
+        if (Boolean.TRUE.equals(usage.getByPtc()) && !hasText(input.getPtc())) {
+            throw new BadRequestException("PTC obligatoire pour cet usage");
+        }
+        if (Boolean.TRUE.equals(usage.getByCategorieTransport()) && input.getCategorieTransportId() == null) {
+            throw new BadRequestException("Categorie transport obligatoire pour cet usage");
+        }
     }
 
     private void applyVehiculeInput(Contrat contrat, Vehicule vehicule, CreateContratRequest.VehiculeInput input) {
@@ -1838,7 +1859,7 @@ public class ContratService {
     public QuittanceResponse creerAvenant(Long agenceId, Long contratId, AvenantRequest request) {
         if (isModificationGarantiesAvenant(request)) {
             AvenantModificationGraph graph = resolveModificationGarantiesAvenant(agenceId, contratId, request, true);
-            return mouvementContratService.creerMouvementSpecialise(
+            QuittanceResponse quittance = mouvementContratService.creerMouvementSpecialise(
                     graph.contrat(),
                     graph.typeMouvement(),
                     toMouvementRequest(request, graph.contrat()),
@@ -1848,6 +1869,8 @@ public class ContratService {
                     NatureSnapshotMouvement.COURANT,
                     graph.differentiel()
             );
+            deleteAvenantDraft(contratId, request);
+            return quittance;
         }
         AvenantGraph graph = resolveAvenantGraph(agenceId, contratId, request, true);
         QuittanceCalculService.Resultat retourPrime = calculerRetourPrime(graph, request);
@@ -1872,7 +1895,17 @@ public class ContratService {
                         retourPrime
                 );
         applyAvenantCurrentState(graph, request);
+        deleteAvenantDraft(contratId, request);
         return quittance;
+    }
+
+    private void deleteAvenantDraft(Long contratId, AvenantRequest request) {
+        if (request != null && hasText(request.getCodeTypeMouvement())) {
+            avenantDraftRepository.deleteByContratIdAndTypeMouvementCodeIgnoreCase(
+                    contratId,
+                    request.getCodeTypeMouvement().trim()
+            );
+        }
     }
 
     private AvenantGraph resolveAvenantGraph(Long agenceId, Long contratId, AvenantRequest request, boolean persistIncorporation) {

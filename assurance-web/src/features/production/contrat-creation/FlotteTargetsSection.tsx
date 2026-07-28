@@ -79,12 +79,13 @@ type Props = {
   targetPreview?: QuittancePreview | null;
   previewing?: boolean;
   saving?: boolean;
-  onPreviewQuittance?: (target: Target) => void;
+  onPreviewQuittance?: (target: Target, selectedGaranties?: GarantieInput[]) => void;
   onSaveDraft?: (label: string, onSuccess?: () => void) => void;
   onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
   onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;
   garantiesExtraAction?: ReactNode;
   targetActionMode?: "save" | "calculate";
+  previewAfterInfoSave?: boolean;
   targetAssistances?: Record<string, AssistanceDraft>;
   setTargetAssistances?: Dispatch<SetStateAction<Record<string, AssistanceDraft>>>;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
@@ -132,6 +133,7 @@ export function FlotteTargetsSection({
   onValidateTarget,
   garantiesExtraAction,
   targetActionMode = "save",
+  previewAfterInfoSave = true,
   targetAssistances,
   setTargetAssistances,
   setAssistanceEnabled,
@@ -172,7 +174,6 @@ export function FlotteTargetsSection({
   const [activeKey, setActiveKey] = useState(targetKey(targets[0]));
   const [activeTargetPart, setActiveTargetPart] = useState<"info" | "garanties">("info");
   const [savedKeys, setSavedKeys] = useState<string[]>([]);
-  const [recalculationRequest, setRecalculationRequest] = useState<{ targetKey: string; seq: number } | null>(null);
   const [dirtyCalculationKeys, setDirtyCalculationKeys] = useState<string[]>([]);
   const [localAssistances, setLocalAssistances] = useState<Record<string, AssistanceDraft>>({});
   const assistances = targetAssistances ?? localAssistances;
@@ -228,16 +229,6 @@ export function FlotteTargetsSection({
       };
 
   useEffect(() => {
-    if (!recalculationRequest || !onPreviewQuittance) {
-      return;
-    }
-    const target = targets.find((item) => targetKey(item) === recalculationRequest.targetKey);
-    if (target) {
-      onPreviewQuittance(target);
-    }
-  }, [recalculationRequest?.seq]);
-
-  useEffect(() => {
     if (wasPreviewingRef.current && !previewing) {
       const targetPrefix = calculationTargetKeyRef.current ? `${calculationTargetKeyRef.current}:` : "";
       setDirtyCalculationKeys((current) => targetPrefix ? current.filter((key) => !key.startsWith(targetPrefix)) : []);
@@ -246,14 +237,14 @@ export function FlotteTargetsSection({
     wasPreviewingRef.current = previewing;
   }, [previewing]);
 
-  const requestTargetCalculation = (target: Target, garantieId?: string) => {
+  const requestTargetCalculation = (target: Target, garantieId?: string, nextSelectedGaranties?: GarantieInput[]) => {
     const key = targetKey(target);
     calculationTargetKeyRef.current = key;
     if (garantieId) {
       const dirtyKey = guaranteeCalculationKey(target, garantieId);
       setDirtyCalculationKeys((current) => (current.includes(dirtyKey) ? current : [...current, dirtyKey]));
     }
-    setRecalculationRequest((current) => ({ targetKey: key, seq: (current?.seq ?? 0) + 1 }));
+    onPreviewQuittance?.(target, nextSelectedGaranties);
   };
 
   const updateAssistance = (target: Target, patch: Partial<AssistanceDraft>) => {
@@ -450,7 +441,9 @@ export function FlotteTargetsSection({
                     loadingText={targetActionText.loading}
                     onClick={() => saveTargetSection(activeVehiculeTarget, "info", "Informations véhicule", () => {
                       setActiveTargetPart("garanties");
-                      onPreviewQuittance?.(activeVehiculeTarget);
+                      if (previewAfterInfoSave) {
+                        onPreviewQuittance?.(activeVehiculeTarget);
+                      }
                     })}
                   >
                     {targetActionText.info}
@@ -588,7 +581,9 @@ export function FlotteTargetsSection({
                     saving={saving}
                     loadingText={targetActionText.loading}
                     onClick={() => saveTargetSection(activeRemorqueTarget, "info", "Informations remorque", () => {
-                      onPreviewQuittance?.(activeRemorqueTarget);
+                      if (previewAfterInfoSave) {
+                        onPreviewQuittance?.(activeRemorqueTarget);
+                      }
                     })}
                   >
                     {targetActionText.info}
@@ -1431,11 +1426,12 @@ function TargetGuaranteesTable({
   preview?: QuittancePreview | null;
   previewing?: boolean;
   dirtyCalculationKeys?: string[];
-  onRequestCalculation?: (target: Target, garantieId?: string) => void;
+  onRequestCalculation?: (target: Target, garantieId?: string, selectedGaranties?: GarantieInput[]) => void;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
-    setSelected((current) => current.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item)));
-    onRequestCalculation?.(target, garantieId);
+    const next = selected.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item));
+    setSelected(next);
+    onRequestCalculation?.(target, garantieId, next);
   };
   const automaticPricing = pricingMode === "AUTOMATIQUE_GRILLE";
   const primeInputEnabled = pricingMode === "MANUELLE_AVEC_PRIME_NETTE";
@@ -1453,18 +1449,18 @@ function TargetGuaranteesTable({
         return;
       }
     }
-    setSelected((current) => checked
-      ? [...current, { ...targetedInput(garantie, target, pricingMode), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
-      : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target))));
-    onRequestCalculation?.(target, garantie.id);
+    const next = checked
+      ? [...selected, { ...targetedInput(garantie, target, pricingMode), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
+      : selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)));
+    setSelected(next);
+    onRequestCalculation?.(target, garantie.id, next);
   };
 
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
     const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
-    setSelected((current) =>
-      checked
+    const next = checked
         ? [
-            ...current,
+            ...selected,
             {
               ...targetedInput(garantie, target),
               modeSelectionne: "PROTECTION",
@@ -1474,9 +1470,9 @@ function TargetGuaranteesTable({
               prime: numberValue(String(formules[0]?.primeNette ?? "")),
             },
           ]
-        : current.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)))
-    );
-    onRequestCalculation?.(target, garantie.id);
+        : selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)));
+    setSelected(next);
+    onRequestCalculation?.(target, garantie.id, next);
   };
 
   const usage = target.kind === "vehicule" ? usages.find((item) => item.id === target.usageId) : undefined;

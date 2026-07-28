@@ -15,6 +15,7 @@ import type {
   ElementFacturable,
   EcheanceAutomobileResponse,
   AvenantContext,
+  AvenantDraft,
   AvenantRequest,
   LivraisonAttestation,
   PieceJointe,
@@ -199,6 +200,32 @@ export const productionApi = {
 
   async getAvenantContext(contratId: string) {
     return unwrap(await apiFetch<ApiResponse<AvenantContext>>(`/api/v1/contrats/${contratId}/avenants`));
+  },
+
+  async getAvenantDraft(contratId: string, codeTypeMouvement: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<AvenantDraft | null>>(
+        `/api/v1/contrats/${contratId}/avenants/brouillon${buildQueryString({ code: codeTypeMouvement })}`
+      )
+    );
+  },
+
+  async saveAvenantDraft(contratId: string, request: AvenantRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<AvenantDraft>>(`/api/v1/contrats/${contratId}/avenants/brouillon`, {
+        method: "PUT",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async deleteAvenantDraft(contratId: string, codeTypeMouvement: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(
+        `/api/v1/contrats/${contratId}/avenants/brouillon${buildQueryString({ code: codeTypeMouvement })}`,
+        { method: "DELETE" }
+      )
+    );
   },
 
   async previewAvenant(contratId: string, request: AvenantRequest) {

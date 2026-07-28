@@ -86,13 +86,23 @@ export default function AvenantContratPage() {
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof productionApi.previewAvenant>> | null>(null);
+  const [targetPreview, setTargetPreview] = useState<Awaited<ReturnType<typeof productionApi.previewAvenant>> | null>(null);
   const [grilleConfiguratorOpen, setGrilleConfiguratorOpen] = useState(false);
   const autoPreviewKeyRef = useRef("");
   const manualPreviewKeyRef = useRef("");
+  const globalPreviewRequestKeyRef = useRef("");
+  const targetPreviewRequestKeyRef = useRef("");
+  const hydratedDraftCodeRef = useRef("");
+  const previewedDraftCodeRef = useRef("");
 
   const contextQuery = useQuery({
     queryKey: ["avenant-context", contratId],
     queryFn: () => productionApi.getAvenantContext(contratId),
+    enabled: Boolean(contratId),
+  });
+  const draftQuery = useQuery({
+    queryKey: ["avenant-draft", contratId, movementCode],
+    queryFn: () => productionApi.getAvenantDraft(contratId, movementCode),
     enabled: Boolean(contratId),
   });
   const usages = useQuery({ queryKey: ["referentiel", "usages", "avenant-contrat"], queryFn: () => productionApi.referentiel("usages") });
@@ -113,6 +123,7 @@ export default function AvenantContratPage() {
       .filter((item) => !Boolean(item.renouvelleContrat)),
     [contextQuery.data?.mouvementsDisponibles]
   );
+  const movementAvailable = availableMovements.some((item) => normalizeCode(item.code) === movementCode);
   const contratKindLabel = contrat?.typeContrat === "FLOTTE" ? "flotte" : contrat?.typeContrat === "CONVENTION" ? "convention" : "mono";
   const targets = useMemo<Target[]>(() => [
     ...(contrat?.vehicules ?? []).map((item, index) => ({
@@ -184,6 +195,7 @@ export default function AvenantContratPage() {
 
   useEffect(() => {
     setPreview(null);
+    setTargetPreview(null);
     setSelectedTargetIds([]);
     setPrecisionDrafts({});
     if (movementCode === "INC_F") {
@@ -258,13 +270,79 @@ export default function AvenantContratPage() {
     setSelectedGaranties(mapCurrentGaranties(contrat.garanties ?? [], mappedVehicules, mappedRemorques));
   }, [contrat, movementCode]);
 
+  useEffect(() => {
+    if (!draftQuery.isFetched || hydratedDraftCodeRef.current === movementCode) {
+      return;
+    }
+    hydratedDraftCodeRef.current = movementCode;
+    const request = draftQuery.data?.request;
+    if (!request) {
+      return;
+    }
+    setDateEffet(request.dateEffet ?? contrat?.dateEffet ?? undefined);
+    setDateEcheance(contrat?.dateEcheance ?? request.dateEcheance ?? undefined);
+    setVehicules(request.vehicules?.length ? request.vehicules : movementCode === "EXR_M" ? [] : [{ ...DEFAULT_VEHICLE }]);
+    setRemorques(request.remorques?.length ? request.remorques : movementCode === "EXR_M" ? [{}] : []);
+    setSelectedGaranties(request.garanties ?? []);
+    setSelectedTargetIds([
+      ...(request.vehiculeIds ?? []).map((id) => `vehicule:${id}`),
+      ...(request.remorqueIds ?? []).map((id) => `remorque:${id}`),
+    ]);
+    const nextPrecisions: Record<string, PrecisionDraft> = {};
+    for (const precision of request.precisions ?? []) {
+      const key = precision.vehiculeId
+        ? `vehicule:${precision.vehiculeId}`
+        : precision.remorqueId
+          ? `remorque:${precision.remorqueId}`
+          : "";
+      if (key) {
+        nextPrecisions[key] = {
+          immatriculation: precision.immatriculation,
+          immatriculationProvisoire: precision.immatriculationProvisoire,
+          numeroAttestation: precision.numeroAttestation,
+        };
+      }
+    }
+    setPrecisionDrafts(nextPrecisions);
+  }, [contrat?.dateEcheance, contrat?.dateEffet, draftQuery.data, draftQuery.isFetched, movementCode]);
+
   const previewMutation = useMutation({
     mutationFn: (request: AvenantRequest) => productionApi.previewAvenant(contratId, request),
-    onSuccess: setPreview,
+    onSuccess: (data, request) => {
+      if (globalPreviewRequestKeyRef.current === JSON.stringify(request)) {
+        setPreview(data);
+      }
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+  const targetPreviewMutation = useMutation({
+    mutationFn: ({ request }: {
+      request: AvenantRequest;
+      target: FlotteSectionTarget;
+      requestKey: string;
+      onSuccess?: () => void;
+    }) => productionApi.previewAvenant(contratId, request),
+    onSuccess: (data, variables) => {
+      if (targetPreviewRequestKeyRef.current !== variables.requestKey) {
+        return;
+      }
+      setTargetPreview(remapScopedPreview(data, variables.target));
+      variables.onSuccess?.();
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+  const draftMutation = useMutation({
+    mutationFn: (request: AvenantRequest) => productionApi.saveAvenantDraft(contratId, request),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["avenant-draft", contratId, movementCode] });
+    },
     onError: (error) => toast.error(errorMessage(error)),
   });
   const saveMutation = useMutation({
-    mutationFn: (request: AvenantRequest) => productionApi.createAvenant(contratId, request),
+    mutationFn: async (request: AvenantRequest) => {
+      await productionApi.saveAvenantDraft(contratId, request);
+      return productionApi.createAvenant(contratId, request);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
       await queryClient.invalidateQueries({ queryKey: ["avenant-context", contratId] });
@@ -273,6 +351,48 @@ export default function AvenantContratPage() {
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
+
+  const buildDraftRequest = (guaranteesOverride?: GarantieInput[]): AvenantRequest => {
+    const draftGaranties = guaranteesOverride ?? selectedGaranties;
+    const request: AvenantRequest = {
+      codeTypeMouvement: movementCode,
+      dateEffet,
+      dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
+    };
+    if (movementCode === "INC_F") {
+      request.vehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
+      request.remorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
+      request.garanties = ensureRcGaranties(
+        draftGaranties,
+        request.vehicules.length,
+        request.remorques.length,
+        garanties.data ?? []
+      );
+    }
+    if (isGuaranteeModificationCode(movementCode)) {
+      request.garanties = draftGaranties;
+    }
+    if (movementCode === "EXR_M") {
+      request.remorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
+      request.garanties = ensureRcGaranties(draftGaranties, 0, request.remorques.length, garanties.data ?? []);
+    }
+    const selected = splitTargets(targets, selectedTargetIds);
+    if (movementCode === "RET_F" || movementCode === "EXR_F" || movementCode === "DUP_F" || movementCode === "DUP_M" || isPrecisionCode(movementCode)) {
+      request.vehiculeIds = selected.vehiculeIds;
+      request.remorqueIds = selected.remorqueIds;
+    }
+    if (isPrecisionCode(movementCode)) {
+      request.precisions = selectedTargetIds.flatMap((targetId) => {
+        const target = targets.find((item) => targetKey(item) === targetId);
+        if (!target) return [];
+        const precision = precisionDrafts[targetId] ?? {};
+        return [target.kind === "vehicule"
+          ? { vehiculeId: target.id, ...precision }
+          : { remorqueId: target.id, ...precision }];
+      });
+    }
+    return request;
+  };
 
   const buildRequest = (silent = false): AvenantRequest | null => {
     const notify = (message: string) => {
@@ -284,18 +404,16 @@ export default function AvenantContratPage() {
       notify("La date d'effet est obligatoire");
       return null;
     }
-    const request: AvenantRequest = {
-      codeTypeMouvement: movementCode,
-      dateEffet,
-      dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
-    };
+    const request = buildDraftRequest();
     if (movementCode === "INC_F") {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
       const garantiesRequest = ensureRcGaranties(selectedGaranties, normalizedVehicules.length, normalizedRemorques.length, garanties.data ?? []);
-      const invalidVehicule = normalizedVehicules.some((item) => !item.usageId || !item.marqueId || !item.immatriculation || !item.puissanceFiscale || !item.nombrePlaces);
+      const invalidVehicule = normalizedVehicules
+        .map((item) => vehicleValidationMessage(item, flotteTargetUsages))
+        .find(Boolean);
       if (invalidVehicule) {
-        notify("Usage, marque, immatriculation, puissance fiscale et nombre de places sont obligatoires pour chaque véhicule");
+        notify(invalidVehicule);
         return null;
       }
       if (garantiesRequest.length === 0) {
@@ -320,9 +438,9 @@ export default function AvenantContratPage() {
     if (movementCode === "EXR_M") {
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
       const garantiesRequest = ensureRcGaranties(selectedGaranties, 0, normalizedRemorques.length, garanties.data ?? []);
-      const invalidRemorque = normalizedRemorques.some((item) => !item.usageId || !item.marqueId || !item.immatriculation || !item.ptc);
+      const invalidRemorque = normalizedRemorques.map(remorqueValidationMessage).find(Boolean);
       if (invalidRemorque) {
-        notify("Usage, marque, immatriculation et PTC sont obligatoires pour chaque remorque");
+        notify(invalidRemorque);
         return null;
       }
       if (garantiesRequest.length === 0) {
@@ -374,7 +492,11 @@ export default function AvenantContratPage() {
     return request;
   };
 
-  const buildTargetCreationPreviewRequest = (target: FlotteSectionTarget, silent = false): AvenantRequest | null => {
+  const buildTargetCreationPreviewRequest = (
+    target: FlotteSectionTarget,
+    silent = false,
+    guaranteesOverride?: GarantieInput[]
+  ): AvenantRequest | null => {
     const notify = (message: string) => {
       if (!silent) {
         toast.error(message);
@@ -389,6 +511,7 @@ export default function AvenantContratPage() {
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
     };
+    const previewGaranties = guaranteesOverride ?? selectedGaranties;
     if (movementCode === "INC_F") {
       const normalizedVehicules = target.kind === "vehicule"
         ? [normalizeVehicle(vehicules[target.index], dateEffet, request.dateEcheance)]
@@ -397,7 +520,7 @@ export default function AvenantContratPage() {
         ? [normalizeRemorque(remorques[target.index], dateEffet, request.dateEcheance)]
         : [];
       const garantiesRequest = ensureRcGaranties(
-        scopeGarantiesForTarget(selectedGaranties, target),
+        scopeGarantiesForTarget(previewGaranties, target),
         normalizedVehicules.length,
         normalizedRemorques.length,
         garanties.data ?? []
@@ -412,7 +535,7 @@ export default function AvenantContratPage() {
         ? [normalizeRemorque(remorques[target.index], dateEffet, request.dateEcheance)]
         : [];
       request.remorques = normalizedRemorques;
-      request.garanties = ensureRcGaranties(scopeGarantiesForTarget(selectedGaranties, target), 0, normalizedRemorques.length, garanties.data ?? []);
+      request.garanties = ensureRcGaranties(scopeGarantiesForTarget(previewGaranties, target), 0, normalizedRemorques.length, garanties.data ?? []);
       return request;
     }
     return buildRequest(silent);
@@ -444,6 +567,7 @@ export default function AvenantContratPage() {
     }
     const timeout = window.setTimeout(() => {
       autoPreviewKeyRef.current = key;
+      globalPreviewRequestKeyRef.current = key;
       previewMutation.mutate(request);
     }, 350);
     return () => window.clearTimeout(timeout);
@@ -463,9 +587,39 @@ export default function AvenantContratPage() {
     selectedGaranties,
   ]);
 
+  useEffect(() => {
+    if (!isTargetCreationCode(movementCode)
+        || !draftQuery.data?.request
+        || hydratedDraftCodeRef.current !== movementCode
+        || previewedDraftCodeRef.current === movementCode) {
+      return;
+    }
+    const request = buildRequest(true);
+    if (!request) {
+      return;
+    }
+    previewedDraftCodeRef.current = movementCode;
+    manualPreviewKeyRef.current = JSON.stringify(request);
+    globalPreviewRequestKeyRef.current = JSON.stringify(request);
+    previewMutation.mutate(request);
+  }, [
+    draftQuery.data,
+    movementCode,
+    dateEffet,
+    vehicules,
+    remorques,
+    selectedGaranties,
+  ]);
+
   const save = () => {
     const request = buildRequest();
     if (request) saveMutation.mutate(request);
+  };
+
+  const saveDraft = () => {
+    draftMutation.mutate(buildDraftRequest(), {
+      onSuccess: () => toast.success("Brouillon d'avenant enregistré"),
+    });
   };
 
   const validateTargetCreation = (target: FlotteSectionTarget, part?: "info" | "garanties") => {
@@ -474,15 +628,17 @@ export default function AvenantContratPage() {
     }
     if (target.kind === "vehicule") {
       const vehicule = vehicules[target.index];
-      if (!vehicule?.usageId || !vehicule.marqueId || !vehicule.immatriculation || !vehicule.puissanceFiscale || !vehicule.nombrePlaces) {
-        toast.error("Usage, marque, immatriculation, puissance fiscale et nombre de places sont obligatoires pour ce véhicule");
+      const validationMessage = vehicleValidationMessage(vehicule, flotteTargetUsages);
+      if (validationMessage) {
+        toast.error(validationMessage);
         return false;
       }
     }
     if (target.kind === "remorque") {
       const remorque = remorques[target.index];
-      if (!remorque?.usageId || !remorque.marqueId || !remorque.immatriculation || !remorque.ptc) {
-        toast.error("Usage, marque, immatriculation et PTC sont obligatoires pour cette remorque");
+      const validationMessage = remorqueValidationMessage(remorque);
+      if (validationMessage) {
+        toast.error(validationMessage);
         return false;
       }
     }
@@ -498,28 +654,66 @@ export default function AvenantContratPage() {
     return true;
   };
 
-  const previewTargetCreation = (target?: FlotteSectionTarget, onSuccess?: () => void) => {
-    const request = target ? buildTargetCreationPreviewRequest(target) : buildRequest();
+  const previewTargetCreation = (
+    target: FlotteSectionTarget,
+    onSuccess?: () => void,
+    guaranteesOverride?: GarantieInput[]
+  ) => {
+    const request = buildTargetCreationPreviewRequest(target, false, guaranteesOverride);
     if (!request) {
       return false;
     }
+    const requestKey = `${target.kind}:${target.index}:${JSON.stringify(request)}`;
     manualPreviewKeyRef.current = JSON.stringify(request);
-    previewMutation.mutate(request, {
-      onSuccess: (data) => {
-        if (target) {
-          setPreview(remapScopedPreview(data, target));
-        }
-        onSuccess?.();
-      },
+    targetPreviewRequestKeyRef.current = requestKey;
+    setTargetPreview(null);
+    setPreview(null);
+    targetPreviewMutation.mutate({
+      request,
+      target,
+      requestKey,
+      onSuccess,
     });
     return true;
   };
 
-  const requestTargetCreationCalculation = (target: FlotteSectionTarget) => {
+  const previewCompleteDraft = () => {
+    const request = buildRequest(true);
+    if (!request) {
+      setPreview(null);
+      return;
+    }
+    manualPreviewKeyRef.current = JSON.stringify(request);
+    globalPreviewRequestKeyRef.current = JSON.stringify(request);
+    previewMutation.mutate(request);
+  };
+
+  const requestTargetCreationCalculation = (target: FlotteSectionTarget, guaranteesOverride?: GarantieInput[]) => {
     if (!validateTargetCreation(target)) {
       return;
     }
-    window.setTimeout(() => previewTargetCreation(target), 0);
+    previewTargetCreation(target, undefined, guaranteesOverride);
+  };
+
+  const saveTargetDraft = (
+    target: FlotteSectionTarget,
+    part: "info" | "garanties",
+    label: string,
+    onSuccess?: () => void
+  ) => {
+    const request = buildDraftRequest();
+    draftMutation.mutate(request, {
+      onSuccess: () => {
+        toast.success(`${label} enregistré`);
+        onSuccess?.();
+        if (isTargetCreationCode(movementCode)) {
+          previewTargetCreation(target, previewCompleteDraft);
+        } else if (part === "garanties") {
+          previewCompleteDraft();
+        }
+      },
+    });
+    return true;
   };
 
   return (
@@ -533,8 +727,26 @@ export default function AvenantContratPage() {
           <p className="text-sm text-muted-foreground">{contrat?.numeroDossier ?? contrat?.numeroContrat ?? contratId}</p>
         </div>
         <div className="flex gap-2">
-          <Button type="button" onClick={save} disabled={saveMutation.isPending || contextQuery.isLoading || (isGuaranteeModificationCode(movementCode) && !hasActiveTargets)}>
-            <Save className="size-4" />Enregistrer
+          <Button
+            type="button"
+            variant="outline"
+            onClick={saveDraft}
+            disabled={draftMutation.isPending || contextQuery.isLoading || !movementAvailable}
+          >
+            <Save className="size-4" />Enregistrer brouillon
+          </Button>
+          <Button
+            type="button"
+            onClick={save}
+            disabled={
+              saveMutation.isPending
+              || draftMutation.isPending
+              || contextQuery.isLoading
+              || !movementAvailable
+              || (isGuaranteeModificationCode(movementCode) && !hasActiveTargets)
+            }
+          >
+            <Save className="size-4" />Valider l'avenant
           </Button>
         </div>
       </div>
@@ -546,10 +758,14 @@ export default function AvenantContratPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <Field label="Type">
-            <Select value={movementCode} onValueChange={(value) => navigate(`/app/production/contrats/${contratId}/avenants/${value}`)}>
+            <Select
+              value={movementCode}
+              disabled={contextQuery.isLoading || availableMovements.length === 0}
+              onValueChange={(value) => navigate(`/app/production/contrats/${contratId}/avenants/${value}`)}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(availableMovements.length ? availableMovements : supportedAvenantOptions()).map((item) => (
+                {availableMovements.map((item) => (
                   <SelectItem key={item.code} value={item.code}>{item.libelle ?? MOVEMENT_LABELS[item.code] ?? item.code}</SelectItem>
                 ))}
               </SelectContent>
@@ -594,8 +810,9 @@ export default function AvenantContratPage() {
           grilleSelected={Boolean(grilleTarifaireId)}
           pricingMode={contrat?.modeSaisieGaranties ?? "AUTOMATIQUE_GRILLE"}
           preview={preview}
-          previewing={previewMutation.isPending}
-          saving={saveMutation.isPending}
+          targetPreview={targetPreview}
+          previewing={previewMutation.isPending || targetPreviewMutation.isPending}
+          saving={saveMutation.isPending || draftMutation.isPending}
           crmPartage={Boolean(contrat?.crmPartage)}
           crmPartageValeur={contrat?.crmPartageValeur ?? ""}
           maxRemorques={null}
@@ -604,7 +821,8 @@ export default function AvenantContratPage() {
           allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
           onValidateTarget={isTargetCreationCode(movementCode) ? validateTargetCreation : undefined}
           onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
-          targetActionMode={isTargetCreationCode(movementCode) ? "calculate" : "save"}
+          targetActionMode="save"
+          previewAfterInfoSave={false}
           garantiesExtraAction={movementCode === "INC_F" ? (
             <Button
               type="button"
@@ -616,15 +834,7 @@ export default function AvenantContratPage() {
               Grille tarifaire
             </Button>
           ) : null}
-          onSaveTargetDraft={isTargetCreationCode(movementCode)
-            ? (_target, part, _label, onSuccess) => {
-                if (part === "info") {
-                  onSuccess?.();
-                  return true;
-                }
-                return previewTargetCreation(_target, onSuccess);
-              }
-            : undefined}
+          onSaveTargetDraft={isTargetCreationCode(movementCode) || isGuaranteeModificationCode(movementCode) ? saveTargetDraft : undefined}
         />
       ) : !isClosureCode(movementCode) ? (
         <TargetsSection
@@ -766,12 +976,57 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="grid gap-1.5 text-xs font-semibold uppercase text-slate-700 dark:text-neutral-300"><span>{label}</span>{children}</label>;
 }
 
-function normalizeVehicle(vehicle: VehiculeInput, dateEffet: string, dateEcheance?: string): VehiculeInput {
+function normalizeVehicle(vehicle: VehiculeInput, dateEffet?: string, dateEcheance?: string): VehiculeInput {
   return { ...vehicle, typeVehicule: vehicle.typeVehicule ?? "AUTOMOBILE", dateEffet, dateEcheance };
 }
 
-function normalizeRemorque(remorque: RemorqueInput, dateEffet: string, dateEcheance?: string): RemorqueInput {
+function normalizeRemorque(remorque: RemorqueInput, dateEffet?: string, dateEcheance?: string): RemorqueInput {
   return { ...remorque, dateEffet, dateEcheance };
+}
+
+function vehicleValidationMessage(vehicle: VehiculeInput | undefined, usages: ReferenceOption[]) {
+  if (!vehicle) {
+    return "Véhicule introuvable";
+  }
+  if (!vehicle.usageId) {
+    return "L'usage est obligatoire pour chaque véhicule";
+  }
+  if (!vehicle.marqueId && !vehicle.marqueLibelle?.trim()) {
+    return "La marque est obligatoire pour chaque véhicule";
+  }
+  if (!vehicle.carrosserieId && !vehicle.carrosserieLibelle?.trim()) {
+    return "La carrosserie est obligatoire pour chaque véhicule";
+  }
+  if (!vehicle.immatriculation?.trim()) {
+    return "L'immatriculation est obligatoire pour chaque véhicule";
+  }
+  if (!vehicle.nombrePlaces?.trim()) {
+    return "Le nombre de places est obligatoire pour chaque véhicule";
+  }
+  if (!vehicle.crm?.trim()) {
+    return "Le CRM est obligatoire pour chaque véhicule";
+  }
+  const usage = usages.find((item) => item.id === vehicle.usageId);
+  if (Boolean(usage?.byCarburantAndPf) && (!vehicle.carburant?.trim() || !vehicle.puissanceFiscale?.trim())) {
+    return "Le carburant et la puissance fiscale sont obligatoires pour cet usage";
+  }
+  if (Boolean(usage?.bySousClasse) && !vehicle.sousClasse?.trim()) {
+    return "La sous-classe est obligatoire pour cet usage";
+  }
+  if (Boolean(usage?.byPtc) && !vehicle.ptc?.trim()) {
+    return "Le PTC est obligatoire pour cet usage";
+  }
+  if (Boolean(usage?.byCategorieTransport) && !vehicle.categorieTransportId) {
+    return "La catégorie de transport est obligatoire pour cet usage";
+  }
+  return null;
+}
+
+function remorqueValidationMessage(remorque: RemorqueInput | undefined) {
+  if (!remorque) {
+    return "Remorque introuvable";
+  }
+  return remorque.usageId ? null : "L'usage est obligatoire pour chaque remorque";
 }
 
 function ensureRcGaranties(
@@ -920,10 +1175,6 @@ const supportedAvenantCodes = new Set([
   "PRI_F",
   "DUP_F",
 ]);
-
-function supportedAvenantOptions() {
-  return Array.from(supportedAvenantCodes).map((code) => ({ code, libelle: MOVEMENT_LABELS[code] ?? code }));
-}
 
 function normalizeCode(code?: string | null) {
   return (code ?? "").trim().toUpperCase();

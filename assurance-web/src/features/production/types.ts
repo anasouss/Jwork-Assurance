@@ -278,6 +278,14 @@ export type AvenantRequest = {
   garanties?: GarantieInput[];
 };
 
+export type AvenantDraft = {
+  id: string;
+  contratId: string;
+  codeTypeMouvement: string;
+  updatedAt?: string | null;
+  request: AvenantRequest;
+};
+
 export type AvenantContext = {
   contrat: ContratSummary;
   mouvementsDisponibles: MouvementDisponible[];

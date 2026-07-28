@@ -8,6 +8,7 @@ import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.ApiResponse;
+import com.assurance.dto.response.AvenantDraftResponse;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.CarteVerteContextResponse;
@@ -20,6 +21,7 @@ import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
+import com.assurance.service.AvenantDraftService;
 import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
@@ -50,6 +52,7 @@ import java.util.List;
 public class ContratController {
 
     private final ContratService contratService;
+    private final AvenantDraftService avenantDraftService;
     private final ContratActionService contratActionService;
     private final AssistanceContratService assistanceContratService;
     private final CarteVerteService carteVerteService;
@@ -258,6 +261,36 @@ public class ContratController {
                 .contrat(contratService.getAvenantContext(TenantContext.getCurrentAgence(), id))
                 .mouvementsDisponibles(actions.getMouvementsDisponibles())
                 .build()));
+    }
+
+    @GetMapping("/{id}/avenants/brouillon")
+    public ResponseEntity<ApiResponse<AvenantDraftResponse>> brouillonAvenant(
+            @PathVariable Long id,
+            @RequestParam String code
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                avenantDraftService.get(TenantContext.getCurrentAgence(), id, code)
+        ));
+    }
+
+    @PutMapping("/{id}/avenants/brouillon")
+    public ResponseEntity<ApiResponse<AvenantDraftResponse>> enregistrerBrouillonAvenant(
+            @PathVariable Long id,
+            @RequestBody AvenantRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                avenantDraftService.save(TenantContext.getCurrentAgence(), id, request),
+                "Brouillon d'avenant enregistre"
+        ));
+    }
+
+    @DeleteMapping("/{id}/avenants/brouillon")
+    public ResponseEntity<ApiResponse<Void>> supprimerBrouillonAvenant(
+            @PathVariable Long id,
+            @RequestParam String code
+    ) {
+        avenantDraftService.delete(TenantContext.getCurrentAgence(), id, code);
+        return ResponseEntity.ok(ApiResponse.success(null, "Brouillon d'avenant supprime"));
     }
 
     @PostMapping("/{id}/avenants/previsualisation-quittance")

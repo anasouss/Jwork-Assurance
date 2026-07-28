@@ -35,6 +35,11 @@ type PrecisionDraft = {
   numeroAttestation?: string;
 };
 
+type FlotteSectionTarget = {
+  kind: "vehicule" | "remorque";
+  index: number;
+};
+
 const MOVEMENT_LABELS: Record<string, string> = {
   EXG_M: "Extension garanties",
   MOG_M: "Modification garanties",
@@ -80,6 +85,7 @@ export default function AvenantContratPage() {
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof productionApi.previewAvenant>> | null>(null);
   const autoPreviewKeyRef = useRef("");
+  const manualPreviewKeyRef = useRef("");
 
   const contextQuery = useQuery({
     queryKey: ["avenant-context", contratId],
@@ -275,9 +281,9 @@ export default function AvenantContratPage() {
     if (movementCode === "INC_F") {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
-      const invalidVehicule = normalizedVehicules.some((item) => !item.usageId || !item.marqueId || !item.immatriculation || !item.puissanceFiscale);
+      const invalidVehicule = normalizedVehicules.some((item) => !item.usageId || !item.marqueId || !item.immatriculation || !item.puissanceFiscale || !item.nombrePlaces);
       if (invalidVehicule) {
-        notify("Usage, marque, immatriculation et puissance fiscale sont obligatoires pour chaque véhicule");
+        notify("Usage, marque, immatriculation, puissance fiscale et nombre de places sont obligatoires pour chaque véhicule");
         return null;
       }
       if (selectedGaranties.length === 0) {
@@ -360,6 +366,16 @@ export default function AvenantContratPage() {
       return;
     }
     const request = buildRequest(true);
+    if (isTargetCreationCode(movementCode)) {
+      const key = request
+        ? JSON.stringify(request)
+        : JSON.stringify({ movementCode, dateEffet, dateEcheance, vehicules, remorques, selectedGaranties });
+      if (manualPreviewKeyRef.current && manualPreviewKeyRef.current !== key) {
+        setPreview(null);
+      }
+      autoPreviewKeyRef.current = "";
+      return;
+    }
     if (!request) {
       autoPreviewKeyRef.current = "";
       setPreview(null);
@@ -393,6 +409,46 @@ export default function AvenantContratPage() {
   const save = () => {
     const request = buildRequest();
     if (request) saveMutation.mutate(request);
+  };
+
+  const validateTargetCreation = (target: FlotteSectionTarget, part?: "info" | "garanties") => {
+    if (!isTargetCreationCode(movementCode)) {
+      return true;
+    }
+    if (target.kind === "vehicule") {
+      const vehicule = vehicules[target.index];
+      if (!vehicule?.usageId || !vehicule.marqueId || !vehicule.immatriculation || !vehicule.puissanceFiscale || !vehicule.nombrePlaces) {
+        toast.error("Usage, marque, immatriculation, puissance fiscale et nombre de places sont obligatoires pour ce véhicule");
+        return false;
+      }
+    }
+    if (target.kind === "remorque") {
+      const remorque = remorques[target.index];
+      if (!remorque?.usageId || !remorque.marqueId || !remorque.immatriculation || !remorque.ptc) {
+        toast.error("Usage, marque, immatriculation et PTC sont obligatoires pour cette remorque");
+        return false;
+      }
+    }
+    if (part === "garanties") {
+      const hasSelectedGarantie = selectedGaranties.some((garantie) =>
+        target.kind === "vehicule" ? garantie.vehiculeIndex === target.index : garantie.remorqueIndex === target.index
+      );
+      if (!hasSelectedGarantie) {
+        toast.error("Sélectionnez au moins une garantie pour cette cible");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const previewTargetCreation = (onSuccess?: () => void) => {
+    const request = buildRequest();
+    if (!request) {
+      return false;
+    }
+    manualPreviewKeyRef.current = JSON.stringify(request);
+    previewMutation.mutate(request, { onSuccess });
+    return true;
   };
 
   return (
@@ -475,6 +531,16 @@ export default function AvenantContratPage() {
           showAssistance={false}
           showInfoSections={movementCode === "INC_F" || movementCode === "EXR_M"}
           allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
+          onValidateTarget={isTargetCreationCode(movementCode) ? validateTargetCreation : undefined}
+          onSaveTargetDraft={isTargetCreationCode(movementCode)
+            ? (_target, part, _label, onSuccess) => {
+                if (part === "info") {
+                  onSuccess?.();
+                  return true;
+                }
+                return previewTargetCreation(onSuccess);
+              }
+            : undefined}
         />
       ) : !isClosureCode(movementCode) ? (
         <TargetsSection
@@ -713,6 +779,10 @@ function isEcheanceClosureCode(code: string) {
 
 function isClosureCode(code: string) {
   return code === "RES_F" || code === "RES_M" || code === "RCH_F" || code === "RCH_M" || code === "ANN_M";
+}
+
+function isTargetCreationCode(code: string) {
+  return code === "INC_F" || code === "EXR_M";
 }
 
 function errorMessage(error: unknown) {

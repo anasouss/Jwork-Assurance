@@ -1478,7 +1478,7 @@ public class ContratService {
                 .collect(java.util.stream.Collectors.groupingBy(AvenantDraftSummaryResponse::getContratId));
         return contratRepository.findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(agenceId).stream()
                 .map(this::ensureNumeroDossier)
-                .sorted(Comparator.comparing(
+                .sorted(Comparator.<Contrat, LocalDateTime>comparing(
                         contrat -> latestContratActivityAt(contrat, draftsByContrat.getOrDefault(contrat.getId(), List.of())),
                         Comparator.nullsLast(Comparator.naturalOrder())
                 ).reversed())

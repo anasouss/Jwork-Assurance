@@ -83,6 +83,7 @@ type Props = {
   onSaveDraft?: (label: string, onSuccess?: () => void) => void;
   onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
   onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;
+  garantiesExtraAction?: ReactNode;
   targetAssistances?: Record<string, AssistanceDraft>;
   setTargetAssistances?: Dispatch<SetStateAction<Record<string, AssistanceDraft>>>;
   setAssistanceEnabled?: Dispatch<SetStateAction<boolean>>;
@@ -128,6 +129,7 @@ export function FlotteTargetsSection({
   onSaveDraft,
   onSaveTargetDraft,
   onValidateTarget,
+  garantiesExtraAction,
   targetAssistances,
   setTargetAssistances,
   setAssistanceEnabled,
@@ -446,16 +448,19 @@ export function FlotteTargetsSection({
                 open={!showInfoSections || activeTargetPart === "garanties"}
                 onOpenChange={() => setActiveTargetPart("garanties")}
                 action={
-                  <Button
-                    type="button"
-                    disabled={previewing || saving}
-                    onClick={() => {
-                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
-                    }}
-                  >
-                    {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
-                  </Button>
+                  <>
+                    {garantiesExtraAction}
+                    <Button
+                      type="button"
+                      disabled={previewing || saving}
+                      onClick={() => {
+                        saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
+                      }}
+                    >
+                      {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
+                    </Button>
+                  </>
                 }
               >
                 <TargetGuaranteesTable
@@ -574,16 +579,19 @@ export function FlotteTargetsSection({
                 title="Garanties"
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length > 1 ? "s" : ""}`}
                 action={
-                  <Button
-                    type="button"
-                    disabled={previewing || saving}
-                    onClick={() => {
-                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
-                    }}
-                  >
-                    {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
-                  </Button>
+                  <>
+                    {garantiesExtraAction}
+                    <Button
+                      type="button"
+                      disabled={previewing || saving}
+                      onClick={() => {
+                        saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
+                      }}
+                    >
+                      {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
+                    </Button>
+                  </>
                 }
               >
                 <TargetGuaranteesTable

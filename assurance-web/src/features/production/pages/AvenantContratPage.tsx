@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
 import { AttestationNumberInput } from "../components/AttestationNumberInput";
+import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { FlotteTargetsSection } from "../contrat-creation/FlotteTargetsSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { toDateOnly } from "../date";
@@ -84,6 +86,7 @@ export default function AvenantContratPage() {
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof productionApi.previewAvenant>> | null>(null);
+  const [grilleConfiguratorOpen, setGrilleConfiguratorOpen] = useState(false);
   const autoPreviewKeyRef = useRef("");
   const manualPreviewKeyRef = useRef("");
 
@@ -101,6 +104,7 @@ export default function AvenantContratPage() {
   const categoriesTransport = useQuery({ queryKey: ["referentiel", "categories-transport", "avenant-contrat"], queryFn: () => productionApi.referentiel("categories-transport") });
   const compagniesAssistance = useQuery({ queryKey: ["referentiel", "compagnies-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assistance") });
   const produitsAssistance = useQuery({ queryKey: ["referentiel", "produits-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("produits-assistance") });
+  const grilles = useQuery({ queryKey: ["referentiel", "grilles-tarifaires", "avenant-contrat"], queryFn: () => productionApi.referentiel("grilles-tarifaires") });
 
   const contrat = contextQuery.data?.contrat;
   const availableMovements = useMemo(
@@ -134,6 +138,12 @@ export default function AvenantContratPage() {
   ], [contrat?.remorques, contrat?.vehicules]);
   const hasActiveTargets = targets.length > 0;
   const grilleTarifaireId = contrat?.grilleTarifaireId ? String(contrat.grilleTarifaireId) : undefined;
+  const configuredGrille = useMemo(
+    () => grilleTarifaireId
+      ? (grilles.data ?? []).find((grille) => grille.id === grilleTarifaireId) ?? { id: grilleTarifaireId, libelle: "Grille tarifaire" }
+      : null,
+    [grilleTarifaireId, grilles.data]
+  );
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId, "avenant-contrat"],
     queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId }),
@@ -160,16 +170,17 @@ export default function AvenantContratPage() {
 
   useEffect(() => {
     if (!contrat) return;
+    const hydrateUsageFromExistingTarget = !isTargetCreationCode(movementCode);
     setDateEffet((current) => current ?? contrat.dateEffet ?? undefined);
     setDateEcheance((current) => current ?? contrat.dateEcheance ?? undefined);
     setVehicules((current) => current.map((item) => ({
       ...item,
-      usageId: item.usageId ?? contrat.vehicules?.[0]?.usageId ?? undefined,
+      usageId: item.usageId ?? (hydrateUsageFromExistingTarget ? contrat.vehicules?.[0]?.usageId : undefined) ?? undefined,
       crm: item.crm ?? contrat.crmPartageValeur ?? contrat.vehicules?.[0]?.crm ?? undefined,
       dateEffet: item.dateEffet ?? contrat.dateEffet ?? undefined,
       dateEcheance: item.dateEcheance ?? contrat.dateEcheance ?? undefined,
     })));
-  }, [contrat]);
+  }, [contrat, movementCode]);
 
   useEffect(() => {
     setPreview(null);
@@ -532,6 +543,17 @@ export default function AvenantContratPage() {
           showInfoSections={movementCode === "INC_F" || movementCode === "EXR_M"}
           allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
           onValidateTarget={isTargetCreationCode(movementCode) ? validateTargetCreation : undefined}
+          garantiesExtraAction={movementCode === "INC_F" ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!configuredGrille}
+              onClick={() => setGrilleConfiguratorOpen(true)}
+            >
+              <Settings2 className="size-4" />
+              Grille tarifaire
+            </Button>
+          ) : null}
           onSaveTargetDraft={isTargetCreationCode(movementCode)
             ? (_target, part, _label, onSuccess) => {
                 if (part === "info") {
@@ -570,6 +592,32 @@ export default function AvenantContratPage() {
           <QuittancePreviewCard preview={preview} loading={previewMutation.isPending} />
         </CardContent>
       </Card>
+
+      <Sheet open={grilleConfiguratorOpen} onOpenChange={setGrilleConfiguratorOpen}>
+        <SheetContent side="right" className="w-[min(96vw,1180px)] overflow-y-auto sm:max-w-none">
+          <SheetHeader>
+            <SheetTitle>Configurer la grille tarifaire</SheetTitle>
+            <SheetDescription>
+              {configuredGrille?.libelle ?? "Grille tarifaire"}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-4">
+            {configuredGrille ? (
+              <GrilleTarifaireConfigurator
+                grille={configuredGrille}
+                garanties={garanties.data ?? []}
+                usages={usages.data ?? []}
+                categoriesTransport={categoriesTransport.data ?? []}
+                queryScope={`avenant-${contratId}-${configuredGrille.id}`}
+              />
+            ) : (
+              <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                Ce contrat n'a pas de grille tarifaire assignée.
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

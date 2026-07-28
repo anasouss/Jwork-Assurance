@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Field } from "../components/Field";
+import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { SectionCard } from "../components/SectionCard";
 import { toDateOnly } from "../date";
 import type { CreateContratRequest } from "../types";
@@ -243,7 +244,15 @@ export function ContractInfoSection({
             </Field>
             {showNumeroAttestation ? (
               <Field label="N° attestation">
-                <Input value={form.numeroAttestation} onChange={(event) => form.setNumeroAttestation(event.target.value)} />
+                <AttestationNumberInput
+                  value={form.numeroAttestation}
+                  onChange={form.setNumeroAttestation}
+                  compagnieAssuranceId={form.compagnieAssuranceId}
+                  usageId={form.usageId}
+                  compagnies={form.refs.compagnies.data ?? []}
+                  usages={form.refs.usages.data ?? []}
+                  required={Boolean(selectedUsage?.consommeAttestation)}
+                />
               </Field>
             ) : null}
             <Field label="Type de contrat" required error={form.validationErrors.typeRenouvellement}>

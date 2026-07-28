@@ -27,6 +27,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
+import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { Field } from "../components/Field";
 import { toDateOnly } from "../date";
 import type { AssistanceContrat, ContratSummary, ReferenceOption } from "../types";
@@ -65,6 +66,10 @@ export default function ProspectionPage() {
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance", "prospections"],
     queryFn: () => productionApi.referentiel("compagnies-assurance"),
+  });
+  const usages = useQuery({
+    queryKey: ["referentiel", "usages", "prospections"],
+    queryFn: () => productionApi.referentiel("usages"),
   });
   const assistanceContext = useQuery({
     queryKey: ["prospection-assistances", convertTarget?.id],
@@ -324,7 +329,13 @@ export default function ProspectionPage() {
             ) : null}
             <div className="grid gap-2">
               <div className="text-sm font-semibold uppercase text-blue-700">Numéros d'attestation par véhicule</div>
-              <AttestationInputs contrat={convertTarget} values={attestations} onChange={setAttestations} />
+              <AttestationInputs
+                contrat={convertTarget}
+                values={attestations}
+                onChange={setAttestations}
+                compagnies={companies.data ?? []}
+                usages={usages.data ?? []}
+              />
             </div>
           </div>
           <DialogFooter>
@@ -399,23 +410,31 @@ function AttestationInputs({
   contrat,
   values,
   onChange,
+  compagnies,
+  usages,
 }: {
   contrat: ContratSummary | null;
   values: Record<string, string>;
   onChange: (value: Record<string, string>) => void;
+  compagnies: ReferenceOption[];
+  usages: ReferenceOption[];
 }) {
   const rows = [
     ...(contrat?.vehicules ?? []).map((vehicule) => ({
       key: `vehicule-${vehicule.vehiculeId}`,
+      usageId: vehicule.usageId ?? undefined,
       usage: vehicule.usageCode ?? vehicule.usageLibelle ?? "Sans usage",
       label: vehicleLabel(vehicule),
       required: Boolean(vehicule.consommeAttestation),
+      currentNumero: vehicule.numeroAttestation ?? undefined,
     })),
     ...(contrat?.remorques ?? []).map((remorque) => ({
       key: `remorque-${remorque.remorqueId}`,
+      usageId: remorque.usageId ?? undefined,
       usage: remorque.usageCode ?? remorque.usageLibelle ?? "Remorques",
       label: remorqueLabel(remorque),
       required: Boolean(remorque.consommeAttestation),
+      currentNumero: remorque.numeroAttestation ?? undefined,
     })),
   ];
   if (!rows.length) {
@@ -433,9 +452,15 @@ function AttestationInputs({
           <div className="grid gap-3">
             {usageRows.map((row) => (
               <Field key={row.key} label={row.label} required={row.required}>
-                <Input
+                <AttestationNumberInput
                   value={values[row.key] ?? ""}
-                  onChange={(event) => onChange({ ...values, [row.key]: event.target.value })}
+                  onChange={(value) => onChange({ ...values, [row.key]: value })}
+                  compagnieAssuranceId={contrat?.compagnieAssuranceId}
+                  usageId={row.usageId}
+                  compagnies={compagnies}
+                  usages={usages}
+                  numeroCourant={row.currentNumero}
+                  required={row.required}
                   placeholder="Numéro d'attestation"
                 />
               </Field>

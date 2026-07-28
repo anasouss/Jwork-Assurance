@@ -89,6 +89,18 @@ export type LivraisonAttestationLot = {
 
 export type AttestationStockStatus = "DISPONIBLE" | "RESERVEE" | "UTILISEE" | "ANNULEE" | "DESACTIVEE";
 
+export type AttestationNumeroValidation = {
+  controleStockActif: boolean;
+  validationRequise: boolean;
+  disponible: boolean;
+  numeroNormalise?: string | null;
+  prefixe?: string | null;
+  codeUsageStock?: string | null;
+  statut?: AttestationStockStatus | null;
+  message?: string | null;
+  suggestions?: string[];
+};
+
 export type AttestationStockDashboard = {
   controleStockActif: boolean;
   summary: {

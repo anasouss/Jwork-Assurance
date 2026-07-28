@@ -7,6 +7,7 @@ import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
+import { AttestationNumberInput } from "./AttestationNumberInput";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
 import { productionApi } from "../api";
@@ -28,6 +29,8 @@ export function VehiculeSection({
   vehicules,
   setVehicules,
   usages,
+  compagnies = [],
+  compagnieAssuranceId,
   marques,
   carrosseries,
   categoriesTransport,
@@ -46,6 +49,8 @@ export function VehiculeSection({
   vehicules: VehiculeInput[];
   setVehicules: (vehicules: VehiculeInput[]) => void;
   usages: ReferenceOption[];
+  compagnies?: ReferenceOption[];
+  compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
@@ -261,7 +266,15 @@ export function VehiculeSection({
                 </Field>
                 {showAttestation ? (
                   <Field label="N° attestation">
-                    <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
+                    <AttestationNumberInput
+                      value={vehicule.numeroAttestation ?? ""}
+                      onChange={(value) => update(index, { numeroAttestation: value })}
+                      compagnieAssuranceId={compagnieAssuranceId}
+                      usageId={vehicule.usageId}
+                      compagnies={compagnies}
+                      usages={usages}
+                      required={Boolean(usage?.consommeAttestation)}
+                    />
                   </Field>
                 ) : null}
                 <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>

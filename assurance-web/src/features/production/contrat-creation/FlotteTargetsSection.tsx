@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Field } from "../components/Field";
+import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { MoneyInput } from "../components/MoneyInput";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
@@ -73,6 +74,8 @@ type Props = {
   lignes: ReferenceOption[];
   formulesPersonne: ReferenceOption[];
   usages: ReferenceOption[];
+  compagnies?: ReferenceOption[];
+  compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
@@ -113,6 +116,8 @@ export function FlotteTargetsSection({
   lignes,
   formulesPersonne,
   usages,
+  compagnies = [],
+  compagnieAssuranceId,
   marques,
   carrosseries,
   categoriesTransport,
@@ -396,6 +401,8 @@ export function FlotteTargetsSection({
                     vehicule={vehicules[activeVehiculeTarget.index]}
                     setVehicules={setVehicules}
                     usages={usages}
+                    compagnies={compagnies}
+                    compagnieAssuranceId={compagnieAssuranceId}
                     marques={marques}
                     carrosseries={carrosseries}
                     categoriesTransport={categoriesTransport}
@@ -535,6 +542,8 @@ export function FlotteTargetsSection({
                     remorque={remorques[activeRemorqueTarget.index]}
                     setRemorques={setRemorques}
                     usages={usages}
+                    compagnies={compagnies}
+                    compagnieAssuranceId={compagnieAssuranceId}
                     marques={marques}
                     prospectionMode={prospectionMode}
                   />
@@ -956,6 +965,8 @@ function VehicleForm({
   vehicule,
   setVehicules,
   usages,
+  compagnies,
+  compagnieAssuranceId,
   marques,
   carrosseries,
   categoriesTransport,
@@ -968,6 +979,8 @@ function VehicleForm({
   vehicule: VehiculeInput;
   setVehicules: Dispatch<SetStateAction<VehiculeInput[]>>;
   usages: ReferenceOption[];
+  compagnies: ReferenceOption[];
+  compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
@@ -1158,7 +1171,15 @@ function VehicleForm({
         ) : null}
         {!prospectionMode ? (
           <Field label="N° attestation">
-            <Input value={vehicule.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
+            <AttestationNumberInput
+              value={vehicule.numeroAttestation ?? ""}
+              onChange={(value) => update({ numeroAttestation: value })}
+              compagnieAssuranceId={compagnieAssuranceId}
+              usageId={vehicule.usageId}
+              compagnies={compagnies}
+              usages={usages}
+              required={Boolean(usages.find((usage) => usage.id === vehicule.usageId)?.consommeAttestation)}
+            />
           </Field>
         ) : null}
         <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
@@ -1215,6 +1236,8 @@ function RemorqueForm({
   remorque,
   setRemorques,
   usages,
+  compagnies,
+  compagnieAssuranceId,
   marques,
   prospectionMode,
 }: {
@@ -1222,6 +1245,8 @@ function RemorqueForm({
   remorque: RemorqueInput;
   setRemorques: Dispatch<SetStateAction<RemorqueInput[]>>;
   usages: ReferenceOption[];
+  compagnies: ReferenceOption[];
+  compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
   prospectionMode: boolean;
 }) {
@@ -1278,7 +1303,15 @@ function RemorqueForm({
         </Field>
         {!prospectionMode ? (
           <Field label="N° attestation">
-            <Input value={remorque.numeroAttestation ?? ""} onChange={(event) => update({ numeroAttestation: event.target.value })} />
+            <AttestationNumberInput
+              value={remorque.numeroAttestation ?? ""}
+              onChange={(value) => update({ numeroAttestation: value })}
+              compagnieAssuranceId={compagnieAssuranceId}
+              usageId={remorque.usageId}
+              compagnies={compagnies}
+              usages={usages}
+              required={Boolean(usages.find((usage) => usage.id === remorque.usageId)?.consommeAttestation)}
+            />
           </Field>
         ) : null}
         <Field label="Valeur assurée">

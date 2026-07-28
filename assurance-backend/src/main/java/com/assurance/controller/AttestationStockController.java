@@ -5,6 +5,7 @@ import com.assurance.dto.request.CreateLivraisonAttestationRequest;
 import com.assurance.dto.request.UpdateAttestationStockSettingsRequest;
 import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
 import com.assurance.dto.response.ApiResponse;
+import com.assurance.dto.response.AttestationNumeroValidationResponse;
 import com.assurance.dto.response.AttestationStockDashboardResponse;
 import com.assurance.dto.response.AttestationStockItemResponse;
 import com.assurance.dto.response.AttestationStockSettingsResponse;
@@ -144,5 +145,28 @@ public class AttestationStockController {
         Usage usage = usageRepository.findById(usageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
         return ResponseEntity.ok(ApiResponse.success(attestationStockService.listerDisponibles(fragment, contrat, usage)));
+    }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<ApiResponse<List<String>>> suggestions(
+            @RequestParam Long compagnieAssuranceId,
+            @RequestParam Long usageId,
+            @RequestParam(defaultValue = "") String fragment
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.listerDisponibles(TenantContext.getCurrentAgence(), compagnieAssuranceId, usageId, fragment)
+        ));
+    }
+
+    @GetMapping("/validation")
+    public ResponseEntity<ApiResponse<AttestationNumeroValidationResponse>> validation(
+            @RequestParam Long compagnieAssuranceId,
+            @RequestParam Long usageId,
+            @RequestParam(defaultValue = "") String numero,
+            @RequestParam(required = false) String numeroCourant
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.validerNumero(TenantContext.getCurrentAgence(), compagnieAssuranceId, usageId, numero, numeroCourant)
+        ));
     }
 }

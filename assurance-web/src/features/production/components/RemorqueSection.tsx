@@ -4,6 +4,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
 import { Field } from "./Field";
+import { AttestationNumberInput } from "./AttestationNumberInput";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
 import { toDateOnly } from "../date";
@@ -14,6 +15,8 @@ export function RemorqueSection({
   remorques,
   setRemorques,
   usages,
+  compagnies = [],
+  compagnieAssuranceId,
   marques,
   maxRemorques,
   openSection,
@@ -22,6 +25,8 @@ export function RemorqueSection({
   remorques: RemorqueInput[];
   setRemorques: (remorques: RemorqueInput[]) => void;
   usages: ReferenceOption[];
+  compagnies?: ReferenceOption[];
+  compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
   maxRemorques?: number | null;
   openSection?: ContratSectionKey;
@@ -114,7 +119,15 @@ export function RemorqueSection({
                 <Input value={remorque.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />
               </Field>
               <Field label="N° attestation">
-                <Input value={remorque.numeroAttestation ?? ""} onChange={(event) => update(index, { numeroAttestation: event.target.value })} />
+                <AttestationNumberInput
+                  value={remorque.numeroAttestation ?? ""}
+                  onChange={(value) => update(index, { numeroAttestation: value })}
+                  compagnieAssuranceId={compagnieAssuranceId}
+                  usageId={remorque.usageId}
+                  compagnies={compagnies}
+                  usages={usages}
+                  required={Boolean(usages.find((usage) => usage.id === remorque.usageId)?.consommeAttestation)}
+                />
               </Field>
               <Field label="Valeur assurée">
                 <MoneyInput value={remorque.valeurAssuree} onValueChange={(value) => update(index, { valeurAssuree: value })} />

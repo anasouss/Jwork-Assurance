@@ -34,6 +34,22 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
     );
 
     @Query("""
+            select a from AttestationStock a
+            where upper(a.numero) in :numeros
+              and a.actif = true
+              and a.lot.actif = true
+              and a.lot.livraison.actif = true
+              and a.lot.livraison.validee = true
+              and a.compagnieAssurance.id = :compagnieId
+              and a.groupeUsageAttestation.id = :groupeUsageAttestationId
+            """)
+    List<AttestationStock> findGestionnable(
+            @Param("numeros") Collection<String> numeros,
+            @Param("compagnieId") Long compagnieId,
+            @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
+    );
+
+    @Query("""
             select a.numero from AttestationStock a
             where upper(a.numero) like upper(concat('%', :fragment, '%'))
               and a.statut = :statut

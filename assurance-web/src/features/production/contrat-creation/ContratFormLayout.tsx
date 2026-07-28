@@ -142,6 +142,8 @@ export function ContratFormLayout({
       vehicules={form.vehicules}
       setVehicules={form.setVehicules}
       usages={form.refs.usages.data ?? []}
+      compagnies={form.refs.compagnies.data ?? []}
+      compagnieAssuranceId={form.compagnieAssuranceId}
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
@@ -219,6 +221,8 @@ export function ContratFormLayout({
       lignes={form.lignesGrille.data ?? []}
       formulesPersonne={form.formulesPersonne.data ?? []}
       usages={flotteTargetUsages}
+      compagnies={form.refs.compagnies.data ?? []}
+      compagnieAssuranceId={form.compagnieAssuranceId}
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
@@ -250,6 +254,8 @@ export function ContratFormLayout({
       remorques={form.remorques}
       setRemorques={form.setRemorques}
       usages={form.refs.usages.data ?? []}
+      compagnies={form.refs.compagnies.data ?? []}
+      compagnieAssuranceId={form.compagnieAssuranceId}
       marques={form.refs.marques.data ?? []}
       maxRemorques={maxRemorques}
       openSection={activeSection}

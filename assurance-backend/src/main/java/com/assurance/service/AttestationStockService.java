@@ -5,6 +5,7 @@ import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
 import com.assurance.dto.response.AttestationStockDashboardResponse;
 import com.assurance.dto.response.AttestationStockItemResponse;
 import com.assurance.dto.response.AttestationStockSettingsResponse;
+import com.assurance.dto.response.AttestationNumeroValidationResponse;
 import com.assurance.dto.response.SeuilStockAttestationResponse;
 import com.assurance.entity.AttestationStock;
 import com.assurance.entity.CompagnieAssurance;
@@ -28,6 +29,7 @@ import com.assurance.repository.AttestationStockRepository;
 import com.assurance.repository.GroupeUsageAttestationRepository;
 import com.assurance.repository.MouvementStockAttestationRepository;
 import com.assurance.repository.SeuilStockAttestationRepository;
+import com.assurance.repository.UsageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,7 @@ public class AttestationStockService {
     private final SeuilStockAttestationRepository seuilStockAttestationRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
+    private final UsageRepository usageRepository;
     private final ParametreApplicationService parametreApplicationService;
     private final AttestationNumeroService attestationNumeroService;
 
@@ -78,6 +81,105 @@ public class AttestationStockService {
                 contrat.getCompagnieAssurance().getId(),
                 groupe.getId()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> listerDisponibles(Long agenceId, Long compagnieId, Long usageId, String fragment) {
+        if (!controleActif(agenceId) || compagnieId == null || usageId == null || !hasText(fragment)) {
+            return List.of();
+        }
+        Usage usage = usageRepository.findById(usageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
+        GroupeUsageAttestation groupe = groupeStock(usage);
+        if (groupe == null) {
+            return List.of();
+        }
+        return attestationStockRepository.findDisponibles(
+                        fragment.trim(),
+                        StatutAttestationStock.DISPONIBLE,
+                        compagnieId,
+                        groupe.getId()
+                )
+                .stream()
+                .limit(10)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AttestationNumeroValidationResponse validerNumero(Long agenceId, Long compagnieId, Long usageId, String numero, String numeroCourant) {
+        CompagnieAssurance compagnie = compagnieId == null ? null : compagnieAssuranceRepository.findById(compagnieId)
+                .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", compagnieId));
+        Usage usage = usageId == null ? null : usageRepository.findById(usageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
+        String prefixe = attestationNumeroService.normaliserPrefixe(compagnie != null ? compagnie.getPrefixeAttestation() : null);
+        String codeUsageStock = attestationNumeroService.codeGroupe(usage);
+        String numeroNormalise = attestationNumeroService.normaliser(numero, compagnie, usage);
+        boolean controleStockActif = controleActif(agenceId);
+        boolean validationRequise = controleStockActif
+                && Boolean.TRUE.equals(usage != null ? usage.getConsommeAttestation() : null)
+                && groupeStock(usage) != null
+                && compagnie != null;
+
+        if (!validationRequise) {
+            return AttestationNumeroValidationResponse.builder()
+                    .controleStockActif(controleStockActif)
+                    .validationRequise(false)
+                    .disponible(true)
+                    .numeroNormalise(numeroNormalise)
+                    .prefixe(prefixe)
+                    .codeUsageStock(codeUsageStock)
+                    .suggestions(List.of())
+                    .build();
+        }
+        if (!hasText(numeroNormalise)) {
+            return AttestationNumeroValidationResponse.builder()
+                    .controleStockActif(true)
+                    .validationRequise(true)
+                    .disponible(false)
+                    .numeroNormalise(numeroNormalise)
+                    .prefixe(prefixe)
+                    .codeUsageStock(codeUsageStock)
+                    .message("Numero d'attestation obligatoire")
+                    .suggestions(List.of())
+                    .build();
+        }
+
+        String numeroCourantNormalise = attestationNumeroService.normaliser(numeroCourant, compagnie, usage);
+        if (hasText(numeroCourantNormalise) && numeroCourantNormalise.equalsIgnoreCase(numeroNormalise)) {
+            return AttestationNumeroValidationResponse.builder()
+                    .controleStockActif(true)
+                    .validationRequise(true)
+                    .disponible(true)
+                    .numeroNormalise(numeroNormalise)
+                    .prefixe(prefixe)
+                    .codeUsageStock(codeUsageStock)
+                    .message("Numero deja associe a cette cible")
+                    .suggestions(List.of())
+                    .build();
+        }
+
+        GroupeUsageAttestation groupe = groupeStock(usage);
+        List<AttestationStock> candidates = attestationStockRepository.findGestionnable(
+                attestationNumeroService.candidats(numeroNormalise, compagnie, usage),
+                compagnie.getId(),
+                groupe.getId()
+        );
+        AttestationStock stock = candidates.stream().findFirst().orElse(null);
+        boolean disponible = stock != null && stock.getStatut() == StatutAttestationStock.DISPONIBLE;
+        String message = stock == null
+                ? "Ce numero d'attestation n'existe pas en stock"
+                : disponible ? "Numero disponible en stock" : messageStatut(stock.getStatut());
+        return AttestationNumeroValidationResponse.builder()
+                .controleStockActif(true)
+                .validationRequise(true)
+                .disponible(disponible)
+                .numeroNormalise(numeroNormalise)
+                .prefixe(prefixe)
+                .codeUsageStock(codeUsageStock)
+                .statut(stock != null ? stock.getStatut() : null)
+                .message(message)
+                .suggestions(listerDisponibles(agenceId, compagnieId, usageId, numero))
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -427,6 +529,22 @@ public class AttestationStockService {
 
     private String seuilKey(Long compagnieId, Long groupeUsageAttestationId) {
         return compagnieId + "|" + groupeUsageAttestationId;
+    }
+
+    private String messageStatut(StatutAttestationStock statut) {
+        if (statut == StatutAttestationStock.UTILISEE) {
+            return "Ce numero d'attestation est deja utilise";
+        }
+        if (statut == StatutAttestationStock.RESERVEE) {
+            return "Ce numero d'attestation est reserve";
+        }
+        if (statut == StatutAttestationStock.ANNULEE) {
+            return "Ce numero d'attestation est annule";
+        }
+        if (statut == StatutAttestationStock.DESACTIVEE) {
+            return "Ce numero d'attestation est desactive";
+        }
+        return "Ce numero d'attestation n'est pas disponible en stock";
     }
 
     private long toLong(Object value) {

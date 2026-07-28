@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
+import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { FlotteTargetsSection } from "../contrat-creation/FlotteTargetsSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { toDateOnly } from "../date";
-import type { AvenantRequest, ContratSummary, GarantieInput, RemorqueInput, VehiculeInput } from "../types";
+import type { AvenantRequest, ContratSummary, GarantieInput, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
   kind: "vehicule" | "remorque";
@@ -23,7 +24,9 @@ type Target = {
   label: string;
   sublabel?: string | null;
   immatriculation?: string | null;
+  usageId?: string | null;
   usage?: string | null;
+  numeroAttestation?: string | null;
 };
 
 type PrecisionDraft = {
@@ -84,6 +87,7 @@ export default function AvenantContratPage() {
     enabled: Boolean(contratId),
   });
   const usages = useQuery({ queryKey: ["referentiel", "usages", "avenant-contrat"], queryFn: () => productionApi.referentiel("usages") });
+  const compagnies = useQuery({ queryKey: ["referentiel", "compagnies-assurance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assurance") });
   const marques = useQuery({ queryKey: ["referentiel", "marques", "avenant-contrat"], queryFn: () => productionApi.referentiel("marques") });
   const carrosseries = useQuery({ queryKey: ["referentiel", "carrosseries", "avenant-contrat"], queryFn: () => productionApi.referentiel("carrosseries") });
   const garanties = useQuery({ queryKey: ["referentiel", "garanties", "avenant-contrat"], queryFn: productionApi.garantiesParametrage });
@@ -106,7 +110,9 @@ export default function AvenantContratPage() {
       label: item.immatriculation || `Véhicule ${index + 1}`,
       sublabel: [item.marque, item.carrosserie].filter(Boolean).join(" - "),
       immatriculation: item.immatriculation,
+      usageId: item.usageId,
       usage: item.usageLibelle ?? item.usageCode,
+      numeroAttestation: item.numeroAttestation,
     })),
     ...(contrat?.remorques ?? []).map((item, index) => ({
       kind: "remorque" as const,
@@ -114,7 +120,9 @@ export default function AvenantContratPage() {
       label: item.immatriculation || `Remorque ${index + 1}`,
       sublabel: item.marque,
       immatriculation: item.immatriculation,
+      usageId: item.usageId,
       usage: item.usageLibelle ?? item.usageCode,
+      numeroAttestation: item.numeroAttestation,
     })),
   ], [contrat?.remorques, contrat?.vehicules]);
   const hasActiveTargets = targets.length > 0;
@@ -447,6 +455,8 @@ export default function AvenantContratPage() {
           lignes={lignesGrille.data ?? []}
           formulesPersonne={formulesPersonne.data ?? []}
           usages={flotteTargetUsages}
+          compagnies={compagnies.data ?? []}
+          compagnieAssuranceId={contrat?.compagnieAssuranceId}
           marques={marques.data ?? []}
           carrosseries={carrosseries.data ?? []}
           categoriesTransport={categoriesTransport.data ?? []}
@@ -472,6 +482,9 @@ export default function AvenantContratPage() {
           setSelectedTargetIds={setSelectedTargetIds}
           precisionDrafts={precisionDrafts}
           setPrecisionDrafts={setPrecisionDrafts}
+          compagnieAssuranceId={contrat?.compagnieAssuranceId}
+          compagnies={compagnies.data ?? []}
+          usages={usages.data ?? []}
         />
       ) : (
         <Card className="border-border/70 shadow-none">
@@ -500,6 +513,9 @@ function TargetsSection({
   setSelectedTargetIds,
   precisionDrafts,
   setPrecisionDrafts,
+  compagnieAssuranceId,
+  compagnies,
+  usages,
 }: {
   movementCode: string;
   targets: Target[];
@@ -507,6 +523,9 @@ function TargetsSection({
   setSelectedTargetIds: (value: string[] | ((current: string[]) => string[])) => void;
   precisionDrafts: Record<string, PrecisionDraft>;
   setPrecisionDrafts: (value: Record<string, PrecisionDraft> | ((current: Record<string, PrecisionDraft>) => Record<string, PrecisionDraft>)) => void;
+  compagnieAssuranceId?: string | null;
+  compagnies: ReferenceOption[];
+  usages: ReferenceOption[];
 }) {
   return (
     <Card className="border-border/70 shadow-none">
@@ -541,7 +560,17 @@ function TargetsSection({
                       <div className="grid gap-2 md:grid-cols-3">
                         <Input disabled={!checked} placeholder="Immatriculation" value={precisionDrafts[key]?.immatriculation ?? ""} onChange={(event) => updatePrecision(key, { immatriculation: event.target.value }, setPrecisionDrafts)} />
                         {target.kind === "vehicule" ? <Input disabled={!checked} placeholder="WW" value={precisionDrafts[key]?.immatriculationProvisoire ?? ""} onChange={(event) => updatePrecision(key, { immatriculationProvisoire: event.target.value }, setPrecisionDrafts)} /> : null}
-                        <Input disabled={!checked} placeholder="Attestation" value={precisionDrafts[key]?.numeroAttestation ?? ""} onChange={(event) => updatePrecision(key, { numeroAttestation: event.target.value }, setPrecisionDrafts)} />
+                        <AttestationNumberInput
+                          disabled={!checked}
+                          value={precisionDrafts[key]?.numeroAttestation ?? ""}
+                          onChange={(value) => updatePrecision(key, { numeroAttestation: value }, setPrecisionDrafts)}
+                          compagnieAssuranceId={compagnieAssuranceId}
+                          usageId={target.usageId}
+                          compagnies={compagnies}
+                          usages={usages}
+                          numeroCourant={target.numeroAttestation}
+                          placeholder="Attestation"
+                        />
                       </div>
                     </td>
                   ) : null}

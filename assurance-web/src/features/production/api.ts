@@ -7,6 +7,7 @@ import type {
   AttestationStockDashboard,
   AttestationStockItem,
   AttestationStockStatus,
+  AttestationNumeroValidation,
   ContratSummary,
   CreateLivraisonAttestationRequest,
   CreateContratRequest,
@@ -435,6 +436,25 @@ export const productionApi = {
   async attestationsDisponibles(params: { contratId: string; usageId: string; fragment: string }) {
     return unwrap(
       await apiFetch<ApiResponse<string[]>>(`/api/v1/attestations-stock/disponibles${buildQueryString(params)}`)
+    );
+  },
+
+  async suggestionsAttestation(params: { compagnieAssuranceId?: string; usageId?: string; fragment?: string }) {
+    return unwrap(
+      await apiFetch<ApiResponse<string[]>>(`/api/v1/attestations-stock/suggestions${buildQueryString(params)}`)
+    );
+  },
+
+  async validateAttestationNumero(params: {
+    compagnieAssuranceId?: string;
+    usageId?: string;
+    numero?: string;
+    numeroCourant?: string;
+  }) {
+    return unwrap(
+      await apiFetch<ApiResponse<AttestationNumeroValidation>>(
+        `/api/v1/attestations-stock/validation${buildQueryString(params)}`
+      )
     );
   },
 

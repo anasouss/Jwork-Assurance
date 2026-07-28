@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Car, FileText, FileTextIcon, UserRound } from "lucide-react";
@@ -9,16 +9,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { productionApi } from "../api";
 import { formatMoney, moneyAmount, text } from "../utils/format";
 import type { ClientResponse, ContratSummary, ReferenceOption } from "../types";
+import type { jsPDF as JsPDF } from "jspdf";
 
 type Garantie = NonNullable<ContratSummary["garanties"]>[number];
 type Vehicule = NonNullable<ContratSummary["vehicules"]>[number];
 type Remorque = NonNullable<ContratSummary["remorques"]>[number];
+type Mouvement = NonNullable<ContratSummary["mouvements"]>[number];
 
 export default function ContratShowPage() {
   const { contratId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const mouvementId = searchParams.get("mouvementId");
-  const sheetRef = useRef<HTMLDivElement>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const contratQuery = useQuery({
     queryKey: ["contrat", contratId, mouvementId],
@@ -52,10 +53,20 @@ export default function ContratShowPage() {
   const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
   const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement?.numeroMouvement ? `-mvt-${selectedMouvement.numeroMouvement}` : ""}.pdf`;
   const openPdf = async () => {
-    if (!sheetRef.current || generatingPdf) return;
+    if (generatingPdf) return;
     setGeneratingPdf(true);
     try {
-      await openElementAsPdf(sheetRef.current, pdfName);
+      await openContratPdf({
+        contrat,
+        dossier,
+        souscripteur,
+        proprietaire,
+        sameClient,
+        compagnie,
+        convention,
+        mouvement: selectedMouvement,
+        filename: pdfName,
+      });
     } finally {
       setGeneratingPdf(false);
     }
@@ -76,7 +87,7 @@ export default function ContratShowPage() {
         </div>
       </div>
 
-      <div ref={sheetRef} data-pdf-sheet="true" className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      <div className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <header className="border-b-2 border-slate-900 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -419,166 +430,302 @@ function statusLabel(statut?: string | null) {
   return text(statut);
 }
 
-async function openElementAsPdf(element: HTMLElement, filename: string) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import("html2canvas"),
-    import("jspdf"),
-  ]);
-  const canvas = await html2canvas(element, {
-    backgroundColor: "#ffffff",
-    onclone: (clonedDocument, clonedElement) => sanitizePdfClone(clonedDocument, clonedElement as HTMLElement),
-    scale: 2,
-    useCORS: true,
-  });
+async function openContratPdf(params: {
+  contrat: ContratSummary;
+  dossier: string;
+  souscripteur?: ClientResponse | null;
+  proprietaire?: ClientResponse | null;
+  sameClient: boolean;
+  compagnie: string;
+  convention: string;
+  mouvement?: Mouvement | null;
+  filename: string;
+}) {
+  const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const margin = 8;
-  const contentWidth = pageWidth - margin * 2;
-  const contentHeight = pageHeight - margin * 2;
-  const sliceHeight = Math.floor((contentHeight * canvas.width) / contentWidth);
-  let offset = 0;
-  let page = 0;
+  const ctx: PdfContext = {
+    pdf,
+    x: 12,
+    y: 14,
+    width: 186,
+    pageHeight: 297,
+  };
 
-  while (offset < canvas.height) {
-    const height = Math.min(sliceHeight, canvas.height - offset);
-    const slice = document.createElement("canvas");
-    slice.width = canvas.width;
-    slice.height = height;
-    const context = slice.getContext("2d");
-    if (!context) break;
-    context.drawImage(canvas, 0, offset, canvas.width, height, 0, 0, canvas.width, height);
-    const image = slice.toDataURL("image/png");
-    const imageHeight = (height * contentWidth) / canvas.width;
-    if (page > 0) pdf.addPage();
-    pdf.addImage(image, "PNG", margin, margin, contentWidth, imageHeight);
-    offset += height;
-    page += 1;
+  pdf.setProperties({ title: params.filename.replace(/\.pdf$/i, "") });
+  drawPdfHeader(ctx, params);
+  drawPdfSection(ctx, "CONTRAT", () => {
+    drawPdfInfoGrid(ctx, [
+      ["Nature", params.mouvement?.libelle ?? latestEvent(params.contrat)],
+      ["Produit", productLabel(params.contrat)],
+      ["Compagnie", params.compagnie],
+      ...(params.contrat.typeContrat === "CONVENTION" ? [["Convention", params.convention] as [string, string]] : []),
+      ["N° police", text(params.contrat.numeroPolice)],
+      ["N° attestation", firstAttestation(params.contrat)],
+      ["Date d'effet", formatDate(params.mouvement?.dateEffet ?? params.contrat.dateEffet)],
+      ["Date d'échéance", formatDate(params.mouvement?.dateEcheance ?? params.contrat.dateEcheance)],
+      ["Type client", clientTypeLabel(params.souscripteur)],
+      ["Fractionnement", text(params.contrat.fractionnement)],
+    ]);
+  });
+
+  drawPdfSection(ctx, "CLIENTS", () => {
+    if (params.sameClient) {
+      drawPdfClient(ctx, "Souscripteur et propriétaire", params.souscripteur, ctx.x, ctx.width);
+    } else {
+      const columnWidth = (ctx.width - 4) / 2;
+      const startY = ctx.y;
+      drawPdfClient(ctx, "Souscripteur", params.souscripteur, ctx.x, columnWidth);
+      const leftHeight = ctx.y;
+      ctx.y = startY;
+      drawPdfClient(ctx, "Propriétaire", params.proprietaire, ctx.x + columnWidth + 4, columnWidth);
+      ctx.y = Math.max(ctx.y, leftHeight);
+    }
+  });
+
+  for (const [index, vehicule] of (params.contrat.vehicules ?? []).entries()) {
+    drawPdfSection(ctx, `VÉHICULE ${index + 1}`, () => {
+      drawPdfInfoGrid(ctx, [
+        ["Usage", [vehicule.usageCode, vehicule.usageLibelle].filter(Boolean).join(" - ")],
+        ["Marque", text(vehicule.marque)],
+        ["Immatriculation", text(vehicule.immatriculation)],
+        ["Carburant", text(vehicule.carburant)],
+        ["Puissance fiscale", text(vehicule.puissanceFiscale)],
+        ["Date de MC", formatDate(vehicule.datePremiereCirculation)],
+        ["Carrosserie", text(vehicule.carrosserie)],
+        ["Nombre de places", text(vehicule.nombrePlaces)],
+        ["CRM", text(vehicule.crm)],
+        ["Valeur à neuf", formatOptionalAmount(vehicule.valeurNeuf)],
+        ["Valeur vénale", formatOptionalAmount(vehicule.valeurVenale)],
+        ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
+      ]);
+      const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
+      drawPdfGaranties(ctx, garanties);
+    });
   }
+
+  for (const [index, remorque] of (params.contrat.remorques ?? []).entries()) {
+    drawPdfSection(ctx, `REMORQUE ${index + 1}`, () => {
+      drawPdfInfoGrid(ctx, [
+        ["Usage", [remorque.usageCode, remorque.usageLibelle].filter(Boolean).join(" - ")],
+        ["Marque", text(remorque.marque)],
+        ["Immatriculation", text(remorque.immatriculation)],
+        ["PTC", text(remorque.ptc)],
+        ["Date de MC", formatDate(remorque.dateMiseEnCirculation)],
+        ["Valeur assurée", formatOptionalAmount(remorque.valeurAssuree)],
+      ]);
+      const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.remorqueId ?? "") === String(remorque.remorqueId));
+      drawPdfGaranties(ctx, garanties);
+    });
+  }
+
+  const personnes = personneGaranties(params.contrat);
+  if (personnes.length) {
+    drawPdfSection(ctx, "PROTECTION PERSONNES", () => drawPdfPersonnes(ctx, personnes));
+  }
+
+  drawPdfSection(ctx, params.mouvement?.libelle ? `QUITTANCE - ${params.mouvement.libelle}` : "QUITTANCE GÉNÉRALE", () => {
+    drawPdfQuittance(ctx, params.contrat);
+  });
 
   const blobUrl = URL.createObjectURL(pdf.output("blob"));
   const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
   if (!opened) {
-    pdf.save(filename);
+    pdf.save(params.filename);
     URL.revokeObjectURL(blobUrl);
   } else {
     window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
   }
 }
 
-function sanitizePdfClone(document: Document, root: HTMLElement) {
-  const style = document.createElement("style");
-  style.textContent = `
-    :root, html, body, [data-pdf-sheet="true"] {
-      background: #ffffff !important;
-      color: #020617 !important;
-      color-scheme: light !important;
-      --background: #ffffff !important;
-      --foreground: #020617 !important;
-      --card: #ffffff !important;
-      --card-foreground: #020617 !important;
-      --popover: #ffffff !important;
-      --popover-foreground: #020617 !important;
-      --primary: #059669 !important;
-      --primary-foreground: #ffffff !important;
-      --secondary: #f1f5f9 !important;
-      --secondary-foreground: #020617 !important;
-      --muted: #f1f5f9 !important;
-      --muted-foreground: #475569 !important;
-      --accent: #f1f5f9 !important;
-      --accent-foreground: #020617 !important;
-      --destructive: #dc2626 !important;
-      --border: #e2e8f0 !important;
-      --input: #cbd5e1 !important;
-      --ring: #94a3b8 !important;
-    }
-    *, *::before, *::after {
-      border-color: #e2e8f0 !important;
-      box-shadow: none !important;
-      outline-color: #94a3b8 !important;
-      text-decoration-color: #020617 !important;
-      text-shadow: none !important;
-      --tw-ring-color: #94a3b8 !important;
-      --tw-ring-offset-color: #ffffff !important;
-      --tw-shadow-color: transparent !important;
-      --tw-shadow: 0 0 transparent !important;
-      --tw-ring-shadow: 0 0 transparent !important;
-      --tw-inset-shadow: 0 0 transparent !important;
-    }
-    [data-pdf-sheet="true"], [data-pdf-sheet="true"] .bg-white {
-      background-color: #ffffff !important;
-    }
-    [data-pdf-sheet="true"] .bg-slate-100,
-    [data-pdf-sheet="true"] thead,
-    [data-pdf-sheet="true"] thead * {
-      background-color: #f1f5f9 !important;
-    }
-    [data-pdf-sheet="true"] .text-slate-500 {
-      color: #64748b !important;
-    }
-    [data-pdf-sheet="true"] .text-slate-600,
-    [data-pdf-sheet="true"] .text-slate-700 {
-      color: #475569 !important;
-    }
-    [data-pdf-sheet="true"] .text-emerald-700 {
-      color: #047857 !important;
-    }
-    [data-pdf-sheet="true"] .border-slate-900 {
-      border-color: #0f172a !important;
-    }
-    [data-pdf-sheet="true"] .border-emerald-600 {
-      border-left-color: #059669 !important;
-    }
-  `;
-  document.head.appendChild(style);
-  document.documentElement.style.backgroundColor = "#ffffff";
-  document.documentElement.style.color = "#020617";
-  document.body.style.backgroundColor = "#ffffff";
-  document.body.style.color = "#020617";
+type PdfContext = {
+  pdf: JsPDF;
+  x: number;
+  y: number;
+  width: number;
+  pageHeight: number;
+};
 
-  const elements = [document.documentElement, document.body, root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))];
-  for (const element of elements) {
-    const className = typeof element.className === "string" ? element.className : "";
-    element.style.color = "#020617";
-    element.style.backgroundColor = "transparent";
-    element.style.borderColor = "#e2e8f0";
-    element.style.borderTopColor = "#e2e8f0";
-    element.style.borderRightColor = "#e2e8f0";
-    element.style.borderBottomColor = "#e2e8f0";
-    element.style.borderLeftColor = "#e2e8f0";
-    element.style.boxShadow = "none";
-    element.style.caretColor = "#020617";
-    element.style.outlineColor = "#94a3b8";
-    element.style.textDecorationColor = "#020617";
+function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossier: string }) {
+  const { pdf } = ctx;
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.setTextColor(4, 120, 87);
+  pdf.text("FICHE SYNTHÈSE", ctx.x, ctx.y);
+  ctx.y += 7;
+  pdf.setTextColor(2, 6, 23);
+  pdf.setFontSize(15);
+  pdf.text(pdfSafe(`Dossier N° ${params.dossier}`), ctx.x, ctx.y);
+  pdf.setFontSize(9);
+  pdf.text(pdfSafe(text(params.contrat.numeroPolice)), ctx.x + ctx.width, ctx.y - 1, { align: "right" });
+  ctx.y += 6;
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(71, 85, 105);
+  pdf.text(pdfSafe(`${productLabel(params.contrat)} · Automobile`), ctx.x, ctx.y);
+  pdf.text("Police N°", ctx.x + ctx.width, ctx.y, { align: "right" });
+  ctx.y += 8;
+  pdf.setDrawColor(15, 23, 42);
+  pdf.setLineWidth(0.5);
+  pdf.line(ctx.x, ctx.y, ctx.x + ctx.width, ctx.y);
+  ctx.y += 6;
+}
 
-    if (element === root || className.includes("bg-white")) {
-      element.style.backgroundColor = "#ffffff";
-    }
-    if (className.includes("bg-slate-100") || element.tagName === "THEAD" || Boolean(element.closest("thead"))) {
-      element.style.backgroundColor = "#f1f5f9";
-    }
-    if (className.includes("text-slate-500")) {
-      element.style.color = "#64748b";
-    }
-    if (className.includes("text-slate-600") || className.includes("text-slate-700")) {
-      element.style.color = "#475569";
-    }
-    if (className.includes("text-emerald-700")) {
-      element.style.color = "#047857";
-    }
-    if (className.includes("border-slate-900")) {
-      element.style.borderColor = "#0f172a";
-      element.style.borderBottomColor = "#0f172a";
-    }
-    if (className.includes("border-emerald-600")) {
-      element.style.borderLeftColor = "#059669";
-    }
+function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
+  ensurePdfSpace(ctx, 22);
+  const { pdf } = ctx;
+  const startY = ctx.y;
+  pdf.setFillColor(241, 245, 249);
+  pdf.setDrawColor(226, 232, 240);
+  pdf.rect(ctx.x, ctx.y, ctx.width, 9, "FD");
+  pdf.setFillColor(5, 150, 105);
+  pdf.rect(ctx.x, ctx.y, 1.2, 9, "F");
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(9);
+  pdf.setTextColor(2, 6, 23);
+  pdf.text(pdfSafe(title), ctx.x + 4, ctx.y + 6);
+  ctx.y += 12;
+  draw();
+  pdf.setDrawColor(226, 232, 240);
+  pdf.roundedRect(ctx.x, startY, ctx.width, ctx.y - startY + 2, 1.5, 1.5, "S");
+  ctx.y += 7;
+}
+
+function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
+  const columnWidth = ctx.width / 3;
+  for (let index = 0; index < items.length; index += 1) {
+    const column = index % 3;
+    if (column === 0 && index > 0) ctx.y += 8;
+    ensurePdfSpace(ctx, 12);
+    const x = ctx.x + column * columnWidth + 3;
+    const [label, value] = items[index];
+    ctx.pdf.setDrawColor(226, 232, 240);
+    ctx.pdf.line(x, ctx.y + 5.5, x + columnWidth - 8, ctx.y + 5.5);
+    ctx.pdf.setFont("helvetica", "bold");
+    ctx.pdf.setFontSize(7);
+    ctx.pdf.setTextColor(100, 116, 139);
+    ctx.pdf.text(pdfSafe(label.toUpperCase()), x, ctx.y);
+    ctx.pdf.setFontSize(8);
+    ctx.pdf.setTextColor(2, 6, 23);
+    ctx.pdf.text(wrapPdfText(ctx, valueToPdfText(value), columnWidth - 30), x + 23, ctx.y, { maxWidth: columnWidth - 30 });
   }
+  ctx.y += 9;
+}
 
-  for (const svg of root.querySelectorAll<SVGElement>("svg")) {
-    svg.style.color = "#020617";
-    svg.style.setProperty("stroke", "#020617");
+function drawPdfClient(ctx: PdfContext, title: string, client: ClientResponse | null | undefined, x: number, width: number) {
+  ensurePdfSpace(ctx, 24);
+  const startY = ctx.y;
+  ctx.pdf.setDrawColor(226, 232, 240);
+  ctx.pdf.roundedRect(x, startY, width, 23, 1.5, 1.5, "S");
+  ctx.pdf.setFont("helvetica", "bold");
+  ctx.pdf.setFontSize(7);
+  ctx.pdf.setTextColor(4, 120, 87);
+  ctx.pdf.text(pdfSafe(title.toUpperCase()), x + 3, startY + 5);
+  ctx.pdf.setFontSize(10);
+  ctx.pdf.setTextColor(2, 6, 23);
+  ctx.pdf.text(wrapPdfText(ctx, clientName(client), width - 6), x + 3, startY + 11, { maxWidth: width - 6 });
+  ctx.pdf.setFont("helvetica", "normal");
+  ctx.pdf.setFontSize(7.5);
+  ctx.pdf.setTextColor(51, 65, 85);
+  ctx.pdf.text(wrapPdfText(ctx, clientIdentity(client), width - 6), x + 3, startY + 16, { maxWidth: width - 6 });
+  ctx.pdf.text(wrapPdfText(ctx, `${text(client?.adresse)}${client?.ville ? `, ${client.ville}` : ""}`, width - 6), x + 3, startY + 20, { maxWidth: width - 6 });
+  ctx.y = startY + 25;
+}
+
+function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[]) {
+  const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
+  if (!vehiculeGaranties.length) return;
+  drawPdfTable(ctx, ["Garantie assurée", "Valeur assurée", "Taux", "Franchise", "Prime nette"], vehiculeGaranties.map((garantie) => [
+    garantieLabel(garantie),
+    formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
+    garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`,
+    franchiseLabel(garantie),
+    formatMoney(garantie.prime),
+  ]), [55, 35, 24, 42, 30]);
+}
+
+function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
+  drawPdfTable(ctx, ["Garantie", "Formule", "Décès", "Invalidité", "Frais médicaux", "Prime nette"], garanties.map((garantie) => [
+    garantieLabel(garantie),
+    text(garantie.formule),
+    amountOrDash(garantie.montantDeces),
+    amountOrDash(garantie.montantInvalidite),
+    amountOrDash(garantie.montantFraisMedicaux),
+    formatMoney(garantie.prime),
+  ]), [48, 28, 25, 25, 30, 30]);
+}
+
+function drawPdfQuittance(ctx: PdfContext, contrat: ContratSummary) {
+  const lignes = (contrat.quittanceGenerale?.lignes ?? []).filter((ligne) => {
+    const categorie = String(ligne.categorie ?? "").toUpperCase();
+    return categorie !== "CORPOREL" || personneGaranties(contrat).length > 0;
+  });
+  drawPdfTable(ctx, ["Catégorie", "P. nette", "Taxes", "TPF", "Accessoires", "CNPAC", "Total"], lignes.map((ligne) => [
+    ligne.globale ? "Total général" : text(ligne.categorie),
+    formatMoney(ligne.primeNette),
+    formatMoney(ligne.taxe),
+    formatMoney(ligne.taxeParafiscale),
+    formatMoney(ligne.accessoire),
+    formatMoney(ligne.cnpac),
+    formatMoney(ligne.primeTotale),
+  ]), [30, 27, 27, 25, 30, 25, 22]);
+}
+
+function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widths: number[]) {
+  if (!rows.length) return;
+  const rowHeight = 8;
+  ensurePdfSpace(ctx, rowHeight * 2);
+  ctx.pdf.setFillColor(241, 245, 249);
+  ctx.pdf.setDrawColor(226, 232, 240);
+  ctx.pdf.rect(ctx.x + 3, ctx.y, ctx.width - 6, rowHeight, "FD");
+  let cursorX = ctx.x + 4;
+  ctx.pdf.setFont("helvetica", "bold");
+  ctx.pdf.setFontSize(7);
+  ctx.pdf.setTextColor(51, 65, 85);
+  headers.forEach((header, index) => {
+    ctx.pdf.text(pdfSafe(header), cursorX, ctx.y + 5);
+    cursorX += widths[index];
+  });
+  ctx.y += rowHeight;
+
+  for (const row of rows) {
+    ensurePdfSpace(ctx, rowHeight + 3);
+    cursorX = ctx.x + 4;
+    ctx.pdf.setDrawColor(226, 232, 240);
+    ctx.pdf.line(ctx.x + 3, ctx.y, ctx.x + ctx.width - 3, ctx.y);
+    row.forEach((cell, index) => {
+      const isLast = index === row.length - 1;
+      ctx.pdf.setFont("helvetica", isLast ? "bold" : "normal");
+      ctx.pdf.setFontSize(7.5);
+      ctx.pdf.setTextColor(2, 6, 23);
+      const align = index === 0 ? "left" : "right";
+      const textX = align === "right" ? cursorX + widths[index] - 2 : cursorX;
+      ctx.pdf.text(wrapPdfText(ctx, cell, widths[index] - 4), textX, ctx.y + 5, { align, maxWidth: widths[index] - 4 });
+      cursorX += widths[index];
+    });
+    ctx.y += rowHeight;
   }
+  ctx.y += 3;
+}
+
+function ensurePdfSpace(ctx: PdfContext, needed: number) {
+  if (ctx.y + needed <= ctx.pageHeight - 12) return;
+  ctx.pdf.addPage();
+  ctx.y = 14;
+}
+
+function wrapPdfText(ctx: PdfContext, value: string, width: number) {
+  return ctx.pdf.splitTextToSize(pdfSafe(value), width);
+}
+
+function valueToPdfText(value: ReactNode) {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  return isBlankNode(value) ? "-" : String(value);
+}
+
+function pdfSafe(value: string) {
+  return String(value ?? "")
+    .replace(/\u202f/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/[–—]/g, "-");
 }
 
 function sanitizeFilename(value: string) {

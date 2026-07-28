@@ -94,6 +94,11 @@ export default function AvenantContratPage() {
   const targetPreviewRequestKeyRef = useRef("");
   const hydratedDraftCodeRef = useRef("");
   const previewedDraftCodeRef = useRef("");
+  const selectedGarantiesRef = useRef<GarantieInput[]>([]);
+
+  useEffect(() => {
+    selectedGarantiesRef.current = selectedGaranties;
+  }, [selectedGaranties]);
 
   const contextQuery = useQuery({
     queryKey: ["avenant-context", contratId],
@@ -397,7 +402,8 @@ export default function AvenantContratPage() {
     return request;
   };
 
-  const buildRequest = (silent = false): AvenantRequest | null => {
+  const buildRequest = (silent = false, garantiesOverride?: GarantieInput[]): AvenantRequest | null => {
+    const currentGaranties = garantiesOverride ?? selectedGaranties;
     const notify = (message: string) => {
       if (!silent) {
         toast.error(message);
@@ -407,11 +413,11 @@ export default function AvenantContratPage() {
       notify("La date d'effet est obligatoire");
       return null;
     }
-    const request = buildDraftRequest();
+    const request = buildDraftRequest(currentGaranties);
     if (movementCode === "INC_F") {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
-      const garantiesRequest = ensureRcGaranties(selectedGaranties, normalizedVehicules.length, normalizedRemorques.length, garanties.data ?? []);
+      const garantiesRequest = ensureRcGaranties(currentGaranties, normalizedVehicules.length, normalizedRemorques.length, garanties.data ?? []);
       const invalidVehicule = normalizedVehicules
         .map((item) => vehicleValidationMessage(item, flotteTargetUsages))
         .find(Boolean);
@@ -432,15 +438,15 @@ export default function AvenantContratPage() {
         notify("Aucune cible active disponible pour cet avenant");
         return null;
       }
-      if (selectedGaranties.length === 0) {
+      if (currentGaranties.length === 0) {
         notify("Sélectionnez au moins une garantie");
         return null;
       }
-      request.garanties = selectedGaranties;
+      request.garanties = currentGaranties;
     }
     if (movementCode === "EXR_M") {
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
-      const garantiesRequest = ensureRcGaranties(selectedGaranties, 0, normalizedRemorques.length, garanties.data ?? []);
+      const garantiesRequest = ensureRcGaranties(currentGaranties, 0, normalizedRemorques.length, garanties.data ?? []);
       const invalidRemorque = normalizedRemorques.map(remorqueValidationMessage).find(Boolean);
       if (invalidRemorque) {
         notify(invalidRemorque);
@@ -685,8 +691,8 @@ export default function AvenantContratPage() {
     return true;
   };
 
-  const previewCompleteDraft = () => {
-    const request = buildRequest(true);
+  const previewCompleteDraft = (garantiesOverride?: GarantieInput[]) => {
+    const request = buildRequest(true, garantiesOverride);
     if (!request) {
       setPreview(null);
       return;
@@ -715,7 +721,12 @@ export default function AvenantContratPage() {
         toast.success(`${label} enregistré`);
         onSuccess?.();
         if (isTargetCreationCode(movementCode)) {
-          previewTargetCreation(target, previewCompleteDraft);
+          const latestGaranties = selectedGarantiesRef.current;
+          previewTargetCreation(
+            target,
+            () => previewCompleteDraft(latestGaranties),
+            latestGaranties
+          );
         } else if (part === "garanties") {
           previewCompleteDraft();
         }

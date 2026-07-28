@@ -767,7 +767,12 @@ public class MouvementContratService {
         TypeImpactMouvement impact = typeMouvement == null || typeMouvement.getTypeImpact() == null
                 ? TypeImpactMouvement.NORMAL
                 : typeMouvement.getTypeImpact();
-        return impact == TypeImpactMouvement.NORMAL;
+        String code = typeMouvement == null || typeMouvement.getCode() == null
+                ? ""
+                : typeMouvement.getCode().trim().toUpperCase(Locale.ROOT);
+        return impact == TypeImpactMouvement.NORMAL
+                || "INC_F".equals(code)
+                || "EXR_M".equals(code);
     }
 
     private QuittanceResponse.GarantieLigne toQuittanceGarantieResponse(

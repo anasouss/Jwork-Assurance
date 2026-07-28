@@ -447,20 +447,18 @@ export function FlotteTargetsSection({
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeVehiculeTarget)).length > 1 ? "s" : ""}`}
                 open={!showInfoSections || activeTargetPart === "garanties"}
                 onOpenChange={() => setActiveTargetPart("garanties")}
+                headerAction={garantiesExtraAction}
                 action={
-                  <>
-                    {garantiesExtraAction}
-                    <Button
-                      type="button"
-                      disabled={previewing || saving}
-                      onClick={() => {
-                        saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
-                      }}
-                    >
-                      {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                      {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
-                    </Button>
-                  </>
+                  <Button
+                    type="button"
+                    disabled={previewing || saving}
+                    onClick={() => {
+                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
+                    }}
+                  >
+                    {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
+                  </Button>
                 }
               >
                 <TargetGuaranteesTable
@@ -578,20 +576,18 @@ export function FlotteTargetsSection({
               <TargetSubsection
                 title="Garanties"
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length > 1 ? "s" : ""}`}
+                headerAction={garantiesExtraAction}
                 action={
-                  <>
-                    {garantiesExtraAction}
-                    <Button
-                      type="button"
-                      disabled={previewing || saving}
-                      onClick={() => {
-                        saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
-                      }}
-                    >
-                      {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                      {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
-                    </Button>
-                  </>
+                  <Button
+                    type="button"
+                    disabled={previewing || saving}
+                    onClick={() => {
+                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
+                    }}
+                  >
+                    {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : "Enregistrer garanties"}
+                  </Button>
                 }
               >
                 <TargetGuaranteesTable
@@ -681,6 +677,7 @@ function LookupMessage({ state }: { state?: LookupState }) {
 function TargetSubsection({
   title,
   badge,
+  headerAction,
   action,
   children,
   defaultOpen = true,
@@ -689,6 +686,7 @@ function TargetSubsection({
 }: {
   title: string;
   badge?: string;
+  headerAction?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
@@ -706,15 +704,16 @@ function TargetSubsection({
 
   return (
     <Collapsible open={open} onOpenChange={handleOpenChange} className="overflow-hidden rounded-md border bg-card">
-      <CollapsibleTrigger asChild>
-        <button type="button" className="flex w-full items-center justify-between gap-3 bg-emerald-50 px-4 py-3 text-left text-emerald-950 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-50 dark:hover:bg-emerald-950/45">
-          <span className="flex min-w-0 items-center gap-2">
+      <div className="flex items-center justify-between gap-3 bg-emerald-50 px-4 py-3 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-emerald-700 dark:hover:text-emerald-100">
             <ChevronDown className={cn("size-4 shrink-0 transition-transform", !open && "-rotate-90")} />
             <span className="truncate text-sm font-semibold">{title}</span>
             {badge ? <Badge variant="secondary">{badge}</Badge> : null}
-          </span>
-        </button>
-      </CollapsibleTrigger>
+          </button>
+        </CollapsibleTrigger>
+        {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+      </div>
       <CollapsibleContent>
         <div className="border-t p-4">
           {children}

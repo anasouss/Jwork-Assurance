@@ -18,7 +18,7 @@ import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfig
 import { FlotteTargetsSection } from "../contrat-creation/FlotteTargetsSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { toDateOnly } from "../date";
-import type { AvenantRequest, ContratSummary, GarantieInput, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
+import type { AvenantRequest, ContratSummary, GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 
 type Target = {
   kind: "vehicule" | "remorque";
@@ -292,18 +292,19 @@ export default function AvenantContratPage() {
     if (movementCode === "INC_F") {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance));
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
+      const garantiesRequest = ensureRcGaranties(selectedGaranties, normalizedVehicules.length, normalizedRemorques.length, garanties.data ?? []);
       const invalidVehicule = normalizedVehicules.some((item) => !item.usageId || !item.marqueId || !item.immatriculation || !item.puissanceFiscale || !item.nombrePlaces);
       if (invalidVehicule) {
         notify("Usage, marque, immatriculation, puissance fiscale et nombre de places sont obligatoires pour chaque véhicule");
         return null;
       }
-      if (selectedGaranties.length === 0) {
+      if (garantiesRequest.length === 0) {
         notify("Sélectionnez au moins une garantie");
         return null;
       }
       request.vehicules = normalizedVehicules;
       request.remorques = normalizedRemorques;
-      request.garanties = selectedGaranties;
+      request.garanties = garantiesRequest;
     }
     if (isGuaranteeModificationCode(movementCode)) {
       if (!hasActiveTargets) {
@@ -318,17 +319,18 @@ export default function AvenantContratPage() {
     }
     if (movementCode === "EXR_M") {
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
+      const garantiesRequest = ensureRcGaranties(selectedGaranties, 0, normalizedRemorques.length, garanties.data ?? []);
       const invalidRemorque = normalizedRemorques.some((item) => !item.usageId || !item.marqueId || !item.immatriculation || !item.ptc);
       if (invalidRemorque) {
         notify("Usage, marque, immatriculation et PTC sont obligatoires pour chaque remorque");
         return null;
       }
-      if (selectedGaranties.length === 0) {
+      if (garantiesRequest.length === 0) {
         notify("Sélectionnez au moins une garantie");
         return null;
       }
       request.remorques = normalizedRemorques;
-      request.garanties = selectedGaranties;
+      request.garanties = garantiesRequest;
     }
     if (movementCode === "RET_F") {
       const selected = splitTargets(targets, selectedTargetIds);
@@ -370,6 +372,50 @@ export default function AvenantContratPage() {
       request.remorqueIds = selected.remorqueIds;
     }
     return request;
+  };
+
+  const buildTargetCreationPreviewRequest = (target: FlotteSectionTarget, silent = false): AvenantRequest | null => {
+    const notify = (message: string) => {
+      if (!silent) {
+        toast.error(message);
+      }
+    };
+    if (!dateEffet) {
+      notify("La date d'effet est obligatoire");
+      return null;
+    }
+    const request: AvenantRequest = {
+      codeTypeMouvement: movementCode,
+      dateEffet,
+      dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
+    };
+    if (movementCode === "INC_F") {
+      const normalizedVehicules = target.kind === "vehicule"
+        ? [normalizeVehicle(vehicules[target.index], dateEffet, request.dateEcheance)]
+        : [];
+      const normalizedRemorques = target.kind === "remorque"
+        ? [normalizeRemorque(remorques[target.index], dateEffet, request.dateEcheance)]
+        : [];
+      const garantiesRequest = ensureRcGaranties(
+        scopeGarantiesForTarget(selectedGaranties, target),
+        normalizedVehicules.length,
+        normalizedRemorques.length,
+        garanties.data ?? []
+      );
+      request.vehicules = normalizedVehicules;
+      request.remorques = normalizedRemorques;
+      request.garanties = garantiesRequest;
+      return request;
+    }
+    if (movementCode === "EXR_M") {
+      const normalizedRemorques = target.kind === "remorque"
+        ? [normalizeRemorque(remorques[target.index], dateEffet, request.dateEcheance)]
+        : [];
+      request.remorques = normalizedRemorques;
+      request.garanties = ensureRcGaranties(scopeGarantiesForTarget(selectedGaranties, target), 0, normalizedRemorques.length, garanties.data ?? []);
+      return request;
+    }
+    return buildRequest(silent);
   };
 
   useEffect(() => {
@@ -452,14 +498,28 @@ export default function AvenantContratPage() {
     return true;
   };
 
-  const previewTargetCreation = (onSuccess?: () => void) => {
-    const request = buildRequest();
+  const previewTargetCreation = (target?: FlotteSectionTarget, onSuccess?: () => void) => {
+    const request = target ? buildTargetCreationPreviewRequest(target) : buildRequest();
     if (!request) {
       return false;
     }
     manualPreviewKeyRef.current = JSON.stringify(request);
-    previewMutation.mutate(request, { onSuccess });
+    previewMutation.mutate(request, {
+      onSuccess: (data) => {
+        if (target) {
+          setPreview(remapScopedPreview(data, target));
+        }
+        onSuccess?.();
+      },
+    });
     return true;
+  };
+
+  const requestTargetCreationCalculation = (target: FlotteSectionTarget) => {
+    if (!validateTargetCreation(target)) {
+      return;
+    }
+    window.setTimeout(() => previewTargetCreation(target), 0);
   };
 
   return (
@@ -543,6 +603,7 @@ export default function AvenantContratPage() {
           showInfoSections={movementCode === "INC_F" || movementCode === "EXR_M"}
           allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
           onValidateTarget={isTargetCreationCode(movementCode) ? validateTargetCreation : undefined}
+          onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
           garantiesExtraAction={movementCode === "INC_F" ? (
             <Button
               type="button"
@@ -560,7 +621,7 @@ export default function AvenantContratPage() {
                   onSuccess?.();
                   return true;
                 }
-                return previewTargetCreation(onSuccess);
+                return previewTargetCreation(_target, onSuccess);
               }
             : undefined}
         />
@@ -710,6 +771,64 @@ function normalizeVehicle(vehicle: VehiculeInput, dateEffet: string, dateEcheanc
 
 function normalizeRemorque(remorque: RemorqueInput, dateEffet: string, dateEcheance?: string): RemorqueInput {
   return { ...remorque, dateEffet, dateEcheance };
+}
+
+function ensureRcGaranties(
+  selectedGaranties: GarantieInput[],
+  vehiculeCount: number,
+  remorqueCount: number,
+  garanties: ReferenceOption[]
+) {
+  const rc = garanties.find((garantie) => Boolean(garantie.responsabiliteCivile));
+  if (!rc) {
+    return selectedGaranties;
+  }
+  const next = [...selectedGaranties];
+  for (let index = 0; index < vehiculeCount; index++) {
+    if (!next.some((garantie) => garantie.garantieId === rc.id && garantie.vehiculeIndex === index && garantie.remorqueIndex == null)) {
+      next.push(rcGarantieInput(rc, { vehiculeIndex: index }));
+    }
+  }
+  for (let index = 0; index < remorqueCount; index++) {
+    if (!next.some((garantie) => garantie.garantieId === rc.id && garantie.remorqueIndex === index && garantie.vehiculeIndex == null)) {
+      next.push(rcGarantieInput(rc, { remorqueIndex: index }));
+    }
+  }
+  return next;
+}
+
+function scopeGarantiesForTarget(selectedGaranties: GarantieInput[], target: FlotteSectionTarget): GarantieInput[] {
+  return selectedGaranties
+    .filter((garantie) => target.kind === "vehicule" ? garantie.vehiculeIndex === target.index : garantie.remorqueIndex === target.index)
+    .map((garantie) => target.kind === "vehicule"
+      ? { ...garantie, vehiculeIndex: 0, remorqueIndex: undefined }
+      : { ...garantie, remorqueIndex: 0, vehiculeIndex: undefined }
+    );
+}
+
+function remapScopedPreview(preview: QuittancePreview, target: FlotteSectionTarget): QuittancePreview {
+  const targetKind = target.kind.toUpperCase();
+  return {
+    ...preview,
+    garanties: preview.garanties?.map((garantie) => target.kind === "vehicule"
+      ? { ...garantie, vehiculeIndex: target.index, remorqueIndex: undefined }
+      : { ...garantie, remorqueIndex: target.index, vehiculeIndex: undefined }
+    ),
+    targetSummaries: preview.targetSummaries?.map((summary) => (
+      String(summary.kind ?? "").toUpperCase() === targetKind
+        ? { ...summary, vehiculeIndex: target.kind === "vehicule" ? target.index : undefined, remorqueIndex: target.kind === "remorque" ? target.index : undefined }
+        : summary
+    )),
+  };
+}
+
+function rcGarantieInput(rc: ReferenceOption, target: Pick<GarantieInput, "vehiculeIndex" | "remorqueIndex">): GarantieInput {
+  return {
+    garantieId: rc.id,
+    ...target,
+    modeSelectionne: String(rc.modeParDefaut ?? "TAUX"),
+    sourceValeurSelectionnee: "AUCUNE",
+  };
 }
 
 function splitTargets(targets: Target[], selectedTargetIds: string[]) {

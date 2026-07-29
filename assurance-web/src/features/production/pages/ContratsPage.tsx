@@ -325,6 +325,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     && !child
     && !terminal
     && !hasActiveAvenants;
+  const canRectifyMovement = !child
+    && !terminal
+    && Boolean(movement.mouvementId)
+    && !movement.isSynthetic
+    && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";
   const canDownload = !isTerminalMovementCode(movement.code);
   const hasPrimaryActions = canEditDirectly || canCreateMovement;
   const deleteMode = resolveDeleteMode(contrat, movement, child);
@@ -409,6 +414,13 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           {canEditDirectly ? (
             <DropdownMenuItem asChild>
               <Link to={editPath}>Modifier</Link>
+            </DropdownMenuItem>
+          ) : null}
+          {canRectifyMovement ? (
+            <DropdownMenuItem asChild>
+              <Link to={`${avenantPath(contrat, movement.code)}?mouvementId=${movement.mouvementId}`}>
+                Rectifier l&apos;avenant
+              </Link>
             </DropdownMenuItem>
           ) : null}
           {canCreateMovement ? (

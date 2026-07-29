@@ -250,6 +250,26 @@ export const productionApi = {
     );
   },
 
+  async getAvenantRectification(contratId: string, mouvementId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<AvenantRequest>>(
+        `/api/v1/contrats/${contratId}/avenants/${mouvementId}/rectification`
+      )
+    );
+  },
+
+  async rectifyAvenant(contratId: string, mouvementId: string, request: AvenantRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<QuittancePreview>>(
+        `/api/v1/contrats/${contratId}/avenants/${mouvementId}/rectification`,
+        {
+          method: "PUT",
+          body: JSON.stringify(request),
+        }
+      )
+    );
+  },
+
   async getAssistanceContext(contratId: string, params?: { mouvementId?: string | null; dateSouscription?: string | null }) {
     return unwrap(
       await apiFetch<ApiResponse<AssistanceContratContext>>(

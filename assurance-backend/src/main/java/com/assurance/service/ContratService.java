@@ -24,6 +24,7 @@ import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
+import com.assurance.enums.TypeMouvementStockAttestation;
 import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
@@ -89,6 +90,7 @@ public class ContratService {
     private final PieceJointeRepository pieceJointeRepository;
     private final CarteVerteRepository carteVerteRepository;
     private final MouvementStockAttestationRepository mouvementStockAttestationRepository;
+    private final AttestationStockService attestationStockService;
     private final EcheanceService echeanceService;
 
     @Transactional
@@ -1802,6 +1804,327 @@ public class ContratService {
         return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)), true, null, false);
     }
 
+    @Transactional(readOnly = true)
+    public AvenantRequest getAvenantRectification(Long agenceId, Long contratId, Long mouvementId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        MouvementContrat mouvement = resolveRectifiableMovement(agenceId, contrat, mouvementId);
+        return toAvenantRequest(mouvement);
+    }
+
+    @Transactional
+    public QuittanceResponse rectifierAvenant(
+            Long agenceId,
+            Long contratId,
+            Long mouvementId,
+            AvenantRequest request
+    ) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        MouvementContrat mouvement = resolveRectifiableMovement(agenceId, contrat, mouvementId);
+        String originalCode = mouvement.getTypeMouvement().getCode();
+        if (request == null || !originalCode.equalsIgnoreCase(request.getCodeTypeMouvement())) {
+            throw new BadRequestException("Le type de l'avenant rectifie ne peut pas etre modifie");
+        }
+        if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Cet avenant contient des pieces jointes. Retirez-les avant la rectification.");
+        }
+        if (carteVerteRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Cet avenant contient une carte verte. Retirez-la avant la rectification.");
+        }
+        if (quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId).stream()
+                .anyMatch(quittance -> Boolean.TRUE.equals(quittance.getPayee()))) {
+            throw new BadRequestException("Une quittance de cet avenant est payee. Utilisez un mouvement comptable de correction.");
+        }
+        if (isModificationGarantiesAvenant(request)
+                && mouvementGarantieRepository.findByMouvementContratId(mouvementId).stream()
+                .noneMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)) {
+            throw new BadRequestException("Cet ancien avenant ne contient pas l'etat garanties avant modification et ne peut pas etre rectifie automatiquement.");
+        }
+
+        libererStockMouvement(contrat, mouvement);
+        desactiverDependancesMouvement(mouvementId);
+        rollbackCurrentStateForMovementDeletion(mouvement);
+        mouvement.setStatut(StatutMouvementContrat.ANNULE);
+        mouvement.setNotes(appendNote(mouvement.getNotes(), "Rectifie le " + LocalDate.now()));
+        mouvementContratRepository.save(mouvement);
+        refreshContratStatusAfterMovementDeletion(contrat);
+
+        request.setNumeroMouvement(null);
+        request.setNotes(appendNote(request.getNotes(), "Rectification du mouvement " + mouvement.getNumeroMouvement()));
+        return creerAvenant(agenceId, contratId, request);
+    }
+
+    private MouvementContrat resolveRectifiableMovement(Long agenceId, Contrat contrat, Long mouvementId) {
+        MouvementContrat mouvement = mouvementContratRepository.findByContratIdAndId(contrat.getId(), mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        if (mouvement.getAgence() == null || !agenceId.equals(mouvement.getAgence().getId())) {
+            throw new ResourceNotFoundException("MouvementContrat", mouvementId);
+        }
+        List<MouvementContrat> actifs = mouvementsActifsChronologiquesDesc(contrat);
+        if (actifs.isEmpty() || !mouvementId.equals(actifs.get(0).getId())) {
+            throw new BadRequestException("Seul le dernier avenant valide peut etre rectifie");
+        }
+        if (mouvement.getStatut() != StatutMouvementContrat.VALIDE
+                || mouvement.getTypeMouvement() == null
+                || mouvement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.AFFAIRE_NOUVELLE
+                || Boolean.TRUE.equals(mouvement.getTypeMouvement().getClotureContrat())) {
+            throw new BadRequestException("Ce mouvement ne peut pas etre rectifie");
+        }
+        return mouvement;
+    }
+
+    private AvenantRequest toAvenantRequest(MouvementContrat mouvement) {
+        AvenantRequest request = new AvenantRequest();
+        request.setCodeTypeMouvement(mouvement.getTypeMouvement().getCode());
+        request.setDateEffet(mouvement.getDateEffet());
+        request.setDateEcheance(mouvement.getDateEcheance());
+        request.setNotes(mouvement.getNotes());
+
+        List<MouvementVehicule> vehiculeSnapshots = mouvementVehiculeRepository
+                .findByMouvementContratId(mouvement.getId()).stream()
+                .sorted(Comparator.comparing(MouvementVehicule::getId))
+                .toList();
+        List<MouvementRemorque> remorqueSnapshots = mouvementRemorqueRepository
+                .findByMouvementContratId(mouvement.getId()).stream()
+                .sorted(Comparator.comparing(MouvementRemorque::getId))
+                .toList();
+        List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository
+                .findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
+                .sorted(Comparator.comparing(MouvementGarantie::getId))
+                .toList();
+
+        boolean creationCibles = "INC_F".equalsIgnoreCase(request.getCodeTypeMouvement())
+                || "EXR_M".equalsIgnoreCase(request.getCodeTypeMouvement());
+        if (creationCibles) {
+            request.setVehicules(vehiculeSnapshots.stream().map(this::toVehiculeInput).toList());
+            request.setRemorques(remorqueSnapshots.stream().map(this::toRemorqueInput).toList());
+        } else {
+            request.setVehiculeIds(distinctIds(vehiculeSnapshots.stream()
+                    .map(MouvementVehicule::getVehicule).toList()));
+            request.setRemorqueIds(distinctIds(remorqueSnapshots.stream()
+                    .map(MouvementRemorque::getRemorque).toList()));
+        }
+
+        Map<Long, Integer> vehiculeIndexes = targetIndexes(
+                creationCibles ? vehiculeSnapshots.stream().map(MouvementVehicule::getVehicule).toList()
+                        : activeVehicules(mouvement.getContrat())
+        );
+        Map<Long, Integer> remorqueIndexes = targetIndexes(
+                creationCibles ? remorqueSnapshots.stream().map(MouvementRemorque::getRemorque).toList()
+                        : activeRemorques(mouvement.getContrat())
+        );
+        request.setGaranties(garantieSnapshots.stream()
+                .map(snapshot -> toGarantieInput(snapshot, vehiculeIndexes, remorqueIndexes))
+                .toList());
+        request.setAssistances(toAssistanceInputs(mouvement.getId(), vehiculeIndexes));
+
+        if ("PRI_F".equalsIgnoreCase(request.getCodeTypeMouvement())
+                || "PRI_M".equalsIgnoreCase(request.getCodeTypeMouvement())) {
+            request.setPrecisions(toPrecisionInputs(vehiculeSnapshots, remorqueSnapshots));
+        }
+        return request;
+    }
+
+    private CreateContratRequest.VehiculeInput toVehiculeInput(MouvementVehicule snapshot) {
+        CreateContratRequest.VehiculeInput input = new CreateContratRequest.VehiculeInput();
+        input.setTypeVehicule(snapshot.getTypeVehicule());
+        input.setUsageId(snapshot.getUsage() != null ? snapshot.getUsage().getId() : null);
+        input.setMarqueId(snapshot.getMarque() != null ? snapshot.getMarque().getId() : null);
+        input.setCarrosserieId(snapshot.getCarrosserie() != null ? snapshot.getCarrosserie().getId() : null);
+        input.setCategorieTransportId(snapshot.getCategorieTransport() != null ? snapshot.getCategorieTransport().getId() : null);
+        input.setImmatriculation(snapshot.getImmatriculation());
+        input.setImmatriculationProvisoire(snapshot.getImmatriculationProvisoire());
+        input.setCarburant(snapshot.getCarburant());
+        input.setPuissanceFiscale(snapshot.getPuissanceFiscale());
+        input.setNombrePlaces(snapshot.getNombrePlaces());
+        input.setSousClasse(snapshot.getSousClasse());
+        input.setPtc(snapshot.getPtc());
+        input.setDatePremiereCirculation(snapshot.getDatePremiereCirculation());
+        input.setDateExpirationCarteGrise(snapshot.getDateExpirationCarteGrise());
+        input.setDateEffet(snapshot.getDateEffet());
+        input.setDateEcheance(snapshot.getDateEcheance());
+        input.setCrm(snapshot.getCrm());
+        input.setNumeroAttestation(snapshot.getNumeroAttestation());
+        input.setCoefficientProrata(snapshot.getCoefficientProrata());
+        input.setValeurVenale(snapshot.getValeurVenale());
+        input.setValeurNeuf(snapshot.getValeurNeuf());
+        input.setValeurGlace(snapshot.getValeurGlace());
+        input.setOrganismeCredit(snapshot.getOrganismeCredit());
+        input.setNomOrganismeCredit(snapshot.getNomOrganismeCredit());
+        input.setMontantCredit(snapshot.getMontantCredit());
+        input.setDateFinCredit(snapshot.getDateFinCredit());
+        return input;
+    }
+
+    private CreateContratRequest.RemorqueInput toRemorqueInput(MouvementRemorque snapshot) {
+        CreateContratRequest.RemorqueInput input = new CreateContratRequest.RemorqueInput();
+        input.setUsageId(snapshot.getUsage() != null ? snapshot.getUsage().getId() : null);
+        input.setMarqueId(snapshot.getMarque() != null ? snapshot.getMarque().getId() : null);
+        input.setImmatriculation(snapshot.getImmatriculation());
+        input.setPtc(snapshot.getPtc());
+        input.setDateMiseEnCirculation(snapshot.getDateMiseEnCirculation());
+        input.setDateEffet(snapshot.getDateEffet());
+        input.setDateEcheance(snapshot.getDateEcheance());
+        input.setCrm(snapshot.getCrm());
+        input.setNumeroAttestation(snapshot.getNumeroAttestation());
+        input.setCoefficientProrata(snapshot.getCoefficientProrata());
+        input.setValeurAssuree(snapshot.getValeurAssuree());
+        return input;
+    }
+
+    private CreateContratRequest.GarantieInput toGarantieInput(
+            MouvementGarantie snapshot,
+            Map<Long, Integer> vehiculeIndexes,
+            Map<Long, Integer> remorqueIndexes
+    ) {
+        CreateContratRequest.GarantieInput input = new CreateContratRequest.GarantieInput();
+        input.setGarantieId(snapshot.getGarantie().getId());
+        input.setLigneGrilleTarifaireId(snapshot.getLigneGrilleTarifaire() != null ? snapshot.getLigneGrilleTarifaire().getId() : null);
+        input.setClientId(snapshot.getClient() != null ? snapshot.getClient().getId() : null);
+        input.setVehiculeIndex(snapshot.getVehicule() != null ? vehiculeIndexes.get(snapshot.getVehicule().getId()) : null);
+        input.setRemorqueIndex(snapshot.getRemorque() != null ? remorqueIndexes.get(snapshot.getRemorque().getId()) : null);
+        input.setModeSelectionne(snapshot.getModeSelectionne() != null ? snapshot.getModeSelectionne().name() : null);
+        input.setSourceValeurSelectionnee(snapshot.getSourceValeurSelectionnee() != null ? snapshot.getSourceValeurSelectionnee().name() : null);
+        input.setFormuleGarantiePersonneId(snapshot.getFormuleGarantiePersonne() != null ? snapshot.getFormuleGarantiePersonne().getId() : null);
+        input.setValeurVenale(snapshot.getValeurVenale());
+        input.setValeurNeuf(snapshot.getValeurNeuf());
+        input.setValeurGlace(snapshot.getValeurGlace());
+        input.setValeurAssuree(snapshot.getCapital());
+        input.setFormule(snapshot.getFormule());
+        input.setMontantDeces(snapshot.getMontantDeces());
+        input.setMontantInvalidite(snapshot.getMontantInvalidite());
+        input.setMontantFraisMedicaux(snapshot.getMontantFraisMedicaux());
+        input.setMontantFraisHospitalisation(snapshot.getMontantFraisHospitalisation());
+        input.setMontantFraisFuneraires(snapshot.getMontantFraisFuneraires());
+        input.setMontantFraisChirurgie(snapshot.getMontantFraisChirurgie());
+        input.setAccessoire(snapshot.getAccessoire());
+        input.setCapital(snapshot.getCapital());
+        input.setTaux(snapshot.getTaux());
+        input.setPrime(snapshot.getPrime());
+        input.setTauxFranchise(snapshot.getTauxFranchise());
+        input.setFranchiseMinimale(snapshot.getFranchiseMinimale());
+        return input;
+    }
+
+    private List<AvenantRequest.AssistanceInput> toAssistanceInputs(
+            Long mouvementId,
+            Map<Long, Integer> vehiculeIndexes
+    ) {
+        return assistanceContratRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId).stream()
+                .filter(assistance -> Boolean.TRUE.equals(assistance.getActif()))
+                .filter(assistance -> assistance.getVehicule() != null
+                        && vehiculeIndexes.containsKey(assistance.getVehicule().getId()))
+                .map(assistance -> {
+                    AvenantRequest.AssistanceInput input = new AvenantRequest.AssistanceInput();
+                    input.setAssistanceId(assistance.getId());
+                    input.setVehiculeIndex(vehiculeIndexes.get(assistance.getVehicule().getId()));
+                    input.setEnabled(true);
+                    input.setCompagnieAssistanceId(assistance.getCompagnieAssistance() != null
+                            ? assistance.getCompagnieAssistance().getId() : null);
+                    input.setProduitAssistanceId(assistance.getProduitAssistance() != null
+                            ? assistance.getProduitAssistance().getId() : null);
+                    input.setDateSouscription(assistance.getDateSouscription());
+                    input.setDateEffet(assistance.getDateEffet());
+                    input.setEcheanceCode(assistance.getEcheanceCode());
+                    input.setNumeroContratOuQuittance(assistance.getNumeroContratOuQuittance());
+                    input.setTypeQuittance(assistance.getTypeQuittance());
+                    return input;
+                })
+                .toList();
+    }
+
+    private List<AvenantRequest.TargetPrecision> toPrecisionInputs(
+            List<MouvementVehicule> vehicules,
+            List<MouvementRemorque> remorques
+    ) {
+        List<AvenantRequest.TargetPrecision> result = new ArrayList<>();
+        for (MouvementVehicule snapshot : vehicules) {
+            if (snapshot.getVehicule() == null) {
+                continue;
+            }
+            AvenantRequest.TargetPrecision precision = new AvenantRequest.TargetPrecision();
+            precision.setVehiculeId(snapshot.getVehicule().getId());
+            precision.setImmatriculation(snapshot.getVehicule().getImmatriculation());
+            precision.setImmatriculationProvisoire(snapshot.getVehicule().getImmatriculationProvisoire());
+            precision.setNumeroAttestation(snapshot.getVehicule().getNumeroAttestation());
+            result.add(precision);
+        }
+        for (MouvementRemorque snapshot : remorques) {
+            if (snapshot.getRemorque() == null) {
+                continue;
+            }
+            AvenantRequest.TargetPrecision precision = new AvenantRequest.TargetPrecision();
+            precision.setRemorqueId(snapshot.getRemorque().getId());
+            precision.setImmatriculation(snapshot.getRemorque().getImmatriculation());
+            precision.setNumeroAttestation(snapshot.getRemorque().getNumeroAttestation());
+            result.add(precision);
+        }
+        return result;
+    }
+
+    private <T extends BaseEntity> List<Long> distinctIds(List<T> targets) {
+        return targets.stream()
+                .filter(target -> target != null && target.getId() != null)
+                .map(BaseEntity::getId)
+                .distinct()
+                .toList();
+    }
+
+    private <T extends BaseEntity> Map<Long, Integer> targetIndexes(List<T> targets) {
+        Map<Long, Integer> indexes = new HashMap<>();
+        for (int index = 0; index < targets.size(); index++) {
+            T target = targets.get(index);
+            if (target != null && target.getId() != null) {
+                indexes.putIfAbsent(target.getId(), index);
+            }
+        }
+        return indexes;
+    }
+
+    private void libererStockMouvement(Contrat contrat, MouvementContrat mouvement) {
+        Set<Long> liberated = new LinkedHashSet<>();
+        for (MouvementStockAttestation stockMovement
+                : mouvementStockAttestationRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvement.getId())) {
+            if (stockMovement.getTypeMouvement() != TypeMouvementStockAttestation.UTILISATION
+                    || stockMovement.getAttestationStock() == null
+                    || !liberated.add(stockMovement.getAttestationStock().getId())) {
+                continue;
+            }
+            AttestationStock attestation = stockMovement.getAttestationStock();
+            attestationStockService.liberer(
+                    contrat,
+                    mouvement,
+                    attestation.getNumero(),
+                    attestation.getUsageRepresentatif()
+            );
+        }
+    }
+
+    private void desactiverDependancesMouvement(Long mouvementId) {
+        for (AssistanceContrat assistance
+                : assistanceContratRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId)) {
+            assistance.setActif(false);
+            if (assistance.getElementFacturable() != null) {
+                assistance.getElementFacturable().setActif(false);
+                assistance.getElementFacturable().setStatut(StatutElementFacturable.ANNULE);
+                elementFacturableRepository.save(assistance.getElementFacturable());
+            }
+            assistanceContratRepository.save(assistance);
+        }
+        for (ElementFacturable element
+                : elementFacturableRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId)) {
+            element.setActif(false);
+            element.setStatut(StatutElementFacturable.ANNULE);
+            elementFacturableRepository.save(element);
+        }
+    }
+
+    private String appendNote(String current, String addition) {
+        return hasText(current) ? current.trim() + "\n" + addition : addition;
+    }
+
     @Transactional
     public void deleteContrat(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
@@ -1902,8 +2225,12 @@ public class ContratService {
             Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
             if (actif != null) {
                 snapshot.getVehicule().setActif(actif);
-                vehiculesToSave.add(snapshot.getVehicule());
             }
+            if (snapshot.getNature() == NatureSnapshotMouvement.COURANT
+                    || snapshot.getNature() == NatureSnapshotMouvement.AVANT) {
+                restoreVehiculeSnapshot(snapshot);
+            }
+            vehiculesToSave.add(snapshot.getVehicule());
         }
         if (!vehiculesToSave.isEmpty()) {
             vehiculeRepository.saveAll(vehiculesToSave);
@@ -1917,8 +2244,12 @@ public class ContratService {
             Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
             if (actif != null) {
                 snapshot.getRemorque().setActif(actif);
-                remorquesToSave.add(snapshot.getRemorque());
             }
+            if (snapshot.getNature() == NatureSnapshotMouvement.COURANT
+                    || snapshot.getNature() == NatureSnapshotMouvement.AVANT) {
+                restoreRemorqueSnapshot(snapshot);
+            }
+            remorquesToSave.add(snapshot.getRemorque());
         }
         if (!remorquesToSave.isEmpty()) {
             remorqueRepository.saveAll(remorquesToSave);
@@ -1932,8 +2263,13 @@ public class ContratService {
             Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
             if (actif != null) {
                 snapshot.getContratGarantie().setActif(actif);
-                garantiesToSave.add(snapshot.getContratGarantie());
             }
+            if (snapshot.getNature() == NatureSnapshotMouvement.AVANT) {
+                snapshot.getContratGarantie().setActif(true);
+            } else if (snapshot.getNature() == NatureSnapshotMouvement.APRES) {
+                snapshot.getContratGarantie().setActif(false);
+            }
+            garantiesToSave.add(snapshot.getContratGarantie());
         }
         if (!garantiesToSave.isEmpty()) {
             contratGarantieRepository.saveAll(garantiesToSave);
@@ -1941,11 +2277,62 @@ public class ContratService {
         updateTargetCounts(mouvement.getContrat());
     }
 
+    private void restoreVehiculeSnapshot(MouvementVehicule snapshot) {
+        Vehicule vehicule = snapshot.getVehicule();
+        vehicule.setTypeVehicule(snapshot.getTypeVehicule());
+        vehicule.setUsage(snapshot.getUsage());
+        vehicule.setMarque(snapshot.getMarque());
+        vehicule.setCarrosserie(snapshot.getCarrosserie());
+        vehicule.setCategorieTransport(snapshot.getCategorieTransport());
+        vehicule.setImmatriculation(snapshot.getImmatriculation());
+        vehicule.setImmatriculationProvisoire(snapshot.getImmatriculationProvisoire());
+        vehicule.setCarburant(snapshot.getCarburant());
+        vehicule.setPuissanceFiscale(snapshot.getPuissanceFiscale());
+        vehicule.setNombrePlaces(snapshot.getNombrePlaces());
+        vehicule.setSousClasse(snapshot.getSousClasse());
+        vehicule.setPtc(snapshot.getPtc());
+        vehicule.setDatePremiereCirculation(snapshot.getDatePremiereCirculation());
+        vehicule.setDateExpirationCarteGrise(snapshot.getDateExpirationCarteGrise());
+        vehicule.setDateEffet(snapshot.getDateEffet());
+        vehicule.setDateEcheance(snapshot.getDateEcheance());
+        vehicule.setCrm(snapshot.getCrm());
+        vehicule.setNumeroAttestation(snapshot.getNumeroAttestation());
+        vehicule.setCoefficientProrata(snapshot.getCoefficientProrata());
+        vehicule.setValeurVenale(snapshot.getValeurVenale());
+        vehicule.setValeurNeuf(snapshot.getValeurNeuf());
+        vehicule.setValeurGlace(snapshot.getValeurGlace());
+        vehicule.setOrganismeCredit(snapshot.getOrganismeCredit());
+        vehicule.setNomOrganismeCredit(snapshot.getNomOrganismeCredit());
+        vehicule.setMontantCredit(snapshot.getMontantCredit());
+        vehicule.setDateFinCredit(snapshot.getDateFinCredit());
+    }
+
+    private void restoreRemorqueSnapshot(MouvementRemorque snapshot) {
+        Remorque remorque = snapshot.getRemorque();
+        remorque.setUsage(snapshot.getUsage());
+        remorque.setMarque(snapshot.getMarque());
+        remorque.setImmatriculation(snapshot.getImmatriculation());
+        remorque.setPtc(snapshot.getPtc());
+        remorque.setDateMiseEnCirculation(snapshot.getDateMiseEnCirculation());
+        remorque.setDateEffet(snapshot.getDateEffet());
+        remorque.setDateEcheance(snapshot.getDateEcheance());
+        remorque.setCrm(snapshot.getCrm());
+        remorque.setNumeroAttestation(snapshot.getNumeroAttestation());
+        remorque.setCoefficientProrata(snapshot.getCoefficientProrata());
+        remorque.setValeurAssuree(snapshot.getValeurAssuree());
+    }
+
     private Boolean actifApresSuppressionSnapshot(NatureSnapshotMouvement nature) {
         if (nature == NatureSnapshotMouvement.RETRAIT) {
             return true;
         }
         if (nature == NatureSnapshotMouvement.AJOUT) {
+            return false;
+        }
+        if (nature == NatureSnapshotMouvement.AVANT) {
+            return true;
+        }
+        if (nature == NatureSnapshotMouvement.APRES) {
             return false;
         }
         return null;
@@ -2026,6 +2413,13 @@ public class ContratService {
                     NatureSnapshotMouvement.COURANT,
                     graph.differentiel()
             );
+            if (quittance.getMouvementContratId() != null) {
+                mouvementContratService.remplacerSnapshotsGaranties(
+                        quittance.getMouvementContratId(),
+                        graph.anciennesGaranties(),
+                        graph.nouvellesGaranties()
+                );
+            }
             quittance.setAssistances(persistAvenantAssistances(
                     graph.contrat(),
                     graph.vehicules(),

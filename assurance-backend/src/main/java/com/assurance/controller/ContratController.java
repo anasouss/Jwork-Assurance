@@ -293,6 +293,28 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(null, "Brouillon d'avenant supprime"));
     }
 
+    @GetMapping("/{id}/avenants/{mouvementId}/rectification")
+    public ResponseEntity<ApiResponse<AvenantRequest>> rectificationAvenant(
+            @PathVariable Long id,
+            @PathVariable Long mouvementId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.getAvenantRectification(TenantContext.getCurrentAgence(), id, mouvementId)
+        ));
+    }
+
+    @PutMapping("/{id}/avenants/{mouvementId}/rectification")
+    public ResponseEntity<ApiResponse<QuittanceResponse>> rectifierAvenant(
+            @PathVariable Long id,
+            @PathVariable Long mouvementId,
+            @Valid @RequestBody AvenantRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.rectifierAvenant(TenantContext.getCurrentAgence(), id, mouvementId, request),
+                "Avenant rectifie"
+        ));
+    }
+
     @PostMapping("/{id}/avenants/previsualisation-quittance")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserAvenant(
             @PathVariable Long id,

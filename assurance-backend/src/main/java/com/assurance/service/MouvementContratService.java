@@ -295,6 +295,21 @@ public class MouvementContratService {
     }
 
     @Transactional
+    public void remplacerSnapshotsGaranties(
+            Long mouvementId,
+            List<ContratGarantie> garantiesAvant,
+            List<ContratGarantie> garantiesApres
+    ) {
+        MouvementContrat mouvement = mouvementContratRepository.findById(mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        mouvementGarantieRepository.deleteByMouvementContratId(mouvementId);
+        mouvementGarantieRepository.flush();
+        mouvement.getGaranties().clear();
+        snapshotGaranties(mouvement, garantiesAvant, NatureSnapshotMouvement.AVANT);
+        snapshotGaranties(mouvement, garantiesApres, NatureSnapshotMouvement.APRES);
+    }
+
+    @Transactional
     public QuittanceResponse creerMouvement(Long agenceId, Long contratId, MouvementContratRequest request) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());

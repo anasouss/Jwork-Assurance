@@ -113,6 +113,16 @@ export default function AvenantContratPage() {
     queryFn: () => productionApi.getAvenantDraft(contratId, movementCode),
     enabled: Boolean(contratId) && !validatedMovementId,
   });
+  const rectificationQuery = useQuery({
+    queryKey: ["avenant-rectification", contratId, validatedMovementId],
+    queryFn: () => productionApi.getAvenantRectification(contratId, validatedMovementId!),
+    enabled: Boolean(contratId && validatedMovementId),
+  });
+  useEffect(() => {
+    if (rectificationQuery.error) {
+      toast.error(errorMessage(rectificationQuery.error));
+    }
+  }, [rectificationQuery.error]);
   const usages = useQuery({ queryKey: ["referentiel", "usages", "avenant-contrat"], queryFn: () => productionApi.referentiel("usages") });
   const compagnies = useQuery({ queryKey: ["referentiel", "compagnies-assurance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assurance") });
   const marques = useQuery({ queryKey: ["referentiel", "marques", "avenant-contrat"], queryFn: () => productionApi.referentiel("marques") });
@@ -123,16 +133,6 @@ export default function AvenantContratPage() {
   const compagniesAssistance = useQuery({ queryKey: ["referentiel", "compagnies-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assistance") });
   const produitsAssistance = useQuery({ queryKey: ["referentiel", "produits-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("produits-assistance") });
   const grilles = useQuery({ queryKey: ["referentiel", "grilles-tarifaires", "avenant-contrat"], queryFn: () => productionApi.referentiel("grilles-tarifaires") });
-
-  useEffect(() => {
-    if (!contratId || !validatedMovementId) {
-      return;
-    }
-    navigate(
-      `/app/production/contrats/${contratId}?mouvementId=${encodeURIComponent(validatedMovementId)}`,
-      { replace: true }
-    );
-  }, [contratId, navigate, validatedMovementId]);
 
   const contrat = contextQuery.data?.contrat;
   const sharedCrm = contrat?.crmPartage
@@ -300,11 +300,13 @@ export default function AvenantContratPage() {
   }, [contrat, movementCode]);
 
   useEffect(() => {
-    if (!draftQuery.isFetched || hydratedDraftCodeRef.current === movementCode) {
+    const hydrationKey = `${movementCode}:${validatedMovementId ?? "draft"}`;
+    const sourceFetched = validatedMovementId ? rectificationQuery.isFetched : draftQuery.isFetched;
+    if (!sourceFetched || hydratedDraftCodeRef.current === hydrationKey) {
       return;
     }
-    hydratedDraftCodeRef.current = movementCode;
-    const request = draftQuery.data?.request;
+    hydratedDraftCodeRef.current = hydrationKey;
+    const request = validatedMovementId ? rectificationQuery.data : draftQuery.data?.request;
     if (!request) {
       return;
     }
@@ -343,7 +345,18 @@ export default function AvenantContratPage() {
       }
     }
     setPrecisionDrafts(nextPrecisions);
-  }, [contrat?.dateEcheance, contrat?.dateEffet, draftQuery.data, draftQuery.isFetched, movementCode]);
+  }, [
+    contrat?.assistances,
+    contrat?.dateEcheance,
+    contrat?.dateEffet,
+    contrat?.vehicules,
+    draftQuery.data,
+    draftQuery.isFetched,
+    movementCode,
+    rectificationQuery.data,
+    rectificationQuery.isFetched,
+    validatedMovementId,
+  ]);
 
   const previewMutation = useMutation({
     mutationFn: (request: AvenantRequest) => productionApi.previewAvenant(contratId, request),
@@ -379,13 +392,16 @@ export default function AvenantContratPage() {
   });
   const saveMutation = useMutation({
     mutationFn: async (request: AvenantRequest) => {
+      if (validatedMovementId) {
+        return productionApi.rectifyAvenant(contratId, validatedMovementId, request);
+      }
       await productionApi.saveAvenantDraft(contratId, request);
       return productionApi.createAvenant(contratId, request);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
       await queryClient.invalidateQueries({ queryKey: ["avenant-context", contratId] });
-      toast.success("Avenant enregistré");
+      toast.success(validatedMovementId ? "Avenant rectifié" : "Avenant enregistré");
       navigate("/app/production/contrats");
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -647,23 +663,27 @@ export default function AvenantContratPage() {
   ]);
 
   useEffect(() => {
+    const hydrationKey = `${movementCode}:${validatedMovementId ?? "draft"}`;
+    const hydratedRequest = validatedMovementId ? rectificationQuery.data : draftQuery.data?.request;
     if (!isTargetCreationCode(movementCode)
-        || !draftQuery.data?.request
-        || hydratedDraftCodeRef.current !== movementCode
-        || previewedDraftCodeRef.current === movementCode) {
+        || !hydratedRequest
+        || hydratedDraftCodeRef.current !== hydrationKey
+        || previewedDraftCodeRef.current === hydrationKey) {
       return;
     }
     const request = buildRequest(true);
     if (!request) {
       return;
     }
-    previewedDraftCodeRef.current = movementCode;
+    previewedDraftCodeRef.current = hydrationKey;
     manualPreviewKeyRef.current = JSON.stringify(request);
     globalPreviewRequestKeyRef.current = JSON.stringify(request);
     previewMutation.mutate(request);
   }, [
     draftQuery.data,
     movementCode,
+    rectificationQuery.data,
+    validatedMovementId,
     dateEffet,
     vehicules,
     remorques,
@@ -775,6 +795,15 @@ export default function AvenantContratPage() {
     label: string,
     onSuccess?: () => void
   ) => {
+    if (validatedMovementId) {
+      if (!validateTargetCreation(target, part)) {
+        return false;
+      }
+      toast.success(`${label} prêt pour rectification`);
+      onSuccess?.();
+      previewTargetCreation(target, () => previewCompleteDraft(selectedGarantiesRef.current));
+      return true;
+    }
     const request = buildDraftRequest();
     draftMutation.mutate(request, {
       onSuccess: () => {
@@ -802,10 +831,12 @@ export default function AvenantContratPage() {
           <Button asChild variant="ghost" size="sm" className="-ml-2">
             <Link to="/app/production/contrats"><ArrowLeft className="size-4" />Retour liste</Link>
           </Button>
-          <h1 className="mt-1 text-xl font-semibold">Avenant {contratKindLabel} - {MOVEMENT_LABELS[movementCode] ?? movementCode}</h1>
+          <h1 className="mt-1 text-xl font-semibold">
+            {validatedMovementId ? "Rectification avenant" : `Avenant ${contratKindLabel}`} - {MOVEMENT_LABELS[movementCode] ?? movementCode}
+          </h1>
           <p className="text-sm text-muted-foreground">{contrat?.numeroDossier ?? contrat?.numeroContrat ?? contratId}</p>
         </div>
-        <div className="flex gap-2">
+        {!validatedMovementId ? <div className="flex gap-2">
           <Button
             type="button"
             variant="outline"
@@ -814,7 +845,7 @@ export default function AvenantContratPage() {
           >
             <Save className="size-4" />Enregistrer brouillon
           </Button>
-        </div>
+        </div> : null}
       </div>
 
       <Card className="border-border/70 shadow-none">
@@ -942,11 +973,13 @@ export default function AvenantContratPage() {
             saveMutation.isPending
             || draftMutation.isPending
             || contextQuery.isLoading
-            || !movementAvailable
+            || rectificationQuery.isLoading
+            || (!movementAvailable && !validatedMovementId)
             || (isGuaranteeModificationCode(movementCode) && !hasActiveTargets)
           }
         >
-          <Save className="size-4" />Valider l'avenant
+          <Save className="size-4" />
+          {validatedMovementId ? "Valider la rectification" : "Valider l'avenant"}
         </Button>
       </div>
 

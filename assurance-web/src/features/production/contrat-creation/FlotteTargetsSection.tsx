@@ -442,6 +442,7 @@ export function FlotteTargetsSection({
                     crmPartage={crmPartage}
                     crmPartageValeur={crmPartageValeur}
                     prospectionMode={prospectionMode}
+                    controleStockAttestation={controleStockAttestation}
                     errors={errors}
                   />
                   <SectionSubmitButton
@@ -1055,6 +1056,7 @@ function VehicleForm({
   crmPartage,
   crmPartageValeur,
   prospectionMode,
+  controleStockAttestation,
   errors,
 }: {
   index: number;
@@ -1070,6 +1072,7 @@ function VehicleForm({
   crmPartage: boolean;
   crmPartageValeur: string;
   prospectionMode: boolean;
+  controleStockAttestation: boolean;
   errors: Record<string, string>;
 }) {
   const usage = usages.find((item) => item.id === vehicule.usageId);

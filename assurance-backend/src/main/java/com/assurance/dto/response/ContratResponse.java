@@ -6,6 +6,7 @@ import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.TypePayeurPrime;
+import com.assurance.enums.ModeTermeRenouvellement;
 import lombok.Builder;
 import lombok.Data;
 
@@ -30,6 +31,8 @@ public class ContratResponse {
     private Long conventionId;
     private Long contratOrigineId;
     private Boolean renouvele;
+    private ModeTermeRenouvellement modeTermeRenouvellement;
+    private Boolean renouvellementTermeCompagnieEligible;
     private Long usageId;
     private String usageCode;
     private String usageLibelle;

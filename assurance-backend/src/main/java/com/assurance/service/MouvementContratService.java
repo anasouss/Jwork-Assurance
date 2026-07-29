@@ -18,6 +18,7 @@ import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.NatureSnapshotMouvement;
+import com.assurance.enums.ModeTermeRenouvellement;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
@@ -435,6 +436,10 @@ public class MouvementContratService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
+        if (CODE_RENOUVELLEMENT.equalsIgnoreCase(mouvement.getTypeMouvement().getCode())
+                && contrat.getModeTermeRenouvellement() == ModeTermeRenouvellement.COMPAGNIE) {
+            return;
+        }
         Set<String> numerosConsommes = new HashSet<>();
         boolean hasVehicules = vehicules != null && !vehicules.isEmpty();
         boolean hasRemorques = remorques != null && !remorques.isEmpty();

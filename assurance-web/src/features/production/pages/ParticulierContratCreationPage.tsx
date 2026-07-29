@@ -7,11 +7,14 @@ export default function ParticulierContratCreationPage() {
   const { draftId } = useParams();
   const [params] = useSearchParams();
   const location = useLocation();
-  const form = useContratCreationForm("PARTICULIER", draftId, { prospectionMode: location.pathname.includes("/prospection") });
+  const form = useContratCreationForm("PARTICULIER", draftId, {
+    prospectionMode: location.pathname.includes("/prospection"),
+    renewalMode: location.pathname.includes("/renouvellements/"),
+  });
   const categorieClientId = params.get("categorieClientId");
 
   useEffect(() => {
-    if (!categorieClientId) {
+    if (!categorieClientId || draftId) {
       return;
     }
     form.setClients(
@@ -21,7 +24,7 @@ export default function ParticulierContratCreationPage() {
           : client
       )
     );
-  }, [categorieClientId]);
+  }, [categorieClientId, draftId]);
 
   return <ParticulierContratForm form={form} />;
 }

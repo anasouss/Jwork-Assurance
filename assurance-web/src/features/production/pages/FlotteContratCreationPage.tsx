@@ -5,7 +5,10 @@ import { useContratCreationForm } from "../contrat-creation/useContratCreationFo
 export default function FlotteContratCreationPage() {
   const { draftId } = useParams();
   const location = useLocation();
-  const form = useContratCreationForm("FLOTTE", draftId, { prospectionMode: location.pathname.includes("/prospection") });
+  const form = useContratCreationForm("FLOTTE", draftId, {
+    prospectionMode: location.pathname.includes("/prospection"),
+    renewalMode: location.pathname.includes("/renouvellements/"),
+  });
 
   return <FlotteContratForm form={form} />;
 }

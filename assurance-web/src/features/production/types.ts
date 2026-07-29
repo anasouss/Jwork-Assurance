@@ -697,6 +697,7 @@ export type CreateContratRequest = {
   dateEcheance?: string;
   echeance?: string;
   typeRenouvellement?: "renouvelable" | "ferme";
+  modeTermeRenouvellement?: "CABINET" | "COMPAGNIE";
   periodicite?: string;
   modeReglement?: string;
   numeroBonCommande?: string;
@@ -1050,6 +1051,8 @@ export type ContratSummary = {
   conventionId?: string | null;
   contratOrigineId?: string | null;
   renouvele?: boolean;
+  modeTermeRenouvellement?: "CABINET" | "COMPAGNIE" | null;
+  renouvellementTermeCompagnieEligible?: boolean | null;
   usageId?: string;
   usageCode?: string;
   usageLibelle?: string;

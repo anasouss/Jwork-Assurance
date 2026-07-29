@@ -7,7 +7,10 @@ export default function ConventionContratCreationPage() {
   const { draftId } = useParams();
   const [params] = useSearchParams();
   const location = useLocation();
-  const form = useContratCreationForm("CONVENTION", draftId, { prospectionMode: location.pathname.includes("/prospection") });
+  const form = useContratCreationForm("CONVENTION", draftId, {
+    prospectionMode: location.pathname.includes("/prospection"),
+    renewalMode: location.pathname.includes("/renouvellements/"),
+  });
   const compagnieAssuranceId = params.get("compagnieAssuranceId");
   const conventionId = params.get("conventionId");
   const usageId = params.get("usageId");

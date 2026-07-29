@@ -221,10 +221,10 @@ export function ContractInfoSection({
               </Field>
             ) : null}
             <Field label="Date effet" required error={form.validationErrors.dateEffet}>
-              <DatePicker date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
+              <DatePicker disabled={form.renewalMode} date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
             </Field>
             <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
-              <DatePicker disabled={form.showContractEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
+              <DatePicker disabled={form.renewalMode || form.showContractEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
             </Field>
             {showFractionnement ? (
               <Field label="Fractionnement">
@@ -292,7 +292,8 @@ export function ContractInfoSection({
                   usageId={form.usageId}
                   compagnies={form.refs.compagnies.data ?? []}
                   usages={form.refs.usages.data ?? []}
-                  required={Boolean(selectedUsage?.consommeAttestation)}
+                  controleStock={form.modeTermeRenouvellement !== "COMPAGNIE"}
+                  required={form.modeTermeRenouvellement !== "COMPAGNIE" && Boolean(selectedUsage?.consommeAttestation)}
                 />
               </Field>
             ) : null}
@@ -314,10 +315,10 @@ export function ContractInfoSection({
               </Select>
             </Field>
             <Field label="Date effet" required error={form.validationErrors.dateEffet}>
-              <DatePicker date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
+              <DatePicker disabled={form.renewalMode} date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
             </Field>
             <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
-              <DatePicker disabled={form.lockDateEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
+              <DatePicker disabled={form.renewalMode || form.lockDateEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
             </Field>
             {showFractionnement && (!readOnlyConventionContext || showConventionDateToDateFractionnement) ? (
               <Field label="Périodicité">

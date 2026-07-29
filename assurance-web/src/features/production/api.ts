@@ -132,6 +132,18 @@ export const productionApi = {
     })}`));
   },
 
+  async createRenouvellementDraft(
+    contratId: string,
+    modeTermeRenouvellement: "CABINET" | "COMPAGNIE"
+  ) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/${contratId}/renouvellements/brouillon`, {
+        method: "POST",
+        body: JSON.stringify({ modeTermeRenouvellement }),
+      })
+    );
+  },
+
   async deleteContrat(contratId: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}`, {

@@ -5,6 +5,7 @@ import com.assurance.enums.Fractionnement;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.ModeFacturationContrat;
+import com.assurance.enums.ModeTermeRenouvellement;
 import com.assurance.enums.TypePayeurPrime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -32,7 +33,8 @@ import java.util.List;
 @Table(name = "contrats",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_contrat_agence_numero", columnNames = {"agence_id", "numero_contrat"}),
-                @UniqueConstraint(name = "uk_contrat_agence_numero_dossier", columnNames = {"agence_id", "numero_dossier"})
+                @UniqueConstraint(name = "uk_contrat_agence_numero_dossier", columnNames = {"agence_id", "numero_dossier"}),
+                @UniqueConstraint(name = "uk_contrat_origine", columnNames = {"contrat_origine_id"})
         },
         indexes = {
                 @Index(name = "idx_contrat_agence", columnList = "agence_id"),
@@ -70,6 +72,10 @@ public class Contrat extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contrat_origine_id")
     private Contrat contratOrigine;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_terme_renouvellement", length = 30)
+    private ModeTermeRenouvellement modeTermeRenouvellement;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "contrat_type", nullable = false, length = 30)

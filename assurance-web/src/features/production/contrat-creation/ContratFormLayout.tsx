@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Save, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ClientSection } from "../components/ClientSection";
 import { GarantieSection } from "../components/GarantieSection";
@@ -173,6 +174,7 @@ export function ContratFormLayout({
       allowMultipleVehicules={allowMultipleVehicules}
       showUsage={!showConvention}
       showAttestation={!showConvention}
+      controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
       showRemorqueFlag={showConvention}
       errors={form.validationErrors}
       onSaveSection={form.handleSaveSection}
@@ -268,6 +270,8 @@ export function ContratFormLayout({
       crmPartage={form.crmPartage}
       crmPartageValeur={form.crmPartageValeur}
       prospectionMode={form.prospectionMode}
+      controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
+      lockContractDates={form.renewalMode}
       maxRemorques={maxRemorques}
       errors={form.validationErrors}
       openSection={activeSection}
@@ -284,6 +288,8 @@ export function ContratFormLayout({
       compagnieAssuranceId={form.compagnieAssuranceId}
       marques={form.refs.marques.data ?? []}
       maxRemorques={maxRemorques}
+      controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
+      lockContractDates={form.renewalMode}
       openSection={activeSection}
       onSectionOpenChange={handleSectionOpenChange}
     />
@@ -294,7 +300,16 @@ export function ContratFormLayout({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</div>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">{form.prospectionMode ? "Ajouter devis" : "Ajouter dossier"}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight">
+              {form.renewalMode ? "Renouveler le contrat" : form.prospectionMode ? "Ajouter devis" : "Ajouter dossier"}
+            </h1>
+            {form.renewalMode ? (
+              <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800">
+                {form.modeTermeRenouvellement === "COMPAGNIE" ? "Terme compagnie · Sans stock" : "Terme cabinet · Avec stock"}
+              </Badge>
+            ) : null}
+          </div>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </div>
@@ -338,8 +353,8 @@ export function ContratFormLayout({
         <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
           {form.createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
           {form.createMutation.isPending
-            ? form.correctionMode ? "Enregistrement..." : "Création..."
-            : form.correctionMode ? "Enregistrer" : form.prospectionMode ? "Créer devis" : "Créer contrat"}
+            ? form.correctionMode ? "Enregistrement..." : form.renewalMode ? "Renouvellement..." : "Création..."
+            : form.correctionMode ? "Enregistrer" : form.renewalMode ? "Valider le renouvellement" : form.prospectionMode ? "Créer devis" : "Créer contrat"}
         </Button>
       </div>
 

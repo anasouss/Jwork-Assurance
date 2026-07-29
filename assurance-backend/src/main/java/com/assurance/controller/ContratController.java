@@ -1,6 +1,7 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.dto.request.CreateRenouvellementDraftRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.DevisPdfFilterRequest;
 import com.assurance.dto.request.AvenantRequest;
@@ -132,9 +133,19 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserQuittance(request)));
     }
 
-    @PostMapping("/{id}/renouvellements")
-    public ResponseEntity<ApiResponse<ContratResponse>> renouveler(@PathVariable Long id, @Valid @RequestBody CreateContratRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.renouveler(TenantContext.getCurrentAgence(), id, request), "Contrat renouvele"));
+    @PostMapping("/{id}/renouvellements/brouillon")
+    public ResponseEntity<ApiResponse<ContratResponse>> createRenouvellementDraft(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateRenouvellementDraftRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.createRenouvellementDraft(
+                        TenantContext.getCurrentAgence(),
+                        id,
+                        request.getModeTermeRenouvellement()
+                ),
+                "Brouillon de renouvellement prêt"
+        ));
     }
 
     @GetMapping

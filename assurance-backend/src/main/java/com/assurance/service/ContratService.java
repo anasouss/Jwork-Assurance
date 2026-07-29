@@ -15,6 +15,7 @@ import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeFacturationContrat;
+import com.assurance.enums.ModeTermeRenouvellement;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
@@ -95,27 +96,45 @@ public class ContratService {
 
     @Transactional
     public ContratResponse create(CreateContratRequest request) {
-        return createContrat(request, null);
+        return createContrat(request);
     }
 
     @Transactional
-    public ContratResponse renouveler(Long agenceId, Long contratOrigineId, CreateContratRequest request) {
-        Contrat contratOrigine = contratRepository.findByAgenceIdAndId(agenceId, contratOrigineId)
+    public ContratResponse createRenouvellementDraft(
+            Long agenceId,
+            Long contratOrigineId,
+            ModeTermeRenouvellement modeTerme
+    ) {
+        Contrat source = contratRepository.findByAgenceIdAndId(agenceId, contratOrigineId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratOrigineId));
-        if (Boolean.TRUE.equals(contratOrigine.getRenouvele())) {
-            throw new BadRequestException("Le contrat est deja renouvele");
+        validateRenewalSource(source, modeTerme);
+
+        Contrat existingDraft = contratRepository
+                .findFirstByAgenceIdAndContratOrigineIdAndStatutAndBrouillonTrueOrderByCreatedAtDesc(
+                        agenceId,
+                        contratOrigineId,
+                        StatutContrat.DRAFT
+                )
+                .orElse(null);
+        if (existingDraft != null) {
+            return toResponse(existingDraft);
         }
-        if (request.getAgenceId() == null) {
-            request.setAgenceId(agenceId);
-        }
-        if (!agenceId.equals(request.getAgenceId())) {
-            throw new BadRequestException("L'agence du renouvellement ne correspond pas au contrat origine");
-        }
-        ContratResponse response = createContrat(request, contratOrigine);
-        contratOrigine.setRenouvele(true);
-        contratOrigine.setStatut(StatutContrat.RENEWED);
-        contratRepository.save(contratOrigine);
-        return response;
+
+        List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(source);
+        CreateContratRequest request = buildRenewalDraftRequest(source, modeTerme);
+        Contrat draft = Contrat.builder()
+                .agence(source.getAgence())
+                .contratOrigine(source)
+                .typeContrat(source.getTypeContrat())
+                .modeTermeRenouvellement(modeTerme)
+                .statut(StatutContrat.DRAFT)
+                .brouillon(true)
+                .prospection(false)
+                .build();
+        draft = contratRepository.save(draft);
+        applyDraftRequest(draft, request);
+        restoreRenewalDraftAssistances(draft, activeVehicules(draft), assistanceSnapshots);
+        return toResponse(draft);
     }
 
     @Transactional
@@ -149,6 +168,7 @@ public class ContratService {
     public ContratResponse updateDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
         request.setAgenceId(agenceId);
+        enforceRenewalPeriod(contrat, request);
         if (isCorrectionAffaireNouvelle(contrat)) {
             return appliquerCorrectionAffaireNouvelle(contrat, request);
         }
@@ -159,6 +179,7 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftVehicule(Long agenceId, Long contratId, int index, CreateContratRequest.VehiculeInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        enforceRenewalPeriod(contrat, input);
         saveVehiculeTarget(contrat, index, input);
         rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
         return toResponse(contrat);
@@ -214,6 +235,7 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftRemorque(Long agenceId, Long contratId, int index, CreateContratRequest.RemorqueInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        enforceRenewalPeriod(contrat, input);
         saveRemorqueTarget(contrat, index, input);
         rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
         return toResponse(contrat);
@@ -270,6 +292,12 @@ public class ContratService {
     public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
         request.setAgenceId(agenceId);
+        Contrat contratOrigine = contrat.getContratOrigine();
+        if (contratOrigine != null) {
+            request.setModeTermeRenouvellement(contrat.getModeTermeRenouvellement());
+            enforceRenewalPeriod(contrat, request);
+            validateRenewalSource(contratOrigine, contrat.getModeTermeRenouvellement());
+        }
         if (hasText(request.getNumeroContrat())
                 && contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(agenceId, request.getNumeroContrat(), contrat.getId())) {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
@@ -291,18 +319,31 @@ public class ContratService {
         contratRepository.save(contrat);
         refreshDraftAssistanceReferences(contrat, graph.assistances());
         if (!prospection) {
-            mouvementContratService.creerAffaireNouvelle(
-                    contrat,
-                    graph.vehicules(),
-                    graph.remorques(),
-                    graph.garanties(),
-                    graph.quittanceManuelle()
-            );
+            if (contratOrigine == null) {
+                mouvementContratService.creerAffaireNouvelle(
+                        contrat,
+                        graph.vehicules(),
+                        graph.remorques(),
+                        graph.garanties(),
+                        graph.quittanceManuelle()
+                );
+            } else {
+                mouvementContratService.creerRenouvellement(
+                        contrat,
+                        contratOrigine,
+                        graph.vehicules(),
+                        graph.remorques(),
+                        graph.garanties()
+                );
+                contratOrigine.setRenouvele(true);
+                contratOrigine.setStatut(StatutContrat.RENEWED);
+                contratRepository.save(contratOrigine);
+            }
         }
         return toResponse(contrat);
     }
 
-    private ContratResponse createContrat(CreateContratRequest request, Contrat contratOrigine) {
+    private ContratResponse createContrat(CreateContratRequest request) {
         validateContractReference(request);
         if (hasText(request.getNumeroContrat()) && contratRepository.existsByAgenceIdAndNumeroContrat(request.getAgenceId(), request.getNumeroContrat())) {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
@@ -337,7 +378,7 @@ public class ContratService {
                 .convention(convention)
                 .usage(usageContrat)
                 .grilleTarifaire(grilleTarifaire)
-                .contratOrigine(contratOrigine)
+                .modeTermeRenouvellement(request.getModeTermeRenouvellement())
                 .typeContrat(request.getTypeContrat())
                 .numeroContrat(request.getNumeroContrat())
                 .numeroDevis(request.getNumeroDevis())
@@ -797,6 +838,9 @@ public class ContratService {
         contrat.setDateEcheance(contractDates.dateEcheance());
         contrat.setEcheance(contractDates.echeance());
         contrat.setTypeRenouvellement(blankToNull(request.getTypeRenouvellement()));
+        if (contrat.getContratOrigine() == null || request.getModeTermeRenouvellement() != null) {
+            contrat.setModeTermeRenouvellement(request.getModeTermeRenouvellement());
+        }
         contrat.setModePaiement(blankToNull(request.getModePaiement()));
         contrat.setModeReglement(blankToNull(request.getModeReglement()));
         contrat.setNumeroBonCommande(blankToNull(request.getNumeroBonCommande()));
@@ -933,16 +977,17 @@ public class ContratService {
     }
 
     private List<DraftAssistanceSnapshot> snapshotDraftAssistances(Contrat contrat) {
-        List<Vehicule> vehicules = vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        List<Vehicule> vehicules = activeVehicules(contrat);
         Map<Long, Integer> vehiculeIndexById = new HashMap<>();
         for (int index = 0; index < vehicules.size(); index++) {
             vehiculeIndexById.put(vehicules.get(index).getId(), index);
         }
         List<DraftAssistanceSnapshot> snapshots = new ArrayList<>();
+        Set<Long> vehiculeIdsTraites = new HashSet<>();
         for (AssistanceContrat assistance : assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())) {
             Long vehiculeId = assistance.getVehicule() == null ? null : assistance.getVehicule().getId();
             Integer vehiculeIndex = vehiculeId == null ? null : vehiculeIndexById.get(vehiculeId);
-            if (vehiculeIndex == null) {
+            if (vehiculeIndex == null || !vehiculeIdsTraites.add(vehiculeId)) {
                 continue;
             }
             snapshots.add(new DraftAssistanceSnapshot(
@@ -1029,6 +1074,31 @@ public class ContratService {
         contrat.setAssistance(!restored.isEmpty());
         contratRepository.save(contrat);
         return restored;
+    }
+
+    private void restoreRenewalDraftAssistances(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            List<DraftAssistanceSnapshot> snapshots
+    ) {
+        for (DraftAssistanceSnapshot snapshot : snapshots) {
+            if (snapshot.vehiculeIndex() < 0
+                    || snapshot.vehiculeIndex() >= vehicules.size()
+                    || snapshot.compagnieAssistance() == null
+                    || snapshot.produitAssistance() == null) {
+                continue;
+            }
+            UpsertAssistanceContratRequest request = new UpsertAssistanceContratRequest();
+            request.setVehiculeId(vehicules.get(snapshot.vehiculeIndex()).getId());
+            request.setCompagnieAssistanceId(snapshot.compagnieAssistance().getId());
+            request.setProduitAssistanceId(snapshot.produitAssistance().getId());
+            request.setDateSouscription(contrat.getDateEffet());
+            request.setDateEffet(contrat.getDateEffet());
+            request.setEcheanceCode(contrat.getEcheance());
+            request.setNumeroContratOuQuittance(snapshot.numeroContratOuQuittance());
+            request.setTypeQuittance(snapshot.typeQuittance());
+            assistanceContratService.upsert(contrat.getAgence().getId(), contrat.getId(), request);
+        }
     }
 
     private void refreshDraftAssistanceReferences(Contrat contrat, List<AssistanceContrat> assistances) {
@@ -3144,6 +3214,260 @@ public class ContratService {
         return vehiculeRepository.findActiveByContratIdOrderByCreatedAtAsc(contrat.getId());
     }
 
+    private void validateRenewalSource(Contrat source, ModeTermeRenouvellement modeTerme) {
+        if (source.getStatut() != StatutContrat.ACTIVE
+                || Boolean.TRUE.equals(source.getBrouillon())
+                || Boolean.TRUE.equals(source.getProspection())) {
+            throw new BadRequestException("Seul un contrat actif peut être renouvelé");
+        }
+        if (Boolean.TRUE.equals(source.getRenouvele())) {
+            throw new BadRequestException("Le contrat est déjà renouvelé");
+        }
+        if (!"renouvelable".equalsIgnoreCase(blankToNull(source.getTypeRenouvellement()))) {
+            throw new BadRequestException("Ce contrat n'est pas renouvelable");
+        }
+        if (source.getDateEcheance() == null) {
+            throw new BadRequestException("La date d'échéance du contrat est obligatoire");
+        }
+        ModeTermeRenouvellement resolvedMode = modeTerme == null
+                ? ModeTermeRenouvellement.CABINET
+                : modeTerme;
+        if (resolvedMode == ModeTermeRenouvellement.COMPAGNIE && !isRenewalCompanyTermEligible(source)) {
+            throw new BadRequestException("Le terme compagnie est réservé aux échéances trimestrielles de fin de mois");
+        }
+    }
+
+    private void enforceRenewalPeriod(Contrat contrat, CreateContratRequest request) {
+        if (contrat.getContratOrigine() == null) {
+            return;
+        }
+        request.setDateEffet(contrat.getDateEffet());
+        request.setDateEcheance(contrat.getDateEcheance());
+        request.setEcheance(contrat.getEcheance());
+        for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null
+                ? List.<CreateContratRequest.VehiculeInput>of()
+                : request.getVehicules()) {
+            enforceRenewalPeriod(contrat, input);
+        }
+        for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null
+                ? List.<CreateContratRequest.RemorqueInput>of()
+                : request.getRemorques()) {
+            enforceRenewalPeriod(contrat, input);
+        }
+    }
+
+    private void enforceRenewalPeriod(Contrat contrat, CreateContratRequest.VehiculeInput input) {
+        if (contrat.getContratOrigine() != null && input != null) {
+            input.setDateEffet(contrat.getDateEffet());
+            input.setDateEcheance(contrat.getDateEcheance());
+        }
+    }
+
+    private void enforceRenewalPeriod(Contrat contrat, CreateContratRequest.RemorqueInput input) {
+        if (contrat.getContratOrigine() != null && input != null) {
+            input.setDateEffet(contrat.getDateEffet());
+            input.setDateEcheance(contrat.getDateEcheance());
+        }
+    }
+
+    private boolean isRenewalCompanyTermEligible(Contrat contrat) {
+        if (!"renouvelable".equalsIgnoreCase(blankToNull(contrat.getTypeRenouvellement()))
+                || contrat.getDateEcheance() == null) {
+            return false;
+        }
+        LocalDate echeance = contrat.getDateEcheance();
+        int month = echeance.getMonthValue();
+        return (month == 3 || month == 6 || month == 9 || month == 12)
+                && echeance.getDayOfMonth() == echeance.lengthOfMonth();
+    }
+
+    private CreateContratRequest buildRenewalDraftRequest(
+            Contrat source,
+            ModeTermeRenouvellement modeTerme
+    ) {
+        LocalDate dateEffet = source.getDateEcheance().plusDays(1);
+        LocalDate dateEcheance = source.getDateEcheance().plusYears(1);
+        List<Vehicule> vehicules = activeVehicules(source);
+        List<Remorque> remorques = activeRemorques(source);
+        Map<Long, Integer> vehiculeIndexes = new HashMap<>();
+        Map<Long, Integer> remorqueIndexes = new HashMap<>();
+        for (int index = 0; index < vehicules.size(); index++) {
+            vehiculeIndexes.put(vehicules.get(index).getId(), index);
+        }
+        for (int index = 0; index < remorques.size(); index++) {
+            remorqueIndexes.put(remorques.get(index).getId(), index);
+        }
+
+        CreateContratRequest request = new CreateContratRequest();
+        request.setAgenceId(source.getAgence().getId());
+        request.setCompagnieAssuranceId(source.getCompagnieAssurance() == null ? null : source.getCompagnieAssurance().getId());
+        request.setConventionId(source.getConvention() == null ? null : source.getConvention().getId());
+        request.setUsageId(source.getUsage() == null ? null : source.getUsage().getId());
+        request.setGrilleTarifaireId(source.getGrilleTarifaire() == null ? null : source.getGrilleTarifaire().getId());
+        request.setTypeContrat(source.getTypeContrat());
+        request.setNumeroPolice(source.getNumeroPolice());
+        request.setDateEffet(dateEffet);
+        request.setDateEcheance(dateEcheance);
+        request.setEcheance(source.getEcheance());
+        request.setTypeRenouvellement(source.getTypeRenouvellement());
+        request.setModeTermeRenouvellement(modeTerme);
+        request.setModePaiement(source.getModePaiement());
+        request.setModeReglement(source.getModeReglement());
+        request.setNumeroBonCommande(source.getNumeroBonCommande());
+        request.setTypePayeurPrime(source.getTypePayeurPrime());
+        request.setPayeurPrimeClientId(source.getPayeurPrime() == null ? null : source.getPayeurPrime().getId());
+        request.setGroupeFacturationId(source.getGroupeFacturation() == null ? null : source.getGroupeFacturation().getId());
+        request.setModeFacturation(source.getModeFacturation());
+        request.setReferenceMandatPayeur(source.getReferenceMandatPayeur());
+        request.setPeriodicite(source.getPeriodicite());
+        request.setFractionnement(source.getFractionnement());
+        request.setTauxRc(source.getTauxRc());
+        request.setModeSaisieGaranties(source.getModeSaisieGaranties());
+        request.setSaisiePrimeNette(source.getSaisiePrimeNette());
+        request.setNombreVehicules(vehicules.size());
+        request.setNombreRemorques(remorques.size());
+        request.setProspection(false);
+        request.setAssistance(source.getAssistance());
+        request.setCrmPartage(source.getCrmPartage());
+        request.setCrmPartageValeur(source.getCrmPartageValeur());
+        request.setNotes(source.getNotes());
+
+        request.setClients(source.getClients().stream().map(link -> {
+            CreateContratRequest.ClientInput input = new CreateContratRequest.ClientInput();
+            input.setClientId(link.getClient().getId());
+            input.setRole(link.getRole());
+            input.setPrincipalPourRole(Boolean.TRUE.equals(link.getPrincipalPourRole()));
+            return input;
+        }).toList());
+        request.setVehicules(vehicules.stream()
+                .map(vehicule -> toRenewalVehiculeInput(vehicule, dateEffet, dateEcheance))
+                .toList());
+        request.setRemorques(remorques.stream()
+                .map(remorque -> toRenewalRemorqueInput(remorque, dateEffet, dateEcheance))
+                .toList());
+        request.setGaranties(activeGaranties(source).stream()
+                .filter(garantie -> garantie.getVehicule() == null
+                        || vehiculeIndexes.containsKey(garantie.getVehicule().getId()))
+                .filter(garantie -> garantie.getRemorque() == null
+                        || remorqueIndexes.containsKey(garantie.getRemorque().getId()))
+                .map(garantie -> toRenewalGarantieInput(garantie, vehiculeIndexes, remorqueIndexes))
+                .toList());
+
+        QuittanceResponse sourceQuittance = buildQuittanceGenerale(source, true);
+        if (sourceQuittance != null && sourceQuittance.getLignes() != null) {
+            request.setQuittances(sourceQuittance.getLignes().stream()
+                    .map(this::toRenewalQuittanceInput)
+                    .toList());
+        }
+        return request;
+    }
+
+    private CreateContratRequest.VehiculeInput toRenewalVehiculeInput(
+            Vehicule source,
+            LocalDate dateEffet,
+            LocalDate dateEcheance
+    ) {
+        CreateContratRequest.VehiculeInput input = new CreateContratRequest.VehiculeInput();
+        input.setTypeVehicule(source.getTypeVehicule());
+        input.setUsageId(source.getUsage() == null ? null : source.getUsage().getId());
+        input.setMarqueId(source.getMarque() == null ? null : source.getMarque().getId());
+        input.setCarrosserieId(source.getCarrosserie() == null ? null : source.getCarrosserie().getId());
+        input.setCategorieTransportId(source.getCategorieTransport() == null ? null : source.getCategorieTransport().getId());
+        input.setImmatriculation(source.getImmatriculation());
+        input.setImmatriculationProvisoire(source.getImmatriculationProvisoire());
+        input.setCarburant(source.getCarburant());
+        input.setPuissanceFiscale(source.getPuissanceFiscale());
+        input.setNombrePlaces(source.getNombrePlaces());
+        input.setSousClasse(source.getSousClasse());
+        input.setPtc(source.getPtc());
+        input.setDatePremiereCirculation(source.getDatePremiereCirculation());
+        input.setDateExpirationCarteGrise(source.getDateExpirationCarteGrise());
+        input.setDateEffet(dateEffet);
+        input.setDateEcheance(dateEcheance);
+        input.setCrm(source.getCrm());
+        input.setCoefficientProrata(source.getCoefficientProrata());
+        input.setRemorque(source.getRemorque());
+        input.setValeurVenale(source.getValeurVenale());
+        input.setValeurNeuf(source.getValeurNeuf());
+        input.setValeurGlace(source.getValeurGlace());
+        input.setOrganismeCredit(source.getOrganismeCredit());
+        input.setNomOrganismeCredit(source.getNomOrganismeCredit());
+        input.setMontantCredit(source.getMontantCredit());
+        input.setDateFinCredit(source.getDateFinCredit());
+        return input;
+    }
+
+    private CreateContratRequest.RemorqueInput toRenewalRemorqueInput(
+            Remorque source,
+            LocalDate dateEffet,
+            LocalDate dateEcheance
+    ) {
+        CreateContratRequest.RemorqueInput input = new CreateContratRequest.RemorqueInput();
+        input.setUsageId(source.getUsage() == null ? null : source.getUsage().getId());
+        input.setMarqueId(source.getMarque() == null ? null : source.getMarque().getId());
+        input.setImmatriculation(source.getImmatriculation());
+        input.setPtc(source.getPtc());
+        input.setDateMiseEnCirculation(source.getDateMiseEnCirculation());
+        input.setDateEffet(dateEffet);
+        input.setDateEcheance(dateEcheance);
+        input.setCrm(source.getCrm());
+        input.setCoefficientProrata(source.getCoefficientProrata());
+        input.setValeurAssuree(source.getValeurAssuree());
+        return input;
+    }
+
+    private CreateContratRequest.GarantieInput toRenewalGarantieInput(
+            ContratGarantie source,
+            Map<Long, Integer> vehiculeIndexes,
+            Map<Long, Integer> remorqueIndexes
+    ) {
+        CreateContratRequest.GarantieInput input = new CreateContratRequest.GarantieInput();
+        input.setGarantieId(source.getGarantie().getId());
+        input.setLigneGrilleTarifaireId(source.getLigneGrilleTarifaire() == null ? null : source.getLigneGrilleTarifaire().getId());
+        input.setClientId(source.getClient() == null ? null : source.getClient().getId());
+        input.setVehiculeIndex(source.getVehicule() == null ? null : vehiculeIndexes.get(source.getVehicule().getId()));
+        input.setRemorqueIndex(source.getRemorque() == null ? null : remorqueIndexes.get(source.getRemorque().getId()));
+        input.setModeSelectionne(source.getModeSelectionne() == null ? null : source.getModeSelectionne().name());
+        input.setSourceValeurSelectionnee(source.getSourceValeurSelectionnee() == null ? null : source.getSourceValeurSelectionnee().name());
+        input.setFormuleGarantiePersonneId(source.getFormuleGarantiePersonne() == null ? null : source.getFormuleGarantiePersonne().getId());
+        input.setValeurVenale(source.getValeurVenale());
+        input.setValeurNeuf(source.getValeurNeuf());
+        input.setValeurGlace(source.getValeurGlace());
+        input.setValeurAssuree(source.getCapital());
+        input.setFormule(source.getFormule());
+        input.setMontantDeces(source.getMontantDeces());
+        input.setMontantInvalidite(source.getMontantInvalidite());
+        input.setMontantFraisMedicaux(source.getMontantFraisMedicaux());
+        input.setMontantFraisHospitalisation(source.getMontantFraisHospitalisation());
+        input.setMontantFraisFuneraires(source.getMontantFraisFuneraires());
+        input.setMontantFraisChirurgie(source.getMontantFraisChirurgie());
+        input.setAccessoire(source.getAccessoire());
+        input.setCapital(source.getCapital());
+        input.setTaux(source.getTaux());
+        input.setPrime(source.getPrime());
+        input.setTauxFranchise(source.getTauxFranchise());
+        input.setFranchiseMinimale(source.getFranchiseMinimale());
+        return input;
+    }
+
+    private CreateContratRequest.QuittanceInput toRenewalQuittanceInput(QuittanceResponse.Ligne source) {
+        CreateContratRequest.QuittanceInput input = new CreateContratRequest.QuittanceInput();
+        try {
+            input.setCategorie(CategorieQuittance.valueOf(source.getCategorie()));
+        } catch (IllegalArgumentException | NullPointerException ignored) {
+            input.setCategorie(CategorieQuittance.TOTAL);
+        }
+        input.setOrdre(source.getOrdre());
+        input.setGlobale(source.getGlobale());
+        input.setPrimeNette(source.getPrimeNette());
+        input.setTaxe(source.getTaxe());
+        input.setTaxeParafiscale(source.getTaxeParafiscale());
+        input.setAccessoire(source.getAccessoire());
+        input.setCnpac(source.getCnpac());
+        input.setPrimeTotale(source.getPrimeTotale());
+        return input;
+    }
+
     private List<Remorque> activeRemorques(Contrat contrat) {
         return remorqueRepository.findActiveByContratIdOrderByCreatedAtAsc(contrat.getId());
     }
@@ -3733,6 +4057,8 @@ public class ContratService {
                 .conventionId(contrat.getConvention() != null ? contrat.getConvention().getId() : null)
                 .contratOrigineId(contrat.getContratOrigine() != null ? contrat.getContratOrigine().getId() : null)
                 .renouvele(contrat.getRenouvele())
+                .modeTermeRenouvellement(contrat.getModeTermeRenouvellement())
+                .renouvellementTermeCompagnieEligible(isRenewalCompanyTermEligible(contrat))
                 .usageId(contrat.getUsage() != null ? contrat.getUsage().getId() : null)
                 .usageCode(contrat.getUsage() != null ? contrat.getUsage().getCode() : null)
                 .usageLibelle(contrat.getUsage() != null ? contrat.getUsage().getLibelle() : null)

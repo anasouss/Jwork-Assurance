@@ -96,6 +96,8 @@ type Props = {
   crmPartage?: boolean;
   crmPartageValeur?: string;
   prospectionMode?: boolean;
+  controleStockAttestation?: boolean;
+  lockContractDates?: boolean;
   maxRemorques?: number | null;
   errors?: Record<string, string>;
   openSection?: ContratSectionKey;
@@ -144,6 +146,8 @@ export function FlotteTargetsSection({
   crmPartage = false,
   crmPartageValeur = "",
   prospectionMode = false,
+  controleStockAttestation = true,
+  lockContractDates = false,
   maxRemorques,
   errors = {},
   openSection,
@@ -580,6 +584,8 @@ export function FlotteTargetsSection({
                     compagnieAssuranceId={compagnieAssuranceId}
                     marques={marques}
                     prospectionMode={prospectionMode}
+                    controleStockAttestation={controleStockAttestation}
+                    lockContractDates={lockContractDates}
                   />
                   <SectionSubmitButton
                     icon="save"
@@ -1266,7 +1272,8 @@ function VehicleForm({
               usageId={vehicule.usageId}
               compagnies={compagnies}
               usages={usages}
-              required={Boolean(usages.find((usage) => usage.id === vehicule.usageId)?.consommeAttestation)}
+              controleStock={controleStockAttestation}
+              required={controleStockAttestation && Boolean(usages.find((usage) => usage.id === vehicule.usageId)?.consommeAttestation)}
             />
           </Field>
         ) : null}
@@ -1328,6 +1335,8 @@ function RemorqueForm({
   compagnieAssuranceId,
   marques,
   prospectionMode,
+  controleStockAttestation,
+  lockContractDates,
 }: {
   index: number;
   remorque: RemorqueInput;
@@ -1337,6 +1346,8 @@ function RemorqueForm({
   compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
   prospectionMode: boolean;
+  controleStockAttestation: boolean;
+  lockContractDates: boolean;
 }) {
   const update = (patch: Partial<RemorqueInput>) => {
     setRemorques((current) => current.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
@@ -1381,10 +1392,10 @@ function RemorqueForm({
           <DatePicker date={remorque.dateMiseEnCirculation} onSelect={(date) => update({ dateMiseEnCirculation: toDateOnly(date) })} />
         </Field>
         <Field label="Date d'effet">
-          <DatePicker date={remorque.dateEffet} onSelect={(date) => update({ dateEffet: toDateOnly(date) })} />
+          <DatePicker disabled={lockContractDates} date={remorque.dateEffet} onSelect={(date) => update({ dateEffet: toDateOnly(date) })} />
         </Field>
         <Field label="Date d'échéance">
-          <DatePicker date={remorque.dateEcheance} onSelect={(date) => update({ dateEcheance: toDateOnly(date) })} />
+          <DatePicker disabled={lockContractDates} date={remorque.dateEcheance} onSelect={(date) => update({ dateEcheance: toDateOnly(date) })} />
         </Field>
         <Field label="CRM">
           <Input className="text-right" value={remorque.crm ?? ""} onChange={(event) => update({ crm: event.target.value })} />
@@ -1398,7 +1409,8 @@ function RemorqueForm({
               usageId={remorque.usageId}
               compagnies={compagnies}
               usages={usages}
-              required={Boolean(usages.find((usage) => usage.id === remorque.usageId)?.consommeAttestation)}
+              controleStock={controleStockAttestation}
+              required={controleStockAttestation && Boolean(usages.find((usage) => usage.id === remorque.usageId)?.consommeAttestation)}
             />
           </Field>
         ) : null}

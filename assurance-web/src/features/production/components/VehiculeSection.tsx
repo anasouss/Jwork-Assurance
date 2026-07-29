@@ -38,6 +38,7 @@ export function VehiculeSection({
   allowMultipleVehicules = true,
   showUsage = true,
   showAttestation = true,
+  controleStockAttestation = true,
   showRemorqueFlag = false,
   errors = {},
   extraAction,
@@ -59,6 +60,7 @@ export function VehiculeSection({
   allowMultipleVehicules?: boolean;
   showUsage?: boolean;
   showAttestation?: boolean;
+  controleStockAttestation?: boolean;
   showRemorqueFlag?: boolean;
   errors?: Record<string, string>;
   extraAction?: ReactNode;
@@ -286,7 +288,8 @@ export function VehiculeSection({
                       usageId={vehicule.usageId}
                       compagnies={compagnies}
                       usages={usages}
-                      required={Boolean(usage?.consommeAttestation)}
+                      controleStock={controleStockAttestation}
+                      required={controleStockAttestation && Boolean(usage?.consommeAttestation)}
                     />
                   </Field>
                 ) : null}

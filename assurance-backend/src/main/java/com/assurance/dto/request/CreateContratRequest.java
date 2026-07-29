@@ -8,6 +8,7 @@ import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.RelationGroupeClient;
+import com.assurance.enums.ModeTermeRenouvellement;
 import com.assurance.enums.TypePayeurPrime;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -41,6 +42,7 @@ public class CreateContratRequest {
     private LocalDate dateEcheance;
     private String echeance;
     private String typeRenouvellement;
+    private ModeTermeRenouvellement modeTermeRenouvellement;
     private String modePaiement;
     private String modeReglement;
     private String numeroBonCommande;

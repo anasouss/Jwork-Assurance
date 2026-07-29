@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
+import { Building2, ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -309,6 +317,8 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const queryClient = useQueryClient();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [draftChoiceCode, setDraftChoiceCode] = useState<string | null>(null);
+  const [renewalDialogOpen, setRenewalDialogOpen] = useState(false);
+  const [renewalTerm, setRenewalTerm] = useState<"CABINET" | "COMPAGNIE">("CABINET");
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -321,6 +331,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     return code !== "AN" && statut !== "ANNULE";
   });
   const canCreateMovement = !child && !terminal && !Boolean(contrat.renouvele) && isActiveContrat(contrat);
+  const canRenew = canCreateMovement && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
   const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat))
     && !child
     && !terminal
@@ -385,6 +396,27 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
       toast.error(error instanceof Error ? error.message : "Le brouillon ne peut pas être supprimé");
     },
   });
+  const renewalMutation = useMutation({
+    mutationFn: (mode: "CABINET" | "COMPAGNIE") =>
+      productionApi.createRenouvellementDraft(contrat.id, mode),
+    onSuccess: async (draft) => {
+      await queryClient.invalidateQueries({ queryKey: ["contrats"] });
+      setRenewalDialogOpen(false);
+      toast.success("Brouillon de renouvellement prêt");
+      navigate(renewalDraftPath(draft));
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Le renouvellement ne peut pas être préparé");
+    },
+  });
+  const startRenewal = () => {
+    if (contrat.renouvellementTermeCompagnieEligible) {
+      setRenewalTerm("CABINET");
+      setRenewalDialogOpen(true);
+      return;
+    }
+    renewalMutation.mutate("CABINET");
+  };
   return (
     <>
       <DropdownMenu>
@@ -463,7 +495,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
               <DropdownMenuItem asChild>
                 <Link to={carteVertePath}>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>Renouvellement</DropdownMenuItem>
+              {canRenew ? (
+                <DropdownMenuItem disabled={renewalMutation.isPending} onSelect={startRenewal}>
+                  Renouvellement
+                </DropdownMenuItem>
+              ) : null}
             </>
           ) : null}
           {hasPrimaryActions ? <DropdownMenuSeparator /> : null}
@@ -510,6 +546,54 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={renewalDialogOpen} onOpenChange={(open) => {
+        if (!renewalMutation.isPending) setRenewalDialogOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Type de terme</DialogTitle>
+            <DialogDescription>Choisissez le mode de renouvellement à appliquer pour ce contrat.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <button
+              type="button"
+              className={cn(
+                "grid grid-cols-[1fr_auto] gap-3 rounded-md border p-4 text-left transition-colors",
+                renewalTerm === "CABINET" ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40"
+              )}
+              onClick={() => setRenewalTerm("CABINET")}
+            >
+              <span className="grid gap-1">
+                <span className="font-semibold">Terme cabinet</span>
+                <span className="text-xs text-muted-foreground">Renouvellement interne avec contrôle du stock sur le numéro d’attestation.</span>
+                <Badge className="mt-1 w-fit bg-emerald-100 text-[10px] text-emerald-800 hover:bg-emerald-100">AVEC STOCK</Badge>
+              </span>
+              <ShieldCheck className="size-5 text-emerald-700" />
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "grid grid-cols-[1fr_auto] gap-3 rounded-md border p-4 text-left transition-colors",
+                renewalTerm === "COMPAGNIE" ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40"
+              )}
+              onClick={() => setRenewalTerm("COMPAGNIE")}
+            >
+              <span className="grid gap-1">
+                <span className="font-semibold">Terme compagnie</span>
+                <span className="text-xs text-muted-foreground">Renouvellement sans contrôle du stock d’attestation selon les règles compagnie.</span>
+                <Badge className="mt-1 w-fit bg-amber-100 text-[10px] text-amber-800 hover:bg-amber-100">SANS STOCK</Badge>
+              </span>
+              <Building2 className="size-5 text-emerald-700" />
+            </button>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={renewalMutation.isPending} onClick={() => setRenewalDialogOpen(false)}>Annuler</Button>
+            <Button type="button" disabled={renewalMutation.isPending} onClick={() => renewalMutation.mutate(renewalTerm)}>
+              {renewalMutation.isPending ? "Préparation..." : "Continuer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={Boolean(selectedDraft)} onOpenChange={(open) => {
         if (!open && !restartDraftMutation.isPending) {
           setDraftChoiceCode(null);
@@ -562,10 +646,17 @@ function showContratPath(contrat: ContratSummary, movement: MovementLine) {
 }
 
 function editContratPath(contrat: ContratSummary) {
+  if (contrat.contratOrigineId) return renewalDraftPath(contrat);
   if (contrat.prospection && contrat.typeContrat === "FLOTTE") return `/app/production/prospection/devis/flotte/${contrat.id}`;
   if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;
   if (contrat.typeContrat === "CONVENTION") return `/app/production/ajouter-dossier/convention/${contrat.id}`;
   return `/app/production/ajouter-dossier/particulier/${contrat.id}`;
+}
+
+function renewalDraftPath(contrat: ContratSummary) {
+  if (contrat.typeContrat === "FLOTTE") return `/app/production/renouvellements/flotte/${contrat.id}`;
+  if (contrat.typeContrat === "CONVENTION") return `/app/production/renouvellements/convention/${contrat.id}`;
+  return `/app/production/renouvellements/particulier/${contrat.id}`;
 }
 
 function isDirectlyEditable(contrat: ContratSummary) {

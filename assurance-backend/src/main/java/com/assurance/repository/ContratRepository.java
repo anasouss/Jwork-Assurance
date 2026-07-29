@@ -2,6 +2,7 @@ package com.assurance.repository;
 
 import com.assurance.entity.Contrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.StatutContrat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -27,6 +28,12 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             "convention"
     })
     Optional<Contrat> findByAgenceIdAndId(Long agenceId, Long id);
+
+    Optional<Contrat> findFirstByAgenceIdAndContratOrigineIdAndStatutAndBrouillonTrueOrderByCreatedAtDesc(
+            Long agenceId,
+            Long contratOrigineId,
+            StatutContrat statut
+    );
 
     boolean existsByAgenceIdAndNumeroContrat(Long agenceId, String numeroContrat);
 

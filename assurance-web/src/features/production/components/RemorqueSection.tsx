@@ -19,6 +19,8 @@ export function RemorqueSection({
   compagnieAssuranceId,
   marques,
   maxRemorques,
+  controleStockAttestation = true,
+  lockContractDates = false,
   openSection,
   onSectionOpenChange,
 }: {
@@ -29,6 +31,8 @@ export function RemorqueSection({
   compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
   maxRemorques?: number | null;
+  controleStockAttestation?: boolean;
+  lockContractDates?: boolean;
   openSection?: ContratSectionKey;
   onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
@@ -110,10 +114,10 @@ export function RemorqueSection({
                 <DatePicker date={remorque.dateMiseEnCirculation} onSelect={(date) => update(index, { dateMiseEnCirculation: toDateOnly(date) })} />
               </Field>
               <Field label="Date d'effet">
-                <DatePicker date={remorque.dateEffet} onSelect={(date) => update(index, { dateEffet: toDateOnly(date) })} />
+                <DatePicker disabled={lockContractDates} date={remorque.dateEffet} onSelect={(date) => update(index, { dateEffet: toDateOnly(date) })} />
               </Field>
               <Field label="Date d'échéance">
-                <DatePicker date={remorque.dateEcheance} onSelect={(date) => update(index, { dateEcheance: toDateOnly(date) })} />
+                <DatePicker disabled={lockContractDates} date={remorque.dateEcheance} onSelect={(date) => update(index, { dateEcheance: toDateOnly(date) })} />
               </Field>
               <Field label="CRM">
                 <Input value={remorque.crm ?? ""} onChange={(event) => update(index, { crm: event.target.value })} />
@@ -126,7 +130,8 @@ export function RemorqueSection({
                   usageId={remorque.usageId}
                   compagnies={compagnies}
                   usages={usages}
-                  required={Boolean(usages.find((usage) => usage.id === remorque.usageId)?.consommeAttestation)}
+                  controleStock={controleStockAttestation}
+                  required={controleStockAttestation && Boolean(usages.find((usage) => usage.id === remorque.usageId)?.consommeAttestation)}
                 />
               </Field>
               <Field label="Valeur assurée">

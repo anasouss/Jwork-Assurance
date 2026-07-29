@@ -14,6 +14,7 @@ type Props = {
   usages?: ReferenceOption[];
   numeroCourant?: string | null;
   required?: boolean;
+  controleStock?: boolean;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -28,6 +29,7 @@ export function AttestationNumberInput({
   usages = [],
   numeroCourant,
   required = false,
+  controleStock = true,
   disabled = false,
   placeholder = "Série attestation",
   className,
@@ -42,7 +44,7 @@ export function AttestationNumberInput({
   );
   const rawValue = value ?? "";
   const displayValue = stripPrefix(rawValue, canonicalPrefix);
-  const canValidate = Boolean(compagnieAssuranceId && usageId);
+  const canValidate = Boolean(controleStock && compagnieAssuranceId && usageId);
 
   useEffect(() => {
     if (!canValidate || disabled) {
@@ -146,7 +148,12 @@ export function AttestationNumberInput({
       {message ? (
         <span className={cn("text-xs", valid ? "text-emerald-700 dark:text-emerald-400" : "text-red-600")}>{message}</span>
       ) : null}
-      {!canValidate ? <span className="text-xs text-muted-foreground">Sélectionnez la compagnie et l'usage pour contrôler le stock.</span> : null}
+      {controleStock && !canValidate ? (
+        <span className="text-xs text-muted-foreground">Sélectionnez la compagnie et l'usage pour contrôler le stock.</span>
+      ) : null}
+      {!controleStock ? (
+        <span className="text-xs text-muted-foreground">Terme compagnie : contrôle du stock désactivé.</span>
+      ) : null}
     </div>
   );
 }

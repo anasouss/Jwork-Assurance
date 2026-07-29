@@ -29,7 +29,11 @@ export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contra
 export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorque" | "flotteTargets" | "garanties" | "quittances";
 export type ContratTargetKey = { kind: "vehicule" | "remorque"; index: number };
 
-export function useContratCreationForm(typeContrat: TypeContrat, draftId?: string, options?: { prospectionMode?: boolean }) {
+export function useContratCreationForm(
+  typeContrat: TypeContrat,
+  draftId?: string,
+  options?: { prospectionMode?: boolean; renewalMode?: boolean }
+) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -43,6 +47,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
   const [dateEffet, setDateEffet] = useState<string | undefined>();
   const [dateEcheance, setDateEcheance] = useState<string | undefined>();
   const [typeRenouvellement, setTypeRenouvellement] = useState<"renouvelable" | "ferme">("renouvelable");
+  const [modeTermeRenouvellement, setModeTermeRenouvellement] = useState<"CABINET" | "COMPAGNIE">("CABINET");
   const [echeance, setEcheance] = useState<string | undefined>();
   const [modeReglement, setModeReglement] = useState("bureau");
   const [numeroBonCommande, setNumeroBonCommande] = useState("");
@@ -208,6 +213,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setDateEffet(hydrated.dateEffet);
     setDateEcheance(hydrated.dateEcheance);
     setTypeRenouvellement(hydrated.typeRenouvellement);
+    setModeTermeRenouvellement(hydrated.modeTermeRenouvellement);
     setEcheance(hydrated.echeance);
     setModeReglement(hydrated.modeReglement);
     setNumeroBonCommande(hydrated.numeroBonCommande);
@@ -281,6 +287,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     dateEcheance,
     echeance: showContractEcheance ? effectiveEcheance : undefined,
     typeRenouvellement,
+    modeTermeRenouvellement: options?.renewalMode ? modeTermeRenouvellement : undefined,
     periodicite: periodiciteFromFractionnement(fractionnement),
     modeReglement: typeContrat === "CONVENTION" ? modeReglement : undefined,
     numeroBonCommande: typeContrat === "CONVENTION" && modeReglement === "facture" ? emptyToUndefined(numeroBonCommande) : undefined,
@@ -346,6 +353,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     effectiveEcheance,
     showContractEcheance,
     typeRenouvellement,
+    modeTermeRenouvellement,
     modeReglement,
     numeroBonCommande,
     typePayeurPrime,
@@ -368,6 +376,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     garanties,
     quittances,
     options?.prospectionMode,
+    options?.renewalMode,
   ]);
 
   useEffect(() => {
@@ -423,10 +432,21 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
         navigate("/app/production/contrats");
         return;
       }
+      if (options?.renewalMode) {
+        toast.success("Contrat renouvelé");
+        navigate(`/app/production/contrats/${contrat.id}`);
+        return;
+      }
       toast.success("Contrat créé");
       navigate(`/app/production/contrats/${contrat.id}/pieces-jointes`);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : correctionMode ? "Modification impossible" : "Création impossible"),
+    onError: (error) => toast.error(error instanceof Error
+      ? error.message
+      : options?.renewalMode
+        ? "Renouvellement impossible"
+        : correctionMode
+          ? "Modification impossible"
+          : "Création impossible"),
   });
 
   const saveDraftMutation = useMutation({
@@ -1031,6 +1051,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setDateEcheance,
     typeRenouvellement,
     setTypeRenouvellement,
+    modeTermeRenouvellement,
     echeance,
     setEcheance,
     effectiveEcheance,
@@ -1079,6 +1100,7 @@ export function useContratCreationForm(typeContrat: TypeContrat, draftId?: strin
     setQuittances,
     validationErrors,
     prospectionMode: Boolean(options?.prospectionMode),
+    renewalMode: Boolean(options?.renewalMode),
     correctionMode,
   };
 }
@@ -1477,6 +1499,7 @@ function hydrateDraft(draft: ContratSummary) {
     dateEffet: draft.dateEffet,
     dateEcheance: draft.dateEcheance,
     typeRenouvellement: draft.typeRenouvellement === "ferme" ? "ferme" as const : "renouvelable" as const,
+    modeTermeRenouvellement: draft.modeTermeRenouvellement === "COMPAGNIE" ? "COMPAGNIE" as const : "CABINET" as const,
     echeance: draft.echeance ?? undefined,
     modeReglement: draft.modeReglement ?? "bureau",
     numeroBonCommande: draft.numeroBonCommande ?? "",

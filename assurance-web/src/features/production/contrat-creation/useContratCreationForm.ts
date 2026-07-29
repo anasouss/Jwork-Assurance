@@ -238,6 +238,15 @@ export function useContratCreationForm(
     setHydratedDraftId(draftId);
   }, [draftId, draftQuery.data, hydratedDraftId]);
 
+  const initialLoading = Boolean(draftId) && (
+    draftQuery.isLoading
+    || (!draftQuery.isError && hydratedDraftId !== draftId)
+    || Object.values(refs).some((query) => query.isLoading)
+    || groupesClients.isLoading
+    || lignesGrille.isLoading
+    || formulesPersonne.isLoading
+  );
+
   useEffect(() => {
     if (!isFlotteLocationCategory && tauxRc) {
       setTauxRc("");
@@ -1010,6 +1019,7 @@ export function useContratCreationForm(
     request,
     draftId,
     draftQuery,
+    initialLoading,
     preview,
     targetPreview,
     previewMutation,

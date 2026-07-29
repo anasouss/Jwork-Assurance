@@ -11,6 +11,7 @@ import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { RemorqueSection } from "../components/RemorqueSection";
 import { SectionCard } from "../components/SectionCard";
 import { VehiculeSection } from "../components/VehiculeSection";
+import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
 import { ContractInfoSection } from "./ContractInfoSection";
 import { FlotteTargetsSection } from "./FlotteTargetsSection";
 import { TariffGridSection } from "./TariffGridSection";
@@ -294,6 +295,10 @@ export function ContratFormLayout({
       onSectionOpenChange={handleSectionOpenChange}
     />
   );
+
+  if (form.initialLoading) {
+    return <ProductionFormSkeleton variant="contract" />;
+  }
 
   return (
     <div className="grid gap-4">

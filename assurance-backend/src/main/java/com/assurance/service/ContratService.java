@@ -1829,7 +1829,7 @@ public class ContratService {
         if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0) {
             throw new BadRequestException("Cet avenant contient des pieces jointes. Retirez-les avant la rectification.");
         }
-        if (carteVerteRepository.countByMouvementContratId(mouvementId) > 0) {
+        if (carteVerteRepository.countByMouvementContratIdAndActifTrue(mouvementId) > 0) {
             throw new BadRequestException("Cet avenant contient une carte verte. Retirez-la avant la rectification.");
         }
         if (quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId).stream()
@@ -2155,6 +2155,7 @@ public class ContratService {
             throw new BadRequestException("L'affaire nouvelle ne se supprime pas depuis les actions. Supprimez le contrat brouillon ou creez un avenant d'annulation.");
         }
         assertNoBlockingMovementReferences(mouvement.getId());
+        libererStockMouvement(contrat, mouvement);
         rollbackCurrentStateForMovementDeletion(mouvement);
         deleteMovementGeneratedData(mouvement.getId());
         contrat.getMouvements().removeIf(item -> mouvement.getId().equals(item.getId()));
@@ -2184,18 +2185,31 @@ public class ContratService {
         if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0) {
             throw new BadRequestException("Impossible de supprimer ce mouvement: des pieces jointes y sont liees.");
         }
-        if (assistanceContratRepository.countByMouvementContratId(mouvementId) > 0) {
-            throw new BadRequestException("Impossible de supprimer ce mouvement: un contrat assistance y est lie.");
+        if (assistanceContratRepository.countByMouvementContratIdAndActifTrue(mouvementId) > 0) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement : supprimez d’abord l’assistance active qui y est liée.");
         }
-        if (carteVerteRepository.countByMouvementContratId(mouvementId) > 0) {
-            throw new BadRequestException("Impossible de supprimer ce mouvement: une carte verte y est liee.");
+        if (carteVerteRepository.countByMouvementContratIdAndActifTrue(mouvementId) > 0) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement : supprimez d’abord la carte verte active qui y est liée.");
         }
-        if (mouvementStockAttestationRepository.countByMouvementContratId(mouvementId) > 0) {
-            throw new BadRequestException("Impossible de supprimer ce mouvement: des attestations ont ete consommees.");
+        if (quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId).stream()
+                .anyMatch(quittance -> Boolean.TRUE.equals(quittance.getPayee()))) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement : une quittance est déjà payée.");
         }
     }
 
     private void deleteMovementGeneratedData(Long mouvementId) {
+        List<AssistanceContrat> assistances = assistanceContratRepository
+                .findByMouvementContratIdOrderByCreatedAtDesc(mouvementId);
+        if (!assistances.isEmpty()) {
+            assistanceContratRepository.deleteAll(assistances);
+            assistanceContratRepository.flush();
+        }
+        List<CarteVerte> cartesVertes = carteVerteRepository
+                .findByMouvementContratIdOrderByCreatedAtDesc(mouvementId);
+        if (!cartesVertes.isEmpty()) {
+            carteVerteRepository.deleteAll(cartesVertes);
+            carteVerteRepository.flush();
+        }
         for (Quittance quittance : quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId)) {
             ligneQuittanceRepository.deleteByQuittanceId(quittance.getId());
             quittanceRepository.delete(quittance);
@@ -2207,6 +2221,8 @@ public class ContratService {
         mouvementGarantieRepository.deleteByMouvementContratId(mouvementId);
         mouvementRemorqueRepository.deleteByMouvementContratId(mouvementId);
         mouvementVehiculeRepository.deleteByMouvementContratId(mouvementId);
+        mouvementStockAttestationRepository.deleteByMouvementContratId(mouvementId);
+        mouvementStockAttestationRepository.flush();
     }
 
     private void rollbackCurrentStateForMovementDeletion(MouvementContrat mouvement) {

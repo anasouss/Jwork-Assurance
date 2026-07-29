@@ -3,6 +3,16 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -29,6 +39,7 @@ export default function ContratAssistancePage() {
   const mouvementId = numericParam(searchParams.get("mouvementId"));
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>({});
+  const [assistanceToDelete, setAssistanceToDelete] = useState<AssistanceContratContext["assistances"][number] | null>(null);
   const contextQuery = useQuery({
     queryKey: ["contrat-assistance", contratId, mouvementId, form.dateSouscription],
     queryFn: () => productionApi.getAssistanceContext(contratId, { mouvementId, dateSouscription: form.dateSouscription }),
@@ -92,6 +103,7 @@ export default function ContratAssistancePage() {
     mutationFn: (assistanceId: string) => productionApi.deleteAssistance(contratId, assistanceId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-assistance", contratId] });
+      setAssistanceToDelete(null);
       toast.success("Assistance supprimée");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Suppression impossible"),
@@ -253,7 +265,15 @@ export default function ContratAssistancePage() {
                     <td className="px-3 py-2 text-right">{money(assistance.primeNette)}</td>
                     <td className="px-3 py-2 text-right">{money(assistance.primeTotale)}</td>
                     <td className="px-3 py-2 text-right">
-                      <Button type="button" variant="ghost" size="icon" className="size-8 text-destructive" disabled={deleteMutation.variables === assistance.id} onClick={() => deleteMutation.mutate(assistance.id)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-destructive"
+                        disabled={deleteMutation.isPending}
+                        title="Supprimer l’assistance"
+                        onClick={() => setAssistanceToDelete(assistance)}
+                      >
                         <Trash2 className="size-4" />
                       </Button>
                     </td>
@@ -268,6 +288,43 @@ export default function ContratAssistancePage() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={Boolean(assistanceToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) {
+            setAssistanceToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer l’assistance ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              L’assistance
+              {assistanceToDelete?.vehiculeImmatriculation
+                ? ` du véhicule ${assistanceToDelete.vehiculeImmatriculation}`
+                : ""}
+              {" "}sera retirée du mouvement et de la quittance. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (assistanceToDelete) {
+                  deleteMutation.mutate(assistanceToDelete.id);
+                }
+              }}
+            >
+              {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

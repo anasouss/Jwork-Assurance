@@ -401,7 +401,7 @@ export default function AvenantContratPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
       await queryClient.invalidateQueries({ queryKey: ["avenant-context", contratId] });
-      toast.success(validatedMovementId ? "Avenant rectifié" : "Avenant enregistré");
+      toast.success(validatedMovementId ? "Avenant modifié" : "Avenant enregistré");
       navigate("/app/production/contrats");
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -799,7 +799,7 @@ export default function AvenantContratPage() {
       if (!validateTargetCreation(target, part)) {
         return false;
       }
-      toast.success(`${label} prêt pour rectification`);
+      toast.success(`${label} prêt pour modification`);
       onSuccess?.();
       previewTargetCreation(target, () => previewCompleteDraft(selectedGarantiesRef.current));
       return true;
@@ -832,7 +832,7 @@ export default function AvenantContratPage() {
             <Link to="/app/production/contrats"><ArrowLeft className="size-4" />Retour liste</Link>
           </Button>
           <h1 className="mt-1 text-xl font-semibold">
-            {validatedMovementId ? "Rectification avenant" : `Avenant ${contratKindLabel}`} - {MOVEMENT_LABELS[movementCode] ?? movementCode}
+            {validatedMovementId ? "Modification de l’avenant" : `Avenant ${contratKindLabel}`} - {MOVEMENT_LABELS[movementCode] ?? movementCode}
           </h1>
           <p className="text-sm text-muted-foreground">{contrat?.numeroDossier ?? contrat?.numeroContrat ?? contratId}</p>
         </div>
@@ -979,7 +979,7 @@ export default function AvenantContratPage() {
           }
         >
           <Save className="size-4" />
-          {validatedMovementId ? "Valider la rectification" : "Valider l'avenant"}
+          {validatedMovementId ? "Valider les modifications" : "Valider l’avenant"}
         </Button>
       </div>
 

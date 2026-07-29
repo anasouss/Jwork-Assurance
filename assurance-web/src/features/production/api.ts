@@ -11,6 +11,7 @@ import type {
   ContratSummary,
   CreateLivraisonAttestationRequest,
   CreateContratRequest,
+  ClientInput,
   ClientResponse,
   ClientCrm,
   ClientPage,
@@ -367,6 +368,19 @@ export const productionApi = {
   async getClientCrm(clientId: string) {
     return normalizeEntityIds(
       unwrap(await apiFetch<ApiResponse<ClientCrm>>(`/api/v1/clients/${clientId}`))
+    );
+  },
+
+  async createClient(request: ClientInput["client"] & {
+    agenceId: string;
+    groupeClientId?: string;
+    relationGroupe?: RelationGroupeClient;
+  }) {
+    return normalizeEntityIds(
+      unwrap(await apiFetch<ApiResponse<ClientResponse>>("/api/v1/clients", {
+        method: "POST",
+        body: JSON.stringify(request),
+      }))
     );
   },
 

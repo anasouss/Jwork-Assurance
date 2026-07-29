@@ -7,6 +7,7 @@ import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Client;
 import com.assurance.entity.ClientTelephone;
 import com.assurance.entity.Ville;
+import com.assurance.enums.TypeClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 @Service
@@ -33,7 +35,34 @@ public class ClientService {
 
     @Transactional
     public ClientResponse create(CreateClientRequest request) {
-        return toResponse(createEntity(request));
+        validateStandaloneClient(request);
+        Client client = createEntity(request);
+        if (request.getGroupeClientId() != null) {
+            groupeClientService.assign(
+                    request.getAgenceId(),
+                    client.getId(),
+                    request.getGroupeClientId(),
+                    request.getRelationGroupe(),
+                    true,
+                    LocalDate.now()
+            );
+        }
+        return toResponse(client);
+    }
+
+    private void validateStandaloneClient(CreateClientRequest request) {
+        if (request.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE) {
+            if (isBlank(request.getCivilite()) || isBlank(request.getPrenom()) || isBlank(request.getNom())
+                    || isBlank(request.getCin()) || request.getCinValidite() == null) {
+                throw new BadRequestException("La civilité, le nom, le prénom, le CIN et sa validité sont obligatoires");
+            }
+        } else if (request.getTypeClient() == TypeClient.PERSONNE_MORALE
+                && (isBlank(request.getRaisonSociale()) || isBlank(request.getRc()))) {
+            throw new BadRequestException("La raison sociale et le RC sont obligatoires");
+        }
+        if (request.getVilleId() == null || isBlank(request.getAdresse()) || isBlank(request.getTelephone())) {
+            throw new BadRequestException("La ville, l'adresse et le téléphone sont obligatoires");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -60,6 +89,7 @@ public class ClientService {
         if (request.getTypeClient() == null) {
             throw new BadRequestException("Le type client est obligatoire");
         }
+        assertIdentityAvailable(request.getAgenceId(), null, request);
         Agence agence = agenceRepository.findById(request.getAgenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", request.getAgenceId()));
         Client clientParent = request.getClientParentId() == null ? null :
@@ -116,12 +146,34 @@ public class ClientService {
     public Client updateEntity(Long agenceId, Long clientId, CreateClientRequest request) {
         Client client = clientRepository.findByAgenceIdAndId(agenceId, clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+        assertIdentityAvailable(agenceId, clientId, request);
         applyRequest(client, request);
         client = clientRepository.save(client);
         clientTelephoneRepository.deleteAll(client.getTelephones());
         client.getTelephones().clear();
         saveTelephones(client, request);
         return client;
+    }
+
+    private void assertIdentityAvailable(Long agenceId, Long currentClientId, CreateClientRequest request) {
+        if (request.getCin() != null && !request.getCin().isBlank()) {
+            clientRepository.findFirstByAgenceIdAndCinIgnoreCase(agenceId, request.getCin().trim())
+                    .filter(existing -> !existing.getId().equals(currentClientId))
+                    .ifPresent(existing -> {
+                        throw new BadRequestException("Un client avec ce CIN existe déjà");
+                    });
+        }
+        if (request.getRc() != null && !request.getRc().isBlank()) {
+            clientRepository.findFirstByAgenceIdAndRcIgnoreCase(agenceId, request.getRc().trim())
+                    .filter(existing -> !existing.getId().equals(currentClientId))
+                    .ifPresent(existing -> {
+                        throw new BadRequestException("Un client avec ce RC existe déjà");
+                    });
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     public ClientResponse toResponse(Client client) {

@@ -63,7 +63,8 @@ public class ClientController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<ClientResponse>> create(@Valid @RequestBody CreateClientRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(clientService.create(request), "Client cree"));
+        request.setAgenceId(TenantContext.getCurrentAgence());
+        return ResponseEntity.ok(ApiResponse.success(clientService.create(request), "Client créé"));
     }
 
     @PutMapping("/{id}/groupe")

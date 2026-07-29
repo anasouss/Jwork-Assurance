@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import com.assurance.enums.RelationGroupeClient;
 import com.assurance.enums.TypeClient;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -17,6 +18,8 @@ public class CreateClientRequest {
     private TypeClient typeClient;
 
     private Long clientParentId;
+    private Long groupeClientId;
+    private RelationGroupeClient relationGroupe;
     private Long villeId;
     private Long categorieClientId;
     private String codeClient;

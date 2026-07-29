@@ -70,7 +70,7 @@ public class GroupeClientService {
                 .build();
         applyResponsibleClients(agenceId, groupe, request);
         groupe = groupeClientRepository.save(groupe);
-        ensureResponsibleMemberships(groupe);
+        synchronizeResponsibleMemberships(groupe);
         return toResponse(agenceId, groupe, true);
     }
 
@@ -89,7 +89,7 @@ public class GroupeClientService {
         }
         applyResponsibleClients(agenceId, groupe, request);
         groupeClientRepository.save(groupe);
-        ensureResponsibleMemberships(groupe);
+        synchronizeResponsibleMemberships(groupe);
         return toResponse(agenceId, groupe, true);
     }
 
@@ -108,24 +108,44 @@ public class GroupeClientService {
             throw new BadRequestException("Le groupe client est inactif");
         }
         LocalDate effectiveDate = dateDebut == null ? LocalDate.now() : dateDebut;
-        if (effectiveDate.isAfter(LocalDate.now())) {
-            throw new BadRequestException("La date de rattachement ne peut pas etre future");
-        }
         RelationGroupeClient effectiveRelation = relation == null ? RelationGroupeClient.SOCIETE_LIEE : relation;
+        if (effectiveRelation != RelationGroupeClient.TETE_GROUPE
+                && groupe.getClientTete() != null
+                && groupe.getClientTete().getId().equals(clientId)) {
+            throw new BadRequestException("Définissez une autre tête de groupe avant de modifier la relation de ce client");
+        }
+        if (effectiveRelation == RelationGroupeClient.TETE_GROUPE) {
+            for (GroupeClientMembre current : membreRepository.findActiveByGroupe(agenceId, groupeId, effectiveDate)) {
+                if (current.getTypeRelation() == RelationGroupeClient.TETE_GROUPE
+                        && !current.getClient().getId().equals(clientId)) {
+                    current.setTypeRelation(RelationGroupeClient.SOCIETE_LIEE);
+                    current.setPrincipal(false);
+                    membreRepository.save(current);
+                }
+            }
+            groupe.setClientTete(client);
+            groupeClientRepository.save(groupe);
+            principal = true;
+        }
         if (principal) {
-            for (GroupeClientMembre current : membreRepository.findActiveByClient(agenceId, clientId, LocalDate.now())) {
+            for (GroupeClientMembre current : membreRepository.findActiveByClient(agenceId, clientId, effectiveDate)) {
                 if (Boolean.TRUE.equals(current.getPrincipal()) && !current.getGroupe().getId().equals(groupeId)) {
-                    current.setDateFin(LocalDate.now());
+                    current.setDateFin(effectiveDate);
+                    current.setPrincipal(false);
                     membreRepository.save(current);
                 }
             }
         }
-        GroupeClientMembre membership = membreRepository.findActiveMembership(groupeId, clientId, LocalDate.now())
+        GroupeClientMembre membership = membreRepository.findOpenMemberships(groupeId, clientId).stream()
+                .findFirst()
                 .orElseGet(() -> GroupeClientMembre.builder()
                         .groupe(groupe)
                         .client(client)
                         .dateDebut(effectiveDate)
                         .build());
+        if (membership.getDateDebut() == null || effectiveDate.isBefore(membership.getDateDebut())) {
+            membership.setDateDebut(effectiveDate);
+        }
         membership.setTypeRelation(effectiveRelation);
         membership.setPrincipal(principal);
         membership.setDateFin(null);
@@ -153,6 +173,7 @@ public class GroupeClientService {
                 || !membership.getGroupe().getAgence().getId().equals(agenceId)) {
             throw new ResourceNotFoundException("Rattachement groupe", membershipId);
         }
+        assertMembershipCanEnd(membership);
         membership.setDateFin(LocalDate.now());
         membership.setPrincipal(false);
         membreRepository.save(membership);
@@ -162,6 +183,7 @@ public class GroupeClientService {
     public void endActiveMemberships(Long agenceId, Long clientId) {
         requireClient(agenceId, clientId);
         for (GroupeClientMembre membership : membreRepository.findActiveByClient(agenceId, clientId, LocalDate.now())) {
+            assertMembershipCanEnd(membership);
             membership.setDateFin(LocalDate.now());
             membership.setPrincipal(false);
             membreRepository.save(membership);
@@ -170,7 +192,16 @@ public class GroupeClientService {
 
     @Transactional(readOnly = true)
     public ClientResponse.GroupeView activePrincipalMembership(Long agenceId, Long clientId) {
-        List<GroupeClientMembre> memberships = membreRepository.findActiveByClient(agenceId, clientId, LocalDate.now());
+        return activePrincipalMembership(agenceId, clientId, LocalDate.now());
+    }
+
+    @Transactional(readOnly = true)
+    public ClientResponse.GroupeView activePrincipalMembership(Long agenceId, Long clientId, LocalDate date) {
+        List<GroupeClientMembre> memberships = membreRepository.findActiveByClient(
+                agenceId,
+                clientId,
+                date == null ? LocalDate.now() : date
+        );
         return memberships.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getPrincipal()))
                 .findFirst()
@@ -193,11 +224,39 @@ public class GroupeClientService {
     }
 
     private void applyResponsibleClients(Long agenceId, GroupeClient groupe, UpsertGroupeClientRequest request) {
-        groupe.setClientTete(request.getClientTeteId() == null ? null : requireClient(agenceId, request.getClientTeteId()));
-        groupe.setClientTresorerie(request.getClientTresorerieId() == null ? null : requireClient(agenceId, request.getClientTresorerieId()));
+        groupe.setClientTete(request.getClientTeteId() == null ? null : requireActiveClient(agenceId, request.getClientTeteId()));
+        groupe.setClientTresorerie(request.getClientTresorerieId() == null ? null : requireActiveClient(agenceId, request.getClientTresorerieId()));
     }
 
-    private void ensureResponsibleMemberships(GroupeClient groupe) {
+    private void assertMembershipCanEnd(GroupeClientMembre membership) {
+        GroupeClient groupe = membership.getGroupe();
+        Long clientId = membership.getClient().getId();
+        if (groupe.getClientTete() != null && groupe.getClientTete().getId().equals(clientId)) {
+            throw new BadRequestException("Définissez une autre tête de groupe avant de retirer ce client");
+        }
+        if (groupe.getClientTresorerie() != null && groupe.getClientTresorerie().getId().equals(clientId)) {
+            throw new BadRequestException("Définissez une autre entité responsable des paiements avant de retirer ce client");
+        }
+    }
+
+    private void synchronizeResponsibleMemberships(GroupeClient groupe) {
+        if (!Boolean.TRUE.equals(groupe.getActif())) {
+            return;
+        }
+        LocalDate today = LocalDate.now();
+        Long headId = groupe.getClientTete() == null ? null : groupe.getClientTete().getId();
+        for (GroupeClientMembre membership : membreRepository.findActiveByGroupe(
+                groupe.getAgence().getId(),
+                groupe.getId(),
+                today
+        )) {
+            if (membership.getTypeRelation() == RelationGroupeClient.TETE_GROUPE
+                    && (headId == null || !headId.equals(membership.getClient().getId()))) {
+                membership.setTypeRelation(RelationGroupeClient.SOCIETE_LIEE);
+                membership.setPrincipal(false);
+                membreRepository.save(membership);
+            }
+        }
         if (groupe.getClientTete() != null) {
             assign(
                     groupe.getAgence().getId(),
@@ -210,20 +269,34 @@ public class GroupeClientService {
         }
         if (groupe.getClientTresorerie() != null
                 && (groupe.getClientTete() == null || !groupe.getClientTresorerie().getId().equals(groupe.getClientTete().getId()))) {
-            assign(
-                    groupe.getAgence().getId(),
-                    groupe.getClientTresorerie().getId(),
+            if (membreRepository.findActiveMembership(
                     groupe.getId(),
-                    RelationGroupeClient.SOCIETE_LIEE,
-                    false,
-                    LocalDate.now()
-            );
+                    groupe.getClientTresorerie().getId(),
+                    today
+            ).isEmpty()) {
+                assign(
+                        groupe.getAgence().getId(),
+                        groupe.getClientTresorerie().getId(),
+                        groupe.getId(),
+                        RelationGroupeClient.SOCIETE_LIEE,
+                        false,
+                        today
+                );
+            }
         }
     }
 
     private Client requireClient(Long agenceId, Long clientId) {
         return clientRepository.findByAgenceIdAndId(agenceId, clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+    }
+
+    private Client requireActiveClient(Long agenceId, Long clientId) {
+        Client client = requireClient(agenceId, clientId);
+        if (!Boolean.TRUE.equals(client.getActif())) {
+            throw new BadRequestException("Le client responsable doit être actif");
+        }
+        return client;
     }
 
     private GroupeClientResponse toResponse(Long agenceId, GroupeClient groupe, boolean includeMembers) {

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, ChevronLeft, ChevronRight, Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,16 +18,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
+import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "@/features/production/api";
-import type { ClientResponse, GroupeClient, RelationGroupeClient } from "@/features/production/types";
+import { toDateOnly } from "@/features/production/date";
+import type {
+  ClientInput,
+  ClientResponse,
+  GroupeClient,
+  RelationGroupeClient,
+  TypeClient,
+} from "@/features/production/types";
 
 export default function ClientCrmPage() {
+  const agenceId = useAuthStore((state) => state.user?.agenceId ?? "");
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
   const [groupeId, setGroupeId] = useState("TOUS");
   const [page, setPage] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
 
@@ -67,10 +78,16 @@ export default function ClientCrmPage() {
           <h1 className="text-2xl font-semibold">Fiche client</h1>
           <p className="text-sm text-muted-foreground">Portefeuille, groupes et situation contractuelle.</p>
         </div>
-        <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setGroupDialogOpen(true)}>
-          <Plus className="size-4" />
-          Nouveau groupe
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setGroupDialogOpen(true)}>
+            <Users className="size-4" />
+            Nouveau groupe
+          </Button>
+          <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setClientDialogOpen(true)}>
+            <Plus className="size-4" />
+            Nouveau client
+          </Button>
+        </div>
       </header>
 
       <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,2.1fr)]">
@@ -175,6 +192,16 @@ export default function ClientCrmPage() {
         onOpenChange={setGroupDialogOpen}
         onSaved={refreshCrm}
       />
+      <ClientDialog
+        open={clientDialogOpen}
+        onOpenChange={setClientDialogOpen}
+        agenceId={agenceId}
+        groupes={groupesQuery.data ?? []}
+        onSaved={async (clientId) => {
+          await refreshCrm();
+          setSelectedClientId(clientId);
+        }}
+      />
       <AssignmentDialog
         open={assignmentOpen}
         onOpenChange={setAssignmentOpen}
@@ -187,6 +214,224 @@ export default function ClientCrmPage() {
         }}
       />
     </div>
+  );
+}
+
+type ClientDraft = ClientInput["client"] & {
+  groupeClientId?: string;
+  relationGroupe?: RelationGroupeClient;
+};
+
+function ClientDialog({
+  open,
+  onOpenChange,
+  agenceId,
+  groupes,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  agenceId: string;
+  groupes: GroupeClient[];
+  onSaved: (clientId: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<ClientDraft>(() => emptyClientDraft());
+  const villesQuery = useQuery({
+    queryKey: ["referentiel", "villes"],
+    queryFn: () => productionApi.referentiel("villes"),
+    staleTime: 60_000,
+    enabled: open,
+  });
+  const categoriesQuery = useQuery({
+    queryKey: ["referentiel", "categories-client"],
+    queryFn: () => productionApi.referentiel("categories-client"),
+    staleTime: 60_000,
+    enabled: open,
+  });
+  const update = (patch: Partial<ClientDraft>) => setDraft((current) => ({ ...current, ...patch }));
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const client = await productionApi.createClient({
+        agenceId,
+        typeClient: draft.typeClient,
+        civilite: clean(draft.civilite),
+        prenom: clean(draft.prenom),
+        nom: clean(draft.nom),
+        raisonSociale: clean(draft.raisonSociale),
+        cin: clean(draft.cin),
+        cinValidite: draft.cinValidite,
+        rc: clean(draft.rc),
+        ice: clean(draft.ice),
+        villeId: draft.villeId,
+        categorieClientId: draft.categorieClientId,
+        adresse: clean(draft.adresse),
+        telephone: clean(draft.telephone),
+        email: clean(draft.email),
+        groupeClientId: draft.groupeClientId,
+        relationGroupe: draft.relationGroupe,
+        telephones: draft.telephone?.trim()
+          ? [{ numero: draft.telephone.trim(), principal: true, whatsapp: false }]
+          : [],
+      });
+      return client;
+    },
+    onSuccess: async (client) => {
+      await onSaved(client.id);
+      toast.success("Client créé");
+      setDraft(emptyClientDraft());
+      onOpenChange(false);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
+  });
+  const physical = draft.typeClient === "PERSONNE_PHYSIQUE";
+  const valid = Boolean(
+    agenceId
+      && draft.villeId
+      && draft.adresse?.trim()
+      && draft.telephone?.trim()
+      && (physical
+        ? draft.civilite && draft.nom?.trim() && draft.prenom?.trim() && draft.cin?.trim() && draft.cinValidite
+        : draft.raisonSociale?.trim() && draft.rc?.trim())
+  );
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!createMutation.isPending) {
+          onOpenChange(next);
+        }
+      }}
+    >
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Nouveau client</DialogTitle>
+          <DialogDescription>Créez la fiche CRM puis rattachez-la éventuellement à un groupe.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Type de client">
+            <Select
+              value={draft.typeClient}
+              onValueChange={(value) => setDraft({
+                ...emptyClientDraft(value as TypeClient),
+                groupeClientId: draft.groupeClientId,
+                relationGroupe: draft.relationGroupe,
+              })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PERSONNE_MORALE">Personne morale</SelectItem>
+                <SelectItem value="PERSONNE_PHYSIQUE">Personne physique</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          {physical ? (
+            <>
+              <Field label="Civilité" required>
+                <Select value={draft.civilite ?? ""} onValueChange={(value) => update({ civilite: value })}>
+                  <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monsieur">Monsieur</SelectItem>
+                    <SelectItem value="madame">Madame</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="CIN" required>
+                <Input value={draft.cin ?? ""} onChange={(event) => update({ cin: event.target.value })} />
+              </Field>
+              <Field label="Validité CIN" required>
+                <DatePicker date={draft.cinValidite} onSelect={(date) => update({ cinValidite: toDateOnly(date) })} />
+              </Field>
+              <Field label="Nom" required>
+                <Input value={draft.nom ?? ""} onChange={(event) => update({ nom: event.target.value })} />
+              </Field>
+              <Field label="Prénom" required>
+                <Input value={draft.prenom ?? ""} onChange={(event) => update({ prenom: event.target.value })} />
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label="Raison sociale" required>
+                <Input value={draft.raisonSociale ?? ""} onChange={(event) => update({ raisonSociale: event.target.value })} />
+              </Field>
+              <Field label="RC" required>
+                <Input value={draft.rc ?? ""} onChange={(event) => update({ rc: event.target.value })} />
+              </Field>
+              <Field label="ICE">
+                <Input value={draft.ice ?? ""} onChange={(event) => update({ ice: event.target.value })} />
+              </Field>
+            </>
+          )}
+          <Field label="Ville" required>
+            <AutocompleteSelect
+              value={draft.villeId ?? ""}
+              onValueChange={(value) => update({ villeId: value })}
+              options={(villesQuery.data ?? []).map((ville) => ({ value: ville.id, label: ville.libelle }))}
+              placeholder="Ville"
+              emptyText="Aucune ville trouvée"
+              invalidText="Choisissez une ville existante."
+            />
+          </Field>
+          <Field label="Adresse" required>
+            <Input value={draft.adresse ?? ""} onChange={(event) => update({ adresse: event.target.value })} />
+          </Field>
+          <Field label="Téléphone" required>
+            <Input value={draft.telephone ?? ""} onChange={(event) => update({ telephone: event.target.value })} />
+          </Field>
+          <Field label="Email">
+            <Input type="email" value={draft.email ?? ""} onChange={(event) => update({ email: event.target.value })} />
+          </Field>
+          <Field label="Catégorie">
+            <Select value={draft.categorieClientId ?? "AUCUNE"} onValueChange={(value) => update({ categorieClientId: value === "AUCUNE" ? undefined : value })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AUCUNE">Non définie</SelectItem>
+                {(categoriesQuery.data ?? []).filter((item) => item.actif !== false).map((categorie) => (
+                  <SelectItem key={categorie.id} value={categorie.id}>{categorie.libelle}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Groupe">
+            <Select value={draft.groupeClientId ?? "INDEPENDANT"} onValueChange={(value) => update({
+              groupeClientId: value === "INDEPENDANT" ? undefined : value,
+              relationGroupe: value === "INDEPENDANT" ? undefined : draft.relationGroupe ?? "FILIALE",
+            })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="INDEPENDANT">Client indépendant</SelectItem>
+                {groupes.filter((groupe) => groupe.actif).map((groupe) => (
+                  <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {draft.groupeClientId ? (
+            <Field label="Relation au groupe">
+              <Select value={draft.relationGroupe ?? "FILIALE"} onValueChange={(value) => update({ relationGroupe: value as RelationGroupeClient })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TETE_GROUPE">Tête de groupe</SelectItem>
+                  <SelectItem value="FILIALE">Filiale</SelectItem>
+                  <SelectItem value="SOCIETE_LIEE">Société liée</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={createMutation.isPending} onClick={() => onOpenChange(false)}>Annuler</Button>
+          <Button
+            type="button"
+            className="bg-blue-600 text-white hover:bg-blue-700"
+            disabled={!valid || createMutation.isPending}
+            onClick={() => createMutation.mutate()}
+          >
+            {createMutation.isPending ? "Enregistrement..." : "Créer le client"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -243,7 +488,7 @@ function ClientDetail({
                   {groupe.code} - {groupe.libelle}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Trésorerie : {groupe.clientTresorerieNom || "Non définie"} · {groupe.facturationConsolideeDefaut ? "Consolidée" : "Directe"}
+                  Entité responsable des paiements : {groupe.clientTresorerieNom || "Non définie"} · {groupe.facturationConsolideeDefaut ? "Consolidée" : "Directe"}
                 </div>
               </div>
             ))}
@@ -352,7 +597,7 @@ function GroupDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nouveau groupe client</DialogTitle>
-          <DialogDescription>Définissez la structure juridique et la trésorerie responsable.</DialogDescription>
+          <DialogDescription>Définissez la structure du groupe et l'entité qui centralise ses paiements.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Code">
@@ -370,7 +615,7 @@ function GroupDialog({
               placeholder="RC, CIN ou nom"
             />
           </Field>
-          <Field label="Trésorerie">
+          <Field label="Entité responsable des paiements">
             <AutocompleteSelect
               value={clientTresorerieId}
               onValueChange={(value) => selectResponsible(value, setClientTresorerieId)}
@@ -516,10 +761,34 @@ function Info({ label: infoLabel, value }: { label: string; value?: string | nul
   );
 }
 
-function Field({ label: fieldLabel, children }: { label: string; children: ReactNode }) {
+function emptyClientDraft(typeClient: TypeClient = "PERSONNE_MORALE"): ClientDraft {
+  return {
+    typeClient,
+    conducteurHabituel: true,
+    sahara: false,
+  };
+}
+
+function clean(value?: string) {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function Field({
+  label: fieldLabel,
+  children,
+  required = false,
+}: {
+  label: string;
+  children: ReactNode;
+  required?: boolean;
+}) {
   return (
     <label className="grid gap-1.5 text-sm">
-      <span className="font-medium">{fieldLabel}</span>
+      <span className="font-medium">
+        {fieldLabel}
+        {required ? <span className="text-red-600"> *</span> : null}
+      </span>
       {children}
     </label>
   );

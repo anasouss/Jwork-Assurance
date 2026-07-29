@@ -1185,7 +1185,7 @@ public class ContratService {
             if (client == null) {
                 continue;
             }
-            applyClientGroupAssignment(agenceId, input, client);
+            applyClientGroupAssignment(agenceId, input, client, contrat.getDateEffet());
             saveClientLink(contrat, input, client);
             resolvedByRole.put(input.getRole(), client);
         }
@@ -1206,7 +1206,7 @@ public class ContratService {
                 }
                 client = clientService.updateEntity(agenceId, client.getId(), input.getClient());
             }
-            applyClientGroupAssignment(agenceId, input, client);
+            applyClientGroupAssignment(agenceId, input, client, contrat.getDateEffet());
             saveClientLink(contrat, input, client);
             resolvedByRole.put(input.getRole(), client);
         }
@@ -1225,7 +1225,8 @@ public class ContratService {
     private void applyClientGroupAssignment(
             Long agenceId,
             CreateContratRequest.ClientInput input,
-            Client client
+            Client client,
+            LocalDate dateEffetContrat
     ) {
         if (Boolean.TRUE.equals(input.getRetirerGroupesActifs())) {
             if (input.getGroupeClientId() != null) {
@@ -1243,7 +1244,7 @@ public class ContratService {
                 input.getGroupeClientId(),
                 input.getRelationGroupe(),
                 true,
-                LocalDate.now()
+                dateEffetContrat == null ? LocalDate.now() : dateEffetContrat
         );
     }
 
@@ -1263,9 +1264,11 @@ public class ContratService {
         TypePayeurPrime typePayeur = request.getTypePayeurPrime() == null
                 ? TypePayeurPrime.SOUSCRIPTEUR
                 : request.getTypePayeurPrime();
+        LocalDate billingDate = firstNonNull(request.getDateEffet(), contrat.getDateEffet(), LocalDate.now());
         ClientResponse.GroupeView groupeSouscripteur = groupeClientService.activePrincipalMembership(
                 contrat.getAgence().getId(),
-                souscripteur.getId()
+                souscripteur.getId(),
+                billingDate
         );
         Long groupeId = request.getGroupeFacturationId() != null
                 ? request.getGroupeFacturationId()
@@ -1277,7 +1280,7 @@ public class ContratService {
                 contrat.getAgence().getId(),
                 groupe.getId(),
                 souscripteur.getId(),
-                LocalDate.now()
+                billingDate
         )) {
             throw new BadRequestException("Le souscripteur n'appartient pas au groupe de facturation");
         }
@@ -1300,7 +1303,7 @@ public class ContratService {
                         contrat.getAgence().getId(),
                         groupe.getId(),
                         payeur.getId(),
-                        LocalDate.now()
+                        billingDate
                 )) {
                     throw new BadRequestException("Le payeur selectionne n'appartient pas au groupe");
                 }

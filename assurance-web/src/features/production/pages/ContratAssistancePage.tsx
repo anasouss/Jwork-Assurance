@@ -56,7 +56,9 @@ export default function ContratAssistancePage() {
   useEffect(() => {
     if (!context) return;
     setForm((current) => ({
-      vehiculeId: current.vehiculeId ?? context.vehiculesEligibles[0]?.id,
+      vehiculeId: context.vehiculesEligibles.some((vehicule) => vehicule.id === current.vehiculeId)
+        ? current.vehiculeId
+        : context.vehiculesEligibles[0]?.id,
       numeroContratOuQuittance: current.numeroContratOuQuittance,
       dateEffet: current.dateEffet ?? context.dateEffet ?? undefined,
       dateSouscription: current.dateSouscription,

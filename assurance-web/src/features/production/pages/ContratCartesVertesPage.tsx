@@ -42,7 +42,11 @@ export default function ContratCartesVertesPage() {
     if (!context) return;
     const firstVehicle = context.vehiculesEligibles[0];
     setForm((current) => ({
-      vehiculeId: current.vehiculeId ?? (firstVehicle ? String(firstVehicle.id) : undefined),
+      vehiculeId: context.vehiculesEligibles.some((vehicule) => String(vehicule.id) === current.vehiculeId)
+        ? current.vehiculeId
+        : firstVehicle
+          ? String(firstVehicle.id)
+          : undefined,
       numero: current.numero,
       dateEffet: current.dateEffet ?? firstVehicle?.dateEffet ?? context.dateEffet ?? undefined,
     }));

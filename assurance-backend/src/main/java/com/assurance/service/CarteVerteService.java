@@ -7,7 +7,9 @@ import com.assurance.entity.CarteVerte;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.MouvementContrat;
+import com.assurance.entity.MouvementVehicule;
 import com.assurance.entity.Vehicule;
+import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.exception.BadRequestException;
@@ -16,6 +18,7 @@ import com.assurance.repository.CarteVerteRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.MouvementContratRepository;
+import com.assurance.repository.MouvementVehiculeRepository;
 import com.assurance.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,6 +40,7 @@ public class CarteVerteService {
 
     private final ContratRepository contratRepository;
     private final MouvementContratRepository mouvementContratRepository;
+    private final MouvementVehiculeRepository mouvementVehiculeRepository;
     private final VehiculeRepository vehiculeRepository;
     private final CarteVerteRepository carteVerteRepository;
     private final ElementFacturableRepository elementFacturableRepository;
@@ -44,7 +50,9 @@ public class CarteVerteService {
     public CarteVerteContextResponse getContext(Long agenceId, Long contratId, Long mouvementId) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         MouvementContrat mouvement = resolveMouvement(contrat, mouvementId);
-        List<CarteVerte> activeCartes = carteVerteRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId());
+        List<CarteVerte> activeCartes = mouvement == null
+                ? carteVerteRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
+                : carteVerteRepository.findByMouvementContratIdAndActifTrueOrderByCreatedAtDesc(mouvement.getId());
         Set<Long> vehiculesAvecCarte = activeCartes.stream()
                 .filter(carte -> carte.getVehicule() != null)
                 .map(carte -> carte.getVehicule().getId())
@@ -61,7 +69,8 @@ public class CarteVerteService {
                 .mouvementCode(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)
                 .mouvementLibelle(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getLibelle() : "Contrat")
                 .montant(resolveMontant(agenceId))
-                .vehiculesEligibles(vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId()).stream()
+                .vehiculesEligibles(resolveVehiculesCibles(contrat, mouvement).stream()
+                        .filter(vehicule -> Boolean.TRUE.equals(vehicule.getActif()))
                         .filter(vehicule -> !vehiculesAvecCarte.contains(vehicule.getId()))
                         .map(this::toVehiculeOption)
                         .toList())
@@ -78,13 +87,29 @@ public class CarteVerteService {
             throw new BadRequestException("Le vehicule ne correspond pas au contrat");
         }
         MouvementContrat mouvement = resolveMouvement(contrat, request.getMouvementContratId());
+        validateVehiculeCible(contrat, mouvement, vehicule);
         LocalDate dateEffet = firstNonNull(request.getDateEffet(), mouvement != null ? mouvement.getDateEffet() : null, vehicule.getDateEffet(), contrat.getDateEffet(), LocalDate.now());
         LocalDate dateEcheance = firstNonNull(mouvement != null ? mouvement.getDateEcheance() : null, vehicule.getDateEcheance(), contrat.getDateEcheance(), dateEffet);
         BigDecimal montant = resolveMontant(agenceId);
 
         CarteVerte carte = carteVerteRepository
                 .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contrat.getId(), vehicule.getId())
-                .orElseGet(CarteVerte::new);
+                .orElse(null);
+        if (carte != null
+                && mouvement != null
+                && (carte.getMouvementContrat() == null
+                    || !mouvement.getId().equals(carte.getMouvementContrat().getId()))) {
+            carte.setActif(false);
+            if (carte.getElementFacturable() != null) {
+                carte.getElementFacturable().setActif(false);
+                elementFacturableRepository.save(carte.getElementFacturable());
+            }
+            carteVerteRepository.save(carte);
+            carte = null;
+        }
+        if (carte == null) {
+            carte = new CarteVerte();
+        }
         carte.setContrat(contrat);
         carte.setMouvementContrat(mouvement);
         carte.setVehicule(vehicule);
@@ -164,6 +189,37 @@ public class CarteVerteService {
             throw new BadRequestException("Le mouvement ne correspond pas au contrat");
         }
         return mouvement;
+    }
+
+    private List<Vehicule> resolveVehiculesCibles(Contrat contrat, MouvementContrat mouvement) {
+        if (mouvement == null) {
+            return vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        }
+        Map<Long, Vehicule> vehicules = new LinkedHashMap<>();
+        for (MouvementVehicule snapshot : mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId())) {
+            if (snapshot.getVehicule() != null && isEtatApresMouvement(snapshot.getNature())) {
+                vehicules.putIfAbsent(snapshot.getVehicule().getId(), snapshot.getVehicule());
+            }
+        }
+        return List.copyOf(vehicules.values());
+    }
+
+    private void validateVehiculeCible(Contrat contrat, MouvementContrat mouvement, Vehicule vehicule) {
+        if (mouvement == null) {
+            return;
+        }
+        boolean cibleDuMouvement = resolveVehiculesCibles(contrat, mouvement).stream()
+                .anyMatch(cible -> cible.getId().equals(vehicule.getId())
+                        && Boolean.TRUE.equals(cible.getActif()));
+        if (!cibleDuMouvement) {
+            throw new BadRequestException("Le véhicule ne correspond pas aux cibles actives du mouvement");
+        }
+    }
+
+    private boolean isEtatApresMouvement(NatureSnapshotMouvement nature) {
+        return nature == NatureSnapshotMouvement.AJOUT
+                || nature == NatureSnapshotMouvement.APRES
+                || nature == NatureSnapshotMouvement.COURANT;
     }
 
     private BigDecimal resolveMontant(Long agenceId) {

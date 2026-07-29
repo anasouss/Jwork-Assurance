@@ -10,10 +10,12 @@ import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.MouvementContrat;
+import com.assurance.entity.MouvementVehicule;
 import com.assurance.entity.ProduitAssistance;
 import com.assurance.entity.TarifProduitAssistance;
 import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
+import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutElementFacturable;
@@ -25,6 +27,7 @@ import com.assurance.repository.CompagnieAssistanceRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.MouvementContratRepository;
+import com.assurance.repository.MouvementVehiculeRepository;
 import com.assurance.repository.ProduitAssistanceRepository;
 import com.assurance.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +38,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -46,6 +51,7 @@ public class AssistanceContratService {
     private final ContratRepository contratRepository;
     private final VehiculeRepository vehiculeRepository;
     private final MouvementContratRepository mouvementContratRepository;
+    private final MouvementVehiculeRepository mouvementVehiculeRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final AssistanceContratRepository assistanceContratRepository;
@@ -59,14 +65,15 @@ public class AssistanceContratService {
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         MouvementContrat mouvement = resolveMouvement(contrat, mouvementId);
         LocalDate referenceDate = firstNonNull(dateSouscription, mouvement != null ? mouvement.getDateEffet() : null, contrat.getDateEffet(), LocalDate.now());
-        List<AssistanceContrat> activeAssistances = assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId());
+        List<AssistanceContrat> activeAssistances = mouvement == null
+                ? assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
+                : assistanceContratRepository.findByMouvementContratIdAndActifTrueOrderByCreatedAtDesc(mouvement.getId());
         Set<Long> vehiculesAvecAssistance = activeAssistances.stream()
                 .filter(assistance -> assistance.getVehicule() != null)
                 .map(assistance -> assistance.getVehicule().getId())
                 .collect(Collectors.toSet());
-        List<AssistanceContratContextResponse.VehiculeAssistanceOption> vehicules = vehiculeRepository
-                .findByContratIdOrderByCreatedAtAsc(contrat.getId())
-                .stream()
+        List<AssistanceContratContextResponse.VehiculeAssistanceOption> vehicules = resolveVehiculesCibles(contrat, mouvement).stream()
+                .filter(vehicule -> Boolean.TRUE.equals(vehicule.getActif()))
                 .filter(vehicule -> !vehiculesAvecAssistance.contains(vehicule.getId()))
                 .map(this::toVehiculeOption)
                 .toList();
@@ -113,6 +120,7 @@ public class AssistanceContratService {
             throw new BadRequestException("Le vehicule ne correspond pas au contrat");
         }
         MouvementContrat mouvement = resolveMouvement(contrat, request.getMouvementContratId());
+        validateVehiculeCible(contrat, mouvement, vehicule);
         AssistancePricing pricing = resolvePricing(contrat, vehicule, request);
 
         AssistanceContrat assistance = assistanceContratRepository
@@ -328,6 +336,37 @@ public class AssistanceContratService {
             throw new BadRequestException("Le mouvement ne correspond pas au contrat");
         }
         return mouvement;
+    }
+
+    private List<Vehicule> resolveVehiculesCibles(Contrat contrat, MouvementContrat mouvement) {
+        if (mouvement == null) {
+            return vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        }
+        Map<Long, Vehicule> vehicules = new LinkedHashMap<>();
+        for (MouvementVehicule snapshot : mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId())) {
+            if (snapshot.getVehicule() != null && isEtatApresMouvement(snapshot.getNature())) {
+                vehicules.putIfAbsent(snapshot.getVehicule().getId(), snapshot.getVehicule());
+            }
+        }
+        return List.copyOf(vehicules.values());
+    }
+
+    private void validateVehiculeCible(Contrat contrat, MouvementContrat mouvement, Vehicule vehicule) {
+        if (mouvement == null) {
+            return;
+        }
+        boolean cibleDuMouvement = resolveVehiculesCibles(contrat, mouvement).stream()
+                .anyMatch(cible -> cible.getId().equals(vehicule.getId())
+                        && Boolean.TRUE.equals(cible.getActif()));
+        if (!cibleDuMouvement) {
+            throw new BadRequestException("Le véhicule ne correspond pas aux cibles actives du mouvement");
+        }
+    }
+
+    private boolean isEtatApresMouvement(NatureSnapshotMouvement nature) {
+        return nature == NatureSnapshotMouvement.AJOUT
+                || nature == NatureSnapshotMouvement.APRES
+                || nature == NatureSnapshotMouvement.COURANT;
     }
 
     private AssistanceContratContextResponse.VehiculeAssistanceOption toVehiculeOption(Vehicule vehicule) {

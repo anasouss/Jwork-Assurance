@@ -400,7 +400,7 @@ public class MouvementContratService {
                 .contratOrigine(contratOrigine)
                 .typeMouvement(typeMouvement)
                 .statut(StatutMouvementContrat.VALIDE)
-                .numeroMouvement("1")
+                .numeroMouvement(prochainNumeroMouvement(contrat))
                 .dateEffet(contrat.getDateEffet())
                 .dateEcheance(contrat.getDateEcheance())
                 .dateValidation(LocalDate.now())
@@ -687,13 +687,31 @@ public class MouvementContratService {
     }
 
     private String prochainNumeroMouvement(Contrat contrat) {
-        List<MouvementContrat> mouvements = mouvementContratRepository.findByContratIdOrderByCreatedAtDesc(contrat.getId());
-        int plusGrandNumero = mouvements.stream()
-                .map(MouvementContrat::getNumeroMouvement)
-                .map(this::numeroMouvementPositif)
-                .max(Integer::compareTo)
-                .orElse(0);
-        return String.valueOf(Math.max(plusGrandNumero, mouvements.size()) + 1);
+        int plusGrandNumero = 0;
+        int nombreMouvements = 0;
+        Set<Long> contratsVisites = new HashSet<>();
+        Contrat contratCourant = contrat;
+
+        while (contratCourant != null
+                && contratCourant.getId() != null
+                && contratsVisites.add(contratCourant.getId())) {
+            List<MouvementContrat> mouvements = mouvementContratRepository
+                    .findByContratIdOrderByCreatedAtDesc(contratCourant.getId()).stream()
+                    .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
+                    .toList();
+            nombreMouvements += mouvements.size();
+            plusGrandNumero = Math.max(
+                    plusGrandNumero,
+                    mouvements.stream()
+                            .map(MouvementContrat::getNumeroMouvement)
+                            .map(this::numeroMouvementPositif)
+                            .max(Integer::compareTo)
+                            .orElse(0)
+            );
+            contratCourant = contratCourant.getContratOrigine();
+        }
+
+        return String.valueOf(Math.max(plusGrandNumero, nombreMouvements) + 1);
     }
 
     private int numeroMouvementPositif(String value) {

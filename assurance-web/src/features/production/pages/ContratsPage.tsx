@@ -56,7 +56,7 @@ type ContratFilters = {
 type MovementLine = {
   key: string;
   mouvementId?: string | null;
-  numeroMouvement: number;
+  numeroMouvement: string;
   code?: string | null;
   libelle?: string | null;
   categorie?: string | null;
@@ -64,6 +64,16 @@ type MovementLine = {
   dateEffet?: string | null;
   dateEcheance?: string | null;
   isSynthetic?: boolean;
+};
+
+type ContractHistoryLine = {
+  contrat: ContratSummary;
+  movement: MovementLine;
+};
+
+type ContractHistoryGroup = {
+  key: string;
+  lines: ContractHistoryLine[];
 };
 
 const DEFAULT_FILTERS: ContratFilters = {
@@ -92,7 +102,8 @@ export default function ContratsPage() {
   const companyMap = useMemo(() => optionMap(companies.data), [companies.data]);
   const conventionMap = useMemo(() => optionMap(conventions.data), [conventions.data]);
   const rows = useMemo(
-    () => (contrats.data ?? []).filter((contrat) => matchesFilters(contrat, appliedFilters, companyMap)),
+    () => contractHistoryGroups(contrats.data ?? [])
+      .filter((group) => group.lines.some(({ contrat }) => matchesFilters(contrat, appliedFilters, companyMap))),
     [appliedFilters, companyMap, contrats.data]
   );
 
@@ -204,31 +215,30 @@ export default function ContratsPage() {
                     <td colSpan={14} className="px-3 py-8 text-center text-muted-foreground">Chargement des dossiers...</td>
                   </tr>
                 ) : rows.length ? (
-                  rows.map((contrat) => {
-                    const movements = movementLines(contrat);
-                    const current = movements[0];
-                    const olderMovements = movements.slice(1);
-                    const isExpanded = Boolean(expanded[contrat.id]);
+                  rows.map((group) => {
+                    const current = group.lines[0];
+                    const olderMovements = group.lines.slice(1);
+                    const isExpanded = Boolean(expanded[group.key]);
                     return (
-                      <Fragment key={contrat.id}>
+                      <Fragment key={group.key}>
                         <ContratRow
-                          contrat={contrat}
-                          movement={current}
-                          companyLabel={companyLabel(contrat, companyMap)}
-                          conventionLabel={conventionLabel(contrat, conventionMap)}
-                          movementCount={movements.length}
+                          contrat={current.contrat}
+                          movement={current.movement}
+                          companyLabel={companyLabel(current.contrat, companyMap)}
+                          conventionLabel={conventionLabel(current.contrat, conventionMap)}
+                          movementCount={group.lines.length}
                           expanded={isExpanded}
                           canExpand={olderMovements.length > 0}
-                          onToggle={() => setExpanded((currentExpanded) => ({ ...currentExpanded, [contrat.id]: !isExpanded }))}
+                          onToggle={() => setExpanded((currentExpanded) => ({ ...currentExpanded, [group.key]: !isExpanded }))}
                         />
-                        {isExpanded ? olderMovements.map((movement) => (
+                        {isExpanded ? olderMovements.map(({ contrat, movement }) => (
                           <ContratRow
-                            key={movement.key}
+                            key={`${contrat.id}-${movement.key}`}
                             contrat={contrat}
                             movement={movement}
                             companyLabel={companyLabel(contrat, companyMap)}
                             conventionLabel={conventionLabel(contrat, conventionMap)}
-                            movementCount={movements.length}
+                            movementCount={group.lines.length}
                             child
                           />
                         )) : null}
@@ -289,7 +299,6 @@ function ContratRow({
       <TableCell className="text-center font-semibold">
         <div className="flex flex-col items-center">
           <span>{eventLabel(contrat, movement)}</span>
-          {contrat.contratOrigineId && !child ? <span className="text-xs font-normal text-blue-600">Contrat origine #{contrat.contratOrigineId}</span> : null}
         </div>
       </TableCell>
       <TableCell className="text-center">{formatDate(movement.dateEffet ?? contrat.dateEffet)}</TableCell>
@@ -744,10 +753,10 @@ function matchesFilters(contrat: ContratSummary, filters: ContratFilters, compan
 function movementLines(contrat: ContratSummary): MovementLine[] {
   const sorted = sortedMouvements(contrat);
   if (sorted.length) {
-    return sorted.map((movement, index) => ({
+    return sorted.map((movement) => ({
       key: `${contrat.id}-${movement.id}`,
       mouvementId: movement.id,
-      numeroMouvement: Number(movement.numeroMouvement) || sorted.length - index,
+      numeroMouvement: movement.numeroMouvement ?? "-",
       code: movement.code,
       libelle: movement.libelle,
       categorie: movement.categorie,
@@ -758,7 +767,7 @@ function movementLines(contrat: ContratSummary): MovementLine[] {
   }
   return [{
     key: `${contrat.id}-initial`,
-    numeroMouvement: 1,
+    numeroMouvement: "1",
     code: "AN",
     libelle: "Affaire nouvelle",
     categorie: "AFFAIRE_NOUVELLE",
@@ -767,6 +776,50 @@ function movementLines(contrat: ContratSummary): MovementLine[] {
     dateEcheance: contrat.dateEcheance,
     isSynthetic: true,
   }];
+}
+
+function contractHistoryGroups(contrats: ContratSummary[]): ContractHistoryGroup[] {
+  const byId = new Map(contrats.map((contrat) => [String(contrat.id), contrat]));
+  const renewedContractIds = new Set(
+    contrats
+      .map((contrat) => contrat.contratOrigineId)
+      .filter((id): id is string => Boolean(id))
+      .map(String)
+  );
+  const leaves = contrats.filter((contrat) => !renewedContractIds.has(String(contrat.id)));
+  const groupedIds = new Set<string>();
+
+  const groups = leaves.map((latest) => {
+    const chain: ContratSummary[] = [];
+    const chainIds = new Set<string>();
+    let current: ContratSummary | undefined = latest;
+    while (current && !chainIds.has(String(current.id))) {
+      const currentId = String(current.id);
+      chain.push(current);
+      chainIds.add(currentId);
+      groupedIds.add(currentId);
+      current = current.contratOrigineId ? byId.get(String(current.contratOrigineId)) : undefined;
+    }
+
+    const lines = chain.flatMap((contrat) => movementLines(contrat).map((movement) => ({ contrat, movement })));
+    return { key: String(latest.id), lines };
+  });
+
+  for (const contrat of contrats) {
+    if (!groupedIds.has(String(contrat.id))) {
+      groups.push({
+        key: String(contrat.id),
+        lines: movementLines(contrat).map((movement) => ({ contrat, movement })),
+      });
+    }
+  }
+
+  return groups.sort((a, b) => {
+    const aCurrent = a.lines[0]?.contrat;
+    const bCurrent = b.lines[0]?.contrat;
+    const dateDiff = dateRank(bCurrent?.dateEffet) - dateRank(aCurrent?.dateEffet);
+    return dateDiff || numericRank(bCurrent?.id) - numericRank(aCurrent?.id);
+  });
 }
 
 function sortedMouvements(contrat: ContratSummary) {

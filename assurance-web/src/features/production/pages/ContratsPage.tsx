@@ -462,7 +462,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           ) : null}
           {canRectifyMovement && rectificationPath ? (
             <DropdownMenuItem asChild>
-              <Link to={rectificationPath}>Modifier l’avenant</Link>
+              <Link to={rectificationPath}>Modifier</Link>
             </DropdownMenuItem>
           ) : null}
           {canCreateMovement ? (

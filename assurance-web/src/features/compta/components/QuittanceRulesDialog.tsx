@@ -183,7 +183,7 @@ export function QuittanceRulesDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+        <DialogContent className="max-h-[92vh] sm:!max-w-[min(96vw,1400px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Configuration des quittances compagnie</DialogTitle>
             <DialogDescription>

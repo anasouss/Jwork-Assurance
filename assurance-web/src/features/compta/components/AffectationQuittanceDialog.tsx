@@ -209,7 +209,7 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[94vh] max-w-[min(96vw,1400px)] overflow-y-auto">
+        <DialogContent className="max-h-[94vh] sm:!max-w-[min(96vw,1400px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Affectation de la quittance compagnie</DialogTitle>
             <DialogDescription>

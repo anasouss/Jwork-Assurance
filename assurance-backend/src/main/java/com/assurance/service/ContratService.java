@@ -3348,11 +3348,13 @@ public class ContratService {
                 .map(garantie -> toRenewalGarantieInput(garantie, vehiculeIndexes, remorqueIndexes))
                 .toList());
 
-        QuittanceResponse sourceQuittance = buildQuittanceGenerale(source, true);
-        if (sourceQuittance != null && sourceQuittance.getLignes() != null) {
-            request.setQuittances(sourceQuittance.getLignes().stream()
-                    .map(this::toRenewalQuittanceInput)
-                    .toList());
+        if (source.getTypeContrat() == TypeContrat.PARTICULIER) {
+            QuittanceResponse sourceQuittance = buildQuittanceGenerale(source, true);
+            if (sourceQuittance != null && sourceQuittance.getLignes() != null) {
+                request.setQuittances(sourceQuittance.getLignes().stream()
+                        .map(this::toRenewalQuittanceInput)
+                        .toList());
+            }
         }
         return request;
     }

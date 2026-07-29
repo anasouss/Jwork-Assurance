@@ -335,9 +335,8 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const editPath = editContratPath(contrat);
   const terminal = isTerminalContratRow(contrat, movement);
   const hasActiveAvenants = (contrat.mouvements ?? []).some((item) => {
-    const code = String(item.code ?? "").trim().toUpperCase();
     const statut = String(item.statut ?? "").trim().toUpperCase();
-    return code !== "AN" && statut !== "ANNULE";
+    return !isInitialContractMovement(item) && statut !== "ANNULE";
   });
   const canCreateMovement = !child && !terminal && !Boolean(contrat.renouvele) && isActiveContrat(contrat);
   const canRenew = canCreateMovement && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
@@ -352,6 +351,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     && !terminal
     && Boolean(rectificationPath)
     && !movement.isSynthetic
+    && !isInitialContractMovement(movement)
     && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";
   const canDownload = !isTerminalMovementCode(movement.code);
   const hasPrimaryActions = canEditDirectly || canCreateMovement;
@@ -687,10 +687,19 @@ function isTerminalMovementCode(code?: string | null) {
   return ["RES_F", "RES_M", "RCH_F", "RCH_M", "ANN_M"].includes(normalized);
 }
 
+function isInitialContractMovement(movement: { code?: string | null; categorie?: string | null }) {
+  const code = String(movement.code ?? "").trim().toUpperCase();
+  const categorie = String(movement.categorie ?? "").trim().toUpperCase();
+  return code === "AN"
+    || code === "REN"
+    || categorie === "AFFAIRE_NOUVELLE"
+    || categorie === "RENOUVELLEMENT";
+}
+
 function resolveDeleteMode(contrat: ContratSummary, movement: MovementLine, child?: boolean): "CONTRAT" | "MOUVEMENT" | null {
   if (child) return null;
   if (String(movement.statut ?? "").toUpperCase() === "ANNULE") return null;
-  if (movement.mouvementId && !movement.isSynthetic && movement.code !== "AN") return "MOUVEMENT";
+  if (movement.mouvementId && !movement.isSynthetic && !isInitialContractMovement(movement)) return "MOUVEMENT";
   const hasMovements = (contrat.mouvements?.length ?? 0) > 0;
   if (!hasMovements && isDraftLikeSummary(contrat)) return "CONTRAT";
   return null;

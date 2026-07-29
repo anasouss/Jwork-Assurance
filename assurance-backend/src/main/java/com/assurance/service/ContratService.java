@@ -286,16 +286,19 @@ public class ContratService {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
         request.setAgenceId(agenceId);
         Contrat contratOrigine = contrat.getContratOrigine();
+        boolean correctionContratActif = isCorrectionAffaireNouvelle(contrat);
         if (contratOrigine != null) {
             request.setModeTermeRenouvellement(contrat.getModeTermeRenouvellement());
             enforceRenewalPeriod(contrat, request);
-            validateRenewalSource(contratOrigine, contrat.getModeTermeRenouvellement());
+            if (!correctionContratActif) {
+                validateRenewalSource(contratOrigine, contrat.getModeTermeRenouvellement());
+            }
         }
         if (hasText(request.getNumeroContrat())
                 && contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(agenceId, request.getNumeroContrat(), contrat.getId())) {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
         }
-        if (isCorrectionAffaireNouvelle(contrat)) {
+        if (correctionContratActif) {
             return appliquerCorrectionAffaireNouvelle(contrat, request);
         }
         PersistedDraftGraph graph = applyFinalRequestToExistingContrat(contrat, request);

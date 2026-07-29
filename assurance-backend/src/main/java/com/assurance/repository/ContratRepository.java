@@ -149,4 +149,27 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             "compagnieAssurance"
     })
     List<Contrat> findByAgenceIdAndIdIn(Long agenceId, List<Long> ids);
+
+    @EntityGraph(attributePaths = {
+            "compagnieAssurance",
+            "payeurPrime",
+            "groupeFacturation",
+            "clients",
+            "clients.client"
+    })
+    @Query("""
+            select distinct contrat
+            from Contrat contrat
+            left join contrat.clients lien
+            where contrat.agence.id = :agenceId
+              and (
+                    lien.client.id = :clientId
+                    or contrat.payeurPrime.id = :clientId
+              )
+            order by contrat.createdAt desc, contrat.id desc
+            """)
+    List<Contrat> findForClientCrm(
+            @Param("agenceId") Long agenceId,
+            @Param("clientId") Long clientId
+    );
 }

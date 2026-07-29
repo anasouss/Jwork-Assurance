@@ -4,6 +4,8 @@ import com.assurance.enums.Fractionnement;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.ModeFacturationContrat;
+import com.assurance.enums.TypePayeurPrime;
 import lombok.Builder;
 import lombok.Data;
 
@@ -43,6 +45,13 @@ public class ContratResponse {
     private String modePaiement;
     private String modeReglement;
     private String numeroBonCommande;
+    private TypePayeurPrime typePayeurPrime;
+    private Long payeurPrimeClientId;
+    private String payeurPrimeNom;
+    private Long groupeFacturationId;
+    private String groupeFacturationNom;
+    private ModeFacturationContrat modeFacturation;
+    private String referenceMandatPayeur;
     private String periodicite;
     private Fractionnement fractionnement;
     private BigDecimal tauxRc;

@@ -330,12 +330,18 @@ export type Quittance = QuittancePreview & {
 export type TypeContrat = "PARTICULIER" | "CONVENTION" | "FLOTTE";
 export type TypeClient = "PERSONNE_PHYSIQUE" | "PERSONNE_MORALE";
 export type RoleClientContrat = "SOUSCRIPTEUR" | "PROPRIETAIRE" | "CONDUCTEUR" | "BENEFICIAIRE";
+export type RelationGroupeClient = "TETE_GROUPE" | "FILIALE" | "SOCIETE_LIEE";
+export type TypePayeurPrime = "SOUSCRIPTEUR" | "TRESORERIE_GROUPE" | "MEMBRE_GROUPE" | "TIERS_MANDATE";
+export type ModeFacturationContrat = "DIRECTE" | "CONSOLIDEE_GROUPE";
 
 export type ClientInput = {
   clientId?: string;
   sameAsRole?: RoleClientContrat;
   role: RoleClientContrat;
   principalPourRole: boolean;
+  groupeClientId?: string;
+  relationGroupe?: RelationGroupeClient;
+  retirerGroupesActifs?: boolean;
   client: {
     agenceId?: string;
     typeClient: TypeClient;
@@ -374,6 +380,70 @@ export type ClientResponse = ClientInput["client"] & {
   categorieClientLibelle?: string | null;
   actif?: boolean | null;
   telephones?: { id?: string; numero: string; principal?: boolean; whatsapp?: boolean }[];
+  groupe?: {
+    id: string;
+    code: string;
+    libelle: string;
+    typeRelation: RelationGroupeClient;
+    clientTresorerieId?: string | null;
+    clientTresorerieNom?: string | null;
+    facturationConsolideeDefaut?: boolean | null;
+  } | null;
+};
+
+export type GroupeClient = {
+  id: string;
+  code: string;
+  libelle: string;
+  clientTeteId?: string | null;
+  clientTeteNom?: string | null;
+  clientTresorerieId?: string | null;
+  clientTresorerieNom?: string | null;
+  facturationConsolideeDefaut: boolean;
+  actif: boolean;
+  membres: {
+    membershipId: string;
+    clientId: string;
+    clientNom: string;
+    typeRelation: RelationGroupeClient;
+    dateDebut?: string | null;
+    dateFin?: string | null;
+    principal: boolean;
+  }[];
+};
+
+export type ClientPage = {
+  items: ClientResponse[];
+  page: {
+    number: number;
+    size: number;
+    totalPages: number;
+    totalElements: number;
+    first: boolean;
+    last: boolean;
+  };
+};
+
+export type ClientCrm = {
+  client: ClientResponse;
+  groupes: GroupeClient[];
+  contrats: {
+    id: string;
+    numeroDossier?: string | null;
+    numeroPolice?: string | null;
+    typeContrat?: string | null;
+    statut?: string | null;
+    dateEffet?: string | null;
+    dateEcheance?: string | null;
+    compagnie?: string | null;
+    roleClient?: string | null;
+    typePayeurPrime?: string | null;
+    payeurPrimeNom?: string | null;
+    modeFacturation?: string | null;
+    primeTotale: number;
+  }[];
+  totalQuittances: number;
+  totalImpayes: number;
 };
 
 export type VehiculeInput = {
@@ -630,6 +700,11 @@ export type CreateContratRequest = {
   periodicite?: string;
   modeReglement?: string;
   numeroBonCommande?: string;
+  typePayeurPrime?: TypePayeurPrime;
+  payeurPrimeClientId?: string;
+  groupeFacturationId?: string;
+  modeFacturation?: ModeFacturationContrat;
+  referenceMandatPayeur?: string;
   fractionnement?: "ANNUEL" | "SEMESTRIEL" | "TRIMESTRIEL" | "MENSUEL";
   tauxRc?: number;
   modeSaisieGaranties?: "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE";
@@ -990,6 +1065,13 @@ export type ContratSummary = {
   modePaiement?: string | null;
   modeReglement?: string | null;
   numeroBonCommande?: string | null;
+  typePayeurPrime?: TypePayeurPrime | null;
+  payeurPrimeClientId?: string | null;
+  payeurPrimeNom?: string | null;
+  groupeFacturationId?: string | null;
+  groupeFacturationNom?: string | null;
+  modeFacturation?: ModeFacturationContrat | null;
+  referenceMandatPayeur?: string | null;
   periodicite?: string | null;
   fractionnement?: string | null;
   tauxRc?: number | null;

@@ -29,6 +29,7 @@ public class ClientService {
     private final ClientTelephoneRepository clientTelephoneRepository;
     private final VilleRepository villeRepository;
     private final CategorieClientRepository categorieClientRepository;
+    private final GroupeClientService groupeClientService;
 
     @Transactional
     public ClientResponse create(CreateClientRequest request) {
@@ -172,6 +173,10 @@ public class ClientService {
                 .justificatifSahara(client.getJustificatifSahara())
                 .actif(client.getActif())
                 .telephones(telephones)
+                .groupe(groupeClientService.activePrincipalMembership(
+                        client.getAgence().getId(),
+                        client.getId()
+                ))
                 .build();
     }
 

@@ -83,6 +83,11 @@ export function ContratFormLayout({
     () => (form.refs.grilles.data ?? []).find((grille) => grille.id === form.grilleTarifaireId) ?? null,
     [form.grilleTarifaireId, form.refs.grilles.data]
   );
+  const souscripteurGroupeId = form.clients.find((client) => client.role === "SOUSCRIPTEUR")?.groupeClientId ?? "";
+  const souscripteurGroupe = useMemo(
+    () => (form.groupesClients.data ?? []).find((groupe) => groupe.id === souscripteurGroupeId),
+    [form.groupesClients.data, souscripteurGroupeId]
+  );
   const conventionLabel = String(form.selectedConvention?.libelle ?? form.selectedConvention?.intitule ?? "Convention");
 
   useEffect(() => {
@@ -90,6 +95,14 @@ export function ContratFormLayout({
       setActiveSection(workflowSections[0] ?? "souscripteur");
     }
   }, [activeSection, workflowSections]);
+
+  useEffect(() => {
+    if (!souscripteurGroupe || form.groupeFacturationId) {
+      return;
+    }
+    form.setGroupeFacturationId(souscripteurGroupe.id);
+    form.setModeFacturation(souscripteurGroupe.facturationConsolideeDefaut ? "CONSOLIDEE_GROUPE" : "DIRECTE");
+  }, [form, souscripteurGroupe]);
 
   const handleSectionOpenChange = (section: ContratSectionKey, open: boolean) => {
     if (!open) {
@@ -114,6 +127,15 @@ export function ContratFormLayout({
       setClients={form.setClients}
       villes={form.refs.villes.data ?? []}
       categoriesClient={form.refs.categoriesClient.data ?? []}
+      groupesClients={form.groupesClients.data ?? []}
+      onSouscripteurGroupChange={(groupe) => {
+        form.setGroupeFacturationId(groupe?.id ?? "");
+        form.setModeFacturation(groupe?.facturationConsolideeDefaut ? "CONSOLIDEE_GROUPE" : "DIRECTE");
+        if (!groupe && form.typePayeurPrime !== "TIERS_MANDATE") {
+          form.setTypePayeurPrime("SOUSCRIPTEUR");
+          form.setPayeurPrimeClientId("");
+        }
+      }}
       showOptionalRoles={false}
       showProprietaireCategorie={order === "flotte"}
       errors={form.validationErrors}

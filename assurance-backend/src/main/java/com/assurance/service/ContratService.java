@@ -7,12 +7,14 @@ import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.AvenantDraftSummaryResponse;
+import com.assurance.dto.response.ClientResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
 import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeSaisieGarantieContrat;
+import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
@@ -22,6 +24,7 @@ import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
+import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.*;
@@ -68,6 +71,7 @@ public class ContratService {
     private final AssistanceContratRepository assistanceContratRepository;
     private final AssistanceContratService assistanceContratService;
     private final ClientService clientService;
+    private final GroupeClientService groupeClientService;
     private final CalculGarantieService calculGarantieService;
     private final QuittanceCalculService quittanceCalculService;
     private final ElementFacturableCibleService elementFacturableCibleService;
@@ -364,6 +368,7 @@ public class ContratService {
         contrat = contratRepository.save(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), Map.of(), true);
+        applyContractBilling(contrat, request, true);
 
         List<Vehicule> vehiculesCrees = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
@@ -816,6 +821,7 @@ public class ContratService {
         clearDraftChildren(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
+        applyContractBilling(contrat, request, finalMode);
 
         Usage usageContrat = contrat.getUsage();
         List<Vehicule> vehiculesCrees = new ArrayList<>();
@@ -1177,6 +1183,7 @@ public class ContratService {
             if (client == null) {
                 continue;
             }
+            applyClientGroupAssignment(agenceId, input, client);
             saveClientLink(contrat, input, client);
             resolvedByRole.put(input.getRole(), client);
         }
@@ -1197,6 +1204,7 @@ public class ContratService {
                 }
                 client = clientService.updateEntity(agenceId, client.getId(), input.getClient());
             }
+            applyClientGroupAssignment(agenceId, input, client);
             saveClientLink(contrat, input, client);
             resolvedByRole.put(input.getRole(), client);
         }
@@ -1210,6 +1218,125 @@ public class ContratService {
                 .principalPourRole(input.isPrincipalPourRole())
                 .build());
         contrat.getClients().add(link);
+    }
+
+    private void applyClientGroupAssignment(
+            Long agenceId,
+            CreateContratRequest.ClientInput input,
+            Client client
+    ) {
+        if (Boolean.TRUE.equals(input.getRetirerGroupesActifs())) {
+            if (input.getGroupeClientId() != null) {
+                throw new BadRequestException("Le retrait des groupes ne peut pas etre combine avec un rattachement");
+            }
+            groupeClientService.endActiveMemberships(agenceId, client.getId());
+            return;
+        }
+        if (input.getGroupeClientId() == null) {
+            return;
+        }
+        groupeClientService.assign(
+                agenceId,
+                client.getId(),
+                input.getGroupeClientId(),
+                input.getRelationGroupe(),
+                true,
+                LocalDate.now()
+        );
+    }
+
+    private void applyContractBilling(Contrat contrat, CreateContratRequest request, boolean finalMode) {
+        Client souscripteur = contrat.getClients().stream()
+                .filter(link -> link.getRole() == com.assurance.enums.RoleClientContrat.SOUSCRIPTEUR)
+                .map(ContratClient::getClient)
+                .findFirst()
+                .orElse(null);
+        if (souscripteur == null) {
+            if (finalMode && (request.getTypePayeurPrime() != null || request.getPayeurPrimeClientId() != null)) {
+                throw new BadRequestException("Le souscripteur doit etre enregistre avant le payeur");
+            }
+            return;
+        }
+
+        TypePayeurPrime typePayeur = request.getTypePayeurPrime() == null
+                ? TypePayeurPrime.SOUSCRIPTEUR
+                : request.getTypePayeurPrime();
+        ClientResponse.GroupeView groupeSouscripteur = groupeClientService.activePrincipalMembership(
+                contrat.getAgence().getId(),
+                souscripteur.getId()
+        );
+        Long groupeId = request.getGroupeFacturationId() != null
+                ? request.getGroupeFacturationId()
+                : groupeSouscripteur == null ? null : groupeSouscripteur.getId();
+        GroupeClient groupe = groupeId == null
+                ? null
+                : groupeClientService.requireGroupe(contrat.getAgence().getId(), groupeId);
+        if (groupe != null && !groupeClientService.isActiveMember(
+                contrat.getAgence().getId(),
+                groupe.getId(),
+                souscripteur.getId(),
+                LocalDate.now()
+        )) {
+            throw new BadRequestException("Le souscripteur n'appartient pas au groupe de facturation");
+        }
+
+        Client payeur;
+        switch (typePayeur) {
+            case SOUSCRIPTEUR -> payeur = souscripteur;
+            case TRESORERIE_GROUPE -> {
+                if (groupe == null || groupe.getClientTresorerie() == null) {
+                    throw new BadRequestException("La tresorerie du groupe doit etre configuree");
+                }
+                payeur = groupe.getClientTresorerie();
+            }
+            case MEMBRE_GROUPE -> {
+                if (groupe == null || request.getPayeurPrimeClientId() == null) {
+                    throw new BadRequestException("Le groupe et le membre payeur sont obligatoires");
+                }
+                payeur = requireBillingClient(contrat, request.getPayeurPrimeClientId());
+                if (!groupeClientService.isActiveMember(
+                        contrat.getAgence().getId(),
+                        groupe.getId(),
+                        payeur.getId(),
+                        LocalDate.now()
+                )) {
+                    throw new BadRequestException("Le payeur selectionne n'appartient pas au groupe");
+                }
+            }
+            case TIERS_MANDATE -> {
+                if (request.getPayeurPrimeClientId() == null || !hasText(request.getReferenceMandatPayeur())) {
+                    throw new BadRequestException("Le tiers payeur et la reference du mandat sont obligatoires");
+                }
+                payeur = requireBillingClient(contrat, request.getPayeurPrimeClientId());
+            }
+            default -> throw new BadRequestException("Type de payeur non supporte");
+        }
+
+        ModeFacturationContrat modeFacturation = request.getModeFacturation();
+        if (modeFacturation == null) {
+            modeFacturation = groupe != null && Boolean.TRUE.equals(groupe.getFacturationConsolideeDefaut())
+                    ? ModeFacturationContrat.CONSOLIDEE_GROUPE
+                    : ModeFacturationContrat.DIRECTE;
+        }
+        if (modeFacturation == ModeFacturationContrat.CONSOLIDEE_GROUPE && groupe == null) {
+            throw new BadRequestException("Un groupe est obligatoire pour la facturation consolidee");
+        }
+
+        contrat.setTypePayeurPrime(typePayeur);
+        contrat.setPayeurPrime(payeur);
+        contrat.setGroupeFacturation(groupe);
+        contrat.setModeFacturation(modeFacturation);
+        contrat.setReferenceMandatPayeur(
+                typePayeur == TypePayeurPrime.TIERS_MANDATE
+                        ? blankToNull(request.getReferenceMandatPayeur())
+                        : null
+        );
+        contratRepository.save(contrat);
+    }
+
+    private Client requireBillingClient(Contrat contrat, Long clientId) {
+        return clientRepository.findByAgenceIdAndId(contrat.getAgence().getId(), clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client payeur", clientId));
     }
 
     private void buildPreviewClientLinks(Contrat contrat, List<CreateContratRequest.ClientInput> inputs, Long agenceId) {
@@ -3117,18 +3244,22 @@ public class ContratService {
                     .toList();
         }
 
+        List<MouvementContrat> mouvementsActifs = contrat.getMouvements().stream()
+                .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
+                .sorted(Comparator
+                        .comparing(MouvementContrat::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(MouvementContrat::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
         List<ContratResponse.MouvementView> mouvements = new ArrayList<>();
-        for (MouvementContrat mouvement : contrat.getMouvements()) {
-            if (mouvement.getStatut() == StatutMouvementContrat.ANNULE) {
-                continue;
-            }
+        for (int mouvementIndex = 0; mouvementIndex < mouvementsActifs.size(); mouvementIndex++) {
+            MouvementContrat mouvement = mouvementsActifs.get(mouvementIndex);
             mouvements.add(ContratResponse.MouvementView.builder()
                     .id(mouvement.getId())
                     .code(mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)
                     .libelle(mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getLibelle() : null)
                     .categorie(mouvement.getTypeMouvement() != null && mouvement.getTypeMouvement().getCategorie() != null ? mouvement.getTypeMouvement().getCategorie().name() : null)
                     .statut(mouvement.getStatut() != null ? mouvement.getStatut().name() : null)
-                    .numeroMouvement(mouvement.getNumeroMouvement())
+                    .numeroMouvement(numeroActeAffiche(mouvement, mouvementIndex + 1))
                     .dateEffet(mouvement.getDateEffet())
                     .dateEcheance(mouvement.getDateEcheance())
                     .primeNette(mouvement.getPrimeNette())
@@ -3204,6 +3335,17 @@ public class ContratService {
                 .modePaiement(contrat.getModePaiement())
                 .modeReglement(contrat.getModeReglement())
                 .numeroBonCommande(contrat.getNumeroBonCommande())
+                .typePayeurPrime(contrat.getTypePayeurPrime() == null
+                        ? TypePayeurPrime.SOUSCRIPTEUR
+                        : contrat.getTypePayeurPrime())
+                .payeurPrimeClientId(contrat.getPayeurPrime() == null ? null : contrat.getPayeurPrime().getId())
+                .payeurPrimeNom(contrat.getPayeurPrime() == null ? null : contrat.getPayeurPrime().getNomAffichage())
+                .groupeFacturationId(contrat.getGroupeFacturation() == null ? null : contrat.getGroupeFacturation().getId())
+                .groupeFacturationNom(contrat.getGroupeFacturation() == null ? null : contrat.getGroupeFacturation().getLibelle())
+                .modeFacturation(contrat.getModeFacturation() == null
+                        ? ModeFacturationContrat.DIRECTE
+                        : contrat.getModeFacturation())
+                .referenceMandatPayeur(contrat.getReferenceMandatPayeur())
                 .periodicite(contrat.getPeriodicite())
                 .fractionnement(contrat.getFractionnement())
                 .tauxRc(contrat.getTauxRc())
@@ -3228,6 +3370,14 @@ public class ContratService {
                 .targetSummaries(targetSummaries)
                 .quittanceGenerale(quittanceGenerale)
                 .build();
+    }
+
+    private String numeroActeAffiche(MouvementContrat mouvement, int positionChronologique) {
+        String numero = mouvement.getNumeroMouvement();
+        if (numero != null && numero.trim().matches("\\d+")) {
+            return numero.trim();
+        }
+        return String.valueOf(positionChronologique);
     }
 
     private AssistanceContratResponse toAssistanceResponse(AssistanceContrat assistance) {

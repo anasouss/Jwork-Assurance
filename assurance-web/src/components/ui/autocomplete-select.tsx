@@ -16,6 +16,7 @@ type AutocompleteSelectProps = {
   onValueChange: (value: string) => void;
   customValue?: string;
   onCustomValueChange?: (value: string | undefined) => void;
+  onQueryChange?: (value: string) => void;
   allowCustomValue?: boolean;
   placeholder?: string;
   emptyText?: string;
@@ -30,6 +31,7 @@ export function AutocompleteSelect({
   onValueChange,
   customValue,
   onCustomValueChange,
+  onQueryChange,
   allowCustomValue = false,
   placeholder = "Choisir",
   emptyText = "Aucun résultat",
@@ -114,6 +116,7 @@ export function AutocompleteSelect({
           setQuery(event.target.value);
           setOpen(true);
           setInvalid(false);
+          onQueryChange?.(event.target.value);
           onValueChange("");
           onCustomValueChange?.(allowCustomValue && event.target.value ? event.target.value : undefined);
         }}

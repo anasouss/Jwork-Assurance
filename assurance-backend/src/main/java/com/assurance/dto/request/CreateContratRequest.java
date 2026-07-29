@@ -6,6 +6,9 @@ import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.TypeVehiculeContrat;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.ModeFacturationContrat;
+import com.assurance.enums.RelationGroupeClient;
+import com.assurance.enums.TypePayeurPrime;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -41,6 +44,11 @@ public class CreateContratRequest {
     private String modePaiement;
     private String modeReglement;
     private String numeroBonCommande;
+    private TypePayeurPrime typePayeurPrime;
+    private Long payeurPrimeClientId;
+    private Long groupeFacturationId;
+    private ModeFacturationContrat modeFacturation;
+    private String referenceMandatPayeur;
     private String periodicite;
     private Fractionnement fractionnement;
     private BigDecimal tauxRc;
@@ -77,6 +85,9 @@ public class CreateContratRequest {
         @NotNull
         private RoleClientContrat role;
         private boolean principalPourRole;
+        private Long groupeClientId;
+        private RelationGroupeClient relationGroupe;
+        private Boolean retirerGroupesActifs;
     }
 
     @Data

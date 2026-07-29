@@ -12,6 +12,8 @@ import type {
   CreateLivraisonAttestationRequest,
   CreateContratRequest,
   ClientResponse,
+  ClientCrm,
+  ClientPage,
   ElementFacturable,
   EcheanceAutomobileResponse,
   AvenantContext,
@@ -48,6 +50,8 @@ import type {
   UpsertTarifUsageRequest,
   UpsertUsageRequest,
   VehiculeResponse,
+  GroupeClient,
+  RelationGroupeClient,
 } from "./types";
 
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
@@ -330,7 +334,71 @@ export const productionApi = {
   },
 
   async searchClient(params: { cin?: string; rc?: string }) {
-    return unwrap(await apiFetch<ApiResponse<ClientResponse | null>>(`/api/v1/clients/search${buildQueryString(params)}`));
+    const client = unwrap(await apiFetch<ApiResponse<ClientResponse | null>>(`/api/v1/clients/search${buildQueryString(params)}`));
+    return client ? normalizeEntityIds(client) : null;
+  },
+
+  async listClients(params: { query?: string; groupeId?: string; page?: number; size?: number } = {}) {
+    return normalizeEntityIds(
+      unwrap(await apiFetch<ApiResponse<ClientPage>>(`/api/v1/clients${buildQueryString(params)}`))
+    );
+  },
+
+  async getClientCrm(clientId: string) {
+    return normalizeEntityIds(
+      unwrap(await apiFetch<ApiResponse<ClientCrm>>(`/api/v1/clients/${clientId}`))
+    );
+  },
+
+  async listGroupesClients() {
+    return normalizeEntityIds(
+      unwrap(await apiFetch<ApiResponse<GroupeClient[]>>("/api/v1/groupes-clients"))
+    );
+  },
+
+  async createGroupeClient(request: {
+    code: string;
+    libelle: string;
+    clientTeteId?: string;
+    clientTresorerieId?: string;
+    facturationConsolideeDefaut?: boolean;
+    actif?: boolean;
+  }) {
+    return normalizeEntityIds(unwrap(await apiFetch<ApiResponse<GroupeClient>>("/api/v1/groupes-clients", {
+      method: "POST",
+      body: JSON.stringify(request),
+    })));
+  },
+
+  async updateGroupeClient(id: string, request: {
+    code: string;
+    libelle: string;
+    clientTeteId?: string;
+    clientTresorerieId?: string;
+    facturationConsolideeDefaut?: boolean;
+    actif?: boolean;
+  }) {
+    return normalizeEntityIds(unwrap(await apiFetch<ApiResponse<GroupeClient>>(`/api/v1/groupes-clients/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(request),
+    })));
+  },
+
+  async assignClientGroup(clientId: string, request: {
+    groupeClientId: string;
+    typeRelation: RelationGroupeClient;
+    principal?: boolean;
+  }) {
+    return normalizeEntityIds(unwrap(await apiFetch<ApiResponse<ClientResponse["groupe"]>>(`/api/v1/clients/${clientId}/groupe`, {
+      method: "PUT",
+      body: JSON.stringify(request),
+    })));
+  },
+
+  async endClientGroup(clientId: string, membershipId: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/clients/${clientId}/groupes/${membershipId}`, {
+      method: "DELETE",
+    }));
   },
 
   async searchVehicule(params: { immatriculation?: string }) {
@@ -933,4 +1001,24 @@ function normalizeReferenceValue(key: string, value: unknown): unknown {
     return value.map((item) => String(item));
   }
   return value;
+}
+
+function normalizeEntityIds<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeEntityIds(item)) as T;
+  }
+  if (value == null || typeof value !== "object") {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => {
+      if (item != null && (key === "id" || key.endsWith("Id"))) {
+        return [key, String(item)];
+      }
+      if (key.endsWith("Ids") && Array.isArray(item)) {
+        return [key, item.map((id) => String(id))];
+      }
+      return [key, normalizeEntityIds(item)];
+    })
+  ) as T;
 }

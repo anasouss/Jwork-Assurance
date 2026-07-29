@@ -4,6 +4,8 @@ import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.Fractionnement;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.ModeFacturationContrat;
+import com.assurance.enums.TypePayeurPrime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -117,6 +119,27 @@ public class Contrat extends BaseEntity {
 
     @Column(name = "numero_bon_commande", length = 120)
     private String numeroBonCommande;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_payeur_prime", length = 30)
+    @Builder.Default
+    private TypePayeurPrime typePayeurPrime = TypePayeurPrime.SOUSCRIPTEUR;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payeur_prime_client_id")
+    private Client payeurPrime;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "groupe_facturation_id")
+    private GroupeClient groupeFacturation;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_facturation", length = 30)
+    @Builder.Default
+    private ModeFacturationContrat modeFacturation = ModeFacturationContrat.DIRECTE;
+
+    @Column(name = "reference_mandat_payeur", length = 160)
+    private String referenceMandatPayeur;
 
     @Column(length = 80)
     private String echeance;

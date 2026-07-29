@@ -1,3 +1,5 @@
+import { useDeferredValue, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -10,7 +12,8 @@ import { Field } from "../components/Field";
 import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { SectionCard } from "../components/SectionCard";
 import { toDateOnly } from "../date";
-import type { CreateContratRequest } from "../types";
+import { productionApi } from "../api";
+import type { CreateContratRequest, ModeFacturationContrat, TypePayeurPrime } from "../types";
 import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
 type Props = {
@@ -32,6 +35,14 @@ export function ContractInfoSection({
   openSection,
   onSectionOpenChange,
 }: Props) {
+  const [payerSearch, setPayerSearch] = useState("");
+  const deferredPayerSearch = useDeferredValue(payerSearch.trim());
+  const payerClientsQuery = useQuery({
+    queryKey: ["clients", "payer-search", deferredPayerSearch],
+    queryFn: () => productionApi.listClients({ query: deferredPayerSearch, size: 25 }),
+    enabled: form.typePayeurPrime === "TIERS_MANDATE" && deferredPayerSearch.length >= 2,
+    staleTime: 30_000,
+  });
   const filteredConventions = (form.refs.conventions.data ?? []).filter(
     (convention) => !form.compagnieAssuranceId || convention.compagnieAssuranceId === form.compagnieAssuranceId
   );
@@ -54,6 +65,36 @@ export function ContractInfoSection({
     && Boolean(form.request.echeance ?? form.effectiveEcheance)
     && selectedConvention?.typeEcheance === "A_ECHEANCE";
   const showConventionDateToDateFractionnement = readOnlyConventionContext && selectedConvention?.typeEcheance === "DATE_A_DATE";
+  const subscriberGroupId = souscripteur?.groupeClientId ?? "";
+  const selectedGroup = (form.groupesClients.data ?? []).find(
+    (groupe) => groupe.id === (form.groupeFacturationId || subscriberGroupId)
+  );
+  const payerOptions = useMemo(() => {
+    if (form.typePayeurPrime === "MEMBRE_GROUPE") {
+      return (selectedGroup?.membres ?? []).map((membre) => ({
+        value: membre.clientId,
+        label: membre.clientNom,
+        keywords: membre.typeRelation,
+      }));
+    }
+    const loaded = payerClientsQuery.data?.items ?? [];
+    const linked = form.clients
+      .filter((client) => client.clientId)
+      .map((client) => ({
+        id: client.clientId ?? "",
+        nomAffichage: client.client.raisonSociale
+          || [client.client.prenom, client.client.nom].filter(Boolean).join(" ")
+          || client.clientId,
+        rc: client.client.rc,
+        cin: client.client.cin,
+      }));
+    const byId = new Map([...linked, ...loaded].map((client) => [client.id, client]));
+    return [...byId.values()].map((client) => ({
+      value: client.id,
+      label: client.nomAffichage ?? client.id,
+      keywords: [client.rc, client.cin].filter(Boolean).join(" "),
+    }));
+  }, [form.clients, form.typePayeurPrime, payerClientsQuery.data?.items, selectedGroup?.membres]);
 
   return (
     <SectionCard
@@ -336,6 +377,71 @@ export function ContractInfoSection({
             ) : null}
           </>
         )}
+        <Field label="Payeur des primes" required error={form.validationErrors.payeurPrimeClientId}>
+          <Select
+            value={form.typePayeurPrime}
+            onValueChange={(value) => {
+              const type = value as TypePayeurPrime;
+              form.setTypePayeurPrime(type);
+              form.setPayeurPrimeClientId("");
+              if (type !== "TIERS_MANDATE") {
+                form.setReferenceMandatPayeur("");
+              }
+            }}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="SOUSCRIPTEUR">Souscripteur</SelectItem>
+              {selectedGroup?.clientTresorerieId ? (
+                <SelectItem value="TRESORERIE_GROUPE">Trésorerie du groupe</SelectItem>
+              ) : null}
+              {selectedGroup?.membres.length ? (
+                <SelectItem value="MEMBRE_GROUPE">Autre membre du groupe</SelectItem>
+              ) : null}
+              <SelectItem value="TIERS_MANDATE">Tiers mandaté</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        {selectedGroup ? (
+          <Field label="Groupe de facturation">
+            <Input value={`${selectedGroup.code} - ${selectedGroup.libelle}`} disabled />
+          </Field>
+        ) : null}
+        {form.typePayeurPrime === "MEMBRE_GROUPE" || form.typePayeurPrime === "TIERS_MANDATE" ? (
+          <Field label={form.typePayeurPrime === "MEMBRE_GROUPE" ? "Membre payeur" : "Tiers payeur"} required>
+            <AutocompleteSelect
+              value={form.payeurPrimeClientId}
+              onValueChange={form.setPayeurPrimeClientId}
+              onQueryChange={form.typePayeurPrime === "TIERS_MANDATE" ? setPayerSearch : undefined}
+              options={payerOptions}
+              placeholder={form.typePayeurPrime === "TIERS_MANDATE" ? "RC, CIN ou nom" : "Membre du groupe"}
+              emptyText="Aucun client trouvé"
+              invalidText="Sélectionnez un client existant."
+            />
+          </Field>
+        ) : null}
+        {form.typePayeurPrime === "TIERS_MANDATE" ? (
+          <Field label="Référence du mandat" required error={form.validationErrors.referenceMandatPayeur}>
+            <Input
+              value={form.referenceMandatPayeur}
+              onChange={(event) => form.setReferenceMandatPayeur(event.target.value)}
+            />
+          </Field>
+        ) : null}
+        <Field label="Facturation" required error={form.validationErrors.groupeFacturationId}>
+          <Select
+            value={form.modeFacturation}
+            onValueChange={(value) => form.setModeFacturation(value as ModeFacturationContrat)}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DIRECTE">Directe au payeur</SelectItem>
+              {selectedGroup ? (
+                <SelectItem value="CONSOLIDEE_GROUPE">Consolidée au groupe</SelectItem>
+              ) : null}
+            </SelectContent>
+          </Select>
+        </Field>
       </div>
       <div className="mt-4 flex justify-end border-t pt-3">
         <Button

@@ -10,7 +10,7 @@ import { SectionCard } from "./SectionCard";
 import { Field } from "./Field";
 import { toDateOnly } from "../date";
 import { productionApi } from "../api";
-import type { ClientInput, ClientResponse, ReferenceOption } from "../types";
+import type { ClientInput, ClientResponse, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 type LookupStatus = "idle" | "loading" | "found" | "new" | "error";
@@ -36,6 +36,8 @@ export function ClientSection({
   setClients,
   villes,
   categoriesClient = [],
+  groupesClients = [],
+  onSouscripteurGroupChange,
   showOptionalRoles = false,
   showProprietaireCategorie = false,
   errors = {},
@@ -49,6 +51,8 @@ export function ClientSection({
   setClients: (clients: ClientInput[]) => void;
   villes: ReferenceOption[];
   categoriesClient?: ReferenceOption[];
+  groupesClients?: GroupeClient[];
+  onSouscripteurGroupChange?: (groupe?: GroupeClient) => void;
   showOptionalRoles?: boolean;
   showProprietaireCategorie?: boolean;
   errors?: Record<string, string>;
@@ -144,6 +148,10 @@ export function ClientSection({
     );
   };
 
+  const updateClientLink = (index: number, patch: Partial<Omit<ClientInput, "client">>) => {
+    setClients(clients.map((client, idx) => idx === index ? { ...client, ...patch } : client));
+  };
+
   const fillExistingClient = (index: number, found: ClientResponse) => {
     const target = clients[index];
     const shouldFillSameAsPair = sameAsSouscripteur && (target?.role === "SOUSCRIPTEUR" || target?.role === "PROPRIETAIRE");
@@ -154,6 +162,9 @@ export function ClientSection({
           ? {
               ...client,
               clientId: found.id,
+              groupeClientId: found.groupe?.id ?? undefined,
+              relationGroupe: found.groupe?.typeRelation ?? undefined,
+              retirerGroupesActifs: false,
               sameAsRole: client.role === "PROPRIETAIRE" && shouldFillSameAsPair ? "SOUSCRIPTEUR" : client.sameAsRole,
               client: {
                 ...client.client,
@@ -188,6 +199,11 @@ export function ClientSection({
           : client;
       })
     );
+    if (target?.role === "SOUSCRIPTEUR") {
+      onSouscripteurGroupChange?.(
+        found.groupe ? groupesClients.find((groupe) => groupe.id === found.groupe?.id) : undefined
+      );
+    }
   };
 
   const searchClient = async (index: number, params: { cin?: string; rc?: string }) => {
@@ -570,6 +586,65 @@ export function ClientSection({
                   </Field>
                 </div>
               ) : null}
+              {item.role === "SOUSCRIPTEUR" ? (
+                <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Organisation">
+                    <Select
+                      value={item.groupeClientId ?? "INDEPENDANT"}
+                      onValueChange={(value) => {
+                        if (value === "INDEPENDANT") {
+                          updateClientLink(index, {
+                            groupeClientId: undefined,
+                            relationGroupe: undefined,
+                            retirerGroupesActifs: Boolean(item.clientId && item.groupeClientId),
+                          });
+                          onSouscripteurGroupChange?.();
+                          return;
+                        }
+                        const selectedGroup = groupesClients.find((groupe) => groupe.id === value);
+                        updateClientLink(index, {
+                          groupeClientId: value,
+                          relationGroupe: item.relationGroupe ?? "FILIALE",
+                          retirerGroupesActifs: false,
+                        });
+                        onSouscripteurGroupChange?.(selectedGroup);
+                      }}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INDEPENDANT">Client indépendant</SelectItem>
+                        {groupesClients.filter((groupe) => groupe.actif).map((groupe) => (
+                          <SelectItem key={groupe.id} value={groupe.id}>
+                            {groupe.code} - {groupe.libelle}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  {item.groupeClientId ? (
+                    <>
+                      <Field label="Lien avec le groupe">
+                        <Select
+                          value={item.relationGroupe ?? "FILIALE"}
+                          onValueChange={(value) => updateClientLink(index, {
+                            relationGroupe: value as RelationGroupeClient,
+                          })}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="TETE_GROUPE">Tête de groupe</SelectItem>
+                            <SelectItem value="FILIALE">Filiale</SelectItem>
+                            <SelectItem value="SOCIETE_LIEE">Société liée</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <div className="flex items-end pb-2 text-sm text-muted-foreground md:col-span-2">
+                        {formatGroupContext(groupesClients.find((groupe) => groupe.id === item.groupeClientId))}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -628,6 +703,17 @@ export function ClientSection({
       ) : null}
     </>
   );
+}
+
+function formatGroupContext(groupe?: GroupeClient) {
+  if (!groupe) {
+    return "";
+  }
+  const treasury = groupe.clientTresorerieNom
+    ? `Trésorerie : ${groupe.clientTresorerieNom}`
+    : "Trésorerie non définie";
+  const billing = groupe.facturationConsolideeDefaut ? "Facturation consolidée par défaut" : "Facturation directe par défaut";
+  return `${treasury} · ${billing}`;
 }
 
 function SaveSectionButton({ saving, onClick }: { saving?: boolean; onClick: () => void }) {

@@ -51,7 +51,8 @@ export default function ContratShowPage() {
   const compagnie = optionLabel(compagniesQuery.data, contrat.compagnieAssuranceId);
   const convention = optionLabel(conventionsQuery.data, contrat.conventionId);
   const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
-  const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement?.numeroMouvement ? `-mvt-${selectedMouvement.numeroMouvement}` : ""}.pdf`;
+  const selectedActNumber = selectedMouvement?.numeroMouvement ?? "1";
+  const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement ? `-acte-${selectedActNumber}` : ""}.pdf`;
   const openPdf = async () => {
     if (generatingPdf) return;
     setGeneratingPdf(true);
@@ -124,6 +125,12 @@ export default function ContratShowPage() {
                 ["Date d'échéance", formatDate(selectedMouvement?.dateEcheance ?? contrat.dateEcheance)],
                 ["Type client", clientTypeLabel(souscripteur)],
                 ["Fractionnement", text(contrat.fractionnement)],
+                ["Groupe client", souscripteur?.groupe?.libelle ?? "Indépendant"],
+                ["Payeur des primes", contrat.payeurPrimeNom ?? payerTypeLabel(contrat.typePayeurPrime)],
+                ["Facturation", billingModeLabel(contrat.modeFacturation)],
+                ...(contrat.referenceMandatPayeur
+                  ? [["Référence mandat", contrat.referenceMandatPayeur] as [string, ReactNode]]
+                  : []),
               ]}
             />
           </Section>
@@ -193,19 +200,26 @@ function FlottePolicySheet({
   const totalAmount = totals?.primeTotale ?? totals?.lignes?.find((ligne) => ligne.globale)?.primeTotale;
   const targetSummaries = contrat.targetSummaries ?? contrat.quittanceGenerale?.targetSummaries ?? [];
   const actLabel = mouvement?.libelle ?? latestEvent(contrat);
+  const actNumber = mouvement?.numeroMouvement ?? "1";
 
   return (
     <div className="w-full overflow-x-auto">
       <div className="mx-auto min-w-[1180px] max-w-[1320px] border bg-white p-4 text-[11px] leading-tight text-slate-950 shadow-sm">
         <div className="mx-auto w-[470px] border border-slate-900 bg-slate-100 px-3 py-2 text-center text-slate-900">
           <div className="text-lg font-bold uppercase tracking-wide">Police flotte automobile</div>
-          <div className="text-sm font-semibold">ACTE N {text(mouvement?.numeroMouvement ?? "1")} : {text(actLabel)}</div>
+          <div className="text-sm font-semibold">ACTE N {actNumber} : {text(actLabel)}</div>
         </div>
 
         <div className="mt-3 grid grid-cols-[1fr_360px] border border-slate-300">
           <div className="space-y-1 p-2">
             <div><span className="font-bold text-blue-950">Assure : </span>{clientName(souscripteur)}</div>
             <div><span className="font-bold text-blue-950">Adresse : </span>{text(souscripteur?.adresse)}{souscripteur?.ville ? `, ${souscripteur.ville}` : ""}</div>
+            <div>
+              <span className="font-bold text-blue-950">Payeur : </span>
+              {contrat.payeurPrimeNom ?? payerTypeLabel(contrat.typePayeurPrime)}
+              <span className="ml-3 font-bold text-blue-950">Facturation : </span>
+              {billingModeLabel(contrat.modeFacturation)}
+            </div>
           </div>
           <div className="space-y-1 p-2 text-right">
             <div className="font-bold text-blue-950">Police N {text(contrat.numeroPolice)}</div>
@@ -652,6 +666,23 @@ function productLabel(contrat: ContratSummary) {
   if (contrat.typeContrat === "CONVENTION") return "Convention";
   if (contrat.typeContrat === "FLOTTE") return "Flotte";
   return "Mono";
+}
+
+function payerTypeLabel(type?: ContratSummary["typePayeurPrime"]) {
+  switch (type) {
+    case "TRESORERIE_GROUPE":
+      return "Trésorerie du groupe";
+    case "MEMBRE_GROUPE":
+      return "Membre du groupe";
+    case "TIERS_MANDATE":
+      return "Tiers mandaté";
+    default:
+      return "Souscripteur";
+  }
+}
+
+function billingModeLabel(mode?: ContratSummary["modeFacturation"]) {
+  return mode === "CONSOLIDEE_GROUPE" ? "Consolidée au groupe" : "Directe au payeur";
 }
 
 function latestEvent(contrat: ContratSummary) {

@@ -124,7 +124,7 @@ public class MouvementContratService {
                 ? quittanceManuelle
                 : calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
 
-        mouvement.setNumeroMouvement(contrat.getNumeroContrat());
+        mouvement.setNumeroMouvement("1");
         mouvement.setDateEffet(contrat.getDateEffet());
         mouvement.setDateEcheance(contrat.getDateEcheance());
         mouvement.setPrimeNette(montants.primeNette());
@@ -252,7 +252,7 @@ public class MouvementContratService {
                 .contrat(contrat)
                 .typeMouvement(typeMouvement)
                 .statut(StatutMouvementContrat.VALIDE)
-                .numeroMouvement(hasText(request.getNumeroMouvement()) ? request.getNumeroMouvement() : contrat.getNumeroContrat() + "-" + typeMouvement.getCode())
+                .numeroMouvement(prochainNumeroMouvement(contrat))
                 .dateEffet(dateEffet)
                 .dateEcheance(dateEcheance)
                 .dateValidation(LocalDate.now())
@@ -315,7 +315,7 @@ public class MouvementContratService {
                 .contrat(contrat)
                 .typeMouvement(typeMouvement)
                 .statut(StatutMouvementContrat.VALIDE)
-                .numeroMouvement(hasText(request.getNumeroMouvement()) ? request.getNumeroMouvement() : contrat.getNumeroContrat() + "-" + typeMouvement.getCode())
+                .numeroMouvement(prochainNumeroMouvement(contrat))
                 .dateEffet(dateEffet)
                 .dateEcheance(dateEcheance)
                 .dateValidation(LocalDate.now())
@@ -384,7 +384,7 @@ public class MouvementContratService {
                 .contratOrigine(contratOrigine)
                 .typeMouvement(typeMouvement)
                 .statut(StatutMouvementContrat.VALIDE)
-                .numeroMouvement(contrat.getNumeroContrat())
+                .numeroMouvement("1")
                 .dateEffet(contrat.getDateEffet())
                 .dateEcheance(contrat.getDateEcheance())
                 .dateValidation(LocalDate.now())
@@ -664,6 +664,27 @@ public class MouvementContratService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private String prochainNumeroMouvement(Contrat contrat) {
+        List<MouvementContrat> mouvements = mouvementContratRepository.findByContratIdOrderByCreatedAtDesc(contrat.getId());
+        int plusGrandNumero = mouvements.stream()
+                .map(MouvementContrat::getNumeroMouvement)
+                .map(this::numeroMouvementPositif)
+                .max(Integer::compareTo)
+                .orElse(0);
+        return String.valueOf(Math.max(plusGrandNumero, mouvements.size()) + 1);
+    }
+
+    private int numeroMouvementPositif(String value) {
+        if (!hasText(value) || !value.trim().matches("\\d+")) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(value.trim()));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private QuittanceCalculService.Resultat calculerMontants(

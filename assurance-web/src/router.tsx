@@ -109,6 +109,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/QuittancesPage")),
       },
       {
+        path: "crm",
+        lazy: lazyRoute(() => import("@/features/crm/pages/ClientCrmPage")),
+      },
+      {
         path: "companies",
         lazy: lazyRoute(() => import("@/features/production/pages/CompaniesDashboardPage")),
       },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Save, Settings2 } from "lucide-react";
 import { toast } from "sonner";
@@ -76,8 +76,10 @@ const DEFAULT_VEHICLE: VehiculeInput = {
 export default function AvenantContratPage() {
   const { contratId = "", code = "INC_F" } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const movementCode = code.toUpperCase();
+  const validatedMovementId = searchParams.get("mouvementId");
   const [dateEffet, setDateEffet] = useState<string>();
   const [dateEcheance, setDateEcheance] = useState<string>();
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
@@ -109,7 +111,7 @@ export default function AvenantContratPage() {
   const draftQuery = useQuery({
     queryKey: ["avenant-draft", contratId, movementCode],
     queryFn: () => productionApi.getAvenantDraft(contratId, movementCode),
-    enabled: Boolean(contratId),
+    enabled: Boolean(contratId) && !validatedMovementId,
   });
   const usages = useQuery({ queryKey: ["referentiel", "usages", "avenant-contrat"], queryFn: () => productionApi.referentiel("usages") });
   const compagnies = useQuery({ queryKey: ["referentiel", "compagnies-assurance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assurance") });
@@ -121,6 +123,16 @@ export default function AvenantContratPage() {
   const compagniesAssistance = useQuery({ queryKey: ["referentiel", "compagnies-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("compagnies-assistance") });
   const produitsAssistance = useQuery({ queryKey: ["referentiel", "produits-assistance", "avenant-contrat"], queryFn: () => productionApi.referentiel("produits-assistance") });
   const grilles = useQuery({ queryKey: ["referentiel", "grilles-tarifaires", "avenant-contrat"], queryFn: () => productionApi.referentiel("grilles-tarifaires") });
+
+  useEffect(() => {
+    if (!contratId || !validatedMovementId) {
+      return;
+    }
+    navigate(
+      `/app/production/contrats/${contratId}?mouvementId=${encodeURIComponent(validatedMovementId)}`,
+      { replace: true }
+    );
+  }, [contratId, navigate, validatedMovementId]);
 
   const contrat = contextQuery.data?.contrat;
   const sharedCrm = contrat?.crmPartage

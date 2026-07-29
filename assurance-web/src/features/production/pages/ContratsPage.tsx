@@ -325,7 +325,6 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     && !child
     && !terminal
     && !hasActiveAvenants;
-  const avenantEditPath = editAvenantPath(contrat, movement, child);
   const canDownload = !isTerminalMovementCode(movement.code);
   const hasPrimaryActions = canEditDirectly || canCreateMovement;
   const deleteMode = resolveDeleteMode(contrat, movement, child);
@@ -410,11 +409,6 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           {canEditDirectly ? (
             <DropdownMenuItem asChild>
               <Link to={editPath}>Modifier</Link>
-            </DropdownMenuItem>
-          ) : null}
-          {avenantEditPath ? (
-            <DropdownMenuItem asChild>
-              <Link to={avenantEditPath}>Modifier l'avenant</Link>
             </DropdownMenuItem>
           ) : null}
           {canCreateMovement ? (
@@ -578,15 +572,6 @@ function isTerminalContratRow(contrat: ContratSummary, movement: MovementLine) {
 function isTerminalMovementCode(code?: string | null) {
   const normalized = String(code ?? "").trim().toUpperCase();
   return ["RES_F", "RES_M", "RCH_F", "RCH_M", "ANN_M"].includes(normalized);
-}
-
-function editAvenantPath(contrat: ContratSummary, movement: MovementLine, child?: boolean) {
-  if (child || movement.isSynthetic || !movement.mouvementId) return null;
-  const code = String(movement.code ?? "").trim().toUpperCase();
-  if (!code || code === "AN" || isTerminalMovementCode(code)) return null;
-  if (String(movement.statut ?? "").toUpperCase() === "ANNULE") return null;
-  if (!isActiveContrat(contrat)) return null;
-  return `/app/production/contrats/${contrat.id}/avenants/${code}?mouvementId=${movement.mouvementId}`;
 }
 
 function resolveDeleteMode(contrat: ContratSummary, movement: MovementLine, child?: boolean): "CONTRAT" | "MOUVEMENT" | null {

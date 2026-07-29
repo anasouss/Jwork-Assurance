@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
 import { formatMoney, moneyAmount, text } from "../utils/format";
-import type { ClientResponse, ContratSummary, ReferenceOption } from "../types";
+import type { AssistanceContrat, ClientResponse, ContratSummary, ReferenceOption } from "../types";
 import type { jsPDF as JsPDF } from "jspdf";
 
 type Garantie = NonNullable<ContratSummary["garanties"]>[number];
@@ -79,7 +79,7 @@ export default function ContratShowPage() {
           <Link to="/app/production/contrats"><ArrowLeft className="size-4" />Retour liste</Link>
         </Button>
         <div className="flex items-center gap-2">
-          <Badge className="bg-emerald-600">{statusLabel(contrat.statut)}</Badge>
+          <Badge className="bg-emerald-600">{statusLabel(selectedMouvement?.statut ?? contrat.statut)}</Badge>
           <Button type="button" onClick={openPdf} disabled={generatingPdf}>
             <FileTextIcon className="size-4" />
             {generatingPdf ? "Génération..." : "Ouvrir PDF"}
@@ -158,6 +158,7 @@ export default function ContratShowPage() {
           ))}
 
           <PersonnesSection garanties={personneGaranties(contrat)} />
+          <AssistancesSection assistances={contrat.assistances ?? []} />
           <QuittanceSection contrat={contrat} movementLabel={selectedMouvement?.libelle} />
         </main>
       </div>
@@ -178,10 +179,16 @@ function FlottePolicySheet({
   mouvement?: Mouvement | null;
 }) {
   const vehicles = contrat.vehicules ?? [];
+  const trailers = contrat.remorques ?? [];
+  const targets = [
+    ...vehicles.map((item, index) => ({ kind: "VEHICULE" as const, index, item })),
+    ...trailers.map((item, index) => ({ kind: "REMORQUE" as const, index, item })),
+  ];
   const vehicleGuarantees = (contrat.garanties ?? []).filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   const guaranteeCodes = flotteGuaranteeCodes(vehicleGuarantees);
   const hasDcCapital = vehicleGuarantees.some((garantie) => String(garantie.code ?? "").toUpperCase() === "DC");
-  const showAssistance = Boolean(contrat.assistance);
+  const assistances = contrat.assistances ?? [];
+  const showAssistance = assistances.length > 0;
   const totals = contrat.quittanceGenerale;
   const totalAmount = totals?.primeTotale ?? totals?.lignes?.find((ligne) => ligne.globale)?.primeTotale;
   const targetSummaries = contrat.targetSummaries ?? contrat.quittanceGenerale?.targetSummaries ?? [];
@@ -234,27 +241,39 @@ function FlottePolicySheet({
             </tr>
           </thead>
           <tbody>
-            {vehicles.map((vehicule, index) => {
-              const garanties = vehicleGuarantees.filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
-              const summary = targetSummaries.find((item) => item.kind === "VEHICULE" && item.vehiculeIndex === index);
+            {targets.map((target) => {
+              const isVehicle = target.kind === "VEHICULE";
+              const targetId = isVehicle ? target.item.vehiculeId : target.item.remorqueId;
+              const garanties = vehicleGuarantees.filter((garantie) => isVehicle
+                ? String(garantie.vehiculeId ?? "") === String(targetId)
+                : String(garantie.remorqueId ?? "") === String(targetId));
+              const summary = targetSummaries.find((item) => isVehicle
+                ? item.kind === "VEHICULE" && item.vehiculeIndex === target.index
+                : item.kind === "REMORQUE" && item.remorqueIndex === target.index);
+              const dateMiseEnCirculation = isVehicle ? target.item.datePremiereCirculation : target.item.dateMiseEnCirculation;
+              const pfOuPtc = isVehicle ? target.item.puissanceFiscale ?? target.item.ptc : target.item.ptc;
+              const carburant = isVehicle ? target.item.carburant : null;
+              const valeurNeuf = isVehicle ? target.item.valeurNeuf : null;
+              const valeurVenale = isVehicle ? target.item.valeurVenale : target.item.valeurAssuree;
+              const valeurGlace = isVehicle ? target.item.valeurGlace : null;
               return (
-                <tr key={vehicule.vehiculeId ?? index} className="align-middle">
-                  <td className="border border-slate-700 px-1 py-1">{text(vehicule.usageCode)}</td>
-                  <td className="border border-slate-700 px-1 py-1">{text(vehicule.marque)}</td>
-                  <td className="border border-slate-700 px-1 py-1 text-center">{text(vehicule.immatriculation)}</td>
-                  <td className="border border-slate-700 px-1 py-1 text-center">{formatDate(vehicule.datePremiereCirculation)}</td>
-                  <td className="border border-slate-700 px-1 py-1 text-center">{text(vehicule.puissanceFiscale ?? vehicule.ptc)}</td>
-                  <td className="border border-slate-700 px-1 py-1 text-center uppercase">{text(vehicule.carburant)}</td>
-                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(vehicule.valeurNeuf)}</td>
-                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(vehicule.valeurVenale)}</td>
-                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(vehicule.valeurGlace)}</td>
+                <tr key={`${target.kind}-${targetId ?? target.index}`} className="align-middle">
+                  <td className="border border-slate-700 px-1 py-1">{text(target.item.usageCode)}</td>
+                  <td className="border border-slate-700 px-1 py-1">{text(target.item.marque)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center">{text(target.item.immatriculation)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center">{formatDate(dateMiseEnCirculation)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center">{text(pfOuPtc)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center uppercase">{text(carburant)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(valeurNeuf)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(valeurVenale)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-right">{amountNoCurrency(valeurGlace)}</td>
                   {hasDcCapital ? <td className="border border-slate-700 px-1 py-1 text-right">{capitalForCode(garanties, "DC")}</td> : null}
                   {guaranteeCodes.map((code) => (
                     <td key={code} className="border border-slate-700 bg-emerald-50 px-1 py-1 text-center font-bold">
                       {flotteGuaranteeCell(garanties, code)}
                     </td>
                   ))}
-                  {showAssistance ? <td className="border border-slate-700 bg-amber-50 px-1 py-1 text-center">{assistanceCell(garanties)}</td> : null}
+                  {showAssistance ? <td className="border border-slate-700 bg-amber-50 px-1 py-1 text-center">{isVehicle ? assistanceCell(assistances, target.item.vehiculeId) : ""}</td> : null}
                   <td className="border border-slate-700 px-1 py-1 text-right font-semibold">{formatMoney(summary?.primeTotale ?? summary?.primeNette)}</td>
                 </tr>
               );
@@ -345,6 +364,36 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
               <TableCell className="text-right">{amountOrDash(garantie.montantInvalidite)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantFraisMedicaux)}</TableCell>
               <TableCell className="text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Section>
+  );
+}
+
+function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] }) {
+  if (!assistances.length) return null;
+  return (
+    <Section title="Assistance">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-slate-100">
+            <TableHead>Véhicule</TableHead>
+            <TableHead>Compagnie</TableHead>
+            <TableHead>Produit</TableHead>
+            <TableHead>Période</TableHead>
+            <TableHead className="text-right">Prime TTC</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {assistances.map((assistance) => (
+            <TableRow key={assistance.id}>
+              <TableCell className="font-medium">{text(assistance.vehiculeImmatriculation)}</TableCell>
+              <TableCell>{text(assistance.compagnieAssistanceLibelle)}</TableCell>
+              <TableCell>{text(assistance.produit)}</TableCell>
+              <TableCell>{formatDate(assistance.dateEffet)} au {formatDate(assistance.dateEcheance)}</TableCell>
+              <TableCell className="text-right font-semibold">{formatMoney(assistance.primeTotale)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -548,8 +597,9 @@ function capitalForCode(garanties: Garantie[], code: string) {
   return amountNoCurrency(garantie?.capital ?? garantie?.valeurAssuree);
 }
 
-function assistanceCell(_garanties: Garantie[]) {
-  return "";
+function assistanceCell(assistances: AssistanceContrat[], vehiculeId?: string | null) {
+  const assistance = assistances.find((item) => String(item.vehiculeId ?? "") === String(vehiculeId ?? ""));
+  return assistance?.produit ?? "";
 }
 
 function flotteFranchiseRows(vehicles: Vehicule[], garanties: Garantie[], usages: string[]) {
@@ -754,6 +804,11 @@ async function openContratPdf(params: {
     drawPdfSection(ctx, "PROTECTION PERSONNES", () => drawPdfPersonnes(ctx, personnes));
   }
 
+  const assistances = params.contrat.assistances ?? [];
+  if (assistances.length) {
+    drawPdfSection(ctx, "ASSISTANCE", () => drawPdfAssistances(ctx, assistances));
+  }
+
   drawPdfSection(ctx, params.mouvement?.libelle ? `QUITTANCE - ${params.mouvement.libelle}` : "QUITTANCE GÉNÉRALE", () => {
     drawPdfQuittance(ctx, params.contrat);
   });
@@ -901,6 +956,16 @@ function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
     amountOrDash(garantie.montantFraisMedicaux),
     formatMoney(garantie.prime),
   ]), [45, 28, 24, 24, 31, 28]);
+}
+
+function drawPdfAssistances(ctx: PdfContext, assistances: AssistanceContrat[]) {
+  drawPdfTable(ctx, ["Véhicule", "Compagnie", "Produit", "Période", "Prime TTC"], assistances.map((assistance) => [
+    text(assistance.vehiculeImmatriculation),
+    text(assistance.compagnieAssistanceLibelle),
+    text(assistance.produit),
+    `${formatDate(assistance.dateEffet)} au ${formatDate(assistance.dateEcheance)}`,
+    formatMoney(assistance.primeTotale),
+  ]), [28, 43, 43, 42, 24]);
 }
 
 function drawPdfQuittance(ctx: PdfContext, contrat: ContratSummary) {

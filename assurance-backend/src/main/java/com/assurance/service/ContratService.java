@@ -2880,6 +2880,202 @@ public class ContratService {
         return toResponse(contrat, includeTargetSummaries, selectedMouvementId, true);
     }
 
+    private ContratResponse.VehiculeView toVehiculeView(Vehicule vehicule) {
+        return ContratResponse.VehiculeView.builder()
+                .vehiculeId(vehicule.getId())
+                .typeVehicule(vehicule.getTypeVehicule().name())
+                .usageId(vehicule.getUsage() != null ? vehicule.getUsage().getId() : null)
+                .usageCode(vehicule.getUsage() != null ? vehicule.getUsage().getCode() : null)
+                .usageLibelle(vehicule.getUsage() != null ? vehicule.getUsage().getLibelle() : null)
+                .groupeUsageAttestationCode(vehicule.getUsage() != null && vehicule.getUsage().getGroupeUsageAttestation() != null ? vehicule.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .consommeAttestation(vehicule.getUsage() != null ? vehicule.getUsage().getConsommeAttestation() : null)
+                .immatriculation(vehicule.getImmatriculation())
+                .numeroAttestation(vehicule.getNumeroAttestation())
+                .remorque(vehicule.getRemorque())
+                .marqueId(vehicule.getMarque() != null ? vehicule.getMarque().getId() : null)
+                .marque(vehicule.getMarque() != null ? vehicule.getMarque().getLibelle() : null)
+                .carrosserieId(vehicule.getCarrosserie() != null ? vehicule.getCarrosserie().getId() : null)
+                .carrosserie(vehicule.getCarrosserie() != null ? vehicule.getCarrosserie().getLibelle() : null)
+                .categorieTransportId(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getId() : null)
+                .categorieTransportCode(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getCode() : null)
+                .categorieTransportLibelle(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getLibelle() : null)
+                .carburant(vehicule.getCarburant())
+                .puissanceFiscale(vehicule.getPuissanceFiscale())
+                .nombrePlaces(vehicule.getNombrePlaces())
+                .sousClasse(vehicule.getSousClasse())
+                .ptc(vehicule.getPtc())
+                .datePremiereCirculation(vehicule.getDatePremiereCirculation())
+                .dateExpirationCarteGrise(vehicule.getDateExpirationCarteGrise())
+                .dateEffet(vehicule.getDateEffet())
+                .dateEcheance(vehicule.getDateEcheance())
+                .crm(vehicule.getCrm())
+                .coefficientProrata(vehicule.getCoefficientProrata())
+                .valeurVenale(vehicule.getValeurVenale())
+                .valeurNeuf(vehicule.getValeurNeuf())
+                .valeurGlace(vehicule.getValeurGlace())
+                .organismeCredit(vehicule.getOrganismeCredit())
+                .nomOrganismeCredit(vehicule.getNomOrganismeCredit())
+                .montantCredit(vehicule.getMontantCredit())
+                .dateFinCredit(vehicule.getDateFinCredit())
+                .build();
+    }
+
+    private ContratResponse.VehiculeView toVehiculeView(MouvementVehicule snapshot) {
+        Vehicule vehicule = snapshot.getVehicule();
+        return ContratResponse.VehiculeView.builder()
+                .vehiculeId(vehicule != null ? vehicule.getId() : snapshot.getId())
+                .typeVehicule(snapshot.getTypeVehicule() != null ? snapshot.getTypeVehicule().name() : null)
+                .usageId(snapshot.getUsage() != null ? snapshot.getUsage().getId() : null)
+                .usageCode(snapshot.getUsage() != null ? snapshot.getUsage().getCode() : null)
+                .usageLibelle(snapshot.getUsage() != null ? snapshot.getUsage().getLibelle() : null)
+                .groupeUsageAttestationCode(snapshot.getUsage() != null && snapshot.getUsage().getGroupeUsageAttestation() != null ? snapshot.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .consommeAttestation(snapshot.getUsage() != null ? snapshot.getUsage().getConsommeAttestation() : null)
+                .immatriculation(snapshot.getImmatriculation())
+                .numeroAttestation(snapshot.getNumeroAttestation())
+                .remorque(false)
+                .marqueId(snapshot.getMarque() != null ? snapshot.getMarque().getId() : null)
+                .marque(snapshot.getMarque() != null ? snapshot.getMarque().getLibelle() : null)
+                .carrosserieId(snapshot.getCarrosserie() != null ? snapshot.getCarrosserie().getId() : null)
+                .carrosserie(snapshot.getCarrosserie() != null ? snapshot.getCarrosserie().getLibelle() : null)
+                .categorieTransportId(snapshot.getCategorieTransport() != null ? snapshot.getCategorieTransport().getId() : null)
+                .categorieTransportCode(snapshot.getCategorieTransport() != null ? snapshot.getCategorieTransport().getCode() : null)
+                .categorieTransportLibelle(snapshot.getCategorieTransport() != null ? snapshot.getCategorieTransport().getLibelle() : null)
+                .carburant(snapshot.getCarburant())
+                .puissanceFiscale(snapshot.getPuissanceFiscale())
+                .nombrePlaces(snapshot.getNombrePlaces())
+                .sousClasse(snapshot.getSousClasse())
+                .ptc(snapshot.getPtc())
+                .datePremiereCirculation(snapshot.getDatePremiereCirculation())
+                .dateExpirationCarteGrise(snapshot.getDateExpirationCarteGrise())
+                .dateEffet(snapshot.getDateEffet())
+                .dateEcheance(snapshot.getDateEcheance())
+                .crm(snapshot.getCrm())
+                .coefficientProrata(snapshot.getCoefficientProrata())
+                .valeurVenale(snapshot.getValeurVenale())
+                .valeurNeuf(snapshot.getValeurNeuf())
+                .valeurGlace(snapshot.getValeurGlace())
+                .organismeCredit(snapshot.getOrganismeCredit())
+                .nomOrganismeCredit(snapshot.getNomOrganismeCredit())
+                .montantCredit(snapshot.getMontantCredit())
+                .dateFinCredit(snapshot.getDateFinCredit())
+                .build();
+    }
+
+    private ContratResponse.RemorqueView toRemorqueView(Remorque remorque) {
+        return ContratResponse.RemorqueView.builder()
+                .remorqueId(remorque.getId())
+                .usageId(remorque.getUsage() != null ? remorque.getUsage().getId() : null)
+                .usageCode(remorque.getUsage() != null ? remorque.getUsage().getCode() : null)
+                .usageLibelle(remorque.getUsage() != null ? remorque.getUsage().getLibelle() : null)
+                .groupeUsageAttestationCode(remorque.getUsage() != null && remorque.getUsage().getGroupeUsageAttestation() != null ? remorque.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .consommeAttestation(remorque.getUsage() != null ? remorque.getUsage().getConsommeAttestation() : null)
+                .immatriculation(remorque.getImmatriculation())
+                .numeroAttestation(remorque.getNumeroAttestation())
+                .marqueId(remorque.getMarque() != null ? remorque.getMarque().getId() : null)
+                .marque(remorque.getMarque() != null ? remorque.getMarque().getLibelle() : null)
+                .ptc(remorque.getPtc())
+                .dateMiseEnCirculation(remorque.getDateMiseEnCirculation())
+                .dateEffet(remorque.getDateEffet())
+                .dateEcheance(remorque.getDateEcheance())
+                .crm(remorque.getCrm())
+                .coefficientProrata(remorque.getCoefficientProrata())
+                .valeurAssuree(remorque.getValeurAssuree())
+                .build();
+    }
+
+    private ContratResponse.RemorqueView toRemorqueView(MouvementRemorque snapshot) {
+        Remorque remorque = snapshot.getRemorque();
+        return ContratResponse.RemorqueView.builder()
+                .remorqueId(remorque != null ? remorque.getId() : snapshot.getId())
+                .usageId(snapshot.getUsage() != null ? snapshot.getUsage().getId() : null)
+                .usageCode(snapshot.getUsage() != null ? snapshot.getUsage().getCode() : null)
+                .usageLibelle(snapshot.getUsage() != null ? snapshot.getUsage().getLibelle() : null)
+                .groupeUsageAttestationCode(snapshot.getUsage() != null && snapshot.getUsage().getGroupeUsageAttestation() != null ? snapshot.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .consommeAttestation(snapshot.getUsage() != null ? snapshot.getUsage().getConsommeAttestation() : null)
+                .immatriculation(snapshot.getImmatriculation())
+                .numeroAttestation(snapshot.getNumeroAttestation())
+                .marqueId(snapshot.getMarque() != null ? snapshot.getMarque().getId() : null)
+                .marque(snapshot.getMarque() != null ? snapshot.getMarque().getLibelle() : null)
+                .ptc(snapshot.getPtc())
+                .dateMiseEnCirculation(snapshot.getDateMiseEnCirculation())
+                .dateEffet(snapshot.getDateEffet())
+                .dateEcheance(snapshot.getDateEcheance())
+                .crm(snapshot.getCrm())
+                .coefficientProrata(snapshot.getCoefficientProrata())
+                .valeurAssuree(snapshot.getValeurAssuree())
+                .build();
+    }
+
+    private ContratResponse.GarantieView toGarantieView(ContratGarantie contratGarantie) {
+        return ContratResponse.GarantieView.builder()
+                .contratGarantieId(contratGarantie.getId())
+                .garantieId(contratGarantie.getGarantie().getId())
+                .code(contratGarantie.getGarantie().getCode())
+                .libelle(contratGarantie.getGarantie().getLibelle())
+                .typeGarantie(contratGarantie.getGarantie().getTypeGarantie().name())
+                .clientId(contratGarantie.getClient() != null ? contratGarantie.getClient().getId() : null)
+                .vehiculeId(contratGarantie.getVehicule() != null ? contratGarantie.getVehicule().getId() : null)
+                .remorqueId(contratGarantie.getRemorque() != null ? contratGarantie.getRemorque().getId() : null)
+                .ligneGrilleTarifaireId(contratGarantie.getLigneGrilleTarifaire() != null ? contratGarantie.getLigneGrilleTarifaire().getId() : null)
+                .modeSelectionne(contratGarantie.getModeSelectionne() != null ? contratGarantie.getModeSelectionne().name() : null)
+                .sourceValeurSelectionnee(contratGarantie.getSourceValeurSelectionnee() != null ? contratGarantie.getSourceValeurSelectionnee().name() : null)
+                .formuleGarantiePersonneId(contratGarantie.getFormuleGarantiePersonne() != null ? contratGarantie.getFormuleGarantiePersonne().getId() : null)
+                .valeurVenale(contratGarantie.getValeurVenale())
+                .valeurNeuf(contratGarantie.getValeurNeuf())
+                .valeurGlace(contratGarantie.getValeurGlace())
+                .valeurAssuree(contratGarantie.getCapital())
+                .formule(contratGarantie.getFormule())
+                .montantDeces(contratGarantie.getMontantDeces())
+                .montantInvalidite(contratGarantie.getMontantInvalidite())
+                .montantFraisMedicaux(contratGarantie.getMontantFraisMedicaux())
+                .montantFraisHospitalisation(contratGarantie.getMontantFraisHospitalisation())
+                .montantFraisFuneraires(contratGarantie.getMontantFraisFuneraires())
+                .montantFraisChirurgie(contratGarantie.getMontantFraisChirurgie())
+                .accessoire(contratGarantie.getAccessoire())
+                .capital(contratGarantie.getCapital())
+                .taux(contratGarantie.getTaux())
+                .prime(contratGarantie.getPrime())
+                .tauxFranchise(contratGarantie.getTauxFranchise())
+                .franchiseMinimale(contratGarantie.getFranchiseMinimale())
+                .build();
+    }
+
+    private ContratResponse.GarantieView toGarantieView(MouvementGarantie snapshot) {
+        Garantie garantie = snapshot.getGarantie();
+        ContratGarantie contratGarantie = snapshot.getContratGarantie();
+        return ContratResponse.GarantieView.builder()
+                .contratGarantieId(contratGarantie != null ? contratGarantie.getId() : snapshot.getId())
+                .garantieId(garantie.getId())
+                .code(garantie.getCode())
+                .libelle(garantie.getLibelle())
+                .typeGarantie(garantie.getTypeGarantie().name())
+                .clientId(snapshot.getClient() != null ? snapshot.getClient().getId() : null)
+                .vehiculeId(snapshot.getVehicule() != null ? snapshot.getVehicule().getId() : null)
+                .remorqueId(snapshot.getRemorque() != null ? snapshot.getRemorque().getId() : null)
+                .ligneGrilleTarifaireId(snapshot.getLigneGrilleTarifaire() != null ? snapshot.getLigneGrilleTarifaire().getId() : null)
+                .modeSelectionne(snapshot.getModeSelectionne() != null ? snapshot.getModeSelectionne().name() : null)
+                .sourceValeurSelectionnee(snapshot.getSourceValeurSelectionnee() != null ? snapshot.getSourceValeurSelectionnee().name() : null)
+                .formuleGarantiePersonneId(snapshot.getFormuleGarantiePersonne() != null ? snapshot.getFormuleGarantiePersonne().getId() : null)
+                .valeurVenale(snapshot.getValeurVenale())
+                .valeurNeuf(snapshot.getValeurNeuf())
+                .valeurGlace(snapshot.getValeurGlace())
+                .valeurAssuree(snapshot.getCapital())
+                .formule(snapshot.getFormule())
+                .montantDeces(snapshot.getMontantDeces())
+                .montantInvalidite(snapshot.getMontantInvalidite())
+                .montantFraisMedicaux(snapshot.getMontantFraisMedicaux())
+                .montantFraisHospitalisation(snapshot.getMontantFraisHospitalisation())
+                .montantFraisFuneraires(snapshot.getMontantFraisFuneraires())
+                .montantFraisChirurgie(snapshot.getMontantFraisChirurgie())
+                .accessoire(snapshot.getAccessoire())
+                .capital(snapshot.getCapital())
+                .taux(snapshot.getTaux())
+                .prime(snapshot.getPrime())
+                .tauxFranchise(snapshot.getTauxFranchise())
+                .franchiseMinimale(snapshot.getFranchiseMinimale())
+                .build();
+    }
+
     private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries, Long selectedMouvementId, boolean fallbackInactiveForView) {
         List<ContratResponse.ClientLink> clients = new ArrayList<>();
         for (ContratClient link : contrat.getClients()) {
@@ -2892,107 +3088,33 @@ public class ContratService {
                     .build());
         }
 
-        List<ContratResponse.VehiculeView> vehicules = new ArrayList<>();
-        List<Vehicule> vehiculesActifs = fallbackInactiveForView ? activeVehiculesForView(contrat) : activeVehicules(contrat);
-        List<Remorque> remorquesActives = fallbackInactiveForView ? activeRemorquesForView(contrat) : activeRemorques(contrat);
-        List<ContratGarantie> garantiesActives = fallbackInactiveForView ? activeGarantiesForView(contrat) : activeGaranties(contrat);
-
-        for (Vehicule vehicule : vehiculesActifs) {
-            vehicules.add(ContratResponse.VehiculeView.builder()
-                    .vehiculeId(vehicule.getId())
-                    .typeVehicule(vehicule.getTypeVehicule().name())
-                    .usageId(vehicule.getUsage() != null ? vehicule.getUsage().getId() : null)
-                    .usageCode(vehicule.getUsage() != null ? vehicule.getUsage().getCode() : null)
-                    .usageLibelle(vehicule.getUsage() != null ? vehicule.getUsage().getLibelle() : null)
-                    .groupeUsageAttestationCode(vehicule.getUsage() != null && vehicule.getUsage().getGroupeUsageAttestation() != null ? vehicule.getUsage().getGroupeUsageAttestation().getCode() : null)
-                    .consommeAttestation(vehicule.getUsage() != null ? vehicule.getUsage().getConsommeAttestation() : null)
-                    .immatriculation(vehicule.getImmatriculation())
-                    .numeroAttestation(vehicule.getNumeroAttestation())
-                    .remorque(vehicule.getRemorque())
-                    .marqueId(vehicule.getMarque() != null ? vehicule.getMarque().getId() : null)
-                    .marque(vehicule.getMarque() != null ? vehicule.getMarque().getLibelle() : null)
-                    .carrosserieId(vehicule.getCarrosserie() != null ? vehicule.getCarrosserie().getId() : null)
-                    .carrosserie(vehicule.getCarrosserie() != null ? vehicule.getCarrosserie().getLibelle() : null)
-                    .categorieTransportId(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getId() : null)
-                    .categorieTransportCode(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getCode() : null)
-                    .categorieTransportLibelle(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getLibelle() : null)
-                    .carburant(vehicule.getCarburant())
-                    .puissanceFiscale(vehicule.getPuissanceFiscale())
-                    .nombrePlaces(vehicule.getNombrePlaces())
-                    .sousClasse(vehicule.getSousClasse())
-                    .ptc(vehicule.getPtc())
-                    .datePremiereCirculation(vehicule.getDatePremiereCirculation())
-                    .dateExpirationCarteGrise(vehicule.getDateExpirationCarteGrise())
-                    .dateEffet(vehicule.getDateEffet())
-                    .dateEcheance(vehicule.getDateEcheance())
-                    .crm(vehicule.getCrm())
-                    .coefficientProrata(vehicule.getCoefficientProrata())
-                    .valeurVenale(vehicule.getValeurVenale())
-                    .valeurNeuf(vehicule.getValeurNeuf())
-                    .valeurGlace(vehicule.getValeurGlace())
-                    .organismeCredit(vehicule.getOrganismeCredit())
-                    .nomOrganismeCredit(vehicule.getNomOrganismeCredit())
-                    .montantCredit(vehicule.getMontantCredit())
-                    .dateFinCredit(vehicule.getDateFinCredit())
-                    .build());
-        }
-
-        List<ContratResponse.RemorqueView> remorques = new ArrayList<>();
-        for (Remorque remorque : remorquesActives) {
-            remorques.add(ContratResponse.RemorqueView.builder()
-                    .remorqueId(remorque.getId())
-                    .usageId(remorque.getUsage() != null ? remorque.getUsage().getId() : null)
-                    .usageCode(remorque.getUsage() != null ? remorque.getUsage().getCode() : null)
-                    .usageLibelle(remorque.getUsage() != null ? remorque.getUsage().getLibelle() : null)
-                    .groupeUsageAttestationCode(remorque.getUsage() != null && remorque.getUsage().getGroupeUsageAttestation() != null ? remorque.getUsage().getGroupeUsageAttestation().getCode() : null)
-                    .consommeAttestation(remorque.getUsage() != null ? remorque.getUsage().getConsommeAttestation() : null)
-                    .immatriculation(remorque.getImmatriculation())
-                    .numeroAttestation(remorque.getNumeroAttestation())
-                    .marqueId(remorque.getMarque() != null ? remorque.getMarque().getId() : null)
-                    .marque(remorque.getMarque() != null ? remorque.getMarque().getLibelle() : null)
-                    .ptc(remorque.getPtc())
-                    .dateMiseEnCirculation(remorque.getDateMiseEnCirculation())
-                    .dateEffet(remorque.getDateEffet())
-                    .dateEcheance(remorque.getDateEcheance())
-                    .crm(remorque.getCrm())
-                    .coefficientProrata(remorque.getCoefficientProrata())
-                    .valeurAssuree(remorque.getValeurAssuree())
-                    .build());
-        }
-
-        List<ContratResponse.GarantieView> garanties = new ArrayList<>();
-        for (ContratGarantie contratGarantie : garantiesActives) {
-            garanties.add(ContratResponse.GarantieView.builder()
-                    .contratGarantieId(contratGarantie.getId())
-                    .garantieId(contratGarantie.getGarantie().getId())
-                    .code(contratGarantie.getGarantie().getCode())
-                    .libelle(contratGarantie.getGarantie().getLibelle())
-                    .typeGarantie(contratGarantie.getGarantie().getTypeGarantie().name())
-                    .clientId(contratGarantie.getClient() != null ? contratGarantie.getClient().getId() : null)
-                    .vehiculeId(contratGarantie.getVehicule() != null ? contratGarantie.getVehicule().getId() : null)
-                    .remorqueId(contratGarantie.getRemorque() != null ? contratGarantie.getRemorque().getId() : null)
-                    .ligneGrilleTarifaireId(contratGarantie.getLigneGrilleTarifaire() != null ? contratGarantie.getLigneGrilleTarifaire().getId() : null)
-                    .modeSelectionne(contratGarantie.getModeSelectionne() != null ? contratGarantie.getModeSelectionne().name() : null)
-                    .sourceValeurSelectionnee(contratGarantie.getSourceValeurSelectionnee() != null ? contratGarantie.getSourceValeurSelectionnee().name() : null)
-                    .formuleGarantiePersonneId(contratGarantie.getFormuleGarantiePersonne() != null ? contratGarantie.getFormuleGarantiePersonne().getId() : null)
-                    .valeurVenale(contratGarantie.getValeurVenale())
-                    .valeurNeuf(contratGarantie.getValeurNeuf())
-                    .valeurGlace(contratGarantie.getValeurGlace())
-                    .valeurAssuree(contratGarantie.getCapital())
-                    .formule(contratGarantie.getFormule())
-                    .montantDeces(contratGarantie.getMontantDeces())
-                    .montantInvalidite(contratGarantie.getMontantInvalidite())
-                    .montantFraisMedicaux(contratGarantie.getMontantFraisMedicaux())
-                    .montantFraisHospitalisation(contratGarantie.getMontantFraisHospitalisation())
-                    .montantFraisFuneraires(contratGarantie.getMontantFraisFuneraires())
-                    .montantFraisChirurgie(contratGarantie.getMontantFraisChirurgie())
-                    .accessoire(contratGarantie.getAccessoire())
-                    .capital(contratGarantie.getCapital())
-                    .taux(contratGarantie.getTaux())
-                    .prime(contratGarantie.getPrime())
-                    .tauxFranchise(contratGarantie.getTauxFranchise())
-                    .franchiseMinimale(contratGarantie.getFranchiseMinimale())
-                    .build());
+        MouvementContrat selectedMouvement = selectedMouvementId == null
+                ? null
+                : mouvementContratRepository.findByContratIdAndId(contrat.getId(), selectedMouvementId)
+                        .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", selectedMouvementId));
+        List<ContratResponse.VehiculeView> vehicules;
+        List<ContratResponse.RemorqueView> remorques;
+        List<ContratResponse.GarantieView> garanties;
+        if (selectedMouvement == null) {
+            List<Vehicule> vehiculesActifs = fallbackInactiveForView ? activeVehiculesForView(contrat) : activeVehicules(contrat);
+            List<Remorque> remorquesActives = fallbackInactiveForView ? activeRemorquesForView(contrat) : activeRemorques(contrat);
+            List<ContratGarantie> garantiesActives = fallbackInactiveForView ? activeGarantiesForView(contrat) : activeGaranties(contrat);
+            vehicules = vehiculesActifs.stream().map(this::toVehiculeView).toList();
+            remorques = remorquesActives.stream().map(this::toRemorqueView).toList();
+            garanties = garantiesActives.stream().map(this::toGarantieView).toList();
+        } else {
+            vehicules = mouvementVehiculeRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
+                    .sorted(Comparator.comparing(MouvementVehicule::getId))
+                    .map(this::toVehiculeView)
+                    .toList();
+            remorques = mouvementRemorqueRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
+                    .sorted(Comparator.comparing(MouvementRemorque::getId))
+                    .map(this::toRemorqueView)
+                    .toList();
+            garanties = mouvementGarantieRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
+                    .sorted(Comparator.comparing(MouvementGarantie::getId))
+                    .map(this::toGarantieView)
+                    .toList();
         }
 
         List<ContratResponse.MouvementView> mouvements = new ArrayList<>();
@@ -3037,8 +3159,12 @@ public class ContratService {
                     .primeTotale(element.getPrimeTotale())
                     .build());
         }
-        List<AssistanceContratResponse> assistances = assistanceContratRepository
-                .findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
+        List<AssistanceContratResponse> assistances = (selectedMouvement == null
+                ? assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
+                : assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(contrat.getId()).stream()
+                        .filter(assistance -> assistance.getMouvementContrat() != null
+                                && selectedMouvement.getId().equals(assistance.getMouvementContrat().getId()))
+                        .toList())
                 .stream()
                 .map(this::toAssistanceResponse)
                 .toList();
@@ -3087,7 +3213,9 @@ public class ContratService {
                 .nombreRemorques(contrat.getNombreRemorques())
                 .brouillon(contrat.getBrouillon())
                 .prospection(contrat.getProspection())
-                .assistance(Boolean.TRUE.equals(contrat.getAssistance()) || !assistances.isEmpty())
+                .assistance(selectedMouvement == null
+                        ? Boolean.TRUE.equals(contrat.getAssistance()) || !assistances.isEmpty()
+                        : !assistances.isEmpty())
                 .crmPartage(contrat.getCrmPartage())
                 .crmPartageValeur(contrat.getCrmPartageValeur())
                 .clients(clients)

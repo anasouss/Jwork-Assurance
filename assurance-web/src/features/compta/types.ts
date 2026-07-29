@@ -27,7 +27,6 @@ export type Rule = {
   tauxTvaIncluseCommission: number;
   retenueParDefaut: boolean;
   tauxRetenue: number;
-  toleranceEcart: number;
   dateDebut: string;
   dateFin?: string | null;
   actif: boolean;
@@ -143,8 +142,7 @@ export type ImportPreview = {
   commissionNette: number;
   netCompagnie: number;
   ecart: number;
-  toleranceEcart: number;
-  ecartAccepte: boolean;
+  equilibre: boolean;
 };
 
 export type ReferenceOption = {

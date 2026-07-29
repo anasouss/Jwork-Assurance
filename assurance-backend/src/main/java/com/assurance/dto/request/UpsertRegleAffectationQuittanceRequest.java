@@ -38,9 +38,6 @@ public class UpsertRegleAffectationQuittanceRequest {
     @DecimalMin("0")
     private BigDecimal tauxRetenue;
     @NotNull
-    @DecimalMin("0")
-    private BigDecimal toleranceEcart;
-    @NotNull
     private LocalDate dateDebut;
     private LocalDate dateFin;
     @NotNull

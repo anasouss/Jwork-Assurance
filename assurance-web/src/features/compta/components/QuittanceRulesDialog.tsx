@@ -28,7 +28,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
 import type { ModeCalculCommission, Rule, RuleRequest, TypeContrat } from "../types";
@@ -50,7 +49,6 @@ type RuleForm = {
   tauxTvaIncluseCommission?: number;
   retenueParDefaut: boolean;
   tauxRetenue?: number;
-  toleranceEcart?: number;
   dateDebut: string;
   dateFin: string;
   actif: boolean;
@@ -172,7 +170,6 @@ export function QuittanceRulesDialog({
       tauxTvaIncluseCommission: rule.tauxTvaIncluseCommission,
       retenueParDefaut: rule.retenueParDefaut,
       tauxRetenue: rule.tauxRetenue,
-      toleranceEcart: rule.toleranceEcart,
       dateDebut: rule.dateDebut,
       dateFin: rule.dateFin ?? "",
       actif: rule.actif,
@@ -301,12 +298,6 @@ export function QuittanceRulesDialog({
                   value={form.tauxRetenue}
                   onChange={(value) => setForm((current) => ({ ...current, tauxRetenue: value }))}
                 />
-                <Field label="Tolérance d'écart (MAD)" required>
-                  <MoneyInput
-                    value={form.toleranceEcart}
-                    onValueChange={(value) => setForm((current) => ({ ...current, toleranceEcart: value }))}
-                  />
-                </Field>
                 <Field label="Date de début" required>
                   <DatePicker
                     date={form.dateDebut}
@@ -511,7 +502,6 @@ function isComplete(form: RuleForm) {
       form.dateDebut &&
       commissionComplete &&
       form.tauxRetenue != null &&
-      form.toleranceEcart != null &&
       (!form.dateFin || form.dateFin >= form.dateDebut)
   );
 }
@@ -534,7 +524,6 @@ function toRequest(form: RuleForm): RuleRequest {
         : form.tauxTvaIncluseCommission!,
     retenueParDefaut: form.retenueParDefaut,
     tauxRetenue: form.tauxRetenue!,
-    toleranceEcart: form.toleranceEcart!,
     dateDebut: form.dateDebut,
     dateFin: form.dateFin || null,
     actif: form.actif,

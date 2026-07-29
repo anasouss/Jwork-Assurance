@@ -2,6 +2,8 @@ package com.assurance.seeder;
 
 import com.assurance.entity.*;
 import com.assurance.enums.CategorieMouvementContrat;
+import com.assurance.enums.ModeAffectationQuittance;
+import com.assurance.enums.ModeCalculCommission;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeContrat;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +49,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ParametreApplicationRepository parametreApplicationRepository;
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
     private final TypeMouvementContratRepository typeMouvementContratRepository;
+    private final RegleAffectationQuittanceRepository regleAffectationQuittanceRepository;
 
     @Value("${app.seed.admin-email:admin@jway.ma}")
     private String adminEmail;
@@ -92,6 +96,7 @@ public class DataSeeder implements CommandLineRunner {
         ));
 
         List<CompagnieAssurance> compagniesAssurance = seedCompagniesAssurance();
+        seedReglesAffectationQuittance(agenceDefaut, compagniesAssurance);
         seedCompagniesAssistance();
 
         Carrosserie berline = seedCarrosserie("Berline");
@@ -318,6 +323,80 @@ public class DataSeeder implements CommandLineRunner {
                 && usageRepository.count() > 0
                 && garantieRepository.count() > 0
                 && categorieClientRepository.count() > 0;
+    }
+
+    private void seedReglesAffectationQuittance(
+            Agence agence,
+            List<CompagnieAssurance> compagnies
+    ) {
+        LocalDate dateDebut = LocalDate.of(2000, 1, 1);
+        for (CompagnieAssurance compagnie : compagnies) {
+            regleAffectationQuittanceRepository.save(buildRegleAffectation(
+                    agence,
+                    compagnie,
+                    TypeContrat.PARTICULIER,
+                    ModeAffectationQuittance.AUTOMATIQUE,
+                    ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE,
+                    "12",
+                    "3",
+                    "25",
+                    "9.0911",
+                    dateDebut
+            ));
+            regleAffectationQuittanceRepository.save(buildRegleAffectation(
+                    agence,
+                    compagnie,
+                    TypeContrat.CONVENTION,
+                    ModeAffectationQuittance.AUTOMATIQUE,
+                    ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE,
+                    "12",
+                    "3",
+                    "25",
+                    "9.0911",
+                    dateDebut
+            ));
+            regleAffectationQuittanceRepository.save(buildRegleAffectation(
+                    agence,
+                    compagnie,
+                    TypeContrat.FLOTTE,
+                    ModeAffectationQuittance.MANUEL_OU_IMPORT,
+                    ModeCalculCommission.TAUX_NET,
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                    dateDebut
+            ));
+        }
+    }
+
+    private RegleAffectationQuittance buildRegleAffectation(
+            Agence agence,
+            CompagnieAssurance compagnie,
+            TypeContrat typeContrat,
+            ModeAffectationQuittance modeAffectation,
+            ModeCalculCommission modeCalculCommission,
+            String tauxAutomobile,
+            String tauxEvcat,
+            String tauxCorporel,
+            String tauxTvaIncluse,
+            LocalDate dateDebut
+    ) {
+        return RegleAffectationQuittance.builder()
+                .agence(agence)
+                .compagnieAssurance(compagnie)
+                .typeContrat(typeContrat)
+                .modeAffectation(modeAffectation)
+                .modeCalculCommission(modeCalculCommission)
+                .tauxCommissionAutomobile(new BigDecimal(tauxAutomobile))
+                .tauxCommissionEvcat(new BigDecimal(tauxEvcat))
+                .tauxCommissionCorporel(new BigDecimal(tauxCorporel))
+                .tauxTvaIncluseCommission(new BigDecimal(tauxTvaIncluse))
+                .retenueParDefaut(false)
+                .tauxRetenue(new BigDecimal("5"))
+                .dateDebut(dateDebut)
+                .actif(true)
+                .build();
     }
 
     private Permission seedPermission(String code, String nom, String module) {

@@ -251,7 +251,12 @@ public class AffectationQuittanceService {
         BigDecimal montantTtc = sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getMontantTtc);
         BigDecimal expected = requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance");
         BigDecimal ecart = money(montantTtc.subtract(expected));
-        BigDecimal tolerance = money(regle.getToleranceEcart());
+        boolean equilibre = ecart.signum() == 0;
+        if (!equilibre) {
+            parsed.errors().add(
+                    "Le total TTC importé ne correspond pas au montant de la quittance de production"
+            );
+        }
 
         return ImportAffectationQuittancePreviewResponse.builder()
                 .fichier(cleanFileName(file.getOriginalFilename()))
@@ -265,8 +270,7 @@ public class AffectationQuittanceService {
                 .commissionNette(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getCommissionNette))
                 .netCompagnie(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getNetCompagnie))
                 .ecart(ecart)
-                .toleranceEcart(tolerance)
-                .ecartAccepte(ecart.abs().compareTo(tolerance) <= 0)
+                .equilibre(equilibre)
                 .build();
     }
 
@@ -401,7 +405,7 @@ public class AffectationQuittanceService {
 
         List<AffectationQuittanceCompagnie> result = new ArrayList<>();
         for (EnregistrerAffectationQuittanceRequest.Ligne line : request.getLignes()) {
-            validateFleetLine(line, regle, quittance);
+            validateFleetLine(line, quittance);
             BigDecimal commission = money(line.getCommissionNette());
             Retention retention = calculateRetention(commission, request.getAvecRetenue(), regle);
             result.add(AffectationQuittanceCompagnie.builder()
@@ -434,7 +438,6 @@ public class AffectationQuittanceService {
 
     private void validateFleetLine(
             EnregistrerAffectationQuittanceRequest.Ligne line,
-            RegleAffectationQuittance regle,
             Quittance quittance
     ) {
         if (trimToNull(line.getNumeroQuittanceCompagnie()) == null) {
@@ -455,7 +458,7 @@ public class AffectationQuittanceService {
         BigDecimal calculatedTtc = line.getPrimeNette()
                 .add(line.getMontantTaxes())
                 .add(line.getAccessoires());
-        if (calculatedTtc.subtract(line.getMontantTtc()).abs().compareTo(regle.getToleranceEcart()) > 0) {
+        if (money(calculatedTtc).compareTo(money(line.getMontantTtc())) != 0) {
             throw new BadRequestException(
                     "Le montant TTC de la quittance " + line.getNumeroQuittanceCompagnie()
                             + " ne correspond pas à prime nette + taxes + accessoires"
@@ -508,8 +511,7 @@ public class AffectationQuittanceService {
                 ));
         BigDecimal categoryNetTotal = primes.values().stream().reduce(ZERO, BigDecimal::add);
         BigDecimal quittanceNetTotal = requiredAmount(quittance.getPrimeNette(), "Prime nette de la quittance");
-        BigDecimal tolerance = requiredAmount(regle.getToleranceEcart(), "Tolérance d'écart");
-        if (categoryNetTotal.subtract(quittanceNetTotal).abs().compareTo(tolerance) > 0) {
+        if (money(categoryNetTotal).compareTo(money(quittanceNetTotal)) != 0) {
             throw new BadRequestException(
                     "Le total net des lignes comptables ne correspond pas à la prime nette de la quittance"
             );
@@ -557,11 +559,7 @@ public class AffectationQuittanceService {
         }
         StatutAffectationQuittance statut = affectations.isEmpty()
                 ? StatutAffectationQuittance.NON_AFFECTEE
-                : resolveStatus(
-                        expected,
-                        allocated,
-                        requiredAmount(regle.getToleranceEcart(), "Tolérance d'écart")
-                );
+                : resolveStatus(expected, allocated);
         boolean avecRetenue = affectations.stream()
                 .findFirst()
                 .map(AffectationQuittanceCompagnie::getAvecRetenue)
@@ -686,7 +684,7 @@ public class AffectationQuittanceService {
                     LocalDate lineEndDate = optionalDate(row, columns, "datefin");
                     validateAllocationPeriod(lineEffectDate, lineEndDate, quittance, number);
                     BigDecimal calculatedTtc = primeNette.add(taxes).add(accessoires);
-                    if (calculatedTtc.subtract(montantTtc).abs().compareTo(regle.getToleranceEcart()) > 0) {
+                    if (money(calculatedTtc).compareTo(money(montantTtc)) != 0) {
                         throw new BadRequestException("le montant TTC ne correspond pas à prime nette + taxes + accessoires");
                     }
                     Retention retention = calculateRetention(commission, avecRetenue, regle);
@@ -842,9 +840,6 @@ public class AffectationQuittanceService {
         validatePercentage(request.getTauxCommissionCorporel(), "Taux commission corporel");
         validatePercentage(request.getTauxTvaIncluseCommission(), "Taux TVA incluse");
         validatePercentage(request.getTauxRetenue(), "Taux retenue");
-        if (request.getToleranceEcart().signum() < 0) {
-            throw new BadRequestException("La tolérance d'écart ne peut pas être négative");
-        }
         if (request.getTypeContrat() == TypeContrat.FLOTTE
                 && request.getModeAffectation() != ModeAffectationQuittance.MANUEL_OU_IMPORT) {
             throw new BadRequestException("Une règle flotte doit utiliser le mode manuel/import");
@@ -923,7 +918,6 @@ public class AffectationQuittanceService {
         entity.setTauxTvaIncluseCommission(request.getTauxTvaIncluseCommission());
         entity.setRetenueParDefaut(request.getRetenueParDefaut());
         entity.setTauxRetenue(request.getTauxRetenue());
-        entity.setToleranceEcart(request.getToleranceEcart());
         entity.setDateDebut(request.getDateDebut());
         entity.setDateFin(request.getDateFin());
         entity.setActif(request.getActif());
@@ -943,7 +937,6 @@ public class AffectationQuittanceService {
                 .tauxTvaIncluseCommission(entity.getTauxTvaIncluseCommission())
                 .retenueParDefaut(entity.getRetenueParDefaut())
                 .tauxRetenue(entity.getTauxRetenue())
-                .toleranceEcart(entity.getToleranceEcart())
                 .dateDebut(entity.getDateDebut())
                 .dateFin(entity.getDateFin())
                 .actif(entity.getActif())
@@ -1062,10 +1055,9 @@ public class AffectationQuittanceService {
 
     private StatutAffectationQuittance resolveStatus(
             BigDecimal expected,
-            BigDecimal allocated,
-            BigDecimal tolerance
+            BigDecimal allocated
     ) {
-        if (allocated.subtract(expected).abs().compareTo(tolerance) <= 0) {
+        if (money(allocated).compareTo(money(expected)) == 0) {
             return StatutAffectationQuittance.AFFECTEE;
         }
         if (expected.signum() == allocated.signum() && allocated.abs().compareTo(expected.abs()) < 0) {

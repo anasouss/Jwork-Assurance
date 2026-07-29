@@ -73,9 +73,6 @@ public class RegleAffectationQuittance extends BaseEntity {
     @Column(name = "taux_retenue", nullable = false, precision = 9, scale = 4)
     private BigDecimal tauxRetenue;
 
-    @Column(name = "tolerance_ecart", nullable = false, precision = 14, scale = 2)
-    private BigDecimal toleranceEcart;
-
     @Column(name = "date_debut", nullable = false)
     private LocalDate dateDebut;
 

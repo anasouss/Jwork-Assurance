@@ -20,6 +20,5 @@ public class ImportAffectationQuittancePreviewResponse {
     private BigDecimal commissionNette;
     private BigDecimal netCompagnie;
     private BigDecimal ecart;
-    private BigDecimal toleranceEcart;
-    private boolean ecartAccepte;
+    private boolean equilibre;
 }

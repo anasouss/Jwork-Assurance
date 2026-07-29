@@ -24,7 +24,6 @@ public class RegleAffectationQuittanceResponse {
     private BigDecimal tauxTvaIncluseCommission;
     private Boolean retenueParDefaut;
     private BigDecimal tauxRetenue;
-    private BigDecimal toleranceEcart;
     private LocalDate dateDebut;
     private LocalDate dateFin;
     private Boolean actif;

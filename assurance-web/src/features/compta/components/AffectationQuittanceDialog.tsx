@@ -489,12 +489,9 @@ function ImportResult({ preview }: { preview: ImportPreview }) {
         <FileSpreadsheet className="size-4" />
         <span className="font-medium">{preview.fichier}</span>
         <Badge variant="secondary">{preview.lignesLues} ligne(s)</Badge>
-        <Badge variant={preview.ecartAccepte ? "default" : "destructive"}>
+        <Badge variant={preview.equilibre ? "default" : "destructive"}>
           Écart {money(preview.ecart)}
         </Badge>
-        <span className="text-xs text-muted-foreground">
-          Tolérance configurée : {money(preview.toleranceEcart)}
-        </span>
       </div>
       {preview.erreurs.length ? (
         <Alert variant="destructive">

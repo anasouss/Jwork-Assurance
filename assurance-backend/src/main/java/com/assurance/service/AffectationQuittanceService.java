@@ -5,6 +5,7 @@ import com.assurance.dto.request.UpsertRegleAffectationQuittanceRequest;
 import com.assurance.dto.response.AffectationQuittancePageResponse;
 import com.assurance.dto.response.AffectationQuittanceResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
+import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
 import com.assurance.entity.AffectationQuittanceCompagnie;
 import com.assurance.entity.Agence;
@@ -120,7 +121,7 @@ public class AffectationQuittanceService {
                         .collect(Collectors.groupingBy(item -> item.getQuittance().getId()));
         Map<Long, String> souscripteurs = resolveSouscripteurs(contratIds);
         List<RegleAffectationQuittance> regles = regleRepository
-                .findByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(agenceId);
+                .findAllByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(agenceId);
 
         List<AffectationQuittanceResponse> rows = quittances.stream()
                 .map(quittance -> {
@@ -275,12 +276,28 @@ public class AffectationQuittanceService {
     }
 
     @Transactional(readOnly = true)
-    public List<RegleAffectationQuittanceResponse> listRules(Long agenceId) {
+    public RegleAffectationQuittancePageResponse listRules(
+            Long agenceId,
+            int page,
+            int size
+    ) {
         validateTenant(agenceId);
-        return regleRepository.findByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(agenceId)
-                .stream()
-                .map(this::toRuleResponse)
-                .toList();
+        Page<RegleAffectationQuittance> result =
+                regleRepository.findByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(
+                        agenceId,
+                        PageRequest.of(Math.max(0, page), Math.min(Math.max(size, 1), 100))
+                );
+        return RegleAffectationQuittancePageResponse.builder()
+                .rows(result.getContent().stream().map(this::toRuleResponse).toList())
+                .page(RegleAffectationQuittancePageResponse.PageInfo.builder()
+                        .number(result.getNumber())
+                        .size(result.getSize())
+                        .totalPages(result.getTotalPages())
+                        .totalElements(result.getTotalElements())
+                        .first(result.isFirst())
+                        .last(result.isLast())
+                        .build())
+                .build();
     }
 
     @Transactional

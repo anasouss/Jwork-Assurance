@@ -26,6 +26,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toDateOnly } from "@/features/production/date";
@@ -54,6 +61,8 @@ type RuleForm = {
   actif: boolean;
 };
 
+const RULES_PAGE_SIZE = 10;
+
 const EMPTY_FORM: RuleForm = {
   compagnieAssuranceId: "",
   typeContrat: "PARTICULIER",
@@ -75,6 +84,7 @@ export function QuittanceRulesDialog({
   const [form, setForm] = useState<RuleForm>(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Rule | null>(null);
+  const [page, setPage] = useState(0);
 
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance", "compta"],
@@ -82,14 +92,14 @@ export function QuittanceRulesDialog({
     enabled: open,
   });
   const rules = useQuery({
-    queryKey: ["compta", "regles-quittances"],
-    queryFn: comptaApi.rules,
+    queryKey: ["compta", "regles-quittances", page, RULES_PAGE_SIZE],
+    queryFn: () => comptaApi.rules({ page, size: RULES_PAGE_SIZE }),
     enabled: open,
   });
 
   const sortedRules = useMemo(
     () =>
-      [...(rules.data ?? [])].sort(
+      [...(rules.data?.rows ?? [])].sort(
         (left, right) =>
           left.compagnie.localeCompare(right.compagnie) ||
           left.typeContrat.localeCompare(right.typeContrat) ||
@@ -97,12 +107,15 @@ export function QuittanceRulesDialog({
       ),
     [rules.data]
   );
+  const totalPages = Math.max(1, rules.data?.page.totalPages ?? 1);
+  const currentPage = Math.min(rules.data?.page.number ?? page, totalPages - 1);
 
   useEffect(() => {
     if (!open) {
       setEditing(null);
       setShowForm(false);
       setPendingDelete(null);
+      setPage(0);
       return;
     }
     if (initialCompanyId || initialTypeContrat) {
@@ -114,6 +127,13 @@ export function QuittanceRulesDialog({
       setShowForm(true);
     }
   }, [initialCompanyId, initialTypeContrat, open]);
+
+  useEffect(() => {
+    const availablePages = rules.data?.page.totalPages;
+    if (availablePages != null && availablePages > 0 && page >= availablePages) {
+      setPage(availablePages - 1);
+    }
+  }, [page, rules.data?.page.totalPages]);
 
   const saveRule = useMutation({
     mutationFn: async () => {
@@ -140,6 +160,9 @@ export function QuittanceRulesDialog({
     onSuccess: async () => {
       toast.success("Règle supprimée");
       setPendingDelete(null);
+      if ((rules.data?.rows.length ?? 0) === 1 && page > 0) {
+        setPage((current) => current - 1);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "regles-quittances"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittances"] }),
@@ -399,6 +422,38 @@ export function QuittanceRulesDialog({
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage + 1} / {totalPages} · {rules.data?.page.totalElements ?? 0} règle(s)
+            </span>
+            <Pagination className="mx-0 w-auto justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    aria-disabled={currentPage <= 0 || rules.isLoading}
+                    className={currentPage <= 0 || rules.isLoading ? "pointer-events-none opacity-50" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((current) => Math.max(0, current - 1));
+                    }}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    aria-disabled={currentPage >= totalPages - 1 || rules.isLoading}
+                    className={currentPage >= totalPages - 1 || rules.isLoading ? "pointer-events-none opacity-50" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((current) => Math.min(totalPages - 1, current + 1));
+                    }}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
 
           <DialogFooter>

@@ -8,6 +8,7 @@ import type {
   QuittancePage,
   ReferenceOption,
   Rule,
+  RulePage,
   RuleRequest,
   TypeContrat,
 } from "./types";
@@ -90,10 +91,13 @@ export const comptaApi = {
     };
   },
 
-  async rules() {
-    return unwrap(
-      await apiFetch<ApiResponse<Rule[]>>("/api/v1/compta/regles-quittances")
-    ).map(normalizeRule);
+  async rules(params: { page: number; size: number }) {
+    const result = unwrap(
+      await apiFetch<ApiResponse<RulePage>>(
+        `/api/v1/compta/regles-quittances${buildQueryString(params)}`
+      )
+    );
+    return { ...result, rows: result.rows.map(normalizeRule) };
   },
 
   async createRule(request: RuleRequest) {

@@ -2,6 +2,8 @@ package com.assurance.repository;
 
 import com.assurance.entity.RegleAffectationQuittance;
 import com.assurance.enums.TypeContrat;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -14,7 +16,15 @@ import java.util.Optional;
 public interface RegleAffectationQuittanceRepository extends JpaRepository<RegleAffectationQuittance, Long> {
 
     @EntityGraph(attributePaths = {"compagnieAssurance"})
-    List<RegleAffectationQuittance> findByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(Long agenceId);
+    Page<RegleAffectationQuittance> findByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(
+            Long agenceId,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"compagnieAssurance"})
+    List<RegleAffectationQuittance> findAllByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(
+            Long agenceId
+    );
 
     @EntityGraph(attributePaths = {"compagnieAssurance", "agence"})
     Optional<RegleAffectationQuittance> findByAgenceIdAndId(Long agenceId, Long id);

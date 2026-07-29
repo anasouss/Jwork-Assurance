@@ -34,6 +34,18 @@ export type Rule = {
 
 export type RuleRequest = Omit<Rule, "id" | "compagnie">;
 
+export type RulePage = {
+  rows: Rule[];
+  page: {
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
+  };
+};
+
 export type AllocationLine = {
   id?: string;
   numeroQuittanceCompagnie: string;

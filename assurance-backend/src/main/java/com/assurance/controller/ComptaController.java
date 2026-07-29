@@ -7,6 +7,7 @@ import com.assurance.dto.response.AffectationQuittanceResponse;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.ElementFacturableResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
+import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
 import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.TypeContrat;
@@ -125,9 +126,12 @@ public class ComptaController {
 
     @GetMapping("/regles-quittances")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
-    public ResponseEntity<ApiResponse<List<RegleAffectationQuittanceResponse>>> reglesQuittances() {
+    public ResponseEntity<ApiResponse<RegleAffectationQuittancePageResponse>> reglesQuittances(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
         return ResponseEntity.ok(ApiResponse.success(
-                affectationQuittanceService.listRules(TenantContext.getCurrentAgence())
+                affectationQuittanceService.listRules(TenantContext.getCurrentAgence(), page, size)
         ));
     }
 

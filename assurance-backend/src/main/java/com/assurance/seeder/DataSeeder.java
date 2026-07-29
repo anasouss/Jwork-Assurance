@@ -71,6 +71,7 @@ public class DataSeeder implements CommandLineRunner {
         Permission grilleManage = seedPermission("grille-tarifaire:manage", "Gerer les grilles tarifaires", "grille-tarifaire");
         Permission quittanceView = seedPermission("quittance:view", "Consulter les quittances", "quittance");
         Permission quittanceCreate = seedPermission("quittance:create", "Creer une quittance", "quittance");
+        Permission quittanceManage = seedPermission("quittance:manage", "Gérer les règles de quittance", "quittance");
         Permission agenceView = seedPermission("agence:view", "Consulter les agences", "agence", true);
         Permission agenceCreate = seedPermission("agence:create", "Creer une agence", "agence", true);
         Permission userView = seedPermission("user:view", "Consulter les utilisateurs", "admin");
@@ -238,7 +239,7 @@ public class DataSeeder implements CommandLineRunner {
                         .systemRole(true)
                         .build()
         ));
-        superAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, garantieManage, grilleView, grilleManage, quittanceView, quittanceCreate, agenceView, agenceCreate, userView, userManage, roleView, roleManage, configView, configManage));
+        superAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, garantieManage, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, agenceView, agenceCreate, userView, userManage, roleView, roleManage, configView, configManage));
         roleRepository.save(superAdmin);
 
         Role agenceAdmin = roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENCY_ADMIN").orElseGet(() -> roleRepository.save(
@@ -249,7 +250,7 @@ public class DataSeeder implements CommandLineRunner {
                         .systemRole(true)
                         .build()
         ));
-        agenceAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, grilleView, grilleManage, quittanceView, quittanceCreate, userView, userManage, roleView, roleManage));
+        agenceAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, userView, userManage, roleView, roleManage));
         roleRepository.save(agenceAdmin);
 
         roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENT").orElseGet(() -> roleRepository.save(

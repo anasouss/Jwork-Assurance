@@ -52,7 +52,7 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "config:view" },
   { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "config:view" },
   { module: "crm", title: "Fiche client", url: "/app/crm", icon: Users, exact: true, permission: "client:view" },
-  { module: "compta", title: "Quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
+  { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
   { module: "admin", title: "Utilisateurs & rôles", url: "/app/admin", icon: UserCog, exact: true, permission: "user:view" },
 ];
 

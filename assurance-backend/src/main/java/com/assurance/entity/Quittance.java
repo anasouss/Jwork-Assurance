@@ -45,7 +45,7 @@ public class Quittance extends BaseEntity {
     private ElementFacturable elementFacturable;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "compagnie_assurance_id")
+    @JoinColumn(name = "compagnie_assurance_id", nullable = false)
     private CompagnieAssurance compagnieAssurance;
 
     @Column(name = "numero_quittance", nullable = false, length = 80)
@@ -59,8 +59,10 @@ public class Quittance extends BaseEntity {
 
     private Integer periode;
 
+    @Column(nullable = false)
     private LocalDate dateDebut;
 
+    @Column(nullable = false)
     private LocalDate dateFin;
 
     @Column(name = "prime_nette", precision = 14, scale = 2)

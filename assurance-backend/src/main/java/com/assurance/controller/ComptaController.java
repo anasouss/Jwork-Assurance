@@ -9,7 +9,7 @@ import com.assurance.dto.response.ElementFacturableResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
-import com.assurance.enums.CategorieMouvementContrat;
+import com.assurance.enums.NatureAffectationQuittance;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AffectationQuittanceService;
@@ -52,7 +52,7 @@ public class ComptaController {
     public ResponseEntity<ApiResponse<AffectationQuittancePageResponse>> quittances(
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) TypeContrat typeContrat,
-            @RequestParam(required = false) CategorieMouvementContrat nature,
+            @RequestParam(required = false) NatureAffectationQuittance nature,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
             @RequestParam(required = false) String search,

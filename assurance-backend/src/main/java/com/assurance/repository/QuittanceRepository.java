@@ -2,6 +2,7 @@ package com.assurance.repository;
 
 import com.assurance.entity.Quittance;
 import com.assurance.enums.CategorieMouvementContrat;
+import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.TypeContrat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -62,7 +63,24 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               )
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
-              and (:nature is null or tm.categorie = :nature)
+              and (
+                    (:natureMouvement is null and :natureElement is null)
+                    or (
+                        :natureMouvement is not null
+                        and tm.categorie = :natureMouvement
+                        and (
+                            q.elementFacturable is null
+                            or q.elementFacturable.nature in (
+                                com.assurance.enums.NatureElementFacturable.CONTRAT,
+                                com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT
+                            )
+                        )
+                    )
+                    or (
+                        :natureElement is not null
+                        and q.elementFacturable.nature = :natureElement
+                    )
+              )
               and (:dateDu is null or q.dateDebut >= :dateDu)
               and (:dateAu is null or q.dateDebut <= :dateAu)
               and (
@@ -119,7 +137,24 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               )
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
-              and (:nature is null or tm.categorie = :nature)
+              and (
+                    (:natureMouvement is null and :natureElement is null)
+                    or (
+                        :natureMouvement is not null
+                        and tm.categorie = :natureMouvement
+                        and (
+                            q.elementFacturable is null
+                            or q.elementFacturable.nature in (
+                                com.assurance.enums.NatureElementFacturable.CONTRAT,
+                                com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT
+                            )
+                        )
+                    )
+                    or (
+                        :natureElement is not null
+                        and q.elementFacturable.nature = :natureElement
+                    )
+              )
               and (:dateDu is null or q.dateDebut >= :dateDu)
               and (:dateAu is null or q.dateDebut <= :dateAu)
               and (
@@ -162,7 +197,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             @Param("agenceId") Long agenceId,
             @Param("compagnieId") Long compagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
-            @Param("nature") CategorieMouvementContrat nature,
+            @Param("natureMouvement") CategorieMouvementContrat natureMouvement,
+            @Param("natureElement") NatureElementFacturable natureElement,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("search") String search,

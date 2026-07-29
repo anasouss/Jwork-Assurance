@@ -1,6 +1,6 @@
 package com.assurance.dto.response;
 
-import com.assurance.enums.CategorieMouvementContrat;
+import com.assurance.enums.NatureAffectationQuittance;
 import com.assurance.enums.SourceAffectationQuittance;
 import com.assurance.enums.StatutAffectationQuittance;
 import com.assurance.enums.TypeContrat;
@@ -21,7 +21,7 @@ public class AffectationQuittanceResponse {
     private String produit;
     private TypeContrat typeContrat;
     private String mouvement;
-    private CategorieMouvementContrat nature;
+    private NatureAffectationQuittance nature;
     private String souscripteur;
     private String police;
     private Long compagnieId;

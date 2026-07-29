@@ -3,8 +3,7 @@ export type CategorieMouvement =
   | "AFFAIRE_NOUVELLE"
   | "AVENANT"
   | "RENOUVELLEMENT"
-  | "DOCUMENT"
-  | "SERVICE";
+  | "CARTE_VERTE";
 export type StatutAffectation =
   | "NON_AFFECTEE"
   | "PARTIELLEMENT_AFFECTEE"

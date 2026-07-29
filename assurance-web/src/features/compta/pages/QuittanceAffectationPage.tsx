@@ -192,8 +192,7 @@ export default function QuittanceAffectationPage() {
                   <SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem>
                   <SelectItem value="AVENANT">Avenant</SelectItem>
                   <SelectItem value="RENOUVELLEMENT">Renouvellement</SelectItem>
-                  <SelectItem value="DOCUMENT">Document</SelectItem>
-                  <SelectItem value="SERVICE">Service</SelectItem>
+                  <SelectItem value="CARTE_VERTE">Carte verte</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>
@@ -419,8 +418,7 @@ function natureLabel(nature?: CategorieMouvement | null) {
   if (nature === "AFFAIRE_NOUVELLE") return "Affaire nouvelle";
   if (nature === "RENOUVELLEMENT") return "Renouvellement";
   if (nature === "AVENANT") return "Avenant";
-  if (nature === "DOCUMENT") return "Document";
-  if (nature === "SERVICE") return "Service";
+  if (nature === "CARTE_VERTE") return "Carte verte";
   return "";
 }
 

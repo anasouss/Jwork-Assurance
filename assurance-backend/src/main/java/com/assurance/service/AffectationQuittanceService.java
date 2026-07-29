@@ -15,10 +15,12 @@ import com.assurance.entity.ContratClient;
 import com.assurance.entity.LigneQuittance;
 import com.assurance.entity.Quittance;
 import com.assurance.entity.RegleAffectationQuittance;
-import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.CategorieQuittance;
+import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
+import com.assurance.enums.NatureAffectationQuittance;
+import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.SourceAffectationQuittance;
 import com.assurance.enums.StatutAffectationQuittance;
@@ -90,7 +92,7 @@ public class AffectationQuittanceService {
             Long agenceId,
             Long compagnieId,
             TypeContrat typeContrat,
-            CategorieMouvementContrat nature,
+            NatureAffectationQuittance nature,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
@@ -104,7 +106,8 @@ public class AffectationQuittanceService {
                 agenceId,
                 compagnieId,
                 typeContrat,
-                nature,
+                movementNature(nature),
+                elementNature(nature),
                 dateDu,
                 dateAu,
                 normalizedSearch,
@@ -592,10 +595,7 @@ public class AffectationQuittanceService {
                 .produit(productLabel(contrat))
                 .typeContrat(contrat.getTypeContrat())
                 .mouvement(movementLabel(quittance))
-                .nature(quittance.getMouvementContrat() != null
-                        && quittance.getMouvementContrat().getTypeMouvement() != null
-                        ? quittance.getMouvementContrat().getTypeMouvement().getCategorie()
-                        : null)
+                .nature(resolveNature(quittance))
                 .souscripteur(firstNonBlank(souscripteur, "-"))
                 .police(firstNonBlank(contrat.getNumeroPolice(), contrat.getNumeroContrat(), "-"))
                 .compagnieId(resolveCompagnieId(quittance))
@@ -622,6 +622,36 @@ public class AffectationQuittanceService {
                 .regle(regle != null ? toRuleResponse(regle) : null)
                 .lignes(includeLines ? affectations.stream().map(this::toLineResponse).toList() : List.of())
                 .build();
+    }
+
+    private NatureAffectationQuittance resolveNature(Quittance quittance) {
+        if (quittance.getElementFacturable() != null
+                && quittance.getElementFacturable().getNature() == NatureElementFacturable.CARTE_VERTE) {
+            return NatureAffectationQuittance.CARTE_VERTE;
+        }
+        if (quittance.getMouvementContrat() == null
+                || quittance.getMouvementContrat().getTypeMouvement() == null) {
+            return null;
+        }
+        return switch (quittance.getMouvementContrat().getTypeMouvement().getCategorie()) {
+            case AFFAIRE_NOUVELLE -> NatureAffectationQuittance.AFFAIRE_NOUVELLE;
+            case AVENANT -> NatureAffectationQuittance.AVENANT;
+            case RENOUVELLEMENT -> NatureAffectationQuittance.RENOUVELLEMENT;
+            case DOCUMENT, SERVICE -> null;
+        };
+    }
+
+    private CategorieMouvementContrat movementNature(NatureAffectationQuittance nature) {
+        if (nature == null || nature == NatureAffectationQuittance.CARTE_VERTE) {
+            return null;
+        }
+        return CategorieMouvementContrat.valueOf(nature.name());
+    }
+
+    private NatureElementFacturable elementNature(NatureAffectationQuittance nature) {
+        return nature == NatureAffectationQuittance.CARTE_VERTE
+                ? NatureElementFacturable.CARTE_VERTE
+                : null;
     }
 
     private AffectationQuittanceResponse.Ligne toLineResponse(AffectationQuittanceCompagnie entity) {

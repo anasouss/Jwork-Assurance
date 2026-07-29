@@ -35,7 +35,7 @@ export const appModules: AppModule[] = [
   { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, disabled: true },
   { title: "Compagnies", url: "/app/companies", icon: Building2, permission: "config:view" },
   { title: "CRM", url: "/app/crm", icon: Users, permission: "client:view" },
-  { title: "Compta", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
+  { title: "Compta", url: "/app/compta", icon: Calculator, permission: "quittance:view" },
   { title: "Administration", url: "/app/admin", icon: Settings, permission: "user:view" },
 ];
 
@@ -52,6 +52,7 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "config:view" },
   { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "config:view" },
   { module: "crm", title: "Fiche client", url: "/app/crm", icon: Users, exact: true, permission: "client:view" },
+  { module: "compta", title: "Tableau de bord", url: "/app/compta", icon: LayoutDashboard, exact: true, permission: "quittance:view" },
   { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
   { module: "admin", title: "Utilisateurs & rôles", url: "/app/admin", icon: UserCog, exact: true, permission: "user:view" },
 ];

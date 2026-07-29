@@ -315,8 +315,16 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const carteVertePath = `/app/production/contrats/${contrat.id}/cartes-vertes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const editPath = editContratPath(contrat);
   const terminal = isTerminalContratRow(contrat, movement);
+  const hasActiveAvenants = (contrat.mouvements ?? []).some((item) => {
+    const code = String(item.code ?? "").trim().toUpperCase();
+    const statut = String(item.statut ?? "").trim().toUpperCase();
+    return code !== "AN" && statut !== "ANNULE";
+  });
   const canCreateMovement = !child && !terminal && !Boolean(contrat.renouvele) && isActiveContrat(contrat);
-  const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat)) && !child && !terminal;
+  const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat))
+    && !child
+    && !terminal
+    && !hasActiveAvenants;
   const avenantEditPath = editAvenantPath(contrat, movement, child);
   const canDownload = !isTerminalMovementCode(movement.code);
   const hasPrimaryActions = canEditDirectly || canCreateMovement;

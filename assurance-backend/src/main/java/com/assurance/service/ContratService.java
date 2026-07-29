@@ -39,14 +39,7 @@ import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -528,12 +521,14 @@ public class ContratService {
         }
 
         QuittanceCalculService.Resultat quittanceManuelle = buildManualQuittanceResult(request);
-        if (contratOrigine == null) {
-            if (!Boolean.TRUE.equals(contrat.getProspection())) {
-                mouvementContratService.creerAffaireNouvelle(contrat, vehiculesCrees, remorquesCreees, garantiesCreees, quittanceManuelle);
-            }
-        } else {
-            mouvementContratService.creerRenouvellement(contrat, contratOrigine, vehiculesCrees, remorquesCreees, garantiesCreees);
+        if (!Boolean.TRUE.equals(contrat.getProspection())) {
+            mouvementContratService.creerAffaireNouvelle(
+                    contrat,
+                    vehiculesCrees,
+                    remorquesCreees,
+                    garantiesCreees,
+                    quittanceManuelle
+            );
         }
 
         return toResponse(contrat);

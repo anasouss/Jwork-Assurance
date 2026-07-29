@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Eye, FilePenLine, FilePlus2, MoreHorizontal, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "../api";
 import { toDateOnly } from "../date";
-import type { AvenantDraftSummary, ContratSummary, ReferenceOption, TypeContrat } from "../types";
+import type { ContratSummary, ReferenceOption, TypeContrat } from "../types";
 
 type ContratFilters = {
   typeContrat: "ALL" | TypeContrat;
@@ -200,7 +200,6 @@ export default function ContratsPage() {
                     const movements = movementLines(contrat);
                     const current = movements[0];
                     const olderMovements = movements.slice(1);
-                    const drafts = sortedAvenantDrafts(contrat);
                     const isExpanded = Boolean(expanded[contrat.id]);
                     return (
                       <Fragment key={contrat.id}>
@@ -214,15 +213,6 @@ export default function ContratsPage() {
                           canExpand={olderMovements.length > 0}
                           onToggle={() => setExpanded((currentExpanded) => ({ ...currentExpanded, [contrat.id]: !isExpanded }))}
                         />
-                        {drafts.map((draft) => (
-                          <AvenantDraftRow
-                            key={`draft-${draft.id}`}
-                            contrat={contrat}
-                            draft={draft}
-                            companyLabel={companyLabel(contrat, companyMap)}
-                            conventionLabel={conventionLabel(contrat, conventionMap)}
-                          />
-                        ))}
                         {isExpanded ? olderMovements.map((movement) => (
                           <ContratRow
                             key={movement.key}
@@ -248,105 +238,6 @@ export default function ContratsPage() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function AvenantDraftRow({
-  contrat,
-  draft,
-  companyLabel,
-  conventionLabel,
-}: {
-  contrat: ContratSummary;
-  draft: AvenantDraftSummary;
-  companyLabel: string;
-  conventionLabel?: string;
-}) {
-  const queryClient = useQueryClient();
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const deleteMutation = useMutation({
-    mutationFn: () => productionApi.deleteAvenantDraft(contrat.id, draft.codeTypeMouvement),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["contrats"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["avenant-draft", contrat.id, draft.codeTypeMouvement],
-        }),
-      ]);
-      setConfirmDeleteOpen(false);
-      toast.success("Brouillon d'avenant supprimé");
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Suppression impossible");
-    },
-  });
-  const resumePath = `/app/production/contrats/${contrat.id}/avenants/${draft.codeTypeMouvement}`;
-
-  return (
-    <>
-      <tr className="border-b bg-amber-50/80 transition-colors hover:bg-amber-50 dark:bg-amber-950/20 dark:hover:bg-amber-950/30">
-        <TableCellStrong>{dossierNumber(contrat)}</TableCellStrong>
-        <td className="px-2 py-2 text-center"><TypeBadge type={contrat.typeContrat} /></td>
-        <TableCell>{clientCode(contrat)}</TableCell>
-        <TableCell className="font-medium uppercase">{mainClient(contrat)}</TableCell>
-        <TableCell className="uppercase">{branchLabel(contrat)}</TableCell>
-        <TableCell>
-          <div className="flex flex-col items-center text-center">
-            <span>{productLabel(contrat)}</span>
-            {conventionLabel ? <span className="text-xs text-muted-foreground">{conventionLabel}</span> : null}
-          </div>
-        </TableCell>
-        <TableCell className="text-center text-muted-foreground">-</TableCell>
-        <TableCell className="text-center uppercase">{contrat.numeroPolice ?? "-"}</TableCell>
-        <TableCell className="text-center">{companyLabel}</TableCell>
-        <TableCell className="text-center font-semibold">
-          {draft.libelleTypeMouvement || draft.codeTypeMouvement}
-        </TableCell>
-        <TableCell className="text-center">{formatDate(draft.dateEffet)}</TableCell>
-        <TableCell className="text-center">{formatDate(draft.dateEcheance ?? contrat.dateEcheance)}</TableCell>
-        <TableCell className="text-center"><StatusBadge statut="BROUILLON" /></TableCell>
-        <td className="px-2 py-2">
-          <div className="flex items-center justify-center gap-2">
-            <Button asChild variant="outline" size="icon" className="size-8" title="Continuer le brouillon">
-              <Link to={resumePath}><FilePenLine className="size-4" /></Link>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8 text-destructive hover:text-destructive"
-              title="Supprimer le brouillon"
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
-        </td>
-      </tr>
-      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce brouillon d'avenant ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Les informations saisies dans ce brouillon seront définitivement supprimées. Le contrat et ses mouvements validés ne seront pas modifiés.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteMutation.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                deleteMutation.mutate();
-              }}
-            >
-              {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
   );
 }
 
@@ -414,8 +305,10 @@ function ContratRow({
 }
 
 function RowActions({ contrat, movement, child }: { contrat: ContratSummary; movement: MovementLine; child?: boolean }) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [draftChoiceCode, setDraftChoiceCode] = useState<string | null>(null);
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -451,6 +344,32 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const deleteDescription = deleteMode === "CONTRAT"
     ? "Cette action supprimera definitivement ce brouillon. Elle ne peut pas etre annulee."
     : "Cette action supprimera uniquement le dernier avenant actif avec sa quittance generee. Les mouvements plus anciens ne seront pas modifies.";
+  const avenantDrafts = sortedAvenantDrafts(contrat);
+  const selectedDraft = draftChoiceCode
+    ? avenantDrafts.find((draft) => normalize(draft.codeTypeMouvement) === normalize(draftChoiceCode))
+    : undefined;
+  const selectAvenant = (code: string) => {
+    const existingDraft = avenantDrafts.find((draft) => normalize(draft.codeTypeMouvement) === normalize(code));
+    if (existingDraft) {
+      setDraftChoiceCode(existingDraft.codeTypeMouvement);
+      return;
+    }
+    navigate(avenantPath(contrat, code));
+  };
+  const restartDraftMutation = useMutation({
+    mutationFn: (code: string) => productionApi.deleteAvenantDraft(contrat.id, code),
+    onSuccess: async (_data, code) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["contrats"] }),
+        queryClient.invalidateQueries({ queryKey: ["avenant-draft", contrat.id, code] }),
+      ]);
+      setDraftChoiceCode(null);
+      navigate(avenantPath(contrat, code));
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Le brouillon ne peut pas être supprimé");
+    },
+  });
   return (
     <>
       <DropdownMenu>
@@ -460,6 +379,26 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
+          {avenantDrafts.length ? (
+            <>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  Brouillons ({avenantDrafts.length})
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-60">
+                  {avenantDrafts.map((draft) => (
+                    <DropdownMenuItem
+                      key={draft.id}
+                      onSelect={() => setDraftChoiceCode(draft.codeTypeMouvement)}
+                    >
+                      Continuer {draft.libelleTypeMouvement || draft.codeTypeMouvement}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           {canEditDirectly ? (
             <DropdownMenuItem asChild>
               <Link to={editPath}>Modifier</Link>
@@ -474,17 +413,17 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
             <>
               {isFlotte ? (
                 <>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "INC_F")}>Incorporation</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RET_F")}>Retrait</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_F")}>Précision</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_F")}>Duplicata</Link></DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => selectAvenant("INC_F")}>Incorporation</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => selectAvenant("RET_F")}>Retrait</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => selectAvenant("PRI_F")}>Précision</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => selectAvenant("DUP_F")}>Duplicata</DropdownMenuItem>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>Autre avenant</DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="w-56">
-                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_F")}>Modification garanties</Link></DropdownMenuItem>
-                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_F")}>Extension remorque</Link></DropdownMenuItem>
-                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_F")}>Résiliation</Link></DropdownMenuItem>
-                      <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_F")}>Résiliation à l'échéance</Link></DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => selectAvenant("MOG_F")}>Modification garanties</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => selectAvenant("EXR_F")}>Extension remorque</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => selectAvenant("RES_F")}>Résiliation</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => selectAvenant("RCH_F")}>Résiliation à l'échéance</DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                 </>
@@ -492,14 +431,14 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>Ajouter avenant</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-56">
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXG_M")}>Extension garanties</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "MOG_M")}>Modification garanties</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "EXR_M")}>Extension remorque</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "PRI_M")}>Précision</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "DUP_M")}>Duplicata</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RES_M")}>Résiliation</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "RCH_M")}>Résiliation à l'échéance</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to={avenantPath(contrat, "ANN_M")}>Annulation</Link></DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("EXG_M")}>Extension garanties</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("MOG_M")}>Modification garanties</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("EXR_M")}>Extension remorque</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("PRI_M")}>Précision</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("DUP_M")}>Duplicata</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("RES_M")}>Résiliation</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("RCH_M")}>Résiliation à l'échéance</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("ANN_M")}>Annulation</DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
               )}
@@ -552,6 +491,48 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
               }}
             >
               {deleteMutation.isPending ? "Traitement..." : "Confirmer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={Boolean(selectedDraft)} onOpenChange={(open) => {
+        if (!open && !restartDraftMutation.isPending) {
+          setDraftChoiceCode(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Un brouillon existe déjà</AlertDialogTitle>
+            <AlertDialogDescription>
+              Un brouillon « {selectedDraft?.libelleTypeMouvement || selectedDraft?.codeTypeMouvement} » est déjà enregistré pour ce contrat. Vous pouvez continuer la saisie existante ou la supprimer et recommencer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restartDraftMutation.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={restartDraftMutation.isPending || !selectedDraft}
+              onClick={(event) => {
+                event.preventDefault();
+                if (selectedDraft) {
+                  restartDraftMutation.mutate(selectedDraft.codeTypeMouvement);
+                }
+              }}
+            >
+              {restartDraftMutation.isPending ? "Suppression..." : "Supprimer et recommencer"}
+            </AlertDialogAction>
+            <AlertDialogAction
+              disabled={restartDraftMutation.isPending || !selectedDraft}
+              onClick={(event) => {
+                event.preventDefault();
+                if (selectedDraft) {
+                  const code = selectedDraft.codeTypeMouvement;
+                  setDraftChoiceCode(null);
+                  navigate(avenantPath(contrat, code));
+                }
+              }}
+            >
+              Continuer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -180,6 +180,8 @@ public class ComptaController {
     @GetMapping("/documents-clients/sources")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<SourceDocumentClientPageResponse>> sourcesDocumentsClients(
+            @RequestParam String payeurType,
+            @RequestParam Long payeurId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
@@ -189,6 +191,8 @@ public class ComptaController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(documentClientService.searchSources(
                 TenantContext.getCurrentAgence(),
+                payeurType,
+                payeurId,
                 typeContrat,
                 dateDu,
                 dateAu,
@@ -201,6 +205,8 @@ public class ComptaController {
     @GetMapping("/documents-clients")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<DocumentClientPageResponse>> documentsClients(
+            @RequestParam String payeurType,
+            @RequestParam Long payeurId,
             @RequestParam(required = false) TypeDocumentClient type,
             @RequestParam(required = false) StatutDocumentClient statut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
@@ -211,6 +217,8 @@ public class ComptaController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(documentClientService.searchDocuments(
                 TenantContext.getCurrentAgence(),
+                payeurType,
+                payeurId,
                 type,
                 statut,
                 dateDu,

@@ -6,6 +6,7 @@ import com.assurance.dto.response.DocumentClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.dto.response.SourceDocumentClientResponse;
+import com.assurance.entity.AffectationQuittanceCompagnie;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
@@ -26,6 +27,7 @@ import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
+import com.assurance.repository.AffectationQuittanceCompagnieRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.DocumentClientRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
@@ -65,10 +67,13 @@ public class DocumentClientService {
     private final LigneDocumentClientRepository ligneDocumentClientRepository;
     private final SequenceDocumentClientRepository sequenceDocumentClientRepository;
     private final AgenceRepository agenceRepository;
+    private final AffectationQuittanceCompagnieRepository affectationQuittanceCompagnieRepository;
 
     @Transactional(readOnly = true)
     public SourceDocumentClientPageResponse searchSources(
             Long agenceId,
+            String payeurType,
+            Long payeurId,
             TypeContrat typeContrat,
             LocalDate dateDu,
             LocalDate dateAu,
@@ -76,6 +81,7 @@ public class DocumentClientService {
             int page,
             int size
     ) {
+        validatePayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size));
         Page<Quittance> result = quittanceRepository.searchForClientDocuments(
@@ -83,6 +89,8 @@ public class DocumentClientService {
                 typeContrat,
                 dateDu,
                 dateAu,
+                payeurType,
+                payeurId,
                 normalizeSearch(search),
                 pageable
         );
@@ -96,9 +104,20 @@ public class DocumentClientService {
                         TypeDocumentClient.FACTURE,
                         StatutDocumentClient.EMIS
                 ));
+        Set<Long> allocatedIds = pageIds.isEmpty()
+                ? Set.of()
+                : affectationQuittanceCompagnieRepository.findByQuittanceIdIn(pageIds).stream()
+                .map(allocation -> allocation.getQuittance().getId())
+                .collect(Collectors.toSet());
 
         List<SourceDocumentClientResponse> rows = result.getContent().stream()
-                .map(q -> toSourceResponse(q, resolvePayer(q.getContrat(), subscribers), alreadyInvoiced))
+                .map(q -> toSourceResponse(
+                        q,
+                        resolvePayer(q.getContrat(), subscribers),
+                        subscribers.get(q.getContrat().getId()),
+                        allocatedIds,
+                        alreadyInvoiced
+                ))
                 .toList();
 
         return SourceDocumentClientPageResponse.builder()
@@ -113,6 +132,8 @@ public class DocumentClientService {
     @Transactional(readOnly = true)
     public DocumentClientPageResponse searchDocuments(
             Long agenceId,
+            String payeurType,
+            Long payeurId,
             TypeDocumentClient type,
             StatutDocumentClient statut,
             LocalDate dateDu,
@@ -121,6 +142,7 @@ public class DocumentClientService {
             int page,
             int size
     ) {
+        validatePayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         Page<DocumentClient> result = documentClientRepository.search(
                 agenceId,
@@ -128,6 +150,8 @@ public class DocumentClientService {
                 statut,
                 dateDu,
                 dateAu,
+                payeurType,
+                payeurId,
                 normalizeSearch(search),
                 PageRequest.of(normalizePage(page), normalizeSize(size))
         );
@@ -178,6 +202,16 @@ public class DocumentClientService {
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
             validateInvoiceSources(sources);
         }
+        Map<Long, List<AffectationQuittanceCompagnie>> allocationsBySource =
+                loadAllocationsBySource(sources);
+        List<Quittance> unallocatedSources = sources.stream()
+                .filter(source -> allocationsBySource.getOrDefault(source.getId(), List.of()).isEmpty())
+                .toList();
+        if (!unallocatedSources.isEmpty()) {
+            throw new BadRequestException(
+                    "Affectez d'abord un numéro de quittance compagnie à chaque quittance sélectionnée"
+            );
+        }
 
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
@@ -210,30 +244,38 @@ public class DocumentClientService {
         BigDecimal debit = ZERO;
         BigDecimal credit = ZERO;
         for (Quittance source : orderedSources) {
-            BigDecimal ttc = money(source.getPrimeTotale());
-            BigDecimal lineDebit = ttc.signum() > 0 ? ttc : ZERO;
-            BigDecimal lineCredit = ttc.signum() < 0 ? ttc.abs() : ZERO;
-            LigneDocumentClient line = LigneDocumentClient.builder()
-                    .document(document)
-                    .quittance(source)
-                    .ordre(order++)
-                    .dateOperation(source.getDateDebut())
-                    .dateEcheance(source.getDateFin())
-                    .numeroDossier(source.getContrat().getNumeroDossier())
-                    .numeroPolice(source.getContrat().getNumeroPolice())
-                    .numeroQuittance(source.getNumeroQuittance())
-                    .mouvement(movementLabel(source))
-                    .compagnie(source.getCompagnieAssurance().getNom())
-                    .debit(lineDebit)
-                    .credit(lineCredit)
-                    .primeNette(money(source.getPrimeNette()))
-                    .taxes(taxes(source))
-                    .accessoires(accessories(source))
-                    .montantTtc(ttc)
-                    .build();
-            document.getLignes().add(line);
-            debit = debit.add(lineDebit);
-            credit = credit.add(lineCredit);
+            List<AffectationQuittanceCompagnie> allocations = allocationsBySource.get(source.getId()).stream()
+                    .sorted(Comparator
+                            .comparing(AffectationQuittanceCompagnie::getDateEffet)
+                            .thenComparing(AffectationQuittanceCompagnie::getNumeroQuittanceCompagnie))
+                    .toList();
+            for (AffectationQuittanceCompagnie allocation : allocations) {
+                BigDecimal ttc = money(allocation.getMontantTtc());
+                BigDecimal lineDebit = ttc.signum() > 0 ? ttc : ZERO;
+                BigDecimal lineCredit = ttc.signum() < 0 ? ttc.abs() : ZERO;
+                LigneDocumentClient line = LigneDocumentClient.builder()
+                        .document(document)
+                        .quittance(source)
+                        .affectationQuittanceCompagnie(allocation)
+                        .ordre(order++)
+                        .dateOperation(allocation.getDateEffet())
+                        .dateEcheance(allocation.getDateEcheance())
+                        .numeroDossier(source.getContrat().getNumeroDossier())
+                        .numeroPolice(source.getContrat().getNumeroPolice())
+                        .numeroQuittance(allocation.getNumeroQuittanceCompagnie())
+                        .mouvement(movementLabel(source))
+                        .compagnie(allocation.getCompagnieAssurance().getNom())
+                        .debit(lineDebit)
+                        .credit(lineCredit)
+                        .primeNette(money(allocation.getPrimeNette()))
+                        .taxes(money(allocation.getMontantTaxes()))
+                        .accessoires(money(allocation.getAccessoires()))
+                        .montantTtc(ttc)
+                        .build();
+                document.getLignes().add(line);
+                debit = debit.add(lineDebit);
+                credit = credit.add(lineCredit);
+            }
         }
         document.setTotalDebit(money(debit));
         document.setTotalCredit(money(credit));
@@ -272,6 +314,12 @@ public class DocumentClientService {
             if (request.getDateEcheance().isBefore(LocalDate.now())) {
                 throw new BadRequestException("La date d'échéance ne peut pas être antérieure à la date d'émission");
             }
+        }
+    }
+
+    private void validatePayer(String payeurType, Long payeurId) {
+        if (payeurId == null || (!"CLIENT".equals(payeurType) && !"GROUPE".equals(payeurType))) {
+            throw new BadRequestException("Sélectionnez un payeur valide");
         }
     }
 
@@ -388,9 +436,12 @@ public class DocumentClientService {
     private SourceDocumentClientResponse toSourceResponse(
             Quittance source,
             Payer payer,
+            Client subscriber,
+            Set<Long> allocatedIds,
             Set<Long> alreadyInvoiced
     ) {
         BigDecimal ttc = money(source.getPrimeTotale());
+        boolean allocated = allocatedIds.contains(source.getId());
         return SourceDocumentClientResponse.builder()
                 .quittanceId(source.getId())
                 .contratId(source.getContrat().getId())
@@ -405,13 +456,27 @@ public class DocumentClientService {
                 .payeurType(payer.group() == null ? "CLIENT" : "GROUPE")
                 .payeurId(payer.group() == null ? payer.client().getId() : payer.group().getId())
                 .payeurNom(payer.name())
+                .souscripteurId(subscriber == null ? null : subscriber.getId())
+                .souscripteurNom(subscriber == null ? null : subscriber.getNomAffichage())
                 .primeNette(money(source.getPrimeNette()))
                 .taxes(taxes(source))
                 .accessoires(accessories(source))
                 .montantTtc(ttc)
+                .affectee(allocated)
                 .dejaFacturee(alreadyInvoiced.contains(source.getId()))
-                .facturable(ttc.signum() > 0 && !alreadyInvoiced.contains(source.getId()))
+                .facturable(allocated && ttc.signum() > 0 && !alreadyInvoiced.contains(source.getId()))
                 .build();
+    }
+
+    private Map<Long, List<AffectationQuittanceCompagnie>> loadAllocationsBySource(
+            Collection<Quittance> sources
+    ) {
+        List<Long> sourceIds = sources.stream().map(Quittance::getId).toList();
+        if (sourceIds.isEmpty()) {
+            return Map.of();
+        }
+        return affectationQuittanceCompagnieRepository.findByQuittanceIdIn(sourceIds).stream()
+                .collect(Collectors.groupingBy(allocation -> allocation.getQuittance().getId()));
     }
 
     private DocumentClientResponse toResponse(DocumentClient document, boolean includeLines) {

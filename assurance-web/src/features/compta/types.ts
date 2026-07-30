@@ -193,10 +193,13 @@ export type ClientDocumentSource = {
   payeurType: "CLIENT" | "GROUPE";
   payeurId: string;
   payeurNom: string;
+  souscripteurId?: string | null;
+  souscripteurNom?: string | null;
   primeNette: number;
   taxes: number;
   accessoires: number;
   montantTtc: number;
+  affectee: boolean;
   dejaFacturee: boolean;
   facturable: boolean;
 };

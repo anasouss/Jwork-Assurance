@@ -12,6 +12,7 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
     @EntityGraph(attributePaths = {"compagnieAssurance"})
     List<AffectationQuittanceCompagnie> findByQuittanceIdOrderByDateEffetAscNumeroQuittanceCompagnieAsc(Long quittanceId);
 
+    @EntityGraph(attributePaths = {"compagnieAssurance"})
     List<AffectationQuittanceCompagnie> findByQuittanceIdIn(Collection<Long> quittanceIds);
 
     void deleteByQuittanceId(Long quittanceId);

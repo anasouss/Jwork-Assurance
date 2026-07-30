@@ -23,10 +23,13 @@ public class SourceDocumentClientResponse {
     private String payeurType;
     private Long payeurId;
     private String payeurNom;
+    private Long souscripteurId;
+    private String souscripteurNom;
     private BigDecimal primeNette;
     private BigDecimal taxes;
     private BigDecimal accessoires;
     private BigDecimal montantTtc;
+    private boolean affectee;
     private boolean dejaFacturee;
     private boolean facturable;
 }

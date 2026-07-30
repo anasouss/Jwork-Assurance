@@ -25,6 +25,10 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
               and (
+                    (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
+                    or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
+              )
+              and (
                     :search is null
                     or lower(d.numero) like concat('%', :search, '%')
                     or lower(d.payeurNom) like concat('%', :search, '%')
@@ -38,6 +42,8 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             @Param("statut") StatutDocumentClient statut,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
+            @Param("payeurType") String payeurType,
+            @Param("payeurId") Long payeurId,
             @Param("search") String search,
             Pageable pageable
     );

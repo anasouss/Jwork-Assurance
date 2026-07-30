@@ -132,6 +132,8 @@ export const comptaApi = {
   },
 
   async searchClientDocumentSources(params: {
+    payeurType: "CLIENT" | "GROUPE";
+    payeurId: string;
     typeContrat?: TypeContrat;
     dateDu?: string;
     dateAu?: string;
@@ -152,11 +154,14 @@ export const comptaApi = {
         contratId: String(row.contratId),
         mouvementId: row.mouvementId == null ? null : String(row.mouvementId),
         payeurId: String(row.payeurId),
+        souscripteurId: row.souscripteurId == null ? null : String(row.souscripteurId),
       })),
     };
   },
 
   async searchClientDocuments(params: {
+    payeurType: "CLIENT" | "GROUPE";
+    payeurId: string;
     type?: ClientDocumentType;
     statut?: ClientDocumentStatus;
     dateDu?: string;

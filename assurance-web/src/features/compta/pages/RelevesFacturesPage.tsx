@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
+  Building2,
   Download,
   Eye,
   FilePlus2,
@@ -10,6 +11,7 @@ import {
   ReceiptText,
   RotateCcw,
   Search,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -23,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,7 +51,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { productionApi } from "@/features/production/api";
 import { toDateOnly } from "@/features/production/date";
+import type { ClientResponse, GroupeClient } from "@/features/production/types";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import type {
@@ -72,6 +77,16 @@ type DocumentFilters = {
   dateDu: string;
   dateAu: string;
   search: string;
+};
+
+type SelectedPayer = {
+  type: "CLIENT" | "GROUPE";
+  id: string;
+  name: string;
+  identifier: string;
+  groupName?: string;
+  treasuryName?: string;
+  memberCount?: number;
 };
 
 const SOURCE_DEFAULTS: SourceFilters = {
@@ -103,16 +118,41 @@ export default function RelevesFacturesPage() {
   const [issueOpen, setIssueOpen] = useState(false);
   const [detailId, setDetailId] = useState<string>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
+  const [payerMode, setPayerMode] = useState<SelectedPayer["type"]>("CLIENT");
+  const [payerSearch, setPayerSearch] = useState("");
+  const deferredPayerSearch = useDeferredValue(payerSearch.trim());
+  const [selectedPayer, setSelectedPayer] = useState<SelectedPayer>();
+
+  const clients = useQuery({
+    queryKey: ["compta", "document-payers", "clients", deferredPayerSearch],
+    queryFn: () => productionApi.listClients({
+      query: deferredPayerSearch || undefined,
+      page: 0,
+      size: 30,
+    }),
+    enabled: payerMode === "CLIENT",
+    staleTime: 30_000,
+  });
+  const groups = useQuery({
+    queryKey: ["groupes-clients"],
+    queryFn: productionApi.listGroupesClients,
+    enabled: payerMode === "GROUPE",
+    staleTime: 60_000,
+  });
 
   const sourceParams = useMemo(() => ({
+    payeurType: selectedPayer?.type ?? payerMode,
+    payeurId: selectedPayer?.id ?? "",
     typeContrat: appliedSourceFilters.typeContrat === "ALL" ? undefined : appliedSourceFilters.typeContrat,
     dateDu: appliedSourceFilters.dateDu || undefined,
     dateAu: appliedSourceFilters.dateAu || undefined,
     search: appliedSourceFilters.search.trim() || undefined,
     page: sourcePage,
     size: PAGE_SIZE,
-  }), [appliedSourceFilters, sourcePage]);
+  }), [appliedSourceFilters, payerMode, selectedPayer, sourcePage]);
   const documentParams = useMemo(() => ({
+    payeurType: selectedPayer?.type ?? payerMode,
+    payeurId: selectedPayer?.id ?? "",
     type: appliedDocumentFilters.type === "ALL" ? undefined : appliedDocumentFilters.type,
     statut: appliedDocumentFilters.statut === "ALL" ? undefined : appliedDocumentFilters.statut,
     dateDu: appliedDocumentFilters.dateDu || undefined,
@@ -120,21 +160,29 @@ export default function RelevesFacturesPage() {
     search: appliedDocumentFilters.search.trim() || undefined,
     page: documentPage,
     size: PAGE_SIZE,
-  }), [appliedDocumentFilters, documentPage]);
+  }), [appliedDocumentFilters, documentPage, payerMode, selectedPayer]);
 
   const sources = useQuery({
     queryKey: ["compta", "client-document-sources", sourceParams],
     queryFn: () => comptaApi.searchClientDocumentSources(sourceParams),
+    enabled: Boolean(selectedPayer),
   });
   const documents = useQuery({
     queryKey: ["compta", "client-documents", documentParams],
     queryFn: () => comptaApi.searchClientDocuments(documentParams),
-    enabled: tab === "documents",
+    enabled: Boolean(selectedPayer) && tab === "documents",
   });
 
   useEffect(() => {
     setSelected({});
   }, [sourceParams]);
+
+  function changePayer(payer?: SelectedPayer) {
+    setSelectedPayer(payer);
+    setSelected({});
+    setSourcePage(0);
+    setDocumentPage(0);
+  }
 
   const selectedRows = useMemo(() => Object.values(selected), [selected]);
   const selectedPayerKey = selectedRows.length
@@ -192,7 +240,22 @@ export default function RelevesFacturesPage() {
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <PayerAccountSelector
+        mode={payerMode}
+        selected={selectedPayer}
+        clients={clients.data?.items ?? []}
+        groups={groups.data ?? []}
+        loading={clients.isFetching || groups.isFetching}
+        onQueryChange={setPayerSearch}
+        onModeChange={(mode) => {
+          setPayerMode(mode);
+          setPayerSearch("");
+          changePayer();
+        }}
+        onSelect={changePayer}
+      />
+
+      {selectedPayer ? <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="sources">
             <ReceiptText className="size-4" />
@@ -217,8 +280,8 @@ export default function RelevesFacturesPage() {
                 <CardTitle className="text-base">Quittances validées</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {selectedRows.length
-                    ? `${selectedRows.length} quittance(s) sélectionnée(s) pour ${selectedRows[0].payeurNom}.`
-                    : "Sélectionnez les lignes d'un même payeur."}
+                    ? `${selectedRows.length} quittance(s) sélectionnée(s).`
+                    : "Sélectionnez les quittances à regrouper dans le document."}
                 </p>
               </div>
               {canIssue ? (
@@ -234,7 +297,7 @@ export default function RelevesFacturesPage() {
                   <thead className="border-y bg-amber-600 text-white">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left" aria-label="Sélection" />
-                      <Header>Payeur</Header>
+                      <Header>{selectedPayer.type === "GROUPE" ? "Entité / souscripteur" : "Souscripteur"}</Header>
                       <Header>Dossier / police</Header>
                       <Header>Mouvement</Header>
                       <Header>Compagnie</Header>
@@ -257,14 +320,15 @@ export default function RelevesFacturesPage() {
                           <Checkbox
                             checked={Boolean(selected[row.quittanceId])}
                             onCheckedChange={(checked) => toggleSource(row, checked === true)}
+                            disabled={!row.affectee}
                             aria-label={`Sélectionner ${row.dossier}`}
                           />
                         </td>
                         <td className="px-3 py-3">
-                          <div className="font-medium">{row.payeurNom}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {row.payeurType === "GROUPE" ? "Groupe consolidé" : "Client"}
-                          </div>
+                          <div className="font-medium">{row.souscripteurNom || row.payeurNom}</div>
+                          {selectedPayer.type === "GROUPE" ? (
+                            <div className="text-xs text-muted-foreground">{selectedPayer.name}</div>
+                          ) : null}
                         </td>
                         <td className="px-3 py-3">
                           <div className="font-medium">{row.dossier || "-"}</div>
@@ -277,7 +341,8 @@ export default function RelevesFacturesPage() {
                         <MoneyCell value={row.taxes} />
                         <MoneyCell value={row.montantTtc} strong />
                         <td className="px-3 py-3">
-                          {row.dejaFacturee ? <Badge className="bg-emerald-100 text-emerald-800">Émise</Badge>
+                          {!row.affectee ? <Badge variant="secondary">Non affectée</Badge>
+                            : row.dejaFacturee ? <Badge className="bg-emerald-100 text-emerald-800">Émise</Badge>
                             : row.facturable ? <Badge variant="outline">Disponible</Badge>
                               : <Badge variant="secondary">Crédit</Badge>}
                         </td>
@@ -319,7 +384,17 @@ export default function RelevesFacturesPage() {
             onCancel={canIssue ? setCancelTarget : undefined}
           />
         </TabsContent>
-      </Tabs>
+      </Tabs> : (
+        <div className="grid min-h-64 place-items-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
+          <div className="max-w-md">
+            <Users className="mx-auto mb-3 size-9 text-muted-foreground" />
+            <h2 className="font-semibold">Sélectionnez le payeur</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Les quittances et les documents seront chargés dans un compte client ou groupe unique.
+            </p>
+          </div>
+        </div>
+      )}
 
       <IssueDialog
         open={issueOpen}
@@ -334,6 +409,138 @@ export default function RelevesFacturesPage() {
       <DocumentDetailDialog id={detailId} onOpenChange={(open) => !open && setDetailId(undefined)} />
       <CancelDocumentDialog target={cancelTarget} onClose={() => setCancelTarget(undefined)} />
     </div>
+  );
+}
+
+function PayerAccountSelector(props: {
+  mode: SelectedPayer["type"];
+  selected?: SelectedPayer;
+  clients: ClientResponse[];
+  groups: GroupeClient[];
+  loading: boolean;
+  onModeChange: (mode: SelectedPayer["type"]) => void;
+  onQueryChange: (query: string) => void;
+  onSelect: (payer?: SelectedPayer) => void;
+}) {
+  const clientOptions = useMemo(() => {
+    const options = props.clients.map((client) => {
+      const identifier = client.codeClient || client.rc || client.cin || client.ice || "";
+      return {
+        value: client.id,
+        label: [client.nomAffichage || "Client", identifier].filter(Boolean).join(" · "),
+        keywords: [client.codeClient, client.rc, client.cin, client.ice, client.email].filter(Boolean).join(" "),
+      };
+    });
+    if (props.selected?.type === "CLIENT" && !options.some((option) => option.value === props.selected?.id)) {
+      options.unshift({
+        value: props.selected.id,
+        label: [props.selected.name, props.selected.identifier].filter(Boolean).join(" · "),
+        keywords: props.selected.identifier,
+      });
+    }
+    return options;
+  }, [props.clients, props.selected]);
+
+  const groupOptions = useMemo(() => {
+    const options = props.groups.map((group) => ({
+      value: group.id,
+      label: `${group.code} · ${group.libelle}`,
+      keywords: [group.clientTeteNom, group.clientTresorerieNom, ...group.membres.map((member) => member.clientNom)]
+        .filter(Boolean)
+        .join(" "),
+    }));
+    if (props.selected?.type === "GROUPE" && !options.some((option) => option.value === props.selected?.id)) {
+      options.unshift({
+        value: props.selected.id,
+        label: [props.selected.identifier, props.selected.name].filter(Boolean).join(" · "),
+        keywords: props.selected.treasuryName ?? "",
+      });
+    }
+    return options;
+  }, [props.groups, props.selected]);
+
+  function select(value: string) {
+    if (!value) {
+      props.onSelect();
+      return;
+    }
+    if (props.mode === "CLIENT") {
+      const client = props.clients.find((item) => item.id === value);
+      if (!client) return;
+      props.onSelect({
+        type: "CLIENT",
+        id: client.id,
+        name: client.nomAffichage || "Client",
+        identifier: client.codeClient || client.rc || client.cin || client.ice || "",
+        groupName: client.groupe?.libelle || undefined,
+      });
+      return;
+    }
+    const group = props.groups.find((item) => item.id === value);
+    if (!group) return;
+    props.onSelect({
+      type: "GROUPE",
+      id: group.id,
+      name: group.libelle,
+      identifier: group.code,
+      treasuryName: group.clientTresorerieNom || undefined,
+      memberCount: group.membres.length,
+    });
+  }
+
+  const Icon = props.mode === "GROUPE" ? Building2 : Users;
+  return (
+    <section className="overflow-visible rounded-md border bg-card">
+      <div className="grid gap-4 p-4 lg:grid-cols-[220px_minmax(320px,620px)_1fr] lg:items-end">
+        <FilterField label="Compte payeur">
+          <div className="grid grid-cols-2 rounded-md border bg-muted/30 p-1">
+            {(["CLIENT", "GROUPE"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={`h-8 rounded-sm px-3 text-sm font-medium ${
+                  props.mode === mode ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => props.onModeChange(mode)}
+              >
+                {mode === "CLIENT" ? "Client" : "Groupe"}
+              </button>
+            ))}
+          </div>
+        </FilterField>
+        <FilterField label={props.mode === "CLIENT" ? "Rechercher un client" : "Rechercher un groupe"}>
+          <AutocompleteSelect
+            options={props.mode === "CLIENT" ? clientOptions : groupOptions}
+            value={props.selected?.type === props.mode ? props.selected.id : ""}
+            onValueChange={select}
+            onQueryChange={props.mode === "CLIENT" ? props.onQueryChange : undefined}
+            placeholder={props.mode === "CLIENT" ? "Nom, RC, CIN, ICE ou code" : "Code, groupe ou membre"}
+            emptyText={props.loading ? "Chargement..." : "Aucun résultat"}
+          />
+        </FilterField>
+        {props.selected ? (
+          <div className="flex min-w-0 items-center gap-3 rounded-md border-l-4 border-l-amber-500 bg-amber-50/60 px-4 py-2.5">
+            <Icon className="size-5 shrink-0 text-amber-700" />
+            <div className="min-w-0">
+              <div className="truncate font-semibold">{props.selected.name}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {[
+                  props.selected.identifier,
+                  props.selected.type === "GROUPE"
+                    ? `${props.selected.memberCount ?? 0} membre(s)`
+                    : props.selected.groupName || "Client indépendant",
+                  props.selected.treasuryName ? `Trésorerie : ${props.selected.treasuryName}` : null,
+                ].filter(Boolean).join(" · ")}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="pb-2 text-sm text-muted-foreground">
+            Choisissez un payeur pour ouvrir son compte documentaire.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -365,7 +572,7 @@ function SourceSearch(props: {
         <FilterField label="Date d'effet au">
           <DatePicker date={filters.dateAu} onSelect={(date) => onChange({ ...filters, dateAu: toDateOnly(date) ?? "" })} />
         </FilterField>
-        <FilterField label="Payeur, dossier, police ou quittance">
+        <FilterField label="Dossier, police ou quittance">
           <Input value={filters.search} onChange={(event) => onChange({ ...filters, search: event.target.value })} />
         </FilterField>
         <SearchActions onApply={props.onApply} onReset={props.onReset} />
@@ -411,7 +618,7 @@ function DocumentSearch(props: {
         <FilterField label="Émis au">
           <DatePicker date={filters.dateAu} onSelect={(date) => onChange({ ...filters, dateAu: toDateOnly(date) ?? "" })} />
         </FilterField>
-        <FilterField label="N° document ou payeur">
+        <FilterField label="N° document">
           <Input value={filters.search} onChange={(event) => onChange({ ...filters, search: event.target.value })} />
         </FilterField>
         <SearchActions onApply={props.onApply} onReset={props.onReset} />
@@ -434,12 +641,11 @@ function DocumentTable(props: {
       <CardHeader className="pb-3"><CardTitle className="text-base">Historique émis</CardTitle></CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1020px] text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="border-y bg-amber-600 text-white">
               <tr>
                 <Header>N° document</Header>
                 <Header>Type</Header>
-                <Header>Payeur</Header>
                 <Header>Émission</Header>
                 <Header>Période</Header>
                 <Header align="right">Montant</Header>
@@ -448,15 +654,14 @@ function DocumentTable(props: {
               </tr>
             </thead>
             <tbody>
-              {props.loading ? <LoadingRows columns={8} /> : null}
+              {props.loading ? <LoadingRows columns={7} /> : null}
               {!props.loading && !props.rows.length ? (
-                <tr><td colSpan={8} className="h-32 text-center text-muted-foreground">Aucun document émis.</td></tr>
+                <tr><td colSpan={7} className="h-32 text-center text-muted-foreground">Aucun document émis.</td></tr>
               ) : null}
               {props.rows.map((document) => (
                 <tr key={document.id} className="border-b hover:bg-muted/30">
                   <td className="px-4 py-3 font-semibold">{document.numero}</td>
                   <td className="px-3 py-3">{document.typeDocument === "RELEVE" ? "Relevé" : "Facture"}</td>
-                  <td className="px-3 py-3">{document.payeurNom}</td>
                   <td className="px-3 py-3">{formatDate(document.dateEmission)}</td>
                   <td className="whitespace-nowrap px-3 py-3">
                     {formatDate(document.periodeDebut)} au {formatDate(document.periodeFin)}

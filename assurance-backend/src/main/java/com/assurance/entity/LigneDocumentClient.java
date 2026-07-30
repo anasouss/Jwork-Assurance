@@ -20,12 +20,13 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "lignes_documents_clients",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_ligne_document_client_source",
-                columnNames = {"document_id", "quittance_id"}
+                name = "uk_ligne_document_client_affectation",
+                columnNames = {"document_id", "affectation_quittance_compagnie_id"}
         ),
         indexes = {
         @Index(name = "idx_ligne_document_client_document", columnList = "document_id"),
-        @Index(name = "idx_ligne_document_client_quittance", columnList = "quittance_id")
+        @Index(name = "idx_ligne_document_client_quittance", columnList = "quittance_id"),
+        @Index(name = "idx_ligne_document_client_affectation", columnList = "affectation_quittance_compagnie_id")
 })
 @Getter
 @Setter
@@ -41,6 +42,10 @@ public class LigneDocumentClient extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quittance_id", nullable = false)
     private Quittance quittance;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "affectation_quittance_compagnie_id", nullable = false)
+    private AffectationQuittanceCompagnie affectationQuittanceCompagnie;
 
     @Column(nullable = false)
     private Integer ordre;

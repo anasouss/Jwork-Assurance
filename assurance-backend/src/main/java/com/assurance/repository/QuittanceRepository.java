@@ -238,6 +238,39 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (:dateDu is null or q.dateDebut >= :dateDu)
               and (:dateAu is null or q.dateDebut <= :dateAu)
               and (
+                    (
+                        :payeurType = 'GROUPE'
+                        and gf.id = :payeurId
+                        and (
+                            c.modeFacturation = com.assurance.enums.ModeFacturationContrat.CONSOLIDEE_GROUPE
+                            or c.typePayeurPrime = com.assurance.enums.TypePayeurPrime.TRESORERIE_GROUPE
+                        )
+                    )
+                    or (
+                        :payeurType = 'CLIENT'
+                        and (
+                            gf is null
+                            or (
+                                (c.modeFacturation is null or c.modeFacturation <> com.assurance.enums.ModeFacturationContrat.CONSOLIDEE_GROUPE)
+                                and (c.typePayeurPrime is null or c.typePayeurPrime <> com.assurance.enums.TypePayeurPrime.TRESORERIE_GROUPE)
+                            )
+                        )
+                        and (
+                            pp.id = :payeurId
+                            or (
+                                c.payeurPrime is null
+                                and exists (
+                                    select 1
+                                    from ContratClient payerCc
+                                    where payerCc.contrat = c
+                                      and payerCc.role = com.assurance.enums.RoleClientContrat.SOUSCRIPTEUR
+                                      and payerCc.client.id = :payeurId
+                                )
+                            )
+                        )
+                    )
+              )
+              and (
                     :search is null
                     or lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%')
                     or lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%')
@@ -285,6 +318,39 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (:dateDu is null or q.dateDebut >= :dateDu)
               and (:dateAu is null or q.dateDebut <= :dateAu)
               and (
+                    (
+                        :payeurType = 'GROUPE'
+                        and gf.id = :payeurId
+                        and (
+                            c.modeFacturation = com.assurance.enums.ModeFacturationContrat.CONSOLIDEE_GROUPE
+                            or c.typePayeurPrime = com.assurance.enums.TypePayeurPrime.TRESORERIE_GROUPE
+                        )
+                    )
+                    or (
+                        :payeurType = 'CLIENT'
+                        and (
+                            gf is null
+                            or (
+                                (c.modeFacturation is null or c.modeFacturation <> com.assurance.enums.ModeFacturationContrat.CONSOLIDEE_GROUPE)
+                                and (c.typePayeurPrime is null or c.typePayeurPrime <> com.assurance.enums.TypePayeurPrime.TRESORERIE_GROUPE)
+                            )
+                        )
+                        and (
+                            pp.id = :payeurId
+                            or (
+                                c.payeurPrime is null
+                                and exists (
+                                    select 1
+                                    from ContratClient payerCc
+                                    where payerCc.contrat = c
+                                      and payerCc.role = com.assurance.enums.RoleClientContrat.SOUSCRIPTEUR
+                                      and payerCc.client.id = :payeurId
+                                )
+                            )
+                        )
+                    )
+              )
+              and (
                     :search is null
                     or lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%')
                     or lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%')
@@ -317,6 +383,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
+            @Param("payeurType") String payeurType,
+            @Param("payeurId") Long payeurId,
             @Param("search") String search,
             Pageable pageable
     );

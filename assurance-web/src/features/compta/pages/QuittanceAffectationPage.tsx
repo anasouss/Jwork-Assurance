@@ -282,7 +282,13 @@ export default function QuittanceAffectationPage() {
                       <Cell className="text-right">{money(row.montantTaxes)}</Cell>
                       <Cell className="text-right font-medium">{money(row.montantTtc)}</Cell>
                       <Cell>
-                        {row.numerosQuittanceCompagnie || "—"}
+                        {row.numerosQuittanceCompagnie ? (
+                          <span className="whitespace-nowrap font-semibold tabular-nums text-foreground">
+                            {row.numerosQuittanceCompagnie}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                         {!row.regle ? (
                           <div className="mt-1 text-xs font-medium text-destructive">Configuration manquante</div>
                         ) : null}

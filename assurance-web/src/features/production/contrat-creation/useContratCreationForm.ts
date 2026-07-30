@@ -1001,6 +1001,16 @@ export function useContratCreationForm(
     }
   }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement]);
 
+  useEffect(() => {
+    if (showContractEcheance || conventionUsesPeriodicite || !dateEffet) {
+      return;
+    }
+    const computed = computeDateEcheanceFromMonths(dateEffet, monthsFromFractionnement(fractionnement));
+    if (computed && computed !== dateEcheance) {
+      setDateEcheance(computed);
+    }
+  }, [conventionUsesPeriodicite, dateEffet, fractionnement, showContractEcheance]);
+
   return {
     typeContrat,
     refs,

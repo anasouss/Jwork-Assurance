@@ -24,6 +24,7 @@ type Props = {
   showFractionnement?: boolean;
   openSection?: ContratSectionKey;
   onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
+  onSaved?: () => void;
 };
 
 export function ContractInfoSection({
@@ -34,6 +35,7 @@ export function ContractInfoSection({
   showFractionnement = true,
   openSection,
   onSectionOpenChange,
+  onSaved,
 }: Props) {
   const [payerSearch, setPayerSearch] = useState("");
   const deferredPayerSearch = useDeferredValue(payerSearch.trim());
@@ -450,7 +452,7 @@ export function ContractInfoSection({
           size="sm"
           className="bg-emerald-600 text-white hover:bg-emerald-700"
           disabled={form.saveDraftMutation.isPending}
-          onClick={() => form.handleSaveSection("contrat")}
+          onClick={() => form.handleSaveSection("contrat", onSaved)}
         >
           {form.saveDraftMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
           {form.saveDraftMutation.isPending ? "Enregistrement..." : "Enregistrer"}

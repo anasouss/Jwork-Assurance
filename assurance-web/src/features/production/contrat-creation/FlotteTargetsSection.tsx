@@ -83,6 +83,8 @@ type Props = {
   onSaveDraft?: (label: string, onSuccess?: () => void) => void;
   onSaveTargetDraft?: (target: Target, part: "info" | "garanties", label: string, onSuccess?: () => void) => boolean;
   onValidateTarget?: (target: Target, part?: "info" | "garanties") => boolean;
+  onVehiculesCompleted?: () => void;
+  onRemorquesCompleted?: () => void;
   garantiesExtraAction?: ReactNode;
   targetActionMode?: "save" | "calculate";
   previewAfterInfoSave?: boolean;
@@ -133,6 +135,8 @@ export function FlotteTargetsSection({
   onSaveDraft,
   onSaveTargetDraft,
   onValidateTarget,
+  onVehiculesCompleted,
+  onRemorquesCompleted,
   garantiesExtraAction,
   targetActionMode = "save",
   previewAfterInfoSave = true,
@@ -368,6 +372,27 @@ export function FlotteTargetsSection({
     return true;
   };
 
+  const advanceAfterVehiculeGaranties = (target: Target) => {
+    const currentIndex = vehiculeTargets.findIndex((candidate) => targetKey(candidate) === targetKey(target));
+    const nextTarget = currentIndex >= 0 ? vehiculeTargets[currentIndex + 1] : undefined;
+    if (nextTarget) {
+      setActiveKey(targetKey(nextTarget));
+      setActiveTargetPart("info");
+      return;
+    }
+    onVehiculesCompleted?.();
+  };
+
+  const advanceAfterRemorqueGaranties = (target: Target) => {
+    const currentIndex = remorqueTargets.findIndex((candidate) => targetKey(candidate) === targetKey(target));
+    const nextTarget = currentIndex >= 0 ? remorqueTargets[currentIndex + 1] : undefined;
+    if (nextTarget) {
+      setActiveKey(targetKey(nextTarget));
+      return;
+    }
+    onRemorquesCompleted?.();
+  };
+
   return (
     <>
       <SectionCard
@@ -471,7 +496,12 @@ export function FlotteTargetsSection({
                     type="button"
                     disabled={previewing || saving}
                     onClick={() => {
-                      saveTargetSection(activeVehiculeTarget, "garanties", "Garanties véhicule");
+                      saveTargetSection(
+                        activeVehiculeTarget,
+                        "garanties",
+                        "Garanties véhicule",
+                        () => advanceAfterVehiculeGaranties(activeVehiculeTarget)
+                      );
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
@@ -611,7 +641,12 @@ export function FlotteTargetsSection({
                     type="button"
                     disabled={previewing || saving}
                     onClick={() => {
-                      saveTargetSection(activeRemorqueTarget, "garanties", "Garanties remorque");
+                      saveTargetSection(
+                        activeRemorqueTarget,
+                        "garanties",
+                        "Garanties remorque",
+                        () => advanceAfterRemorqueGaranties(activeRemorqueTarget)
+                      );
                     }}
                   >
                     {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}

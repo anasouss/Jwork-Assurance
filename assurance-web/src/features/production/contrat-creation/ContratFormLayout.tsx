@@ -123,6 +123,20 @@ export function ContratFormLayout({
     setActiveSection(section);
   };
 
+  const advanceAfterSectionSave = (section: ContratSectionKey) => {
+    const currentIndex = workflowSections.indexOf(section);
+    const nextSection = currentIndex >= 0 ? workflowSections[currentIndex + 1] : undefined;
+    if (nextSection) {
+      setActiveSection(nextSection);
+    }
+  };
+
+  const saveSectionAndAdvance = (
+    section: "souscripteur" | "proprietaire" | "vehicule" | "garanties"
+  ) => {
+    form.handleSaveSection(section, () => advanceAfterSectionSave(section));
+  };
+
   const clientSections = (
     <ClientSection
       clients={form.clients}
@@ -141,7 +155,7 @@ export function ContratFormLayout({
       showOptionalRoles={false}
       showProprietaireCategorie={order === "flotte"}
       errors={form.validationErrors}
-      onSaveSection={form.handleSaveSection}
+      onSaveSection={saveSectionAndAdvance}
       savedSections={form.savedSections}
       saving={form.saveDraftMutation.isPending}
       openSection={activeSection}
@@ -158,6 +172,7 @@ export function ContratFormLayout({
       showFractionnement={showFractionnement}
       openSection={activeSection}
       onSectionOpenChange={handleSectionOpenChange}
+      onSaved={() => advanceAfterSectionSave("contrat")}
     />
   );
 
@@ -178,7 +193,7 @@ export function ContratFormLayout({
       controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
       showRemorqueFlag={showConvention}
       errors={form.validationErrors}
-      onSaveSection={form.handleSaveSection}
+      onSaveSection={saveSectionAndAdvance}
       savedSections={form.savedSections}
       saving={form.saveDraftMutation.isPending}
       openSection={activeSection}
@@ -227,7 +242,7 @@ export function ContratFormLayout({
           </Button>
         ) : null
       }
-      onSaveSection={form.handleSaveSection}
+      onSaveSection={saveSectionAndAdvance}
       savedSections={form.savedSections}
       saving={form.saveDraftMutation.isPending}
       openSection={activeSection}
@@ -264,6 +279,8 @@ export function ContratFormLayout({
       onSaveDraft={form.handleSaveDraft}
       onSaveTargetDraft={form.handleSaveTargetDraft}
       onValidateTarget={form.validateTarget}
+      onVehiculesCompleted={() => advanceAfterSectionSave("flotteTargets")}
+      onRemorquesCompleted={() => advanceAfterSectionSave("remorque")}
       targetAssistances={form.targetAssistances}
       setTargetAssistances={form.setTargetAssistances}
       setAssistanceEnabled={form.setAssistanceEnabled}
@@ -323,7 +340,11 @@ export function ContratFormLayout({
       {contractSection}
       {order === "flotte" ? (
         <>
-          <TariffGridSection form={form} openSection={activeSection} onSectionOpenChange={handleSectionOpenChange} />
+          <TariffGridSection
+            form={form}
+            openSection={activeSection}
+            onSectionOpenChange={handleSectionOpenChange}
+          />
           {flotteTargetsSection}
         </>
       ) : (

@@ -26,7 +26,7 @@ import type {
 } from "../types";
 
 export type SavableContratSectionKey = "souscripteur" | "proprietaire" | "contrat" | "grille" | "vehicule" | "garanties";
-export type ContratSectionKey = SavableContratSectionKey | "vehicule" | "remorque" | "flotteTargets" | "garanties" | "quittances";
+export type ContratSectionKey = SavableContratSectionKey | "remorque" | "flotteTargets" | "quittances";
 export type ContratTargetKey = { kind: "vehicule" | "remorque"; index: number };
 
 export function useContratCreationForm(
@@ -787,7 +787,7 @@ export function useContratCreationForm(
     return true;
   };
 
-  const handleSaveSection = (section: SavableContratSectionKey) => {
+  const handleSaveSection = (section: SavableContratSectionKey, onSuccess?: () => void) => {
     const label = sectionLabel(section);
     if (!validateSection(section)) {
       return;
@@ -795,6 +795,7 @@ export function useContratCreationForm(
     saveDraftMutation.mutate(request, {
       onSuccess: () => {
         setSavedSections((current) => ({ ...current, [section]: true }));
+        onSuccess?.();
         toast.success(`${label} enregistré`);
       },
     });

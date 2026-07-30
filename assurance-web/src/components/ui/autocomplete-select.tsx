@@ -22,6 +22,7 @@ type AutocompleteSelectProps = {
   emptyText?: string;
   invalidText?: string;
   disabled?: boolean;
+  openOnFocus?: boolean;
   className?: string;
 };
 
@@ -37,6 +38,7 @@ export function AutocompleteSelect({
   emptyText = "Aucun résultat",
   invalidText = "Choisissez une option existante.",
   disabled = false,
+  openOnFocus = true,
   className,
 }: AutocompleteSelectProps) {
   const selectedOption = options.find((option) => option.value === value);
@@ -111,7 +113,11 @@ export function AutocompleteSelect({
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          if (openOnFocus) {
+            setOpen(true);
+          }
+        }}
         onChange={(event) => {
           setQuery(event.target.value);
           setOpen(true);

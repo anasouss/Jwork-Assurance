@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, CheckCircle2, ClipboardList, PackagePlus, Plus, Search, Settings2, Truck } from "lucide-react";
+import { Boxes, CheckCircle2, ClipboardList, Eye, PackagePlus, Plus, Search, Settings2, Truck } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -460,6 +460,7 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
   const [lotForm, setLotForm] = useState(emptyLotForm);
   const [createOpen, setCreateOpen] = useState(false);
   const [receptionOpen, setReceptionOpen] = useState(false);
+  const [detailsLivraison, setDetailsLivraison] = useState<LivraisonAttestation | null>(null);
 
   const compagnies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
@@ -498,7 +499,7 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
   const createLivraison = useMutation({
     mutationFn: productionApi.createLivraisonAttestation,
     onSuccess: async (livraison) => {
-      toast.success(source === "COMMANDE" ? "Commande créée" : "Réception créée");
+      toast.success(source === "COMMANDE" ? "Commande créée" : "Réception validée");
       setCreateForm(emptyCreateForm());
       setCreateOpen(false);
       setLotForm({ livraisonId: livraison.id, lignes: [] });
@@ -679,7 +680,7 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
             {source === "COMMANDE" ? "Commandes d'attestations" : "Réceptions d'attestations"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {source === "COMMANDE" ? "Création des demandes, réception des lots et validation." : "Entrée directe des lots reçus et validation."}
+            {source === "COMMANDE" ? "Création des demandes, réception des lots et validation." : "Entrée directe des lots reçus et validation immédiate."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -711,7 +712,8 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                 <TableRow className="hover:bg-emerald-700">
                   <TableHead>Référence</TableHead>
                   <TableHead>Compagnie</TableHead>
-                  <TableHead>Groupes</TableHead>
+                  <TableHead>Usages</TableHead>
+                  <TableHead className="text-right">Lots</TableHead>
                   <TableHead>Reçu</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Action</TableHead>
@@ -730,23 +732,16 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                     </TableCell>
                     <TableCell className="align-top">{livraison.compagnieAssuranceNom}</TableCell>
                     <TableCell className="align-top">
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex max-w-xl flex-wrap gap-1.5">
                         {livraison.lignes.map((ligne) => (
                           <Badge key={ligne.id} variant="secondary">
                             {ligne.groupeUsageAttestationCode} {ligne.quantiteRecue}/{ligne.quantiteDemandee}
                           </Badge>
                         ))}
                       </div>
-                      {livraison.lots.length > 0 ? (
-                        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                          {livraison.lots.map((lot) => (
-                            <div key={lot.id}>
-                              {lot.groupeUsageAttestationCode}: {lot.prefixe}
-                              {lot.numeroDebut}-{lot.numeroFin} ({lot.quantite})
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right align-top">
+                      {livraison.lots.length}
                     </TableCell>
                     <TableCell className="align-top">
                       {livraison.quantiteRecue}/{livraison.quantiteDemandee}
@@ -756,6 +751,9 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                     </TableCell>
                     <TableCell className="text-right align-top">
                       <div className="flex justify-end gap-2">
+                        <Button type="button" size="icon" variant="ghost" onClick={() => setDetailsLivraison(livraison)} aria-label="Voir le détail">
+                          <Eye className="size-4" />
+                        </Button>
                         {source === "COMMANDE" && !livraison.validee && livraison.quantiteRecue < livraison.quantiteDemandee ? (
                           <Button
                             type="button"
@@ -770,23 +768,25 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                             Réceptionner
                           </Button>
                         ) : null}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={livraison.validee || livraison.lots.length === 0 || validateLivraison.isPending}
-                          onClick={() => validateLivraison.mutate(livraison.id)}
-                        >
-                          <CheckCircle2 className="size-4" />
-                          Valider
-                        </Button>
+                        {source === "COMMANDE" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={livraison.validee || livraison.lots.length === 0 || validateLivraison.isPending}
+                            onClick={() => validateLivraison.mutate(livraison.id)}
+                          >
+                            <CheckCircle2 className="size-4" />
+                            Valider
+                          </Button>
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
                       Aucun élément.
                     </TableCell>
                   </TableRow>
@@ -797,6 +797,103 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
         </Card>
 
       </div>
+
+      <Dialog open={Boolean(detailsLivraison)} onOpenChange={(open) => !open && setDetailsLivraison(null)}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-5xl">
+          {detailsLivraison ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Détail de la livraison</DialogTitle>
+                <DialogDescription>
+                  {detailsLivraison.referenceCommande ?? detailsLivraison.referenceBl ?? detailsLivraison.id} · {detailsLivraison.compagnieAssuranceNom}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <StockReceptionSummary label="Demandé" value={detailsLivraison.quantiteDemandee} />
+                <StockReceptionSummary label="Reçu" value={detailsLivraison.quantiteRecue} />
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <div className="text-xs font-medium uppercase text-muted-foreground">Statut</div>
+                  <div className="mt-1">
+                    <Badge variant={statusVariant(detailsLivraison.statut)}>{statusLabel(detailsLivraison.statut)}</Badge>
+                  </div>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <div className="text-xs font-medium uppercase text-muted-foreground">Date</div>
+                  <div className="mt-1 text-lg font-semibold">
+                    {formatDate(detailsLivraison.source === "COMMANDE" ? detailsLivraison.dateDemande : detailsLivraison.dateReception)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <div className="rounded-md border">
+                  <div className="border-b bg-muted/30 px-4 py-3 font-medium">Usages concernés</div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usage</TableHead>
+                        <TableHead className="text-right">Demandé</TableHead>
+                        <TableHead className="text-right">Reçu</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detailsLivraison.lignes.map((ligne) => (
+                        <TableRow key={ligne.id}>
+                          <TableCell>
+                            <div className="font-medium">{ligne.groupeUsageAttestationCode}</div>
+                            <div className="text-xs text-muted-foreground">{ligne.groupeUsageAttestationLibelle}</div>
+                          </TableCell>
+                          <TableCell className="text-right">{ligne.quantiteDemandee}</TableCell>
+                          <TableCell className="text-right font-medium">{ligne.quantiteRecue}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="rounded-md border">
+                  <div className="border-b bg-muted/30 px-4 py-3 font-medium">Lots et plages</div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usage</TableHead>
+                        <TableHead>Préfixe</TableHead>
+                        <TableHead>Plage</TableHead>
+                        <TableHead className="text-right">Quantité</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detailsLivraison.lots.map((lot) => (
+                        <TableRow key={lot.id}>
+                          <TableCell className="font-medium">{lot.groupeUsageAttestationCode}</TableCell>
+                          <TableCell>{lot.prefixe}</TableCell>
+                          <TableCell>
+                            {lot.numeroDebut} - {lot.numeroFin}
+                          </TableCell>
+                          <TableCell className="text-right">{lot.quantite}</TableCell>
+                        </TableRow>
+                      ))}
+                      {detailsLivraison.lots.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="h-20 text-center text-sm text-muted-foreground">
+                            Aucun lot reçu.
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDetailsLivraison(null)}>
+                  Fermer
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
@@ -834,6 +931,7 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                   placeholder="Rechercher une compagnie"
                   emptyText="Aucune compagnie"
                   invalidText="Sélectionnez une compagnie existante."
+                  openOnFocus={false}
                 />
               </Field>
               <Field label={source === "COMMANDE" ? "Date de demande" : "Date de réception"}>

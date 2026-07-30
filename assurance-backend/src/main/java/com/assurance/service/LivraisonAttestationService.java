@@ -107,6 +107,10 @@ public class LivraisonAttestationService {
 
         livraison.setQuantiteDemandee(totalDemande);
         recalculer(livraison);
+        if (source == SourceLivraisonAttestation.RECEPTION_DIRECTE) {
+            livraison.setValidee(true);
+            livraison.setStatut(StatutLivraisonAttestation.VALIDEE);
+        }
         return toResponse(livraisonAttestationRepository.save(livraison));
     }
 

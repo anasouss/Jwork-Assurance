@@ -48,6 +48,7 @@ public class ContratResponse {
     private String modePaiement;
     private String modeReglement;
     private String numeroBonCommande;
+    private BigDecimal montantBulletin;
     private TypePayeurPrime typePayeurPrime;
     private Long payeurPrimeClientId;
     private String payeurPrimeNom;

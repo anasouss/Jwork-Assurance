@@ -5,6 +5,7 @@ import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
 import com.assurance.enums.ModeTarificationGarantie;
+import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
@@ -330,11 +331,15 @@ public class DataSeeder implements CommandLineRunner {
     ) {
         LocalDate dateDebut = LocalDate.of(2000, 1, 1);
         for (CompagnieAssurance compagnie : compagnies) {
+            ModeVentilationQuittance modeVentilation = "ATLANTA_SANAD".equalsIgnoreCase(compagnie.getCode())
+                    ? ModeVentilationQuittance.PAR_CATEGORIE
+                    : ModeVentilationQuittance.GLOBALE;
             regleAffectationQuittanceRepository.save(buildRegleAffectation(
                     agence,
                     compagnie,
                     TypeContrat.PARTICULIER,
                     ModeAffectationQuittance.AUTOMATIQUE,
+                    modeVentilation,
                     ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE,
                     "12",
                     "3",
@@ -347,6 +352,7 @@ public class DataSeeder implements CommandLineRunner {
                     compagnie,
                     TypeContrat.CONVENTION,
                     ModeAffectationQuittance.AUTOMATIQUE,
+                    modeVentilation,
                     ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE,
                     "12",
                     "3",
@@ -359,6 +365,7 @@ public class DataSeeder implements CommandLineRunner {
                     compagnie,
                     TypeContrat.FLOTTE,
                     ModeAffectationQuittance.MANUEL_OU_IMPORT,
+                    ModeVentilationQuittance.GLOBALE,
                     ModeCalculCommission.TAUX_NET,
                     "0",
                     "0",
@@ -374,6 +381,7 @@ public class DataSeeder implements CommandLineRunner {
             CompagnieAssurance compagnie,
             TypeContrat typeContrat,
             ModeAffectationQuittance modeAffectation,
+            ModeVentilationQuittance modeVentilation,
             ModeCalculCommission modeCalculCommission,
             String tauxAutomobile,
             String tauxEvcat,
@@ -386,6 +394,7 @@ public class DataSeeder implements CommandLineRunner {
                 .compagnieAssurance(compagnie)
                 .typeContrat(typeContrat)
                 .modeAffectation(modeAffectation)
+                .modeVentilation(modeVentilation)
                 .modeCalculCommission(modeCalculCommission)
                 .tauxCommissionAutomobile(new BigDecimal(tauxAutomobile))
                 .tauxCommissionEvcat(new BigDecimal(tauxEvcat))

@@ -11,6 +11,7 @@ export type StatutAffectation =
   | "AVEC_ECART";
 export type SourceAffectation = "AUTOMATIQUE" | "MANUEL" | "IMPORT";
 export type ModeAffectation = "AUTOMATIQUE" | "MANUEL_OU_IMPORT";
+export type ModeVentilationQuittance = "GLOBALE" | "PAR_CATEGORIE";
 export type ModeCalculCommission = "TAUX_NET" | "TAUX_BRUT_TVA_INCLUSE";
 
 export type Rule = {
@@ -19,6 +20,7 @@ export type Rule = {
   compagnie: string;
   typeContrat: TypeContrat;
   modeAffectation: ModeAffectation;
+  modeVentilation: ModeVentilationQuittance;
   modeCalculCommission: ModeCalculCommission;
   tauxCommissionAutomobile: number;
   tauxCommissionEvcat: number;
@@ -67,6 +69,7 @@ export type AllocationLine = {
   dateEcheance?: string | null;
   acteSource?: string | null;
   categorieSource?: string | null;
+  categorieQuittance?: "AUTOMOBILE" | "EVCAT" | "CORPOREL" | "TOTAL" | null;
   statutSource?: string | null;
   fichierSource?: string | null;
   primeNette: number;
@@ -139,6 +142,7 @@ export type AllocationRequestLine = Pick<
   | "dateEcheance"
   | "acteSource"
   | "categorieSource"
+  | "categorieQuittance"
   | "statutSource"
   | "primeNette"
   | "montantTaxes"

@@ -2,6 +2,7 @@ package com.assurance.dto.response;
 
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
+import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.TypeContrat;
 import lombok.Builder;
 import lombok.Data;
@@ -17,6 +18,7 @@ public class RegleAffectationQuittanceResponse {
     private String compagnie;
     private TypeContrat typeContrat;
     private ModeAffectationQuittance modeAffectation;
+    private ModeVentilationQuittance modeVentilation;
     private ModeCalculCommission modeCalculCommission;
     private BigDecimal tauxCommissionAutomobile;
     private BigDecimal tauxCommissionEvcat;

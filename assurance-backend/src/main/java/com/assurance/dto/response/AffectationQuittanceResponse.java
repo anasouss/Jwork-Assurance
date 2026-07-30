@@ -3,6 +3,7 @@ package com.assurance.dto.response;
 import com.assurance.enums.NatureAffectationQuittance;
 import com.assurance.enums.SourceAffectationQuittance;
 import com.assurance.enums.StatutAffectationQuittance;
+import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.TypeContrat;
 import lombok.Builder;
 import lombok.Data;
@@ -53,6 +54,7 @@ public class AffectationQuittanceResponse {
         private LocalDate dateEcheance;
         private String acteSource;
         private String categorieSource;
+        private CategorieQuittance categorieQuittance;
         private String statutSource;
         private String fichierSource;
         private BigDecimal primeNette;

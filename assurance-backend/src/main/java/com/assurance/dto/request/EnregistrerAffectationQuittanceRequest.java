@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.SourceAffectationQuittance;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -31,6 +32,7 @@ public class EnregistrerAffectationQuittanceRequest {
         private LocalDate dateEcheance;
         private String acteSource;
         private String categorieSource;
+        private CategorieQuittance categorieQuittance;
         private String statutSource;
         @NotNull
         private BigDecimal primeNette;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, Save, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ClientSection } from "../components/ClientSection";
 import { GarantieSection } from "../components/GarantieSection";
@@ -12,6 +13,7 @@ import { RemorqueSection } from "../components/RemorqueSection";
 import { SectionCard } from "../components/SectionCard";
 import { VehiculeSection } from "../components/VehiculeSection";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
+import { Field } from "../components/Field";
 import { ContractInfoSection } from "./ContractInfoSection";
 import { FlotteTargetsSection } from "./FlotteTargetsSection";
 import { TariffGridSection } from "./TariffGridSection";
@@ -374,6 +376,20 @@ export function ContratFormLayout({
         <QuittancePreviewCard preview={form.preview} loading={form.previewMutation.isPending || form.autoPreviewMutation.isPending} />
       </SectionCard>
     )}
+
+      {showConvention && form.modeReglement === "facture" ? (
+        <SectionCard title="Bulletin" badge="Obligatoire" tone="production" defaultOpen>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Montant du bulletin" required error={form.validationErrors.montantBulletin}>
+              <Input
+                inputMode="decimal"
+                value={form.montantBulletin}
+                onChange={(event) => form.setMontantBulletin(event.target.value)}
+              />
+            </Field>
+          </div>
+        </SectionCard>
+      ) : null}
 
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>

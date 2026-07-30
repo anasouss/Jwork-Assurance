@@ -2,6 +2,7 @@ package com.assurance.entity;
 
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
+import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.TypeContrat;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -49,6 +50,11 @@ public class RegleAffectationQuittance extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "mode_affectation", nullable = false, length = 30)
     private ModeAffectationQuittance modeAffectation;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_ventilation", nullable = false, length = 30)
+    private ModeVentilationQuittance modeVentilation = ModeVentilationQuittance.GLOBALE;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "mode_calcul_commission", nullable = false, length = 40)

@@ -1,5 +1,6 @@
 package com.assurance.entity;
 
+import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.SourceAffectationQuittance;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -68,6 +69,10 @@ public class AffectationQuittanceCompagnie extends BaseEntity {
 
     @Column(name = "categorie_source", length = 220)
     private String categorieSource;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "categorie_quittance", length = 30)
+    private CategorieQuittance categorieQuittance;
 
     @Column(name = "statut_source", length = 100)
     private String statutSource;

@@ -2,6 +2,7 @@ package com.assurance.dto.request;
 
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
+import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.TypeContrat;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,8 @@ public class UpsertRegleAffectationQuittanceRequest {
     private TypeContrat typeContrat;
     @NotNull
     private ModeAffectationQuittance modeAffectation;
+    @NotNull
+    private ModeVentilationQuittance modeVentilation;
     @NotNull
     private ModeCalculCommission modeCalculCommission;
     @NotNull

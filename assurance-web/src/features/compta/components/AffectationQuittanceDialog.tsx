@@ -33,6 +33,7 @@ import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
 import type {
+  AllocationLine,
   AllocationRequest,
   AllocationRequestLine,
   ImportPreview,
@@ -57,6 +58,7 @@ type FleetLine = {
   dateEcheance: string;
   acteSource?: string | null;
   categorieSource?: string | null;
+  categorieQuittance?: AllocationLine["categorieQuittance"];
   statutSource?: string | null;
   fichierSource?: string | null;
   primeNette?: number;
@@ -120,28 +122,21 @@ export function AffectationQuittanceDialog({
     if (!data || initializedId === data.quittanceId) return;
     setAvecRetenue(data.avecRetenue);
     setNumero(data.lignes[0]?.numeroQuittanceCompagnie ?? "");
-    setFleetLines(
-      data.lignes.map((line) => ({
-        key: line.id ?? crypto.randomUUID(),
-        numeroQuittanceCompagnie: line.numeroQuittanceCompagnie,
-        dateEffet: line.dateEffet,
-        dateEcheance: line.dateEcheance ?? "",
-        acteSource: line.acteSource,
-        categorieSource: line.categorieSource,
-        statutSource: line.statutSource,
-        fichierSource: line.fichierSource,
-        primeNette: line.primeNette,
-        montantTaxes: line.montantTaxes,
-        accessoires: line.accessoires,
-        montantTtc: line.montantTtc,
-        commissionNette: line.commissionNette,
-        montantRetenue: line.montantRetenue,
-        netCompagnie: line.netCompagnie,
-      }))
-    );
+    setFleetLines(data.lignes.map(toFleetLine));
     setFleetMode(data.lignes[0]?.source === "IMPORT" ? "IMPORT" : "MANUEL");
     setInitializedId(data.quittanceId);
   }, [initializedId, open, savedDetail.data]);
+
+  useEffect(() => {
+    const data = retentionPreview.data;
+    if (!data || data.typeContrat === "FLOTTE" || data.regle?.modeVentilation !== "PAR_CATEGORIE") return;
+    setFleetLines((current) =>
+      data.lignes.map((line, index) => ({
+        ...toFleetLine(line),
+        numeroQuittanceCompagnie: current[index]?.numeroQuittanceCompagnie ?? line.numeroQuittanceCompagnie ?? "",
+      }))
+    );
+  }, [retentionPreview.data]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -181,25 +176,7 @@ export function AffectationQuittanceDialog({
     },
     onSuccess: (preview) => {
       setImportPreview(preview);
-      setFleetLines(
-        preview.lignes.map((line) => ({
-          key: line.id ?? crypto.randomUUID(),
-          numeroQuittanceCompagnie: line.numeroQuittanceCompagnie,
-          dateEffet: line.dateEffet,
-          dateEcheance: line.dateEcheance ?? "",
-          acteSource: line.acteSource,
-          categorieSource: line.categorieSource,
-          statutSource: line.statutSource,
-          fichierSource: line.fichierSource,
-          primeNette: line.primeNette,
-          montantTaxes: line.montantTaxes,
-          accessoires: line.accessoires,
-          montantTtc: line.montantTtc,
-          commissionNette: line.commissionNette,
-          montantRetenue: line.montantRetenue,
-          netCompagnie: line.netCompagnie,
-        }))
-      );
+      setFleetLines(preview.lignes.map(toFleetLine));
       if (preview.erreurs.length) {
         toast.warning(`${preview.erreurs.length} anomalie(s) détectée(s)`);
       } else {
@@ -209,10 +186,15 @@ export function AffectationQuittanceDialog({
     onError: (error) => toast.error(error instanceof Error ? error.message : "Import impossible"),
   });
 
-  const hasAllocation = Boolean(savedDetail.data?.lignes.length);
+  const hasAllocation = Boolean(savedDetail.data?.lignes.some((line) => line.id));
   const canSave = useMemo(() => {
     if (!detailData || avecRetenue == null) return false;
-    if (detailData.typeContrat !== "FLOTTE") return Boolean(numero.trim());
+    if (detailData.typeContrat !== "FLOTTE") {
+      if (detailData.regle?.modeVentilation === "PAR_CATEGORIE") {
+        return fleetLines.length > 0 && fleetLines.every(isCompleteAutomaticCategoryLine);
+      }
+      return Boolean(numero.trim());
+    }
     return (
       fleetLines.length > 0 &&
       fleetLines.every(isCompleteFleetLine) &&
@@ -342,6 +324,8 @@ export function AffectationQuittanceDialog({
                     ) : null}
                   </TabsContent>
                 </Tabs>
+              ) : detailData.regle?.modeVentilation === "PAR_CATEGORIE" ? (
+                <AutomaticCategoryAllocation lines={fleetLines} onChange={setFleetLines} readOnly={readOnly} />
               ) : (
                 <AutomaticAllocation
                   data={detailData}
@@ -460,6 +444,73 @@ function AutomaticAllocation({
       </div>
       <p className="text-xs text-muted-foreground">
         Les montants sont calculés par le serveur à partir des lignes de la quittance et de la règle effective.
+      </p>
+    </div>
+  );
+}
+
+function AutomaticCategoryAllocation({
+  lines,
+  readOnly,
+  onChange,
+}: {
+  lines: FleetLine[];
+  readOnly: boolean;
+  onChange: (lines: FleetLine[]) => void;
+}) {
+  function update(key: string, patch: Partial<FleetLine>) {
+    onChange(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  }
+
+  return (
+    <div className="grid gap-3 border-y py-4">
+      <div className="overflow-x-auto border">
+        <table className="w-full min-w-[1120px] text-sm">
+          <thead className="bg-muted/60 text-left text-xs uppercase">
+            <tr>
+              <th className="px-3 py-2">Catégorie</th>
+              <th className="px-3 py-2">N° quittance compagnie</th>
+              <th className="px-3 py-2 text-right">Montant TTC</th>
+              <th className="px-3 py-2 text-right">Prime nette</th>
+              <th className="px-3 py-2 text-right">Commission nette</th>
+              <th className="px-3 py-2 text-right">Retenue source</th>
+              <th className="px-3 py-2 text-right">Net compagnie</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.length ? (
+              lines.map((line) => (
+                <tr key={line.key} className="border-t">
+                  <td className="px-3 py-2 font-medium">
+                    {line.categorieSource || categoryLabel(line.categorieQuittance)}
+                  </td>
+                  <td className="min-w-56 px-3 py-2">
+                    <Input
+                      aria-label={`N° quittance compagnie ${categoryLabel(line.categorieQuittance)}`}
+                      readOnly={readOnly}
+                      value={line.numeroQuittanceCompagnie}
+                      onChange={(event) => update(line.key, { numeroQuittanceCompagnie: event.target.value })}
+                    />
+                  </td>
+                  <MoneyValue value={line.montantTtc} strong />
+                  <MoneyValue value={line.primeNette} />
+                  <MoneyValue value={line.commissionNette} />
+                  <MoneyValue value={line.montantRetenue} />
+                  <MoneyValue value={line.netCompagnie} strong />
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                  Aucune ligne de catégorie à affecter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Une ligne est créée uniquement pour les catégories comptables réelles de la quittance. Le total général reste un résumé et n'est pas affecté.
       </p>
     </div>
   );
@@ -641,9 +692,43 @@ function emptyFleetLine(dateEffet: string, dateEcheance: string): FleetLine {
   };
 }
 
+function toFleetLine(line: AllocationLine): FleetLine {
+  return {
+    key: line.id ?? `${line.categorieQuittance ?? "line"}-${crypto.randomUUID()}`,
+    numeroQuittanceCompagnie: line.numeroQuittanceCompagnie ?? "",
+    dateEffet: line.dateEffet,
+    dateEcheance: line.dateEcheance ?? "",
+    acteSource: line.acteSource,
+    categorieSource: line.categorieSource,
+    categorieQuittance: line.categorieQuittance,
+    statutSource: line.statutSource,
+    fichierSource: line.fichierSource,
+    primeNette: line.primeNette,
+    montantTaxes: line.montantTaxes,
+    accessoires: line.accessoires,
+    montantTtc: line.montantTtc,
+    commissionNette: line.commissionNette,
+    montantRetenue: line.montantRetenue,
+    netCompagnie: line.netCompagnie,
+  };
+}
+
 function isCompleteFleetLine(line: FleetLine) {
   return Boolean(
     line.numeroQuittanceCompagnie.trim() &&
+      line.dateEffet &&
+      line.primeNette != null &&
+      line.montantTaxes != null &&
+      line.accessoires != null &&
+      line.montantTtc != null &&
+      line.commissionNette != null
+  );
+}
+
+function isCompleteAutomaticCategoryLine(line: FleetLine) {
+  return Boolean(
+    line.categorieQuittance &&
+      line.numeroQuittanceCompagnie.trim() &&
       line.dateEffet &&
       line.primeNette != null &&
       line.montantTaxes != null &&
@@ -662,6 +747,16 @@ function buildRequest(
   importPreview: ImportPreview | null
 ): AllocationRequest {
   if (data.typeContrat !== "FLOTTE") {
+    if (data.regle?.modeVentilation === "PAR_CATEGORIE") {
+      if (!fleetLines.length || !fleetLines.every(isCompleteAutomaticCategoryLine)) {
+        throw new Error("Renseignez un numéro de quittance compagnie pour chaque catégorie");
+      }
+      return {
+        source: "AUTOMATIQUE",
+        avecRetenue,
+        lignes: fleetLines.map(toRequestLine),
+      };
+    }
     return {
       source: "AUTOMATIQUE",
       avecRetenue,
@@ -688,6 +783,7 @@ function toRequestLine(line: FleetLine): AllocationRequestLine {
     dateEcheance: line.dateEcheance || null,
     acteSource: line.acteSource,
     categorieSource: line.categorieSource,
+    categorieQuittance: line.categorieQuittance,
     statutSource: line.statutSource,
     primeNette: line.primeNette!,
     montantTaxes: line.montantTaxes!,
@@ -701,6 +797,14 @@ function contractLabel(type: QuittanceAllocation["typeContrat"]) {
   if (type === "PARTICULIER") return "Mono";
   if (type === "CONVENTION") return "Convention";
   return "Flotte";
+}
+
+function categoryLabel(category?: AllocationLine["categorieQuittance"]) {
+  if (category === "AUTOMOBILE") return "Automobile";
+  if (category === "EVCAT") return "EVCAT";
+  if (category === "CORPOREL") return "Corporel";
+  if (category === "TOTAL") return "Total";
+  return "Catégorie";
 }
 
 function money(value: number) {

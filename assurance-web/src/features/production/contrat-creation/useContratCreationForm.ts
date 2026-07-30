@@ -50,6 +50,7 @@ export function useContratCreationForm(
   const [echeance, setEcheance] = useState<string | undefined>();
   const [modeReglement, setModeReglement] = useState("bureau");
   const [numeroBonCommande, setNumeroBonCommande] = useState("");
+  const [montantBulletin, setMontantBulletin] = useState("");
   const [typePayeurPrime, setTypePayeurPrime] = useState<TypePayeurPrime>("SOUSCRIPTEUR");
   const [payeurPrimeClientId, setPayeurPrimeClientId] = useState("");
   const [groupeFacturationId, setGroupeFacturationId] = useState("");
@@ -215,6 +216,7 @@ export function useContratCreationForm(
     setEcheance(hydrated.echeance);
     setModeReglement(hydrated.modeReglement);
     setNumeroBonCommande(hydrated.numeroBonCommande);
+    setMontantBulletin(hydrated.montantBulletin);
     setTypePayeurPrime(hydrated.typePayeurPrime);
     setPayeurPrimeClientId(hydrated.payeurPrimeClientId);
     setGroupeFacturationId(hydrated.groupeFacturationId);
@@ -297,6 +299,7 @@ export function useContratCreationForm(
     periodicite: periodiciteFromFractionnement(fractionnement),
     modeReglement: typeContrat === "CONVENTION" ? modeReglement : undefined,
     numeroBonCommande: typeContrat === "CONVENTION" && modeReglement === "facture" ? emptyToUndefined(numeroBonCommande) : undefined,
+    montantBulletin: typeContrat === "CONVENTION" && modeReglement === "facture" ? positiveNumberOrUndefined(montantBulletin) : undefined,
     typePayeurPrime,
     payeurPrimeClientId: typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE"
       ? emptyToUndefined(payeurPrimeClientId)
@@ -361,6 +364,7 @@ export function useContratCreationForm(
     modeTermeRenouvellement,
     modeReglement,
     numeroBonCommande,
+    montantBulletin,
     typePayeurPrime,
     payeurPrimeClientId,
     groupeFacturationId,
@@ -546,6 +550,11 @@ export function useContratCreationForm(
     if (typeContrat === "CONVENTION" && modeReglement === "facture" && !numeroBonCommande.trim()) {
       setValidationErrors({ numeroBonCommande: "N° bon de commande obligatoire." });
       toast.error("N° bon de commande obligatoire.");
+      return false;
+    }
+    if (typeContrat === "CONVENTION" && modeReglement === "facture" && !positiveNumberOrUndefined(montantBulletin)) {
+      setValidationErrors({ montantBulletin: "Montant du bulletin obligatoire." });
+      toast.error("Montant du bulletin obligatoire.");
       return false;
     }
     if (isFlotteLocationCategory && !positiveNumberOrUndefined(tauxRc)) {
@@ -1070,6 +1079,8 @@ export function useContratCreationForm(
     setModeReglement,
     numeroBonCommande,
     setNumeroBonCommande,
+    montantBulletin,
+    setMontantBulletin,
     typePayeurPrime,
     setTypePayeurPrime,
     payeurPrimeClientId,
@@ -1165,7 +1176,7 @@ function numberOrZero(value?: number) {
 }
 
 function positiveNumberOrUndefined(value: string) {
-  const parsed = Number(value.trim().replace(",", "."));
+  const parsed = Number(value.trim().replace(/\s|\u00a0/g, "").replace(",", "."));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
@@ -1258,6 +1269,9 @@ function isValidationErrorResolved(key: string, request: CreateContratRequest, t
   }
   if (key === "numeroBonCommande") {
     return Boolean(request.numeroBonCommande?.trim());
+  }
+  if (key === "montantBulletin") {
+    return typeof request.montantBulletin === "number" && request.montantBulletin > 0;
   }
   const value = request[key as keyof CreateContratRequest];
   return value != null && (typeof value !== "string" || value.trim() !== "");
@@ -1511,6 +1525,7 @@ function hydrateDraft(draft: ContratSummary) {
     echeance: draft.echeance ?? undefined,
     modeReglement: draft.modeReglement ?? "bureau",
     numeroBonCommande: draft.numeroBonCommande ?? "",
+    montantBulletin: draft.montantBulletin == null ? "" : String(draft.montantBulletin),
     typePayeurPrime: draft.typePayeurPrime ?? "SOUSCRIPTEUR",
     payeurPrimeClientId: idString(draft.payeurPrimeClientId),
     groupeFacturationId: idString(draft.groupeFacturationId),

@@ -25,6 +25,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -125,6 +126,9 @@ public class Contrat extends BaseEntity {
 
     @Column(name = "numero_bon_commande", length = 120)
     private String numeroBonCommande;
+
+    @Column(name = "montant_bulletin", precision = 19, scale = 2)
+    private BigDecimal montantBulletin;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type_payeur_prime", length = 30)

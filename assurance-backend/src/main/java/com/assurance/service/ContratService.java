@@ -341,6 +341,7 @@ public class ContratService {
 
     private ContratResponse createContrat(CreateContratRequest request) {
         validateContractReference(request);
+        validateConventionReglement(request);
         if (hasText(request.getNumeroContrat()) && contratRepository.existsByAgenceIdAndNumeroContrat(request.getAgenceId(), request.getNumeroContrat())) {
             throw new BadRequestException("Numero de contrat deja utilise pour cette agence");
         }
@@ -388,6 +389,7 @@ public class ContratService {
                 .modePaiement(request.getModePaiement())
                 .modeReglement(request.getModeReglement())
                 .numeroBonCommande(request.getNumeroBonCommande())
+                .montantBulletin(request.getMontantBulletin())
                 .periodicite(request.getPeriodicite())
                 .fractionnement(request.getFractionnement())
                 .tauxRc(request.getTauxRc())
@@ -614,6 +616,7 @@ public class ContratService {
             throw new BadRequestException("Le type de contrat est obligatoire");
         }
         validateContractReference(request);
+        validateConventionReglement(request);
         CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
                 compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                         .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
@@ -740,6 +743,7 @@ public class ContratService {
             throw new BadRequestException("Le type de contrat est obligatoire");
         }
         validateContractReference(request);
+        validateConventionReglement(request);
         CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
                 compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                         .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
@@ -842,6 +846,7 @@ public class ContratService {
         contrat.setModePaiement(blankToNull(request.getModePaiement()));
         contrat.setModeReglement(blankToNull(request.getModeReglement()));
         contrat.setNumeroBonCommande(blankToNull(request.getNumeroBonCommande()));
+        contrat.setMontantBulletin(request.getMontantBulletin());
         contrat.setPeriodicite(blankToNull(request.getPeriodicite()));
         contrat.setFractionnement(request.getFractionnement());
         contrat.setTauxRc(request.getTauxRc());
@@ -3312,6 +3317,7 @@ public class ContratService {
         request.setModePaiement(source.getModePaiement());
         request.setModeReglement(source.getModeReglement());
         request.setNumeroBonCommande(source.getNumeroBonCommande());
+        request.setMontantBulletin(source.getMontantBulletin());
         request.setTypePayeurPrime(source.getTypePayeurPrime());
         request.setPayeurPrimeClientId(source.getPayeurPrime() == null ? null : source.getPayeurPrime().getId());
         request.setGroupeFacturationId(source.getGroupeFacturation() == null ? null : source.getGroupeFacturation().getId());
@@ -3525,6 +3531,7 @@ public class ContratService {
                 .modePaiement(request.getModePaiement())
                 .modeReglement(request.getModeReglement())
                 .numeroBonCommande(request.getNumeroBonCommande())
+                .montantBulletin(request.getMontantBulletin())
                 .periodicite(request.getPeriodicite())
                 .fractionnement(request.getFractionnement())
                 .tauxRc(request.getTauxRc())
@@ -4074,6 +4081,7 @@ public class ContratService {
                 .modePaiement(contrat.getModePaiement())
                 .modeReglement(contrat.getModeReglement())
                 .numeroBonCommande(contrat.getNumeroBonCommande())
+                .montantBulletin(contrat.getMontantBulletin())
                 .typePayeurPrime(contrat.getTypePayeurPrime() == null
                         ? TypePayeurPrime.SOUSCRIPTEUR
                         : contrat.getTypePayeurPrime())
@@ -4652,6 +4660,24 @@ public class ContratService {
         }
         if (!hasText(request.getNumeroPolice())) {
             throw new BadRequestException("Numero de police obligatoire");
+        }
+    }
+
+    private void validateConventionReglement(CreateContratRequest request) {
+        if (request.getTypeContrat() != TypeContrat.CONVENTION) {
+            return;
+        }
+        if (!hasText(request.getModeReglement())) {
+            throw new BadRequestException("Mode de reglement obligatoire");
+        }
+        if (!"facture".equalsIgnoreCase(request.getModeReglement())) {
+            return;
+        }
+        if (!hasText(request.getNumeroBonCommande())) {
+            throw new BadRequestException("Numero de bon de commande obligatoire");
+        }
+        if (request.getMontantBulletin() == null || request.getMontantBulletin().signum() <= 0) {
+            throw new BadRequestException("Montant du bulletin obligatoire");
         }
     }
 

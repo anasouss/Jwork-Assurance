@@ -716,6 +716,7 @@ export type CreateContratRequest = {
   periodicite?: string;
   modeReglement?: string;
   numeroBonCommande?: string;
+  montantBulletin?: number;
   typePayeurPrime?: TypePayeurPrime;
   payeurPrimeClientId?: string;
   groupeFacturationId?: string;
@@ -1083,6 +1084,7 @@ export type ContratSummary = {
   modePaiement?: string | null;
   modeReglement?: string | null;
   numeroBonCommande?: string | null;
+  montantBulletin?: number | null;
   typePayeurPrime?: TypePayeurPrime | null;
   payeurPrimeClientId?: string | null;
   payeurPrimeNom?: string | null;

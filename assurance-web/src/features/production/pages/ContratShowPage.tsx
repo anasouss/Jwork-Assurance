@@ -128,6 +128,15 @@ export default function ContratShowPage() {
                 ["Groupe client", souscripteur?.groupe?.libelle ?? "Indépendant"],
                 ["Payeur des primes", contrat.payeurPrimeNom ?? payerTypeLabel(contrat.typePayeurPrime)],
                 ["Facturation", billingModeLabel(contrat.modeFacturation)],
+                ...(contrat.modeReglement
+                  ? [["Mode de règlement", contractPaymentModeLabel(contrat.modeReglement)] as [string, ReactNode]]
+                  : []),
+                ...(contrat.numeroBonCommande
+                  ? [["N° bon de commande", contrat.numeroBonCommande] as [string, ReactNode]]
+                  : []),
+                ...(contrat.montantBulletin != null
+                  ? [["Montant du bulletin", formatMoney(contrat.montantBulletin)] as [string, ReactNode]]
+                  : []),
                 ...(contrat.referenceMandatPayeur
                   ? [["Référence mandat", contrat.referenceMandatPayeur] as [string, ReactNode]]
                   : []),
@@ -683,6 +692,12 @@ function payerTypeLabel(type?: ContratSummary["typePayeurPrime"]) {
 
 function billingModeLabel(mode?: ContratSummary["modeFacturation"]) {
   return mode === "CONSOLIDEE_GROUPE" ? "Consolidée au groupe" : "Directe au payeur";
+}
+
+function contractPaymentModeLabel(mode?: string | null) {
+  if (mode === "facture") return "Règlement facture";
+  if (mode === "bureau") return "Règlement bureau";
+  return text(mode);
 }
 
 function latestEvent(contrat: ContratSummary) {

@@ -18,6 +18,7 @@ import com.assurance.entity.RegleAffectationQuittance;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
+import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.NatureAffectationQuittance;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.RoleClientContrat;
@@ -188,15 +189,23 @@ public class AffectationQuittanceService {
                         .orElse(Boolean.TRUE.equals(regle.getRetenueParDefaut()));
         response.setAvecRetenue(retentionEnabled);
         if (quittance.getContrat().getTypeContrat() != TypeContrat.FLOTTE) {
-            BigDecimal commission = calculateCommission(quittance, regle);
-            Retention retention = calculateRetention(commission, retentionEnabled, regle);
-            response.setCommissionCalculee(commission);
-            response.setRetenueCalculee(retention.amount());
-            response.setNetCompagnieCalcule(money(
-                    requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance")
-                            .subtract(commission)
-                            .add(retention.amount())
-            ));
+            if (regle.getModeVentilation() == ModeVentilationQuittance.PAR_CATEGORIE && response.getLignes().isEmpty()) {
+                List<AffectationQuittanceResponse.Ligne> previewLines = buildAutomaticCategoryPreviewLines(quittance, regle, retentionEnabled);
+                response.setLignes(previewLines);
+                response.setCommissionCalculee(sum(previewLines, AffectationQuittanceResponse.Ligne::getCommissionNette));
+                response.setRetenueCalculee(sum(previewLines, AffectationQuittanceResponse.Ligne::getMontantRetenue));
+                response.setNetCompagnieCalcule(sum(previewLines, AffectationQuittanceResponse.Ligne::getNetCompagnie));
+            } else {
+                BigDecimal commission = calculateCommission(quittance, regle);
+                Retention retention = calculateRetention(commission, retentionEnabled, regle);
+                response.setCommissionCalculee(commission);
+                response.setRetenueCalculee(retention.amount());
+                response.setNetCompagnieCalcule(money(
+                        requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance")
+                                .subtract(commission)
+                                .add(retention.amount())
+                ));
+            }
         }
         return response;
     }
@@ -214,7 +223,7 @@ public class AffectationQuittanceService {
 
         List<AffectationQuittanceCompagnie> entities = quittance.getContrat().getTypeContrat() == TypeContrat.FLOTTE
                 ? buildFleetAffectations(agenceId, userId, quittance, regle, request)
-                : List.of(buildAutomaticAffectation(agenceId, userId, quittance, regle, request));
+                : buildAutomaticAffectations(agenceId, userId, quittance, regle, request);
 
         validateRequestNumbers(agenceId, quittance, entities);
         affectationRepository.deleteByQuittanceId(quittanceId);
@@ -355,19 +364,24 @@ public class AffectationQuittanceService {
         }
     }
 
-    private AffectationQuittanceCompagnie buildAutomaticAffectation(
+    private List<AffectationQuittanceCompagnie> buildAutomaticAffectations(
             Long agenceId,
             Long userId,
             Quittance quittance,
             RegleAffectationQuittance regle,
             EnregistrerAffectationQuittanceRequest request
     ) {
+        if (request.getSource() != SourceAffectationQuittance.AUTOMATIQUE) {
+            throw new BadRequestException("Une quittance Mono ou Convention doit être affectée en mode automatique");
+        }
+
+        if (regle.getModeVentilation() == ModeVentilationQuittance.PAR_CATEGORIE) {
+            return buildAutomaticCategoryAffectations(agenceId, userId, quittance, regle, request);
+        }
+
         String numero = trimToNull(request.getNumeroQuittanceCompagnie());
         if (numero == null) {
             throw new BadRequestException("Le numéro de quittance compagnie est obligatoire");
-        }
-        if (request.getSource() != SourceAffectationQuittance.AUTOMATIQUE) {
-            throw new BadRequestException("Une quittance Mono ou Convention doit être affectée en mode automatique");
         }
 
         BigDecimal commissionNette = calculateCommission(quittance, regle);
@@ -376,7 +390,7 @@ public class AffectationQuittanceService {
         BigDecimal accessoires = requiredAmount(quittance.getAccessoire(), "Accessoires de la quittance")
                 .add(requiredAmount(quittance.getCnpac(), "CNPAC de la quittance"));
 
-        return AffectationQuittanceCompagnie.builder()
+        AffectationQuittanceCompagnie entity = AffectationQuittanceCompagnie.builder()
                 .agence(requireAgence(agenceId))
                 .quittance(quittance)
                 .compagnieAssurance(requireQuittanceCompagnie(quittance))
@@ -397,6 +411,81 @@ public class AffectationQuittanceService {
                 .creePar(userId)
                 .modifiePar(userId)
                 .build();
+        return List.of(entity);
+    }
+
+    private List<AffectationQuittanceCompagnie> buildAutomaticCategoryAffectations(
+            Long agenceId,
+            Long userId,
+            Quittance quittance,
+            RegleAffectationQuittance regle,
+            EnregistrerAffectationQuittanceRequest request
+    ) {
+        List<LigneQuittance> categoryLines = accountingCategoryLines(quittance).stream()
+                .filter(line -> line.getCategorie() != CategorieQuittance.TOTAL)
+                .filter(line -> money(line.getPrimeTotale()).compareTo(ZERO) != 0 || money(line.getPrimeNette()).compareTo(ZERO) != 0)
+                .toList();
+        if (categoryLines.isEmpty()) {
+            throw new BadRequestException("Les lignes comptables de la quittance sont requises pour ventiler par catégorie");
+        }
+        if (request.getLignes() == null || request.getLignes().size() != categoryLines.size()) {
+            throw new BadRequestException("Renseignez un numéro de quittance compagnie pour chaque catégorie");
+        }
+        request.getLignes().forEach(line -> {
+            if (line.getCategorieQuittance() == null) {
+                throw new BadRequestException("Chaque ligne ventilée doit préciser sa catégorie");
+            }
+        });
+
+        Map<CategorieQuittance, EnregistrerAffectationQuittanceRequest.Ligne> requestLines = request.getLignes().stream()
+                .collect(Collectors.toMap(
+                        EnregistrerAffectationQuittanceRequest.Ligne::getCategorieQuittance,
+                        Function.identity(),
+                        (left, right) -> {
+                            throw new BadRequestException("La catégorie " + left.getCategorieQuittance() + " est dupliquée");
+                        },
+                        LinkedHashMap::new
+                ));
+
+        Agence agence = requireAgence(agenceId);
+        CompagnieAssurance compagnie = requireQuittanceCompagnie(quittance);
+        List<AffectationQuittanceCompagnie> result = new ArrayList<>();
+        for (LigneQuittance categoryLine : categoryLines) {
+            CategorieQuittance categorie = categoryLine.getCategorie();
+            EnregistrerAffectationQuittanceRequest.Ligne requestLine = requestLines.get(categorie);
+            if (requestLine == null || trimToNull(requestLine.getNumeroQuittanceCompagnie()) == null) {
+                throw new BadRequestException("Le numéro de quittance compagnie est obligatoire pour " + categorie.name());
+            }
+            BigDecimal commissionNette = calculateCommissionForCategory(categoryLine, regle);
+            Retention retention = calculateRetention(commissionNette, request.getAvecRetenue(), regle);
+            BigDecimal montantTtc = requiredAmount(categoryLine.getPrimeTotale(), "Montant TTC de " + categorie.name());
+            BigDecimal accessoires = requiredAmount(categoryLine.getAccessoire(), "Accessoires de " + categorie.name())
+                    .add(requiredAmount(categoryLine.getCnpac(), "CNPAC de " + categorie.name()));
+            result.add(AffectationQuittanceCompagnie.builder()
+                    .agence(agence)
+                    .quittance(quittance)
+                    .compagnieAssurance(compagnie)
+                    .numeroQuittanceCompagnie(requestLine.getNumeroQuittanceCompagnie().trim())
+                    .source(SourceAffectationQuittance.AUTOMATIQUE)
+                    .dateEffet(resolveDateEffet(quittance))
+                    .dateEcheance(resolveDateEcheance(quittance))
+                    .categorieSource(categoryLabel(categorie))
+                    .categorieQuittance(categorie)
+                    .primeNette(requiredAmount(categoryLine.getPrimeNette(), "Prime nette de " + categorie.name()))
+                    .montantTaxes(requiredAmount(categoryLine.getTaxe(), "Taxes de " + categorie.name())
+                            .add(requiredAmount(categoryLine.getTaxeParafiscale(), "Taxe parafiscale de " + categorie.name())))
+                    .accessoires(money(accessoires))
+                    .montantTtc(montantTtc)
+                    .commissionNette(commissionNette)
+                    .avecRetenue(Boolean.TRUE.equals(request.getAvecRetenue()))
+                    .tauxRetenue(retention.rate())
+                    .montantRetenue(retention.amount())
+                    .netCompagnie(money(montantTtc.subtract(commissionNette).add(retention.amount())))
+                    .creePar(userId)
+                    .modifiePar(userId)
+                    .build());
+        }
+        return result;
     }
 
     private List<AffectationQuittanceCompagnie> buildFleetAffectations(
@@ -436,6 +525,7 @@ public class AffectationQuittanceService {
                     .dateEcheance(line.getDateEcheance())
                     .acteSource(trimToNull(line.getActeSource()))
                     .categorieSource(trimToNull(line.getCategorieSource()))
+                    .categorieQuittance(line.getCategorieQuittance())
                     .statutSource(trimToNull(line.getStatutSource()))
                     .fichierSource(fichierSource)
                     .primeNette(money(line.getPrimeNette()))
@@ -510,11 +600,7 @@ public class AffectationQuittanceService {
     }
 
     private BigDecimal calculateCommission(Quittance quittance, RegleAffectationQuittance regle) {
-        List<LigneQuittance> categoryLines = ligneQuittanceRepository
-                .findByQuittanceIdOrderByOrdreAsc(quittance.getId())
-                .stream()
-                .filter(line -> !Boolean.TRUE.equals(line.getGlobale()))
-                .toList();
+        List<LigneQuittance> categoryLines = accountingCategoryLines(quittance);
         if (categoryLines.isEmpty()) {
             throw new BadRequestException(
                     "Les lignes comptables de la quittance sont requises pour calculer la commission"
@@ -542,6 +628,63 @@ public class AffectationQuittanceService {
             base = base.subtract(percent(base, regle.getTauxTvaIncluseCommission()));
         }
         return money(base);
+    }
+
+    private BigDecimal calculateCommissionForCategory(LigneQuittance line, RegleAffectationQuittance regle) {
+        BigDecimal base = switch (line.getCategorie()) {
+            case AUTOMOBILE -> percent(requiredAmount(line.getPrimeNette(), "Prime nette automobile"), regle.getTauxCommissionAutomobile());
+            case EVCAT -> percent(requiredAmount(line.getPrimeNette(), "Prime nette EVCAT"), regle.getTauxCommissionEvcat());
+            case CORPOREL -> percent(requiredAmount(line.getPrimeNette(), "Prime nette corporel"), regle.getTauxCommissionCorporel());
+            case TOTAL -> ZERO;
+        };
+        if (regle.getModeCalculCommission() == ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE) {
+            base = base.subtract(percent(base, regle.getTauxTvaIncluseCommission()));
+        }
+        return money(base);
+    }
+
+    private List<AffectationQuittanceResponse.Ligne> buildAutomaticCategoryPreviewLines(
+            Quittance quittance,
+            RegleAffectationQuittance regle,
+            boolean avecRetenue
+    ) {
+        return accountingCategoryLines(quittance).stream()
+                .filter(line -> line.getCategorie() != CategorieQuittance.TOTAL)
+                .filter(line -> money(line.getPrimeTotale()).compareTo(ZERO) != 0 || money(line.getPrimeNette()).compareTo(ZERO) != 0)
+                .map(line -> {
+                    BigDecimal commission = calculateCommissionForCategory(line, regle);
+                    Retention retention = calculateRetention(commission, avecRetenue, regle);
+                    BigDecimal montantTtc = requiredAmount(line.getPrimeTotale(), "Montant TTC de " + line.getCategorie().name());
+                    BigDecimal accessoires = requiredAmount(line.getAccessoire(), "Accessoires de " + line.getCategorie().name())
+                            .add(requiredAmount(line.getCnpac(), "CNPAC de " + line.getCategorie().name()));
+                    return AffectationQuittanceResponse.Ligne.builder()
+                            .numeroQuittanceCompagnie("")
+                            .source(SourceAffectationQuittance.AUTOMATIQUE)
+                            .dateEffet(resolveDateEffet(quittance))
+                            .dateEcheance(resolveDateEcheance(quittance))
+                            .categorieSource(categoryLabel(line.getCategorie()))
+                            .categorieQuittance(line.getCategorie())
+                            .primeNette(requiredAmount(line.getPrimeNette(), "Prime nette de " + line.getCategorie().name()))
+                            .montantTaxes(requiredAmount(line.getTaxe(), "Taxes de " + line.getCategorie().name())
+                                    .add(requiredAmount(line.getTaxeParafiscale(), "Taxe parafiscale de " + line.getCategorie().name())))
+                            .accessoires(money(accessoires))
+                            .montantTtc(montantTtc)
+                            .commissionNette(commission)
+                            .avecRetenue(avecRetenue)
+                            .tauxRetenue(retention.rate())
+                            .montantRetenue(retention.amount())
+                            .netCompagnie(money(montantTtc.subtract(commission).add(retention.amount())))
+                            .build();
+                })
+                .toList();
+    }
+
+    private List<LigneQuittance> accountingCategoryLines(Quittance quittance) {
+        return ligneQuittanceRepository
+                .findByQuittanceIdOrderByOrdreAsc(quittance.getId())
+                .stream()
+                .filter(line -> !Boolean.TRUE.equals(line.getGlobale()))
+                .toList();
     }
 
     private Retention calculateRetention(
@@ -648,6 +791,7 @@ public class AffectationQuittanceService {
                 .dateEcheance(entity.getDateEcheance())
                 .acteSource(entity.getActeSource())
                 .categorieSource(entity.getCategorieSource())
+                .categorieQuittance(entity.getCategorieQuittance())
                 .statutSource(entity.getStatutSource())
                 .fichierSource(entity.getFichierSource())
                 .primeNette(entity.getPrimeNette())
@@ -924,6 +1068,10 @@ public class AffectationQuittanceService {
             throw new BadRequestException("Une règle flotte doit utiliser le mode manuel/import");
         }
         if (request.getTypeContrat() == TypeContrat.FLOTTE
+                && request.getModeVentilation() != ModeVentilationQuittance.GLOBALE) {
+            throw new BadRequestException("Une règle flotte doit utiliser une ventilation globale");
+        }
+        if (request.getTypeContrat() == TypeContrat.FLOTTE
                 && (request.getModeCalculCommission() != ModeCalculCommission.TAUX_NET
                 || request.getTauxCommissionAutomobile().signum() != 0
                 || request.getTauxCommissionEvcat().signum() != 0
@@ -1049,6 +1197,7 @@ public class AffectationQuittanceService {
     ) {
         entity.setTypeContrat(request.getTypeContrat());
         entity.setModeAffectation(request.getModeAffectation());
+        entity.setModeVentilation(request.getModeVentilation() != null ? request.getModeVentilation() : ModeVentilationQuittance.GLOBALE);
         entity.setModeCalculCommission(request.getModeCalculCommission());
         entity.setTauxCommissionAutomobile(request.getTauxCommissionAutomobile());
         entity.setTauxCommissionEvcat(request.getTauxCommissionEvcat());
@@ -1082,6 +1231,7 @@ public class AffectationQuittanceService {
                 .compagnie(entity.getCompagnieAssurance().getNom())
                 .typeContrat(entity.getTypeContrat())
                 .modeAffectation(entity.getModeAffectation())
+                .modeVentilation(entity.getModeVentilation())
                 .modeCalculCommission(entity.getModeCalculCommission())
                 .tauxCommissionAutomobile(entity.getTauxCommissionAutomobile())
                 .tauxCommissionEvcat(entity.getTauxCommissionEvcat())
@@ -1245,6 +1395,15 @@ public class AffectationQuittanceService {
             case PARTICULIER -> "Mono";
             case CONVENTION -> "Convention";
             case FLOTTE -> "Flotte";
+        };
+    }
+
+    private String categoryLabel(CategorieQuittance categorie) {
+        return switch (categorie) {
+            case AUTOMOBILE -> "Automobile";
+            case EVCAT -> "EVCAT";
+            case CORPOREL -> "Corporel";
+            case TOTAL -> "Total";
         };
     }
 

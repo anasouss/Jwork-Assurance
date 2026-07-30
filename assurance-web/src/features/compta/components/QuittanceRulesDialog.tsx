@@ -37,7 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
-import type { ModeCalculCommission, Rule, RuleRequest, TypeContrat } from "../types";
+import type { ModeCalculCommission, ModeVentilationQuittance, Rule, RuleRequest, TypeContrat } from "../types";
 
 type Props = {
   open: boolean;
@@ -50,6 +50,7 @@ type Props = {
 type RuleForm = {
   compagnieAssuranceId: string;
   typeContrat: TypeContrat;
+  modeVentilation: ModeVentilationQuittance;
   modeCalculCommission: ModeCalculCommission;
   tauxCommissionAutomobile?: number;
   tauxCommissionEvcat?: number;
@@ -98,6 +99,7 @@ const DEFAULT_EXCEL_MAPPING = {
 const EMPTY_FORM: RuleForm = {
   compagnieAssuranceId: "",
   typeContrat: "PARTICULIER",
+  modeVentilation: "GLOBALE",
   modeCalculCommission: "TAUX_NET",
   retenueParDefaut: false,
   dateDebut: "",
@@ -157,10 +159,12 @@ export function QuittanceRulesDialog({
       setForm(ruleToForm(initialRule));
       setShowForm(true);
     } else if (initialCompanyId || initialTypeContrat) {
+      const typeContrat = initialTypeContrat ?? "PARTICULIER";
       setForm({
         ...EMPTY_FORM,
         compagnieAssuranceId: initialCompanyId ?? "",
-        typeContrat: initialTypeContrat ?? "PARTICULIER",
+        typeContrat,
+        modeVentilation: typeContrat === "FLOTTE" ? "GLOBALE" : EMPTY_FORM.modeVentilation,
       });
       setShowForm(true);
     }
@@ -210,11 +214,13 @@ export function QuittanceRulesDialog({
   });
 
   function startCreate() {
+    const typeContrat = initialTypeContrat ?? "PARTICULIER";
     setEditing(null);
     setForm({
       ...EMPTY_FORM,
       compagnieAssuranceId: initialCompanyId ?? "",
-      typeContrat: initialTypeContrat ?? "PARTICULIER",
+      typeContrat,
+      modeVentilation: typeContrat === "FLOTTE" ? "GLOBALE" : EMPTY_FORM.modeVentilation,
     });
     setShowForm(true);
   }
@@ -272,6 +278,7 @@ export function QuittanceRulesDialog({
                         ...current,
                         typeContrat,
                         modeCalculCommission: typeContrat === "FLOTTE" ? "TAUX_NET" : current.modeCalculCommission,
+                        modeVentilation: typeContrat === "FLOTTE" ? "GLOBALE" : current.modeVentilation,
                         tauxCommissionAutomobile: typeContrat === "FLOTTE" ? 0 : current.tauxCommissionAutomobile,
                         tauxCommissionEvcat: typeContrat === "FLOTTE" ? 0 : current.tauxCommissionEvcat,
                         tauxCommissionCorporel: typeContrat === "FLOTTE" ? 0 : current.tauxCommissionCorporel,
@@ -315,6 +322,22 @@ export function QuittanceRulesDialog({
                     value={form.typeContrat === "FLOTTE" ? "Manuel ou import Excel" : "Calcul automatique"}
                   />
                 </Field>
+                {form.typeContrat !== "FLOTTE" ? (
+                  <Field label="Ventilation compagnie" required>
+                    <Select
+                      value={form.modeVentilation}
+                      onValueChange={(value) =>
+                        setForm((current) => ({ ...current, modeVentilation: value as ModeVentilationQuittance }))
+                      }
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GLOBALE">Une quittance globale</SelectItem>
+                        <SelectItem value="PAR_CATEGORIE">Une quittance par catégorie</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                ) : null}
                 {form.typeContrat !== "FLOTTE" ? (
                   <>
                     <RateField
@@ -497,12 +520,13 @@ export function QuittanceRulesDialog({
           ) : null}
 
           <div className="overflow-x-auto border">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead className="bg-muted/60 text-left text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2">Compagnie</th>
                   <th className="px-3 py-2">Contrat</th>
                   <th className="px-3 py-2">Affectation</th>
+                  <th className="px-3 py-2">Ventilation</th>
                   <th className="px-3 py-2 text-right">Auto</th>
                   <th className="px-3 py-2 text-right">EVCAT</th>
                   <th className="px-3 py-2 text-right">Corporel</th>
@@ -515,7 +539,7 @@ export function QuittanceRulesDialog({
                 {rules.isLoading ? (
                   Array.from({ length: 3 }).map((_, index) => (
                     <tr key={index} className="border-t">
-                      <td colSpan={9} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
+                      <td colSpan={10} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
                     </tr>
                   ))
                 ) : sortedRules.length ? (
@@ -525,6 +549,13 @@ export function QuittanceRulesDialog({
                       <td className="px-3 py-3">{contractLabel(rule.typeContrat)}</td>
                       <td className="px-3 py-3">
                         {rule.modeAffectation === "AUTOMATIQUE" ? "Automatique" : "Manuel / import"}
+                      </td>
+                      <td className="px-3 py-3">
+                        {rule.typeContrat === "FLOTTE"
+                          ? "—"
+                          : rule.modeVentilation === "PAR_CATEGORIE"
+                            ? "Par catégorie"
+                            : "Globale"}
                       </td>
                       <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionAutomobile)}</td>
                       <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionEvcat)}</td>
@@ -546,7 +577,7 @@ export function QuittanceRulesDialog({
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={9} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
                 )}
               </tbody>
             </table>
@@ -732,6 +763,7 @@ function ruleToForm(rule: Rule): RuleForm {
   return {
     compagnieAssuranceId: rule.compagnieAssuranceId,
     typeContrat: rule.typeContrat,
+    modeVentilation: rule.typeContrat === "FLOTTE" ? "GLOBALE" : rule.modeVentilation ?? "GLOBALE",
     modeCalculCommission: rule.modeCalculCommission,
     tauxCommissionAutomobile: rule.tauxCommissionAutomobile,
     tauxCommissionEvcat: rule.tauxCommissionEvcat,
@@ -768,6 +800,7 @@ function toRequest(form: RuleForm): RuleRequest {
     compagnieAssuranceId: form.compagnieAssuranceId,
     typeContrat: form.typeContrat,
     modeAffectation: form.typeContrat === "FLOTTE" ? "MANUEL_OU_IMPORT" : "AUTOMATIQUE",
+    modeVentilation: form.typeContrat === "FLOTTE" ? "GLOBALE" : form.modeVentilation,
     modeCalculCommission: form.typeContrat === "FLOTTE" ? "TAUX_NET" : form.modeCalculCommission,
     tauxCommissionAutomobile: form.typeContrat === "FLOTTE" ? 0 : form.tauxCommissionAutomobile!,
     tauxCommissionEvcat: form.typeContrat === "FLOTTE" ? 0 : form.tauxCommissionEvcat!,

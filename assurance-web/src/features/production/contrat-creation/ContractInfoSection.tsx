@@ -356,6 +356,7 @@ export function ContractInfoSection({
                       form.setModeReglement(value);
                       if (value !== "facture") {
                         form.setNumeroBonCommande("");
+                        form.setMontantBulletin("");
                       }
                     }}
                   >

@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -44,6 +45,16 @@ public class Agence extends BaseEntity {
 
     @Column(length = 150)
     private String email;
+
+    @Lob
+    @Column(name = "logo_contenu", columnDefinition = "LONGBLOB")
+    private byte[] logoContenu;
+
+    @Column(name = "logo_type_mime", length = 50)
+    private String logoTypeMime;
+
+    @Column(name = "logo_nom_fichier", length = 255)
+    private String logoNomFichier;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)

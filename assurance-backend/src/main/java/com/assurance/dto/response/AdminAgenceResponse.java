@@ -16,6 +16,7 @@ public class AdminAgenceResponse {
     private String telephone;
     private String fax;
     private String email;
+    private boolean logoDisponible;
     private StatutAgence statut;
 
     public static AdminAgenceResponse from(Agence agence) {
@@ -28,6 +29,7 @@ public class AdminAgenceResponse {
                 .telephone(agence.getTelephone())
                 .fax(agence.getFax())
                 .email(agence.getEmail())
+                .logoDisponible(agence.getLogoContenu() != null && agence.getLogoContenu().length > 0)
                 .statut(agence.getStatut())
                 .build();
     }

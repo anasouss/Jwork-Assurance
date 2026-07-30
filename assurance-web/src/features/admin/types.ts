@@ -45,6 +45,7 @@ export type AdminAgency = {
   telephone?: string | null;
   fax?: string | null;
   email?: string | null;
+  logoDisponible: boolean;
   statut: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 };
 

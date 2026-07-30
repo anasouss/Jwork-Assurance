@@ -88,10 +88,9 @@ public class DataSeeder implements CommandLineRunner {
         Agence agenceDefaut = agenceRepository.findByCode("AG-001").orElseGet(() -> agenceRepository.save(
                 Agence.builder()
                         .code("AG-001")
-                        .nom("Agence Centrale")
-                        .ville("Casablanca")
-                        .email("agence@assurance.local")
-                        .telephone("+212600000000")
+                        .nom("Ambition Ibtissam Assurances")
+                        .adresse("Bureau n° 28, 3e étage, Immeuble Rimal 02, Founty Haut")
+                        .ville("Agadir")
                         .build()
         ));
 

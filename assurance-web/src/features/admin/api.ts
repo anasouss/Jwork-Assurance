@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/base";
+import { apiFetch, apiFetchBlob, apiUpload } from "@/lib/api/base";
 import type { ApiResponse } from "@/lib/types";
 import type {
   AdminAgency,
@@ -83,6 +83,22 @@ export const adminApi = {
     return unwrap(await apiFetch<ApiResponse<AdminAgency>>(`/api/v1/admin/agencies/${id}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    }));
+  },
+
+  async agencyLogo(id: string) {
+    return apiFetchBlob(`/api/v1/admin/agencies/${id}/logo`);
+  },
+
+  async uploadAgencyLogo(id: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return unwrap(await apiUpload<ApiResponse<AdminAgency>>(`/api/v1/admin/agencies/${id}/logo`, formData));
+  },
+
+  async deleteAgencyLogo(id: string) {
+    return unwrap(await apiFetch<ApiResponse<AdminAgency>>(`/api/v1/admin/agencies/${id}/logo`, {
+      method: "DELETE",
     }));
   },
 };

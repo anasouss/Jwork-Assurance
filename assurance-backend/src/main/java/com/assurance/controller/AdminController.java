@@ -13,6 +13,9 @@ import com.assurance.service.AdminService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +24,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -97,5 +102,30 @@ public class AdminController {
     @PutMapping("/agencies/{id}")
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgency(@PathVariable Long id, @Valid @RequestBody UpsertAgenceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateAgency(id, request), "Agence modifiee"));
+    }
+
+    @PostMapping(value = "/agencies/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgencyLogo(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.updateAgencyLogo(id, file), "Logo agence modifié"));
+    }
+
+    @GetMapping("/agencies/{id}/logo")
+    public ResponseEntity<byte[]> agencyLogo(@PathVariable Long id) {
+        AdminService.AgencyLogo logo = adminService.getAgencyLogo(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(logo.contentType()))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename(logo.filename()).build().toString()
+                )
+                .body(logo.content());
+    }
+
+    @DeleteMapping("/agencies/{id}/logo")
+    public ResponseEntity<ApiResponse<AdminAgenceResponse>> deleteAgencyLogo(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.deleteAgencyLogo(id), "Logo agence supprimé"));
     }
 }

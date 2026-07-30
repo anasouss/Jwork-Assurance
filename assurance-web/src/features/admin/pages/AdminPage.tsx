@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, KeyRound, Plus, Search, Trash2 } from "lucide-react";
+import { Edit, ImageIcon, KeyRound, Plus, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { TableRowActions } from "@/components/shared/table-row-actions";
@@ -61,6 +61,7 @@ export default function AdminPage() {
       id: user.agenceId,
       code: "",
       nom: user.agenceName ?? "Agence",
+      logoDisponible: false,
       statut: "ACTIVE",
     }] : [];
   }, [agencies.data, canViewAgencies, user?.agenceId, user?.agenceName]);
@@ -484,14 +485,35 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
   const [editing, setEditing] = useState<AdminAgency | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<UpsertAdminAgencyRequest>(emptyAgency());
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
 
   useEffect(() => {
     if (!dialogOpen) return;
     setForm(editing ? agencyToForm(editing) : emptyAgency());
+    setLogoFile(null);
+    setRemoveLogo(false);
   }, [dialogOpen, editing]);
 
   const save = useMutation({
-    mutationFn: () => editing ? adminApi.updateAgency(editing.id, form) : adminApi.createAgency(form),
+    mutationFn: async () => {
+      const agence = editing
+        ? await adminApi.updateAgency(editing.id, form)
+        : await adminApi.createAgency(form);
+      try {
+        if (logoFile) {
+          return await adminApi.uploadAgencyLogo(agence.id, logoFile);
+        }
+        if (editing && removeLogo && editing.logoDisponible) {
+          return await adminApi.deleteAgencyLogo(agence.id);
+        }
+        return agence;
+      } catch (error) {
+        setEditing(agence);
+        await queryClient.invalidateQueries({ queryKey: ["admin", "agencies"] });
+        throw error;
+      }
+    },
     onSuccess: async () => {
       setDialogOpen(false);
       setEditing(null);
@@ -525,8 +547,13 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
             {agencies.map((agence) => (
               <TableRow key={agence.id}>
                 <TableCell>
-                  <div className="font-medium">{agence.nom}</div>
-                  <div className="text-xs text-muted-foreground">{agence.code}</div>
+                  <div className="flex items-center gap-3">
+                    <AgencyLogoImage agency={agence} className="size-11 rounded border bg-white object-contain p-1" />
+                    <div>
+                      <div className="font-medium">{agence.nom}</div>
+                      <div className="text-xs text-muted-foreground">{agence.code}</div>
+                    </div>
+                  </div>
                 </TableCell>
                 <TableCell>{agence.ville ?? "-"}</TableCell>
                 <TableCell>
@@ -546,12 +573,26 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier agence" : "Ajouter agence"}</DialogTitle>
             <DialogDescription>Les agences portent les utilisateurs, rôles agence et données de production.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)]">
+            <AgencyLogoField
+              agency={editing}
+              file={logoFile}
+              removed={removeLogo}
+              onFile={(file) => {
+                setLogoFile(file);
+                setRemoveLogo(false);
+              }}
+              onRemove={() => {
+                setLogoFile(null);
+                setRemoveLogo(true);
+              }}
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
             <LabeledInput label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
             <LabeledInput label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
             <LabeledInput label="Ville" value={form.ville ?? ""} onChange={(value) => setForm({ ...form, ville: value })} />
@@ -573,6 +614,7 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
               <span className="font-medium">Adresse</span>
               <Textarea value={form.adresse ?? ""} onChange={(event) => setForm({ ...form, adresse: event.target.value })} />
             </label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
@@ -582,6 +624,128 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
       </Dialog>
     </div>
   );
+}
+
+function AgencyLogoField({
+  agency,
+  file,
+  removed,
+  onFile,
+  onRemove,
+}: {
+  agency: AdminAgency | null;
+  file: File | null;
+  removed: boolean;
+  onFile: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setLocalUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setLocalUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const selectFile = (selected?: File) => {
+    if (!selected) return;
+    if (!["image/png", "image/jpeg"].includes(selected.type)) {
+      toast.error("Le logo doit être au format PNG ou JPEG");
+      return;
+    }
+    if (selected.size > 4 * 1024 * 1024) {
+      toast.error("Le logo ne doit pas dépasser 4 Mo");
+      return;
+    }
+    onFile(selected);
+  };
+
+  return (
+    <div className="grid content-start gap-2">
+      <span className="text-sm font-medium">Logo de l’agence</span>
+      <label
+        className={`grid min-h-52 cursor-pointer place-items-center rounded-md border border-dashed p-4 text-center transition-colors ${
+          dragging ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
+        }`}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragOver={(event) => event.preventDefault()}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          selectFile(event.dataTransfer.files[0]);
+        }}
+      >
+        <input
+          type="file"
+          accept="image/png,image/jpeg"
+          className="sr-only"
+          onChange={(event) => {
+            selectFile(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
+        {localUrl ? (
+          <img src={localUrl} alt="Aperçu du logo" className="max-h-36 max-w-full object-contain" />
+        ) : agency && agency.logoDisponible && !removed ? (
+          <AgencyLogoImage agency={agency} className="max-h-36 max-w-full object-contain" />
+        ) : (
+          <div className="grid justify-items-center gap-2 text-muted-foreground">
+            <ImageIcon className="size-10" />
+            <span className="text-sm font-medium text-foreground">Déposer le logo ici</span>
+            <span className="text-xs">PNG ou JPEG, 4 Mo maximum</span>
+          </div>
+        )}
+        <span className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-primary">
+          <Upload className="size-3.5" />
+          Choisir un fichier
+        </span>
+      </label>
+      {(file || (agency?.logoDisponible && !removed)) ? (
+        <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={onRemove}>
+          <Trash2 className="size-4" />
+          Supprimer le logo
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function AgencyLogoImage({ agency, className }: { agency: AdminAgency; className?: string }) {
+  const logo = useQuery({
+    queryKey: ["admin", "agencies", agency.id, "logo"],
+    queryFn: () => adminApi.agencyLogo(agency.id),
+    enabled: agency.logoDisponible,
+    staleTime: 5 * 60_000,
+  });
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!agency.logoDisponible || !logo.data) {
+      setUrl(null);
+      return;
+    }
+    const nextUrl = URL.createObjectURL(logo.data);
+    setUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [agency.logoDisponible, logo.data]);
+
+  if (!agency.logoDisponible || !url) {
+    return (
+      <span className={`grid place-items-center bg-muted text-muted-foreground ${className ?? ""}`}>
+        <ImageIcon className="size-5" />
+      </span>
+    );
+  }
+  return <img src={url} alt={`Logo ${agency.nom}`} className={className} />;
 }
 
 function ResetPasswordDialog({ user, onOpenChange, onChanged }: { user: AdminUser | null; onOpenChange: (open: boolean) => void; onChanged: () => void }) {

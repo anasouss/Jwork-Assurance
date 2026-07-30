@@ -122,7 +122,7 @@ export default function ProductionDashboardPage() {
       </section>
 
       <Dialog open={echeanceDialogOpen} onOpenChange={setEcheanceDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Gestion des échéances</DialogTitle>
           </DialogHeader>
@@ -166,16 +166,16 @@ function EcheanceNatureCard({ title, status, active, disabled }: { title: string
   return (
     <div
       className={cn(
-        "flex min-h-20 items-start justify-between rounded-md border p-4",
+        "flex min-h-24 items-center justify-between gap-3 rounded-md border p-4",
         active && "border-emerald-500 bg-emerald-50",
         disabled && "border-dashed bg-muted/20 text-muted-foreground"
       )}
     >
-      <span className="flex items-center gap-2">
-        <span className={cn("size-3 rounded-full border", active && "border-emerald-600 bg-emerald-600")} />
-        <span className="font-semibold">{title}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className={cn("size-3 shrink-0 rounded-full border", active && "border-emerald-600 bg-emerald-600")} />
+        <span className="min-w-0 text-base font-semibold leading-snug">{title}</span>
       </span>
-      <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", disabled ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700")}>
+      <span className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold", disabled ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700")}>
         {status}
       </span>
     </div>

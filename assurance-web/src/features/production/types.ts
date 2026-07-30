@@ -277,6 +277,11 @@ export type AvenantRequest = {
     immatriculationProvisoire?: string;
     numeroAttestation?: string;
   }[];
+  attestations?: {
+    vehiculeId?: string;
+    remorqueId?: string;
+    numeroAttestation?: string;
+  }[];
   vehicules?: VehiculeInput[];
   remorques?: RemorqueInput[];
   garanties?: GarantieInput[];

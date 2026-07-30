@@ -831,7 +831,8 @@ public class MouvementContratService {
                 : typeMouvement.getCode().trim().toUpperCase(Locale.ROOT);
         return impact == TypeImpactMouvement.NORMAL
                 || "INC_F".equals(code)
-                || "EXR_M".equals(code);
+                || "EXR_M".equals(code)
+                || "CHV_M".equals(code);
     }
 
     private QuittanceResponse.GarantieLigne toQuittanceGarantieResponse(

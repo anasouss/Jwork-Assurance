@@ -30,11 +30,16 @@ type Target = {
   usageId?: string | null;
   usage?: string | null;
   numeroAttestation?: string | null;
+  consommeAttestation?: boolean | null;
 };
 
 type PrecisionDraft = {
   immatriculation?: string;
   immatriculationProvisoire?: string;
+  numeroAttestation?: string;
+};
+
+type DuplicataAttestationDraft = {
   numeroAttestation?: string;
 };
 
@@ -47,8 +52,10 @@ const MOVEMENT_LABELS: Record<string, string> = {
   EXG_M: "Extension garanties",
   MOG_M: "Modification garanties",
   EXR_M: "Extension remorque",
+  CHV_M: "Changement véhicule",
   PRI_M: "Précision immatriculation",
   DUP_M: "Duplicata",
+  PRO_M: "Provisoire",
   RES_M: "Résiliation",
   RCH_M: "Résiliation à l'échéance",
   ANN_M: "Annulation",
@@ -85,6 +92,7 @@ export default function AvenantContratPage() {
   const [dateEcheance, setDateEcheance] = useState<string>();
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [precisionDrafts, setPrecisionDrafts] = useState<Record<string, PrecisionDraft>>({});
+  const [duplicataAttestationDrafts, setDuplicataAttestationDrafts] = useState<Record<string, DuplicataAttestationDraft>>({});
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
@@ -164,6 +172,7 @@ export default function AvenantContratPage() {
       usageId: item.usageId,
       usage: item.usageLibelle ?? item.usageCode,
       numeroAttestation: item.numeroAttestation,
+      consommeAttestation: item.consommeAttestation,
     })),
     ...(contrat?.remorques ?? []).map((item, index) => ({
       kind: "remorque" as const,
@@ -174,6 +183,7 @@ export default function AvenantContratPage() {
       usageId: item.usageId,
       usage: item.usageLibelle ?? item.usageCode,
       numeroAttestation: item.numeroAttestation,
+      consommeAttestation: item.consommeAttestation,
     })),
   ], [contrat?.remorques, contrat?.vehicules]);
   const hasActiveTargets = targets.length > 0;
@@ -252,6 +262,7 @@ export default function AvenantContratPage() {
     setTargetPreview(null);
     setSelectedTargetIds([]);
     setPrecisionDrafts({});
+    setDuplicataAttestationDrafts({});
     if (movementCode === "INC_F") {
       setVehicules([{ ...DEFAULT_VEHICLE }]);
       setRemorques([]);
@@ -273,7 +284,7 @@ export default function AvenantContratPage() {
   }, [movementCode, targets]);
 
   useEffect(() => {
-    if (!isGuaranteeModificationCode(movementCode) || !contrat) return;
+    if ((!isGuaranteeModificationCode(movementCode) && !isVehicleTargetCreationCode(movementCode)) || !contrat) return;
     const mappedVehicules = (contrat.vehicules ?? []).map<VehiculeInput>((item) => ({
       vehiculeId: item.vehiculeId,
       typeVehicule: item.typeVehicule as VehiculeInput["typeVehicule"],
@@ -321,8 +332,8 @@ export default function AvenantContratPage() {
       valeurAssuree: item.valeurAssuree ?? undefined,
     }));
     setVehicules(mappedVehicules.length ? mappedVehicules : [{ ...DEFAULT_VEHICLE }]);
-    setRemorques(mappedRemorques);
-    setSelectedGaranties(mapCurrentGaranties(contrat.garanties ?? [], mappedVehicules, mappedRemorques));
+    setRemorques(movementCode === "INC_F" ? mappedRemorques : []);
+    setSelectedGaranties(mapCurrentGaranties(contrat.garanties ?? [], mappedVehicules, movementCode === "INC_F" ? mappedRemorques : []));
     setTargetAssistances(mapCurrentAssistances(contrat.assistances ?? [], mappedVehicules));
   }, [contrat, movementCode]);
 
@@ -372,6 +383,20 @@ export default function AvenantContratPage() {
       }
     }
     setPrecisionDrafts(nextPrecisions);
+    const nextDuplicataAttestations: Record<string, DuplicataAttestationDraft> = {};
+    for (const attestation of request.attestations ?? []) {
+      const key = attestation.vehiculeId
+        ? `vehicule:${attestation.vehiculeId}`
+        : attestation.remorqueId
+          ? `remorque:${attestation.remorqueId}`
+          : "";
+      if (key) {
+        nextDuplicataAttestations[key] = {
+          numeroAttestation: attestation.numeroAttestation,
+        };
+      }
+    }
+    setDuplicataAttestationDrafts(nextDuplicataAttestations);
     setHydratedSourceKey(hydrationKey);
   }, [
     contrat,
@@ -443,9 +468,15 @@ export default function AvenantContratPage() {
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
     };
-    if (movementCode === "INC_F") {
-      request.vehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
-      request.remorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
+    if (isVehicleTargetCreationCode(movementCode)) {
+      const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
+      const normalizedRemorques = movementCode === "INC_F"
+        ? remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance))
+        : [];
+      request.vehicules = isSingleVehicleTargetCreationCode(movementCode)
+        ? normalizedVehicules.slice(0, 1)
+        : normalizedVehicules;
+      request.remorques = normalizedRemorques;
       request.garanties = ensureRcGaranties(
         draftGaranties,
         request.vehicules.length,
@@ -480,6 +511,16 @@ export default function AvenantContratPage() {
           : { remorqueId: target.id, ...precision }];
       });
     }
+    if (isDuplicataCode(movementCode)) {
+      request.attestations = selectedTargetIds.flatMap((targetId) => {
+        const target = targets.find((item) => targetKey(item) === targetId);
+        if (!target) return [];
+        const attestation = duplicataAttestationDrafts[targetId] ?? {};
+        return [target.kind === "vehicule"
+          ? { vehiculeId: target.id, ...attestation }
+          : { remorqueId: target.id, ...attestation }];
+      });
+    }
     return request;
   };
 
@@ -495,9 +536,14 @@ export default function AvenantContratPage() {
       return null;
     }
     const request = buildDraftRequest(currentGaranties);
-    if (movementCode === "INC_F") {
-      const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
-      const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
+    if (isVehicleTargetCreationCode(movementCode)) {
+      const allNormalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
+      const normalizedVehicules = isSingleVehicleTargetCreationCode(movementCode)
+        ? allNormalizedVehicules.slice(0, 1)
+        : allNormalizedVehicules;
+      const normalizedRemorques = movementCode === "INC_F"
+        ? remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance))
+        : [];
       const garantiesRequest = ensureRcGaranties(currentGaranties, normalizedVehicules.length, normalizedRemorques.length, garanties.data ?? []);
       const invalidVehicule = normalizedVehicules
         .map((item) => vehicleValidationMessage(item, flotteTargetUsages))
@@ -572,6 +618,14 @@ export default function AvenantContratPage() {
         notify("Sélectionnez au moins une cible à préciser");
         return null;
       }
+      const missingAttestation = selectedTargetIds.some((targetId) => {
+        const target = targets.find((item) => targetKey(item) === targetId);
+        return Boolean(target?.consommeAttestation) && !precisionDrafts[targetId]?.numeroAttestation?.trim();
+      });
+      if (missingAttestation) {
+        notify("Le numéro d’attestation est obligatoire pour chaque cible de la précision");
+        return null;
+      }
       request.vehiculeIds = selected.vehiculeIds;
       request.remorqueIds = selected.remorqueIds;
       request.precisions = precisions;
@@ -586,8 +640,33 @@ export default function AvenantContratPage() {
     }
     if (movementCode === "DUP_F" || movementCode === "DUP_M") {
       const selected = splitTargets(targets, selectedTargetIds);
+      if (!selected.vehiculeIds.length && !selected.remorqueIds.length) {
+        notify("Sélectionnez au moins une cible pour le duplicata");
+        return null;
+      }
+      const attestations: NonNullable<AvenantRequest["attestations"]> = [];
+      selectedTargetIds.forEach((targetId) => {
+        const target = targets.find((item) => targetKey(item) === targetId);
+        if (!target) return;
+        const numeroAttestation = duplicataAttestationDrafts[targetId]?.numeroAttestation?.trim();
+        if (Boolean(target.consommeAttestation) && !numeroAttestation) {
+          return;
+        }
+        attestations.push(target.kind === "vehicule"
+          ? { vehiculeId: target.id, numeroAttestation }
+          : { remorqueId: target.id, numeroAttestation });
+      });
+      const missingAttestation = selectedTargetIds.some((targetId) => {
+        const target = targets.find((item) => targetKey(item) === targetId);
+        return Boolean(target?.consommeAttestation) && !duplicataAttestationDrafts[targetId]?.numeroAttestation?.trim();
+      });
+      if (missingAttestation) {
+        notify("Le numéro d’attestation est obligatoire pour chaque cible du duplicata");
+        return null;
+      }
       request.vehiculeIds = selected.vehiculeIds;
       request.remorqueIds = selected.remorqueIds;
+      request.attestations = attestations;
     }
     return request;
   };
@@ -612,11 +691,11 @@ export default function AvenantContratPage() {
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
     };
     const previewGaranties = guaranteesOverride ?? selectedGaranties;
-    if (movementCode === "INC_F") {
+    if (isVehicleTargetCreationCode(movementCode)) {
       const normalizedVehicules = target.kind === "vehicule"
         ? [normalizeVehicle(vehicules[target.index], dateEffet, request.dateEcheance, sharedCrm)]
         : [];
-      const normalizedRemorques = target.kind === "remorque"
+      const normalizedRemorques = movementCode === "INC_F" && target.kind === "remorque"
         ? [normalizeRemorque(remorques[target.index], dateEffet, request.dateEcheance)]
         : [];
       const garantiesRequest = ensureRcGaranties(
@@ -685,6 +764,7 @@ export default function AvenantContratPage() {
     targets,
     selectedTargetIds,
     precisionDrafts,
+    duplicataAttestationDrafts,
     vehicules,
     remorques,
     selectedGaranties,
@@ -917,7 +997,7 @@ export default function AvenantContratPage() {
             <CardDescription>Aucune cible active n'est disponible pour cet avenant. Supprimez d'abord le dernier avenant de clôture si celui-ci a été créé par erreur.</CardDescription>
           </CardHeader>
         </Card>
-      ) : movementCode === "INC_F" || movementCode === "EXR_M" || isGuaranteeModificationCode(movementCode) ? (
+      ) : isTargetCreationCode(movementCode) || isGuaranteeModificationCode(movementCode) ? (
         <FlotteTargetsSection
           vehicules={vehicules}
           setVehicules={setVehicules}
@@ -950,13 +1030,13 @@ export default function AvenantContratPage() {
           setTargetAssistances={setTargetAssistances}
           showAssistance={showAvenantAssistance}
           assistanceCategorieClientId={assistanceCategorieClientId}
-          showInfoSections={movementCode === "INC_F" || movementCode === "EXR_M"}
+          showInfoSections={isTargetCreationCode(movementCode)}
           allowTargetChanges={movementCode === "INC_F" || movementCode === "EXR_M"}
           onValidateTarget={isTargetCreationCode(movementCode) ? validateTargetCreation : undefined}
           onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
           targetActionMode="save"
           previewAfterInfoSave={false}
-          garantiesExtraAction={movementCode === "INC_F" ? (
+          garantiesExtraAction={isVehicleTargetCreationCode(movementCode) ? (
             <Button
               type="button"
               variant="outline"
@@ -977,6 +1057,8 @@ export default function AvenantContratPage() {
           setSelectedTargetIds={setSelectedTargetIds}
           precisionDrafts={precisionDrafts}
           setPrecisionDrafts={setPrecisionDrafts}
+          duplicataAttestationDrafts={duplicataAttestationDrafts}
+          setDuplicataAttestationDrafts={setDuplicataAttestationDrafts}
           compagnieAssuranceId={contrat?.compagnieAssuranceId}
           compagnies={compagnies.data ?? []}
           usages={usages.data ?? []}
@@ -1052,6 +1134,8 @@ function TargetsSection({
   setSelectedTargetIds,
   precisionDrafts,
   setPrecisionDrafts,
+  duplicataAttestationDrafts,
+  setDuplicataAttestationDrafts,
   compagnieAssuranceId,
   compagnies,
   usages,
@@ -1062,6 +1146,8 @@ function TargetsSection({
   setSelectedTargetIds: (value: string[] | ((current: string[]) => string[])) => void;
   precisionDrafts: Record<string, PrecisionDraft>;
   setPrecisionDrafts: (value: Record<string, PrecisionDraft> | ((current: Record<string, PrecisionDraft>) => Record<string, PrecisionDraft>)) => void;
+  duplicataAttestationDrafts: Record<string, DuplicataAttestationDraft>;
+  setDuplicataAttestationDrafts: (value: Record<string, DuplicataAttestationDraft> | ((current: Record<string, DuplicataAttestationDraft>) => Record<string, DuplicataAttestationDraft>)) => void;
   compagnieAssuranceId?: string | null;
   compagnies: ReferenceOption[];
   usages: ReferenceOption[];
@@ -1070,16 +1156,17 @@ function TargetsSection({
     <Card className="border-border/70 shadow-none">
       <CardHeader>
         <CardTitle>Cibles concernées</CardTitle>
-        <CardDescription>{movementCode === "DUP_F" || movementCode === "DUP_M" ? "Sans sélection, le duplicata concerne toutes les cibles actives." : "Sélectionnez les véhicules ou remorques concernés."}</CardDescription>
+        <CardDescription>{movementCode === "DUP_F" || movementCode === "DUP_M" ? "Sélectionnez les cibles du duplicata et renseignez leur nouvelle attestation." : "Sélectionnez les véhicules ou remorques concernés."}</CardDescription>
       </CardHeader>
       <CardContent className="overflow-x-auto">
-        <table className="w-full min-w-[820px] border-collapse text-sm">
+        <table className={cn("w-full border-collapse text-sm", isPrecisionCode(movementCode) || isDuplicataCode(movementCode) ? "min-w-[980px]" : "min-w-[820px]")}>
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="w-12 px-3 py-3" />
               <th className="px-3 py-3 text-left">Cible</th>
               <th className="px-3 py-3 text-left">Usage</th>
               {isPrecisionCode(movementCode) ? <th className="px-3 py-3 text-left">Nouvelle immatriculation / attestation</th> : null}
+              {isDuplicataCode(movementCode) ? <th className="px-3 py-3 text-left">Nouvelle attestation</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -1101,6 +1188,7 @@ function TargetsSection({
                         {target.kind === "vehicule" ? <Input disabled={!checked} placeholder="WW" value={precisionDrafts[key]?.immatriculationProvisoire ?? ""} onChange={(event) => updatePrecision(key, { immatriculationProvisoire: event.target.value }, setPrecisionDrafts)} /> : null}
                         <AttestationNumberInput
                           disabled={!checked}
+                          required={checked && Boolean(target.consommeAttestation)}
                           value={precisionDrafts[key]?.numeroAttestation ?? ""}
                           onChange={(value) => updatePrecision(key, { numeroAttestation: value }, setPrecisionDrafts)}
                           compagnieAssuranceId={compagnieAssuranceId}
@@ -1111,6 +1199,25 @@ function TargetsSection({
                           placeholder="Attestation"
                         />
                       </div>
+                    </td>
+                  ) : null}
+                  {isDuplicataCode(movementCode) ? (
+                    <td className="px-3 py-2">
+                      <AttestationNumberInput
+                        disabled={!checked}
+                        required={checked && Boolean(target.consommeAttestation)}
+                        value={duplicataAttestationDrafts[key]?.numeroAttestation ?? ""}
+                        onChange={(value) => updateDuplicataAttestation(key, { numeroAttestation: value }, setDuplicataAttestationDrafts)}
+                        compagnieAssuranceId={compagnieAssuranceId}
+                        usageId={target.usageId}
+                        compagnies={compagnies}
+                        usages={usages}
+                        numeroCourant={target.numeroAttestation}
+                        placeholder="Attestation duplicata"
+                      />
+                      {checked && !target.consommeAttestation ? (
+                        <p className="mt-1 text-xs text-muted-foreground">Stock non contrôlé pour cet usage.</p>
+                      ) : null}
                     </td>
                   ) : null}
                 </tr>
@@ -1290,6 +1397,9 @@ function vehicleValidationMessage(vehicle: VehiculeInput | undefined, usages: Re
   if (Boolean(usage?.byCategorieTransport) && !vehicle.categorieTransportId) {
     return "La catégorie de transport est obligatoire pour cet usage";
   }
+  if (Boolean(usage?.consommeAttestation) && !vehicle.numeroAttestation?.trim()) {
+    return "Le numéro d'attestation est obligatoire pour chaque véhicule";
+  }
   return null;
 }
 
@@ -1428,12 +1538,22 @@ function updatePrecision(
   setter((current) => ({ ...current, [key]: { ...(current[key] ?? {}), ...patch } }));
 }
 
+function updateDuplicataAttestation(
+  key: string,
+  patch: DuplicataAttestationDraft,
+  setter: (value: Record<string, DuplicataAttestationDraft> | ((current: Record<string, DuplicataAttestationDraft>) => Record<string, DuplicataAttestationDraft>)) => void
+) {
+  setter((current) => ({ ...current, [key]: { ...(current[key] ?? {}), ...patch } }));
+}
+
 const supportedAvenantCodes = new Set([
   "EXG_M",
   "MOG_M",
   "EXR_M",
+  "CHV_M",
   "PRI_M",
   "DUP_M",
+  "PRO_M",
   "RES_M",
   "RCH_M",
   "ANN_M",
@@ -1463,6 +1583,14 @@ function isDuplicataCode(code: string) {
   return code === "DUP_F" || code === "DUP_M";
 }
 
+function isVehicleTargetCreationCode(code: string) {
+  return code === "INC_F" || code === "CHV_M" || code === "PRO_M";
+}
+
+function isSingleVehicleTargetCreationCode(code: string) {
+  return code === "CHV_M" || code === "PRO_M";
+}
+
 function isEcheanceClosureCode(code: string) {
   return code === "RCH_F" || code === "RCH_M";
 }
@@ -1472,7 +1600,7 @@ function isClosureCode(code: string) {
 }
 
 function isTargetCreationCode(code: string) {
-  return code === "INC_F" || code === "EXR_M";
+  return isVehicleTargetCreationCode(code) || code === "EXR_M";
 }
 
 function errorMessage(error: unknown) {

@@ -27,6 +27,9 @@ public class AvenantRequest {
     private List<TargetPrecision> precisions;
 
     @Valid
+    private List<TargetAttestation> attestations;
+
+    @Valid
     private List<CreateContratRequest.VehiculeInput> vehicules;
 
     @Valid
@@ -44,6 +47,13 @@ public class AvenantRequest {
         private Long remorqueId;
         private String immatriculation;
         private String immatriculationProvisoire;
+        private String numeroAttestation;
+    }
+
+    @Data
+    public static class TargetAttestation {
+        private Long vehiculeId;
+        private Long remorqueId;
         private String numeroAttestation;
     }
 

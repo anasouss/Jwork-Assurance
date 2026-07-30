@@ -5,6 +5,7 @@ import { Boxes, CheckCircle2, ClipboardList, PackagePlus, Plus, Search, Settings
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -809,32 +810,31 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
           <form className="space-y-5" onSubmit={submitCreate}>
             <div className="grid gap-4 md:grid-cols-3">
               <Field label="Compagnie">
-                <Select
+                <AutocompleteSelect
                   value={createForm.compagnieAssuranceId}
                   onValueChange={(value) =>
                     setCreateForm((current) => ({
                       ...current,
                       compagnieAssuranceId: value,
-                      lignes: current.lignes.filter((line) => {
-                        const groupe = (groupes.data ?? []).find(
-                          (item) => String(item.code ?? item.id) === line.groupeUsageAttestationCode
-                        );
-                        return groupe ? groupAllowedForCompany(groupe, value) : false;
-                      }),
+                      lignes: value
+                        ? current.lignes.filter((line) => {
+                            const groupe = (groupes.data ?? []).find(
+                              (item) => String(item.code ?? item.id) === line.groupeUsageAttestationCode
+                            );
+                            return groupe ? groupAllowedForCompany(groupe, value) : false;
+                          })
+                        : [],
                     }))
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(compagnies.data ?? []).map((compagnie) => (
-                      <SelectItem key={compagnie.id} value={String(compagnie.id)}>
-                        {compagnie.libelle}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={(compagnies.data ?? []).map((compagnie) => ({
+                    value: String(compagnie.id),
+                    label: compagnie.libelle,
+                    keywords: compagnie.code,
+                  }))}
+                  placeholder="Rechercher une compagnie"
+                  emptyText="Aucune compagnie"
+                  invalidText="Sélectionnez une compagnie existante."
+                />
               </Field>
               <Field label={source === "COMMANDE" ? "Date de demande" : "Date de réception"}>
                 <DatePicker
@@ -1060,7 +1060,7 @@ function UsageSelectionTable<TLine extends StockUsageLine>({
               <TableHead>Usage</TableHead>
               <TableHead className="w-52">Quantité</TableHead>
               {showRanges ? <TableHead className="w-56">N° début</TableHead> : null}
-              {showRanges ? <TableHead className="w-56">N° fin</TableHead> : null}
+              {showRanges ? <TableHead className="w-56">N° fin calculé</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1087,7 +1087,18 @@ function UsageSelectionTable<TLine extends StockUsageLine>({
                       inputMode="numeric"
                       value={line ? quantityValue(line) : ""}
                       disabled={!line}
-                      onChange={(event) => line && onQuantityChange(line, event.target.value)}
+                      onChange={(event) => {
+                        if (!line) {
+                          return;
+                        }
+                        const value = event.target.value;
+                        onQuantityChange(line, value);
+                        if (showRanges) {
+                          onRangeChange(line, {
+                            numeroFin: calculatedRangeEnd(line.numeroDebut, value),
+                          });
+                        }
+                      }}
                     />
                   </TableCell>
                   {showRanges ? (
@@ -1096,17 +1107,27 @@ function UsageSelectionTable<TLine extends StockUsageLine>({
                         inputMode="numeric"
                         value={line?.numeroDebut ?? ""}
                         disabled={!line}
-                        onChange={(event) => line && onRangeChange(line, { numeroDebut: event.target.value })}
+                        onChange={(event) => {
+                          if (!line) {
+                            return;
+                          }
+                          const numeroDebut = event.target.value;
+                          onRangeChange(line, {
+                            numeroDebut,
+                            numeroFin: calculatedRangeEnd(numeroDebut, quantityValue(line)),
+                          });
+                        }}
                       />
                     </TableCell>
                   ) : null}
                   {showRanges ? (
                     <TableCell>
                       <Input
-                        inputMode="numeric"
                         value={line?.numeroFin ?? ""}
                         disabled={!line}
-                        onChange={(event) => line && onRangeChange(line, { numeroFin: event.target.value })}
+                        readOnly
+                        className="bg-muted/50"
+                        aria-label={`Numéro de fin calculé pour l'usage ${code}`}
                       />
                     </TableCell>
                   ) : null}
@@ -1271,6 +1292,15 @@ function rangeQuantity(numeroDebut: string, numeroFin: string) {
     return undefined;
   }
   return fin - debut + 1;
+}
+
+function calculatedRangeEnd(numeroDebut: string, quantite: string) {
+  const debut = Number.parseInt(numeroDebut, 10);
+  const count = toPositiveInteger(quantite);
+  if (!Number.isFinite(debut) || debut < 0 || !count) {
+    return "";
+  }
+  return String(debut + count - 1);
 }
 
 function valueOrUndefined(value: string) {

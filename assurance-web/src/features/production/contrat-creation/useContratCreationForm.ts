@@ -37,7 +37,6 @@ export function useContratCreationForm(
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [numeroContrat, setNumeroContrat] = useState("");
   const [numeroPolice, setNumeroPolice] = useState("");
   const [numeroAttestation, setNumeroAttestation] = useState("");
   const [compagnieAssuranceId, setCompagnieAssuranceId] = useState("");
@@ -203,7 +202,6 @@ export function useContratCreationForm(
       return;
     }
     const hydrated = hydrateDraft(draft);
-    setNumeroContrat(hydrated.numeroContrat);
     setNumeroPolice(hydrated.numeroPolice);
     setNumeroAttestation(hydrated.numeroAttestation);
     setCompagnieAssuranceId(hydrated.compagnieAssuranceId);
@@ -285,7 +283,6 @@ export function useContratCreationForm(
   const request = useMemo<CreateContratRequest>(() => ({
     agenceId: user?.agenceId ?? "",
     typeContrat,
-    numeroContrat: typeContrat === "PARTICULIER" ? numeroContrat : undefined,
     numeroPolice,
     numeroAttestation: typeContrat === "FLOTTE" ? undefined : numeroAttestation,
     compagnieAssuranceId: emptyToUndefined(compagnieAssuranceId),
@@ -349,7 +346,6 @@ export function useContratCreationForm(
   }), [
     user?.agenceId,
     typeContrat,
-    numeroContrat,
     numeroPolice,
     numeroAttestation,
     compagnieAssuranceId,
@@ -700,13 +696,7 @@ export function useContratCreationForm(
     }
     if (section === "contrat") {
       requireField("compagnieAssuranceId", compagnieAssuranceId, "Compagnie obligatoire.");
-      if (typeContrat === "FLOTTE") {
-        if (!options?.prospectionMode) {
-          requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
-        }
-      } else if (typeContrat === "PARTICULIER") {
-        requireField("numeroContrat", numeroContrat, "N° contrat obligatoire.");
-      } else if (typeContrat === "CONVENTION") {
+      if (!options?.prospectionMode) {
         requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
       }
       requireField("typeRenouvellement", typeRenouvellement, "Type de contrat obligatoire.");
@@ -1041,8 +1031,6 @@ export function useContratCreationForm(
     availableUsages,
     selectedConvention,
     conventionUsageIds,
-    numeroContrat,
-    setNumeroContrat,
     numeroPolice,
     setNumeroPolice,
     numeroAttestation,
@@ -1500,7 +1488,6 @@ function hydrateDraft(draft: ContratSummary) {
   }
 
   return {
-    numeroContrat: draft.numeroContrat ?? "",
     numeroPolice: draft.numeroPolice ?? "",
     numeroAttestation: draft.numeroAttestation ?? "",
     compagnieAssuranceId: idString(draft.compagnieAssuranceId),

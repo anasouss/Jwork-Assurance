@@ -60,7 +60,6 @@ export function ContractInfoSection({
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
   const isFlotte = form.typeContrat === "FLOTTE";
   const showContratUsage = form.typeContrat !== "FLOTTE";
-  const showNumeroContrat = form.typeContrat === "PARTICULIER";
   const showNumeroAttestation = !isFlotte;
   const showFlotteNumeroPolice = isFlotte && !form.prospectionMode;
   const conventionHasFixedEcheance = readOnlyConventionContext
@@ -166,12 +165,18 @@ export function ContractInfoSection({
             {readOnlyConventionContext ? (
               <Input value={formatReferenceLabel(selectedUsage) || "Usage sélectionné"} disabled />
             ) : (
-              <Select value={form.usageId} onValueChange={form.setUsageId}>
-                <SelectTrigger><SelectValue placeholder="Usage" /></SelectTrigger>
-                <SelectContent>
-                  {form.availableUsages.map((item) => <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <AutocompleteSelect
+                value={form.usageId}
+                onValueChange={form.setUsageId}
+                options={form.availableUsages.map((item) => ({
+                  value: item.id,
+                  label: item.code ? `${item.code} - ${item.libelle}` : item.libelle,
+                  keywords: item.code,
+                }))}
+                placeholder="Usage"
+                emptyText="Aucun usage"
+                invalidText="Sélectionnez un usage existant."
+              />
             )}
           </Field>
         ) : null}
@@ -277,12 +282,7 @@ export function ContractInfoSection({
           </>
         ) : (
           <>
-            {showNumeroContrat ? (
-              <Field label="N° contrat" required error={form.validationErrors.numeroContrat}>
-                <Input value={form.numeroContrat} onChange={(event) => form.setNumeroContrat(event.target.value)} />
-              </Field>
-            ) : null}
-            <Field label="N° police" required={readOnlyConventionContext} error={form.validationErrors.numeroPolice}>
+            <Field label="N° police" required={!form.prospectionMode} error={form.validationErrors.numeroPolice}>
               <Input value={form.numeroPolice} onChange={(event) => form.setNumeroPolice(event.target.value)} />
             </Field>
             {showNumeroAttestation ? (

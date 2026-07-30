@@ -4647,17 +4647,11 @@ public class ContratService {
         if (request.getTypeContrat() == null) {
             throw new BadRequestException("Le type de contrat est obligatoire");
         }
-        if (request.getTypeContrat() == TypeContrat.FLOTTE || request.getTypeContrat() == TypeContrat.CONVENTION) {
-            if (Boolean.TRUE.equals(request.getProspection())) {
-                return;
-            }
-            if (!hasText(request.getNumeroPolice())) {
-                throw new BadRequestException("Numero de police obligatoire");
-            }
+        if (Boolean.TRUE.equals(request.getProspection())) {
             return;
         }
-        if (request.getTypeContrat() == TypeContrat.PARTICULIER && !hasText(request.getNumeroContrat())) {
-            throw new BadRequestException("Numero de contrat obligatoire");
+        if (!hasText(request.getNumeroPolice())) {
+            throw new BadRequestException("Numero de police obligatoire");
         }
     }
 

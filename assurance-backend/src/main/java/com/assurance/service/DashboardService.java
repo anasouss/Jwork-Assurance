@@ -41,7 +41,8 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardResponse get(Long agenceId, LocalDate dateDu, LocalDate dateAu) {
-        Object[] totals = quittanceRepository.sumDashboardProduction(agenceId, dateDu, dateAu);
+        QuittanceRepository.DashboardProductionTotals totals =
+                quittanceRepository.sumDashboardProduction(agenceId, dateDu, dateAu);
         AttestationStockDashboardResponse stock = attestationStockService.dashboard(agenceId);
         LocalDate today = LocalDate.now();
 
@@ -49,10 +50,10 @@ public class DashboardService {
                 .dateDu(dateDu)
                 .dateAu(dateAu)
                 .kpis(DashboardResponse.Kpis.builder()
-                        .primeNette(decimal(totals[0]))
-                        .taxes(decimal(totals[1]).add(decimal(totals[2])))
-                        .primeTotale(decimal(totals[5]))
-                        .quittances(number(totals[6]))
+                        .primeNette(valueOrZero(totals.getPrimeNette()))
+                        .taxes(valueOrZero(totals.getTaxe()).add(valueOrZero(totals.getTaxeParafiscale())))
+                        .primeTotale(valueOrZero(totals.getPrimeTotale()))
+                        .quittances(totals.getQuittances() == null ? 0L : totals.getQuittances())
                         .mouvements(mouvementContratRepository.countByAgenceIdAndStatutAndDateEffetBetween(
                                 agenceId, StatutMouvementContrat.VALIDE, dateDu, dateAu))
                         .contratsActifs(contratRepository.countByAgenceIdAndProspectionFalseAndBrouillonFalseAndStatut(
@@ -177,7 +178,16 @@ public class DashboardService {
     }
 
     private BigDecimal decimal(Object value) {
-        return value instanceof BigDecimal amount ? amount : new BigDecimal(String.valueOf(value));
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal amount) {
+            return amount;
+        }
+        if (value instanceof Number number) {
+            return new BigDecimal(number.toString());
+        }
+        throw new IllegalArgumentException("Valeur numérique de tableau de bord invalide: " + value.getClass().getName());
     }
 
     private Long number(Object value) {

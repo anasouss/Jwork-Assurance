@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -18,13 +19,13 @@ import jakarta.persistence.LockModeType;
 
 public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
     @Query("""
-            select coalesce(sum(q.primeNette), 0),
-                   coalesce(sum(q.taxe), 0),
-                   coalesce(sum(q.taxeParafiscale), 0),
-                   coalesce(sum(q.accessoire), 0),
-                   coalesce(sum(q.cnpac), 0),
-                   coalesce(sum(q.primeTotale), 0),
-                   count(q)
+            select coalesce(sum(q.primeNette), 0) as primeNette,
+                   coalesce(sum(q.taxe), 0) as taxe,
+                   coalesce(sum(q.taxeParafiscale), 0) as taxeParafiscale,
+                   coalesce(sum(q.accessoire), 0) as accessoire,
+                   coalesce(sum(q.cnpac), 0) as cnpac,
+                   coalesce(sum(q.primeTotale), 0) as primeTotale,
+                   count(q) as quittances
             from Quittance q
             left join q.mouvementContrat m
             where q.contrat.agence.id = :agenceId
@@ -35,11 +36,27 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
               and q.dateDebut between :dateDu and :dateAu
             """)
-    Object[] sumDashboardProduction(
+    DashboardProductionTotals sumDashboardProduction(
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu
     );
+
+    interface DashboardProductionTotals {
+        BigDecimal getPrimeNette();
+
+        BigDecimal getTaxe();
+
+        BigDecimal getTaxeParafiscale();
+
+        BigDecimal getAccessoire();
+
+        BigDecimal getCnpac();
+
+        BigDecimal getPrimeTotale();
+
+        Long getQuittances();
+    }
 
     @Query("""
             select year(q.dateDebut), month(q.dateDebut),

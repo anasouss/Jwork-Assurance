@@ -55,8 +55,7 @@ export function ContractInfoSection({
   const selectedConvention = filteredConventions.find((item) => item.id === form.conventionId);
   const souscripteur = form.clients.find((client) => client.role === "SOUSCRIPTEUR");
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
-  const selectedCategorie = (form.refs.categoriesClient.data ?? []).find((categorie) => categorie.id === categorieClientId);
-  const showCategorieClient = form.typeContrat === "PARTICULIER";
+  const showCategorieClient = form.typeContrat === "PARTICULIER" && !categorieClientId;
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
   const isFlotte = form.typeContrat === "FLOTTE";
   const showContratUsage = form.typeContrat !== "FLOTTE";
@@ -109,27 +108,23 @@ export function ContractInfoSection({
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {showCategorieClient ? (
           <Field label="Catégorie">
-            {categorieClientId ? (
-              <Input value={selectedCategorie?.libelle ?? "Catégorie sélectionnée"} disabled />
-            ) : (
-              <Select
-                value={categorieClientId}
-                onValueChange={(value) =>
-                  form.setClients(
-                    form.clients.map((client) =>
-                      client.role === "SOUSCRIPTEUR"
-                        ? { ...client, client: { ...client.client, categorieClientId: value } }
-                        : client
-                    )
+            <Select
+              value={categorieClientId}
+              onValueChange={(value) =>
+                form.setClients(
+                  form.clients.map((client) =>
+                    client.role === "SOUSCRIPTEUR"
+                      ? { ...client, client: { ...client.client, categorieClientId: value } }
+                      : client
                   )
-                }
-              >
-                <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
-                <SelectContent>
-                  {form.refs.categoriesClient.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
+                )
+              }
+            >
+              <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
+              <SelectContent>
+                {form.refs.categoriesClient.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
         ) : null}
         {!readOnlyConventionContext ? (
@@ -316,12 +311,6 @@ export function ContractInfoSection({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Date effet" required error={form.validationErrors.dateEffet}>
-              <DatePicker disabled={form.renewalMode} date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
-            </Field>
-            <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
-              <DatePicker disabled={form.renewalMode || form.lockDateEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
-            </Field>
             {showFractionnement && (!readOnlyConventionContext || showConventionDateToDateFractionnement) ? (
               <Field label="Périodicité">
                 <Select
@@ -343,6 +332,12 @@ export function ContractInfoSection({
                 </Select>
               </Field>
             ) : null}
+            <Field label="Date effet" required error={form.validationErrors.dateEffet}>
+              <DatePicker disabled={form.renewalMode} date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
+            </Field>
+            <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
+              <DatePicker disabled={form.renewalMode || form.lockDateEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
+            </Field>
             {form.showContractEcheance ? (
               <Field label="Échéance" required error={form.validationErrors.echeance}>
                 <EcheanceInput

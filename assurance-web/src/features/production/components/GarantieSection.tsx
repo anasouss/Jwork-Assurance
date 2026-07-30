@@ -191,7 +191,9 @@ export function GarantieSection({
               const selectedVehicle = vehicules[item?.vehiculeIndex ?? 0] ?? vehicules[0];
               const selectedSource = selectedValueSource(garantie, item, selectedLine, selectedVehicle);
               const sourceOptions = availableVehicleValueSources(garantie, selectedVehicle, selectedLine);
+              const manualPricingSourceOptions = selectableManualValueSources(garantie, selectedVehicle, selectedLine);
               const manualValue = selectedSource === "MANUEL";
+              const manualCapital = canEnterManualCapital(garantie, item, selectedLine);
               const displayCapital = guaranteeCapitalValue(garantie, selectedLine, selectedVehicle, item);
               const estimatedPrime = automaticPricing && checked && !isRc ? estimatePrime(selectedLine, displayCapital) : undefined;
               const rcPrime = isRc ? resolveRcPrime(preview, selected, garanties, lignes, vehicules) : undefined;
@@ -335,12 +337,99 @@ export function GarantieSection({
                   ) : (
                     <>
                       <td className="px-3 py-2">
-                        <MoneyInput
-                          disabled={rowDisabled || isRc}
-                          className={controlClass(editable)}
-                          value={item?.valeurAssuree ?? item?.capital}
-                          onValueChange={(value) => update(garantie.id, { valeurAssuree: value, capital: value })}
-                        />
+                        {isRc ? (
+                          <Input
+                            readOnly
+                            disabled={rowDisabled}
+                            className={controlClass(checked)}
+                            value={money(resolveRcCapital(selectedVehicle, usages))}
+                          />
+                        ) : manualValue && manualPricingSourceOptions.length > 1 ? (
+                          <div className="grid gap-1">
+                            <Select
+                              value={selectedSource}
+                              disabled={!editable}
+                              onValueChange={(value) => update(garantie.id, {
+                                sourceValeurSelectionnee: value,
+                                valeurAssuree: undefined,
+                                capital: undefined,
+                              })}
+                            >
+                              <SelectTrigger className={controlClass(editable)}>
+                                <SelectValue placeholder="Source de la valeur" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {manualPricingSourceOptions.map((source) => (
+                                  <SelectItem key={source} value={source}>
+                                    {sourceOptionLabel(source, selectedVehicle)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <MoneyInput
+                              disabled={rowDisabled}
+                              className={controlClass(editable)}
+                              value={item?.valeurAssuree ?? item?.capital}
+                              onValueChange={(value) => update(garantie.id, {
+                                sourceValeurSelectionnee: "MANUEL",
+                                valeurAssuree: value,
+                                capital: value,
+                              })}
+                            />
+                          </div>
+                        ) : manualValue || (manualPricingSourceOptions.length === 0 && manualCapital) ? (
+                          <MoneyInput
+                            disabled={rowDisabled}
+                            className={controlClass(editable)}
+                            value={item?.valeurAssuree ?? item?.capital}
+                            onValueChange={(value) => update(garantie.id, {
+                              sourceValeurSelectionnee: manualValue ? "MANUEL" : item?.sourceValeurSelectionnee,
+                              valeurAssuree: value,
+                              capital: value,
+                            })}
+                          />
+                        ) : manualPricingSourceOptions.length > 1 ? (
+                          <Select
+                            value={selectedSource}
+                            disabled={!editable}
+                            onValueChange={(value) => {
+                              if (value !== "MANUEL" && !hasVehicleValue(selectedVehicle, value)) {
+                                toast.error(`Renseignez ${sourceLabel(value)} avant de sélectionner cette source.`);
+                                return;
+                              }
+                              update(garantie.id, {
+                                sourceValeurSelectionnee: value,
+                                valeurAssuree: undefined,
+                                capital: undefined,
+                              });
+                            }}
+                          >
+                            <SelectTrigger className={controlClass(editable)}>
+                              <SelectValue placeholder="Source de la valeur" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {manualPricingSourceOptions.map((source) => (
+                                <SelectItem key={source} value={source}>
+                                  {sourceOptionLabel(source, selectedVehicle)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : manualPricingSourceOptions.length === 1 ? (
+                          <Input
+                            readOnly
+                            disabled={rowDisabled}
+                            className={controlClass(editable)}
+                            value={sourceOptionLabel(manualPricingSourceOptions[0], selectedVehicle)}
+                          />
+                        ) : (
+                          <Input
+                            readOnly
+                            disabled
+                            className={controlClass(false)}
+                            value=""
+                          />
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
@@ -848,12 +937,18 @@ function selectedValueSource(garantie: ReferenceOption, item?: GarantieInput, li
     return "AUCUNE";
   }
   const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
+  if (selected === "MANUEL") {
+    return selected;
+  }
   if (selected && (!vehicule || hasVehicleValue(vehicule, selected))) {
     return selected;
   }
   const sourceWithValue = allowedVehicleValueSources(garantie).find((source) => vehicule && hasVehicleValue(vehicule, source));
   if (sourceWithValue) {
     return sourceWithValue;
+  }
+  if (manualValueAllowed(garantie)) {
+    return "MANUEL";
   }
   const defaultValue = configuredDefaultVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 1 ? allowedVehicleValueSources(garantie)[0] : "");
   if (defaultValue) {
@@ -873,6 +968,9 @@ function initialVehicleValueSource(garantie: ReferenceOption, vehicule?: Vehicul
   if (availableSource) {
     return availableSource;
   }
+  if (manualValueAllowed(garantie)) {
+    return "MANUEL";
+  }
   const allowedSources = allowedVehicleValueSources(garantie);
   return configuredDefaultVehicleValueSource(garantie)
     || (allowedSources.length === 1 ? allowedSources[0] : "")
@@ -887,6 +985,31 @@ function availableVehicleValueSources(garantie: ReferenceOption, vehicule?: Vehi
   return allowedVehicleValueSources(garantie).filter((source) => vehicule && hasVehicleValue(vehicule, source));
 }
 
+function selectableManualValueSources(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
+  const sources = availableVehicleValueSources(garantie, vehicule, line);
+  if (manualValueAllowed(garantie) && !sources.includes("MANUEL")) {
+    sources.push("MANUEL");
+  }
+  return sources;
+}
+
+function manualValueAllowed(garantie: ReferenceOption) {
+  const configuredSources = Array.isArray(garantie.sourcesValeurAutorisees)
+    ? garantie.sourcesValeurAutorisees.map((source) => String(source).toUpperCase())
+    : [];
+  return Boolean(garantie.saisieManuelleAutorisee)
+    || configuredSources.includes("MANUEL")
+    || defaultSource(garantie) === "MANUEL";
+}
+
+function canEnterManualCapital(garantie: ReferenceOption, item?: GarantieInput, line?: ReferenceOption) {
+  if (manualValueAllowed(garantie)) {
+    return true;
+  }
+  const mode = String(item?.modeSelectionne || lineMode(line) || garantie.modeParDefaut || "").toUpperCase();
+  return mode === "CAPITAL" && allowedVehicleValueSources(garantie).length === 0;
+}
+
 function requiredVehicleValueWarning(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
   if (!vehicule || lineMode(line) === "CAPITAL" || defaultSource(garantie) === "MANUEL") {
     return "";
@@ -896,9 +1019,15 @@ function requiredVehicleValueWarning(garantie: ReferenceOption, vehicule?: Vehic
     if (allowedSources.some((allowedSource) => hasVehicleValue(vehicule, allowedSource))) {
       return validateValeurVenale(vehicule) ?? "";
     }
+    if (manualValueAllowed(garantie)) {
+      return "";
+    }
     return `Renseignez ${allowedSources.map(sourceLabel).join(" ou ")} avant de sélectionner cette garantie.`;
   }
   const source = configuredDefaultVehicleValueSource(garantie) || allowedSources[0];
+  if (source && !hasVehicleValue(vehicule, source) && manualValueAllowed(garantie)) {
+    return "";
+  }
   if (source === "NEUF" && !vehicule.valeurNeuf) {
     return "Renseignez la valeur à neuf avant de sélectionner cette garantie.";
   }
@@ -964,10 +1093,10 @@ function guaranteeCapitalValue(garantie: ReferenceOption, line?: ReferenceOption
   if (lineMode(line) === "CAPITAL") {
     return numeric(line?.capital);
   }
-  if (isManualValue(garantie, line)) {
+  const source = selectedValueSource(garantie, item, line, vehicule);
+  if (source === "MANUEL" || isManualValue(garantie, line)) {
     return item?.valeurAssuree ?? item?.capital;
   }
-  const source = selectedValueSource(garantie, item, line, vehicule);
   if (source === "VENALE") {
     return vehicule?.valeurVenale;
   }
@@ -999,6 +1128,9 @@ function capitalDisplay(garantie: ReferenceOption, line?: ReferenceOption, vehic
 }
 
 function sourceOptionLabel(source: string, vehicule?: VehiculeInput) {
+  if (source === "MANUEL") {
+    return "Saisie manuelle";
+  }
   if (source === "NEUF") {
     return `V.Neuf: ${money(vehicule?.valeurNeuf)}`;
   }

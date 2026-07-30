@@ -39,7 +39,12 @@ const groups: ComptaGroup[] = [
         permission: "quittance:view",
         primary: true,
       },
-      { title: "Relevés et factures", icon: FileText, disabled: true },
+      {
+        title: "Relevés et factures",
+        icon: FileText,
+        href: "/app/compta/releves-factures",
+        permission: "quittance:view",
+      },
       { title: "Règlements clients", icon: WalletCards, disabled: true },
     ],
   },

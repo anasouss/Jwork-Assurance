@@ -175,3 +175,106 @@ export type ReferenceOption = {
   code?: string;
   libelle: string;
 };
+
+export type ClientDocumentType = "RELEVE" | "FACTURE";
+export type ClientDocumentStatus = "EMIS" | "ANNULE";
+
+export type ClientDocumentSource = {
+  quittanceId: string;
+  contratId: string;
+  mouvementId?: string | null;
+  dossier: string;
+  police: string;
+  typeContrat: TypeContrat;
+  mouvement: string;
+  compagnie: string;
+  dateEffet: string;
+  dateEcheance?: string | null;
+  payeurType: "CLIENT" | "GROUPE";
+  payeurId: string;
+  payeurNom: string;
+  primeNette: number;
+  taxes: number;
+  accessoires: number;
+  montantTtc: number;
+  dejaFacturee: boolean;
+  facturable: boolean;
+};
+
+export type PageInfo = {
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+};
+
+export type ClientDocumentSourcePage = {
+  summary: {
+    total: number;
+  };
+  page: PageInfo;
+  rows: ClientDocumentSource[];
+};
+
+export type ClientDocumentLine = {
+  id: string;
+  quittanceId: string;
+  contratId: string;
+  mouvementId?: string | null;
+  ordre: number;
+  dateOperation: string;
+  dateEcheance?: string | null;
+  numeroDossier: string;
+  numeroPolice: string;
+  numeroQuittance: string;
+  mouvement: string;
+  compagnie: string;
+  debit: number;
+  credit: number;
+  primeNette: number;
+  taxes: number;
+  accessoires: number;
+  montantTtc: number;
+};
+
+export type ClientDocument = {
+  id: string;
+  typeDocument: ClientDocumentType;
+  statut: ClientDocumentStatus;
+  numero: string;
+  dateEmission: string;
+  periodeDebut: string;
+  periodeFin: string;
+  dateEcheance?: string | null;
+  clientPayeurId?: string | null;
+  groupePayeurId?: string | null;
+  payeurNom: string;
+  payeurIdentifiant?: string | null;
+  payeurAdresse?: string | null;
+  totalDebit: number;
+  totalCredit: number;
+  totalDocument: number;
+  notes?: string | null;
+  dateAnnulation?: string | null;
+  motifAnnulation?: string | null;
+  lignes: ClientDocumentLine[];
+};
+
+export type ClientDocumentPage = {
+  summary: {
+    total: number;
+  };
+  page: PageInfo;
+  rows: ClientDocument[];
+};
+
+export type CreateClientDocumentRequest = {
+  typeDocument: ClientDocumentType;
+  quittanceIds: string[];
+  periodeDebut: string;
+  periodeFin: string;
+  dateEcheance?: string;
+  notes?: string;
+};

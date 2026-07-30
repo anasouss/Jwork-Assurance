@@ -1,0 +1,54 @@
+package com.assurance.repository;
+
+import com.assurance.entity.DocumentClient;
+import com.assurance.enums.StatutDocumentClient;
+import com.assurance.enums.TypeDocumentClient;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.util.Optional;
+
+public interface DocumentClientRepository extends JpaRepository<DocumentClient, Long> {
+
+    @EntityGraph(attributePaths = {"clientPayeur", "groupePayeur"})
+    @Query("""
+            select d
+            from DocumentClient d
+            where d.agence.id = :agenceId
+              and (:type is null or d.typeDocument = :type)
+              and (:statut is null or d.statut = :statut)
+              and (:dateDu is null or d.dateEmission >= :dateDu)
+              and (:dateAu is null or d.dateEmission <= :dateAu)
+              and (
+                    :search is null
+                    or lower(d.numero) like concat('%', :search, '%')
+                    or lower(d.payeurNom) like concat('%', :search, '%')
+                    or lower(coalesce(d.payeurIdentifiant, '')) like concat('%', :search, '%')
+              )
+            order by d.dateEmission desc, d.id desc
+            """)
+    Page<DocumentClient> search(
+            @Param("agenceId") Long agenceId,
+            @Param("type") TypeDocumentClient type,
+            @Param("statut") StatutDocumentClient statut,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu,
+            @Param("search") String search,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {
+            "agence",
+            "clientPayeur",
+            "clientPayeur.ville",
+            "groupePayeur",
+            "lignes",
+            "lignes.quittance"
+    })
+    Optional<DocumentClient> findByAgenceIdAndId(Long agenceId, Long id);
+}

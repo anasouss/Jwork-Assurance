@@ -1,7 +1,13 @@
-import { apiFetch, apiUpload, buildQueryString } from "@/lib/api/base";
+import { apiFetch, apiFetchBlob, apiUpload, buildQueryString } from "@/lib/api/base";
 import type { ApiResponse } from "@/lib/types";
 import type {
   AllocationRequest,
+  ClientDocument,
+  ClientDocumentPage,
+  ClientDocumentSourcePage,
+  ClientDocumentStatus,
+  ClientDocumentType,
+  CreateClientDocumentRequest,
   ImportPreview,
   QuittanceAllocation,
   QuittancePage,
@@ -124,6 +130,87 @@ export const comptaApi = {
       })
     );
   },
+
+  async searchClientDocumentSources(params: {
+    typeContrat?: TypeContrat;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(
+      await apiFetch<ApiResponse<ClientDocumentSourcePage>>(
+        `/api/v1/compta/documents-clients/sources${buildQueryString(params)}`
+      )
+    );
+    return {
+      ...result,
+      rows: result.rows.map((row) => ({
+        ...row,
+        quittanceId: String(row.quittanceId),
+        contratId: String(row.contratId),
+        mouvementId: row.mouvementId == null ? null : String(row.mouvementId),
+        payeurId: String(row.payeurId),
+      })),
+    };
+  },
+
+  async searchClientDocuments(params: {
+    type?: ClientDocumentType;
+    statut?: ClientDocumentStatus;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(
+      await apiFetch<ApiResponse<ClientDocumentPage>>(
+        `/api/v1/compta/documents-clients${buildQueryString(params)}`
+      )
+    );
+    return { ...result, rows: result.rows.map(normalizeClientDocument) };
+  },
+
+  async clientDocument(id: string) {
+    return normalizeClientDocument(
+      unwrap(
+        await apiFetch<ApiResponse<ClientDocument>>(
+          `/api/v1/compta/documents-clients/${id}`
+        )
+      )
+    );
+  },
+
+  async createClientDocument(request: CreateClientDocumentRequest) {
+    return normalizeClientDocument(
+      unwrap(
+        await apiFetch<ApiResponse<ClientDocument>>("/api/v1/compta/documents-clients", {
+          method: "POST",
+          body: JSON.stringify(request),
+        })
+      )
+    );
+  },
+
+  async cancelClientDocument(id: string, motif: string) {
+    return normalizeClientDocument(
+      unwrap(
+        await apiFetch<ApiResponse<ClientDocument>>(
+          `/api/v1/compta/documents-clients/${id}/annulation`,
+          {
+            method: "POST",
+            body: JSON.stringify({ motif }),
+          }
+        )
+      )
+    );
+  },
+
+  async clientDocumentPdf(id: string) {
+    return apiFetchBlob(`/api/v1/compta/documents-clients/${id}/pdf`);
+  },
 };
 
 function normalizeReference(option: ReferenceOption): ReferenceOption {
@@ -152,6 +239,22 @@ function normalizeAllocation(allocation: QuittanceAllocation): QuittanceAllocati
     lignes: allocation.lignes.map((line) => ({
       ...line,
       id: line.id == null ? undefined : String(line.id),
+    })),
+  };
+}
+
+function normalizeClientDocument(document: ClientDocument): ClientDocument {
+  return {
+    ...document,
+    id: String(document.id),
+    clientPayeurId: document.clientPayeurId == null ? null : String(document.clientPayeurId),
+    groupePayeurId: document.groupePayeurId == null ? null : String(document.groupePayeurId),
+    lignes: (document.lignes ?? []).map((line) => ({
+      ...line,
+      id: String(line.id),
+      quittanceId: String(line.quittanceId),
+      contratId: String(line.contratId),
+      mouvementId: line.mouvementId == null ? null : String(line.mouvementId),
     })),
   };
 }

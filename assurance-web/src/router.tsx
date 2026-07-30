@@ -125,6 +125,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/QuittanceAffectationPage")),
       },
       {
+        path: "compta/releves-factures",
+        lazy: lazyRoute(() => import("@/features/compta/pages/RelevesFacturesPage")),
+      },
+      {
         path: "crm",
         lazy: lazyRoute(() => import("@/features/crm/pages/ClientCrmPage")),
       },

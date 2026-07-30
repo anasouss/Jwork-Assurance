@@ -17,6 +17,88 @@ import java.util.Collection;
 import jakarta.persistence.LockModeType;
 
 public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
+    @Query("""
+            select coalesce(sum(q.primeNette), 0),
+                   coalesce(sum(q.taxe), 0),
+                   coalesce(sum(q.taxeParafiscale), 0),
+                   coalesce(sum(q.accessoire), 0),
+                   coalesce(sum(q.cnpac), 0),
+                   coalesce(sum(q.primeTotale), 0),
+                   count(q)
+            from Quittance q
+            left join q.mouvementContrat m
+            where q.contrat.agence.id = :agenceId
+              and q.globale = true
+              and q.alternative = false
+              and q.contrat.prospection = false
+              and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
+              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and q.dateDebut between :dateDu and :dateAu
+            """)
+    Object[] sumDashboardProduction(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
+
+    @Query("""
+            select year(q.dateDebut), month(q.dateDebut),
+                   coalesce(sum(q.primeNette), 0),
+                   coalesce(sum(q.primeTotale), 0),
+                   count(q)
+            from Quittance q
+            left join q.mouvementContrat m
+            where q.contrat.agence.id = :agenceId
+              and q.globale = true
+              and q.alternative = false
+              and q.contrat.prospection = false
+              and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
+              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and q.dateDebut between :dateDu and :dateAu
+            group by year(q.dateDebut), month(q.dateDebut)
+            order by year(q.dateDebut), month(q.dateDebut)
+            """)
+    List<Object[]> sumDashboardProductionByMonth(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
+
+    @Query("""
+            select count(q)
+            from Quittance q
+            left join q.mouvementContrat m
+            where q.contrat.agence.id = :agenceId
+              and q.globale = true
+              and q.alternative = false
+              and q.contrat.prospection = false
+              and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
+              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and not exists (
+                  select 1 from AffectationQuittanceCompagnie a where a.quittance = q
+              )
+            """)
+    long countDashboardUnassigned(@Param("agenceId") Long agenceId);
+
+    @Query("""
+            select count(q)
+            from Quittance q
+            left join q.mouvementContrat m
+            where q.contrat.agence.id = :agenceId
+              and q.globale = true
+              and q.alternative = false
+              and q.contrat.prospection = false
+              and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
+              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and not exists (
+                  select 1
+                  from LigneDocumentClient l
+                  where l.quittance = q
+                    and l.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              )
+            """)
+    long countDashboardDocumentsToIssue(@Param("agenceId") Long agenceId);
+
     List<Quittance> findByContratIdOrderByCreatedAtDesc(Long contratId);
 
     List<Quittance> findByContrat_IdAndElementFacturable_IdOrderByCreatedAtDesc(Long contratId, Long elementFacturableId);

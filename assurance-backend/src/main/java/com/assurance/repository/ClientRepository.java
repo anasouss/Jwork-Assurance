@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ClientRepository extends JpaRepository<Client, Long> {
+    long countByAgenceIdAndActifTrue(Long agenceId);
+
     Optional<Client> findByAgenceIdAndId(Long agenceId, Long id);
     Optional<Client> findFirstByAgenceIdAndCinIgnoreCase(Long agenceId, String cin);
     Optional<Client> findFirstByAgenceIdAndRcIgnoreCase(Long agenceId, String rc);

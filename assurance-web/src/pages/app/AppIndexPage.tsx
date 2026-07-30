@@ -1,3 +1,3 @@
-import ProductionDashboardPage from "@/features/production/pages/ProductionDashboardPage";
+import AgencyDashboardPage from "@/features/dashboard/pages/AgencyDashboardPage";
 
-export default ProductionDashboardPage;
+export default AgencyDashboardPage;

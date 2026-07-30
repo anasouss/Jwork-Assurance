@@ -12,8 +12,32 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 public interface ContratRepository extends JpaRepository<Contrat, Long> {
+    long countByAgenceIdAndProspectionFalseAndBrouillonFalseAndStatut(Long agenceId, StatutContrat statut);
+
+    long countByAgenceIdAndProspectionFalseAndBrouillonTrue(Long agenceId);
+
+    long countByAgenceIdAndProspectionFalseAndBrouillonFalseAndStatutAndDateEcheanceBetween(
+            Long agenceId,
+            StatutContrat statut,
+            LocalDate dateDu,
+            LocalDate dateAu
+    );
+
+    @Query("""
+            select c.typeContrat, count(c)
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = false
+              and c.brouillon = false
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+            group by c.typeContrat
+            order by c.typeContrat
+            """)
+    List<Object[]> countActivePortfolioByType(@Param("agenceId") Long agenceId);
+
     List<Contrat> findByAgenceIdOrderByCreatedAtDesc(Long agenceId);
 
     List<Contrat> findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(Long agenceId);

@@ -29,10 +29,12 @@ import type {
   TypeContrat,
 } from "../types";
 
+type QuittancePresence = "AVEC_QUITTANCE" | "SANS_QUITTANCE";
+
 type Filters = {
   compagnieId: "ALL" | string;
   typeContrat: "ALL" | TypeContrat;
-  nature: "ALL" | CategorieMouvement;
+  nature: "ALL" | QuittancePresence;
   dateDu: string;
   dateAu: string;
   search: string;
@@ -68,7 +70,9 @@ export default function QuittanceAffectationPage() {
     () => ({
       compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
       typeContrat: appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
-      nature: appliedFilters.nature === "ALL" ? undefined : appliedFilters.nature,
+      avecQuittance: appliedFilters.nature === "ALL"
+        ? undefined
+        : appliedFilters.nature === "AVEC_QUITTANCE",
       dateDu: appliedFilters.dateDu || undefined,
       dateAu: appliedFilters.dateAu || undefined,
       search: appliedFilters.search.trim() || undefined,
@@ -189,10 +193,8 @@ export default function QuittanceAffectationPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Toutes</SelectItem>
-                  <SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem>
-                  <SelectItem value="AVENANT">Avenant</SelectItem>
-                  <SelectItem value="RENOUVELLEMENT">Renouvellement</SelectItem>
-                  <SelectItem value="CARTE_VERTE">Carte verte</SelectItem>
+                  <SelectItem value="AVEC_QUITTANCE">Primes avec quittances</SelectItem>
+                  <SelectItem value="SANS_QUITTANCE">Primes sans quittances</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>

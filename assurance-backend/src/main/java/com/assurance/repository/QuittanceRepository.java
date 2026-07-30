@@ -1,8 +1,6 @@
 package com.assurance.repository;
 
 import com.assurance.entity.Quittance;
-import com.assurance.enums.CategorieMouvementContrat;
-import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.TypeContrat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -64,21 +62,22 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
-                    (:natureMouvement is null and :natureElement is null)
+                    :avecQuittance is null
                     or (
-                        :natureMouvement is not null
-                        and tm.categorie = :natureMouvement
-                        and (
-                            q.elementFacturable is null
-                            or q.elementFacturable.nature in (
-                                com.assurance.enums.NatureElementFacturable.CONTRAT,
-                                com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT
-                            )
+                        :avecQuittance = true
+                        and exists (
+                            select 1
+                            from AffectationQuittanceCompagnie aq
+                            where aq.quittance = q
                         )
                     )
                     or (
-                        :natureElement is not null
-                        and q.elementFacturable.nature = :natureElement
+                        :avecQuittance = false
+                        and not exists (
+                            select 1
+                            from AffectationQuittanceCompagnie aq
+                            where aq.quittance = q
+                        )
                     )
               )
               and (:dateDu is null or q.dateDebut >= :dateDu)
@@ -138,21 +137,22 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
-                    (:natureMouvement is null and :natureElement is null)
+                    :avecQuittance is null
                     or (
-                        :natureMouvement is not null
-                        and tm.categorie = :natureMouvement
-                        and (
-                            q.elementFacturable is null
-                            or q.elementFacturable.nature in (
-                                com.assurance.enums.NatureElementFacturable.CONTRAT,
-                                com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT
-                            )
+                        :avecQuittance = true
+                        and exists (
+                            select 1
+                            from AffectationQuittanceCompagnie aq
+                            where aq.quittance = q
                         )
                     )
                     or (
-                        :natureElement is not null
-                        and q.elementFacturable.nature = :natureElement
+                        :avecQuittance = false
+                        and not exists (
+                            select 1
+                            from AffectationQuittanceCompagnie aq
+                            where aq.quittance = q
+                        )
                     )
               )
               and (:dateDu is null or q.dateDebut >= :dateDu)
@@ -197,8 +197,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             @Param("agenceId") Long agenceId,
             @Param("compagnieId") Long compagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
-            @Param("natureMouvement") CategorieMouvementContrat natureMouvement,
-            @Param("natureElement") NatureElementFacturable natureElement,
+            @Param("avecQuittance") Boolean avecQuittance,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("search") String search,

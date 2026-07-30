@@ -2,7 +2,6 @@ import { apiFetch, apiUpload, buildQueryString } from "@/lib/api/base";
 import type { ApiResponse } from "@/lib/types";
 import type {
   AllocationRequest,
-  CategorieMouvement,
   ImportPreview,
   QuittanceAllocation,
   QuittancePage,
@@ -25,7 +24,7 @@ export const comptaApi = {
   async searchQuittances(params: {
     compagnieId?: string;
     typeContrat?: TypeContrat;
-    nature?: CategorieMouvement;
+    avecQuittance?: boolean;
     dateDu?: string;
     dateAu?: string;
     search?: string;

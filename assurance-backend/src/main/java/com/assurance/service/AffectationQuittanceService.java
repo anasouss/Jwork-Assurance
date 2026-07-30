@@ -16,7 +16,6 @@ import com.assurance.entity.LigneQuittance;
 import com.assurance.entity.Quittance;
 import com.assurance.entity.RegleAffectationQuittance;
 import com.assurance.enums.CategorieQuittance;
-import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
 import com.assurance.enums.NatureAffectationQuittance;
@@ -92,7 +91,7 @@ public class AffectationQuittanceService {
             Long agenceId,
             Long compagnieId,
             TypeContrat typeContrat,
-            NatureAffectationQuittance nature,
+            Boolean avecQuittance,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
@@ -106,8 +105,7 @@ public class AffectationQuittanceService {
                 agenceId,
                 compagnieId,
                 typeContrat,
-                movementNature(nature),
-                elementNature(nature),
+                avecQuittance,
                 dateDu,
                 dateAu,
                 normalizedSearch,
@@ -639,19 +637,6 @@ public class AffectationQuittanceService {
             case RENOUVELLEMENT -> NatureAffectationQuittance.RENOUVELLEMENT;
             case DOCUMENT, SERVICE -> null;
         };
-    }
-
-    private CategorieMouvementContrat movementNature(NatureAffectationQuittance nature) {
-        if (nature == null || nature == NatureAffectationQuittance.CARTE_VERTE) {
-            return null;
-        }
-        return CategorieMouvementContrat.valueOf(nature.name());
-    }
-
-    private NatureElementFacturable elementNature(NatureAffectationQuittance nature) {
-        return nature == NatureAffectationQuittance.CARTE_VERTE
-                ? NatureElementFacturable.CARTE_VERTE
-                : null;
     }
 
     private AffectationQuittanceResponse.Ligne toLineResponse(AffectationQuittanceCompagnie entity) {

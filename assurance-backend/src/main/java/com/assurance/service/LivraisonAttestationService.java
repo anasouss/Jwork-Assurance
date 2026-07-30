@@ -35,10 +35,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -79,9 +81,13 @@ public class LivraisonAttestationService {
         livraison.setReferenceCommande(genererReference(livraison));
 
         int totalDemande = 0;
+        Set<Long> groupesTraites = new HashSet<>();
         for (CreateLivraisonAttestationRequest.Ligne input : request.getLignes()) {
             LigneDemandee ligne = resolveLigneDemandee(input);
             validerRestrictionCompagnie(compagnie, ligne.groupe());
+            if (!groupesTraites.add(ligne.groupe().getId())) {
+                throw new BadRequestException("Un groupe d'usage ne peut apparaitre qu'une seule fois dans la livraison");
+            }
             totalDemande += ligne.quantite();
 
             LigneLivraisonAttestation entity = ligneLivraisonAttestationRepository.save(LigneLivraisonAttestation.builder()
@@ -106,14 +112,36 @@ public class LivraisonAttestationService {
 
     @Transactional
     public LivraisonAttestationResponse ajouterLot(Long livraisonId, AddLotAttestationRequest request) {
+        return ajouterLots(livraisonId, List.of(request));
+    }
+
+    @Transactional
+    public LivraisonAttestationResponse ajouterLots(Long livraisonId, List<AddLotAttestationRequest> requests) {
         LivraisonAttestation livraison = findLivraison(livraisonId);
         if (Boolean.TRUE.equals(livraison.getValidee()) || livraison.getStatut() == StatutLivraisonAttestation.REFUSEE) {
             throw new BadRequestException("Livraison attestation verrouillee");
         }
-        LigneDemandee ligne = resolveLigneDemandee(request.getUsageId(), request.getGroupeUsageAttestationId(),
-                request.getGroupeUsageAttestationCode(), request.getQuantite(), request.getNumeroDebut(), request.getNumeroFin());
-        validerRestrictionCompagnie(livraison.getCompagnieAssurance(), ligne.groupe());
-        creerLot(livraison, ligne.usage(), ligne.groupe(), ligne.quantite(), request.getNumeroDebut(), request.getNumeroFin());
+        if (requests == null || requests.isEmpty()) {
+            throw new BadRequestException("Aucun lot d'attestations renseigne");
+        }
+
+        List<LotDemande> lots = new ArrayList<>();
+        Set<Long> groupesTraites = new HashSet<>();
+        for (AddLotAttestationRequest request : requests) {
+            LigneDemandee ligne = resolveLigneDemandee(request.getUsageId(), request.getGroupeUsageAttestationId(),
+                    request.getGroupeUsageAttestationCode(), request.getQuantite(), request.getNumeroDebut(), request.getNumeroFin());
+            validerRestrictionCompagnie(livraison.getCompagnieAssurance(), ligne.groupe());
+            if (!groupesTraites.add(ligne.groupe().getId())) {
+                throw new BadRequestException("Un groupe d'usage ne peut apparaitre qu'une seule fois dans une reception");
+            }
+            validerLotCommande(livraison, ligne);
+            lots.add(new LotDemande(ligne, request.getNumeroDebut(), request.getNumeroFin()));
+        }
+
+        for (LotDemande lot : lots) {
+            LigneDemandee ligne = lot.ligne();
+            creerLot(livraison, ligne.usage(), ligne.groupe(), ligne.quantite(), lot.numeroDebut(), lot.numeroFin());
+        }
         recalculer(livraison);
         return toResponse(livraisonAttestationRepository.save(livraison));
     }
@@ -275,6 +303,29 @@ public class LivraisonAttestationService {
         }
     }
 
+    private void validerLotCommande(LivraisonAttestation livraison, LigneDemandee ligne) {
+        if (livraison.getSource() != SourceLivraisonAttestation.COMMANDE) {
+            return;
+        }
+        LigneLivraisonAttestation ligneCommandee = ligneLivraisonAttestationRepository
+                .findByLivraisonAndGroupeUsageAttestationIdAndActifTrue(livraison, ligne.groupe().getId())
+                .orElseThrow(() -> new BadRequestException(
+                        "Le groupe d'usage " + ligne.groupe().getCode() + " ne fait pas partie de cette commande"
+                ));
+        int dejaRecu = lotAttestationRepository.findByLivraisonAndActifTrue(livraison).stream()
+                .filter(lot -> ligne.groupe().getId().equals(lot.getGroupeUsageAttestation().getId()))
+                .mapToInt(lot -> Math.max(0, lot.getQuantite()))
+                .sum();
+        int quantiteDemandee = ligneCommandee.getQuantiteDemandee() == null
+                ? 0
+                : Math.max(0, ligneCommandee.getQuantiteDemandee());
+        if (dejaRecu + ligne.quantite() > quantiteDemandee) {
+            throw new BadRequestException(
+                    "La quantite recue depasse la quantite commandee pour le groupe " + ligne.groupe().getCode()
+            );
+        }
+    }
+
     private void recalculer(LivraisonAttestation livraison) {
         int quantiteRecue = lotAttestationRepository.sumQuantiteByLivraison(livraison);
         livraison.setQuantiteRecue(Math.max(quantiteRecue, 0));
@@ -394,6 +445,9 @@ public class LivraisonAttestationService {
     }
 
     private record LigneDemandee(Usage usage, GroupeUsageAttestation groupe, int quantite) {
+    }
+
+    private record LotDemande(LigneDemandee ligne, String numeroDebut, String numeroFin) {
     }
 
     private record PlageNumeros(List<NumeroGenere> numeros) {

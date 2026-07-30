@@ -1,6 +1,7 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.AddLotAttestationRequest;
+import com.assurance.dto.request.AddLotsAttestationRequest;
 import com.assurance.dto.request.CreateLivraisonAttestationRequest;
 import com.assurance.dto.request.UpdateAttestationStockSettingsRequest;
 import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
@@ -123,6 +124,17 @@ public class AttestationStockController {
         return ResponseEntity.ok(ApiResponse.success(
                 livraisonAttestationService.ajouterLot(id, request),
                 "Lot d'attestations ajoute"
+        ));
+    }
+
+    @PostMapping("/livraisons/{id}/reception")
+    public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> ajouterLots(
+            @PathVariable Long id,
+            @Valid @RequestBody AddLotsAttestationRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                livraisonAttestationService.ajouterLots(id, request.getLots()),
+                "Lots d'attestations ajoutes"
         ));
     }
 

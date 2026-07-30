@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, CheckCircle2, ClipboardList, PackagePlus, Plus, Search, Settings2, Truck } from "lucide-react";
+import { Boxes, CheckCircle2, ClipboardList, PackagePlus, Plus, Search, Settings2, Trash2, Truck } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -38,25 +38,59 @@ const ALL_VALUE = "__ALL__";
 const today = () => new Date().toISOString().slice(0, 10);
 const palette = ["#059669", "#2563eb", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#65a30d", "#be185d"];
 
-const emptyCreateForm = {
-  compagnieAssuranceId: "",
-  dateDemande: today(),
-  dateReception: today(),
-  referenceBl: "",
-  groupeUsageAttestationCode: "",
-  quantiteDemandee: "1",
-  numeroDebut: "",
-  numeroFin: "",
-  commentaireDecision: "",
+type CreateLivraisonLine = {
+  id: string;
+  groupeUsageAttestationCode: string;
+  quantiteDemandee: string;
+  numeroDebut: string;
+  numeroFin: string;
 };
 
-const emptyLotForm = {
-  livraisonId: "",
-  groupeUsageAttestationCode: "",
-  quantite: "1",
-  numeroDebut: "",
-  numeroFin: "",
+function emptyCreateLine(): CreateLivraisonLine {
+  return {
+    id: crypto.randomUUID(),
+    groupeUsageAttestationCode: "",
+    quantiteDemandee: "1",
+    numeroDebut: "",
+    numeroFin: "",
+  };
+}
+
+function emptyCreateForm() {
+  return {
+    compagnieAssuranceId: "",
+    dateDemande: today(),
+    dateReception: today(),
+    referenceBl: "",
+    commentaireDecision: "",
+    lignes: [emptyCreateLine()],
+  };
+}
+
+type ReceptionLine = {
+  id: string;
+  groupeUsageAttestationCode: string;
+  quantite: string;
+  numeroDebut: string;
+  numeroFin: string;
 };
+
+function emptyReceptionLine(): ReceptionLine {
+  return {
+    id: crypto.randomUUID(),
+    groupeUsageAttestationCode: "",
+    quantite: "1",
+    numeroDebut: "",
+    numeroFin: "",
+  };
+}
+
+function emptyLotForm() {
+  return {
+    livraisonId: "",
+    lignes: [emptyReceptionLine()],
+  };
+}
 
 export default function AttestationStockPage() {
   const location = useLocation();
@@ -440,13 +474,20 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
     () => rows.find((item) => item.id === lotForm.livraisonId),
     [rows, lotForm.livraisonId]
   );
+  const groupesCommande = useMemo(() => {
+    if (!selectedLivraison) {
+      return [];
+    }
+    const codes = new Set(selectedLivraison.lignes.map((line) => line.groupeUsageAttestationCode));
+    return (groupes.data ?? []).filter((groupe) => codes.has(String(groupe.code ?? groupe.id)));
+  }, [groupes.data, selectedLivraison]);
 
   const createLivraison = useMutation({
     mutationFn: productionApi.createLivraisonAttestation,
     onSuccess: async (livraison) => {
       toast.success(source === "COMMANDE" ? "Commande créée" : "Réception créée");
-      setCreateForm(emptyCreateForm);
-      setLotForm((current) => ({ ...current, livraisonId: livraison.id }));
+      setCreateForm(emptyCreateForm());
+      setLotForm({ livraisonId: livraison.id, lignes: [emptyReceptionLine()] });
       await queryClient.invalidateQueries({ queryKey: ["livraisons-attestations"] });
       await queryClient.invalidateQueries({ queryKey: ["attestations-stock"] });
     },
@@ -455,19 +496,17 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
 
   const addLot = useMutation({
     mutationFn: () =>
-      productionApi.addLotAttestation(lotForm.livraisonId, {
-        groupeUsageAttestationCode: lotForm.groupeUsageAttestationCode,
-        quantite: toPositiveInteger(lotForm.quantite) ?? rangeQuantity(lotForm.numeroDebut, lotForm.numeroFin),
-        numeroDebut: lotForm.numeroDebut,
-        numeroFin: lotForm.numeroFin,
+      productionApi.addLotsAttestation(lotForm.livraisonId, {
+        lots: lotForm.lignes.map((line) => ({
+          groupeUsageAttestationCode: line.groupeUsageAttestationCode,
+          quantite: toPositiveInteger(line.quantite),
+          numeroDebut: line.numeroDebut,
+          numeroFin: line.numeroFin,
+        })),
       }),
     onSuccess: async () => {
-      toast.success("Lot ajouté");
-      setLotForm((current) => ({
-        ...emptyLotForm,
-        livraisonId: current.livraisonId,
-        groupeUsageAttestationCode: current.groupeUsageAttestationCode,
-      }));
+      toast.success("Réception enregistrée");
+      setLotForm((current) => ({ livraisonId: current.livraisonId, lignes: [emptyReceptionLine()] }));
       await queryClient.invalidateQueries({ queryKey: ["livraisons-attestations"] });
       await queryClient.invalidateQueries({ queryKey: ["attestations-stock"] });
     },
@@ -486,15 +525,53 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
 
   function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const quantite = toPositiveInteger(createForm.quantiteDemandee) ?? rangeQuantity(createForm.numeroDebut, createForm.numeroFin);
-    if (!createForm.compagnieAssuranceId || !createForm.groupeUsageAttestationCode || !quantite) {
-      toast.error("Compagnie, groupe et quantité sont obligatoires");
+    if (!createForm.compagnieAssuranceId) {
+      toast.error("La compagnie est obligatoire");
       return;
     }
-    if (source === "RECEPTION_DIRECTE" && (!createForm.numeroDebut || !createForm.numeroFin)) {
-      toast.error("Les bornes du lot sont obligatoires pour une réception directe");
+    if (createForm.lignes.length === 0) {
+      toast.error("Ajoutez au moins un usage");
       return;
     }
+
+    const codes = createForm.lignes.map((line) => line.groupeUsageAttestationCode).filter(Boolean);
+    if (codes.length !== createForm.lignes.length) {
+      toast.error("Sélectionnez un usage pour chaque ligne");
+      return;
+    }
+    if (new Set(codes).size !== codes.length) {
+      toast.error("Un usage ne peut apparaître qu'une seule fois");
+      return;
+    }
+
+    for (const line of createForm.lignes) {
+      const quantite = toPositiveInteger(line.quantiteDemandee);
+      if (!quantite) {
+        toast.error("La quantité doit être positive pour chaque usage");
+        return;
+      }
+      if (source === "RECEPTION_DIRECTE") {
+        const quantitePlage = rangeQuantity(line.numeroDebut, line.numeroFin);
+        if (!line.numeroDebut || !line.numeroFin || !quantitePlage) {
+          toast.error("Les bornes début et fin sont obligatoires pour chaque usage");
+          return;
+        }
+        if (quantite !== quantitePlage) {
+          toast.error(`La plage de l'usage ${line.groupeUsageAttestationCode} doit contenir ${quantite} attestations`);
+          return;
+        }
+      }
+    }
+
+    if (source === "COMMANDE" && !createForm.dateDemande) {
+      toast.error("La date de demande est obligatoire");
+      return;
+    }
+    if (source === "RECEPTION_DIRECTE" && !createForm.dateReception) {
+      toast.error("La date de réception est obligatoire");
+      return;
+    }
+
     createLivraison.mutate({
       compagnieAssuranceId: createForm.compagnieAssuranceId,
       source,
@@ -502,24 +579,71 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
       dateReception: source === "RECEPTION_DIRECTE" ? createForm.dateReception : undefined,
       referenceBl: valueOrUndefined(createForm.referenceBl),
       commentaireDecision: valueOrUndefined(createForm.commentaireDecision),
-      lignes: [
-        {
-          groupeUsageAttestationCode: createForm.groupeUsageAttestationCode,
-          quantiteDemandee: quantite,
-          numeroDebut: source === "RECEPTION_DIRECTE" ? createForm.numeroDebut : undefined,
-          numeroFin: source === "RECEPTION_DIRECTE" ? createForm.numeroFin : undefined,
-        },
-      ],
+      lignes: createForm.lignes.map((line) => ({
+        groupeUsageAttestationCode: line.groupeUsageAttestationCode,
+        quantiteDemandee: toPositiveInteger(line.quantiteDemandee),
+        numeroDebut: source === "RECEPTION_DIRECTE" ? line.numeroDebut : undefined,
+        numeroFin: source === "RECEPTION_DIRECTE" ? line.numeroFin : undefined,
+      })),
     });
+  }
+
+  function updateCreateLine(id: string, patch: Partial<Omit<CreateLivraisonLine, "id">>) {
+    setCreateForm((current) => ({
+      ...current,
+      lignes: current.lignes.map((line) => (line.id === id ? { ...line, ...patch } : line)),
+    }));
+  }
+
+  function removeCreateLine(id: string) {
+    setCreateForm((current) => ({
+      ...current,
+      lignes: current.lignes.filter((line) => line.id !== id),
+    }));
   }
 
   function submitLot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!lotForm.livraisonId || !lotForm.groupeUsageAttestationCode || !lotForm.numeroDebut || !lotForm.numeroFin) {
-      toast.error("Livraison, groupe et bornes du lot sont obligatoires");
+    if (!lotForm.livraisonId) {
+      toast.error("Sélectionnez une commande");
       return;
     }
+    if (lotForm.lignes.length === 0) {
+      toast.error("Ajoutez au moins un usage reçu");
+      return;
+    }
+    const codes = lotForm.lignes.map((line) => line.groupeUsageAttestationCode).filter(Boolean);
+    if (codes.length !== lotForm.lignes.length || new Set(codes).size !== codes.length) {
+      toast.error("Chaque usage reçu doit être sélectionné une seule fois");
+      return;
+    }
+    for (const line of lotForm.lignes) {
+      const quantite = toPositiveInteger(line.quantite);
+      const quantitePlage = rangeQuantity(line.numeroDebut, line.numeroFin);
+      if (!quantite || !line.numeroDebut || !line.numeroFin || !quantitePlage) {
+        toast.error("Quantité et bornes sont obligatoires pour chaque usage reçu");
+        return;
+      }
+      if (quantite !== quantitePlage) {
+        toast.error(`La plage de l'usage ${line.groupeUsageAttestationCode} doit contenir ${quantite} attestations`);
+        return;
+      }
+    }
     addLot.mutate();
+  }
+
+  function updateReceptionLine(id: string, patch: Partial<Omit<ReceptionLine, "id">>) {
+    setLotForm((current) => ({
+      ...current,
+      lignes: current.lignes.map((line) => (line.id === id ? { ...line, ...patch } : line)),
+    }));
+  }
+
+  function removeReceptionLine(id: string) {
+    setLotForm((current) => ({
+      ...current,
+      lignes: current.lignes.filter((line) => line.id !== id),
+    }));
   }
 
   return (
@@ -569,7 +693,7 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                       <button
                         type="button"
                         className="text-left font-medium hover:underline"
-                        onClick={() => setLotForm((current) => ({ ...current, livraisonId: livraison.id }))}
+                        onClick={() => setLotForm({ livraisonId: livraison.id, lignes: [emptyReceptionLine()] })}
                       >
                         {livraison.referenceCommande ?? livraison.referenceBl ?? livraison.id}
                       </button>
@@ -656,20 +780,6 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Groupe usage">
-                  <GroupCodeSelect
-                    value={createForm.groupeUsageAttestationCode}
-                    groupes={groupes.data ?? []}
-                    onChange={(value) => setCreateForm((current) => ({ ...current, groupeUsageAttestationCode: value }))}
-                  />
-                </Field>
-                <Field label="Quantité">
-                  <Input
-                    inputMode="numeric"
-                    value={createForm.quantiteDemandee}
-                    onChange={(event) => setCreateForm((current) => ({ ...current, quantiteDemandee: event.target.value }))}
-                  />
-                </Field>
                 <Field label={source === "COMMANDE" ? "Date demande" : "Date réception"}>
                   <DatePicker
                     date={source === "COMMANDE" ? createForm.dateDemande : createForm.dateReception}
@@ -688,24 +798,72 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                     onChange={(event) => setCreateForm((current) => ({ ...current, referenceBl: event.target.value }))}
                   />
                 </Field>
-                {source === "RECEPTION_DIRECTE" ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="N° début">
-                      <Input
-                        inputMode="numeric"
-                        value={createForm.numeroDebut}
-                        onChange={(event) => setCreateForm((current) => ({ ...current, numeroDebut: event.target.value }))}
-                      />
-                    </Field>
-                    <Field label="N° fin">
-                      <Input
-                        inputMode="numeric"
-                        value={createForm.numeroFin}
-                        onChange={(event) => setCreateForm((current) => ({ ...current, numeroFin: event.target.value }))}
-                      />
-                    </Field>
+                <div className="space-y-2 border-t pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>Usages et quantités</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setCreateForm((current) => ({ ...current, lignes: [...current.lignes, emptyCreateLine()] }))
+                      }
+                    >
+                      <Plus className="size-4" />
+                      Usage
+                    </Button>
                   </div>
-                ) : null}
+                  {createForm.lignes.map((line, index) => (
+                    <div key={line.id} className="space-y-3 rounded-md border bg-muted/20 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Ligne {index + 1}</span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-7 text-destructive"
+                          disabled={createForm.lignes.length === 1}
+                          onClick={() => removeCreateLine(line.id)}
+                          title="Retirer la ligne"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                      <Field label="Usage attestation">
+                        <GroupCodeSelect
+                          value={line.groupeUsageAttestationCode}
+                          groupes={groupes.data ?? []}
+                          onChange={(value) => updateCreateLine(line.id, { groupeUsageAttestationCode: value })}
+                        />
+                      </Field>
+                      <Field label="Quantité">
+                        <Input
+                          inputMode="numeric"
+                          value={line.quantiteDemandee}
+                          onChange={(event) => updateCreateLine(line.id, { quantiteDemandee: event.target.value })}
+                        />
+                      </Field>
+                      {source === "RECEPTION_DIRECTE" ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <Field label="N° début">
+                            <Input
+                              inputMode="numeric"
+                              value={line.numeroDebut}
+                              onChange={(event) => updateCreateLine(line.id, { numeroDebut: event.target.value })}
+                            />
+                          </Field>
+                          <Field label="N° fin">
+                            <Input
+                              inputMode="numeric"
+                              value={line.numeroFin}
+                              onChange={(event) => updateCreateLine(line.id, { numeroFin: event.target.value })}
+                            />
+                          </Field>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
                 <Field label="Commentaire">
                   <Textarea
                     value={createForm.commentaireDecision}
@@ -733,7 +891,7 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                   <Field label="Commande">
                     <Select
                       value={lotForm.livraisonId}
-                      onValueChange={(value) => setLotForm((current) => ({ ...current, livraisonId: value }))}
+                      onValueChange={(value) => setLotForm({ livraisonId: value, lignes: [emptyReceptionLine()] })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner" />
@@ -754,39 +912,70 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
                       {selectedLivraison.compagnieAssuranceNom} · {selectedLivraison.quantiteRecue}/{selectedLivraison.quantiteDemandee} reçues
                     </div>
                   ) : null}
-                  <Field label="Groupe usage">
-                    <GroupCodeSelect
-                      value={lotForm.groupeUsageAttestationCode}
-                      groupes={groupes.data ?? []}
-                      onChange={(value) => setLotForm((current) => ({ ...current, groupeUsageAttestationCode: value }))}
-                    />
-                  </Field>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Field label="Quantité">
-                      <Input
-                        inputMode="numeric"
-                        value={lotForm.quantite}
-                        onChange={(event) => setLotForm((current) => ({ ...current, quantite: event.target.value }))}
-                      />
-                    </Field>
-                    <Field label="Début">
-                      <Input
-                        inputMode="numeric"
-                        value={lotForm.numeroDebut}
-                        onChange={(event) => setLotForm((current) => ({ ...current, numeroDebut: event.target.value }))}
-                      />
-                    </Field>
-                    <Field label="Fin">
-                      <Input
-                        inputMode="numeric"
-                        value={lotForm.numeroFin}
-                        onChange={(event) => setLotForm((current) => ({ ...current, numeroFin: event.target.value }))}
-                      />
-                    </Field>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>Usages reçus</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!selectedLivraison}
+                      onClick={() => setLotForm((current) => ({ ...current, lignes: [...current.lignes, emptyReceptionLine()] }))}
+                    >
+                      <Plus className="size-4" />
+                      Usage
+                    </Button>
                   </div>
+                  {lotForm.lignes.map((line, index) => (
+                    <div key={line.id} className="space-y-3 rounded-md border bg-muted/20 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Lot {index + 1}</span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-7 text-destructive"
+                          disabled={lotForm.lignes.length === 1}
+                          onClick={() => removeReceptionLine(line.id)}
+                          title="Retirer le lot"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                      <Field label="Usage attestation">
+                        <GroupCodeSelect
+                          value={line.groupeUsageAttestationCode}
+                          groupes={groupesCommande}
+                          onChange={(value) => updateReceptionLine(line.id, { groupeUsageAttestationCode: value })}
+                        />
+                      </Field>
+                      <div className="grid grid-cols-3 gap-3">
+                        <Field label="Quantité">
+                          <Input
+                            inputMode="numeric"
+                            value={line.quantite}
+                            onChange={(event) => updateReceptionLine(line.id, { quantite: event.target.value })}
+                          />
+                        </Field>
+                        <Field label="Début">
+                          <Input
+                            inputMode="numeric"
+                            value={line.numeroDebut}
+                            onChange={(event) => updateReceptionLine(line.id, { numeroDebut: event.target.value })}
+                          />
+                        </Field>
+                        <Field label="Fin">
+                          <Input
+                            inputMode="numeric"
+                            value={line.numeroFin}
+                            onChange={(event) => updateReceptionLine(line.id, { numeroFin: event.target.value })}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  ))}
                   <Button type="submit" className="w-full" variant="secondary" disabled={addLot.isPending}>
                     <PackagePlus className="size-4" />
-                    Ajouter lot
+                    Enregistrer la réception
                   </Button>
                 </form>
               </CardContent>

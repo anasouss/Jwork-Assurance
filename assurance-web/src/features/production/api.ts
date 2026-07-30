@@ -4,6 +4,7 @@ import type {
   AssistanceContrat,
   AssistanceContratContext,
   AddLotAttestationRequest,
+  AddLotsAttestationRequest,
   AttestationStockDashboard,
   AttestationStockItem,
   AttestationStockStatus,
@@ -560,6 +561,15 @@ export const productionApi = {
   async addLotAttestation(livraisonId: string, payload: AddLotAttestationRequest) {
     return unwrap(
       await apiFetch<ApiResponse<LivraisonAttestation>>(`/api/v1/attestations-stock/livraisons/${livraisonId}/lots`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async addLotsAttestation(livraisonId: string, payload: AddLotsAttestationRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<LivraisonAttestation>>(`/api/v1/attestations-stock/livraisons/${livraisonId}/reception`, {
         method: "POST",
         body: JSON.stringify(payload),
       })

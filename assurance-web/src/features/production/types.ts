@@ -196,6 +196,10 @@ export type AddLotAttestationRequest = {
   numeroFin: string;
 };
 
+export type AddLotsAttestationRequest = {
+  lots: AddLotAttestationRequest[];
+};
+
 export type ElementFacturable = {
   id: string;
   contratId: string;

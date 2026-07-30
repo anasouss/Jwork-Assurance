@@ -422,7 +422,7 @@ public class AffectationQuittanceService {
             EnregistrerAffectationQuittanceRequest request
     ) {
         List<LigneQuittance> categoryLines = accountingCategoryLines(quittance).stream()
-                .filter(line -> line.getCategorie() != CategorieQuittance.TOTAL)
+                .filter(line -> isAffectableCategory(line.getCategorie()))
                 .filter(line -> money(line.getPrimeTotale()).compareTo(ZERO) != 0 || money(line.getPrimeNette()).compareTo(ZERO) != 0)
                 .toList();
         if (categoryLines.isEmpty()) {
@@ -635,7 +635,7 @@ public class AffectationQuittanceService {
             case AUTOMOBILE -> percent(requiredAmount(line.getPrimeNette(), "Prime nette automobile"), regle.getTauxCommissionAutomobile());
             case EVCAT -> percent(requiredAmount(line.getPrimeNette(), "Prime nette EVCAT"), regle.getTauxCommissionEvcat());
             case CORPOREL -> percent(requiredAmount(line.getPrimeNette(), "Prime nette corporel"), regle.getTauxCommissionCorporel());
-            case TOTAL -> ZERO;
+            case ASSISTANCE, TOTAL -> ZERO;
         };
         if (regle.getModeCalculCommission() == ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE) {
             base = base.subtract(percent(base, regle.getTauxTvaIncluseCommission()));
@@ -649,7 +649,7 @@ public class AffectationQuittanceService {
             boolean avecRetenue
     ) {
         return accountingCategoryLines(quittance).stream()
-                .filter(line -> line.getCategorie() != CategorieQuittance.TOTAL)
+                .filter(line -> isAffectableCategory(line.getCategorie()))
                 .filter(line -> money(line.getPrimeTotale()).compareTo(ZERO) != 0 || money(line.getPrimeNette()).compareTo(ZERO) != 0)
                 .map(line -> {
                     BigDecimal commission = calculateCommissionForCategory(line, regle);
@@ -685,6 +685,12 @@ public class AffectationQuittanceService {
                 .stream()
                 .filter(line -> !Boolean.TRUE.equals(line.getGlobale()))
                 .toList();
+    }
+
+    private boolean isAffectableCategory(CategorieQuittance categorie) {
+        return categorie == CategorieQuittance.AUTOMOBILE
+                || categorie == CategorieQuittance.EVCAT
+                || categorie == CategorieQuittance.CORPOREL;
     }
 
     private Retention calculateRetention(
@@ -1403,6 +1409,7 @@ public class AffectationQuittanceService {
             case AUTOMOBILE -> "Automobile";
             case EVCAT -> "EVCAT";
             case CORPOREL -> "Corporel";
+            case ASSISTANCE -> "Assistance";
             case TOTAL -> "Total";
         };
     }

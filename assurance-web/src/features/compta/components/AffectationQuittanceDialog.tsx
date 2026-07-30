@@ -803,6 +803,7 @@ function categoryLabel(category?: AllocationLine["categorieQuittance"]) {
   if (category === "AUTOMOBILE") return "Automobile";
   if (category === "EVCAT") return "EVCAT";
   if (category === "CORPOREL") return "Corporel";
+  if (category === "ASSISTANCE") return "Assistance";
   if (category === "TOTAL") return "Total";
   return "Catégorie";
 }

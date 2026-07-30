@@ -69,7 +69,7 @@ export type AllocationLine = {
   dateEcheance?: string | null;
   acteSource?: string | null;
   categorieSource?: string | null;
-  categorieQuittance?: "AUTOMOBILE" | "EVCAT" | "CORPOREL" | "TOTAL" | null;
+  categorieQuittance?: "AUTOMOBILE" | "EVCAT" | "CORPOREL" | "ASSISTANCE" | "TOTAL" | null;
   statutSource?: string | null;
   fichierSource?: string | null;
   primeNette: number;

@@ -500,34 +500,34 @@ export function ClientSection({
                     />
                   </div>
                   {showProprietaireConducteur ? (
-                    morale ? (
-                      <Alert className="mt-3 max-w-5xl border-sky-200 bg-sky-50/70 text-sky-950">
-                        <Info />
-                        <AlertDescription className="text-sky-900">
-                          Une personne morale ne peut pas être conducteur. Renseignez le conducteur habituel ci-dessous.
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
-                        <div className="grid gap-2 text-sm md:col-span-2">
-                          <span className="font-medium">Le propriétaire est-il lui-même le conducteur ?</span>
-                          <RadioGroup
-                            className="flex items-center gap-5"
-                            value={proprietorIsDriver ? "oui" : "non"}
-                            onValueChange={(value) => setProprietaireConducteur(index, value === "oui")}
-                          >
-                            <label className="flex cursor-pointer items-center gap-2">
-                              <RadioGroupItem value="oui" />
-                              Oui
-                            </label>
-                            <label className="flex cursor-pointer items-center gap-2">
-                              <RadioGroupItem value="non" />
-                              Non
-                            </label>
-                          </RadioGroup>
-                        </div>
+                    <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="grid gap-2 text-sm md:col-span-2">
+                        <span className="font-medium">Le propriétaire est-il lui-même le conducteur ?</span>
+                        <RadioGroup
+                          className="flex items-center gap-5"
+                          value={morale ? "non" : proprietorIsDriver ? "oui" : "non"}
+                          onValueChange={(value) => setProprietaireConducteur(index, value === "oui")}
+                          disabled={morale}
+                        >
+                          <label className={`flex items-center gap-2 ${morale ? "cursor-not-allowed text-muted-foreground" : "cursor-pointer"}`}>
+                            <RadioGroupItem value="oui" />
+                            Oui
+                          </label>
+                          <label className={`flex items-center gap-2 ${morale ? "cursor-not-allowed text-muted-foreground" : "cursor-pointer"}`}>
+                            <RadioGroupItem value="non" />
+                            Non
+                          </label>
+                        </RadioGroup>
                       </div>
-                    )
+                      {morale ? (
+                        <Alert className="md:col-span-2 lg:col-span-4 border-sky-200 bg-sky-50/70 text-sky-950">
+                          <Info />
+                          <AlertDescription className="text-sky-900">
+                            Une personne morale ne peut pas être conducteur. Renseignez le conducteur habituel ci-dessous.
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
+                    </div>
                   ) : null}
                   {showProprietairePermisFields ? (
                     <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -589,7 +589,7 @@ export function ClientSection({
                   ) : null}
                 </>
               ) : null}
-              {!isProprietaire && !morale ? (
+              {item.role === "CONDUCTEUR" && !morale ? (
                 <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                   <Field label="Date de naissance">
                     <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })} />

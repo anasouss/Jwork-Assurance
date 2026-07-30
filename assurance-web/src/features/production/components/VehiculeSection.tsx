@@ -10,7 +10,7 @@ import { Field } from "./Field";
 import { AttestationNumberInput } from "./AttestationNumberInput";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
-import { productionApi } from "../api";
+import { VehicleRegistrationLookupInput } from "./VehicleRegistrationLookupInput";
 import { toDateOnly } from "../date";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { ReferenceOption, VehiculeInput, VehiculeResponse } from "../types";
@@ -105,20 +105,6 @@ export function VehiculeSection({
     });
   };
 
-  const searchVehicule = async (index: number, immatriculation?: string) => {
-    const value = immatriculation?.trim();
-    if (!value) {
-      return;
-    }
-    try {
-      const found = await productionApi.searchVehicule({ immatriculation: value });
-      if (found) {
-        fillExistingVehicule(index, found);
-      }
-    } catch {
-      // Non-blocking lookup: users can still enter a new vehicle manually.
-    }
-  };
   const headerActions = (
     <>
       {extraAction}
@@ -190,10 +176,10 @@ export function VehiculeSection({
                   </Field>
                 ) : null}
                 <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
-                  <Input
+                  <VehicleRegistrationLookupInput
                     value={vehicule.immatriculation ?? ""}
-                    onBlur={() => searchVehicule(index, vehicule.immatriculation)}
-                    onChange={(event) => update(index, { immatriculation: event.target.value })}
+                    onValueChange={(nextValue) => update(index, { immatriculation: nextValue })}
+                    onVehicleFound={(found) => fillExistingVehicule(index, found)}
                   />
                 </Field>
                 <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>

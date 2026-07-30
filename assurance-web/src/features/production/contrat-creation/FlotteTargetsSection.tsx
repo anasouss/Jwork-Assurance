@@ -16,6 +16,7 @@ import { Field } from "../components/Field";
 import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { MoneyInput } from "../components/MoneyInput";
 import { SectionCard } from "../components/SectionCard";
+import { VehicleRegistrationLookupInput } from "../components/VehicleRegistrationLookupInput";
 import { emptyVehicule } from "../components/VehiculeSection";
 import { productionApi } from "../api";
 import { resolveAssistanceTariffAmount } from "../assistance-pricing";
@@ -47,11 +48,6 @@ type TargetQuittanceSummary = {
   totalAPayer?: number;
 };
 
-type LookupStatus = "idle" | "loading" | "found" | "new" | "error";
-type LookupState = {
-  status: LookupStatus;
-  message?: string;
-};
 type PricingMode = "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE";
 
 type Props = {
@@ -722,26 +718,6 @@ function SectionSubmitButton({
   );
 }
 
-function LookupMessage({ state }: { state?: LookupState }) {
-  if (!state || state.status === "idle") {
-    return null;
-  }
-  const tone = state.status === "found"
-    ? "text-emerald-700 dark:text-emerald-400"
-    : state.status === "new"
-      ? "text-slate-500"
-      : state.status === "error"
-        ? "text-red-600"
-        : "text-muted-foreground";
-
-  return (
-    <span className={`flex items-center gap-1 text-xs ${tone}`}>
-      {state.status === "loading" ? <Loader2 className="size-3 animate-spin" /> : null}
-      {state.message}
-    </span>
-  );
-}
-
 function TargetSubsection({
   title,
   badge,
@@ -1115,14 +1091,9 @@ function VehicleForm({
   const needsSousClasse = Boolean(usage?.bySousClasse);
   const needsPtc = Boolean(usage?.byPtc);
   const needsCategorieTransport = Boolean(usage?.byCategorieTransport);
-  const [lookup, setLookup] = useState<LookupState>({ status: "idle" });
-  const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const update = (patch: Partial<VehiculeInput>) => {
     setVehicules((current) => current.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
   };
-  useEffect(() => () => {
-    if (lookupTimer.current) clearTimeout(lookupTimer.current);
-  }, []);
 
   const fillExistingVehicule = (found: VehiculeResponse) => {
     const usageId = stringValue(found.usageId);
@@ -1149,39 +1120,6 @@ function VehicleForm({
       valeurNeuf: toOptionalNumber(found.valeurNeuf),
       valeurGlace: toOptionalNumber(found.valeurGlace),
     });
-  };
-
-  const searchVehicule = async (immatriculation?: string) => {
-    const value = immatriculation?.trim();
-    if (!value) {
-      setLookup({ status: "idle" });
-      return;
-    }
-    setLookup({ status: "loading", message: "Recherche du véhicule..." });
-    try {
-      const found = await productionApi.searchVehicule({ immatriculation: value });
-      if (found) {
-        fillExistingVehicule(found);
-        setLookup({ status: "found", message: "Véhicule existant chargé." });
-        return;
-      }
-      setLookup({ status: "new", message: "Nouveau véhicule : aucune fiche trouvée." });
-    } catch {
-      setLookup({ status: "error", message: "Recherche véhicule indisponible." });
-    }
-  };
-
-  const scheduleVehiculeSearch = (immatriculation?: string) => {
-    if (lookupTimer.current) clearTimeout(lookupTimer.current);
-    const value = immatriculation?.trim();
-    if (!value || value.length < 3) {
-      setLookup({ status: "idle" });
-      return;
-    }
-    setLookup({ status: "loading", message: "Recherche du véhicule..." });
-    lookupTimer.current = setTimeout(() => {
-      void searchVehicule(value);
-    }, 500);
   };
 
   return (
@@ -1223,15 +1161,11 @@ function VehicleForm({
           />
         </Field>
         <Field label="Immatriculation" required error={errors[`vehicules.${index}.immatriculation`]}>
-          <Input
+          <VehicleRegistrationLookupInput
             value={vehicule.immatriculation ?? ""}
-            onBlur={() => searchVehicule(vehicule.immatriculation)}
-            onChange={(event) => {
-              update({ immatriculation: event.target.value });
-              scheduleVehiculeSearch(event.target.value);
-            }}
+            onValueChange={(nextValue) => update({ immatriculation: nextValue })}
+            onVehicleFound={fillExistingVehicule}
           />
-          <LookupMessage state={lookup} />
         </Field>
         <Field label="Date mise en circulation">
           <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update({ datePremiereCirculation: toDateOnly(date) })} />

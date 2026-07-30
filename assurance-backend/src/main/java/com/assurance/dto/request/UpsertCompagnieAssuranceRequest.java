@@ -18,6 +18,7 @@ public class UpsertCompagnieAssuranceRequest {
     private String rc;
     private String ice;
     private String prefixeAttestation;
+    private String prefixeCarteVerte;
     private Integer ordreAffichage;
     private Boolean actif;
 }

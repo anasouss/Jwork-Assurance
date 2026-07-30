@@ -37,6 +37,8 @@ export default function ContratCartesVertesPage() {
   );
   const dateEcheance = selectedVehicle?.dateEcheance ?? context?.dateEcheance ?? undefined;
   const cartesVertes = context?.cartesVertes ?? [];
+  const carteVertePrefix = normalizeText(context?.prefixeCarteVerte);
+  const numeroSuffix = stripPrefix(form.numero ?? "", carteVertePrefix);
 
   useEffect(() => {
     if (!context) return;
@@ -74,14 +76,14 @@ export default function ContratCartesVertesPage() {
   });
 
   function submit() {
-    if (!form.vehiculeId || !form.numero?.trim() || !form.dateEffet) {
+    if (!form.vehiculeId || !numeroSuffix || !form.dateEffet) {
       toast.error("Véhicule, N° carte verte et date d'effet sont obligatoires.");
       return;
     }
     saveMutation.mutate({
       mouvementContratId: context?.mouvementContratId ?? mouvementId,
       vehiculeId: form.vehiculeId,
-      numero: form.numero,
+      numero: joinPrefix(carteVertePrefix, numeroSuffix),
       dateEffet: form.dateEffet,
     });
   }
@@ -131,7 +133,18 @@ export default function ContratCartesVertesPage() {
                   </Select>
                 </Field>
                 <Field label="N° carte verte" required>
-                  <Input value={form.numero ?? ""} onChange={(event) => setForm((current) => ({ ...current, numero: event.target.value }))} />
+                  <div className="flex">
+                    {carteVertePrefix ? (
+                      <span className="inline-flex min-h-10 items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        {carteVertePrefix}
+                      </span>
+                    ) : null}
+                    <Input
+                      className={carteVertePrefix ? "rounded-l-none" : undefined}
+                      value={numeroSuffix}
+                      onChange={(event) => setForm((current) => ({ ...current, numero: joinPrefix(carteVertePrefix, event.target.value) }))}
+                    />
+                  </div>
                 </Field>
                 <Field label="Date d'effet" required>
                   <DatePicker date={form.dateEffet} onSelect={(date) => setForm((current) => ({ ...current, dateEffet: toDateOnly(date) }))} />
@@ -236,6 +249,25 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 function numericParam(value: string | null) {
   return value && /^\d+$/.test(value) ? value : null;
+}
+
+function normalizeText(value?: string | null) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function stripPrefix(value: string, prefix: string) {
+  const cleanValue = normalizeText(value);
+  const cleanPrefix = normalizeText(prefix);
+  if (!cleanPrefix) return cleanValue;
+  return cleanValue.toUpperCase().startsWith(cleanPrefix.toUpperCase())
+    ? cleanValue.slice(cleanPrefix.length).replace(/^[\s-]+/, "").trim()
+    : cleanValue;
+}
+
+function joinPrefix(prefix: string, suffix: string) {
+  const cleanPrefix = normalizeText(prefix);
+  const cleanSuffix = stripPrefix(suffix, cleanPrefix);
+  return cleanPrefix ? `${cleanPrefix}${cleanSuffix}` : cleanSuffix;
 }
 
 function vehicleLabel(vehicule: CarteVerteContext["vehiculesEligibles"][number]) {

@@ -450,6 +450,7 @@ public class DataSeeder implements CommandLineRunner {
                         "0522545555",
                         "31719",
                         "000083736000004",
+                        "WAFA",
                         "WAFA"
                 ),
                 seedCompagnieAssurance(
@@ -461,6 +462,7 @@ public class DataSeeder implements CommandLineRunner {
                         "0522474040",
                         "22341",
                         null,
+                        "SANLAM",
                         "SANLAM"
                 ),
                 seedCompagnieAssurance(
@@ -472,6 +474,7 @@ public class DataSeeder implements CommandLineRunner {
                         "0522312163",
                         "15207",
                         "001530601000041",
+                        "RMA",
                         "RMA"
                 ),
                 seedCompagnieAssurance(
@@ -483,18 +486,8 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         "34221",
                         null,
+                        "AXA",
                         "AXA"
-                ),
-                seedCompagnieAssurance(
-                        "ALLIANZ",
-                        "ALLIANZ MAROC",
-                        "166-168, Boulevard Mohamed Zerktouni",
-                        "Casablanca",
-                        null,
-                        "0522499700",
-                        "23041",
-                        "001536538000083",
-                        "ALLIANZ"
                 ),
                 seedCompagnieAssurance(
                         "ATLANTA_SANAD",
@@ -505,29 +498,8 @@ public class DataSeeder implements CommandLineRunner {
                         "0522957676",
                         null,
                         null,
+                        "ATLANTA",
                         "ATLANTA"
-                ),
-                seedCompagnieAssurance(
-                        "MAMDA",
-                        "MUTUELLE AGRICOLE MAROCAINE D'ASSURANCE",
-                        "2, Rue Tetouan",
-                        "Meknes",
-                        null,
-                        "0537766960",
-                        null,
-                        null,
-                        "MAMDA"
-                ),
-                seedCompagnieAssurance(
-                        "MCMA",
-                        "MUTUELLE CENTRALE MAROCAINE D'ASSURANCE",
-                        "Angle Avenue Mohammed VI et Rue Houmane El Fatouaki",
-                        "Rabat",
-                        null,
-                        "0537544400",
-                        "59791",
-                        "000211866000096",
-                        "MCMA"
                 ),
                 seedCompagnieAssurance(
                         "CAT",
@@ -538,7 +510,8 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         "68845",
                         null,
-                        "CAT"
+                        "CAT",
+                        null
                 ),
                 seedCompagnieAssurance(
                         "MATU",
@@ -549,6 +522,7 @@ public class DataSeeder implements CommandLineRunner {
                         "0522596850",
                         null,
                         null,
+                        "MATU",
                         "MATU"
                 ),
                 seedCompagnieAssurance(
@@ -560,7 +534,8 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         null,
                         null,
-                        "MVIE"
+                        "MVIE",
+                        null
                 ),
                 seedCompagnieAssurance(
                         "ATTAMINE_CHAABI",
@@ -571,7 +546,8 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         null,
                         null,
-                        "ATC"
+                        "ATC",
+                        null
                 )
         );
         for (int index = 0; index < compagnies.size(); index++) {
@@ -591,7 +567,8 @@ public class DataSeeder implements CommandLineRunner {
             String telephone,
             String rc,
             String ice,
-            String prefixeAttestation
+            String prefixeAttestation,
+            String prefixeCarteVerte
     ) {
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findByCode(code).orElseGet(() ->
                 compagnieAssuranceRepository.save(CompagnieAssurance.builder()
@@ -608,6 +585,7 @@ public class DataSeeder implements CommandLineRunner {
         compagnie.setRc(rc);
         compagnie.setIce(ice);
         compagnie.setPrefixeAttestation(prefixeAttestation);
+        compagnie.setPrefixeCarteVerte(prefixeCarteVerte);
         if (compagnie.getOrdreAffichage() == null) {
             compagnie.setOrdreAffichage(100);
         }

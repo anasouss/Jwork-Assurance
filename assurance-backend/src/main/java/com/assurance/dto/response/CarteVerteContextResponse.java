@@ -20,6 +20,7 @@ public class CarteVerteContextResponse {
     private Long mouvementContratId;
     private String mouvementCode;
     private String mouvementLibelle;
+    private String prefixeCarteVerte;
     private BigDecimal montant;
     private List<VehiculeCarteVerteOption> vehiculesEligibles;
     private List<CarteVerteResponse> cartesVertes;

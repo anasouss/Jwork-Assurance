@@ -1221,6 +1221,7 @@ public class ReferentielController {
         compagnie.setRc(blankToNull(request.getRc()));
         compagnie.setIce(blankToNull(request.getIce()));
         compagnie.setPrefixeAttestation(blankToNull(request.getPrefixeAttestation()));
+        compagnie.setPrefixeCarteVerte(blankToNull(request.getPrefixeCarteVerte()));
         compagnie.setOrdreAffichage(request.getOrdreAffichage() == null ? 100 : request.getOrdreAffichage());
         compagnie.setActif(request.getActif() == null ? true : request.getActif());
     }
@@ -1235,6 +1236,7 @@ public class ReferentielController {
                 .putValue("rc", compagnie.getRc())
                 .putValue("ice", compagnie.getIce())
                 .putValue("prefixeAttestation", compagnie.getPrefixeAttestation())
+                .putValue("prefixeCarteVerte", compagnie.getPrefixeCarteVerte())
                 .putValue("ordreAffichage", compagnie.getOrdreAffichage())
                 .putValue("actif", compagnie.getActif())
                 .map();

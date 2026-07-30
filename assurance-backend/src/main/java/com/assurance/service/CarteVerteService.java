@@ -68,6 +68,7 @@ public class CarteVerteService {
                 .mouvementContratId(mouvement != null ? mouvement.getId() : null)
                 .mouvementCode(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)
                 .mouvementLibelle(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getLibelle() : "Contrat")
+                .prefixeCarteVerte(contrat.getCompagnieAssurance() != null ? contrat.getCompagnieAssurance().getPrefixeCarteVerte() : null)
                 .montant(resolveMontant(agenceId))
                 .vehiculesEligibles(resolveVehiculesCibles(contrat, mouvement).stream()
                         .filter(vehicule -> Boolean.TRUE.equals(vehicule.getActif()))

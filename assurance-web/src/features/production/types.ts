@@ -678,6 +678,7 @@ export type CarteVerteContext = {
   mouvementContratId?: string | null;
   mouvementCode?: string | null;
   mouvementLibelle?: string | null;
+  prefixeCarteVerte?: string | null;
   montant?: number | null;
   vehiculesEligibles: {
     id: string;
@@ -982,6 +983,7 @@ export type UpsertCompagnieAssuranceRequest = {
   rc?: string;
   ice?: string;
   prefixeAttestation?: string;
+  prefixeCarteVerte?: string;
   ordreAffichage?: number;
   actif?: boolean;
 };

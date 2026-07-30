@@ -120,7 +120,8 @@ export default function CompaniesPage() {
                 <TableHead>Téléphone</TableHead>
                 <TableHead>RC</TableHead>
                 <TableHead>ICE</TableHead>
-                <TableHead>Préfixe</TableHead>
+                <TableHead>Préfixe attestation</TableHead>
+                <TableHead>Préfixe carte verte</TableHead>
                 <TableHead>Actif</TableHead>
                 <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
@@ -139,6 +140,7 @@ export default function CompaniesPage() {
                   <TableCell>{companyField(compagnie, "rc") || "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "ice") || "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "prefixeAttestation") || "-"}</TableCell>
+                  <TableCell>{companyField(compagnie, "prefixeCarteVerte") || "-"}</TableCell>
                   <TableCell>{compagnie.actif === false ? "Non" : "Oui"}</TableCell>
                   <TableCell className="text-right">
                     <TableRowActions
@@ -161,7 +163,7 @@ export default function CompaniesPage() {
               ))}
               {!compagnies.isLoading && filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucune compagnie.</TableCell>
+                  <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Aucune compagnie.</TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -203,6 +205,9 @@ export default function CompaniesPage() {
             </Field>
             <Field label="Préfixe attestation">
               <Input value={payload.prefixeAttestation ?? ""} onChange={(event) => update(setPayload, { prefixeAttestation: event.target.value })} />
+            </Field>
+            <Field label="Préfixe carte verte">
+              <Input value={payload.prefixeCarteVerte ?? ""} onChange={(event) => update(setPayload, { prefixeCarteVerte: event.target.value })} />
             </Field>
             <Field label="Ordre d'affichage">
               <Input
@@ -260,6 +265,7 @@ function companyPayload(compagnie: ReferenceOption): UpsertCompagnieAssuranceReq
     rc: companyField(compagnie, "rc"),
     ice: companyField(compagnie, "ice"),
     prefixeAttestation: companyField(compagnie, "prefixeAttestation"),
+    prefixeCarteVerte: companyField(compagnie, "prefixeCarteVerte"),
     ordreAffichage: companyNumber(compagnie, "ordreAffichage") ?? 100,
     actif: compagnie.actif !== false,
   };

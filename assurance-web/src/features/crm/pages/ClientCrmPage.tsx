@@ -574,7 +574,7 @@ function ClientDetail({
 
   return (
     <section className="min-w-0 overflow-hidden rounded-lg border bg-card">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/50 p-5 dark:border-blue-900 dark:bg-blue-950/20">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom}</h2>
@@ -586,31 +586,35 @@ function ClientDetail({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild type="button" variant="outline"><Link to={accountingUrl}><ReceiptText className="size-4" />Relevés et factures</Link></Button>
-          <Button type="button" variant="outline" onClick={onAssignGroup}><Users className="size-4" />Gérer le groupe</Button>
+          <Button asChild type="button" variant="outline" className="border-amber-200 text-amber-950 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-100 dark:hover:bg-amber-950/30">
+            <Link to={accountingUrl}><ReceiptText className="size-4" />Relevés et factures</Link>
+          </Button>
+          <Button type="button" variant="outline" onClick={onAssignGroup} className="border-violet-200 text-violet-950 hover:bg-violet-50 dark:border-violet-900 dark:text-violet-100 dark:hover:bg-violet-950/30">
+            <Users className="size-4" />Gérer le groupe
+          </Button>
         </div>
       </div>
 
       <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Primes émises" value={money(detail.totalQuittances)} />
-        <Metric label="Solde non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} />
-        <Metric label="Contrats" value={String(detail.contrats.length)} />
-        <Metric label="Mouvements" value={String(movements.length)} />
+        <Metric label="Primes émises" value={money(detail.totalQuittances)} tone="emerald" />
+        <Metric label="Solde non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} tone="amber" />
+        <Metric label="Contrats" value={String(detail.contrats.length)} tone="blue" />
+        <Metric label="Mouvements" value={String(movements.length)} tone="violet" />
       </div>
 
       <Tabs value={activeTab} onValueChange={onTabChange}>
-        <div className="overflow-x-auto border-y px-4 py-2">
-          <TabsList className="w-max min-w-full justify-start">
-            <TabsTrigger value="overview"><Eye className="size-4" />Vue d’ensemble</TabsTrigger>
-            <TabsTrigger value="contracts"><FolderOpen className="size-4" />Contrats</TabsTrigger>
-            <TabsTrigger value="documents"><FileText className="size-4" />Documents</TabsTrigger>
-            <TabsTrigger value="accounting"><CircleDollarSign className="size-4" />Comptabilité</TabsTrigger>
-            <TabsTrigger value="claims"><ShieldCheck className="size-4" />Sinistres <Badge variant="secondary" className="ml-1">À venir</Badge></TabsTrigger>
+        <div className="overflow-x-auto border-y bg-slate-50/70 px-4 py-2 dark:bg-slate-950/30">
+          <TabsList className="w-max min-w-full justify-start bg-transparent">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-950 dark:data-[state=active]:bg-blue-900/50 dark:data-[state=active]:text-blue-100"><Eye className="size-4" />Vue d’ensemble</TabsTrigger>
+            <TabsTrigger value="contracts" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-950 dark:data-[state=active]:bg-emerald-900/50 dark:data-[state=active]:text-emerald-100"><FolderOpen className="size-4" />Contrats</TabsTrigger>
+            <TabsTrigger value="documents" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950 dark:data-[state=active]:bg-amber-900/50 dark:data-[state=active]:text-amber-100"><FileText className="size-4" />Documents</TabsTrigger>
+            <TabsTrigger value="accounting" className="data-[state=active]:bg-cyan-100 data-[state=active]:text-cyan-950 dark:data-[state=active]:bg-cyan-900/50 dark:data-[state=active]:text-cyan-100"><CircleDollarSign className="size-4" />Comptabilité</TabsTrigger>
+            <TabsTrigger value="claims" className="data-[state=active]:bg-slate-200 data-[state=active]:text-slate-950 dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-slate-100"><ShieldCheck className="size-4" />Sinistres <Badge variant="secondary" className="ml-1">À venir</Badge></TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="overview" className="m-0 grid gap-5 p-5 lg:grid-cols-2">
-          <PortfolioSection title="Informations client" icon={<Users className="size-4" />}>
+          <PortfolioSection title="Informations client" icon={<Users className="size-4" />} tone="blue">
             <dl className="grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">
               <Info label="Identifiant" value={client.rc || client.cin || client.ice} />
               <Info label="Catégorie" value={client.categorieClientLibelle} />
@@ -620,7 +624,7 @@ function ClientDetail({
               <Info label="Organisation" value={client.groupe?.libelle ?? "Client indépendant"} />
             </dl>
           </PortfolioSection>
-          <PortfolioSection title="Organisation et groupe" icon={<Building2 className="size-4" />} action={<Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button>}>
+          <PortfolioSection title="Organisation et groupe" icon={<Building2 className="size-4" />} tone="violet" action={<Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button>}>
             {detail.groupes.length ? detail.groupes.map((groupe) => (
               <div key={groupe.id} className="border-b py-3 first:pt-0 last:border-0 last:pb-0">
                 <div className="font-medium">{groupe.code} - {groupe.libelle}</div>
@@ -633,7 +637,7 @@ function ClientDetail({
               </div>
             )) : <EmptyState text="Ce client n’est rattaché à aucun groupe." />}
           </PortfolioSection>
-          <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />}>
+          <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />} tone="emerald">
             {groupMembers.length ? (
               <div className="divide-y">
                 {groupMembers.slice(0, 8).map((member) => (
@@ -645,10 +649,10 @@ function ClientDetail({
               </div>
             ) : <EmptyState text="Aucune autre entité liée." />}
           </PortfolioSection>
-          <PortfolioSection title="Accès rapides" icon={<ArrowRight className="size-4" />}>
+          <PortfolioSection title="Accès rapides" icon={<ArrowRight className="size-4" />} tone="amber">
             <div className="grid gap-2 sm:grid-cols-2">
-              <WorkspaceLink to={`/app/crm?clientId=${client.id}&tab=contracts`} icon={<FolderOpen className="size-4" />} title="Contrats et mouvements" detail={`${detail.contrats.length} contrat(s)`} />
-              <WorkspaceLink to={accountingUrl} icon={<ReceiptText className="size-4" />} title="Relevés et factures" detail="Espace comptable du payeur" />
+              <WorkspaceLink to={`/app/crm?clientId=${client.id}&tab=contracts`} icon={<FolderOpen className="size-4" />} title="Contrats et mouvements" detail={`${detail.contrats.length} contrat(s)`} tone="emerald" />
+              <WorkspaceLink to={accountingUrl} icon={<ReceiptText className="size-4" />} title="Relevés et factures" detail="Espace comptable du payeur" tone="amber" />
             </div>
           </PortfolioSection>
         </TabsContent>
@@ -662,10 +666,10 @@ function ClientDetail({
         </TabsContent>
 
         <TabsContent value="documents" className="m-0 grid gap-5 p-5 lg:grid-cols-[1.4fr_0.8fr]">
-          <PortfolioSection title="Documents comptables émis" icon={<FileText className="size-4" />} action={<Button asChild size="sm" variant="outline"><Link to={accountingUrl}>Gérer les documents</Link></Button>}>
+          <PortfolioSection title="Documents comptables émis" icon={<FileText className="size-4" />} tone="amber" action={<Button asChild size="sm" variant="outline"><Link to={accountingUrl}>Gérer les documents</Link></Button>}>
             <ClientDocuments rows={documentsQuery.data?.rows ?? []} loading={documentsQuery.isLoading} />
           </PortfolioSection>
-          <PortfolioSection title="Pièces contractuelles" icon={<FolderOpen className="size-4" />}>
+          <PortfolioSection title="Pièces contractuelles" icon={<FolderOpen className="size-4" />} tone="blue">
             <p className="mb-3 text-sm text-muted-foreground">Les justificatifs restent rattachés à leur contrat et à leur mouvement d’origine.</p>
             <div className="divide-y">
               {detail.contrats.map((contract) => (
@@ -680,12 +684,12 @@ function ClientDetail({
 
         <TabsContent value="accounting" className="m-0 grid gap-5 p-5">
           <div className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Total émis" value={money(detail.totalQuittances)} />
-            <Metric label="Non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} />
-            <Metric label="À documenter" value={String(sourcesQuery.data?.page.totalElements ?? 0)} />
-            <Metric label="Documents émis" value={String(documentsQuery.data?.page.totalElements ?? 0)} />
+            <Metric label="Total émis" value={money(detail.totalQuittances)} tone="emerald" />
+            <Metric label="Non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} tone="amber" />
+            <Metric label="À documenter" value={String(sourcesQuery.data?.page.totalElements ?? 0)} tone="blue" />
+            <Metric label="Documents émis" value={String(documentsQuery.data?.page.totalElements ?? 0)} tone="violet" />
           </div>
-          <PortfolioSection title="Situation comptable" icon={<CircleDollarSign className="size-4" />} action={<Button asChild><Link to={accountingUrl}>Ouvrir l’espace comptable <ArrowRight className="size-4" /></Link></Button>}>
+          <PortfolioSection title="Situation comptable" icon={<CircleDollarSign className="size-4" />} tone="cyan" action={<Button asChild><Link to={accountingUrl}>Ouvrir l’espace comptable <ArrowRight className="size-4" /></Link></Button>}>
             <p className="text-sm text-muted-foreground">Les quittances validées, relevés, factures et crédits sont gérés dans l’espace comptable du payeur. Les montants affichés ici proviennent des quittances serveur.</p>
           </PortfolioSection>
         </TabsContent>
@@ -715,15 +719,25 @@ function uniqueGroupMembers(groups: GroupeClient[], currentClientId: string) {
   return [...members.values()].sort((left, right) => left.clientNom.localeCompare(right.clientNom, "fr"));
 }
 
-function PortfolioSection({ title, icon, action, children }: {
+type PortfolioTone = "blue" | "violet" | "emerald" | "amber" | "cyan";
+
+function PortfolioSection({ title, icon, action, children, tone = "blue" }: {
   title: string;
   icon: ReactNode;
   action?: ReactNode;
   children: ReactNode;
+  tone?: PortfolioTone;
 }) {
+  const headerTone: Record<PortfolioTone, string> = {
+    blue: "border-blue-100 bg-blue-50/70 text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100",
+    violet: "border-violet-100 bg-violet-50/70 text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100",
+    emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100",
+    amber: "border-amber-100 bg-amber-50/70 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100",
+    cyan: "border-cyan-100 bg-cyan-50/70 text-cyan-950 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-100",
+  };
   return (
     <section className="min-w-0 overflow-hidden rounded-md border">
-      <header className="flex min-h-11 items-center justify-between gap-3 border-b bg-muted/35 px-4 py-2">
+      <header className={`flex min-h-11 items-center justify-between gap-3 border-b px-4 py-2 ${headerTone[tone]}`}>
         <h3 className="flex items-center gap-2 font-semibold">{icon}{title}</h3>
         {action}
       </header>
@@ -736,15 +750,25 @@ function EmptyState({ text }: { text: string }) {
   return <div className="rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">{text}</div>;
 }
 
-function WorkspaceLink({ to, icon, title, detail }: {
+function WorkspaceLink({ to, icon, title, detail, tone }: {
   to: string;
   icon: ReactNode;
   title: string;
   detail: string;
+  tone: "emerald" | "amber";
 }) {
+  const styles = tone === "emerald"
+    ? {
+        link: "hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30",
+        icon: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+      }
+    : {
+        link: "hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30",
+        icon: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+      };
   return (
-    <Link to={to} className="flex min-w-0 items-center gap-3 rounded-md border p-3 transition-colors hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30">
-      <span className="grid size-9 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">{icon}</span>
+    <Link to={to} className={`flex min-w-0 items-center gap-3 rounded-md border p-3 transition-colors ${styles.link}`}>
+      <span className={`grid size-9 shrink-0 place-items-center rounded-md ${styles.icon}`}>{icon}</span>
       <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{title}</strong><span className="block truncate text-xs text-muted-foreground">{detail}</span></span>
       <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
     </Link>
@@ -1048,11 +1072,42 @@ function AssignmentDialog({
   );
 }
 
-function Metric({ label: metricLabel, value, alert }: { label: string; value: string; alert?: boolean }) {
+type MetricTone = "blue" | "violet" | "emerald" | "amber";
+
+function Metric({ label: metricLabel, value, alert, tone = "blue" }: {
+  label: string;
+  value: string;
+  alert?: boolean;
+  tone?: MetricTone;
+}) {
+  const styles: Record<MetricTone, { surface: string; label: string; value: string }> = {
+    blue: {
+      surface: "border-t-2 border-blue-500 bg-blue-50/50 dark:bg-blue-950/20",
+      label: "text-blue-700 dark:text-blue-300",
+      value: "text-blue-950 dark:text-blue-100",
+    },
+    violet: {
+      surface: "border-t-2 border-violet-500 bg-violet-50/50 dark:bg-violet-950/20",
+      label: "text-violet-700 dark:text-violet-300",
+      value: "text-violet-950 dark:text-violet-100",
+    },
+    emerald: {
+      surface: "border-t-2 border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20",
+      label: "text-emerald-700 dark:text-emerald-300",
+      value: "text-emerald-950 dark:text-emerald-100",
+    },
+    amber: {
+      surface: "border-t-2 border-amber-500 bg-amber-50/50 dark:bg-amber-950/20",
+      label: "text-amber-700 dark:text-amber-300",
+      value: "text-amber-950 dark:text-amber-100",
+    },
+  };
+  const style = styles[tone];
+
   return (
-    <div className="bg-card p-4">
-      <div className="text-xs font-medium uppercase text-muted-foreground">{metricLabel}</div>
-      <div className={`mt-1 text-lg font-semibold ${alert ? "text-red-600" : ""}`}>{value}</div>
+    <div className={`p-4 ${style.surface}`}>
+      <div className={`text-xs font-medium uppercase ${style.label}`}>{metricLabel}</div>
+      <div className={`mt-1 text-lg font-semibold ${alert ? "text-red-600 dark:text-red-400" : style.value}`}>{value}</div>
     </div>
   );
 }

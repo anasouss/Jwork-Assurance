@@ -78,11 +78,24 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
   const [confirmClear, setConfirmClear] = useState(false);
   const [initializedId, setInitializedId] = useState<string | null>(null);
 
-  const detail = useQuery({
-    queryKey: ["compta", "affectation-quittance", quittanceId, avecRetenue],
-    queryFn: () => comptaApi.allocation(quittanceId!, avecRetenue),
+  const savedDetail = useQuery({
+    queryKey: ["compta", "affectation-quittance", quittanceId],
+    queryFn: () => comptaApi.allocation(quittanceId!),
     enabled: open && Boolean(quittanceId),
   });
+
+  const retentionPreview = useQuery({
+    queryKey: ["compta", "affectation-quittance-preview", quittanceId, avecRetenue],
+    queryFn: () => comptaApi.allocation(quittanceId!, avecRetenue),
+    enabled:
+      open &&
+      Boolean(quittanceId) &&
+      avecRetenue != null &&
+      initializedId === quittanceId &&
+      avecRetenue !== savedDetail.data?.avecRetenue,
+  });
+
+  const detailData = retentionPreview.data ?? savedDetail.data;
 
   useEffect(() => {
     if (!open) {
@@ -96,7 +109,7 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
       setConfirmClear(false);
       return;
     }
-    const data = detail.data;
+    const data = savedDetail.data;
     if (!data || initializedId === data.quittanceId) return;
     setAvecRetenue(data.avecRetenue);
     setNumero(data.lignes[0]?.numeroQuittanceCompagnie ?? "");
@@ -121,11 +134,11 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
     );
     setFleetMode(data.lignes[0]?.source === "IMPORT" ? "IMPORT" : "MANUEL");
     setInitializedId(data.quittanceId);
-  }, [detail.data, initializedId, open]);
+  }, [initializedId, open, savedDetail.data]);
 
   const save = useMutation({
     mutationFn: async () => {
-      const data = detail.data;
+      const data = detailData;
       if (!data || avecRetenue == null) throw new Error("Données de la quittance indisponibles");
       return comptaApi.saveAllocation(data.quittanceId, buildRequest(data, avecRetenue, numero, fleetMode, fleetLines, importPreview));
     },
@@ -189,10 +202,10 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
     onError: (error) => toast.error(error instanceof Error ? error.message : "Import impossible"),
   });
 
-  const hasAllocation = Boolean(detail.data?.lignes.length);
+  const hasAllocation = Boolean(savedDetail.data?.lignes.length);
   const canSave = useMemo(() => {
-    if (!detail.data || avecRetenue == null) return false;
-    if (detail.data.typeContrat !== "FLOTTE") return Boolean(numero.trim());
+    if (!detailData || avecRetenue == null) return false;
+    if (detailData.typeContrat !== "FLOTTE") return Boolean(numero.trim());
     return (
       fleetLines.length > 0 &&
       fleetLines.every(isCompleteFleetLine) &&
@@ -204,7 +217,7 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
         )
       )
     );
-  }, [avecRetenue, detail.data, fleetLines, fleetMode, importPreview, numero]);
+  }, [avecRetenue, detailData, fleetLines, fleetMode, importPreview, numero]);
 
   return (
     <>
@@ -213,24 +226,24 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
           <DialogHeader>
             <DialogTitle>Affectation de la quittance compagnie</DialogTitle>
             <DialogDescription>
-              {detail.data
-                ? `${detail.data.dossier} · ${detail.data.mouvement} · ${detail.data.compagnie}`
+              {detailData
+                ? `${detailData.dossier} · ${detailData.mouvement} · ${detailData.compagnie}`
                 : "Chargement de la quittance..."}
             </DialogDescription>
           </DialogHeader>
 
-          {detail.isLoading ? (
+          {savedDetail.isLoading ? (
             <AllocationSkeleton />
-          ) : detail.isError ? (
+          ) : savedDetail.isError ? (
             <Alert variant="destructive">
               <AlertTitle>Impossible d'ouvrir l'affectation</AlertTitle>
               <AlertDescription>
-                {detail.error instanceof Error ? detail.error.message : "Une erreur est survenue"}
+                {savedDetail.error instanceof Error ? savedDetail.error.message : "Une erreur est survenue"}
               </AlertDescription>
             </Alert>
-          ) : detail.data ? (
+          ) : detailData ? (
             <div className="grid gap-5">
-              <QuittanceSummary data={detail.data} />
+              <QuittanceSummary data={detailData} />
 
               <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
                 <Checkbox
@@ -244,7 +257,7 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
                 Appliquer la retenue à la source
               </label>
 
-              {detail.data.typeContrat === "FLOTTE" ? (
+              {detailData.typeContrat === "FLOTTE" ? (
                 <Tabs value={fleetMode} onValueChange={(value) => setFleetMode(value as FleetMode)}>
                   <TabsList>
                     <TabsTrigger value="MANUEL">Saisie manuelle</TabsTrigger>
@@ -259,7 +272,7 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
                         onClick={() =>
                           setFleetLines((current) => [
                             ...current,
-                            emptyFleetLine(detail.data!.dateEffet, detail.data!.dateEcheance ?? ""),
+                            emptyFleetLine(detailData.dateEffet, detailData.dateEcheance ?? ""),
                           ])
                         }
                       >
@@ -300,7 +313,7 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
                 </Tabs>
               ) : (
                 <AutomaticAllocation
-                  data={detail.data}
+                  data={detailData}
                   numero={numero}
                   readOnly={readOnly}
                   onNumeroChange={setNumero}
@@ -361,12 +374,11 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
 
 function QuittanceSummary({ data }: { data: QuittanceAllocation }) {
   return (
-    <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 lg:grid-cols-4">
       <Metric label="Produit" value={contractLabel(data.typeContrat)} />
       <Metric label="Police" value={data.police || "—"} />
       <Metric label="Prime nette" value={money(data.primeNette)} />
-      <Metric label="Taxes" value={money(data.montantTaxes)} />
-      <Metric label="Montant TTC" value={money(data.montantTtc)} strong />
+      <Metric label="Montant TTC" value={money(data.montantTtc)} />
     </div>
   );
 }
@@ -383,14 +395,37 @@ function AutomaticAllocation({
   onNumeroChange: (value: string) => void;
 }) {
   return (
-    <div className="grid gap-4 border-y py-4">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="N° quittance compagnie" required>
-          <Input readOnly={readOnly} value={numero} onChange={(event) => onNumeroChange(event.target.value)} />
-        </Field>
-        <ReadonlyMoney label="Commission nette" value={data.commissionCalculee} />
-        <ReadonlyMoney label="Retenue à la source" value={data.retenueCalculee} />
-        <ReadonlyMoney label="Net compagnie" value={data.netCompagnieCalcule} />
+    <div className="grid gap-3 border-y py-4">
+      <div className="overflow-x-auto border">
+        <table className="w-full min-w-[920px] text-sm">
+          <thead className="bg-muted/60 text-left text-xs uppercase">
+            <tr>
+              <th className="px-3 py-2">N° quittance compagnie</th>
+              <th className="px-3 py-2 text-right">Montant TTC</th>
+              <th className="px-3 py-2 text-right">Prime nette</th>
+              <th className="px-3 py-2 text-right">Commission nette</th>
+              <th className="px-3 py-2 text-right">Retenue source</th>
+              <th className="px-3 py-2 text-right">Net compagnie</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t">
+              <td className="min-w-56 px-3 py-2">
+                <Input
+                  aria-label="N° quittance compagnie"
+                  readOnly={readOnly}
+                  value={numero}
+                  onChange={(event) => onNumeroChange(event.target.value)}
+                />
+              </td>
+              <MoneyValue value={data.montantTtc} strong />
+              <MoneyValue value={data.primeNette} />
+              <MoneyValue value={data.commissionCalculee} />
+              <MoneyValue value={data.retenueCalculee} />
+              <MoneyValue value={data.netCompagnieCalcule} strong />
+            </tr>
+          </tbody>
+        </table>
       </div>
       <p className="text-xs text-muted-foreground">
         Les montants sont calculés par le serveur à partir des lignes de la quittance et de la règle effective.
@@ -507,11 +542,16 @@ function ImportResult({ preview }: { preview: ImportPreview }) {
   );
 }
 
-function ReadonlyMoney({ label, value }: { label: string; value?: number | null }) {
+function MoneyValue({ value, strong = false }: { value?: number | null; strong?: boolean }) {
   return (
-    <Field label={label}>
-      <Input readOnly value={value == null ? "" : money(value)} />
-    </Field>
+    <td className="min-w-36 px-3 py-2">
+      <Input
+        aria-label="Montant calculé"
+        className={`text-right ${strong ? "font-semibold" : ""}`}
+        readOnly
+        value={value == null ? "" : money(value)}
+      />
+    </td>
   );
 }
 

@@ -823,12 +823,7 @@ function contractHistoryGroups(contrats: ContratSummary[]): ContractHistoryGroup
     }
   }
 
-  return groups.sort((a, b) => {
-    const aCurrent = a.lines[0]?.contrat;
-    const bCurrent = b.lines[0]?.contrat;
-    const dateDiff = dateRank(bCurrent?.dateEffet) - dateRank(aCurrent?.dateEffet);
-    return dateDiff || numericRank(bCurrent?.id) - numericRank(aCurrent?.id);
-  });
+  return groups;
 }
 
 function sortedMouvements(contrat: ContratSummary) {

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { RotateCcw, Search, Settings2 } from "lucide-react";
+import { Eye, RotateCcw, Search, Settings2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -295,19 +296,29 @@ export default function QuittanceAffectationPage() {
                       </Cell>
                       <Cell><StatusBadge status={row.statutAffectation} /></Cell>
                       <Cell className="text-right">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={row.regle ? "outline" : "default"}
-                          disabled={!row.regle && !canConfigure}
-                          onClick={() => openAllocation(row)}
-                        >
-                          {row.regle
-                            ? canAffect
-                              ? row.statutAffectation === "NON_AFFECTEE" ? "Affecter" : "Modifier"
-                              : "Consulter"
-                            : canConfigure ? "Configurer" : "Configuration requise"}
-                        </Button>
+                        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                          <Button asChild type="button" size="icon" variant="ghost" title="Voir le détail">
+                            <Link
+                              aria-label={`Voir le détail de ${row.mouvement}`}
+                              to={`/app/production/contrats/${row.contratId}${row.mouvementId ? `?mouvementId=${row.mouvementId}` : ""}`}
+                            >
+                              <Eye className="size-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={row.regle ? "outline" : "default"}
+                            disabled={!row.regle && !canConfigure}
+                            onClick={() => openAllocation(row)}
+                          >
+                            {row.regle
+                              ? canAffect
+                                ? row.statutAffectation === "NON_AFFECTEE" ? "Affecter" : "Modifier"
+                                : "Consulter"
+                              : canConfigure ? "Configurer" : "Configuration requise"}
+                          </Button>
+                        </div>
                       </Cell>
                     </tr>
                   ))

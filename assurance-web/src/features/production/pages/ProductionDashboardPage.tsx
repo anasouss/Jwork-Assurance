@@ -43,7 +43,7 @@ export default function ProductionDashboardPage() {
     { title: "Liste des dossiers", icon: List, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Gestion des échéances", icon: CalendarDays, permission: "contrat:view", modal: "echeances" },
     { title: "Registre de production", icon: FileText, href: "/app/production/contrats", permission: "contrat:view" },
-    { title: "Portefeuille client", icon: Users, href: "/app/production/contrats", permission: "client:view" },
+    { title: "Portefeuille client", icon: Users, href: "/app/crm", permission: "client:view" },
     { title: "Prospection", icon: Target, href: "/app/production/prospection", permission: "contrat:view" },
     { title: "Gestion du stock", icon: Archive, href: "/app/production/attestations-stock", permission: "contrat:view" },
   ];

@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
@@ -105,6 +105,9 @@ const DOCUMENT_DEFAULTS: DocumentFilters = {
 const PAGE_SIZE = 25;
 
 export default function RelevesFacturesPage() {
+  const [searchParams] = useSearchParams();
+  const requestedPayerType = searchParams.get("payeurType") === "GROUPE" ? "GROUPE" : "CLIENT";
+  const requestedPayerId = searchParams.get("payeurId") ?? "";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
   const [tab, setTab] = useState("sources");
@@ -118,7 +121,7 @@ export default function RelevesFacturesPage() {
   const [issueOpen, setIssueOpen] = useState(false);
   const [detailId, setDetailId] = useState<string>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
-  const [payerMode, setPayerMode] = useState<SelectedPayer["type"]>("CLIENT");
+  const [payerMode, setPayerMode] = useState<SelectedPayer["type"]>(requestedPayerType);
   const [payerSearch, setPayerSearch] = useState("");
   const deferredPayerSearch = useDeferredValue(payerSearch.trim());
   const [selectedPayer, setSelectedPayer] = useState<SelectedPayer>();
@@ -138,6 +141,12 @@ export default function RelevesFacturesPage() {
     queryFn: productionApi.listGroupesClients,
     enabled: payerMode === "GROUPE",
     staleTime: 60_000,
+  });
+  const requestedClient = useQuery({
+    queryKey: ["crm-client", requestedPayerId],
+    queryFn: () => productionApi.getClientCrm(requestedPayerId),
+    enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
+    staleTime: 30_000,
   });
 
   const sourceParams = useMemo(() => ({
@@ -183,6 +192,35 @@ export default function RelevesFacturesPage() {
     setSourcePage(0);
     setDocumentPage(0);
   }
+
+  useEffect(() => {
+    if (!requestedPayerId || selectedPayer?.id === requestedPayerId) return;
+    if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
+      const client = requestedClient.data.client;
+      setPayerMode("CLIENT");
+      changePayer({
+        type: "CLIENT",
+        id: client.id,
+        name: client.nomAffichage || "Client",
+        identifier: client.codeClient || client.rc || client.cin || client.ice || "",
+        groupName: client.groupe?.libelle || undefined,
+      });
+      return;
+    }
+    if (requestedPayerType === "GROUPE") {
+      const group = groups.data?.find((item) => item.id === requestedPayerId);
+      if (!group) return;
+      setPayerMode("GROUPE");
+      changePayer({
+        type: "GROUPE",
+        id: group.id,
+        name: group.libelle,
+        identifier: group.code,
+        treasuryName: group.clientTresorerieNom || undefined,
+        memberCount: group.membres.length,
+      });
+    }
+  }, [groups.data, requestedClient.data, requestedPayerId, requestedPayerType, selectedPayer?.id]);
 
   const selectedRows = useMemo(() => Object.values(selected), [selected]);
   const selectedPayerKey = selectedRows.length

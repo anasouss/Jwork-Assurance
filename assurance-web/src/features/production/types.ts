@@ -441,6 +441,17 @@ export type ClientCrm = {
     payeurPrimeNom?: string | null;
     modeFacturation?: string | null;
     primeTotale: number;
+    mouvements: {
+      id: string;
+      numeroMouvement?: string | null;
+      code?: string | null;
+      libelle?: string | null;
+      categorie?: string | null;
+      statut?: string | null;
+      dateEffet?: string | null;
+      dateEcheance?: string | null;
+      primeTotale: number;
+    }[];
   }[];
   totalQuittances: number;
   totalImpayes: number;

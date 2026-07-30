@@ -4,12 +4,14 @@ import com.assurance.dto.response.ClientCrmResponse;
 import com.assurance.dto.response.ClientPageResponse;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
+import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.Quittance;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ClientRepository;
 import com.assurance.repository.ContratRepository;
+import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.QuittanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,7 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,7 @@ public class ClientCrmService {
 
     private final ClientRepository clientRepository;
     private final ContratRepository contratRepository;
+    private final MouvementContratRepository mouvementContratRepository;
     private final QuittanceRepository quittanceRepository;
     private final ClientService clientService;
     private final GroupeClientService groupeClientService;
@@ -66,6 +72,16 @@ public class ClientCrmService {
         com.assurance.entity.Client client = clientRepository.findByAgenceIdAndId(agenceId, clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
         List<Contrat> contrats = contratRepository.findForClientCrm(agenceId, clientId);
+        Map<Long, List<MouvementContrat>> mouvementsByContrat = contrats.isEmpty()
+                ? Collections.emptyMap()
+                : mouvementContratRepository.findByContratIdInOrderByCreatedAtDesc(
+                                contrats.stream().map(Contrat::getId).toList()
+                        ).stream()
+                        .collect(Collectors.groupingBy(
+                                mouvement -> mouvement.getContrat().getId(),
+                                java.util.LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
         BigDecimal total = BigDecimal.ZERO;
         BigDecimal impaye = BigDecimal.ZERO;
         List<ClientCrmResponse.ContratView> contractViews = new java.util.ArrayList<>();
@@ -109,6 +125,9 @@ public class ClientCrmService {
                     .payeurPrimeNom(contrat.getPayeurPrime() == null ? null : contrat.getPayeurPrime().getNomAffichage())
                     .modeFacturation(contrat.getModeFacturation() == null ? "DIRECTE" : contrat.getModeFacturation().name())
                     .primeTotale(primeTotale)
+                    .mouvements(mouvementsByContrat.getOrDefault(contrat.getId(), List.of()).stream()
+                            .map(this::toMouvementView)
+                            .toList())
                     .build());
         }
         return ClientCrmResponse.builder()
@@ -117,6 +136,22 @@ public class ClientCrmService {
                 .contrats(contractViews)
                 .totalQuittances(total)
                 .totalImpayes(impaye)
+                .build();
+    }
+
+    private ClientCrmResponse.MouvementView toMouvementView(MouvementContrat mouvement) {
+        return ClientCrmResponse.MouvementView.builder()
+                .id(mouvement.getId())
+                .numeroMouvement(mouvement.getNumeroMouvement())
+                .code(mouvement.getTypeMouvement() == null ? null : mouvement.getTypeMouvement().getCode())
+                .libelle(mouvement.getTypeMouvement() == null ? null : mouvement.getTypeMouvement().getLibelle())
+                .categorie(mouvement.getTypeMouvement() == null || mouvement.getTypeMouvement().getCategorie() == null
+                        ? null
+                        : mouvement.getTypeMouvement().getCategorie().name())
+                .statut(mouvement.getStatut() == null ? null : mouvement.getStatut().name())
+                .dateEffet(mouvement.getDateEffet())
+                .dateEcheance(mouvement.getDateEcheance())
+                .primeTotale(mouvement.getPrimeTotale() == null ? BigDecimal.ZERO : mouvement.getPrimeTotale())
                 .build();
     }
 

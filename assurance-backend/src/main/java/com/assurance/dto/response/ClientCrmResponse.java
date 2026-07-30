@@ -32,5 +32,20 @@ public class ClientCrmResponse {
         private String payeurPrimeNom;
         private String modeFacturation;
         private BigDecimal primeTotale;
+        private List<MouvementView> mouvements;
+    }
+
+    @Data
+    @Builder
+    public static class MouvementView {
+        private Long id;
+        private String numeroMouvement;
+        private String code;
+        private String libelle;
+        private String categorie;
+        private String statut;
+        private LocalDate dateEffet;
+        private LocalDate dateEcheance;
+        private BigDecimal primeTotale;
     }
 }

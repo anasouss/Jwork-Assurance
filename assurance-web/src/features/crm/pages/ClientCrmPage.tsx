@@ -1,7 +1,23 @@
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, ChevronLeft, ChevronRight, Plus, Search, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  Eye,
+  FileText,
+  FolderOpen,
+  History,
+  Plus,
+  ReceiptText,
+  Search,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +33,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "@/features/production/api";
 import { toDateOnly } from "@/features/production/date";
+import { comptaApi } from "@/features/compta/api";
+import type { ClientDocument } from "@/features/compta/types";
 import type {
   ClientInput,
+  ClientPage,
   ClientResponse,
   GroupeClient,
   RelationGroupeClient,
@@ -30,13 +51,16 @@ import type {
 } from "@/features/production/types";
 
 export default function ClientCrmPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const agenceId = useAuthStore((state) => state.user?.agenceId ?? "");
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
   const [groupeId, setGroupeId] = useState("TOUS");
   const [page, setPage] = useState(0);
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const selectedClientId = searchParams.get("clientId") ?? "";
+  const activeTab = normalizePortfolioTab(searchParams.get("tab"));
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
@@ -70,19 +94,35 @@ export default function ClientCrmPage() {
     ]);
   };
 
+  const selectClient = (clientId: string) => {
+    setSearchParams({ clientId, tab: "overview" });
+    setClientPickerOpen(false);
+  };
+
+  const changeTab = (tab: string) => {
+    if (!selectedClientId) return;
+    setSearchParams({ clientId: selectedClientId, tab });
+  };
+
   return (
     <div className="min-w-0 space-y-4 p-4 md:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">CRM</p>
-          <h1 className="text-2xl font-semibold">Fiche client</h1>
-          <p className="text-sm text-muted-foreground">Portefeuille, groupes et situation contractuelle.</p>
+          <h1 className="text-2xl font-semibold">Portefeuille client</h1>
+          <p className="text-sm text-muted-foreground">Identité, organisation, contrats, documents et situation comptable.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => setGroupDialogOpen(true)}>
             <Users className="size-4" />
             Nouveau groupe
           </Button>
+          {selectedClientId ? (
+            <Button type="button" variant="outline" onClick={() => setClientPickerOpen(true)}>
+              <Search className="size-4" />
+              Changer de client
+            </Button>
+          ) : null}
           <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setClientDialogOpen(true)}>
             <Plus className="size-4" />
             Nouveau client
@@ -90,102 +130,63 @@ export default function ClientCrmPage() {
         </div>
       </header>
 
-      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,2.1fr)]">
-        <div className="min-w-0 rounded-lg border bg-card">
-          <div className="grid gap-3 border-b p-3 sm:grid-cols-[1fr_220px] xl:grid-cols-1">
-            <label className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                className="pl-9"
-                placeholder="Nom, RC, CIN, ICE ou code"
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(0);
-                }}
-              />
-            </label>
-            <Select
-              value={groupeId}
-              onValueChange={(value) => {
-                setGroupeId(value);
-                setPage(0);
-              }}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="TOUS">Tous les groupes</SelectItem>
-                {(groupesQuery.data ?? []).map((groupe) => (
-                  <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {!selectedClientId ? (
+        <section className="mx-auto w-full max-w-5xl rounded-lg border bg-card">
+          <div className="border-b p-5">
+            <h2 className="text-lg font-semibold">Rechercher un client</h2>
+            <p className="text-sm text-muted-foreground">Sélectionnez le client dont vous souhaitez ouvrir le portefeuille.</p>
           </div>
-
-          <div className="divide-y">
-            {(clientsQuery.data?.items ?? []).map((client) => (
-              <button
-                key={client.id}
-                type="button"
-                className={`w-full px-4 py-3 text-left transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/30 ${
-                  selectedClientId === client.id ? "bg-blue-50 dark:bg-blue-950/30" : ""
-                }`}
-                onClick={() => setSelectedClientId(client.id)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{client.nomAffichage || client.raisonSociale || client.nom}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {client.codeClient || "Sans code"} · {client.rc || client.cin || client.ice || "Identifiant non renseigné"}
-                    </div>
-                  </div>
-                  {client.groupe ? <Badge variant="secondary">{client.groupe.code}</Badge> : null}
-                </div>
-              </button>
-            ))}
-            {!clientsQuery.isLoading && (clientsQuery.data?.items.length ?? 0) === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Aucun client trouvé.</div>
-            ) : null}
+          <ClientPicker
+            query={query}
+            onQueryChange={(value) => { setQuery(value); setPage(0); }}
+            groupeId={groupeId}
+            onGroupChange={(value) => { setGroupeId(value); setPage(0); }}
+            groupes={groupesQuery.data ?? []}
+            clients={clientsQuery.data?.items ?? []}
+            loading={clientsQuery.isLoading}
+            page={clientsQuery.data?.page}
+            onPageChange={setPage}
+            onSelect={selectClient}
+          />
+        </section>
+      ) : detailQuery.isLoading ? (
+        <PortfolioSkeleton />
+      ) : detailQuery.data ? (
+        <ClientDetail
+          detail={detailQuery.data}
+          activeTab={activeTab}
+          onTabChange={changeTab}
+          onAssignGroup={() => setAssignmentOpen(true)}
+        />
+      ) : (
+        <section className="grid min-h-80 place-items-center rounded-lg border bg-card p-6 text-center">
+          <div>
+            <p className="font-medium">Client introuvable</p>
+            <Button className="mt-3" variant="outline" onClick={() => setSearchParams({})}>Revenir à la recherche</Button>
           </div>
+        </section>
+      )}
 
-          <div className="flex items-center justify-between border-t p-3 text-sm">
-            <span className="text-muted-foreground">{clientsQuery.data?.page.totalElements ?? 0} client(s)</span>
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                disabled={clientsQuery.data?.page.first ?? true}
-                onClick={() => setPage((current) => Math.max(current - 1, 0))}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                disabled={clientsQuery.data?.page.last ?? true}
-                onClick={() => setPage((current) => current + 1)}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="min-w-0 rounded-lg border bg-card">
-          {detailQuery.data ? (
-            <ClientDetail
-              detail={detailQuery.data}
-              onAssignGroup={() => setAssignmentOpen(true)}
-            />
-          ) : (
-            <div className="grid min-h-80 place-items-center p-6 text-center text-sm text-muted-foreground">
-              Sélectionnez un client pour ouvrir sa fiche.
-            </div>
-          )}
-        </div>
-      </section>
+      <Dialog open={clientPickerOpen} onOpenChange={setClientPickerOpen}>
+        <DialogContent className="max-h-[88vh] overflow-hidden p-0 sm:max-w-4xl">
+          <DialogHeader className="border-b px-6 py-5">
+            <DialogTitle>Changer de client</DialogTitle>
+            <DialogDescription>Recherchez par nom, identifiant ou groupe.</DialogDescription>
+          </DialogHeader>
+          <ClientPicker
+            query={query}
+            onQueryChange={(value) => { setQuery(value); setPage(0); }}
+            groupeId={groupeId}
+            onGroupChange={(value) => { setGroupeId(value); setPage(0); }}
+            groupes={groupesQuery.data ?? []}
+            clients={clientsQuery.data?.items ?? []}
+            loading={clientsQuery.isLoading}
+            page={clientsQuery.data?.page}
+            onPageChange={setPage}
+            onSelect={selectClient}
+          />
+        </DialogContent>
+      </Dialog>
 
       <GroupDialog
         open={groupDialogOpen}
@@ -199,7 +200,7 @@ export default function ClientCrmPage() {
         groupes={groupesQuery.data ?? []}
         onSaved={async (clientId) => {
           await refreshCrm();
-          setSelectedClientId(clientId);
+          selectClient(clientId);
         }}
       />
       <AssignmentDialog
@@ -213,6 +214,106 @@ export default function ClientCrmPage() {
           toast.success("Rattachement groupe enregistré");
         }}
       />
+    </div>
+  );
+}
+
+function ClientPicker({
+  query,
+  onQueryChange,
+  groupeId,
+  onGroupChange,
+  groupes,
+  clients,
+  loading,
+  page,
+  onPageChange,
+  onSelect,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  groupeId: string;
+  onGroupChange: (value: string) => void;
+  groupes: GroupeClient[];
+  clients: ClientResponse[];
+  loading: boolean;
+  page?: ClientPage["page"];
+  onPageChange: (page: number) => void;
+  onSelect: (clientId: string) => void;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="grid gap-3 border-b p-4 sm:grid-cols-[minmax(0,1fr)_260px]">
+        <label className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            className="pl-9"
+            placeholder="Nom, code client, RC, CIN ou ICE"
+            onChange={(event) => onQueryChange(event.target.value)}
+          />
+        </label>
+        <Select value={groupeId} onValueChange={onGroupChange}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="TOUS">Tous les groupes</SelectItem>
+            {groupes.map((groupe) => (
+              <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="max-h-[54vh] divide-y overflow-y-auto">
+        {loading ? Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className="flex items-center gap-3 p-4">
+            <Skeleton className="size-10 rounded-md" />
+            <div className="grid flex-1 gap-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-3 w-64 max-w-full" /></div>
+          </div>
+        )) : null}
+        {!loading && clients.map((client) => (
+          <button
+            key={client.id}
+            type="button"
+            className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none dark:hover:bg-blue-950/30"
+            onClick={() => onSelect(client.id)}
+          >
+            <div className="min-w-0">
+              <div className="truncate font-medium">{client.nomAffichage || client.raisonSociale || client.nom}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {[client.codeClient || "Sans code", client.rc || client.cin || client.ice || "Identifiant non renseigné"].join(" · ")}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {client.groupe ? <Badge variant="secondary">{client.groupe.code}</Badge> : null}
+              <ArrowRight className="size-4 text-muted-foreground" />
+            </div>
+          </button>
+        ))}
+        {!loading && clients.length === 0 ? (
+          <div className="p-10 text-center text-sm text-muted-foreground">Aucun client trouvé.</div>
+        ) : null}
+      </div>
+      <div className="flex items-center justify-between border-t p-3 text-sm">
+        <span className="text-muted-foreground">{page?.totalElements ?? 0} client(s)</span>
+        <div className="flex gap-1">
+          <Button type="button" size="icon" variant="outline" disabled={page?.first ?? true} onClick={() => onPageChange(Math.max((page?.number ?? 0) - 1, 0))}>
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button type="button" size="icon" variant="outline" disabled={page?.last ?? true} onClick={() => onPageChange((page?.number ?? 0) + 1)}>
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PortfolioSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-lg border bg-card">
+      <div className="flex items-center gap-4 border-b p-5"><Skeleton className="size-12 rounded-md" /><div className="grid gap-2"><Skeleton className="h-6 w-64" /><Skeleton className="h-4 w-80" /></div></div>
+      <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="bg-card p-4"><Skeleton className="h-3 w-24" /><Skeleton className="mt-2 h-6 w-32" /></div>)}</div>
+      <div className="grid gap-4 p-5 lg:grid-cols-2"><Skeleton className="h-60" /><Skeleton className="h-60" /></div>
     </div>
   );
 }
@@ -437,101 +538,305 @@ function ClientDialog({
 
 function ClientDetail({
   detail,
+  activeTab,
+  onTabChange,
   onAssignGroup,
 }: {
   detail: Awaited<ReturnType<typeof productionApi.getClientCrm>>;
+  activeTab: PortfolioTab;
+  onTabChange: (tab: string) => void;
   onAssignGroup: () => void;
 }) {
   const client = detail.client;
+  const documentsQuery = useQuery({
+    queryKey: ["crm", "client-documents", client.id],
+    queryFn: () => comptaApi.searchClientDocuments({
+      payeurType: "CLIENT",
+      payeurId: client.id,
+      page: 0,
+      size: 8,
+    }),
+    enabled: activeTab === "documents" || activeTab === "accounting",
+  });
+  const sourcesQuery = useQuery({
+    queryKey: ["crm", "client-document-sources", client.id],
+    queryFn: () => comptaApi.searchClientDocumentSources({
+      payeurType: "CLIENT",
+      payeurId: client.id,
+      page: 0,
+      size: 8,
+    }),
+    enabled: activeTab === "accounting",
+  });
+  const movements = detail.contrats.flatMap((contract) => contract.mouvements);
+  const groupMembers = uniqueGroupMembers(detail.groupes, client.id);
+  const accountingUrl = `/app/compta/releves-factures?payeurType=CLIENT&payeurId=${client.id}`;
+
   return (
-    <div className="min-w-0">
+    <section className="min-w-0 overflow-hidden rounded-lg border bg-card">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b p-5">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom}</h2>
             <Badge variant="outline">{client.typeClient === "PERSONNE_MORALE" ? "Personne morale" : "Personne physique"}</Badge>
+            <Badge className={client.actif === false ? "bg-slate-500" : "bg-emerald-600"}>{client.actif === false ? "Inactif" : "Actif"}</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {[client.codeClient, client.rc || client.cin, client.ice].filter(Boolean).join(" · ")}
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={onAssignGroup}>
-          <Users className="size-4" />
-          Gérer le groupe
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild type="button" variant="outline"><Link to={accountingUrl}><ReceiptText className="size-4" />Relevés et factures</Link></Button>
+          <Button type="button" variant="outline" onClick={onAssignGroup}><Users className="size-4" />Gérer le groupe</Button>
+        </div>
       </div>
 
-      <div className="grid gap-px border-b bg-border sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Primes émises" value={money(detail.totalQuittances)} />
         <Metric label="Solde non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} />
         <Metric label="Contrats" value={String(detail.contrats.length)} />
-        <Metric label="Groupe principal" value={client.groupe?.libelle ?? "Indépendant"} />
+        <Metric label="Mouvements" value={String(movements.length)} />
       </div>
 
-      <div className="grid gap-4 p-5 lg:grid-cols-[1fr_1.2fr]">
-        <section className="min-w-0">
-          <h3 className="mb-3 text-sm font-semibold uppercase text-muted-foreground">Coordonnées</h3>
-          <dl className="grid gap-2 text-sm">
-            <Info label="Adresse" value={[client.adresse, client.ville].filter(Boolean).join(", ")} />
-            <Info label="Téléphone" value={client.telephone} />
-            <Info label="Email" value={client.email} />
-            <Info label="Catégorie" value={client.categorieClientLibelle} />
-          </dl>
-        </section>
-        <section className="min-w-0">
-          <h3 className="mb-3 text-sm font-semibold uppercase text-muted-foreground">Groupes actifs</h3>
-          <div className="grid gap-2">
-            {detail.groupes.map((groupe) => (
-              <div key={groupe.id} className="rounded-md border p-3">
-                <div className="flex items-center gap-2 font-medium">
-                  <Building2 className="size-4 text-blue-600" />
-                  {groupe.code} - {groupe.libelle}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Entité responsable des paiements : {groupe.clientTresorerieNom || "Non définie"} · {groupe.facturationConsolideeDefaut ? "Consolidée" : "Directe"}
+      <Tabs value={activeTab} onValueChange={onTabChange}>
+        <div className="overflow-x-auto border-y px-4 py-2">
+          <TabsList className="w-max min-w-full justify-start">
+            <TabsTrigger value="overview"><Eye className="size-4" />Vue d’ensemble</TabsTrigger>
+            <TabsTrigger value="contracts"><FolderOpen className="size-4" />Contrats</TabsTrigger>
+            <TabsTrigger value="documents"><FileText className="size-4" />Documents</TabsTrigger>
+            <TabsTrigger value="accounting"><CircleDollarSign className="size-4" />Comptabilité</TabsTrigger>
+            <TabsTrigger value="claims"><ShieldCheck className="size-4" />Sinistres <Badge variant="secondary" className="ml-1">À venir</Badge></TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="overview" className="m-0 grid gap-5 p-5 lg:grid-cols-2">
+          <PortfolioSection title="Informations client" icon={<Users className="size-4" />}>
+            <dl className="grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">
+              <Info label="Identifiant" value={client.rc || client.cin || client.ice} />
+              <Info label="Catégorie" value={client.categorieClientLibelle} />
+              <Info label="Adresse" value={[client.adresse, client.ville].filter(Boolean).join(", ")} />
+              <Info label="Téléphone" value={client.telephone} />
+              <Info label="Email" value={client.email} />
+              <Info label="Organisation" value={client.groupe?.libelle ?? "Client indépendant"} />
+            </dl>
+          </PortfolioSection>
+          <PortfolioSection title="Organisation et groupe" icon={<Building2 className="size-4" />} action={<Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button>}>
+            {detail.groupes.length ? detail.groupes.map((groupe) => (
+              <div key={groupe.id} className="border-b py-3 first:pt-0 last:border-0 last:pb-0">
+                <div className="font-medium">{groupe.code} - {groupe.libelle}</div>
+                <div className="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+                  <span>Tête de groupe : <strong className="font-medium text-foreground">{groupe.clientTeteNom || "Non définie"}</strong></span>
+                  <span>Responsable des paiements : <strong className="font-medium text-foreground">{groupe.clientTresorerieNom || "Non définie"}</strong></span>
+                  <span>Facturation : <strong className="font-medium text-foreground">{groupe.facturationConsolideeDefaut ? "Consolidée" : "Directe"}</strong></span>
+                  <span>{groupe.membres.length} membre(s)</span>
                 </div>
               </div>
-            ))}
-            {detail.groupes.length === 0 ? <p className="text-sm text-muted-foreground">Aucun rattachement actif.</p> : null}
-          </div>
-        </section>
-      </div>
+            )) : <EmptyState text="Ce client n’est rattaché à aucun groupe." />}
+          </PortfolioSection>
+          <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />}>
+            {groupMembers.length ? (
+              <div className="divide-y">
+                {groupMembers.slice(0, 8).map((member) => (
+                  <Link key={member.clientId} to={`/app/crm?clientId=${member.clientId}&tab=overview`} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-blue-700">
+                    <span><strong>{member.clientNom}</strong><span className="ml-2 text-muted-foreground">{label(member.typeRelation)}</span></span>
+                    <ArrowRight className="size-4" />
+                  </Link>
+                ))}
+              </div>
+            ) : <EmptyState text="Aucune autre entité liée." />}
+          </PortfolioSection>
+          <PortfolioSection title="Accès rapides" icon={<ArrowRight className="size-4" />}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <WorkspaceLink to={`/app/crm?clientId=${client.id}&tab=contracts`} icon={<FolderOpen className="size-4" />} title="Contrats et mouvements" detail={`${detail.contrats.length} contrat(s)`} />
+              <WorkspaceLink to={accountingUrl} icon={<ReceiptText className="size-4" />} title="Relevés et factures" detail="Espace comptable du payeur" />
+            </div>
+          </PortfolioSection>
+        </TabsContent>
 
-      <section className="min-w-0 border-t p-5">
-        <h3 className="mb-3 text-sm font-semibold uppercase text-muted-foreground">Contrats et facturation</h3>
-        <div className="max-w-full overflow-x-auto rounded-md border">
-          <table className="w-full min-w-[860px] text-sm">
-            <thead className="bg-muted/70 text-left">
-              <tr>
-                <th className="px-3 py-2">Dossier</th>
-                <th className="px-3 py-2">Police</th>
-                <th className="px-3 py-2">Produit</th>
-                <th className="px-3 py-2">Rôle</th>
-                <th className="px-3 py-2">Payeur</th>
-                <th className="px-3 py-2">Facturation</th>
-                <th className="px-3 py-2 text-right">Prime</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {detail.contrats.map((contrat) => (
-                <tr key={contrat.id}>
-                  <td className="px-3 py-2 font-medium">
-                    <Link className="text-blue-700 hover:underline" to={`/app/production/contrats/${contrat.id}`}>
-                      {contrat.numeroDossier || `#${contrat.id}`}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2">{contrat.numeroPolice || "-"}</td>
-                  <td className="px-3 py-2">{label(contrat.typeContrat)}</td>
-                  <td className="px-3 py-2">{label(contrat.roleClient)}</td>
-                  <td className="px-3 py-2">{contrat.payeurPrimeNom || label(contrat.typePayeurPrime)}</td>
-                  <td className="px-3 py-2">{label(contrat.modeFacturation)}</td>
-                  <td className="px-3 py-2 text-right font-medium">{money(contrat.primeTotale)}</td>
-                </tr>
+        <TabsContent value="contracts" className="m-0 p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div><h3 className="font-semibold">Contrats et mouvements</h3><p className="text-sm text-muted-foreground">Historique de production associé à ce client comme assuré ou payeur.</p></div>
+            <Button asChild variant="outline" size="sm"><Link to="/app/production/contrats">Ouvrir la liste production</Link></Button>
+          </div>
+          <ContractsPortfolio contracts={detail.contrats} />
+        </TabsContent>
+
+        <TabsContent value="documents" className="m-0 grid gap-5 p-5 lg:grid-cols-[1.4fr_0.8fr]">
+          <PortfolioSection title="Documents comptables émis" icon={<FileText className="size-4" />} action={<Button asChild size="sm" variant="outline"><Link to={accountingUrl}>Gérer les documents</Link></Button>}>
+            <ClientDocuments rows={documentsQuery.data?.rows ?? []} loading={documentsQuery.isLoading} />
+          </PortfolioSection>
+          <PortfolioSection title="Pièces contractuelles" icon={<FolderOpen className="size-4" />}>
+            <p className="mb-3 text-sm text-muted-foreground">Les justificatifs restent rattachés à leur contrat et à leur mouvement d’origine.</p>
+            <div className="divide-y">
+              {detail.contrats.map((contract) => (
+                <Link key={contract.id} to={`/app/production/contrats/${contract.id}`} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-blue-700">
+                  <span><strong>{contract.numeroDossier || `#${contract.id}`}</strong><span className="ml-2 text-muted-foreground">{contract.numeroPolice || "Sans police"}</span></span>
+                  <ArrowRight className="size-4" />
+                </Link>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+            </div>
+          </PortfolioSection>
+        </TabsContent>
+
+        <TabsContent value="accounting" className="m-0 grid gap-5 p-5">
+          <div className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
+            <Metric label="Total émis" value={money(detail.totalQuittances)} />
+            <Metric label="Non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} />
+            <Metric label="À documenter" value={String(sourcesQuery.data?.page.totalElements ?? 0)} />
+            <Metric label="Documents émis" value={String(documentsQuery.data?.page.totalElements ?? 0)} />
+          </div>
+          <PortfolioSection title="Situation comptable" icon={<CircleDollarSign className="size-4" />} action={<Button asChild><Link to={accountingUrl}>Ouvrir l’espace comptable <ArrowRight className="size-4" /></Link></Button>}>
+            <p className="text-sm text-muted-foreground">Les quittances validées, relevés, factures et crédits sont gérés dans l’espace comptable du payeur. Les montants affichés ici proviennent des quittances serveur.</p>
+          </PortfolioSection>
+        </TabsContent>
+
+        <TabsContent value="claims" className="m-0 p-5">
+          <div className="grid min-h-64 place-items-center rounded-md border border-dashed bg-muted/20 p-8 text-center">
+            <div className="max-w-md"><ShieldCheck className="mx-auto size-9 text-muted-foreground" /><h3 className="mt-3 font-semibold">Espace sinistres à venir</h3><p className="mt-1 text-sm text-muted-foreground">Les déclarations, dossiers sinistres et indemnisations seront reliés à ce portefeuille lorsque le module Sinistres sera disponible.</p></div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </section>
+  );
+}
+
+type PortfolioTab = "overview" | "contracts" | "documents" | "accounting" | "claims";
+
+function normalizePortfolioTab(value: string | null): PortfolioTab {
+  const tabs: PortfolioTab[] = ["overview", "contracts", "documents", "accounting", "claims"];
+  return tabs.includes(value as PortfolioTab) ? value as PortfolioTab : "overview";
+}
+
+function uniqueGroupMembers(groups: GroupeClient[], currentClientId: string) {
+  const members = new Map<string, GroupeClient["membres"][number]>();
+  groups.forEach((group) => group.membres.forEach((member) => {
+    if (member.clientId !== currentClientId) members.set(member.clientId, member);
+  }));
+  return [...members.values()].sort((left, right) => left.clientNom.localeCompare(right.clientNom, "fr"));
+}
+
+function PortfolioSection({ title, icon, action, children }: {
+  title: string;
+  icon: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-md border">
+      <header className="flex min-h-11 items-center justify-between gap-3 border-b bg-muted/35 px-4 py-2">
+        <h3 className="flex items-center gap-2 font-semibold">{icon}{title}</h3>
+        {action}
+      </header>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">{text}</div>;
+}
+
+function WorkspaceLink({ to, icon, title, detail }: {
+  to: string;
+  icon: ReactNode;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <Link to={to} className="flex min-w-0 items-center gap-3 rounded-md border p-3 transition-colors hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+      <span className="grid size-9 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">{icon}</span>
+      <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{title}</strong><span className="block truncate text-xs text-muted-foreground">{detail}</span></span>
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
+function ContractsPortfolio({ contracts }: {
+  contracts: Awaited<ReturnType<typeof productionApi.getClientCrm>>["contrats"];
+}) {
+  if (!contracts.length) return <EmptyState text="Aucun contrat n’est associé à ce client." />;
+
+  return (
+    <div className="grid gap-4">
+      {contracts.map((contract) => (
+        <section key={contract.id} className="min-w-0 overflow-hidden rounded-md border">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/25 p-4">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="font-semibold">{contract.numeroDossier || `Contrat #${contract.id}`}</h4>
+                <Badge variant="outline">{label(contract.typeContrat)}</Badge>
+                <StatusBadge status={contract.statut} />
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{contract.numeroPolice || "Sans numéro de police"} · {contract.compagnie || "Compagnie non renseignée"}</p>
+            </div>
+            <Button asChild size="sm" variant="outline"><Link to={`/app/production/contrats/${contract.id}`}><Eye className="size-4" />Voir le contrat</Link></Button>
+          </div>
+          <dl className="grid gap-px border-b bg-border text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <ContractFact label="Période" value={`${dateLabel(contract.dateEffet)} au ${dateLabel(contract.dateEcheance)}`} />
+            <ContractFact label="Rôle du client" value={label(contract.roleClient)} />
+            <ContractFact label="Facturation" value={label(contract.modeFacturation)} />
+            <ContractFact label="Total des quittances" value={money(contract.primeTotale)} />
+          </dl>
+          <details className="group" open={contracts.length === 1}>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-medium hover:bg-muted/30">
+              <span className="flex items-center gap-2"><History className="size-4" />Historique des mouvements <Badge variant="secondary">{contract.mouvements.length}</Badge></span>
+              <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+            </summary>
+            {contract.mouvements.length ? (
+              <div className="overflow-x-auto border-t">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead className="bg-muted/35 text-left text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-2">N°</th><th className="px-4 py-2">Mouvement</th><th className="px-4 py-2">Date d’effet</th><th className="px-4 py-2">Statut</th><th className="px-4 py-2 text-right">Total</th><th className="w-14 px-4 py-2" /></tr></thead>
+                  <tbody>{contract.mouvements.map((movement) => (
+                    <tr key={movement.id} className="border-t first:border-t-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{movement.numeroMouvement || "-"}</td>
+                      <td className="px-4 py-3"><div className="font-medium">{movement.libelle || label(movement.categorie)}</div><div className="text-xs text-muted-foreground">{movement.code || label(movement.categorie)}</div></td>
+                      <td className="whitespace-nowrap px-4 py-3">{dateLabel(movement.dateEffet)}</td>
+                      <td className="px-4 py-3"><StatusBadge status={movement.statut} /></td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium">{money(movement.primeTotale)}</td>
+                      <td className="px-4 py-2"><Button asChild size="icon" variant="ghost" title="Voir ce mouvement"><Link to={`/app/production/contrats/${contract.id}?mouvementId=${movement.id}`}><Eye className="size-4" /></Link></Button></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            ) : <div className="border-t p-5 text-sm text-muted-foreground">Aucun mouvement enregistré.</div>}
+          </details>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function ContractFact({ label: factLabel, value }: { label: string; value: string }) {
+  return <div className="bg-card px-4 py-3"><dt className="text-xs text-muted-foreground">{factLabel}</dt><dd className="mt-1 font-medium">{value}</dd></div>;
+}
+
+function StatusBadge({ status }: { status?: string | null }) {
+  const normalized = status?.toUpperCase() ?? "";
+  const className = normalized.includes("ANNU") || normalized.includes("RESIL")
+    ? "bg-red-100 text-red-800 hover:bg-red-100"
+    : normalized.includes("VALID") || normalized.includes("ACTIF")
+      ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+      : "bg-slate-100 text-slate-700 hover:bg-slate-100";
+  return <Badge className={className}>{label(status)}</Badge>;
+}
+
+function ClientDocuments({ rows, loading }: { rows: ClientDocument[]; loading: boolean }) {
+  if (loading) return <div className="grid gap-2">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-11" />)}</div>;
+  if (!rows.length) return <EmptyState text="Aucun relevé ou facture n’a encore été émis pour ce client." />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[620px] text-sm">
+        <thead className="border-b bg-muted/35 text-left text-xs uppercase text-muted-foreground"><tr><th className="px-3 py-2">Document</th><th className="px-3 py-2">Émission</th><th className="px-3 py-2">Période</th><th className="px-3 py-2">Statut</th><th className="px-3 py-2 text-right">Total</th></tr></thead>
+        <tbody>{rows.map((document) => (
+          <tr key={document.id} className="border-b last:border-0">
+            <td className="px-3 py-3"><div className="font-medium">{document.numero}</div><div className="text-xs text-muted-foreground">{label(document.typeDocument)}</div></td>
+            <td className="whitespace-nowrap px-3 py-3">{dateLabel(document.dateEmission)}</td>
+            <td className="whitespace-nowrap px-3 py-3">{dateLabel(document.periodeDebut)} au {dateLabel(document.periodeFin)}</td>
+            <td className="px-3 py-3"><StatusBadge status={document.statut} /></td>
+            <td className="whitespace-nowrap px-3 py-3 text-right font-medium">{money(document.totalDocument)}</td>
+          </tr>
+        ))}</tbody>
+      </table>
     </div>
   );
 }
@@ -796,6 +1101,12 @@ function Field({
 
 function money(value?: number | null) {
   return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value ?? 0);
+}
+
+function dateLabel(value?: string | null) {
+  if (!value) return "-";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
 }
 
 function label(value?: string | null) {

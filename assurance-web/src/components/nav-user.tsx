@@ -1,5 +1,5 @@
-import { useNavigate } from "react-router-dom";
-import { ChevronsUpDown, LogOut, User } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ChevronsUpDown, LogOut, User, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -68,6 +68,12 @@ export function NavUser() {
               <div className="text-xs text-muted-foreground">{user.roleName ?? user.roleCode}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/app/profile">
+                <UserRound />
+                Profil
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="text-red-500" />
               Déconnexion

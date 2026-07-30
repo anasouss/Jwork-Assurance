@@ -23,6 +23,16 @@ export type AuthResponse = {
   user: AuthUser;
 };
 
+export type AuthSession = {
+  id: string;
+  deviceName?: string | null;
+  deviceType?: string | null;
+  ipAddress?: string | null;
+  current: boolean;
+  lastActivityAt?: string | null;
+  createdAt?: string | null;
+};
+
 export type ApiResponse<T> = {
   success: boolean;
   message?: string;

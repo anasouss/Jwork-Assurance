@@ -1,6 +1,6 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Bell, Download, KeyRound, LogOut, User } from "lucide-react";
+import { Bell, Download, KeyRound, LogOut, User, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -128,6 +128,12 @@ export function AppHeader() {
                 <div className="mt-2 text-xs text-muted-foreground">{user?.agenceName ?? "Agence"} · {user?.roleName ?? user?.roleCode}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/app/profile">
+                  <UserRound />
+                  Profil
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={(event) => { event.preventDefault(); setPasswordOpen(true); }}>
                 <KeyRound />
                 Changer mot de passe

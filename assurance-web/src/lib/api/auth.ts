@@ -1,4 +1,4 @@
-import type { ApiResponse, AuthResponse } from "@/lib/types";
+import type { ApiResponse, AuthResponse, AuthSession } from "@/lib/types";
 import { API_BASE_URL, apiFetch, normalizeApiIds } from "./base";
 import { clearAuth, getRefreshToken, saveAuth } from "@/lib/auth";
 
@@ -79,6 +79,23 @@ export const authApi = {
     });
     if (!result.success) {
       throw new Error(result.message || "Mot de passe impossible à modifier");
+    }
+  },
+
+  async sessions(): Promise<AuthSession[]> {
+    const result = await apiFetch<ApiResponse<AuthSession[]>>("/api/v1/auth/sessions");
+    if (!result.success) {
+      throw new Error(result.message || "Sessions impossibles à charger");
+    }
+    return result.data ?? [];
+  },
+
+  async revokeSession(sessionId: string): Promise<void> {
+    const result = await apiFetch<ApiResponse<void>>(`/api/v1/auth/sessions/${sessionId}`, {
+      method: "DELETE",
+    });
+    if (!result.success) {
+      throw new Error(result.message || "Session impossible à révoquer");
     }
   },
 };

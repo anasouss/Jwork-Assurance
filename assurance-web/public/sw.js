@@ -1,14 +1,16 @@
-const CACHE_VERSION = "skay-assurance-v1";
+const CACHE_VERSION = "skay-assurance-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const APP_SHELL = [
   "/",
   "/app",
   "/login",
-  "/manifest.webmanifest",
-  "/favicon.ico",
-  "/pwa-icon-192.png",
-  "/pwa-icon-512.png",
-  "/pwa-maskable-512.png"
+  "/manifest.webmanifest?v=20260730",
+  "/favicon.ico?v=20260730",
+  "/favicon-32.png?v=20260730",
+  "/favicon-16.png?v=20260730",
+  "/pwa-icon-192.png?v=20260730",
+  "/pwa-icon-512.png?v=20260730",
+  "/pwa-maskable-512.png?v=20260730"
 ];
 
 self.addEventListener("install", (event) => {

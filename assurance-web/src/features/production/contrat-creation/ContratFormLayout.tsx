@@ -188,8 +188,8 @@ export function ContratFormLayout({
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
       sousClasses={form.refs.sousClasses.data ?? []}
       allowMultipleVehicules={allowMultipleVehicules}
-      showUsage={!showConvention}
-      showAttestation={!showConvention}
+      showUsage={form.typeContrat !== "PARTICULIER" && !showConvention}
+      showAttestation={form.typeContrat !== "PARTICULIER" && !showConvention}
       controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
       showRemorqueFlag={showConvention}
       errors={form.validationErrors}

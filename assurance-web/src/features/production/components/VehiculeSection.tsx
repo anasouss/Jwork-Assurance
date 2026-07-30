@@ -83,7 +83,7 @@ export function VehiculeSection({
     const marqueId = stringValue(found.marqueId);
     const carrosserieId = stringValue(found.carrosserieId);
     const categorieTransportId = stringValue(found.categorieTransportId);
-    const usageAllowed = usageId && usages.some((item) => item.id === usageId);
+    const usageAllowed = showUsage && usageId && usages.some((item) => item.id === usageId);
     update(index, {
       usageId: usageAllowed ? usageId : current.usageId,
       marqueId: marqueId || undefined,

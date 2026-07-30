@@ -1,7 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, ImageIcon, KeyRound, Plus, Search, Trash2, Upload } from "lucide-react";
+import {
+  Building2,
+  Edit,
+  ImageIcon,
+  KeyRound,
+  Laptop,
+  Monitor,
+  MonitorSmartphone,
+  Plus,
+  Search,
+  ShieldCheck,
+  Smartphone,
+  Tablet,
+  Trash2,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
@@ -27,12 +54,11 @@ import type {
   AdminPermission,
   AdminRole,
   AdminUser,
+  AdminUserSession,
   UpsertAdminAgencyRequest,
   UpsertAdminRoleRequest,
   UpsertAdminUserRequest,
 } from "../types";
-
-const GLOBAL_AGENCY = "__global__";
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
@@ -68,16 +94,18 @@ export default function AdminPage() {
 
   return (
     <div className="grid gap-5">
-      <div>
-        <p className="text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-400">Administration</p>
-        <h1 className="text-xl font-semibold tracking-tight">Administration</h1>
-        <p className="text-sm text-muted-foreground">Utilisateurs, rôles, permissions et agences.</p>
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-400">Administration d’agence</p>
+        <h1 className="text-2xl font-semibold">Accès et organisation</h1>
+        <p className="text-sm text-muted-foreground">
+          Gérez les comptes de l’agence, leurs rôles et les appareils connectés.
+        </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <SummaryCard label="Utilisateurs" value={users.data?.length ?? 0} />
-        <SummaryCard label="Rôles" value={roles.data?.length ?? 0} />
-        <SummaryCard label="Permissions" value={permissionsQuery.data?.length ?? 0} />
+        <SummaryCard icon={Users} label="Utilisateurs" value={users.data?.length ?? 0} detail={`${users.data?.filter((item) => item.actif).length ?? 0} actifs`} />
+        <SummaryCard icon={ShieldCheck} label="Rôles d’agence" value={roles.data?.length ?? 0} detail={`${permissionsQuery.data?.length ?? 0} permissions disponibles`} />
+        <SummaryCard icon={Building2} label="Agences accessibles" value={availableAgencies.length} detail={canViewAgencies ? "Périmètre plateforme" : user?.agenceName ?? "Agence courante"} />
       </div>
 
       <Tabs defaultValue="users" className="grid gap-4">
@@ -104,7 +132,6 @@ export default function AdminPage() {
             permissions={permissionsQuery.data ?? []}
             agencies={availableAgencies}
             canManage={canManageRoles}
-            canUseGlobal={permissions.includes("config:manage")}
             onChanged={async () => {
               await queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });
               await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
@@ -126,12 +153,28 @@ export default function AdminPage() {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: number;
+  detail: string;
+}) {
   return (
-    <Card className="shadow-none">
-      <CardContent className="flex items-center justify-between p-4">
-        <div className="text-sm text-muted-foreground">{label}</div>
-        <div className="text-xl font-semibold">{value}</div>
+    <Card className="rounded-md shadow-none">
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className="grid size-10 shrink-0 place-items-center rounded-md bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300">
+          <Icon className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">{label}</div>
+          <div className="truncate text-xs text-muted-foreground">{detail}</div>
+        </div>
+        <div className="text-2xl font-semibold tabular-nums">{value}</div>
       </CardContent>
     </Card>
   );
@@ -156,13 +199,26 @@ function UsersPanel({
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [passwordTarget, setPasswordTarget] = useState<AdminUser | null>(null);
+  const [sessionsTarget, setSessionsTarget] = useState<AdminUser | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
   const [form, setForm] = useState<UpsertAdminUserRequest>(emptyUser(agencies[0]?.id, roles[0]?.id));
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!dialogOpen) return;
-    setForm(editing ? userToForm(editing) : emptyUser(agencies[0]?.id, roles[0]?.id));
+    const defaultAgencyId = agencies[0]?.id;
+    const defaultRoleId = roles.find(
+      (role) => String(role.agenceId) === String(defaultAgencyId),
+    )?.id;
+    setForm(editing ? userToForm(editing) : emptyUser(defaultAgencyId, defaultRoleId));
   }, [agencies, dialogOpen, editing, roles]);
+
+  const rolesForAgency = useMemo(
+    () => roles.filter(
+      (role) => String(role.agenceId) === String(form.agenceId),
+    ),
+    [form.agenceId, roles],
+  );
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -190,6 +246,7 @@ function UsersPanel({
   const deactivate = useMutation({
     mutationFn: (id: string) => adminApi.deactivateUser(id),
     onSuccess: async () => {
+      setDeactivateTarget(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
       onChanged();
       toast.success("Utilisateur désactivé");
@@ -246,6 +303,11 @@ function UsersPanel({
                         onSelect: () => { setEditing(item); setDialogOpen(true); },
                       },
                       {
+                        label: "Appareils connectés",
+                        icon: MonitorSmartphone,
+                        onSelect: () => setSessionsTarget(item),
+                      },
+                      {
                         label: "Changer le mot de passe",
                         icon: KeyRound,
                         disabled: !canManage,
@@ -256,7 +318,7 @@ function UsersPanel({
                         icon: Trash2,
                         destructive: true,
                         disabled: !canManage || item.id === currentUserId || !item.actif,
-                        onSelect: () => deactivate.mutate(item.id),
+                        onSelect: () => setDeactivateTarget(item),
                       },
                     ]}
                   />
@@ -271,7 +333,7 @@ function UsersPanel({
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier utilisateur" : "Ajouter utilisateur"}</DialogTitle>
-            <DialogDescription>Associez l'utilisateur à une agence et un role.</DialogDescription>
+            <DialogDescription>Associez l'utilisateur à une agence et un rôle.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <LabeledInput label="Prénom" value={form.prenom} onChange={(value) => setForm({ ...form, prenom: value })} />
@@ -281,16 +343,25 @@ function UsersPanel({
             <LabeledInput label={editing ? "Nouveau mot de passe" : "Mot de passe"} type="password" value={form.password ?? ""} onChange={(value) => setForm({ ...form, password: value })} />
             <label className="grid gap-1.5 text-sm">
               <span className="font-medium">Agence</span>
-              <Select value={form.agenceId ?? ""} onValueChange={(value) => setForm({ ...form, agenceId: value })}>
+              <Select
+                value={form.agenceId ?? ""}
+                onValueChange={(value) => setForm({
+                  ...form,
+                  agenceId: value,
+                  roleId: roles.find(
+                    (role) => String(role.agenceId) === String(value),
+                  )?.id ?? "",
+                })}
+              >
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                 <SelectContent>{agencies.map((agence) => <SelectItem key={agence.id} value={agence.id}>{agence.nom}</SelectItem>)}</SelectContent>
               </Select>
             </label>
             <label className="grid gap-1.5 text-sm">
-              <span className="font-medium">Role</span>
+              <span className="font-medium">Rôle</span>
               <Select value={form.roleId} onValueChange={(value) => setForm({ ...form, roleId: value })}>
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={role.id}>{role.nom}</SelectItem>)}</SelectContent>
+                <SelectContent>{rolesForAgency.map((role) => <SelectItem key={role.id} value={role.id}>{role.nom}</SelectItem>)}</SelectContent>
               </Select>
             </label>
             <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
@@ -306,8 +377,184 @@ function UsersPanel({
       </Dialog>
 
       <ResetPasswordDialog user={passwordTarget} onOpenChange={(open) => !open && setPasswordTarget(null)} onChanged={onChanged} />
+      <UserSessionsDialog
+        user={sessionsTarget}
+        canRevoke={canManage}
+        onOpenChange={(open) => !open && setSessionsTarget(null)}
+      />
+      <AlertDialog open={Boolean(deactivateTarget)} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Désactiver cet utilisateur ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le compte de {deactivateTarget?.fullName} sera désactivé et toutes ses sessions seront révoquées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deactivate.isPending}
+              onClick={() => deactivateTarget && deactivate.mutate(deactivateTarget.id)}
+            >
+              Désactiver
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
+}
+
+function UserSessionsDialog({
+  user,
+  canRevoke,
+  onOpenChange,
+}: {
+  user: AdminUser | null;
+  canRevoke: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [revokeTarget, setRevokeTarget] = useState<AdminUserSession | "ALL" | null>(null);
+  const queryKey = ["admin", "users", user?.id, "sessions"] as const;
+  const sessions = useQuery({
+    queryKey,
+    queryFn: () => adminApi.userSessions(user!.id),
+    enabled: Boolean(user),
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    if (!user) setRevokeTarget(null);
+  }, [user]);
+
+  const revoke = useMutation({
+    mutationFn: async () => {
+      if (!user || !revokeTarget) return;
+      if (revokeTarget === "ALL") {
+        await adminApi.revokeAllUserSessions(user.id);
+      } else {
+        await adminApi.revokeUserSession(user.id, revokeTarget.id);
+      }
+    },
+    onSuccess: async () => {
+      setRevokeTarget(null);
+      await queryClient.invalidateQueries({ queryKey });
+      toast.success("Session(s) révoquée(s)");
+    },
+    onError: showError,
+  });
+
+  return (
+    <>
+      <Dialog open={Boolean(user)} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Appareils connectés</DialogTitle>
+            <DialogDescription>
+              Sessions actives de {user?.fullName}. Une session révoquée devra se reconnecter.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid max-h-[55vh] gap-2 overflow-y-auto pr-1">
+            {sessions.isLoading ? (
+              <div className="grid min-h-32 place-items-center text-sm text-muted-foreground">
+                Chargement des appareils...
+              </div>
+            ) : sessions.isError ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                Impossible de charger les sessions actives.
+              </div>
+            ) : sessions.data?.length ? (
+              sessions.data.map((session) => {
+                const DeviceIcon = sessionDeviceIcon(session.deviceType);
+                return (
+                  <div key={session.id} className="flex items-center gap-3 rounded-md border bg-card p-3">
+                    <div className="grid size-10 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                      <DeviceIcon className="size-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{session.deviceName || "Appareil inconnu"}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {[session.ipAddress || "IP inconnue", `Activité ${formatDateTime(session.lastActivityAt)}`].join(" · ")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Connecté depuis le {formatDateTime(session.createdAt)}
+                      </div>
+                    </div>
+                    {canRevoke ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        aria-label={`Révoquer ${session.deviceName || "la session"}`}
+                        onClick={() => setRevokeTarget(session)}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    ) : null}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="grid min-h-32 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
+                Aucune session active
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="sm:justify-between">
+            {canRevoke && (sessions.data?.length ?? 0) > 0 ? (
+              <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setRevokeTarget("ALL")}>
+                <Trash2 className="size-4" />
+                Révoquer toutes
+              </Button>
+            ) : <span />}
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={Boolean(revokeTarget)} onOpenChange={(open) => !open && setRevokeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {revokeTarget === "ALL" ? "Révoquer toutes les sessions ?" : "Révoquer cette session ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {revokeTarget === "ALL"
+                ? `Tous les appareils de ${user?.fullName ?? "cet utilisateur"} devront se reconnecter.`
+                : "Cet appareil perdra immédiatement sa session de renouvellement."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={revoke.isPending}
+              onClick={() => revoke.mutate()}
+            >
+              Révoquer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function sessionDeviceIcon(deviceType?: string | null) {
+  switch (deviceType?.toUpperCase()) {
+    case "MOBILE":
+      return Smartphone;
+    case "TABLET":
+      return Tablet;
+    case "DESKTOP":
+      return Laptop;
+    default:
+      return Monitor;
+  }
 }
 
 function RolesPanel({
@@ -315,14 +562,12 @@ function RolesPanel({
   permissions,
   agencies,
   canManage,
-  canUseGlobal,
   onChanged,
 }: {
   roles: AdminRole[];
   permissions: AdminPermission[];
   agencies: AdminAgency[];
   canManage: boolean;
-  canUseGlobal: boolean;
   onChanged: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -425,17 +670,12 @@ function RolesPanel({
               <LabeledInput label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
               <label className="grid gap-1.5 text-sm">
                 <span className="font-medium">Agence</span>
-                <Select value={form.agenceId ?? GLOBAL_AGENCY} disabled={!canUseGlobal && agencies.length <= 1} onValueChange={(value) => setForm({ ...form, agenceId: value === GLOBAL_AGENCY ? undefined : value })}>
+                <Select value={form.agenceId ?? ""} disabled={agencies.length <= 1} onValueChange={(value) => setForm({ ...form, agenceId: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {canUseGlobal ? <SelectItem value={GLOBAL_AGENCY}>Global</SelectItem> : null}
                     {agencies.map((agence) => <SelectItem key={agence.id} value={agence.id}>{agence.nom}</SelectItem>)}
                   </SelectContent>
                 </Select>
-              </label>
-              <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                <Checkbox checked={form.systemRole} disabled={!canUseGlobal} onCheckedChange={(checked) => setForm({ ...form, systemRole: Boolean(checked) })} />
-                Rôle système
               </label>
               <label className="grid gap-1.5 text-sm sm:col-span-2">
                 <span className="font-medium">Description</span>

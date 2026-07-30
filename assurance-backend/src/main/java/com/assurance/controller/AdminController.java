@@ -9,6 +9,7 @@ import com.assurance.dto.response.AdminPermissionResponse;
 import com.assurance.dto.response.AdminRoleResponse;
 import com.assurance.dto.response.AdminUtilisateurResponse;
 import com.assurance.dto.response.ApiResponse;
+import com.assurance.dto.response.SessionResponse;
 import com.assurance.service.AdminService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,26 @@ public class AdminController {
     public ResponseEntity<ApiResponse<Void>> resetUserPassword(@PathVariable Long id, @Valid @RequestBody ResetUserPasswordRequest request) {
         adminService.resetPassword(id, request);
         return ResponseEntity.ok(ApiResponse.success(null, "Mot de passe modifie"));
+    }
+
+    @GetMapping("/users/{id}/sessions")
+    public ResponseEntity<ApiResponse<List<SessionResponse>>> userSessions(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.listUserSessions(id)));
+    }
+
+    @DeleteMapping("/users/{id}/sessions/{sessionId}")
+    public ResponseEntity<ApiResponse<Void>> revokeUserSession(
+            @PathVariable Long id,
+            @PathVariable Long sessionId
+    ) {
+        adminService.revokeUserSession(id, sessionId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Session révoquée"));
+    }
+
+    @DeleteMapping("/users/{id}/sessions")
+    public ResponseEntity<ApiResponse<Void>> revokeAllUserSessions(@PathVariable Long id) {
+        adminService.revokeAllUserSessions(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Toutes les sessions ont été révoquées"));
     }
 
     @GetMapping("/roles")

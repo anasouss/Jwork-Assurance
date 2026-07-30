@@ -8,8 +8,10 @@ import com.assurance.dto.response.AdminAgenceResponse;
 import com.assurance.dto.response.AdminPermissionResponse;
 import com.assurance.dto.response.AdminRoleResponse;
 import com.assurance.dto.response.AdminUtilisateurResponse;
+import com.assurance.dto.response.SessionResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Permission;
+import com.assurance.entity.RefreshSession;
 import com.assurance.entity.Role;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.StatutAgence;
@@ -18,6 +20,7 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.exception.UnauthorizedException;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.PermissionRepository;
+import com.assurance.repository.RefreshSessionRepository;
 import com.assurance.repository.RoleRepository;
 import com.assurance.repository.UtilisateurRepository;
 import com.assurance.security.TenantContext;
@@ -33,6 +36,7 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -48,6 +52,7 @@ public class AdminService {
     private final UtilisateurRepository utilisateurRepository;
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final RefreshSessionRepository refreshSessionRepository;
     private final AgenceRepository agenceRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -58,7 +63,10 @@ public class AdminService {
         List<Utilisateur> users = can(actor, "agence:view")
                 ? utilisateurRepository.findAllByOrderByNomAscPrenomAsc()
                 : utilisateurRepository.findByAgenceIdOrderByNomAscPrenomAsc(requiredActorAgence(actor));
-        return users.stream().map(AdminUtilisateurResponse::from).toList();
+        return users.stream()
+                .filter(user -> !isSuperAdmin(user))
+                .map(AdminUtilisateurResponse::from)
+                .toList();
     }
 
     @Transactional
@@ -92,6 +100,7 @@ public class AdminService {
         requireAny(actor, "user:manage", "config:manage");
         Utilisateur user = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        ensureAgencyUser(user);
         ensureManagedAgence(actor, user.getAgence());
         if (utilisateurRepository.existsByEmailIgnoreCaseAndIdNot(request.getEmail(), id)) {
             throw new BadRequestException("Email deja utilise");
@@ -120,9 +129,11 @@ public class AdminService {
         }
         Utilisateur user = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        ensureAgencyUser(user);
         ensureManagedAgence(actor, user.getAgence());
         user.setActif(false);
         utilisateurRepository.save(user);
+        refreshSessionRepository.revokeAllByUserId(id);
     }
 
     @Transactional
@@ -131,9 +142,45 @@ public class AdminService {
         requireAny(actor, "user:manage", "config:manage");
         Utilisateur user = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        ensureAgencyUser(user);
         ensureManagedAgence(actor, user.getAgence());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         utilisateurRepository.save(user);
+        refreshSessionRepository.revokeAllByUserId(id);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> listUserSessions(Long userId) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:view", "user:manage", "config:view");
+        managedAgencyUser(actor, userId);
+        return refreshSessionRepository
+                .findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByLastActivityAtDesc(userId, LocalDateTime.now())
+                .stream()
+                .map(this::toSessionResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void revokeUserSession(Long userId, Long sessionId) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:manage", "config:manage");
+        managedAgencyUser(actor, userId);
+        RefreshSession session = refreshSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session", sessionId));
+        if (!session.getUser().getId().equals(userId)) {
+            throw new BadRequestException("La session ne correspond pas à cet utilisateur");
+        }
+        session.setRevoked(true);
+        refreshSessionRepository.save(session);
+    }
+
+    @Transactional
+    public void revokeAllUserSessions(Long userId) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:manage", "config:manage");
+        managedAgencyUser(actor, userId);
+        refreshSessionRepository.revokeAllByUserId(userId);
     }
 
     @Transactional(readOnly = true)
@@ -143,7 +190,11 @@ public class AdminService {
         List<Role> roles = can(actor, "agence:view")
                 ? roleRepository.findAllByOrderByNomAsc()
                 : roleRepository.findByAgenceIdOrAgenceIsNullOrderByNomAsc(requiredActorAgence(actor));
-        return roles.stream().map(AdminRoleResponse::from).toList();
+        return roles.stream()
+                .filter(role -> role.getAgence() != null)
+                .filter(role -> !"SUPER_ADMIN".equalsIgnoreCase(role.getCode()))
+                .map(AdminRoleResponse::from)
+                .toList();
     }
 
     @Transactional
@@ -169,6 +220,7 @@ public class AdminService {
         requireAny(actor, "role:manage", "config:manage");
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", id));
+        ensureAgencyRole(role);
         ensureManagedAgence(actor, role.getAgence());
         if (Boolean.TRUE.equals(role.getSystemRole()) && !can(actor, "config:manage")) {
             throw new UnauthorizedException("Role systeme non modifiable");
@@ -192,6 +244,7 @@ public class AdminService {
         requireAny(actor, "role:manage", "config:manage");
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", id));
+        ensureAgencyRole(role);
         ensureManagedAgence(actor, role.getAgence());
         if (Boolean.TRUE.equals(role.getSystemRole())) {
             throw new BadRequestException("Role systeme non supprimable");
@@ -207,7 +260,7 @@ public class AdminService {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:view", "role:manage", "config:view");
         return permissionRepository.findAll().stream()
-                .filter(permission -> can(actor, "config:manage") || !Boolean.TRUE.equals(permission.getSuperAdminOnly()))
+                .filter(permission -> !Boolean.TRUE.equals(permission.getSuperAdminOnly()))
                 .map(AdminPermissionResponse::from)
                 .toList();
     }
@@ -391,9 +444,6 @@ public class AdminService {
     }
 
     private Agence resolveRoleAgence(Utilisateur actor, Long agenceId) {
-        if (can(actor, "config:manage") && agenceId == null) {
-            return null;
-        }
         return resolveManagedAgence(actor, agenceId);
     }
 
@@ -409,8 +459,8 @@ public class AdminService {
     private Role resolveAssignableRole(Utilisateur actor, Long roleId, Agence agence) {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", roleId));
-        if (role.getAgence() == null && !can(actor, "config:manage")) {
-            throw new UnauthorizedException("Role global non assignable");
+        if (role.getAgence() == null || "SUPER_ADMIN".equalsIgnoreCase(role.getCode())) {
+            throw new UnauthorizedException("Rôle plateforme non assignable depuis l'administration d'agence");
         }
         if (role.getAgence() != null && !role.getAgence().getId().equals(agence.getId())) {
             throw new BadRequestException("Le role ne correspond pas a l'agence");
@@ -423,8 +473,8 @@ public class AdminService {
         for (Long permissionId : permissionIds == null ? Set.<Long>of() : permissionIds) {
             Permission permission = permissionRepository.findById(permissionId)
                     .orElseThrow(() -> new ResourceNotFoundException("Permission", permissionId));
-            if (Boolean.TRUE.equals(permission.getSuperAdminOnly()) && !can(actor, "config:manage")) {
-                throw new UnauthorizedException("Permission reservee super admin");
+            if (Boolean.TRUE.equals(permission.getSuperAdminOnly())) {
+                throw new UnauthorizedException("Permission réservée à l'administration de la plateforme");
             }
             permissions.add(permission);
         }
@@ -446,5 +496,41 @@ public class AdminService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private Utilisateur managedAgencyUser(Utilisateur actor, Long userId) {
+        Utilisateur user = utilisateurRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
+        ensureAgencyUser(user);
+        ensureManagedAgence(actor, user.getAgence());
+        return user;
+    }
+
+    private void ensureAgencyUser(Utilisateur user) {
+        if (isSuperAdmin(user)) {
+            throw new UnauthorizedException("Compte plateforme géré hors de l'administration d'agence");
+        }
+    }
+
+    private boolean isSuperAdmin(Utilisateur user) {
+        return user.getRole() != null && "SUPER_ADMIN".equalsIgnoreCase(user.getRole().getCode());
+    }
+
+    private void ensureAgencyRole(Role role) {
+        if (role.getAgence() == null || "SUPER_ADMIN".equalsIgnoreCase(role.getCode())) {
+            throw new UnauthorizedException("Rôle plateforme géré hors de l'administration d'agence");
+        }
+    }
+
+    private SessionResponse toSessionResponse(RefreshSession session) {
+        return SessionResponse.builder()
+                .id(session.getId())
+                .deviceName(session.getDeviceName())
+                .deviceType(session.getDeviceType())
+                .ipAddress(session.getIpAddress())
+                .current(false)
+                .lastActivityAt(session.getLastActivityAt())
+                .createdAt(session.getCreatedAt())
+                .build();
     }
 }

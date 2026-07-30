@@ -5,6 +5,7 @@ import type {
   AdminPermission,
   AdminRole,
   AdminUser,
+  AdminUserSession,
   UpsertAdminAgencyRequest,
   UpsertAdminRoleRequest,
   UpsertAdminUserRequest,
@@ -39,6 +40,22 @@ export const adminApi = {
     return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/users/${id}/password`, {
       method: "PUT",
       body: JSON.stringify({ password }),
+    }));
+  },
+
+  async userSessions(id: string) {
+    return unwrap(await apiFetch<ApiResponse<AdminUserSession[]>>(`/api/v1/admin/users/${id}/sessions`));
+  },
+
+  async revokeUserSession(userId: string, sessionId: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/users/${userId}/sessions/${sessionId}`, {
+      method: "DELETE",
+    }));
+  },
+
+  async revokeAllUserSessions(userId: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/users/${userId}/sessions`, {
+      method: "DELETE",
     }));
   },
 

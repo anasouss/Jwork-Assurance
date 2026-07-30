@@ -493,13 +493,15 @@ function PayerAccountSelector(props: {
     <section className="overflow-visible rounded-md border bg-card">
       <div className="grid gap-4 p-4 lg:grid-cols-[220px_minmax(320px,620px)_1fr] lg:items-end">
         <FilterField label="Compte payeur">
-          <div className="grid grid-cols-2 rounded-md border bg-muted/30 p-1">
+          <div className="grid grid-cols-2 rounded-md border border-slate-300 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
             {(["CLIENT", "GROUPE"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 className={`h-8 rounded-sm px-3 text-sm font-medium ${
-                  props.mode === mode ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  props.mode === mode
+                    ? "bg-amber-100 text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-700"
+                    : "text-slate-600 hover:bg-white/70 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`}
                 onClick={() => props.onModeChange(mode)}
               >

@@ -15,6 +15,16 @@ export type AdminUser = {
   permissions: string[];
 };
 
+export type AdminUserSession = {
+  id: string;
+  deviceName?: string | null;
+  deviceType?: string | null;
+  ipAddress?: string | null;
+  current: boolean;
+  lastActivityAt?: string | null;
+  createdAt?: string | null;
+};
+
 export type AdminRole = {
   id: string;
   agenceId?: string | null;

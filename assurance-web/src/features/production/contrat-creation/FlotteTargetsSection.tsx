@@ -1635,13 +1635,17 @@ function TargetGuaranteesTable({
                           onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })}
                         />
                         <MoneyInput
-                          disabled={!editable || !garantie.avecFranchise}
-                          className={cn(controlClass(editable && Boolean(garantie.avecFranchise)), "text-right")}
-                          value={item?.franchiseMinimale}
+                          disabled={!editable || !garantie.avecFranchiseMinimale}
+                          className={cn(controlClass(editable && Boolean(garantie.avecFranchiseMinimale)), "text-right")}
+                          value={garantie.avecFranchiseMinimale ? item?.franchiseMinimale : undefined}
                           onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })}
                         />
                       </div>
-                    ) : franchiseDisplay(selectedLine)}
+                    ) : franchiseDisplay(
+                      selectedLine,
+                      Boolean(garantie.avecFranchise),
+                      Boolean(garantie.avecFranchiseMinimale)
+                    )}
                   </td>
                   <td className="px-3 py-2 text-right font-medium">
                     {primeInputEnabled && !isRc ? (
@@ -2048,8 +2052,8 @@ function targetLineSelectionPatch(garantie: ReferenceOption, line: ReferenceOpti
     capital: undefined,
     taux: manualPricing ? undefined : toNumber(line?.taux),
     prime: manualPricing ? undefined : toNumber(line?.prime),
-    tauxFranchise: manualPricing ? undefined : toNumber(line?.tauxFranchise),
-    franchiseMinimale: manualPricing ? undefined : toNumber(line?.franchiseMinimale),
+    tauxFranchise: manualPricing || !garantie.avecFranchise ? undefined : toNumber(line?.tauxFranchise),
+    franchiseMinimale: manualPricing || !garantie.avecFranchiseMinimale ? undefined : toNumber(line?.franchiseMinimale),
   };
 }
 
@@ -2112,9 +2116,9 @@ function rateDisplay(line?: ReferenceOption) {
   return taux == null ? "-" : `${money(taux)} %`;
 }
 
-function franchiseDisplay(line?: ReferenceOption) {
-  const tauxFranchise = toNumber(line?.tauxFranchise);
-  const franchiseMinimale = toNumber(line?.franchiseMinimale);
+function franchiseDisplay(line?: ReferenceOption, avecFranchise = true, avecFranchiseMinimale = true) {
+  const tauxFranchise = avecFranchise ? toNumber(line?.tauxFranchise) : undefined;
+  const franchiseMinimale = avecFranchiseMinimale ? toNumber(line?.franchiseMinimale) : undefined;
   if (tauxFranchise == null && franchiseMinimale == null) {
     return "-";
   }

@@ -199,7 +199,12 @@ export function FlotteGarantieSection({
                         <Input type="number" disabled={!editable || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(activeTarget, garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
                       </td>
                       <td className="px-3 py-2">
-                        <MoneyInput disabled={!editable || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale} onValueChange={(value) => update(activeTarget, garantie.id, { franchiseMinimale: value })} />
+                        <MoneyInput
+                          disabled={!editable || !garantie.avecFranchiseMinimale}
+                          className={controlClass(editable && Boolean(garantie.avecFranchiseMinimale))}
+                          value={garantie.avecFranchiseMinimale ? item?.franchiseMinimale : undefined}
+                          onValueChange={(value) => update(activeTarget, garantie.id, { franchiseMinimale: value })}
+                        />
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{checked ? "Calcul auto" : "-"}</td>
                     </tr>

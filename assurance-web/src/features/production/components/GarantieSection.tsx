@@ -330,7 +330,13 @@ export function GarantieSection({
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">{franchiseDisplay(selectedLine)}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">
+                        {franchiseDisplay(
+                          selectedLine,
+                          Boolean(garantie.avecFranchise),
+                          Boolean(garantie.avecFranchiseMinimale)
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-right text-muted-foreground">{isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? "-" : money(estimatedPrime)}</td>
                       <td className="px-3 py-2 text-right font-medium">{isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}</td>
                     </>
@@ -438,7 +444,12 @@ export function GarantieSection({
                         <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
                       </td>
                       <td className="px-3 py-2">
-                        <MoneyInput disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.franchiseMinimale} onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })} />
+                        <MoneyInput
+                          disabled={rowDisabled || isRc || !garantie.avecFranchiseMinimale}
+                          className={controlClass(editable && Boolean(garantie.avecFranchiseMinimale))}
+                          value={garantie.avecFranchiseMinimale ? item?.franchiseMinimale : undefined}
+                          onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })}
+                        />
                       </td>
                     </>
                   )}
@@ -1165,9 +1176,9 @@ function rateDisplay(line?: ReferenceOption) {
   return taux == null ? "-" : `${money(taux)} %`;
 }
 
-function franchiseDisplay(line?: ReferenceOption) {
-  const tauxFranchise = numeric(line?.tauxFranchise);
-  const franchiseMinimale = numeric(line?.franchiseMinimale);
+function franchiseDisplay(line?: ReferenceOption, avecFranchise = true, avecFranchiseMinimale = true) {
+  const tauxFranchise = avecFranchise ? numeric(line?.tauxFranchise) : undefined;
+  const franchiseMinimale = avecFranchiseMinimale ? numeric(line?.franchiseMinimale) : undefined;
   if (tauxFranchise == null && franchiseMinimale == null) {
     return "-";
   }

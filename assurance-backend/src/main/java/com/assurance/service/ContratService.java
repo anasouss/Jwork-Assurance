@@ -5157,8 +5157,12 @@ public class ContratService {
         BigDecimal taux = Boolean.TRUE.equals(garantie.getResponsabiliteCivile())
                 ? firstNonNull(input.getTaux(), calculGarantieService.resolveMultiplicateurRc(contrat, usageCible))
                 : firstNonNull(input.getTaux(), calculGarantieService.resolveTauxLigne(ligneGrilleTarifaire, remorque != null));
-        BigDecimal tauxFranchise = firstNonNull(input.getTauxFranchise(), calculGarantieService.resolveTauxFranchiseLigne(ligneGrilleTarifaire, remorque != null));
-        BigDecimal franchiseMinimale = firstNonNull(input.getFranchiseMinimale(), calculGarantieService.resolveFranchiseMinimaleLigne(ligneGrilleTarifaire, remorque != null));
+        BigDecimal tauxFranchise = Boolean.TRUE.equals(garantie.getAvecFranchise())
+                ? firstNonNull(input.getTauxFranchise(), calculGarantieService.resolveTauxFranchiseLigne(ligneGrilleTarifaire, remorque != null))
+                : null;
+        BigDecimal franchiseMinimale = Boolean.TRUE.equals(garantie.getAvecFranchiseMinimale())
+                ? firstNonNull(input.getFranchiseMinimale(), calculGarantieService.resolveFranchiseMinimaleLigne(ligneGrilleTarifaire, remorque != null))
+                : null;
         BigDecimal prime = resolvePrime(contrat, garantie, input, ligneGrilleTarifaire, vehicule, remorque, modeSelectionne, capital, taux);
 
         return new GarantieMontants(

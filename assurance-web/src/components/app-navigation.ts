@@ -87,6 +87,8 @@ export function moduleTitle(module: AppNavigationItem["module"]) {
 
 export function moduleActiveClass(module: AppNavigationItem["module"]) {
   switch (module) {
+    case "dashboard":
+      return "bg-blue-600 text-white";
     case "production":
       return "bg-emerald-600 text-white";
     case "sinistre":
@@ -100,6 +102,6 @@ export function moduleActiveClass(module: AppNavigationItem["module"]) {
     case "admin":
       return "bg-fuchsia-700 text-white";
     default:
-      return "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950";
+      return "bg-blue-600 text-white";
   }
 }

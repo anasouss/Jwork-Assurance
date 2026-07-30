@@ -14,10 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
-import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeUsageAttestationSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
+import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeExclusionGarantieSchema, groupeUsageAttestationSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { numberValue, toNumber } from "../utils/format";
-import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertGroupeUsageAttestationRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
+import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertGroupeExclusionGarantieRequest, UpsertGroupeUsageAttestationRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
 
 export function MarquesSettingsPage() {
   return (
@@ -643,13 +643,25 @@ export function GarantiesSettingsPage() {
     queryFn: productionApi.garantiesParametrage,
     staleTime: 60_000,
   });
+  const groupesExclusion = useQuery({
+    queryKey: ["referentiel", "groupes-exclusion-garanties-parametrage"],
+    queryFn: () => productionApi.referentiel("groupes-exclusion-garanties/parametrage"),
+    staleTime: 60_000,
+  });
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertGarantieRequest>(emptyGarantie());
+  const [editingGroupeExclusion, setEditingGroupeExclusion] = useState<ReferenceOption | null>(null);
+  const [groupeExclusionDialogOpen, setGroupeExclusionDialogOpen] = useState(false);
+  const [groupeExclusionPayload, setGroupeExclusionPayload] = useState<UpsertGroupeExclusionGarantieRequest>(emptyGroupeExclusionGarantie());
 
   useEffect(() => {
     setPayload(editing ? normalizeGarantiePayload(garantiePayloadFromReference(editing)) : emptyGarantie());
   }, [editing]);
+
+  useEffect(() => {
+    setGroupeExclusionPayload(editingGroupeExclusion ? groupeExclusionPayloadFromReference(editingGroupeExclusion) : emptyGroupeExclusionGarantie());
+  }, [editingGroupeExclusion]);
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertGarantieRequest }) =>
@@ -660,6 +672,20 @@ export function GarantiesSettingsPage() {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "garanties"] });
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "garanties-parametrage"] });
       toast.success("Garantie enregistrée");
+    },
+    onError: showError,
+  });
+  const saveGroupeExclusion = useMutation({
+    mutationFn: ({ id, value }: { id?: string; value: UpsertGroupeExclusionGarantieRequest }) =>
+      id ? productionApi.updateGroupeExclusionGarantie(id, value) : productionApi.createGroupeExclusionGarantie(value),
+    onSuccess: async () => {
+      setEditingGroupeExclusion(null);
+      setGroupeExclusionDialogOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "groupes-exclusion-garanties-parametrage"] });
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "groupes-exclusion-garanties"] });
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "garanties"] });
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "garanties-parametrage"] });
+      toast.success("Groupe d'exclusion enregistré");
     },
     onError: showError,
   });
@@ -730,6 +756,7 @@ export function GarantiesSettingsPage() {
         typeGarantie,
         modesAutorises: ["PROTECTION"],
         modeParDefaut: "PROTECTION",
+        groupeExclusionId: undefined,
         sourcesValeurAutorisees: [],
         sourceValeurParDefaut: "AUCUNE",
         requiertValeurVenale: false,
@@ -753,12 +780,104 @@ export function GarantiesSettingsPage() {
 
   return (
     <ReferenceShell title="Garanties" description="Paramétrage central des garanties, modes de tarification, sources de valeur et comportement des grilles.">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" onClick={() => { setEditingGroupeExclusion(null); setGroupeExclusionPayload(emptyGroupeExclusionGarantie()); setGroupeExclusionDialogOpen(true); }}>
+          <Plus className="size-4" />
+          Groupe d'exclusion
+        </Button>
         <Button onClick={() => { setEditing(null); setPayload(emptyGarantie()); setDialogOpen(true); }}>
           <Plus className="size-4" />
           Ajouter garantie
         </Button>
       </div>
+
+      <Dialog open={groupeExclusionDialogOpen} onOpenChange={(open) => { setGroupeExclusionDialogOpen(open); if (!open) setEditingGroupeExclusion(null); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingGroupeExclusion ? "Modifier groupe d'exclusion" : "Ajouter groupe d'exclusion"}</DialogTitle>
+            <DialogDescription>Les garanties rattachées au même groupe ne peuvent pas être choisies ensemble sur la même cible.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Code" required>
+                <Input value={groupeExclusionPayload.code} onChange={(event) => setGroupeExclusionPayload((current) => ({ ...current, code: event.target.value }))} />
+              </Field>
+              <Field label="Libellé" required>
+                <Input value={groupeExclusionPayload.libelle} onChange={(event) => setGroupeExclusionPayload((current) => ({ ...current, libelle: event.target.value }))} />
+              </Field>
+              <Field label="Type">
+                <Select value={groupeExclusionPayload.typeGarantie ?? "VEHICULE"} onValueChange={(value) => setGroupeExclusionPayload((current) => ({ ...current, typeGarantie: value }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {GARANTIE_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <div className="flex items-end pb-2">
+                <Flag label="Actif" checked={groupeExclusionPayload.actif} onChange={(value) => setGroupeExclusionPayload((current) => ({ ...current, actif: value }))} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button disabled={saveGroupeExclusion.isPending} onClick={() => {
+                const parsed = groupeExclusionGarantieSchema.safeParse(cleanTextPayload(groupeExclusionPayload));
+                if (!parsed.success) {
+                  toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
+                  return;
+                }
+                saveGroupeExclusion.mutate({ id: editingGroupeExclusion?.id, value: parsed.data });
+              }}>
+                <Plus className="size-4" />
+                {editingGroupeExclusion ? "Modifier" : "Ajouter"}
+              </Button>
+              <Button variant="outline" onClick={() => setGroupeExclusionDialogOpen(false)}>Annuler</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Card className="border-border/70 shadow-none">
+        <CardHeader><CardTitle className="text-base">Groupes d'exclusion</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader className="bg-muted/60">
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Actif</TableHead>
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(groupesExclusion.data ?? []).map((groupe) => (
+                  <TableRow key={groupe.id}>
+                    <TableCell className="font-medium">{groupe.code ?? "-"}</TableCell>
+                    <TableCell>{groupe.libelle}</TableCell>
+                    <TableCell>{String(groupe.typeGarantie ?? "VEHICULE")}</TableCell>
+                    <TableCell>{groupe.actif === false ? "Non" : "Oui"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => { setEditingGroupeExclusion(groupe); setGroupeExclusionDialogOpen(true); }}
+                        aria-label={`Modifier ${groupe.libelle}`}
+                      >
+                        <Edit className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!groupesExclusion.isLoading && (groupesExclusion.data ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Aucun groupe d'exclusion.</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
         <DialogContent className="sm:max-w-6xl">
@@ -790,6 +909,17 @@ export function GarantiesSettingsPage() {
               </Field>
               <Field label="Description">
                 <Input value={payload.description ?? ""} onChange={(event) => update({ description: event.target.value })} />
+              </Field>
+              <Field label="Groupe d'exclusion">
+                <Select value={payload.groupeExclusionId ?? "NONE"} onValueChange={(value) => update({ groupeExclusionId: value === "NONE" ? undefined : value })}>
+                  <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Aucun</SelectItem>
+                    {(groupesExclusion.data ?? [])
+                      .filter((groupe) => groupe.actif !== false && String(groupe.typeGarantie ?? "VEHICULE") === String(payload.typeGarantie ?? "VEHICULE"))
+                      .map((groupe) => <SelectItem key={groupe.id} value={groupe.id}>{groupe.code ? `${groupe.code} - ` : ""}{groupe.libelle}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </Field>
             </div>
 
@@ -908,6 +1038,7 @@ export function GarantiesSettingsPage() {
                   <TableHead>Libellé</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Mode</TableHead>
+                  <TableHead>Exclusion</TableHead>
                   <TableHead>Grille</TableHead>
                   <TableHead>Valeurs</TableHead>
                   <TableHead>Actif</TableHead>
@@ -922,6 +1053,7 @@ export function GarantiesSettingsPage() {
                     <TableCell>{garantie.libelle}</TableCell>
                     <TableCell>{String(garantie.typeGarantie ?? "VEHICULE")}</TableCell>
                     <TableCell>{String(garantie.modeParDefaut ?? "-")}</TableCell>
+                    <TableCell>{String(garantie.groupeExclusionCode ?? "-")}</TableCell>
                     <TableCell>{garantieTags(garantie).join(", ") || "-"}</TableCell>
                     <TableCell>{valueTags(garantie).join(", ") || "-"}</TableCell>
                     <TableCell>{garantie.actif === false ? "Non" : "Oui"}</TableCell>
@@ -934,7 +1066,7 @@ export function GarantiesSettingsPage() {
                 ))}
                 {!garanties.isLoading && (garanties.data ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Aucune garantie.</TableCell>
+                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucune garantie.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -1558,6 +1690,7 @@ function emptyGarantie(): UpsertGarantieRequest {
     libelle: "",
     description: "",
     branche: "Automobile",
+    groupeExclusionId: undefined,
     typeGarantie: "VEHICULE",
     obligatoire: false,
     responsabiliteCivile: false,
@@ -1581,12 +1714,31 @@ function emptyGarantie(): UpsertGarantieRequest {
   };
 }
 
+function emptyGroupeExclusionGarantie(): UpsertGroupeExclusionGarantieRequest {
+  return {
+    code: "",
+    libelle: "",
+    typeGarantie: "VEHICULE",
+    actif: true,
+  };
+}
+
+function groupeExclusionPayloadFromReference(groupe: ReferenceOption): UpsertGroupeExclusionGarantieRequest {
+  return {
+    code: groupe.code ?? "",
+    libelle: groupe.libelle,
+    typeGarantie: String(groupe.typeGarantie ?? "VEHICULE"),
+    actif: groupe.actif !== false,
+  };
+}
+
 function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantieRequest {
   return {
     code: garantie.code ?? "",
     libelle: garantie.libelle,
     description: String(garantie.description ?? ""),
     branche: String(garantie.branche ?? "Automobile"),
+    groupeExclusionId: garantie.groupeExclusionId ? String(garantie.groupeExclusionId) : undefined,
     typeGarantie: String(garantie.typeGarantie ?? "VEHICULE"),
     obligatoire: Boolean(garantie.obligatoire),
     responsabiliteCivile: Boolean(garantie.responsabiliteCivile),
@@ -1624,6 +1776,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     return {
       ...payload,
       typeGarantie,
+      groupeExclusionId: payload.groupeExclusionId || undefined,
       modesAutorises: ["PROTECTION"],
       modeParDefaut: "PROTECTION",
       sourcesValeurAutorisees: [],
@@ -1647,6 +1800,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
   return {
     ...payload,
     typeGarantie,
+    groupeExclusionId: payload.groupeExclusionId || undefined,
     modesAutorises: normalizedModes,
     modeParDefaut,
     avecFranchiseMinimale: Boolean(payload.avecFranchise && payload.avecFranchiseMinimale),

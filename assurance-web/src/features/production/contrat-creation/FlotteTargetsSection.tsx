@@ -1458,8 +1458,9 @@ function TargetGuaranteesTable({
         return;
       }
     }
+    const baseSelection = checked ? withoutExclusionConflicts(selected, garanties, target, garantie) : selected;
     const next = checked
-      ? [...selected, { ...targetedInput(garantie, target, pricingMode), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
+      ? [...baseSelection, { ...targetedInput(garantie, target, pricingMode), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
       : selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)));
     setSelected(next);
     onRequestCalculation?.(target, garantie.id, next);
@@ -1467,9 +1468,10 @@ function TargetGuaranteesTable({
 
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
     const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
+    const baseSelection = checked ? withoutExclusionConflicts(selected, personneGaranties, target, garantie) : selected;
     const next = checked
         ? [
-            ...selected,
+            ...baseSelection,
             {
               ...targetedInput(garantie, target),
               modeSelectionne: "PROTECTION",
@@ -1935,6 +1937,22 @@ function sameTarget(item: GarantieInput, target?: Target) {
     return false;
   }
   return target.kind === "vehicule" ? item.vehiculeIndex === target.index : item.remorqueIndex === target.index;
+}
+
+function withoutExclusionConflicts(selected: GarantieInput[], garanties: ReferenceOption[], target: Target, garantie: ReferenceOption) {
+  const groupeExclusionId = String(garantie.groupeExclusionId ?? "");
+  if (!groupeExclusionId) {
+    return selected;
+  }
+  const incompatibleGarantieIds = new Set(
+    garanties
+      .filter((candidate) => candidate.id !== garantie.id && String(candidate.groupeExclusionId ?? "") === groupeExclusionId)
+      .map((candidate) => candidate.id)
+  );
+  if (incompatibleGarantieIds.size === 0) {
+    return selected;
+  }
+  return selected.filter((item) => !(sameTarget(item, target) && incompatibleGarantieIds.has(item.garantieId)));
 }
 
 function hasTargetPersonneGaranties(selected: GarantieInput[], personneGaranties: ReferenceOption[], target?: Target) {

@@ -215,10 +215,14 @@ public class ContratService {
         contratGarantieRepository.deleteByContratIdAndVehiculeId(contrat.getId(), vehicule.getId());
         contratGarantieRepository.flush();
         contrat.getGaranties().removeIf(garantie -> garantie.getVehicule() != null && vehicule.getId().equals(garantie.getVehicule().getId()));
+        Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : inputs == null ? List.<CreateContratRequest.GarantieInput>of() : inputs) {
             if (input.getGarantieId() == null) {
                 continue;
             }
+            Garantie garantie = garantieRepository.findById(input.getGarantieId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            registerGarantieExclusion(exclusions, garantie, vehicule, null, null);
             ContratGarantie contratGarantie = saveCalculatedDraftGarantieForTarget(contrat, input, vehicule, null);
             contrat.getGaranties().add(contratGarantie);
         }
@@ -271,10 +275,14 @@ public class ContratService {
         contratGarantieRepository.deleteByContratIdAndRemorqueId(contrat.getId(), remorque.getId());
         contratGarantieRepository.flush();
         contrat.getGaranties().removeIf(garantie -> garantie.getRemorque() != null && remorque.getId().equals(garantie.getRemorque().getId()));
+        Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : inputs == null ? List.<CreateContratRequest.GarantieInput>of() : inputs) {
             if (input.getGarantieId() == null) {
                 continue;
             }
+            Garantie garantie = garantieRepository.findById(input.getGarantieId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            registerGarantieExclusion(exclusions, garantie, null, remorque, null);
             ContratGarantie contratGarantie = saveCalculatedDraftGarantieForTarget(contrat, input, null, remorque);
             contrat.getGaranties().add(contratGarantie);
         }
@@ -477,6 +485,7 @@ public class ContratService {
         }
 
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
+        Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
             Garantie garantie = garantieRepository.findById(input.getGarantieId())
                     .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
@@ -492,6 +501,7 @@ public class ContratService {
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
             GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
             validateGarantieTarget(garantie, vehicule, remorque, client);
+            registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
             validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
             validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
             ContratGarantie contratGarantie = contratGarantieRepository.save(ContratGarantie.builder()
@@ -1508,6 +1518,7 @@ public class ContratService {
             List<Remorque> remorquesCreees
     ) {
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
+        Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
             Garantie garantie = garantieRepository.findById(input.getGarantieId())
                     .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
@@ -1523,6 +1534,7 @@ public class ContratService {
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
             GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
             validateGarantieTarget(garantie, vehicule, remorque, client);
+            registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
             validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
             validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
             ContratGarantie contratGarantie = saveContratGarantie(
@@ -1550,6 +1562,7 @@ public class ContratService {
             List<Remorque> remorquesCreees
     ) {
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
+        Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
             if (input.getGarantieId() == null) {
                 continue;
@@ -1569,6 +1582,8 @@ public class ContratService {
                             .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", input.getFormuleGarantiePersonneId()));
             ModeTarificationGarantie mode = parseMode(input.getModeSelectionne());
             SourceValeurGarantie source = parseSource(input.getSourceValeurSelectionnee());
+            validateGarantieTarget(garantie, vehicule, remorque, client);
+            registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
             ContratGarantie contratGarantie = contratGarantieRepository.save(ContratGarantie.builder()
                     .contrat(contrat)
                     .garantie(garantie)
@@ -3687,6 +3702,7 @@ public class ContratService {
             List<Remorque> remorques
     ) {
         List<ContratGarantie> garanties = new ArrayList<>();
+        Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
             Garantie garantie = garantieRepository.findById(input.getGarantieId())
                     .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
@@ -3702,6 +3718,7 @@ public class ContratService {
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
             GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
             validateGarantieTarget(garantie, vehicule, remorque, client);
+            registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
             validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
             validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
             garanties.add(ContratGarantie.builder()
@@ -4734,6 +4751,47 @@ public class ContratService {
         if (garantie.getTypeGarantie() == TypeGarantie.VEHICULE && client != null) {
             throw new BadRequestException("Une garantie vehicule ne doit pas cibler un client");
         }
+    }
+
+    private void registerGarantieExclusion(
+            Map<String, Garantie> exclusions,
+            Garantie garantie,
+            Vehicule vehicule,
+            Remorque remorque,
+            Client client
+    ) {
+        GroupeExclusionGarantie groupeExclusion = garantie.getGroupeExclusion();
+        if (groupeExclusion == null || !Boolean.TRUE.equals(groupeExclusion.getActif())) {
+            return;
+        }
+        String key = garantieTargetKey(vehicule, remorque, client) + ":" + groupeExclusion.getId();
+        Garantie existing = exclusions.putIfAbsent(key, garantie);
+        if (existing != null && !Objects.equals(existing.getId(), garantie.getId())) {
+            throw new BadRequestException("Les garanties " + garantieLabel(existing) + " et " + garantieLabel(garantie)
+                    + " ne peuvent pas etre selectionnees ensemble sur la meme cible");
+        }
+    }
+
+    private String garantieTargetKey(Vehicule vehicule, Remorque remorque, Client client) {
+        if (vehicule != null) {
+            return "VEHICULE:" + entityKey(vehicule.getId(), vehicule);
+        }
+        if (remorque != null) {
+            return "REMORQUE:" + entityKey(remorque.getId(), remorque);
+        }
+        if (client != null) {
+            return "CLIENT:" + entityKey(client.getId(), client);
+        }
+        return "CONTRAT";
+    }
+
+    private String entityKey(Long id, Object entity) {
+        return id != null ? String.valueOf(id) : "NEW:" + System.identityHashCode(entity);
+    }
+
+    private String garantieLabel(Garantie garantie) {
+        String code = blankToNull(garantie.getCode());
+        return code == null ? garantie.getLibelle() : code + " - " + garantie.getLibelle();
     }
 
     private Usage resolveUsageCible(Contrat contrat, Vehicule vehicule, Remorque remorque) {

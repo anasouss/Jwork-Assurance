@@ -913,6 +913,13 @@ export type UpsertGroupeUsageAttestationRequest = {
   actif?: boolean;
 };
 
+export type UpsertGroupeExclusionGarantieRequest = {
+  code: string;
+  libelle: string;
+  typeGarantie?: string;
+  actif?: boolean;
+};
+
 export type UpsertTarifUsageRequest = {
   usageId: string;
   categorieTransportId?: string;
@@ -934,6 +941,7 @@ export type UpsertGarantieRequest = {
   libelle: string;
   description?: string;
   branche?: string;
+  groupeExclusionId?: string;
   typeGarantie?: string;
   obligatoire?: boolean;
   responsabiliteCivile?: boolean;

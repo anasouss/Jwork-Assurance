@@ -103,7 +103,7 @@ export function FlotteGarantieSection({
       return;
     }
     if (checked) {
-      setSelected([...selected, targetedInput(garantie, target)]);
+      setSelected([...withoutExclusionConflicts(selected, vehiculeGaranties, target, garantie), targetedInput(garantie, target)]);
       return;
     }
     setSelected(selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target))));
@@ -229,6 +229,22 @@ function sameTarget(item: GarantieInput, target?: Target) {
     return false;
   }
   return target.kind === "vehicule" ? item.vehiculeIndex === target.index : item.remorqueIndex === target.index;
+}
+
+function withoutExclusionConflicts(selected: GarantieInput[], garanties: ReferenceOption[], target: Target, garantie: ReferenceOption) {
+  const groupeExclusionId = String(garantie.groupeExclusionId ?? "");
+  if (!groupeExclusionId) {
+    return selected;
+  }
+  const incompatibleGarantieIds = new Set(
+    garanties
+      .filter((candidate) => candidate.id !== garantie.id && String(candidate.groupeExclusionId ?? "") === groupeExclusionId)
+      .map((candidate) => candidate.id)
+  );
+  if (incompatibleGarantieIds.size === 0) {
+    return selected;
+  }
+  return selected.filter((item) => !(sameTarget(item, target) && incompatibleGarantieIds.has(item.garantieId)));
 }
 
 function targetKey(target?: Target) {

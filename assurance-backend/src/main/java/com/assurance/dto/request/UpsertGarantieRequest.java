@@ -18,6 +18,7 @@ public class UpsertGarantieRequest {
 
     private String description;
     private String branche;
+    private Long groupeExclusionId;
     private TypeGarantie typeGarantie;
     private Boolean obligatoire;
     private Boolean responsabiliteCivile;

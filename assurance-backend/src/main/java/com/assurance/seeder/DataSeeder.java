@@ -36,6 +36,7 @@ public class DataSeeder implements CommandLineRunner {
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final GarantieRepository garantieRepository;
+    private final GroupeExclusionGarantieRepository groupeExclusionGarantieRepository;
     private final CompagnieGarantieRepository compagnieGarantieRepository;
     private final UsageRepository usageRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
@@ -266,37 +267,38 @@ public class DataSeeder implements CommandLineRunner {
                         .build()
         ));
 
+        GroupeExclusionGarantie dommagesVehicule = seedGroupeExclusionGarantie("DOMMAGES_VEHICULE", "Dommages véhicule", TypeGarantie.VEHICULE);
         List<Garantie> garanties = List.of(
                 seedGarantie("RC", "Responsabilite Civile", TypeGarantie.VEHICULE, true, true, false, false, false, false, false, false, false, 0,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, true),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, true, null),
                 seedGarantie("V", "Vol", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, false, 10,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("I", "Incendie", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, false, 20,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("BG", "Bris de Glace", TypeGarantie.VEHICULE, false, false, false, false, false, true, false, true, false, 30,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.GLACE, List.of(SourceValeurGarantie.GLACE, SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.GLACE, List.of(SourceValeurGarantie.GLACE, SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("DC", "Dommages Collision", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, true, 40,
-                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.MANUEL), true, false, dommagesVehicule),
                 seedGarantie("DV", "Dommages au Vehicule", TypeGarantie.VEHICULE, false, false, false, true, true, false, true, true, true, 50,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.NEUF, SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.NEUF, SourceValeurGarantie.MANUEL), true, false, dommagesVehicule),
                 seedGarantie("DR", "Defense et Recours", TypeGarantie.VEHICULE, false, false, true, false, false, false, false, false, true, 60,
-                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.AUCUNE, List.of(), false, false),
+                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
                 seedGarantie("RVE", "Rachat Vetuste", TypeGarantie.VEHICULE, false, false, false, false, false, false, false, false, false, 70,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
                 seedGarantie("BOR", "Bris optique et retroviseur", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, true, true, 80,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("BTP", "Bris de toit panoramique", TypeGarantie.VEHICULE, false, false, false, false, false, false, false, true, false, 90,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
                 seedGarantie("VOR", "Vol optique et retroviseur", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, true, true, 100,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("RF", "Risque Financier", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, true, 110,
-                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("PF", "Perte Financiere", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, false, 120,
-                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false),
+                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("PP", "Protection Passagers", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, true, 130,
-                        ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false),
+                        ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
                 seedGarantie("PC", "Protection Conducteur", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, true, 140,
-                        ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false)
+                        ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false, null)
         );
         compagniesAssurance.forEach(compagnieAssurance ->
                 garanties.forEach(garantie -> seedCompagnieGarantie(compagnieAssurance, garantie)));
@@ -655,7 +657,8 @@ public class DataSeeder implements CommandLineRunner {
             SourceValeurGarantie sourceValeurParDefaut,
             List<SourceValeurGarantie> sourcesValeurAutorisees,
             boolean saisieManuelleAutorisee,
-            boolean verrouillee
+            boolean verrouillee,
+            GroupeExclusionGarantie groupeExclusion
     ) {
         Garantie garantie = garantieRepository.findByCode(code).orElseGet(() ->
                 Garantie.builder()
@@ -710,8 +713,25 @@ public class DataSeeder implements CommandLineRunner {
         garantie.getSourcesValeurAutorisees().addAll(sourcesValeurAutorisees);
         garantie.setSaisieManuelleAutorisee(saisieManuelleAutorisee);
         garantie.setVerrouillee(verrouillee);
+        garantie.setGroupeExclusion(groupeExclusion);
         garantie.setActif(true);
         return garantieRepository.save(garantie);
+    }
+
+    private GroupeExclusionGarantie seedGroupeExclusionGarantie(String code, String libelle, TypeGarantie typeGarantie) {
+        GroupeExclusionGarantie groupe = groupeExclusionGarantieRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+                GroupeExclusionGarantie.builder()
+                        .code(code)
+                        .libelle(libelle)
+                        .typeGarantie(typeGarantie)
+                        .actif(true)
+                        .build()
+        );
+        groupe.setCode(code);
+        groupe.setLibelle(libelle);
+        groupe.setTypeGarantie(typeGarantie);
+        groupe.setActif(true);
+        return groupeExclusionGarantieRepository.save(groupe);
     }
 
     private Set<ModeTarificationGarantie> defaultModesTarificationMultiple(String code, boolean tarificationMultiple, ModeTarificationGarantie modeParDefaut) {

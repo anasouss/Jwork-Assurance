@@ -11,6 +11,7 @@ import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
 import com.assurance.dto.request.UpsertGarantieRequest;
 import com.assurance.dto.request.UpsertGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertGrilleUsageConfigurationRequest;
+import com.assurance.dto.request.UpsertGroupeExclusionGarantieRequest;
 import com.assurance.dto.request.UpsertGroupeUsageAttestationRequest;
 import com.assurance.dto.request.UpsertLigneGrilleTarifaireRequest;
 import com.assurance.dto.request.UpsertProduitAssistanceRequest;
@@ -31,6 +32,7 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.FormuleGarantiePersonne;
 import com.assurance.entity.Garantie;
 import com.assurance.entity.GrilleTarifaire;
+import com.assurance.entity.GroupeExclusionGarantie;
 import com.assurance.entity.GroupeUsageAttestation;
 import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.entity.Marque;
@@ -91,6 +93,7 @@ public class ReferentielController {
     private final TarifUsageRepository tarifUsageRepository;
     private final VilleRepository villeRepository;
     private final CategorieClientRepository categorieClientRepository;
+    private final GroupeExclusionGarantieRepository groupeExclusionGarantieRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
     private final ConventionRepository conventionRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
@@ -681,6 +684,47 @@ public class ReferentielController {
                 .toList()));
     }
 
+    @GetMapping("/groupes-exclusion-garanties")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesExclusionGaranties() {
+        return ResponseEntity.ok(ApiResponse.success(groupeExclusionGarantieRepository.findAll(Sort.by("typeGarantie", "code")).stream()
+                .filter(groupe -> Boolean.TRUE.equals(groupe.getActif()))
+                .map(this::toGroupeExclusionGarantieResponse)
+                .toList()));
+    }
+
+    @GetMapping("/groupes-exclusion-garanties/parametrage")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesExclusionGarantiesParametrage() {
+        return ResponseEntity.ok(ApiResponse.success(groupeExclusionGarantieRepository.findAll(Sort.by("typeGarantie", "code")).stream()
+                .map(this::toGroupeExclusionGarantieResponse)
+                .toList()));
+    }
+
+    @PostMapping("/groupes-exclusion-garanties")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeExclusionGarantie(@Valid @RequestBody UpsertGroupeExclusionGarantieRequest request) {
+        groupeExclusionGarantieRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            throw new BadRequestException("Code groupe exclusion deja utilise");
+        });
+        GroupeExclusionGarantie groupe = new GroupeExclusionGarantie();
+        applyGroupeExclusionGarantieRequest(groupe, request);
+        return ResponseEntity.ok(ApiResponse.success(toGroupeExclusionGarantieResponse(groupeExclusionGarantieRepository.save(groupe)), "Groupe exclusion cree"));
+    }
+
+    @PutMapping("/groupes-exclusion-garanties/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateGroupeExclusionGarantie(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertGroupeExclusionGarantieRequest request
+    ) {
+        GroupeExclusionGarantie groupe = groupeExclusionGarantieRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("GroupeExclusionGarantie", id));
+        groupeExclusionGarantieRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
+            if (!existing.getId().equals(id)) {
+                throw new BadRequestException("Code groupe exclusion deja utilise");
+            }
+        });
+        applyGroupeExclusionGarantieRequest(groupe, request);
+        return ResponseEntity.ok(ApiResponse.success(toGroupeExclusionGarantieResponse(groupeExclusionGarantieRepository.save(groupe)), "Groupe exclusion modifie"));
+    }
+
     @PostMapping("/garanties")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGarantie(@Valid @RequestBody UpsertGarantieRequest request) {
         garantieRepository.findByCode(request.getCode()).ifPresent(existing -> {
@@ -1236,6 +1280,13 @@ public class ReferentielController {
         garantie.setLibelle(request.getLibelle());
         garantie.setDescription(blankToNull(request.getDescription()));
         garantie.setBranche(blankToNull(request.getBranche()) == null ? "Automobile" : blankToNull(request.getBranche()));
+        GroupeExclusionGarantie groupeExclusion = request.getGroupeExclusionId() == null ? null :
+                groupeExclusionGarantieRepository.findById(request.getGroupeExclusionId())
+                        .orElseThrow(() -> new ResourceNotFoundException("GroupeExclusionGarantie", request.getGroupeExclusionId()));
+        if (groupeExclusion != null && groupeExclusion.getTypeGarantie() != typeGarantie) {
+            throw new BadRequestException("Le groupe d'exclusion ne correspond pas au type de garantie");
+        }
+        garantie.setGroupeExclusion(groupeExclusion);
         garantie.setTypeGarantie(typeGarantie);
         garantie.setObligatoire(Boolean.TRUE.equals(request.getObligatoire()));
         garantie.setResponsabiliteCivile(Boolean.TRUE.equals(request.getResponsabiliteCivile()));
@@ -1271,6 +1322,9 @@ public class ReferentielController {
         return option(garantie.getId(), garantie.getCode(), garantie.getLibelle())
                 .putValue("description", garantie.getDescription())
                 .putValue("branche", garantie.getBranche())
+                .putValue("groupeExclusionId", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getId() : null)
+                .putValue("groupeExclusionCode", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getCode() : null)
+                .putValue("groupeExclusionLibelle", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getLibelle() : null)
                 .putValue("typeGarantie", garantie.getTypeGarantie())
                 .putValue("obligatoire", garantie.getObligatoire())
                 .putValue("responsabiliteCivile", garantie.getResponsabiliteCivile())
@@ -1291,6 +1345,20 @@ public class ReferentielController {
                 .putValue("verrouillee", garantie.getVerrouillee())
                 .putValue("ordreAffichage", garantie.getOrdreAffichage())
                 .putValue("actif", garantie.getActif())
+                .map();
+    }
+
+    private void applyGroupeExclusionGarantieRequest(GroupeExclusionGarantie groupe, UpsertGroupeExclusionGarantieRequest request) {
+        groupe.setCode(request.getCode());
+        groupe.setLibelle(request.getLibelle());
+        groupe.setTypeGarantie(request.getTypeGarantie() == null ? TypeGarantie.VEHICULE : request.getTypeGarantie());
+        groupe.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private Map<String, Object> toGroupeExclusionGarantieResponse(GroupeExclusionGarantie groupe) {
+        return option(groupe.getId(), groupe.getCode(), groupe.getLibelle())
+                .putValue("typeGarantie", groupe.getTypeGarantie())
+                .putValue("actif", groupe.getActif())
                 .map();
     }
 

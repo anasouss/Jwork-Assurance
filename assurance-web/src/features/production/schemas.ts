@@ -113,6 +113,7 @@ export const garantieSchema = z.object({
   libelle: z.string().min(2, "Libelle obligatoire"),
   description: z.string().optional(),
   branche: z.string().optional(),
+  groupeExclusionId: z.string().optional(),
   typeGarantie: z.enum(["VEHICULE", "PERSONNE"]),
   obligatoire: z.boolean().optional(),
   responsabiliteCivile: z.boolean().optional(),
@@ -153,6 +154,13 @@ export const garantieSchema = z.object({
   if (value.sourceValeurParDefaut !== "AUCUNE" && !(value.sourcesValeurAutorisees ?? []).includes(value.sourceValeurParDefaut)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["sourceValeurParDefaut"], message: "La source par défaut doit être autorisée" });
   }
+});
+
+export const groupeExclusionGarantieSchema = z.object({
+  code: z.string().min(1, "Code obligatoire"),
+  libelle: z.string().min(2, "Libellé obligatoire"),
+  typeGarantie: z.enum(["VEHICULE", "PERSONNE"]).optional(),
+  actif: z.boolean().optional(),
 });
 
 export const tarifUsageSchema = z.object({

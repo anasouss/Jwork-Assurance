@@ -11,6 +11,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,6 +42,10 @@ public class Garantie extends BaseEntity {
 
     @Column(length = 80)
     private String branche;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "groupe_exclusion_id")
+    private GroupeExclusionGarantie groupeExclusion;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type_garantie", nullable = false, length = 30)

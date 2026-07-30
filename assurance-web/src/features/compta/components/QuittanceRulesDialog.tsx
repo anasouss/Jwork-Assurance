@@ -44,6 +44,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   initialCompanyId?: string;
   initialTypeContrat?: TypeContrat;
+  initialRule?: Rule | null;
 };
 
 type RuleForm = {
@@ -58,10 +59,41 @@ type RuleForm = {
   tauxRetenue?: number;
   dateDebut: string;
   dateFin: string;
+  excelFeuille: string;
+  excelLigneEntete: number;
+  excelColonneNumeroPolice: string;
+  excelColonneNumeroQuittance: string;
+  excelColonneDateEffet: string;
+  excelColonneDateEcheance: string;
+  excelColonnePrimeNette: string;
+  excelColonneTaxes: string;
+  excelColonneAccessoires: string;
+  excelColonneMontantTtc: string;
+  excelColonneCommissionNette: string;
+  excelColonneActe: string;
+  excelColonneCategorie: string;
+  excelColonneStatut: string;
   actif: boolean;
 };
 
 const RULES_PAGE_SIZE = 10;
+
+const DEFAULT_EXCEL_MAPPING = {
+  excelFeuille: "",
+  excelLigneEntete: 1,
+  excelColonneNumeroPolice: "",
+  excelColonneNumeroQuittance: "N° Quittance | No Quittance | Numero Quittance",
+  excelColonneDateEffet: "Date effet | Date d'effet",
+  excelColonneDateEcheance: "Date échéance | Date echeance | Date fin",
+  excelColonnePrimeNette: "Prime nette | P nette",
+  excelColonneTaxes: "Taxe | Taxes | Montant taxes",
+  excelColonneAccessoires: "Accessoires | Accessoire",
+  excelColonneMontantTtc: "Montant TTC | TTC",
+  excelColonneCommissionNette: "Commission nette",
+  excelColonneActe: "Acte | Mouvement",
+  excelColonneCategorie: "Catégorie | Categorie",
+  excelColonneStatut: "Statut",
+};
 
 const EMPTY_FORM: RuleForm = {
   compagnieAssuranceId: "",
@@ -70,6 +102,7 @@ const EMPTY_FORM: RuleForm = {
   retenueParDefaut: false,
   dateDebut: "",
   dateFin: "",
+  ...DEFAULT_EXCEL_MAPPING,
   actif: true,
 };
 
@@ -78,6 +111,7 @@ export function QuittanceRulesDialog({
   onOpenChange,
   initialCompanyId,
   initialTypeContrat,
+  initialRule,
 }: Props) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Rule | null>(null);
@@ -118,7 +152,11 @@ export function QuittanceRulesDialog({
       setPage(0);
       return;
     }
-    if (initialCompanyId || initialTypeContrat) {
+    if (initialRule) {
+      setEditing(initialRule);
+      setForm(ruleToForm(initialRule));
+      setShowForm(true);
+    } else if (initialCompanyId || initialTypeContrat) {
       setForm({
         ...EMPTY_FORM,
         compagnieAssuranceId: initialCompanyId ?? "",
@@ -126,7 +164,7 @@ export function QuittanceRulesDialog({
       });
       setShowForm(true);
     }
-  }, [initialCompanyId, initialTypeContrat, open]);
+  }, [initialCompanyId, initialRule, initialTypeContrat, open]);
 
   useEffect(() => {
     const availablePages = rules.data?.page.totalPages;
@@ -183,20 +221,7 @@ export function QuittanceRulesDialog({
 
   function startEdit(rule: Rule) {
     setEditing(rule);
-    setForm({
-      compagnieAssuranceId: rule.compagnieAssuranceId,
-      typeContrat: rule.typeContrat,
-      modeCalculCommission: rule.modeCalculCommission,
-      tauxCommissionAutomobile: rule.tauxCommissionAutomobile,
-      tauxCommissionEvcat: rule.tauxCommissionEvcat,
-      tauxCommissionCorporel: rule.tauxCommissionCorporel,
-      tauxTvaIncluseCommission: rule.tauxTvaIncluseCommission,
-      retenueParDefaut: rule.retenueParDefaut,
-      tauxRetenue: rule.tauxRetenue,
-      dateDebut: rule.dateDebut,
-      dateFin: rule.dateFin ?? "",
-      actif: rule.actif,
-    });
+    setForm(ruleToForm(rule));
     setShowForm(true);
   }
 
@@ -334,6 +359,109 @@ export function QuittanceRulesDialog({
                   />
                 </Field>
               </div>
+              {form.typeContrat === "FLOTTE" ? (
+                <div className="grid gap-4 border-t pt-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Colonnes de l’import Excel</h3>
+                    <p className="text-sm text-muted-foreground">
+                      La casse, les accents, les espaces et la ponctuation sont ignorés.
+                      Séparez plusieurs titres acceptés avec le caractère |.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <ExcelTitleField
+                      label="Feuille"
+                      value={form.excelFeuille}
+                      placeholder="Première feuille"
+                      onChange={(value) => setForm((current) => ({ ...current, excelFeuille: value }))}
+                    />
+                    <Field label="Ligne d’en-tête" required>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.excelLigneEntete}
+                        onChange={(event) => setForm((current) => ({
+                          ...current,
+                          excelLigneEntete: Number(event.target.value),
+                        }))}
+                      />
+                    </Field>
+                    <ExcelTitleField
+                      label="N° quittance"
+                      required
+                      value={form.excelColonneNumeroQuittance}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneNumeroQuittance: value }))}
+                    />
+                    <ExcelTitleField
+                      label="N° police"
+                      value={form.excelColonneNumeroPolice}
+                      placeholder="Optionnel"
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneNumeroPolice: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Date effet"
+                      required
+                      value={form.excelColonneDateEffet}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneDateEffet: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Date échéance"
+                      value={form.excelColonneDateEcheance}
+                      placeholder="Optionnel"
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneDateEcheance: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Prime nette"
+                      required
+                      value={form.excelColonnePrimeNette}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonnePrimeNette: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Taxes"
+                      required
+                      value={form.excelColonneTaxes}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneTaxes: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Accessoires"
+                      required
+                      value={form.excelColonneAccessoires}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneAccessoires: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Montant TTC"
+                      required
+                      value={form.excelColonneMontantTtc}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneMontantTtc: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Commission nette"
+                      required
+                      value={form.excelColonneCommissionNette}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneCommissionNette: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Acte"
+                      value={form.excelColonneActe}
+                      placeholder="Optionnel"
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneActe: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Catégorie"
+                      value={form.excelColonneCategorie}
+                      placeholder="Optionnel"
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneCategorie: value }))}
+                    />
+                    <ExcelTitleField
+                      label="Statut"
+                      value={form.excelColonneStatut}
+                      placeholder="Optionnel"
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneStatut: value }))}
+                    />
+                  </div>
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-center gap-6">
                 <CheckField
                   checked={form.retenueParDefaut}
@@ -523,6 +651,30 @@ function RateField({
   );
 }
 
+function ExcelTitleField({
+  label,
+  value,
+  placeholder,
+  required,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  required?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field label={label} required={required}>
+      <Input
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </Field>
+  );
+}
+
 function CheckField({
   checked,
   label,
@@ -552,19 +704,66 @@ function isComplete(form: RuleForm) {
         form.tauxTvaIncluseCommission != null
       )
     );
+  const excelComplete =
+    form.typeContrat !== "FLOTTE" ||
+    (
+      form.excelLigneEntete >= 1 &&
+      Boolean(
+        form.excelColonneNumeroQuittance.trim() &&
+        form.excelColonneDateEffet.trim() &&
+        form.excelColonnePrimeNette.trim() &&
+        form.excelColonneTaxes.trim() &&
+        form.excelColonneAccessoires.trim() &&
+        form.excelColonneMontantTtc.trim() &&
+        form.excelColonneCommissionNette.trim()
+      )
+    );
   return Boolean(
     form.compagnieAssuranceId &&
       form.dateDebut &&
       commissionComplete &&
+      excelComplete &&
       form.tauxRetenue != null &&
       (!form.dateFin || form.dateFin >= form.dateDebut)
   );
+}
+
+function ruleToForm(rule: Rule): RuleForm {
+  return {
+    compagnieAssuranceId: rule.compagnieAssuranceId,
+    typeContrat: rule.typeContrat,
+    modeCalculCommission: rule.modeCalculCommission,
+    tauxCommissionAutomobile: rule.tauxCommissionAutomobile,
+    tauxCommissionEvcat: rule.tauxCommissionEvcat,
+    tauxCommissionCorporel: rule.tauxCommissionCorporel,
+    tauxTvaIncluseCommission: rule.tauxTvaIncluseCommission,
+    retenueParDefaut: rule.retenueParDefaut,
+    tauxRetenue: rule.tauxRetenue,
+    dateDebut: rule.dateDebut,
+    dateFin: rule.dateFin ?? "",
+    excelFeuille: rule.excelFeuille ?? "",
+    excelLigneEntete: rule.excelLigneEntete ?? 1,
+    excelColonneNumeroPolice: rule.excelColonneNumeroPolice ?? "",
+    excelColonneNumeroQuittance: rule.excelColonneNumeroQuittance ?? "",
+    excelColonneDateEffet: rule.excelColonneDateEffet ?? "",
+    excelColonneDateEcheance: rule.excelColonneDateEcheance ?? "",
+    excelColonnePrimeNette: rule.excelColonnePrimeNette ?? "",
+    excelColonneTaxes: rule.excelColonneTaxes ?? "",
+    excelColonneAccessoires: rule.excelColonneAccessoires ?? "",
+    excelColonneMontantTtc: rule.excelColonneMontantTtc ?? "",
+    excelColonneCommissionNette: rule.excelColonneCommissionNette ?? "",
+    excelColonneActe: rule.excelColonneActe ?? "",
+    excelColonneCategorie: rule.excelColonneCategorie ?? "",
+    excelColonneStatut: rule.excelColonneStatut ?? "",
+    actif: rule.actif,
+  };
 }
 
 function toRequest(form: RuleForm): RuleRequest {
   if (!isComplete(form)) {
     throw new Error("Complétez tous les paramètres obligatoires");
   }
+  const isFleet = form.typeContrat === "FLOTTE";
   return {
     compagnieAssuranceId: form.compagnieAssuranceId,
     typeContrat: form.typeContrat,
@@ -581,6 +780,20 @@ function toRequest(form: RuleForm): RuleRequest {
     tauxRetenue: form.tauxRetenue!,
     dateDebut: form.dateDebut,
     dateFin: form.dateFin || null,
+    excelFeuille: isFleet ? form.excelFeuille.trim() || null : null,
+    excelLigneEntete: isFleet ? form.excelLigneEntete : 1,
+    excelColonneNumeroPolice: isFleet ? form.excelColonneNumeroPolice.trim() || null : null,
+    excelColonneNumeroQuittance: isFleet ? form.excelColonneNumeroQuittance.trim() || null : null,
+    excelColonneDateEffet: isFleet ? form.excelColonneDateEffet.trim() || null : null,
+    excelColonneDateEcheance: isFleet ? form.excelColonneDateEcheance.trim() || null : null,
+    excelColonnePrimeNette: isFleet ? form.excelColonnePrimeNette.trim() || null : null,
+    excelColonneTaxes: isFleet ? form.excelColonneTaxes.trim() || null : null,
+    excelColonneAccessoires: isFleet ? form.excelColonneAccessoires.trim() || null : null,
+    excelColonneMontantTtc: isFleet ? form.excelColonneMontantTtc.trim() || null : null,
+    excelColonneCommissionNette: isFleet ? form.excelColonneCommissionNette.trim() || null : null,
+    excelColonneActe: isFleet ? form.excelColonneActe.trim() || null : null,
+    excelColonneCategorie: isFleet ? form.excelColonneCategorie.trim() || null : null,
+    excelColonneStatut: isFleet ? form.excelColonneStatut.trim() || null : null,
     actif: form.actif,
   };
 }

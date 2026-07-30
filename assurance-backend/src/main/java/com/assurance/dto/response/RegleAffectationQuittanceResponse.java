@@ -26,5 +26,19 @@ public class RegleAffectationQuittanceResponse {
     private BigDecimal tauxRetenue;
     private LocalDate dateDebut;
     private LocalDate dateFin;
+    private String excelFeuille;
+    private Integer excelLigneEntete;
+    private String excelColonneNumeroPolice;
+    private String excelColonneNumeroQuittance;
+    private String excelColonneDateEffet;
+    private String excelColonneDateEcheance;
+    private String excelColonnePrimeNette;
+    private String excelColonneTaxes;
+    private String excelColonneAccessoires;
+    private String excelColonneMontantTtc;
+    private String excelColonneCommissionNette;
+    private String excelColonneActe;
+    private String excelColonneCategorie;
+    private String excelColonneStatut;
     private Boolean actif;
 }

@@ -79,6 +79,49 @@ public class RegleAffectationQuittance extends BaseEntity {
     @Column(name = "date_fin")
     private LocalDate dateFin;
 
+    @Column(name = "excel_feuille", length = 120)
+    private String excelFeuille;
+
+    @Builder.Default
+    @Column(name = "excel_ligne_entete", nullable = false)
+    private Integer excelLigneEntete = 1;
+
+    @Column(name = "excel_colonne_numero_police", length = 500)
+    private String excelColonneNumeroPolice;
+
+    @Column(name = "excel_colonne_numero_quittance", length = 500)
+    private String excelColonneNumeroQuittance;
+
+    @Column(name = "excel_colonne_date_effet", length = 500)
+    private String excelColonneDateEffet;
+
+    @Column(name = "excel_colonne_date_echeance", length = 500)
+    private String excelColonneDateEcheance;
+
+    @Column(name = "excel_colonne_prime_nette", length = 500)
+    private String excelColonnePrimeNette;
+
+    @Column(name = "excel_colonne_taxes", length = 500)
+    private String excelColonneTaxes;
+
+    @Column(name = "excel_colonne_accessoires", length = 500)
+    private String excelColonneAccessoires;
+
+    @Column(name = "excel_colonne_montant_ttc", length = 500)
+    private String excelColonneMontantTtc;
+
+    @Column(name = "excel_colonne_commission_nette", length = 500)
+    private String excelColonneCommissionNette;
+
+    @Column(name = "excel_colonne_acte", length = 500)
+    private String excelColonneActe;
+
+    @Column(name = "excel_colonne_categorie", length = 500)
+    private String excelColonneCategorie;
+
+    @Column(name = "excel_colonne_statut", length = 500)
+    private String excelColonneStatut;
+
     @Builder.Default
     @Column(nullable = false)
     private Boolean actif = true;

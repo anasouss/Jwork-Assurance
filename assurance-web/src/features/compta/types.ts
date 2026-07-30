@@ -28,6 +28,20 @@ export type Rule = {
   tauxRetenue: number;
   dateDebut: string;
   dateFin?: string | null;
+  excelFeuille?: string | null;
+  excelLigneEntete: number;
+  excelColonneNumeroPolice?: string | null;
+  excelColonneNumeroQuittance?: string | null;
+  excelColonneDateEffet?: string | null;
+  excelColonneDateEcheance?: string | null;
+  excelColonnePrimeNette?: string | null;
+  excelColonneTaxes?: string | null;
+  excelColonneAccessoires?: string | null;
+  excelColonneMontantTtc?: string | null;
+  excelColonneCommissionNette?: string | null;
+  excelColonneActe?: string | null;
+  excelColonneCategorie?: string | null;
+  excelColonneStatut?: string | null;
   actif: boolean;
 };
 

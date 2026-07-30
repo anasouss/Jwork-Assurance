@@ -675,13 +675,15 @@ public class AffectationQuittanceService {
             if (workbook.getNumberOfSheets() == 0) {
                 throw new BadRequestException("Le fichier Excel ne contient aucune feuille");
             }
-            Sheet sheet = workbook.getSheetAt(0);
-            Row headerRow = sheet.getRow(sheet.getFirstRowNum());
+            Sheet sheet = resolveImportSheet(workbook, regle);
+            int headerRowIndex = regle.getExcelLigneEntete() - 1;
+            Row headerRow = sheet.getRow(headerRowIndex);
             if (headerRow == null) {
-                throw new BadRequestException("L'en-tête du fichier Excel est manquant");
+                throw new BadRequestException(
+                        "L'en-tête Excel est manquant à la ligne " + regle.getExcelLigneEntete()
+                );
             }
-            Map<String, Integer> columns = readHeaders(headerRow);
-            requireColumns(columns);
+            Map<String, Integer> columns = resolveImportColumns(readHeaders(headerRow), regle);
             String expectedPolicy = normalizeIdentifier(quittance.getContrat().getNumeroPolice());
 
             for (int rowIndex = headerRow.getRowNum() + 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
@@ -692,7 +694,9 @@ public class AffectationQuittanceService {
                 try {
                     String number = requiredText(row, columns, "noquittance", rowIndex);
                     String policy = text(row, columns, "nopolice");
-                    if (expectedPolicy != null && !expectedPolicy.equals(normalizeIdentifier(policy))) {
+                    if (columns.containsKey("nopolice")
+                            && expectedPolicy != null
+                            && !expectedPolicy.equals(normalizeIdentifier(policy))) {
                         throw new BadRequestException("la police " + policy + " ne correspond pas à " + quittance.getContrat().getNumeroPolice());
                     }
                     if (!numbers.add(number.trim().toUpperCase(Locale.ROOT))) {
@@ -752,6 +756,18 @@ public class AffectationQuittanceService {
         return new ParsedImport(lines, errors);
     }
 
+    private Sheet resolveImportSheet(Workbook workbook, RegleAffectationQuittance regle) {
+        String configuredSheet = trimToNull(regle.getExcelFeuille());
+        if (configuredSheet == null) {
+            return workbook.getSheetAt(0);
+        }
+        Sheet sheet = workbook.getSheet(configuredSheet);
+        if (sheet == null) {
+            throw new BadRequestException("La feuille Excel « " + configuredSheet + " » est introuvable");
+        }
+        return sheet;
+    }
+
     private Map<String, Integer> readHeaders(Row row) {
         Map<String, Integer> columns = new HashMap<>();
         DataFormatter formatter = new DataFormatter(Locale.FRANCE);
@@ -764,24 +780,55 @@ public class AffectationQuittanceService {
         return columns;
     }
 
-    private void requireColumns(Map<String, Integer> columns) {
+    private Map<String, Integer> resolveImportColumns(
+            Map<String, Integer> sourceColumns,
+            RegleAffectationQuittance regle
+    ) {
+        Map<String, Integer> columns = new HashMap<>();
         List<String> missing = new ArrayList<>();
-        requireColumn(columns, missing, "N° Police", "nopolice");
-        requireColumn(columns, missing, "N° Quittance", "noquittance");
-        requireColumn(columns, missing, "Date effet", "dateeffet");
-        requireColumn(columns, missing, "Prime nette", "primenette");
-        requireColumn(columns, missing, "Taxe", "taxe");
-        requireColumn(columns, missing, "Accessoires", "accessoires");
-        requireColumn(columns, missing, "Montant TTC", "montantttc");
-        requireColumn(columns, missing, "Commission nette", "commissionnette");
+        resolveImportColumn(sourceColumns, columns, missing, "nopolice", regle.getExcelColonneNumeroPolice(), false);
+        resolveImportColumn(sourceColumns, columns, missing, "noquittance", regle.getExcelColonneNumeroQuittance(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "dateeffet", regle.getExcelColonneDateEffet(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "datefin", regle.getExcelColonneDateEcheance(), false);
+        resolveImportColumn(sourceColumns, columns, missing, "primenette", regle.getExcelColonnePrimeNette(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "taxe", regle.getExcelColonneTaxes(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "accessoires", regle.getExcelColonneAccessoires(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "montantttc", regle.getExcelColonneMontantTtc(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "commissionnette", regle.getExcelColonneCommissionNette(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "acte", regle.getExcelColonneActe(), false);
+        resolveImportColumn(sourceColumns, columns, missing, "categorie", regle.getExcelColonneCategorie(), false);
+        resolveImportColumn(sourceColumns, columns, missing, "statut", regle.getExcelColonneStatut(), false);
         if (!missing.isEmpty()) {
             throw new BadRequestException("Colonnes Excel manquantes : " + String.join(", ", missing));
         }
+        return columns;
     }
 
-    private void requireColumn(Map<String, Integer> columns, List<String> missing, String label, String key) {
-        if (!columns.containsKey(key)) {
-            missing.add(label);
+    private void resolveImportColumn(
+            Map<String, Integer> sourceColumns,
+            Map<String, Integer> resolvedColumns,
+            List<String> missing,
+            String key,
+            String configuredTitles,
+            boolean required
+    ) {
+        String titles = trimToNull(configuredTitles);
+        if (titles == null) {
+            if (required) {
+                missing.add(key);
+            }
+            return;
+        }
+        for (String title : titles.split("\\|")) {
+            String normalized = normalizeHeader(title);
+            Integer index = sourceColumns.get(normalized);
+            if (!normalized.isBlank() && index != null) {
+                resolvedColumns.put(key, index);
+                return;
+            }
+        }
+        if (required) {
+            missing.add(titles.replace("|", " / "));
         }
     }
 
@@ -886,6 +933,9 @@ public class AffectationQuittanceService {
                     "Les taux de commission par catégorie ne s'appliquent pas aux quittances flotte"
             );
         }
+        if (request.getTypeContrat() == TypeContrat.FLOTTE) {
+            validateExcelImportConfiguration(request);
+        }
         if (request.getTypeContrat() != TypeContrat.FLOTTE
                 && request.getModeAffectation() != ModeAffectationQuittance.AUTOMATIQUE) {
             throw new BadRequestException("Une règle Mono ou Convention doit utiliser le mode automatique");
@@ -907,6 +957,62 @@ public class AffectationQuittanceService {
         );
         if (Boolean.TRUE.equals(request.getActif()) && overlaps > 0) {
             throw new BadRequestException("Une règle active existe déjà sur cette période");
+        }
+    }
+
+    private void validateExcelImportConfiguration(UpsertRegleAffectationQuittanceRequest request) {
+        if (request.getExcelLigneEntete() == null || request.getExcelLigneEntete() < 1) {
+            throw new BadRequestException("La ligne d'en-tête Excel doit être supérieure ou égale à 1");
+        }
+        Map<String, String> required = new LinkedHashMap<>();
+        required.put("N° quittance", request.getExcelColonneNumeroQuittance());
+        required.put("Date effet", request.getExcelColonneDateEffet());
+        required.put("Prime nette", request.getExcelColonnePrimeNette());
+        required.put("Taxes", request.getExcelColonneTaxes());
+        required.put("Accessoires", request.getExcelColonneAccessoires());
+        required.put("Montant TTC", request.getExcelColonneMontantTtc());
+        required.put("Commission nette", request.getExcelColonneCommissionNette());
+        List<String> missing = required.entrySet().stream()
+                .filter(entry -> trimToNull(entry.getValue()) == null)
+                .map(Map.Entry::getKey)
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new BadRequestException(
+                    "Titres Excel obligatoires manquants : " + String.join(", ", missing)
+            );
+        }
+        Map<String, String> configuredAliases = new HashMap<>();
+        registerExcelAliases(configuredAliases, "N° police", request.getExcelColonneNumeroPolice());
+        registerExcelAliases(configuredAliases, "N° quittance", request.getExcelColonneNumeroQuittance());
+        registerExcelAliases(configuredAliases, "Date effet", request.getExcelColonneDateEffet());
+        registerExcelAliases(configuredAliases, "Date échéance", request.getExcelColonneDateEcheance());
+        registerExcelAliases(configuredAliases, "Prime nette", request.getExcelColonnePrimeNette());
+        registerExcelAliases(configuredAliases, "Taxes", request.getExcelColonneTaxes());
+        registerExcelAliases(configuredAliases, "Accessoires", request.getExcelColonneAccessoires());
+        registerExcelAliases(configuredAliases, "Montant TTC", request.getExcelColonneMontantTtc());
+        registerExcelAliases(configuredAliases, "Commission nette", request.getExcelColonneCommissionNette());
+        registerExcelAliases(configuredAliases, "Acte", request.getExcelColonneActe());
+        registerExcelAliases(configuredAliases, "Catégorie", request.getExcelColonneCategorie());
+        registerExcelAliases(configuredAliases, "Statut", request.getExcelColonneStatut());
+    }
+
+    private void registerExcelAliases(Map<String, String> aliases, String field, String configuredTitles) {
+        String titles = trimToNull(configuredTitles);
+        if (titles == null) {
+            return;
+        }
+        for (String title : titles.split("\\|")) {
+            String normalized = normalizeHeader(title);
+            if (normalized.isBlank()) {
+                continue;
+            }
+            String existingField = aliases.putIfAbsent(normalized, field);
+            if (existingField != null && !existingField.equals(field)) {
+                throw new BadRequestException(
+                        "Le titre Excel « " + title.trim() + " » est affecté à "
+                                + existingField + " et " + field
+                );
+            }
         }
     }
 
@@ -952,6 +1058,20 @@ public class AffectationQuittanceService {
         entity.setTauxRetenue(request.getTauxRetenue());
         entity.setDateDebut(request.getDateDebut());
         entity.setDateFin(request.getDateFin());
+        entity.setExcelFeuille(trimToNull(request.getExcelFeuille()));
+        entity.setExcelLigneEntete(request.getExcelLigneEntete() != null ? request.getExcelLigneEntete() : 1);
+        entity.setExcelColonneNumeroPolice(trimToNull(request.getExcelColonneNumeroPolice()));
+        entity.setExcelColonneNumeroQuittance(trimToNull(request.getExcelColonneNumeroQuittance()));
+        entity.setExcelColonneDateEffet(trimToNull(request.getExcelColonneDateEffet()));
+        entity.setExcelColonneDateEcheance(trimToNull(request.getExcelColonneDateEcheance()));
+        entity.setExcelColonnePrimeNette(trimToNull(request.getExcelColonnePrimeNette()));
+        entity.setExcelColonneTaxes(trimToNull(request.getExcelColonneTaxes()));
+        entity.setExcelColonneAccessoires(trimToNull(request.getExcelColonneAccessoires()));
+        entity.setExcelColonneMontantTtc(trimToNull(request.getExcelColonneMontantTtc()));
+        entity.setExcelColonneCommissionNette(trimToNull(request.getExcelColonneCommissionNette()));
+        entity.setExcelColonneActe(trimToNull(request.getExcelColonneActe()));
+        entity.setExcelColonneCategorie(trimToNull(request.getExcelColonneCategorie()));
+        entity.setExcelColonneStatut(trimToNull(request.getExcelColonneStatut()));
         entity.setActif(request.getActif());
     }
 
@@ -971,6 +1091,20 @@ public class AffectationQuittanceService {
                 .tauxRetenue(entity.getTauxRetenue())
                 .dateDebut(entity.getDateDebut())
                 .dateFin(entity.getDateFin())
+                .excelFeuille(entity.getExcelFeuille())
+                .excelLigneEntete(entity.getExcelLigneEntete())
+                .excelColonneNumeroPolice(entity.getExcelColonneNumeroPolice())
+                .excelColonneNumeroQuittance(entity.getExcelColonneNumeroQuittance())
+                .excelColonneDateEffet(entity.getExcelColonneDateEffet())
+                .excelColonneDateEcheance(entity.getExcelColonneDateEcheance())
+                .excelColonnePrimeNette(entity.getExcelColonnePrimeNette())
+                .excelColonneTaxes(entity.getExcelColonneTaxes())
+                .excelColonneAccessoires(entity.getExcelColonneAccessoires())
+                .excelColonneMontantTtc(entity.getExcelColonneMontantTtc())
+                .excelColonneCommissionNette(entity.getExcelColonneCommissionNette())
+                .excelColonneActe(entity.getExcelColonneActe())
+                .excelColonneCategorie(entity.getExcelColonneCategorie())
+                .excelColonneStatut(entity.getExcelColonneStatut())
                 .actif(entity.getActif())
                 .build();
     }

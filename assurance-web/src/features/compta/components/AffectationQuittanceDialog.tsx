@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileSpreadsheet, Plus, Trash2, Upload } from "lucide-react";
+import { FileSpreadsheet, Plus, Settings2, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -45,6 +45,7 @@ type Props = {
   open: boolean;
   readOnly?: boolean;
   onOpenChange: (open: boolean) => void;
+  onConfigureRule?: (data: QuittanceAllocation) => void;
 };
 
 type FleetMode = "MANUEL" | "IMPORT";
@@ -67,7 +68,13 @@ type FleetLine = {
   netCompagnie?: number;
 };
 
-export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false, onOpenChange }: Props) {
+export function AffectationQuittanceDialog({
+  quittanceId,
+  open,
+  readOnly = false,
+  onOpenChange,
+  onConfigureRule,
+}: Props) {
   const queryClient = useQueryClient();
   const [avecRetenue, setAvecRetenue] = useState<boolean | undefined>();
   const [numero, setNumero] = useState("");
@@ -283,28 +290,52 @@ export function AffectationQuittanceDialog({ quittanceId, open, readOnly = false
                     <FleetLinesEditor lines={fleetLines} onChange={setFleetLines} readOnly={readOnly} />
                   </TabsContent>
                   <TabsContent value="IMPORT" className="grid gap-4 pt-3">
-                    {!readOnly ? <div className="flex flex-wrap items-end gap-3 border-y py-4">
-                      <Field label="Fichier Excel (.xlsx)">
-                        <Input
-                          type="file"
-                          accept=".xlsx"
-                          onChange={(event) => {
-                            setFile(event.target.files?.[0] ?? null);
-                            setImportPreview(null);
-                            setFleetLines([]);
-                          }}
-                        />
-                      </Field>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!file || previewFile.isPending}
-                        onClick={() => previewFile.mutate()}
-                      >
-                        <Upload className="size-4" />
-                        Analyser le fichier
-                      </Button>
-                    </div> : null}
+                    {!readOnly ? (
+                      <div className="grid gap-3 border-y py-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">Profil Excel compagnie</p>
+                            <p className="text-sm text-muted-foreground">
+                              Feuille {detailData.regle?.excelFeuille || "1"} · en-tête ligne{" "}
+                              {detailData.regle?.excelLigneEntete ?? 1}
+                            </p>
+                          </div>
+                          {onConfigureRule ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onConfigureRule(detailData)}
+                            >
+                              <Settings2 className="size-4" />
+                              Configurer les colonnes
+                            </Button>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap items-end gap-3">
+                          <Field label="Fichier Excel (.xlsx)">
+                            <Input
+                              type="file"
+                              accept=".xlsx"
+                              onChange={(event) => {
+                                setFile(event.target.files?.[0] ?? null);
+                                setImportPreview(null);
+                                setFleetLines([]);
+                              }}
+                            />
+                          </Field>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!file || previewFile.isPending}
+                            onClick={() => previewFile.mutate()}
+                          >
+                            <Upload className="size-4" />
+                            Analyser le fichier
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                     {importPreview ? <ImportResult preview={importPreview} /> : null}
                     {fleetLines.length ? (
                       <FleetLinesEditor lines={fleetLines} onChange={setFleetLines} imported readOnly={readOnly} />

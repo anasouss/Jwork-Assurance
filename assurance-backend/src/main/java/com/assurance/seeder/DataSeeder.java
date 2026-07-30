@@ -382,7 +382,7 @@ public class DataSeeder implements CommandLineRunner {
             String tauxTvaIncluse,
             LocalDate dateDebut
     ) {
-        return RegleAffectationQuittance.builder()
+        RegleAffectationQuittance regle = RegleAffectationQuittance.builder()
                 .agence(agence)
                 .compagnieAssurance(compagnie)
                 .typeContrat(typeContrat)
@@ -395,8 +395,23 @@ public class DataSeeder implements CommandLineRunner {
                 .retenueParDefaut(false)
                 .tauxRetenue(new BigDecimal("5"))
                 .dateDebut(dateDebut)
+                .excelLigneEntete(1)
                 .actif(true)
                 .build();
+        if (typeContrat == TypeContrat.FLOTTE) {
+            regle.setExcelColonneNumeroQuittance("N° Quittance | No Quittance | Numero Quittance");
+            regle.setExcelColonneDateEffet("Date effet | Date d'effet");
+            regle.setExcelColonneDateEcheance("Date échéance | Date echeance | Date fin");
+            regle.setExcelColonnePrimeNette("Prime nette | P nette");
+            regle.setExcelColonneTaxes("Taxe | Taxes | Montant taxes");
+            regle.setExcelColonneAccessoires("Accessoires | Accessoire");
+            regle.setExcelColonneMontantTtc("Montant TTC | TTC");
+            regle.setExcelColonneCommissionNette("Commission nette");
+            regle.setExcelColonneActe("Acte | Mouvement");
+            regle.setExcelColonneCategorie("Catégorie | Categorie");
+            regle.setExcelColonneStatut("Statut");
+        }
+        return regle;
     }
 
     private Permission seedPermission(String code, String nom, String module) {

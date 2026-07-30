@@ -26,6 +26,7 @@ import { QuittanceRulesDialog } from "../components/QuittanceRulesDialog";
 import type {
   CategorieMouvement,
   QuittanceAllocation,
+  Rule,
   StatutAffectation,
   TypeContrat,
 } from "../types";
@@ -61,7 +62,11 @@ export default function QuittanceAffectationPage() {
   const [selectedQuittanceId, setSelectedQuittanceId] = useState<string>();
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [ruleTarget, setRuleTarget] = useState<Pick<QuittanceAllocation, "compagnieId" | "typeContrat">>();
+  const [ruleTarget, setRuleTarget] = useState<{
+    compagnieId?: string | null;
+    typeContrat: TypeContrat;
+    rule?: Rule | null;
+  }>();
 
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance", "compta"],
@@ -367,6 +372,16 @@ export default function QuittanceAffectationPage() {
         quittanceId={selectedQuittanceId}
         open={allocationOpen}
         readOnly={!canAffect}
+        onConfigureRule={(data) => {
+          setAllocationOpen(false);
+          setSelectedQuittanceId(undefined);
+          setRuleTarget({
+            compagnieId: data.compagnieId,
+            typeContrat: data.typeContrat,
+            rule: data.regle,
+          });
+          setRulesOpen(true);
+        }}
         onOpenChange={(value) => {
           setAllocationOpen(value);
           if (!value) setSelectedQuittanceId(undefined);
@@ -380,6 +395,7 @@ export default function QuittanceAffectationPage() {
         }}
         initialCompanyId={ruleTarget?.compagnieId ?? undefined}
         initialTypeContrat={ruleTarget?.typeContrat}
+        initialRule={ruleTarget?.rule}
       />
     </div>
   );

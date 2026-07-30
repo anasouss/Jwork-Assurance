@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Info, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { SectionCard } from "./SectionCard";
@@ -498,26 +500,34 @@ export function ClientSection({
                     />
                   </div>
                   {showProprietaireConducteur ? (
-                    <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
-                      <div className="flex items-end gap-3 pb-2 text-sm md:col-span-2">
-                        <span>Le propriétaire est-il lui-même le conducteur ?</span>
-                        <label className="flex items-center gap-1">
-                          <Checkbox
-                            checked={proprietorIsDriver}
-                            disabled={morale}
-                            onCheckedChange={(checked) => setProprietaireConducteur(index, Boolean(checked))}
-                          />
-                          Oui
-                        </label>
-                        <label className="flex items-center gap-1">
-                          <Checkbox
-                            checked={!proprietorIsDriver}
-                            onCheckedChange={(checked) => setProprietaireConducteur(index, !Boolean(checked))}
-                          />
-                          Non
-                        </label>
+                    morale ? (
+                      <Alert className="mt-3 max-w-5xl border-sky-200 bg-sky-50/70 text-sky-950">
+                        <Info />
+                        <AlertDescription className="text-sky-900">
+                          Une personne morale ne peut pas être conducteur. Renseignez le conducteur habituel ci-dessous.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-2 text-sm md:col-span-2">
+                          <span className="font-medium">Le propriétaire est-il lui-même le conducteur ?</span>
+                          <RadioGroup
+                            className="flex items-center gap-5"
+                            value={proprietorIsDriver ? "oui" : "non"}
+                            onValueChange={(value) => setProprietaireConducteur(index, value === "oui")}
+                          >
+                            <label className="flex cursor-pointer items-center gap-2">
+                              <RadioGroupItem value="oui" />
+                              Oui
+                            </label>
+                            <label className="flex cursor-pointer items-center gap-2">
+                              <RadioGroupItem value="non" />
+                              Non
+                            </label>
+                          </RadioGroup>
+                        </div>
                       </div>
-                    </div>
+                    )
                   ) : null}
                   {showProprietairePermisFields ? (
                     <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">

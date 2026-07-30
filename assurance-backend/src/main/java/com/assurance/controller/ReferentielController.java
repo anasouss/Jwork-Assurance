@@ -1273,7 +1273,16 @@ public class ReferentielController {
         LinkedHashSet<SourceValeurGarantie> sources = new LinkedHashSet<>(
                 request.getSourcesValeurAutorisees() == null ? Set.of() : request.getSourcesValeurAutorisees()
         );
+        boolean saisieManuelleAutorisee = Boolean.TRUE.equals(request.getSaisieManuelleAutorisee());
+        if (saisieManuelleAutorisee) {
+            sources.add(SourceValeurGarantie.MANUEL);
+        } else {
+            sources.remove(SourceValeurGarantie.MANUEL);
+        }
         SourceValeurGarantie sourceParDefaut = request.getSourceValeurParDefaut() == null ? SourceValeurGarantie.AUCUNE : request.getSourceValeurParDefaut();
+        if (!saisieManuelleAutorisee && sourceParDefaut == SourceValeurGarantie.MANUEL) {
+            sourceParDefaut = SourceValeurGarantie.AUCUNE;
+        }
         if (sourceParDefaut != SourceValeurGarantie.AUCUNE && !sources.contains(sourceParDefaut)) {
             throw new BadRequestException("La source de valeur par defaut doit faire partie des sources autorisees");
         }
@@ -1308,7 +1317,7 @@ public class ReferentielController {
         garantie.setSourceValeurParDefaut(sourceParDefaut);
         garantie.getSourcesValeurAutorisees().clear();
         garantie.getSourcesValeurAutorisees().addAll(sources);
-        garantie.setSaisieManuelleAutorisee(Boolean.TRUE.equals(request.getSaisieManuelleAutorisee()));
+        garantie.setSaisieManuelleAutorisee(saisieManuelleAutorisee);
         garantie.setVerrouillee(Boolean.TRUE.equals(request.getVerrouillee()));
         garantie.setOrdreAffichage(request.getOrdreAffichage());
         garantie.setActif(request.getActif() == null ? true : request.getActif());

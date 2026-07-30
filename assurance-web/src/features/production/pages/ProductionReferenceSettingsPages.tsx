@@ -758,6 +758,24 @@ export function GarantiesSettingsPage() {
     });
   };
 
+  const setManualEntryAllowed = (checked: boolean) => {
+    setPayload((current) => {
+      const sourcesValeurAutorisees = toggleArray(
+        current.sourcesValeurAutorisees ?? [],
+        "MANUEL",
+        checked
+      );
+      return {
+        ...current,
+        saisieManuelleAutorisee: checked,
+        sourcesValeurAutorisees,
+        sourceValeurParDefaut: !checked && current.sourceValeurParDefaut === "MANUEL"
+          ? "AUCUNE"
+          : current.sourceValeurParDefaut,
+      };
+    });
+  };
+
   const applyType = (typeGarantie: string) => {
     if (typeGarantie === "PERSONNE") {
       update({
@@ -939,7 +957,7 @@ export function GarantiesSettingsPage() {
               <Flag label="Taux franchise" checked={payload.avecFranchise} onChange={(value) => update({ avecFranchise: value, avecFranchiseMinimale: value ? payload.avecFranchiseMinimale : false })} />
               <Flag label="Franchise minimale" checked={payload.avecFranchiseMinimale} onChange={(value) => update({ avecFranchiseMinimale: value, avecFranchise: value ? true : payload.avecFranchise })} />
               <Flag label="Tarification multiple" checked={(payload.modesTarificationMultiple ?? []).length > 0} onChange={setTarificationMultiple} />
-              <Flag label="Saisie manuelle" checked={payload.saisieManuelleAutorisee} onChange={(value) => update({ saisieManuelleAutorisee: value })} />
+              <Flag label="Saisie manuelle" checked={payload.saisieManuelleAutorisee} onChange={setManualEntryAllowed} />
               <Flag label="Verrouillée" checked={payload.verrouillee} onChange={(value) => update({ verrouillee: value })} />
               <Flag label="Active" checked={payload.actif} onChange={(value) => update({ actif: value })} />
             </div>
@@ -992,7 +1010,7 @@ export function GarantiesSettingsPage() {
                 </div>
                 <div className="text-xs font-medium text-muted-foreground">Sources autorisées pour calculer le capital</div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {SOURCES_VALEUR.map((source) => (
+                  {SOURCES_VALEUR.filter((source) => source !== "MANUEL").map((source) => (
                     <Flag
                       key={source}
                       label={sourceChoiceLabel(source)}
@@ -1852,6 +1870,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
       modeParDefaut: "PROTECTION",
       sourcesValeurAutorisees: [],
       sourceValeurParDefaut: "AUCUNE",
+      saisieManuelleAutorisee: false,
       requiertValeurVenale: false,
       requiertValeurNeuf: false,
       requiertValeurGlace: false,
@@ -1863,7 +1882,13 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     };
   }
 
-  const sourcesValeurAutorisees = (payload.sourcesValeurAutorisees ?? []).filter((source) => SOURCES_VALEUR.includes(source as typeof SOURCES_VALEUR[number]));
+  const saisieManuelleAutorisee = Boolean(payload.saisieManuelleAutorisee);
+  const sourcesValeurAutorisees = (payload.sourcesValeurAutorisees ?? [])
+    .filter((source) => SOURCES_VALEUR.includes(source as typeof SOURCES_VALEUR[number]))
+    .filter((source) => source !== "MANUEL");
+  if (saisieManuelleAutorisee) {
+    sourcesValeurAutorisees.push("MANUEL");
+  }
   const sourceValeurParDefaut = payload.sourceValeurParDefaut && (payload.sourceValeurParDefaut === "AUCUNE" || sourcesValeurAutorisees.includes(payload.sourceValeurParDefaut))
     ? payload.sourceValeurParDefaut
     : "AUCUNE";
@@ -1879,6 +1904,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     modesTarificationMultiple: normalizedMultipleModes,
     sourcesValeurAutorisees,
     sourceValeurParDefaut,
+    saisieManuelleAutorisee,
   };
 }
 

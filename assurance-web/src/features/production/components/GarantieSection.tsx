@@ -867,8 +867,9 @@ function resolveRcCapital(vehicule: VehiculeInput | undefined, usages: Reference
 }
 
 function defaultSource(garantie: ReferenceOption) {
-  if (garantie.sourceValeurParDefaut) {
-    return String(garantie.sourceValeurParDefaut);
+  const configuredSource = String(garantie.sourceValeurParDefaut ?? "").toUpperCase();
+  if (configuredSource && (configuredSource !== "MANUEL" || garantie.saisieManuelleAutorisee)) {
+    return configuredSource;
   }
   if (garantie.requiertValeurVenale) {
     return "VENALE";
@@ -937,7 +938,7 @@ function selectedValueSource(garantie: ReferenceOption, item?: GarantieInput, li
     return "AUCUNE";
   }
   const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
-  if (selected === "MANUEL") {
+  if (selected === "MANUEL" && manualValueAllowed(garantie)) {
     return selected;
   }
   if (selected && (!vehicule || hasVehicleValue(vehicule, selected))) {
@@ -994,12 +995,7 @@ function selectableManualValueSources(garantie: ReferenceOption, vehicule?: Vehi
 }
 
 function manualValueAllowed(garantie: ReferenceOption) {
-  const configuredSources = Array.isArray(garantie.sourcesValeurAutorisees)
-    ? garantie.sourcesValeurAutorisees.map((source) => String(source).toUpperCase())
-    : [];
-  return Boolean(garantie.saisieManuelleAutorisee)
-    || configuredSources.includes("MANUEL")
-    || defaultSource(garantie) === "MANUEL";
+  return Boolean(garantie.saisieManuelleAutorisee);
 }
 
 function canEnterManualCapital(garantie: ReferenceOption, item?: GarantieInput, line?: ReferenceOption) {

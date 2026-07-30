@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
@@ -51,6 +51,7 @@ type ContratFilters = {
   codeClient: string;
   compagnieId: "ALL" | string;
   numeroPolice: string;
+  clientId: string;
 };
 
 type MovementLine = {
@@ -82,12 +83,19 @@ const DEFAULT_FILTERS: ContratFilters = {
   codeClient: "",
   compagnieId: "ALL",
   numeroPolice: "",
+  clientId: "",
 };
 
 export default function ContratsPage() {
+  const [searchParams] = useSearchParams();
+  const initialFilters = useMemo<ContratFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    clientId: searchParams.get("clientId") ?? "",
+    codeClient: searchParams.get("client") ?? "",
+  }), [searchParams]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [filters, setFilters] = useState<ContratFilters>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<ContratFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<ContratFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<ContratFilters>(initialFilters);
   const canCreateContrat = useAuthStore((state) => state.user?.permissions?.includes("contrat:create") ?? false);
   const contrats = useQuery({ queryKey: ["contrats"], queryFn: productionApi.listContrats });
   const companies = useQuery({
@@ -150,7 +158,7 @@ export default function ContratsPage() {
               <DatePicker date={filters.au} onSelect={(date) => setFilters((current) => ({ ...current, au: toDateOnly(date) }))} />
             </FilterField>
             <FilterField label="Code / client">
-              <Input value={filters.codeClient} onChange={(event) => setFilters((current) => ({ ...current, codeClient: event.target.value }))} />
+              <Input value={filters.codeClient} onChange={(event) => setFilters((current) => ({ ...current, codeClient: event.target.value, clientId: "" }))} />
             </FilterField>
             <FilterField label="Compagnie">
               <Select value={filters.compagnieId} onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}>
@@ -745,6 +753,9 @@ function matchesFilters(contrat: ContratSummary, filters: ContratFilters, compan
   if (filters.au && (!date || date > filters.au)) return false;
 
   const clientSearch = filters.codeClient.trim();
+  if (filters.clientId && !contrat.clients?.some((client) => String(client.clientId) === filters.clientId)) {
+    return false;
+  }
   if (clientSearch) {
     const haystack = [
       clientCode(contrat),

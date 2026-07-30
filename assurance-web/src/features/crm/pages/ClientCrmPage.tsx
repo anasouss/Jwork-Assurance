@@ -571,6 +571,9 @@ function ClientDetail({
   const movements = detail.contrats.flatMap((contract) => contract.mouvements);
   const groupMembers = uniqueGroupMembers(detail.groupes, client.id);
   const accountingUrl = `/app/compta/releves-factures?payeurType=CLIENT&payeurId=${client.id}`;
+  const productionUrl = `/app/production/contrats?clientId=${encodeURIComponent(client.id)}&client=${encodeURIComponent(
+    client.codeClient || client.rc || client.cin || client.ice || client.nomAffichage || "",
+  )}`;
 
   return (
     <section className="min-w-0 overflow-hidden rounded-lg border bg-card">
@@ -660,7 +663,9 @@ function ClientDetail({
         <TabsContent value="contracts" className="m-0 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div><h3 className="font-semibold">Contrats et mouvements</h3><p className="text-sm text-muted-foreground">Historique de production associé à ce client comme assuré ou payeur.</p></div>
-            <Button asChild variant="outline" size="sm"><Link to="/app/production/contrats">Ouvrir la liste production</Link></Button>
+            <Button asChild variant="outline" size="sm" className="border-emerald-200 text-emerald-950 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-950/30">
+              <Link to={productionUrl}><FolderOpen className="size-4" />Ouvrir la liste production</Link>
+            </Button>
           </div>
           <ContractsPortfolio contracts={detail.contrats} />
         </TabsContent>
@@ -783,41 +788,48 @@ function ContractsPortfolio({ contracts }: {
   return (
     <div className="grid gap-4">
       {contracts.map((contract) => (
-        <section key={contract.id} className="min-w-0 overflow-hidden rounded-md border">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/25 p-4">
+        <section key={contract.id} className="min-w-0 overflow-hidden rounded-md border border-blue-100 dark:border-blue-900">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/25">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-semibold">{contract.numeroDossier || `Contrat #${contract.id}`}</h4>
-                <Badge variant="outline">{label(contract.typeContrat)}</Badge>
+                <span className="grid size-9 shrink-0 place-items-center rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"><FolderOpen className="size-4" /></span>
+                <h4 className="text-base font-semibold">{contract.numeroDossier || `Contrat #${contract.id}`}</h4>
+                <Badge variant="outline" className="border-blue-200 bg-white/70 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">{contractTypeLabel(contract.typeContrat)}</Badge>
                 <StatusBadge status={contract.statut} />
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{contract.numeroPolice || "Sans numéro de police"} · {contract.compagnie || "Compagnie non renseignée"}</p>
+              <p className="mt-2 text-sm text-muted-foreground"><strong className="font-medium text-foreground">{contract.numeroPolice || "Sans numéro de police"}</strong> · {contract.compagnie || "Compagnie non renseignée"}</p>
             </div>
             <Button asChild size="sm" variant="outline"><Link to={`/app/production/contrats/${contract.id}`}><Eye className="size-4" />Voir le contrat</Link></Button>
           </div>
           <dl className="grid gap-px border-b bg-border text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <ContractFact label="Période" value={`${dateLabel(contract.dateEffet)} au ${dateLabel(contract.dateEcheance)}`} />
-            <ContractFact label="Rôle du client" value={label(contract.roleClient)} />
-            <ContractFact label="Facturation" value={label(contract.modeFacturation)} />
-            <ContractFact label="Total des quittances" value={money(contract.primeTotale)} />
+            <ContractFact label="Période de couverture" value={`${dateLabel(contract.dateEffet)} au ${dateLabel(contract.dateEcheance)}`} tone="blue" />
+            <ContractFact label="Rôle du client" value={contractRoleLabel(contract.roleClient)} tone="violet" />
+            <ContractFact label="Mode de facturation" value={label(contract.modeFacturation)} tone="amber" />
+            <ContractFact label="Total des quittances" value={money(contract.primeTotale)} tone="emerald" />
           </dl>
           <details className="group" open={contracts.length === 1}>
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-medium hover:bg-muted/30">
-              <span className="flex items-center gap-2"><History className="size-4" />Historique des mouvements <Badge variant="secondary">{contract.mouvements.length}</Badge></span>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-emerald-50/35 px-4 py-3 font-medium hover:bg-emerald-50/70 dark:bg-emerald-950/10 dark:hover:bg-emerald-950/25">
+              <span className="flex items-center gap-2 text-emerald-950 dark:text-emerald-100"><History className="size-4 text-emerald-700 dark:text-emerald-300" />Historique des mouvements <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100">{contract.mouvements.length}</Badge></span>
               <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
             </summary>
             {contract.mouvements.length ? (
               <div className="overflow-x-auto border-t">
                 <table className="w-full min-w-[760px] text-sm">
-                  <thead className="bg-muted/35 text-left text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-2">N°</th><th className="px-4 py-2">Mouvement</th><th className="px-4 py-2">Date d’effet</th><th className="px-4 py-2">Statut</th><th className="px-4 py-2 text-right">Total</th><th className="w-14 px-4 py-2" /></tr></thead>
-                  <tbody>{contract.mouvements.map((movement) => (
+                  <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600 dark:bg-slate-950/40 dark:text-slate-300"><tr><th className="w-20 px-4 py-2">Ordre</th><th className="px-4 py-2">Événement contractuel</th><th className="px-4 py-2">Date d’effet</th><th className="px-4 py-2">Statut</th><th className="px-4 py-2 text-right">Impact financier</th><th className="w-14 px-4 py-2" /></tr></thead>
+                  <tbody>{contract.mouvements.map((movement, index) => (
                     <tr key={movement.id} className="border-t first:border-t-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">{movement.numeroMouvement || "-"}</td>
-                      <td className="px-4 py-3"><div className="font-medium">{movement.libelle || label(movement.categorie)}</div><div className="text-xs text-muted-foreground">{movement.code || label(movement.categorie)}</div></td>
+                      <td className="px-4 py-3"><span className="inline-grid min-w-8 place-items-center rounded-md bg-blue-50 px-2 py-1 font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-200">{movement.numeroMouvement || "-"}</span></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{movement.libelle || label(movement.categorie)}</span>
+                          {index === 0 ? <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-200">Dernier mouvement</Badge> : null}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{movement.code || label(movement.categorie)}</div>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">{dateLabel(movement.dateEffet)}</td>
                       <td className="px-4 py-3"><StatusBadge status={movement.statut} /></td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium">{money(movement.primeTotale)}</td>
-                      <td className="px-4 py-2"><Button asChild size="icon" variant="ghost" title="Voir ce mouvement"><Link to={`/app/production/contrats/${contract.id}?mouvementId=${movement.id}`}><Eye className="size-4" /></Link></Button></td>
+                      <td className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${financialImpactClass(movement.primeTotale)}`}>{money(movement.primeTotale)}</td>
+                      <td className="px-4 py-2"><Button asChild size="icon" variant="ghost" title="Voir ce mouvement"><Link aria-label={`Voir le mouvement ${movement.numeroMouvement || ""}`} to={`/app/production/contrats/${contract.id}?mouvementId=${movement.id}`}><Eye className="size-4" /></Link></Button></td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -830,8 +842,16 @@ function ContractsPortfolio({ contracts }: {
   );
 }
 
-function ContractFact({ label: factLabel, value }: { label: string; value: string }) {
-  return <div className="bg-card px-4 py-3"><dt className="text-xs text-muted-foreground">{factLabel}</dt><dd className="mt-1 font-medium">{value}</dd></div>;
+type ContractFactTone = "blue" | "violet" | "amber" | "emerald";
+
+function ContractFact({ label: factLabel, value, tone }: { label: string; value: string; tone: ContractFactTone }) {
+  const styles: Record<ContractFactTone, string> = {
+    blue: "bg-blue-50/35 dark:bg-blue-950/15",
+    violet: "bg-violet-50/35 dark:bg-violet-950/15",
+    amber: "bg-amber-50/35 dark:bg-amber-950/15",
+    emerald: "bg-emerald-50/35 dark:bg-emerald-950/15",
+  };
+  return <div className={`px-4 py-3 ${styles[tone]}`}><dt className="text-xs text-muted-foreground">{factLabel}</dt><dd className="mt-1 font-medium">{value}</dd></div>;
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
@@ -841,7 +861,31 @@ function StatusBadge({ status }: { status?: string | null }) {
     : normalized.includes("VALID") || normalized.includes("ACTIF")
       ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
       : "bg-slate-100 text-slate-700 hover:bg-slate-100";
-  return <Badge className={className}>{label(status)}</Badge>;
+  return <Badge className={className}>{statusLabel(status)}</Badge>;
+}
+
+function contractTypeLabel(type?: string | null) {
+  return type === "PARTICULIER" ? "Mono" : label(type);
+}
+
+function contractRoleLabel(role?: string | null) {
+  if (!role) return "-";
+  return role.split(",").map((value) => label(value.trim())).join(", ");
+}
+
+function financialImpactClass(value?: number | null) {
+  if ((value ?? 0) < 0) return "text-red-700 dark:text-red-400";
+  if ((value ?? 0) > 0) return "text-emerald-700 dark:text-emerald-400";
+  return "text-muted-foreground";
+}
+
+function statusLabel(status?: string | null) {
+  const normalized = status?.toUpperCase() ?? "";
+  if (normalized.includes("CANCEL") || normalized.includes("RESIL")) return "Résilié";
+  if (normalized.includes("VALID")) return "Validé";
+  if (normalized.includes("ACTIF")) return "Actif";
+  if (normalized.includes("DRAFT") || normalized.includes("BROUILLON")) return "Brouillon";
+  return label(status);
 }
 
 function ClientDocuments({ rows, loading }: { rows: ClientDocument[]; loading: boolean }) {

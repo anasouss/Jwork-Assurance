@@ -9,6 +9,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,6 +34,7 @@ export function MarquesSettingsPage() {
       path="marques"
       create={productionApi.createMarque}
       update={productionApi.updateMarque}
+      pageSize={10}
     />
   );
 }
@@ -1371,12 +1379,14 @@ function SimpleReferencePage({
   path,
   create,
   update,
+  pageSize,
 }: {
   title: string;
   description: string;
   path: string;
   create: (payload: UpsertReferenceRequest) => Promise<ReferenceOption>;
   update: (id: string, payload: UpsertReferenceRequest) => Promise<ReferenceOption>;
+  pageSize?: number;
 }) {
   const queryClient = useQueryClient();
   const query = useReference(path);
@@ -1434,7 +1444,12 @@ function SimpleReferencePage({
           </div>
         </DialogContent>
       </Dialog>
-      <ReferenceTable query={query} columns={["Libellé", "Actif"]} onEdit={(item) => { setEditing(item); setDialogOpen(true); }} />
+      <ReferenceTable
+        query={query}
+        columns={["Libellé", "Actif"]}
+        onEdit={(item) => { setEditing(item); setDialogOpen(true); }}
+        pageSize={pageSize}
+      />
     </ReferenceShell>
   );
 }
@@ -1535,11 +1550,29 @@ function ReferenceTable({
   query,
   columns,
   onEdit,
+  pageSize,
 }: {
   query: ReturnType<typeof useReference>;
   columns: string[];
   onEdit: (item: ReferenceOption) => void;
+  pageSize?: number;
 }) {
+  const [page, setPage] = useState(1);
+  const items = query.data ?? [];
+  const normalizedPageSize = pageSize && pageSize > 0 ? pageSize : null;
+  const paginationEnabled = normalizedPageSize !== null;
+  const totalPages = normalizedPageSize ? Math.max(1, Math.ceil(items.length / normalizedPageSize)) : 1;
+  const safePage = Math.min(page, totalPages);
+  const visibleItems = normalizedPageSize
+    ? items.slice((safePage - 1) * normalizedPageSize, safePage * normalizedPageSize)
+    : items;
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   return (
     <Card className="border-border/70 shadow-none">
       <CardHeader><CardTitle className="text-base">Liste</CardTitle></CardHeader>
@@ -1553,7 +1586,7 @@ function ReferenceTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(query.data ?? []).map((item) => (
+              {visibleItems.map((item) => (
                 <TableRow key={item.id}>
                   {columns.includes("Code") ? <TableCell className="font-medium">{item.code ?? "-"}</TableCell> : null}
                   <TableCell>{item.libelle}</TableCell>
@@ -1574,6 +1607,44 @@ function ReferenceTable({
             </TableBody>
           </Table>
         </div>
+        {paginationEnabled ? (
+          <div className="flex flex-col gap-2 border-x border-b px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Page {safePage} / {totalPages} · {items.length} résultat(s)
+            </div>
+            <Pagination className="mx-0 w-auto justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((current) => Math.max(1, current - 1));
+                    }}
+                    aria-disabled={safePage <= 1}
+                    className={safePage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium">
+                    {safePage}
+                  </span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((current) => Math.min(totalPages, current + 1));
+                    }}
+                    aria-disabled={safePage >= totalPages}
+                    className={safePage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

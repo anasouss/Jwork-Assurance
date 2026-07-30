@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
   Building2,
-  Download,
   Eye,
   FilePlus2,
   FileText,
@@ -995,26 +994,36 @@ function CancelDocumentDialog(props: { target?: ClientDocument; onClose: () => v
 
 function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
   const [loading, setLoading] = useState(false);
-  async function download() {
+  async function preview() {
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      return;
+    }
+    previewWindow.opener = null;
     setLoading(true);
     try {
       const blob = await comptaApi.clientDocumentPdf(props.document.id);
       const url = URL.createObjectURL(blob);
-      const anchor = window.document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${props.document.numero}.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      previewWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Téléchargement impossible");
+      previewWindow.close();
+      toast.error(error instanceof Error ? error.message : "Prévisualisation impossible");
     } finally {
       setLoading(false);
     }
   }
   return (
-    <Button variant="ghost" size={props.withLabel ? "default" : "icon"} onClick={download} disabled={loading} title="Télécharger le PDF">
-      <Download className="size-4" />
-      {props.withLabel ? "Télécharger le PDF" : null}
+    <Button
+      variant="ghost"
+      size={props.withLabel ? "default" : "icon"}
+      onClick={preview}
+      disabled={loading}
+      title="Prévisualiser le PDF"
+    >
+      <Eye className="size-4" />
+      {props.withLabel ? (loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
     </Button>
   );
 }

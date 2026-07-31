@@ -1434,6 +1434,23 @@ function RemorqueForm({
   );
 }
 
+function ResponsiveRecordCell({
+  label,
+  children,
+  valueClassName,
+}: {
+  label: string;
+  children: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <td className="col-span-2 grid grid-cols-[minmax(7.5rem,0.8fr)_minmax(0,1.2fr)] items-center gap-3 border-t border-border/60 px-3 py-2 xl:table-cell xl:border-t-0">
+      <span className="text-xs font-medium text-muted-foreground xl:hidden">{label}</span>
+      <div className={cn("min-w-0", valueClassName)}>{children}</div>
+    </td>
+  );
+}
+
 function TargetGuaranteesTable({
   target,
   garanties,
@@ -1541,15 +1558,12 @@ function TargetGuaranteesTable({
 
   return (
     <div className="grid gap-4">
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
         <div className="border-b px-3 py-2 text-sm font-semibold">
           {target.kind === "vehicule" ? "Garanties véhicule" : "Garanties remorque"}
         </div>
-        <table className={cn(
-          "w-full border-collapse text-xs lg:text-sm",
-          layout === "particulier" ? "min-w-[660px] lg:min-w-[720px]" : "min-w-[720px] lg:min-w-[860px]"
-        )}>
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+        <table className="block w-full border-collapse text-sm xl:table xl:min-w-[860px]">
+          <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
             <tr>
               <th className="w-12 px-3 py-3 text-left" />
               <th className="px-3 py-3 text-left">Garantie</th>
@@ -1566,7 +1580,7 @@ function TargetGuaranteesTable({
               {layout === "tariff" ? <th className="w-40 px-3 py-3 text-left">{primeColumnLabel}</th> : null}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="block xl:table-row-group">
             {configuredGaranties.map((garantie) => {
               const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
               const checked = Boolean(item);
@@ -1589,20 +1603,20 @@ function TargetGuaranteesTable({
                 <tr
                   key={garantie.id}
                   className={cn(
-                    "border-t align-middle transition-colors",
+                    "grid w-full grid-cols-[2.5rem_minmax(0,1fr)] border-t align-middle transition-colors xl:table-row",
                     !checked && "bg-muted/20 text-muted-foreground",
                     checked && "bg-background",
                     isRc && "bg-amber-50/50 dark:bg-amber-950/20"
                   )}
                 >
-                  <td className="px-3 py-2">
+                  <td className="col-start-1 row-start-1 px-3 py-3 xl:table-cell xl:py-2">
                     <Checkbox checked={checked} disabled={disabled} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="col-start-2 row-start-1 min-w-0 px-2 py-3 xl:table-cell xl:px-3 xl:py-2">
                     <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                     {warning ? <div className="mt-1 text-xs text-destructive">{warning}</div> : null}
                   </td>
-                  <td className="px-3 py-2">
+                  <ResponsiveRecordCell label={layout === "particulier" ? "Valeur assurée" : "Capital / valeur"}>
                     {manualValue && !isRc ? (
                       <div className="grid gap-1">
                         {sourceOptions.length > 1 ? (
@@ -1674,8 +1688,8 @@ function TargetGuaranteesTable({
                     ) : (
                       <Input readOnly disabled className={cn(controlClass(false), "text-right")} value={capitalDisplay(garantie, selectedLine, target, displayCapital)} />
                     )}
-                  </td>
-                  {layout === "tariff" ? <td className="px-3 py-2">
+                  </ResponsiveRecordCell>
+                  {layout === "tariff" ? <ResponsiveRecordCell label="Taux (%)">
                     {!automaticPricing && !isRc ? (
                       <Input
                         type="number"
@@ -1701,10 +1715,10 @@ function TargetGuaranteesTable({
                     ) : (
                       <span className="block rounded-md px-3 py-2 text-right text-muted-foreground">{isRc ? "-" : rateDisplay(selectedLine)}</span>
                     )}
-                  </td> : null}
+                  </ResponsiveRecordCell> : null}
                   {layout === "particulier" ? (
                     <>
-                      <td className="px-3 py-2">
+                      <ResponsiveRecordCell label="Taux franchise (%)">
                         <Input
                           type="number"
                           disabled={!editable || !garantie.avecFranchise}
@@ -1712,17 +1726,17 @@ function TargetGuaranteesTable({
                           value={garantie.avecFranchise ? item?.tauxFranchise ?? "" : ""}
                           onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })}
                         />
-                      </td>
-                      <td className="px-3 py-2">
+                      </ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Min franchise">
                         <MoneyInput
                           disabled={!editable || !garantie.avecFranchiseMinimale}
                           className={cn(controlClass(editable && Boolean(garantie.avecFranchiseMinimale)), "text-right")}
                           value={garantie.avecFranchiseMinimale ? item?.franchiseMinimale : undefined}
                           onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })}
                         />
-                      </td>
+                      </ResponsiveRecordCell>
                     </>
-                  ) : <td className="px-3 py-2 text-right text-muted-foreground">
+                  ) : <ResponsiveRecordCell label="Taux franchise / Min franchise" valueClassName="text-right text-muted-foreground">
                     {!automaticPricing && !isRc ? (
                       <div className="grid grid-cols-2 gap-2">
                         <Input
@@ -1744,8 +1758,8 @@ function TargetGuaranteesTable({
                       Boolean(garantie.avecFranchise),
                       Boolean(garantie.avecFranchiseMinimale)
                     )}
-                  </td>}
-                  {layout === "tariff" ? <td className="px-3 py-2 text-right font-medium">
+                  </ResponsiveRecordCell>}
+                  {layout === "tariff" ? <ResponsiveRecordCell label={primeColumnLabel} valueClassName="text-right font-medium">
                     {primeInputEnabled && !isRc ? (
                       <MoneyInput
                         disabled={!editable}
@@ -1754,13 +1768,13 @@ function TargetGuaranteesTable({
                         onValueChange={(value) => update(garantie.id, { prime: value })}
                       />
                     ) : checked || previewLine ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
-                  </td> : null}
+                  </ResponsiveRecordCell> : null}
                 </tr>
               );
             })}
             {configuredGaranties.length === 0 ? (
-              <tr>
-                <td colSpan={layout === "particulier" ? 5 : 6} className="px-3 py-8 text-center text-sm text-muted-foreground">
+              <tr className="block xl:table-row">
+                <td colSpan={layout === "particulier" ? 5 : 6} className="block px-3 py-8 text-center text-sm text-muted-foreground xl:table-cell">
                   Aucune garantie véhicule configurée pour cet usage.
                 </td>
               </tr>
@@ -1770,13 +1784,10 @@ function TargetGuaranteesTable({
       </div>
 
       {showPersonne ? (
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
           <div className="border-b px-3 py-2 text-sm font-semibold">Garanties personne</div>
-          <table className={cn(
-            "w-full border-collapse text-xs lg:text-sm",
-            layout === "particulier" ? "min-w-[820px] xl:min-w-[1080px]" : "min-w-[880px] xl:min-w-[1320px]"
-          )}>
-            <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+          <table className="block w-full border-collapse text-sm xl:table xl:min-w-[1080px] 2xl:min-w-[1320px]">
+            <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
               <tr>
                 <th className="w-12 px-3 py-3 text-left" />
                 <th className="px-3 py-3 text-left">Garantie</th>
@@ -1790,7 +1801,7 @@ function TargetGuaranteesTable({
                 {layout === "tariff" ? <th className="w-32 px-3 py-3 text-right">{primeColumnLabel}</th> : null}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block xl:table-row-group">
               {configuredPersonneGaranties.map((garantie) => {
                 const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
                 const checked = Boolean(item);
@@ -1805,18 +1816,18 @@ function TargetGuaranteesTable({
                   <tr
                     key={garantie.id}
                     className={cn(
-                      "border-t align-middle transition-colors",
+                      "grid w-full grid-cols-[2.5rem_minmax(0,1fr)] border-t align-middle transition-colors xl:table-row",
                       !checked && "bg-muted/20 text-muted-foreground",
                       checked && "bg-background"
                     )}
                   >
-                    <td className="px-3 py-2">
+                    <td className="col-start-1 row-start-1 px-3 py-3 xl:table-cell xl:py-2">
                       <Checkbox checked={checked} disabled={disabled} onCheckedChange={(value) => togglePersonne(garantie, Boolean(value))} />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="col-start-2 row-start-1 min-w-0 px-2 py-3 xl:table-cell xl:px-3 xl:py-2">
                       <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                     </td>
-                    {layout === "tariff" ? <td className="px-3 py-2">
+                    {layout === "tariff" ? <ResponsiveRecordCell label="Formule">
                       {automaticPricing ? (
                         <Select
                           value={item?.formuleGarantiePersonneId ?? selectedFormule?.id ?? ""}
@@ -1847,18 +1858,18 @@ function TargetGuaranteesTable({
                           onChange={(event) => update(garantie.id, { formule: event.target.value })}
                         />
                       )}
-                    </td> : null}
-                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantDeces) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantDeces} onValueChange={(value) => update(garantie.id, { montantDeces: value })} />}</td>
-                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantInvalidite} onValueChange={(value) => update(garantie.id, { montantInvalidite: value })} />}</td>
-                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisMedicaux} onValueChange={(value) => update(garantie.id, { montantFraisMedicaux: value })} />}</td>
-                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</td>
-                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</td>
-                    <td className="px-3 py-2">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</td>
-                    {layout === "tariff" ? <td className="px-3 py-2 text-right">
+                    </ResponsiveRecordCell> : null}
+                    <ResponsiveRecordCell label="Décès">{automaticPricing ? money(selectedFormule?.montantDeces) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantDeces} onValueChange={(value) => update(garantie.id, { montantDeces: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Invalidité">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantInvalidite} onValueChange={(value) => update(garantie.id, { montantInvalidite: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Frais médicaux">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisMedicaux} onValueChange={(value) => update(garantie.id, { montantFraisMedicaux: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Hospitalisation">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Frais funéraires">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Chirurgie">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</ResponsiveRecordCell>
+                    {layout === "tariff" ? <ResponsiveRecordCell label={primeColumnLabel} valueClassName="text-right">
                       {primeInputEnabled ? (
                         <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
                       ) : checked || previewLine ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
-                    </td> : null}
+                    </ResponsiveRecordCell> : null}
                   </tr>
                 );
               })}
@@ -1936,7 +1947,7 @@ function AssistanceTable({
   }, [assistance.produitAssistanceId, onChange, selectedProductId]);
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
       <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
         <Checkbox
           checked={assistance.enabled}
@@ -1944,8 +1955,8 @@ function AssistanceTable({
         />
         <span>Assistance</span>
       </div>
-      <table className="w-full min-w-[780px] border-collapse text-xs lg:text-sm xl:min-w-[1100px]">
-        <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+      <table className="block w-full border-collapse text-sm xl:table xl:min-w-[1100px]">
+        <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
           <tr>
             <th className="px-3 py-3 text-left">Date effet</th>
             <th className="px-3 py-3 text-left">Date souscription</th>
@@ -1957,33 +1968,33 @@ function AssistanceTable({
             <th className="px-3 py-3 text-right">Prime</th>
           </tr>
         </thead>
-        <tbody>
-          <tr className={cn("border-t align-middle", !assistance.enabled && "bg-muted/20 text-muted-foreground")}>
-            <td className="px-3 py-2">
+        <tbody className="block xl:table-row-group">
+          <tr className={cn("grid w-full grid-cols-2 border-t align-middle xl:table-row", !assistance.enabled && "bg-muted/20 text-muted-foreground")}>
+            <ResponsiveRecordCell label="Date effet">
               <DatePicker disabled={!assistance.enabled} date={assistance.dateEffet} onSelect={(date) => updateDateEffet(toDateOnly(date))} />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Date souscription">
               <DatePicker disabled={!assistance.enabled} date={assistance.dateSouscription} onSelect={(date) => onChange({ dateSouscription: toDateOnly(date) })} />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Échéance">
               <EcheanceInput
                 disabled={!assistance.enabled}
                 value={assistance.echeanceCode ?? ""}
                 onValueChange={updateEcheance}
               />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Date échéance">
               <DatePicker disabled date={assistance.dateEcheance} onSelect={() => undefined} />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="N° contrat">
               <Input
                 disabled={!assistance.enabled}
                 value={assistance.numeroContratOuQuittance ?? ""}
                 placeholder="N° contrat"
                 onChange={(event) => onChange({ numeroContratOuQuittance: event.target.value })}
               />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Compagnie">
               <Select
                 disabled={!assistance.enabled}
                 value={assistance.compagnieAssistanceId ?? ""}
@@ -1996,8 +2007,8 @@ function AssistanceTable({
                   ))}
                 </SelectContent>
               </Select>
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Produit">
               <Select
                 disabled={!assistance.enabled || filteredProducts.length === 0}
                 value={selectedProductId}
@@ -2010,10 +2021,10 @@ function AssistanceTable({
                   ))}
                 </SelectContent>
               </Select>
-            </td>
-            <td className="px-3 py-2 text-right font-medium">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Prime" valueClassName="text-right font-medium">
               {assistance.enabled && prime != null ? formatMoney(prime) : "-"}
-            </td>
+            </ResponsiveRecordCell>
           </tr>
         </tbody>
       </table>

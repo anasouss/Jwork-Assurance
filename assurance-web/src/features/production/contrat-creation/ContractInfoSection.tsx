@@ -383,21 +383,18 @@ export function ContractInfoSection({
               const type = value as TypePayeurPrime;
               form.setTypePayeurPrime(type);
               form.setPayeurPrimeClientId("");
-              if (type !== "TIERS_MANDATE") {
-                form.setReferenceMandatPayeur("");
-              }
             }}
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="SOUSCRIPTEUR">Souscripteur</SelectItem>
+              <SelectItem value="SOUSCRIPTEUR">Lui-même</SelectItem>
               {selectedGroup?.clientTresorerieId ? (
                 <SelectItem value="TRESORERIE_GROUPE">Trésorerie du groupe</SelectItem>
               ) : null}
               {selectedGroup?.membres.length ? (
                 <SelectItem value="MEMBRE_GROUPE">Autre membre du groupe</SelectItem>
               ) : null}
-              <SelectItem value="TIERS_MANDATE">Tiers mandaté</SelectItem>
+              <SelectItem value="TIERS_MANDATE">Autre personne</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -407,7 +404,7 @@ export function ContractInfoSection({
           </Field>
         ) : null}
         {form.typePayeurPrime === "MEMBRE_GROUPE" || form.typePayeurPrime === "TIERS_MANDATE" ? (
-          <Field label={form.typePayeurPrime === "MEMBRE_GROUPE" ? "Membre payeur" : "Tiers payeur"} required>
+          <Field label={form.typePayeurPrime === "MEMBRE_GROUPE" ? "Membre payeur" : "Autre payeur"} required>
             <AutocompleteSelect
               value={form.payeurPrimeClientId}
               onValueChange={form.setPayeurPrimeClientId}
@@ -416,14 +413,6 @@ export function ContractInfoSection({
               placeholder={form.typePayeurPrime === "TIERS_MANDATE" ? "RC, CIN ou nom" : "Membre du groupe"}
               emptyText="Aucun client trouvé"
               invalidText="Sélectionnez un client existant."
-            />
-          </Field>
-        ) : null}
-        {form.typePayeurPrime === "TIERS_MANDATE" ? (
-          <Field label="Référence du mandat" required error={form.validationErrors.referenceMandatPayeur}>
-            <Input
-              value={form.referenceMandatPayeur}
-              onChange={(event) => form.setReferenceMandatPayeur(event.target.value)}
             />
           </Field>
         ) : null}

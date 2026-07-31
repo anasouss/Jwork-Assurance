@@ -55,7 +55,6 @@ public class ContratResponse {
     private Long groupeFacturationId;
     private String groupeFacturationNom;
     private ModeFacturationContrat modeFacturation;
-    private String referenceMandatPayeur;
     private String periodicite;
     private Fractionnement fractionnement;
     private BigDecimal tauxRc;

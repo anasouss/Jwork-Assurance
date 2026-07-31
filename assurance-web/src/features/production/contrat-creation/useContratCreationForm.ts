@@ -55,7 +55,6 @@ export function useContratCreationForm(
   const [payeurPrimeClientId, setPayeurPrimeClientId] = useState("");
   const [groupeFacturationId, setGroupeFacturationId] = useState("");
   const [modeFacturation, setModeFacturation] = useState<ModeFacturationContrat>("DIRECTE");
-  const [referenceMandatPayeur, setReferenceMandatPayeur] = useState("");
   const [fractionnement, setFractionnement] = useState<CreateContratRequest["fractionnement"]>("ANNUEL");
   const [crmPartage, setCrmPartage] = useState(false);
   const [crmPartageValeur, setCrmPartageValeur] = useState("");
@@ -221,7 +220,6 @@ export function useContratCreationForm(
     setPayeurPrimeClientId(hydrated.payeurPrimeClientId);
     setGroupeFacturationId(hydrated.groupeFacturationId);
     setModeFacturation(hydrated.modeFacturation);
-    setReferenceMandatPayeur(hydrated.referenceMandatPayeur);
     setFractionnement(hydrated.fractionnement);
     setCrmPartage(hydrated.crmPartage);
     setCrmPartageValeur(hydrated.crmPartageValeur);
@@ -306,9 +304,6 @@ export function useContratCreationForm(
       : undefined,
     groupeFacturationId: emptyToUndefined(groupeFacturationId),
     modeFacturation,
-    referenceMandatPayeur: typePayeurPrime === "TIERS_MANDATE"
-      ? emptyToUndefined(referenceMandatPayeur)
-      : undefined,
     fractionnement,
     modeSaisieGaranties,
     saisiePrimeNette: typeContrat === "PARTICULIER" ? saisiePrimeNette : false,
@@ -373,7 +368,6 @@ export function useContratCreationForm(
     payeurPrimeClientId,
     groupeFacturationId,
     modeFacturation,
-    referenceMandatPayeur,
     fractionnement,
     crmPartage,
     crmPartageValeur,
@@ -567,9 +561,6 @@ export function useContratCreationForm(
     if ((typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
       nextErrors.payeurPrimeClientId = "Payeur obligatoire.";
     }
-    if (typePayeurPrime === "TIERS_MANDATE" && !referenceMandatPayeur.trim()) {
-      nextErrors.referenceMandatPayeur = "Référence du mandat obligatoire.";
-    }
     if (modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
       nextErrors.groupeFacturationId = "Groupe de facturation obligatoire.";
     }
@@ -723,9 +714,6 @@ export function useContratCreationForm(
       }
       if ((typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
         nextErrors.payeurPrimeClientId = "Payeur obligatoire.";
-      }
-      if (typePayeurPrime === "TIERS_MANDATE" && !referenceMandatPayeur.trim()) {
-        nextErrors.referenceMandatPayeur = "Référence du mandat obligatoire.";
       }
       if (modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
         nextErrors.groupeFacturationId = "Groupe de facturation obligatoire.";
@@ -1093,8 +1081,6 @@ export function useContratCreationForm(
     setGroupeFacturationId,
     modeFacturation,
     setModeFacturation,
-    referenceMandatPayeur,
-    setReferenceMandatPayeur,
     fractionnement,
     setFractionnement,
     crmPartage,
@@ -1541,7 +1527,6 @@ function hydrateDraft(draft: ContratSummary) {
     payeurPrimeClientId: idString(draft.payeurPrimeClientId),
     groupeFacturationId: idString(draft.groupeFacturationId),
     modeFacturation: draft.modeFacturation ?? "DIRECTE",
-    referenceMandatPayeur: draft.referenceMandatPayeur ?? "",
     fractionnement: asFractionnement(draft.fractionnement),
     crmPartage: Boolean(draft.crmPartage),
     crmPartageValeur: draft.crmPartageValeur ?? "",

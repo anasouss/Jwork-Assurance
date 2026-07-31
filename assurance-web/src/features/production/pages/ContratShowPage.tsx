@@ -137,9 +137,6 @@ export default function ContratShowPage() {
                 ...(contrat.montantBulletin != null
                   ? [["Montant du bulletin", formatMoney(contrat.montantBulletin)] as [string, ReactNode]]
                   : []),
-                ...(contrat.referenceMandatPayeur
-                  ? [["Référence mandat", contrat.referenceMandatPayeur] as [string, ReactNode]]
-                  : []),
               ]}
             />
           </Section>
@@ -684,7 +681,7 @@ function payerTypeLabel(type?: ContratSummary["typePayeurPrime"]) {
     case "MEMBRE_GROUPE":
       return "Membre du groupe";
     case "TIERS_MANDATE":
-      return "Tiers mandaté";
+      return "Autre personne";
     default:
       return "Souscripteur";
   }

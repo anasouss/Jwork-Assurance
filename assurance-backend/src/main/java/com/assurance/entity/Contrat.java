@@ -148,9 +148,6 @@ public class Contrat extends BaseEntity {
     @Builder.Default
     private ModeFacturationContrat modeFacturation = ModeFacturationContrat.DIRECTE;
 
-    @Column(name = "reference_mandat_payeur", length = 160)
-    private String referenceMandatPayeur;
-
     @Column(length = 80)
     private String echeance;
 

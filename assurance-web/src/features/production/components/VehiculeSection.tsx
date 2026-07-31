@@ -221,7 +221,7 @@ export function VehiculeSection({
                   </Field>
                 ) : null}
                 {needsCarburantAndPf ? (
-                  <Field label="Puissance fiscale / cylindrée" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
+                  <Field label="Puissance fiscale" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
                     <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
                   </Field>
                 ) : null}
@@ -256,14 +256,14 @@ export function VehiculeSection({
                     </Select>
                   </Field>
                 ) : null}
-                <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
-                  <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update(index, { nombrePlaces: event.target.value })} />
-                </Field>
                 <Field label="Date mise en circulation">
                   <DatePicker date={vehicule.datePremiereCirculation} onSelect={(date) => update(index, { datePremiereCirculation: toDateOnly(date) })} />
                 </Field>
                 <Field label="Date validité CG" error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
                   <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update(index, { dateExpirationCarteGrise: toDateOnly(date) })} />
+                </Field>
+                <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
+                  <Input value={vehicule.nombrePlaces ?? ""} onChange={(event) => update(index, { nombrePlaces: event.target.value })} />
                 </Field>
                 {showAttestation ? (
                   <Field label="N° attestation">

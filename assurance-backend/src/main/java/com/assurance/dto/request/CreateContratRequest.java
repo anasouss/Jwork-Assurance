@@ -51,7 +51,6 @@ public class CreateContratRequest {
     private Long payeurPrimeClientId;
     private Long groupeFacturationId;
     private ModeFacturationContrat modeFacturation;
-    private String referenceMandatPayeur;
     private String periodicite;
     private Fractionnement fractionnement;
     private BigDecimal tauxRc;

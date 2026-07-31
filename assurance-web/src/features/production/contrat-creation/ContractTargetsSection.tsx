@@ -1201,8 +1201,11 @@ function VehicleForm({
         <Field label="Date validité CG" error={errors[`vehicules.${index}.dateExpirationCarteGrise`]}>
           <DatePicker date={vehicule.dateExpirationCarteGrise} onSelect={(date) => update({ dateExpirationCarteGrise: toDateOnly(date) })} />
         </Field>
+        <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
+          <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
+        </Field>
         {needsCarburantAndPf ? (
-          <Field label="Puissance fiscale / cylindrée" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
+          <Field label="Puissance fiscale" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
             <Input className="text-right" value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update({ puissanceFiscale: event.target.value })} />
           </Field>
         ) : null}
@@ -1277,9 +1280,6 @@ function VehicleForm({
             />
           </Field>
         ) : null}
-        <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
-          <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
-        </Field>
         <Field label="Valeur à neuf" error={errors[`vehicules.${index}.valeurNeuf`]}>
           <MoneyInput className="text-right" value={vehicule.valeurNeuf} onValueChange={(value) => update({ valeurNeuf: value })} />
         </Field>

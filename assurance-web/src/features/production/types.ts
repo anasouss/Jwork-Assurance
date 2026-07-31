@@ -727,7 +727,6 @@ export type CreateContratRequest = {
   payeurPrimeClientId?: string;
   groupeFacturationId?: string;
   modeFacturation?: ModeFacturationContrat;
-  referenceMandatPayeur?: string;
   fractionnement?: "ANNUEL" | "SEMESTRIEL" | "TRIMESTRIEL" | "MENSUEL";
   tauxRc?: number;
   modeSaisieGaranties?: "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE";
@@ -1106,7 +1105,6 @@ export type ContratSummary = {
   groupeFacturationId?: string | null;
   groupeFacturationNom?: string | null;
   modeFacturation?: ModeFacturationContrat | null;
-  referenceMandatPayeur?: string | null;
   periodicite?: string | null;
   fractionnement?: string | null;
   tauxRc?: number | null;

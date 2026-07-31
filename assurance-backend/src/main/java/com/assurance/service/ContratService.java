@@ -1396,8 +1396,8 @@ public class ContratService {
                 }
             }
             case TIERS_MANDATE -> {
-                if (request.getPayeurPrimeClientId() == null || !hasText(request.getReferenceMandatPayeur())) {
-                    throw new BadRequestException("Le tiers payeur et la reference du mandat sont obligatoires");
+                if (request.getPayeurPrimeClientId() == null) {
+                    throw new BadRequestException("Le payeur est obligatoire");
                 }
                 payeur = requireBillingClient(contrat, request.getPayeurPrimeClientId());
             }
@@ -1418,11 +1418,6 @@ public class ContratService {
         contrat.setPayeurPrime(payeur);
         contrat.setGroupeFacturation(groupe);
         contrat.setModeFacturation(modeFacturation);
-        contrat.setReferenceMandatPayeur(
-                typePayeur == TypePayeurPrime.TIERS_MANDATE
-                        ? blankToNull(request.getReferenceMandatPayeur())
-                        : null
-        );
         contratRepository.save(contrat);
     }
 
@@ -4330,7 +4325,6 @@ public class ContratService {
                 .modeFacturation(contrat.getModeFacturation() == null
                         ? ModeFacturationContrat.DIRECTE
                         : contrat.getModeFacturation())
-                .referenceMandatPayeur(contrat.getReferenceMandatPayeur())
                 .periodicite(contrat.getPeriodicite())
                 .fractionnement(contrat.getFractionnement())
                 .tauxRc(contrat.getTauxRc())

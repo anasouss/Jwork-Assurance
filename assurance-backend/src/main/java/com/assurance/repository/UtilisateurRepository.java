@@ -23,10 +23,10 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     List<Utilisateur> findByAgenceIdOrderByNomAscPrenomAsc(Long agenceId);
 
     @EntityGraph(attributePaths = {"role", "role.permissions"})
-    List<Utilisateur> findByRoleCodeIgnoreCaseOrderByNomAscPrenomAsc(String roleCode);
+    List<Utilisateur> findByRole_CodeIgnoreCaseOrderByNomAscPrenomAsc(String roleCode);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    List<Utilisateur> findByRoleCodeIgnoreCaseAndActifTrue(String roleCode);
+    List<Utilisateur> findByRole_CodeIgnoreCaseAndActifTrue(String roleCode);
 
     boolean existsByEmailIgnoreCase(String email);
 

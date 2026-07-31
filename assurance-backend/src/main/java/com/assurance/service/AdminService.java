@@ -63,7 +63,7 @@ public class AdminService {
     public List<AdminUtilisateurResponse> listPlatformAdmins() {
         requirePlatformAdmin(currentUser());
         return utilisateurRepository
-                .findByRoleCodeIgnoreCaseOrderByNomAscPrenomAsc(SUPER_ADMIN_ROLE_CODE)
+                .findByRole_CodeIgnoreCaseOrderByNomAscPrenomAsc(SUPER_ADMIN_ROLE_CODE)
                 .stream()
                 .map(AdminUtilisateurResponse::from)
                 .toList();
@@ -648,7 +648,7 @@ public class AdminService {
         if (actor.getId().equals(target.getId())) {
             throw new BadRequestException("Vous ne pouvez pas désactiver votre propre compte");
         }
-        if (utilisateurRepository.findByRoleCodeIgnoreCaseAndActifTrue(SUPER_ADMIN_ROLE_CODE).size() <= 1) {
+        if (utilisateurRepository.findByRole_CodeIgnoreCaseAndActifTrue(SUPER_ADMIN_ROLE_CODE).size() <= 1) {
             throw new BadRequestException("Au moins un administrateur plateforme actif est obligatoire");
         }
     }

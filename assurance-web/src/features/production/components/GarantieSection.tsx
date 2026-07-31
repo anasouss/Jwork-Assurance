@@ -155,7 +155,10 @@ export function GarantieSection({
       ) : null}
       <div className="mb-2 text-sm font-semibold">Garanties véhicule</div>
       <div className="overflow-x-auto rounded-md border">
-        <table className={cn("w-full border-collapse text-sm", showRateColumn ? "min-w-[980px]" : "min-w-[820px]")}>
+        <table className={cn(
+          "w-full border-collapse text-xs lg:text-sm",
+          showRateColumn ? "min-w-[760px] xl:min-w-[980px]" : "min-w-[680px] xl:min-w-[820px]"
+        )}>
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="w-12 px-3 py-3 text-left"></th>
@@ -500,7 +503,7 @@ export function GarantieSection({
         <div className="mt-4">
           <div className="mb-2 text-sm font-semibold">Garanties personne</div>
           <div className="overflow-x-auto rounded-md border">
-            <table className="w-full min-w-[1120px] border-collapse text-sm">
+            <table className="w-full min-w-[820px] border-collapse text-xs lg:text-sm xl:min-w-[1120px]">
               <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="w-12 px-3 py-3 text-left"></th>
@@ -744,7 +747,7 @@ function AssistanceTable({
         <Checkbox checked={assistance.enabled} onCheckedChange={(checked) => onChange({ enabled: Boolean(checked) })} />
         <span>ASSISTANCE</span>
       </div>
-      <table className="w-full min-w-[1120px] table-fixed border-collapse text-sm">
+      <table className="w-full min-w-[820px] table-fixed border-collapse text-xs lg:text-sm xl:min-w-[1120px]">
         <colgroup>
           <col className="w-[150px]" />
           <col className="w-[150px]" />

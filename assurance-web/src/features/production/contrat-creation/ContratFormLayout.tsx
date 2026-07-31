@@ -317,11 +317,15 @@ export function ContratFormLayout({
   );
 
   if (form.initialLoading) {
-    return <ProductionFormSkeleton variant="contract" />;
+    return (
+      <div className="mx-auto w-full max-w-[1600px]">
+        <ProductionFormSkeleton variant="contract" />
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="mx-auto grid w-full max-w-[1600px] gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</div>

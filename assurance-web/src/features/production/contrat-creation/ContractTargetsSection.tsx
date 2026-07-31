@@ -1545,7 +1545,10 @@ function TargetGuaranteesTable({
         <div className="border-b px-3 py-2 text-sm font-semibold">
           {target.kind === "vehicule" ? "Garanties véhicule" : "Garanties remorque"}
         </div>
-        <table className={cn("w-full border-collapse text-sm", layout === "particulier" ? "min-w-[720px]" : "min-w-[860px]")}>
+        <table className={cn(
+          "w-full border-collapse text-xs lg:text-sm",
+          layout === "particulier" ? "min-w-[660px] lg:min-w-[720px]" : "min-w-[720px] lg:min-w-[860px]"
+        )}>
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="w-12 px-3 py-3 text-left" />
@@ -1769,7 +1772,10 @@ function TargetGuaranteesTable({
       {showPersonne ? (
         <div className="overflow-x-auto rounded-md border">
           <div className="border-b px-3 py-2 text-sm font-semibold">Garanties personne</div>
-          <table className={cn("w-full border-collapse text-sm", layout === "particulier" ? "min-w-[1080px]" : "min-w-[1320px]")}>
+          <table className={cn(
+            "w-full border-collapse text-xs lg:text-sm",
+            layout === "particulier" ? "min-w-[820px] xl:min-w-[1080px]" : "min-w-[880px] xl:min-w-[1320px]"
+          )}>
             <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="w-12 px-3 py-3 text-left" />
@@ -1938,7 +1944,7 @@ function AssistanceTable({
         />
         <span>Assistance</span>
       </div>
-      <table className="w-full min-w-[1100px] border-collapse text-sm">
+      <table className="w-full min-w-[780px] border-collapse text-xs lg:text-sm xl:min-w-[1100px]">
         <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-3 py-3 text-left">Date effet</th>

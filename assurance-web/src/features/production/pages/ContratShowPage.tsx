@@ -47,7 +47,8 @@ export default function ContratShowPage() {
   const dossier = contrat.numeroDossier ?? contrat.numeroContrat ?? `#${contrat.id}`;
   const souscripteur = clientByRole(contrat, "SOUSCRIPTEUR");
   const proprietaire = clientByRole(contrat, "PROPRIETAIRE") ?? souscripteur;
-  const sameClient = sameClientIdentity(souscripteur, proprietaire);
+  const conducteur = clientByRole(contrat, "CONDUCTEUR")
+    ?? (proprietaire?.conducteurHabituel ? proprietaire : null);
   const compagnie = optionLabel(compagniesQuery.data, contrat.compagnieAssuranceId);
   const convention = optionLabel(conventionsQuery.data, contrat.conventionId);
   const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
@@ -63,7 +64,7 @@ export default function ContratShowPage() {
         dossier,
         souscripteur,
         proprietaire,
-        sameClient,
+        conducteur,
         compagnie,
         convention,
         mouvement: selectedMouvement,
@@ -97,13 +98,13 @@ export default function ContratShowPage() {
           mouvement={selectedMouvement}
         />
       ) : (
-      <div className="mx-auto w-full max-w-[980px] rounded-md border bg-white p-6 text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
-        <header className="border-b-2 border-slate-900 pb-4">
+      <div className="mx-auto w-full max-w-[1050px] border bg-white p-4 text-[11px] leading-snug text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
+        <header className="border-b-2 border-slate-900 pb-2">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Fiche synthèse</p>
-              <h1 className="mt-1 text-2xl font-bold">Dossier N° {dossier}</h1>
-              <p className="mt-1 text-sm text-slate-600">{productLabel(contrat)} · Automobile</p>
+              <p className="text-[9px] font-bold uppercase text-emerald-700">Fiche synthèse</p>
+              <h1 className="mt-0.5 text-lg font-bold">Dossier N° {dossier}</h1>
+              <p className="text-[10px] text-slate-600">{productLabel(contrat)} · Automobile</p>
             </div>
             <div className="text-right text-sm">
               <p className="font-semibold">{text(contrat.numeroPolice)}</p>
@@ -112,7 +113,7 @@ export default function ContratShowPage() {
           </div>
         </header>
 
-        <main className="mt-5 grid gap-5">
+        <main className="mt-3 grid gap-3">
           <Section title="Contrat" icon={<FileText className="size-4" />}>
             <InfoGrid
               items={[
@@ -142,15 +143,12 @@ export default function ContratShowPage() {
             />
           </Section>
 
-          <Section title="Clients" icon={<UserRound className="size-4" />}>
-            {sameClient ? (
-              <ClientCard title="Souscripteur et propriétaire" client={souscripteur} />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                <ClientCard title="Souscripteur" client={souscripteur} />
-                <ClientCard title="Propriétaire" client={proprietaire} />
-              </div>
-            )}
+          <Section title="Parties au contrat" icon={<UserRound className="size-4" />}>
+            <PartiesGrid
+              souscripteur={souscripteur}
+              proprietaire={proprietaire}
+              conducteur={conducteur}
+            />
           </Section>
 
           {(contrat.vehicules ?? []).map((vehicule, index) => (
@@ -354,7 +352,7 @@ function VehicleSection({
       />
       <GarantiesTable
         garanties={garanties}
-        primeLabel={replacementSnapshot ? "Prime nette (nouveau)" : "Prime nette"}
+        primeLabel={replacementSnapshot ? "Prime différentielle" : "Prime nette"}
       />
     </Section>
   );
@@ -383,7 +381,7 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
   if (!garanties.length) return null;
   return (
     <Section title="Protection personnes">
-      <Table>
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1.5 [&_th]:h-7 [&_th]:px-2">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Garantie</TableHead>
@@ -415,7 +413,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
   if (!assistances.length) return null;
   return (
     <Section title="Assistance">
-      <Table>
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1.5 [&_th]:h-7 [&_th]:px-2">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Véhicule</TableHead>
@@ -445,25 +443,25 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return null;
   return (
-    <div className="mt-4 overflow-hidden rounded-md border">
-      <Table>
+    <div className="mt-2 overflow-hidden border-t border-slate-300">
+      <Table className="text-[10px]">
         <TableHeader>
           <TableRow className="bg-slate-100">
-            <TableHead>Garantie assurée</TableHead>
-            <TableHead className="text-right">Valeur assurée</TableHead>
-            <TableHead className="text-right">Taux</TableHead>
-            <TableHead>Franchise</TableHead>
-            <TableHead className="text-right">{primeLabel}</TableHead>
+            <TableHead className="h-7 px-2">Garantie assurée</TableHead>
+            <TableHead className="h-7 px-2 text-right">Valeur assurée</TableHead>
+            <TableHead className="h-7 px-2 text-right">Taux</TableHead>
+            <TableHead className="h-7 px-2">Franchise</TableHead>
+            <TableHead className="h-7 px-2 text-right">{primeLabel}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {vehiculeGaranties.map((garantie) => (
             <TableRow key={garantie.contratGarantieId}>
-              <TableCell className="font-medium">{garantieLabel(garantie)}</TableCell>
-              <TableCell className="text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
-              <TableCell className="text-right">{garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`}</TableCell>
-              <TableCell>{franchiseLabel(garantie)}</TableCell>
-              <TableCell className="text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
+              <TableCell className="px-2 py-1.5 font-medium">{garantieLabel(garantie)}</TableCell>
+              <TableCell className="px-2 py-1.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
+              <TableCell className="px-2 py-1.5 text-right">{garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`}</TableCell>
+              <TableCell className="px-2 py-1.5">{franchiseLabel(garantie)}</TableCell>
+              <TableCell className="px-2 py-1.5 text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -490,7 +488,7 @@ function QuittanceSection({
     <Section title={movementLabel
       ? `${differential ? "Quittance différentielle" : "Quittance"} - ${movementLabel}`
       : "Quittance générale"}>
-      <Table>
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1.5 [&_th]:h-7 [&_th]:px-2">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Catégorie</TableHead>
@@ -522,21 +520,21 @@ function QuittanceSection({
 
 function Section({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-md border border-slate-200">
-      <div className="flex items-center gap-2 border-l-4 border-emerald-600 bg-slate-100 px-3 py-2 text-sm font-bold uppercase text-slate-900">
+    <section className="overflow-hidden border border-slate-200">
+      <div className="flex items-center gap-1.5 border-l-2 border-emerald-600 bg-slate-100 px-2 py-1.5 text-[10px] font-bold uppercase text-slate-900">
         {icon}
         {title}
       </div>
-      <div className="p-3">{children}</div>
+      <div className="px-2 py-1.5">{children}</div>
     </section>
   );
 }
 
 function InfoGrid({ items }: { items: [string, ReactNode][] }) {
   return (
-    <div className="grid gap-x-6 md:grid-cols-3">
+    <div className="grid gap-x-4 md:grid-cols-3">
       {items.map(([label, value]) => (
-        <div key={label} className="grid grid-cols-[110px_1fr] gap-2 border-b border-dashed border-slate-200 py-2 text-xs">
+        <div key={label} className="grid grid-cols-[92px_1fr] gap-1.5 border-b border-dashed border-slate-200 py-1 text-[10px]">
           <span className="font-bold uppercase text-slate-500">{label}</span>
           <span className="font-semibold text-slate-950">{isBlankNode(value) ? "-" : value}</span>
         </div>
@@ -545,16 +543,56 @@ function InfoGrid({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
-function ClientCard({ title, client }: { title: string; client?: ClientResponse | null }) {
+function PartiesGrid({
+  souscripteur,
+  proprietaire,
+  conducteur,
+}: {
+  souscripteur?: ClientResponse | null;
+  proprietaire?: ClientResponse | null;
+  conducteur?: ClientResponse | null;
+}) {
   return (
-    <div className="rounded-md border border-slate-200 p-3">
-      <p className="text-xs font-bold uppercase text-emerald-700">{title}</p>
-      <p className="mt-1 text-base font-bold">{clientName(client)}</p>
-      <div className="mt-2 grid gap-1 text-xs text-slate-700">
-        <p>{clientIdentity(client)}</p>
-        <p>{text(client?.adresse)}{client?.ville ? `, ${client.ville}` : ""}</p>
-        <p>Tél: {text(client?.telephone ?? client?.telephones?.find((tel) => tel.principal)?.numero)}</p>
-      </div>
+    <div className="grid border border-slate-200 md:grid-cols-3">
+      <PartyColumn title="Souscripteur" client={souscripteur} />
+      <PartyColumn
+        title="Propriétaire"
+        client={proprietaire}
+        sameAs={sameClientIdentity(proprietaire, souscripteur) ? "souscripteur" : undefined}
+      />
+      <PartyColumn
+        title="Conducteur"
+        client={conducteur}
+        sameAs={sameClientIdentity(conducteur, souscripteur)
+          ? "souscripteur"
+          : sameClientIdentity(conducteur, proprietaire) ? "propriétaire" : undefined}
+      />
+    </div>
+  );
+}
+
+function PartyColumn({
+  title,
+  client,
+  sameAs,
+}: {
+  title: string;
+  client?: ClientResponse | null;
+  sameAs?: string;
+}) {
+  return (
+    <div className="min-w-0 border-b border-slate-200 p-2 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+      <p className="text-[9px] font-bold uppercase text-emerald-700">{title}</p>
+      <p className="mt-0.5 truncate text-xs font-bold">{clientName(client)}</p>
+      {sameAs ? (
+        <p className="mt-1 text-[10px] italic text-slate-500">Même personne que le {sameAs}</p>
+      ) : (
+        <div className="mt-1 space-y-0.5 text-[10px] text-slate-700">
+          <p>{clientIdentity(client)}</p>
+          <p>{text(client?.adresse)}{client?.ville ? `, ${client.ville}` : ""}</p>
+          <p>Tél: {text(client?.telephone ?? client?.telephones?.find((tel) => tel.principal)?.numero)}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -788,7 +826,7 @@ async function openContratPdf(params: {
   dossier: string;
   souscripteur?: ClientResponse | null;
   proprietaire?: ClientResponse | null;
-  sameClient: boolean;
+  conducteur?: ClientResponse | null;
   compagnie: string;
   convention: string;
   mouvement?: Mouvement | null;
@@ -798,9 +836,9 @@ async function openContratPdf(params: {
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const ctx: PdfContext = {
     pdf,
-    x: 12,
-    y: 14,
-    width: 186,
+    x: 9,
+    y: 10,
+    width: 192,
     pageHeight: 297,
   };
 
@@ -821,18 +859,8 @@ async function openContratPdf(params: {
     ]);
   });
 
-  drawPdfSection(ctx, "CLIENTS", () => {
-    if (params.sameClient) {
-      drawPdfClient(ctx, "Souscripteur et propriétaire", params.souscripteur, ctx.x, ctx.width);
-    } else {
-      const columnWidth = (ctx.width - 4) / 2;
-      const startY = ctx.y;
-      drawPdfClient(ctx, "Souscripteur", params.souscripteur, ctx.x, columnWidth);
-      const leftHeight = ctx.y;
-      ctx.y = startY;
-      drawPdfClient(ctx, "Propriétaire", params.proprietaire, ctx.x + columnWidth + 4, columnWidth);
-      ctx.y = Math.max(ctx.y, leftHeight);
-    }
+  drawPdfSection(ctx, "PARTIES AU CONTRAT", () => {
+    drawPdfParties(ctx, params.souscripteur, params.proprietaire, params.conducteur);
   });
 
   for (const [index, vehicule] of (params.contrat.vehicules ?? []).entries()) {
@@ -852,7 +880,11 @@ async function openContratPdf(params: {
         ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
       ]);
       const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
-      drawPdfGaranties(ctx, garanties);
+      drawPdfGaranties(
+        ctx,
+        garanties,
+        String(params.mouvement?.code ?? "").toUpperCase() === "CHV_M" ? "Prime différentielle" : "Prime nette",
+      );
     });
   }
 
@@ -906,62 +938,66 @@ type PdfContext = {
 function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossier: string }) {
   const { pdf } = ctx;
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(8);
+  pdf.setFontSize(6.5);
   pdf.setTextColor(4, 120, 87);
   pdf.text("FICHE SYNTHÈSE", ctx.x, ctx.y);
-  ctx.y += 7;
+  ctx.y += 5;
   pdf.setTextColor(2, 6, 23);
-  pdf.setFontSize(15);
+  pdf.setFontSize(12);
   pdf.text(pdfSafe(`Dossier N° ${params.dossier}`), ctx.x, ctx.y);
-  pdf.setFontSize(9);
+  pdf.setFontSize(7);
   pdf.text(pdfSafe(text(params.contrat.numeroPolice)), ctx.x + ctx.width, ctx.y - 1, { align: "right" });
-  ctx.y += 6;
+  ctx.y += 4.5;
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(71, 85, 105);
   pdf.text(pdfSafe(`${productLabel(params.contrat)} · Automobile`), ctx.x, ctx.y);
   pdf.text("Police N°", ctx.x + ctx.width, ctx.y, { align: "right" });
-  ctx.y += 8;
+  ctx.y += 5;
   pdf.setDrawColor(15, 23, 42);
   pdf.setLineWidth(0.5);
   pdf.line(ctx.x, ctx.y, ctx.x + ctx.width, ctx.y);
-  ctx.y += 6;
+  ctx.y += 3;
 }
 
 function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
-  ensurePdfSpace(ctx, 22);
+  ensurePdfSpace(ctx, 14);
   const { pdf } = ctx;
   pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(226, 232, 240);
-  pdf.rect(ctx.x, ctx.y, ctx.width, 9, "FD");
+  pdf.rect(ctx.x, ctx.y, ctx.width, 6, "FD");
   pdf.setFillColor(5, 150, 105);
-  pdf.rect(ctx.x, ctx.y, 1.2, 9, "F");
+  pdf.rect(ctx.x, ctx.y, 0.8, 6, "F");
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
+  pdf.setFontSize(6.5);
   pdf.setTextColor(2, 6, 23);
-  pdf.text(pdfSafe(title), ctx.x + 4, ctx.y + 6);
-  ctx.y += 12;
+  pdf.text(pdfSafe(title), ctx.x + 3, ctx.y + 4.1);
+  ctx.y += 7.5;
   draw();
   pdf.setDrawColor(226, 232, 240);
   pdf.line(ctx.x, ctx.y, ctx.x + ctx.width, ctx.y);
-  ctx.y += 7;
+  ctx.y += 3;
 }
 
 function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
-  const columnGap = 6;
-  const columnWidth = (ctx.width - 6 - columnGap) / 2;
-  const rowGap = 2.5;
-  for (let index = 0; index < items.length; index += 2) {
-    const left = items[index];
-    const right = items[index + 1];
-    const leftLines = wrapPdfText(ctx, valueToPdfText(left[1]), columnWidth - 4);
-    const rightLines = right ? wrapPdfText(ctx, valueToPdfText(right[1]), columnWidth - 4) : [];
-    const rowHeight = Math.max(9, 6 + Math.max(leftLines.length, rightLines.length) * 3.4);
-    ensurePdfSpace(ctx, rowHeight + rowGap);
-    drawPdfInfoCell(ctx, left[0], leftLines, ctx.x + 3, ctx.y, columnWidth, rowHeight);
-    if (right) {
-      drawPdfInfoCell(ctx, right[0], rightLines, ctx.x + 3 + columnWidth + columnGap, ctx.y, columnWidth, rowHeight);
-    }
-    ctx.y += rowHeight + rowGap;
+  const columnGap = 3;
+  const columnWidth = (ctx.width - 6 - columnGap * 2) / 3;
+  for (let index = 0; index < items.length; index += 3) {
+    const row = items.slice(index, index + 3);
+    const wrapped = row.map(([, value]) => wrapPdfText(ctx, valueToPdfText(value), columnWidth * 0.58));
+    const rowHeight = Math.max(6, 2.5 + Math.max(...wrapped.map((lines) => lines.length)) * 2.7);
+    ensurePdfSpace(ctx, rowHeight);
+    row.forEach(([label], columnIndex) => {
+      drawPdfInfoCell(
+        ctx,
+        label,
+        wrapped[columnIndex],
+        ctx.x + 3 + columnIndex * (columnWidth + columnGap),
+        ctx.y,
+        columnWidth,
+        rowHeight,
+      );
+    });
+    ctx.y += rowHeight;
   }
 }
 
@@ -969,48 +1005,82 @@ function drawPdfInfoCell(ctx: PdfContext, label: string, lines: string[], x: num
   ctx.pdf.setDrawColor(226, 232, 240);
   ctx.pdf.line(x, y + height - 1, x + width, y + height - 1);
   ctx.pdf.setFont("helvetica", "bold");
-  ctx.pdf.setFontSize(7);
+  ctx.pdf.setFontSize(5.5);
   ctx.pdf.setTextColor(100, 116, 139);
-  ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 3);
-  ctx.pdf.setFontSize(8);
+  ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 3.2);
+  ctx.pdf.setFontSize(6.3);
   ctx.pdf.setTextColor(2, 6, 23);
-  ctx.pdf.text(lines.length ? lines : ["-"], x, y + 7, { maxWidth: width - 4 });
+  ctx.pdf.text(lines.length ? lines : ["-"], x + width * 0.4, y + 3.2, { maxWidth: width * 0.58 });
 }
 
-function drawPdfClient(ctx: PdfContext, title: string, client: ClientResponse | null | undefined, x: number, width: number) {
-  const nameLines = wrapPdfText(ctx, clientName(client), width - 6);
-  const identityLines = wrapPdfText(ctx, clientIdentity(client), width - 6);
-  const addressLines = wrapPdfText(ctx, `${text(client?.adresse)}${client?.ville ? `, ${client.ville}` : ""}`, width - 6);
-  const phoneLines = wrapPdfText(ctx, `Tél: ${text(client?.telephone ?? client?.telephones?.find((tel) => tel.principal)?.numero)}`, width - 6);
-  const height = 11 + nameLines.length * 4 + identityLines.length * 3.5 + addressLines.length * 3.5 + phoneLines.length * 3.5;
-  ensurePdfSpace(ctx, height + 2);
+function drawPdfParties(
+  ctx: PdfContext,
+  souscripteur?: ClientResponse | null,
+  proprietaire?: ClientResponse | null,
+  conducteur?: ClientResponse | null,
+) {
+  const parties: Array<{
+    title: string;
+    client?: ClientResponse | null;
+    sameAs?: string | null;
+  }> = [
+    { title: "Souscripteur", client: souscripteur },
+    {
+      title: "Propriétaire",
+      client: proprietaire,
+      sameAs: sameClientIdentity(proprietaire, souscripteur) ? "Même personne que le souscripteur" : null,
+    },
+    {
+      title: "Conducteur",
+      client: conducteur,
+      sameAs: sameClientIdentity(conducteur, souscripteur)
+        ? "Même personne que le souscripteur"
+        : sameClientIdentity(conducteur, proprietaire) ? "Même personne que le propriétaire" : null,
+    },
+  ];
+  const gap = 0;
+  const width = (ctx.width - 6 - gap * 2) / 3;
+  const content = parties.map((party) => {
+    const details = party.sameAs
+      ? [clientName(party.client), party.sameAs]
+      : [
+          clientName(party.client),
+          clientIdentity(party.client),
+          `${text(party.client?.adresse)}${party.client?.ville ? `, ${party.client.ville}` : ""}`,
+          `Tél: ${text(party.client?.telephone ?? party.client?.telephones?.find((tel) => tel.principal)?.numero)}`,
+        ];
+    return details.map((line) => wrapPdfText(ctx, line, width - 5));
+  });
+  const maxLines = Math.max(...content.map((lines) => lines.reduce((total, line) => total + line.length, 0)));
+  const height = Math.max(14, 7 + maxLines * 2.8);
+  ensurePdfSpace(ctx, height);
+  const startX = ctx.x + 3;
   const startY = ctx.y;
-  ctx.pdf.setDrawColor(226, 232, 240);
-  ctx.pdf.roundedRect(x, startY, width, height, 1.5, 1.5, "S");
-  ctx.pdf.setFont("helvetica", "bold");
-  ctx.pdf.setFontSize(7);
-  ctx.pdf.setTextColor(4, 120, 87);
-  ctx.pdf.text(pdfSafe(title.toUpperCase()), x + 3, startY + 5);
-  ctx.pdf.setFontSize(10);
-  ctx.pdf.setTextColor(2, 6, 23);
-  let y = startY + 11;
-  ctx.pdf.text(nameLines, x + 3, y, { maxWidth: width - 6 });
-  y += nameLines.length * 4;
-  ctx.pdf.setFont("helvetica", "normal");
-  ctx.pdf.setFontSize(7.5);
-  ctx.pdf.setTextColor(51, 65, 85);
-  ctx.pdf.text(identityLines, x + 3, y, { maxWidth: width - 6 });
-  y += identityLines.length * 3.5;
-  ctx.pdf.text(addressLines, x + 3, y, { maxWidth: width - 6 });
-  y += addressLines.length * 3.5;
-  ctx.pdf.text(phoneLines, x + 3, y, { maxWidth: width - 6 });
-  ctx.y = startY + height + 2;
+
+  parties.forEach((party, index) => {
+    const x = startX + index * (width + gap);
+    ctx.pdf.setDrawColor(203, 213, 225);
+    ctx.pdf.rect(x, startY, width, height, "S");
+    ctx.pdf.setFont("helvetica", "bold");
+    ctx.pdf.setFontSize(5.8);
+    ctx.pdf.setTextColor(4, 120, 87);
+    ctx.pdf.text(pdfSafe(party.title.toUpperCase()), x + 2, startY + 3.5);
+    let y = startY + 7;
+    content[index].forEach((lines, lineIndex) => {
+      ctx.pdf.setFont("helvetica", lineIndex === 0 ? "bold" : "normal");
+      ctx.pdf.setFontSize(lineIndex === 0 ? 7 : 6);
+      ctx.pdf.setTextColor(lineIndex === 1 && party.sameAs ? 100 : 30, lineIndex === 1 && party.sameAs ? 116 : 41, lineIndex === 1 && party.sameAs ? 139 : 59);
+      ctx.pdf.text(lines, x + 2, y, { maxWidth: width - 4 });
+      y += lines.length * 2.8;
+    });
+  });
+  ctx.y = startY + height;
 }
 
-function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[]) {
+function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[], primeLabel = "Prime nette") {
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return;
-  drawPdfTable(ctx, ["Garantie assurée", "Valeur assurée", "Taux", "Franchise", "Prime nette"], vehiculeGaranties.map((garantie) => [
+  drawPdfTable(ctx, ["Garantie assurée", "Valeur assurée", "Taux", "Franchise", primeLabel], vehiculeGaranties.map((garantie) => [
     garantieLabel(garantie),
     formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
     garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`,
@@ -1062,48 +1132,48 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
   const tableWidth = ctx.width - 6;
   const totalWidth = widths.reduce((sum, width) => sum + width, 0);
   const actualWidths = widths.map((width) => (width / totalWidth) * tableWidth);
-  const headerHeight = 8;
+  const headerHeight = 6;
   ensurePdfSpace(ctx, headerHeight * 2);
   ctx.pdf.setFillColor(241, 245, 249);
   ctx.pdf.setDrawColor(226, 232, 240);
   ctx.pdf.rect(tableX, ctx.y, tableWidth, headerHeight, "FD");
   let cursorX = tableX + 1.5;
   ctx.pdf.setFont("helvetica", "bold");
-  ctx.pdf.setFontSize(7);
+  ctx.pdf.setFontSize(6);
   ctx.pdf.setTextColor(51, 65, 85);
   headers.forEach((header, index) => {
-    ctx.pdf.text(pdfSafe(header), cursorX, ctx.y + 5);
+    ctx.pdf.text(pdfSafe(header), cursorX, ctx.y + 4);
     cursorX += actualWidths[index];
   });
   ctx.y += headerHeight;
 
   for (const row of rows) {
     const wrapped = row.map((cell, index) => wrapPdfText(ctx, cell, actualWidths[index] - 3));
-    const rowHeight = Math.max(8, 4 + Math.max(...wrapped.map((lines) => lines.length)) * 3.5);
-    ensurePdfSpace(ctx, rowHeight + 3);
+    const rowHeight = Math.max(6, 2.7 + Math.max(...wrapped.map((lines) => lines.length)) * 2.8);
+    ensurePdfSpace(ctx, rowHeight + 1);
     cursorX = tableX + 1.5;
     ctx.pdf.setDrawColor(226, 232, 240);
     ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
     row.forEach((_cell, index) => {
       const isLast = index === row.length - 1;
       ctx.pdf.setFont("helvetica", isLast ? "bold" : "normal");
-      ctx.pdf.setFontSize(7.5);
+      ctx.pdf.setFontSize(6.3);
       ctx.pdf.setTextColor(2, 6, 23);
       const align = index === 0 ? "left" : "right";
       const textX = align === "right" ? cursorX + actualWidths[index] - 2 : cursorX;
-      ctx.pdf.text(wrapped[index], textX, ctx.y + 5, { align, maxWidth: actualWidths[index] - 3 });
+      ctx.pdf.text(wrapped[index], textX, ctx.y + 3.8, { align, maxWidth: actualWidths[index] - 3 });
       cursorX += actualWidths[index];
     });
     ctx.y += rowHeight;
   }
   ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
-  ctx.y += 3;
+  ctx.y += 1.5;
 }
 
 function ensurePdfSpace(ctx: PdfContext, needed: number) {
   if (ctx.y + needed <= ctx.pageHeight - 12) return;
   ctx.pdf.addPage();
-  ctx.y = 14;
+  ctx.y = 10;
 }
 
 function wrapPdfText(ctx: PdfContext, value: string, width: number) {

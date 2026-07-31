@@ -311,6 +311,16 @@ public class MouvementContratService {
     }
 
     @Transactional
+    public void ajouterSnapshotsGarantiesDifferentielles(
+            Long mouvementId,
+            List<ContratGarantie> garantiesDifferentielles
+    ) {
+        MouvementContrat mouvement = mouvementContratRepository.findById(mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        snapshotGaranties(mouvement, garantiesDifferentielles, NatureSnapshotMouvement.DIFFERENTIEL, false);
+    }
+
+    @Transactional
     public QuittanceResponse creerMouvement(Long agenceId, Long contratId, MouvementContratRequest request) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());
@@ -648,10 +658,19 @@ public class MouvementContratService {
     }
 
     private void snapshotGaranties(MouvementContrat mouvement, List<ContratGarantie> garanties, NatureSnapshotMouvement nature) {
+        snapshotGaranties(mouvement, garanties, nature, true);
+    }
+
+    private void snapshotGaranties(
+            MouvementContrat mouvement,
+            List<ContratGarantie> garanties,
+            NatureSnapshotMouvement nature,
+            boolean lierGarantieContrat
+    ) {
         for (ContratGarantie garantie : garanties == null ? List.<ContratGarantie>of() : garanties) {
             MouvementGarantie snapshot = mouvementGarantieRepository.save(MouvementGarantie.builder()
                     .mouvementContrat(mouvement)
-                    .contratGarantie(garantie)
+                    .contratGarantie(lierGarantieContrat ? garantie : null)
                     .garantie(garantie.getGarantie())
                     .vehicule(garantie.getVehicule())
                     .remorque(garantie.getRemorque())

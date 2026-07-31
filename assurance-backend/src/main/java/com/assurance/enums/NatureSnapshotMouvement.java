@@ -5,5 +5,6 @@ public enum NatureSnapshotMouvement {
     APRES,
     AJOUT,
     RETRAIT,
-    COURANT
+    COURANT,
+    DIFFERENTIEL
 }

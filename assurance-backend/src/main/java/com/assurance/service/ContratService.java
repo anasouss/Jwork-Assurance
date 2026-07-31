@@ -2009,7 +2009,8 @@ public class ContratService {
                 .toList();
         List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository
                 .findByMouvementContratId(mouvement.getId()).stream()
-                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT
+                        && snapshot.getNature() != NatureSnapshotMouvement.DIFFERENTIEL)
                 .sorted(Comparator.comparing(MouvementGarantie::getId))
                 .toList();
 
@@ -2573,6 +2574,10 @@ public class ContratService {
                         graph.anciennesGaranties(),
                         graph.nouvellesGaranties()
                 );
+                mouvementContratService.ajouterSnapshotsGarantiesDifferentielles(
+                        quittance.getMouvementContratId(),
+                        graph.garantiesDifferentielles()
+                );
             }
             quittance.setAssistances(persistAvenantAssistances(
                     graph.contrat(),
@@ -2607,6 +2612,12 @@ public class ContratService {
                         graph.snapshotNature(),
                         montantsOverride
                 );
+        if (quittance.getMouvementContratId() != null && graph.garantiesAffichees() != null) {
+            mouvementContratService.ajouterSnapshotsGarantiesDifferentielles(
+                    quittance.getMouvementContratId(),
+                    graph.garantiesAffichees()
+            );
+        }
         quittance.setAssistances(persistAvenantAssistances(
                 graph.contrat(),
                 graph.vehicules(),
@@ -4350,7 +4361,13 @@ public class ContratService {
                     .sorted(Comparator.comparing(MouvementRemorque::getId))
                     .map(this::toRemorqueView)
                     .toList();
-            garanties = mouvementGarantieRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
+            List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository
+                    .findByMouvementContratId(selectedMouvement.getId());
+            boolean hasDifferentialSnapshots = garantieSnapshots.stream()
+                    .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL);
+            garanties = garantieSnapshots.stream()
+                    .filter(snapshot -> !hasDifferentialSnapshots
+                            || snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL)
                     .sorted(Comparator.comparing(MouvementGarantie::getId))
                     .map(this::toGarantieView)
                     .toList();

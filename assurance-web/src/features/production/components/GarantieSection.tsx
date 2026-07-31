@@ -182,7 +182,7 @@ export function GarantieSection({
       ) : null}
       <div className="mb-2 text-sm font-semibold">Garanties véhicule</div>
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[720px] table-fixed border-collapse text-xs xl:min-w-[980px] xl:text-sm">
+        <table className="w-full min-w-[720px] table-fixed border-collapse text-xs [&_input]:h-8 [&_input]:px-2 [&_input]:text-xs [&_[data-slot=select-trigger]]:h-8 [&_[data-slot=select-trigger]]:px-2 [&_[data-slot=select-trigger]]:text-xs xl:min-w-[980px] xl:text-sm xl:[&_input]:h-9 xl:[&_input]:px-3 xl:[&_input]:text-sm xl:[&_[data-slot=select-trigger]]:h-9 xl:[&_[data-slot=select-trigger]]:px-3 xl:[&_[data-slot=select-trigger]]:text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="w-10 px-2 py-3 text-left"></th>

@@ -2733,6 +2733,21 @@ public class ContratService {
                     .subtract(zeroIfNull(ancienne == null ? null : ancienne.getPrime()));
             result.add(copierGarantieAvecPrime(nouvelle, scale(primeDifferentielle)));
         }
+        Vehicule nouveauVehicule = (nouvellesGaranties == null ? List.<ContratGarantie>of() : nouvellesGaranties).stream()
+                .map(ContratGarantie::getVehicule)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        for (ContratGarantie ancienne : anciennesGaranties == null ? List.<ContratGarantie>of() : anciennesGaranties) {
+            if (anciennesConsommees.contains(ancienne)) {
+                continue;
+            }
+            ContratGarantie supprimee = copierGarantieAvecPrime(ancienne, scale(zeroIfNull(ancienne.getPrime()).negate()));
+            if (supprimee.getVehicule() != null && nouveauVehicule != null) {
+                supprimee.setVehicule(nouveauVehicule);
+            }
+            result.add(supprimee);
+        }
         return result;
     }
 

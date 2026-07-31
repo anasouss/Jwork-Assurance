@@ -1041,11 +1041,12 @@ function previewGuaranteeLine(
 ) {
   const expectedLineId = selected?.ligneGrilleTarifaireId;
   const expectedFormuleId = selected?.formuleGarantiePersonneId;
+  const personne = String(garantie.typeGarantie ?? "").toUpperCase() === "PERSONNE";
   return preview?.garanties?.find((line) => {
     if (String(line.garantieId ?? "") !== String(garantie.id)) {
       return false;
     }
-    if (target.kind === "vehicule" && line.vehiculeIndex !== target.index) {
+    if (!personne && target.kind === "vehicule" && line.vehiculeIndex !== target.index) {
       return false;
     }
     if (target.kind === "remorque" && line.remorqueIndex !== target.index) {

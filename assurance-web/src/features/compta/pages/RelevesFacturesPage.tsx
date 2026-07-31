@@ -5,11 +5,13 @@ import {
   Ban,
   Building2,
   Eye,
+  FileDown,
   FilePlus2,
   FileText,
   ReceiptText,
   RotateCcw,
   Search,
+  Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -109,6 +111,7 @@ export default function RelevesFacturesPage() {
   const requestedPayerId = searchParams.get("payeurId") ?? "";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
+  const canDelete = permissions.includes("quittance:manage");
   const [tab, setTab] = useState("sources");
   const [sourceFilters, setSourceFilters] = useState(SOURCE_DEFAULTS);
   const [appliedSourceFilters, setAppliedSourceFilters] = useState(SOURCE_DEFAULTS);
@@ -120,6 +123,7 @@ export default function RelevesFacturesPage() {
   const [issueOpen, setIssueOpen] = useState(false);
   const [detailId, setDetailId] = useState<string>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
+  const [deleteTarget, setDeleteTarget] = useState<ClientDocument>();
   const [payerMode, setPayerMode] = useState<SelectedPayer["type"]>(requestedPayerType);
   const [payerSearch, setPayerSearch] = useState("");
   const deferredPayerSearch = useDeferredValue(payerSearch.trim());
@@ -419,6 +423,7 @@ export default function RelevesFacturesPage() {
             onNext={() => setDocumentPage((current) => current + 1)}
             onDetail={setDetailId}
             onCancel={canIssue ? setCancelTarget : undefined}
+            onDelete={canDelete ? setDeleteTarget : undefined}
           />
         </TabsContent>
       </Tabs> : (
@@ -445,6 +450,7 @@ export default function RelevesFacturesPage() {
       />
       <DocumentDetailDialog id={detailId} onOpenChange={(open) => !open && setDetailId(undefined)} />
       <CancelDocumentDialog target={cancelTarget} onClose={() => setCancelTarget(undefined)} />
+      <DeleteDocumentDialog target={deleteTarget} onClose={() => setDeleteTarget(undefined)} />
     </div>
   );
 }
@@ -674,6 +680,7 @@ function DocumentTable(props: {
   onNext: () => void;
   onDetail: (id: string) => void;
   onCancel?: (document: ClientDocument) => void;
+  onDelete?: (document: ClientDocument) => void;
 }) {
   return (
     <Card className="min-w-0 shadow-none">
@@ -720,6 +727,11 @@ function DocumentTable(props: {
                       {props.onCancel && document.statut === "EMIS" ? (
                         <Button variant="ghost" size="icon" title="Annuler le document" onClick={() => props.onCancel?.(document)}>
                           <Ban className="size-4 text-destructive" />
+                        </Button>
+                      ) : null}
+                      {props.onDelete ? (
+                        <Button variant="ghost" size="icon" title="Supprimer le document" onClick={() => props.onDelete?.(document)}>
+                          <Trash2 className="size-4 text-destructive" />
                         </Button>
                       ) : null}
                     </div>
@@ -992,6 +1004,49 @@ function CancelDocumentDialog(props: { target?: ClientDocument; onClose: () => v
   );
 }
 
+function DeleteDocumentDialog(props: { target?: ClientDocument; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const remove = useMutation({
+    mutationFn: () => comptaApi.deleteClientDocument(props.target?.id as string),
+    onSuccess: async () => {
+      toast.success("Document supprimé.");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
+      ]);
+      props.onClose();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Suppression impossible"),
+  });
+
+  return (
+    <AlertDialog open={Boolean(props.target)} onOpenChange={(open) => !open && props.onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Supprimer {props.target?.numero} ?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Cette suppression est définitive. Les quittances liées redeviendront disponibles pour un nouveau document.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Fermer</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground"
+            disabled={remove.isPending}
+            onClick={(event) => {
+              event.preventDefault();
+              remove.mutate();
+            }}
+          >
+            <Trash2 className="size-4" />
+            {remove.isPending ? "Suppression..." : "Supprimer définitivement"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
   const [loading, setLoading] = useState(false);
   async function preview() {
@@ -1022,7 +1077,7 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
       disabled={loading}
       title="Prévisualiser le PDF"
     >
-      <Eye className="size-4" />
+      <FileDown className="size-4" />
       {props.withLabel ? (loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
     </Button>
   );

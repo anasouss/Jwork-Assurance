@@ -299,6 +299,11 @@ public class DocumentClientService {
         return toResponse(documentClientRepository.save(document), true);
     }
 
+    @Transactional
+    public void delete(Long agenceId, Long documentId) {
+        documentClientRepository.delete(findDocument(agenceId, documentId));
+    }
+
     @Transactional(readOnly = true)
     public DocumentClient findDocument(Long agenceId, Long documentId) {
         return documentClientRepository.findByAgenceIdAndId(agenceId, documentId)

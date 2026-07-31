@@ -213,6 +213,12 @@ export const comptaApi = {
     );
   },
 
+  async deleteClientDocument(id: string) {
+    await apiFetch<ApiResponse<null>>(`/api/v1/compta/documents-clients/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   async clientDocumentPdf(id: string) {
     return apiFetchBlob(`/api/v1/compta/documents-clients/${id}/pdf`);
   },

@@ -262,6 +262,13 @@ public class ComptaController {
         ));
     }
 
+    @DeleteMapping("/documents-clients/{documentId}")
+    @PreAuthorize("hasAuthority('PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<Void>> supprimerDocumentClient(@PathVariable Long documentId) {
+        documentClientService.delete(TenantContext.getCurrentAgence(), documentId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Document supprimé"));
+    }
+
     @GetMapping("/documents-clients/{documentId}/pdf")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<byte[]> documentClientPdf(@PathVariable Long documentId) {

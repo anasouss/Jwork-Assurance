@@ -319,7 +319,7 @@ export function useContratCreationForm(
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
-    clients: clients.map((client) => ({
+    clients: clients.filter(shouldPersistClientInput).map((client) => ({
       ...client,
       client: {
         ...client.client,
@@ -1407,6 +1407,13 @@ function hydrateDraft(draft: ContratSummary) {
         } satisfies ClientInput;
       })
     : [emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")];
+  if (!clients.some((client) => client.role === "SOUSCRIPTEUR")) {
+    clients.push(emptyClient("SOUSCRIPTEUR"));
+  }
+  if (!clients.some((client) => client.role === "PROPRIETAIRE")) {
+    clients.push(emptyClient("PROPRIETAIRE"));
+  }
+
   const souscripteur = clients.find((client) => client.role === "SOUSCRIPTEUR");
   const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
   if (souscripteur?.clientId && proprietaire?.clientId && souscripteur.clientId === proprietaire.clientId) {
@@ -1582,6 +1589,25 @@ function targetQuittanceGeneraleFromDraft(draft: ContratSummary): QuittancePrevi
 
 function nullToUndefined<T>(value: T | null | undefined): T | undefined {
   return value == null ? undefined : value;
+}
+
+function shouldPersistClientInput(input: ClientInput) {
+  if (input.clientId || input.sameAsRole) {
+    return true;
+  }
+  const client = input.client;
+  return [
+    client.codeClient,
+    client.cin,
+    client.rc,
+    client.nom,
+    client.prenom,
+    client.raisonSociale,
+    client.telephone,
+    client.email,
+    client.adresse,
+  ].some((value) => Boolean(value?.trim()))
+    || Boolean(client.telephones?.some((telephone) => telephone.numero.trim()));
 }
 
 function idString(value: string | number | null | undefined) {

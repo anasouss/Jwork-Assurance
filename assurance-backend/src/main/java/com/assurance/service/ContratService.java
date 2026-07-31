@@ -1,5 +1,6 @@
 package com.assurance.service;
 
+import com.assurance.dto.request.CreateClientRequest;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.AvenantRequest;
@@ -1264,6 +1265,9 @@ public class ContratService {
                 aliasInputs.add(input);
                 continue;
             }
+            if (!finalMode && !hasDraftClientData(input)) {
+                continue;
+            }
             Client client = resolveClientForDraft(agenceId, input, existingClients, finalMode);
             if (client == null) {
                 continue;
@@ -1501,6 +1505,24 @@ public class ContratService {
 
     private String clientDraftKey(com.assurance.enums.RoleClientContrat role, boolean principal) {
         return role.name() + ":" + principal;
+    }
+
+    private boolean hasDraftClientData(CreateContratRequest.ClientInput input) {
+        if (input.getClientId() != null || input.getClient() == null) {
+            return input.getClientId() != null;
+        }
+        CreateClientRequest client = input.getClient();
+        return hasText(client.getCodeClient())
+                || hasText(client.getCin())
+                || hasText(client.getRc())
+                || hasText(client.getNom())
+                || hasText(client.getPrenom())
+                || hasText(client.getRaisonSociale())
+                || hasText(client.getTelephone())
+                || hasText(client.getEmail())
+                || hasText(client.getAdresse())
+                || (client.getTelephones() != null && client.getTelephones().stream()
+                        .anyMatch(telephone -> hasText(telephone.getNumero())));
     }
 
     private Client existingClientForRole(Map<String, Client> existingClients, com.assurance.enums.RoleClientContrat role) {

@@ -127,9 +127,15 @@ export default function ContratShowPage() {
                 ["Date d'échéance", formatDate(selectedMouvement?.dateEcheance ?? contrat.dateEcheance)],
                 ["Type client", clientTypeLabel(souscripteur)],
                 ["Fractionnement", text(contrat.fractionnement)],
-                ["Groupe client", souscripteur?.groupe?.libelle ?? "Indépendant"],
-                ["Payeur des primes", contrat.payeurPrimeNom ?? payerTypeLabel(contrat.typePayeurPrime)],
-                ["Facturation", billingModeLabel(contrat.modeFacturation)],
+                ...(souscripteur?.groupe?.libelle
+                  ? [["Groupe client", souscripteur.groupe.libelle] as [string, ReactNode]]
+                  : []),
+                ...(!isSubscriberPayer(contrat, souscripteur)
+                  ? [["Payeur des primes", contrat.payeurPrimeNom ?? payerTypeLabel(contrat.typePayeurPrime)] as [string, ReactNode]]
+                  : []),
+                ...(contrat.modeFacturation === "CONSOLIDEE_GROUPE"
+                  ? [["Facturation", billingModeLabel(contrat.modeFacturation)] as [string, ReactNode]]
+                  : []),
                 ...(contrat.modeReglement
                   ? [["Mode de règlement", contractPaymentModeLabel(contrat.modeReglement)] as [string, ReactNode]]
                   : []),
@@ -381,7 +387,7 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
   if (!garanties.length) return null;
   return (
     <Section title="Protection personnes">
-      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2">
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2 [&_th]:text-[9px] [&_th]:uppercase">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Garantie</TableHead>
@@ -413,7 +419,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
   if (!assistances.length) return null;
   return (
     <Section title="Assistance">
-      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2">
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2 [&_th]:text-[9px] [&_th]:uppercase">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Véhicule</TableHead>
@@ -443,15 +449,15 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return null;
   return (
-    <div className="mt-1 overflow-hidden border-t border-slate-300">
+    <div className="mt-2 overflow-hidden border-t border-slate-300">
       <Table className="text-[10px]">
         <TableHeader>
           <TableRow className="bg-slate-100">
-            <TableHead className="h-6 px-2">Garantie assurée</TableHead>
-            <TableHead className="h-6 px-2 text-right">Valeur assurée</TableHead>
-            <TableHead className="h-6 px-2 text-right">Taux</TableHead>
-            <TableHead className="h-6 px-2">Franchise</TableHead>
-            <TableHead className="h-6 px-2 text-right">{primeLabel}</TableHead>
+            <TableHead className="h-6 px-2 text-[9px] uppercase">Garantie assurée</TableHead>
+            <TableHead className="h-6 px-2 text-right text-[9px] uppercase">Valeur assurée</TableHead>
+            <TableHead className="h-6 px-2 text-right text-[9px] uppercase">Taux</TableHead>
+            <TableHead className="h-6 px-2 text-[9px] uppercase">Franchise</TableHead>
+            <TableHead className="h-6 px-2 text-right text-[9px] uppercase">{primeLabel}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -488,7 +494,7 @@ function QuittanceSection({
     <Section title={movementLabel
       ? `${differential ? "Quittance différentielle" : "Quittance"} - ${movementLabel}`
       : "Quittance générale"}>
-      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2">
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2 [&_th]:text-[9px] [&_th]:uppercase">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Catégorie</TableHead>
@@ -534,9 +540,9 @@ function InfoGrid({ items }: { items: [string, ReactNode][] }) {
   return (
     <div className="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
       {items.map(([label, value]) => (
-        <div key={label} className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-1.5 border-b border-dashed border-slate-200 py-0.5 text-[10px]">
-          <span className="font-bold uppercase text-slate-500">{label}</span>
-          <span className="min-w-0 break-words font-semibold text-slate-950">{isBlankNode(value) ? "-" : value}</span>
+        <div key={label} className="flex min-w-0 flex-col border-b border-dashed border-slate-200 py-1">
+          <span className="text-[8px] font-bold uppercase leading-tight text-slate-500">{label}</span>
+          <span className="mt-0.5 min-w-0 break-words text-[10px] font-semibold leading-tight text-slate-950">{isBlankNode(value) ? "-" : value}</span>
         </div>
       ))}
     </div>
@@ -767,6 +773,12 @@ function payerTypeLabel(type?: ContratSummary["typePayeurPrime"]) {
     default:
       return "Souscripteur";
   }
+}
+
+function isSubscriberPayer(contrat: ContratSummary, souscripteur?: ClientResponse | null) {
+  if (!contrat.typePayeurPrime || contrat.typePayeurPrime === "SOUSCRIPTEUR") return true;
+  if (contrat.payeurPrimeClientId == null || souscripteur?.id == null) return false;
+  return String(contrat.payeurPrimeClientId) === String(souscripteur.id);
 }
 
 function billingModeLabel(mode?: ContratSummary["modeFacturation"]) {

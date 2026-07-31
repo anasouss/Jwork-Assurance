@@ -22,7 +22,7 @@ const LABELS: Record<QuittanceInput["categorie"], string> = {
 type MoneyColumnKey = "primeNette" | "taxe" | "taxeParafiscale" | "accessoire" | "cnpac";
 
 const COLUMNS: { key: MoneyColumnKey; label: string }[] = [
-  { key: "primeNette", label: "Prime nette" },
+  { key: "primeNette", label: "Prime Nette" },
   { key: "taxe", label: "Taxes" },
   { key: "taxeParafiscale", label: "TPF" },
   { key: "accessoire", label: "ACC" },

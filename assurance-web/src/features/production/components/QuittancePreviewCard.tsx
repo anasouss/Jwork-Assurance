@@ -17,7 +17,7 @@ export function QuittancePreviewCard({
         <TableHeader>
           <TableRow>
             <TableHead>Catégorie</TableHead>
-            <TableHead className="text-right">Prime nette</TableHead>
+            <TableHead className="text-right">Prime Nette</TableHead>
             <TableHead className="text-right">Taxes</TableHead>
             <TableHead className="text-right">TPF</TableHead>
             <TableHead className="text-right">ACC</TableHead>

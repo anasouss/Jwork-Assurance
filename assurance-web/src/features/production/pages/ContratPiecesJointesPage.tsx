@@ -4,27 +4,33 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileText, FileUp, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { productionApi } from "../api";
-import type { PieceJointe, TypeClient, TypeContrat, TypePieceJointe } from "../types";
+import type { PieceJointe, TypeContrat, TypePieceJointe } from "../types";
+import { Field } from "../components/Field";
+
+const OTHER_TYPE = "__OTHER__";
 
 export default function ContratPiecesJointesPage() {
   const { contratId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const mouvementId = numericParam(searchParams.get("mouvementId"));
   const queryClient = useQueryClient();
-  const [uploadTarget, setUploadTarget] = useState<TypePieceJointe | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [selectedTypeId, setSelectedTypeId] = useState("");
+  const [customTypeLabel, setCustomTypeLabel] = useState("");
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
 
   const piecesQuery = useQuery({
@@ -34,11 +40,10 @@ export default function ContratPiecesJointesPage() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: ({ typePieceJointeId, files }: { typePieceJointeId: string; files: File[] }) =>
-      productionApi.uploadPieceJointe(contratId, { typePieceJointeId, mouvementId, files }),
+    mutationFn: (payload: { typePieceJointeId?: string; customTypeLabel?: string; files: File[] }) =>
+      productionApi.uploadPieceJointe(contratId, { ...payload, mouvementId }),
     onSuccess: async () => {
-      setUploadTarget(null);
-      setUploadFiles([]);
+      resetUpload();
       await queryClient.invalidateQueries({ queryKey: ["contrat-pieces-jointes", contratId, mouvementId] });
       toast.success("Pièce jointe enregistrée");
     },
@@ -58,6 +63,7 @@ export default function ContratPiecesJointesPage() {
   const piecesByType = useMemo(() => groupPiecesByType(data?.pieces ?? []), [data?.pieces]);
   const completedRequired = (data?.types ?? []).filter((type) => type.obligatoire && (piecesByType.get(type.id)?.length ?? 0) > 0).length;
   const requiredCount = (data?.types ?? []).filter((type) => type.obligatoire).length;
+  const selectableTypes = (data?.types ?? []).filter((type) => !isGenericOtherType(type));
 
   async function download(piece: PieceJointe) {
     try {
@@ -73,15 +79,31 @@ export default function ContratPiecesJointesPage() {
     }
   }
 
-  function closeUploadDialog(open: boolean) {
-    if (open) return;
-    setUploadTarget(null);
+  function resetUpload() {
+    setUploadOpen(false);
+    setSelectedTypeId("");
+    setCustomTypeLabel("");
     setUploadFiles([]);
   }
 
   function submitUpload() {
-    if (!uploadTarget || uploadFiles.length === 0) return;
-    uploadMutation.mutate({ typePieceJointeId: uploadTarget.id, files: uploadFiles });
+    if (!selectedTypeId) {
+      toast.error("Sélectionnez un type de document");
+      return;
+    }
+    if (selectedTypeId === OTHER_TYPE && !customTypeLabel.trim()) {
+      toast.error("Saisissez le nom du document");
+      return;
+    }
+    if (uploadFiles.length === 0) {
+      toast.error("Sélectionnez au moins un fichier");
+      return;
+    }
+    uploadMutation.mutate({
+      typePieceJointeId: selectedTypeId === OTHER_TYPE ? undefined : selectedTypeId,
+      customTypeLabel: selectedTypeId === OTHER_TYPE ? customTypeLabel.trim() : undefined,
+      files: uploadFiles,
+    });
   }
 
   return (
@@ -105,47 +127,92 @@ export default function ContratPiecesJointesPage() {
         <InfoCell label="Obligatoires" value={`${completedRequired}/${requiredCount}`} />
       </div>
 
-      <Card className="border-border/70 shadow-none">
-        <CardHeader className="border-b bg-emerald-50/70 py-3 dark:bg-emerald-950/30">
-          <CardTitle className="text-sm">Documents attendus</CardTitle>
+      <Card className="min-w-0 border-border/70 shadow-none">
+        <CardHeader className="flex-row items-center justify-between gap-3 border-b bg-emerald-50/70 py-3 dark:bg-emerald-950/30">
+          <div>
+            <CardTitle className="text-sm">Documents enregistrés</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">Pièces liées à ce mouvement.</p>
+          </div>
+          <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
+            <Plus className="size-4" />
+            Ajouter un document
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
           {piecesQuery.isLoading ? (
             <div className="p-4 text-sm text-muted-foreground">Chargement...</div>
-          ) : (data?.types ?? []).length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">
-              Aucun type de pièce jointe n'est configuré pour ce mouvement.
+          ) : (data?.pieces ?? []).length === 0 ? (
+            <div className="grid min-h-40 place-items-center px-6 py-10 text-center">
+              <div>
+                <FileText className="mx-auto mb-3 size-8 text-muted-foreground" />
+                <p className="text-sm font-medium">Aucun document enregistré</p>
+                <p className="mt-1 text-xs text-muted-foreground">Ajoutez la première pièce jointe de ce mouvement.</p>
+              </div>
             </div>
           ) : (
-            <div className="divide-y">
-              {(data?.types ?? []).map((type) => {
-                const pieces = piecesByType.get(type.id) ?? [];
-                return (
-                  <DocumentSlot
-                    key={type.id}
-                    type={type}
-                    pieces={pieces}
-                    deletingId={deleteMutation.variables}
-                    onAdd={() => {
-                      setUploadTarget(type);
-                      setUploadFiles([]);
-                    }}
-                    onDownload={download}
-                    onDelete={(pieceId) => deleteMutation.mutate(pieceId)}
-                  />
-                );
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="border-b bg-muted/35 text-left text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Type de document</th>
+                    <th className="px-4 py-3">Fichier</th>
+                    <th className="px-4 py-3">Ajouté le</th>
+                    <th className="px-4 py-3 text-right">Taille</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.pieces ?? []).map((piece) => (
+                    <tr key={piece.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <td className="px-4 py-3 font-medium">{piece.typePieceJointeLibelle ?? "Autre"}</td>
+                      <td className="px-4 py-3">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <FileText className="size-4 shrink-0 text-emerald-700" />
+                          <span className="truncate">{piece.nomFichier}</span>
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatDateTime(piece.createdAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-muted-foreground">{formatSize(piece.tailleOctets) || "-"}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => download(piece)} title="Télécharger">
+                            <Download className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-destructive"
+                            disabled={deleteMutation.isPending && deleteMutation.variables === piece.id}
+                            onClick={() => deleteMutation.mutate(piece.id)}
+                            title="Supprimer"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
       </Card>
 
       <UploadPieceDialog
-        type={uploadTarget}
+        types={selectableTypes}
+        selectedTypeId={selectedTypeId}
+        customTypeLabel={customTypeLabel}
         files={uploadFiles}
-        open={Boolean(uploadTarget)}
+        open={uploadOpen}
         uploading={uploadMutation.isPending}
-        onOpenChange={closeUploadDialog}
+        onOpenChange={(open) => open ? setUploadOpen(true) : resetUpload()}
+        onTypeChange={(value) => {
+          setSelectedTypeId(value);
+          if (value !== OTHER_TYPE) setCustomTypeLabel("");
+        }}
+        onCustomTypeLabelChange={setCustomTypeLabel}
         onFiles={setUploadFiles}
         onUpload={submitUpload}
       />
@@ -162,87 +229,33 @@ function InfoCell({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DocumentSlot({
-  type,
-  pieces,
-  deletingId,
-  onAdd,
-  onDownload,
-  onDelete,
-}: {
-  type: TypePieceJointe;
-  pieces: PieceJointe[];
-  deletingId?: string;
-  onAdd: () => void;
-  onDownload: (piece: PieceJointe) => void;
-  onDelete: (pieceId: string) => void;
-}) {
-  const done = pieces.length > 0;
-  return (
-    <div className={cn("grid gap-3 p-4 lg:grid-cols-[280px_1fr_auto]", type.obligatoire && !done && "bg-amber-50/40 dark:bg-amber-950/15")}>
-      <div className="grid content-start gap-2">
-        <div className="flex flex-wrap items-center gap-2 pr-1">
-          <span className="min-w-0 font-medium">{type.libelle}</span>
-          {type.obligatoire ? <Badge variant={done ? "default" : "destructive"}>{done ? "Reçu" : "Obligatoire"}</Badge> : <Badge variant="secondary">Optionnel</Badge>}
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {type.typeMouvementLibelle ?? "Tous mouvements"} · {clientTypeLabel(type.typeClient)}
-        </div>
-      </div>
-
-      <div className="grid gap-2">
-        {pieces.length === 0 ? (
-          <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">Aucun fichier enregistré.</div>
-        ) : (
-          pieces.map((piece) => (
-            <div key={piece.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
-              <span className="flex min-w-0 items-center gap-2">
-                <FileText className="size-4 shrink-0 text-emerald-700" />
-                <span className="truncate text-sm font-medium">{piece.nomFichier}</span>
-                <span className="text-xs text-muted-foreground">{formatSize(piece.tailleOctets)}</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => onDownload(piece)} title="Télécharger">
-                  <Download className="size-4" />
-                </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-8 text-destructive" disabled={deletingId === piece.id} onClick={() => onDelete(piece.id)} title="Supprimer">
-                  <Trash2 className="size-4" />
-                </Button>
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="flex items-start justify-end">
-        <Button type="button" variant={done ? "outline" : "default"} size="sm" onClick={onAdd}>
-          <Plus className="size-4" />
-          Ajouter
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function UploadPieceDialog({
-  type,
+  types,
+  selectedTypeId,
+  customTypeLabel,
   files,
   open,
   uploading,
   onOpenChange,
+  onTypeChange,
+  onCustomTypeLabelChange,
   onFiles,
   onUpload,
 }: {
-  type: TypePieceJointe | null;
+  types: TypePieceJointe[];
+  selectedTypeId: string;
+  customTypeLabel: string;
   files: File[];
   open: boolean;
   uploading: boolean;
   onOpenChange: (open: boolean) => void;
+  onTypeChange: (value: string) => void;
+  onCustomTypeLabelChange: (value: string) => void;
   onFiles: (files: File[]) => void;
   onUpload: () => void;
 }) {
   const [dragging, setDragging] = useState(false);
-  const inputId = type ? `pj-upload-${type.id}` : "pj-upload";
+  const inputId = "pj-upload";
 
   function acceptFiles(nextFiles: File[]) {
     if (nextFiles.length > 1 && nextFiles.some((file) => !file.type.startsWith("image/"))) {
@@ -266,10 +279,36 @@ function UploadPieceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{type ? `Ajouter ${type.libelle}` : "Ajouter une pièce jointe"}</DialogTitle>
+          <DialogTitle>Ajouter un document</DialogTitle>
+          <DialogDescription>Sélectionnez le type puis ajoutez un PDF ou des images.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
+          <Field label="Type de document" required>
+            <Select value={selectedTypeId} onValueChange={onTypeChange}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+              <SelectContent>
+                {types.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>
+                    {type.libelle}{type.obligatoire ? " (obligatoire)" : ""}
+                  </SelectItem>
+                ))}
+                <SelectItem value={OTHER_TYPE}>Autre</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {selectedTypeId === OTHER_TYPE ? (
+            <Field label="Nom du document" required>
+              <Input
+                value={customTypeLabel}
+                maxLength={160}
+                placeholder="Ex. Attestation complémentaire"
+                onChange={(event) => onCustomTypeLabelChange(event.target.value)}
+              />
+            </Field>
+          ) : null}
+
           <label
             htmlFor={inputId}
             onDragOver={(event) => {
@@ -289,6 +328,7 @@ function UploadPieceDialog({
               multiple
               accept="image/*,.pdf"
               className="sr-only"
+              onClick={(event) => { event.currentTarget.value = ""; }}
               onChange={(event) => acceptFiles(Array.from(event.target.files ?? []))}
             />
             <span className="grid justify-items-center gap-2">
@@ -327,9 +367,13 @@ function UploadPieceDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button type="button" disabled={!files.length || uploading} onClick={onUpload}>
+          <Button
+            type="button"
+            disabled={!selectedTypeId || !files.length || (selectedTypeId === OTHER_TYPE && !customTypeLabel.trim()) || uploading}
+            onClick={onUpload}
+          >
             <Upload className="size-4" />
-            Envoyer
+            {uploading ? "Envoi..." : "Enregistrer"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -352,14 +396,20 @@ function formatSize(value?: number | null) {
   return `${(value / 1024 / 1024).toFixed(1)} Mo`;
 }
 
-function numericParam(value: string | null) {
-  return value && /^\d+$/.test(value) ? value : null;
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
-function clientTypeLabel(type?: TypeClient | null) {
-  if (type === "PERSONNE_MORALE") return "Personne morale";
-  if (type === "PERSONNE_PHYSIQUE") return "Personne physique";
-  return "Tout client";
+function isGenericOtherType(type: TypePieceJointe) {
+  const label = type.libelle.trim().toLocaleLowerCase("fr");
+  return label === "autre" || label === "autre document";
+}
+
+function numericParam(value: string | null) {
+  return value && /^\d+$/.test(value) ? value : null;
 }
 
 function contractTypeLabel(type?: TypeContrat | string | null) {

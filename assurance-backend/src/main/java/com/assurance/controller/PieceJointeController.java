@@ -76,10 +76,18 @@ public class PieceJointeController {
     public ResponseEntity<ApiResponse<PieceJointeResponse>> upload(
             @PathVariable Long contratId,
             @RequestParam(required = false) Long mouvementId,
-            @RequestParam Long typePieceJointeId,
+            @RequestParam(required = false) Long typePieceJointeId,
+            @RequestParam(required = false) String customTypeLabel,
             @RequestPart("files") List<MultipartFile> files
     ) {
-        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.upload(TenantContext.getCurrentAgence(), contratId, mouvementId, typePieceJointeId, files), "Piece jointe enregistree"));
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.upload(
+                TenantContext.getCurrentAgence(),
+                contratId,
+                mouvementId,
+                typePieceJointeId,
+                customTypeLabel,
+                files
+        ), "Piece jointe enregistree"));
     }
 
     @GetMapping("/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/download")

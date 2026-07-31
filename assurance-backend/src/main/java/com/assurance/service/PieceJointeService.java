@@ -162,17 +162,25 @@ public class PieceJointeService {
     }
 
     @Transactional
-    public PieceJointeResponse upload(Long agenceId, Long contratId, Long mouvementId, Long typePieceJointeId, List<MultipartFile> files) {
+    public PieceJointeResponse upload(
+            Long agenceId,
+            Long contratId,
+            Long mouvementId,
+            Long typePieceJointeId,
+            String customTypeLabel,
+            List<MultipartFile> files
+    ) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         MouvementContrat mouvement = resolveMouvement(contrat, mouvementId);
-        TypePieceJointe type = typePieceJointeRepository.findById(typePieceJointeId)
-                .orElseThrow(() -> new ResourceNotFoundException("TypePieceJointe", typePieceJointeId));
         TypeClient typeClient = resolveTypeClient(contrat);
-        boolean allowed = eligibleTypes(agenceId, contrat, mouvement, typeClient).stream()
-                .anyMatch(eligible -> eligible.getId().equals(type.getId()));
-        if (!allowed) {
-            throw new BadRequestException("Ce type de piece jointe n'est pas autorise pour ce mouvement");
-        }
+        TypePieceJointe type = resolveUploadType(
+                agenceId,
+                contrat,
+                mouvement,
+                typeClient,
+                typePieceJointeId,
+                customTypeLabel
+        );
         if (files == null || files.isEmpty() || files.stream().allMatch(MultipartFile::isEmpty)) {
             throw new BadRequestException("Aucun fichier selectionne");
         }
@@ -188,6 +196,50 @@ public class PieceJointeService {
                 .tailleOctets(stored.size())
                 .build());
         return toPieceResponse(piece);
+    }
+
+    private TypePieceJointe resolveUploadType(
+            Long agenceId,
+            Contrat contrat,
+            MouvementContrat mouvement,
+            TypeClient typeClient,
+            Long typePieceJointeId,
+            String customTypeLabel
+    ) {
+        String customLabel = customTypeLabel == null ? null : customTypeLabel.trim();
+        if (customLabel != null && !customLabel.isEmpty()) {
+            if (customLabel.length() > 160) {
+                throw new BadRequestException("Le nom du document ne doit pas depasser 160 caracteres");
+            }
+            TypePieceJointe existing = eligibleTypes(agenceId, contrat, mouvement, typeClient).stream()
+                    .filter(type -> type.getAgence() != null && agenceId.equals(type.getAgence().getId()))
+                    .filter(type -> customLabel.equalsIgnoreCase(type.getLibelle()))
+                    .findFirst()
+                    .orElse(null);
+            if (existing != null) {
+                return existing;
+            }
+            return typePieceJointeRepository.save(TypePieceJointe.builder()
+                    .agence(contrat.getAgence())
+                    .libelle(customLabel)
+                    .typeContrat(contrat.getTypeContrat())
+                    .typeClient(typeClient)
+                    .typeMouvement(mouvement == null ? null : mouvement.getTypeMouvement())
+                    .obligatoire(false)
+                    .actif(true)
+                    .build());
+        }
+        if (typePieceJointeId == null) {
+            throw new BadRequestException("Le type de piece jointe est obligatoire");
+        }
+        TypePieceJointe type = typePieceJointeRepository.findById(typePieceJointeId)
+                .orElseThrow(() -> new ResourceNotFoundException("TypePieceJointe", typePieceJointeId));
+        boolean allowed = eligibleTypes(agenceId, contrat, mouvement, typeClient).stream()
+                .anyMatch(eligible -> eligible.getId().equals(type.getId()));
+        if (!allowed) {
+            throw new BadRequestException("Ce type de piece jointe n'est pas autorise pour ce mouvement");
+        }
+        return type;
     }
 
     @Transactional(readOnly = true)

@@ -346,9 +346,19 @@ export const productionApi = {
     );
   },
 
-  async uploadPieceJointe(contratId: string, payload: { typePieceJointeId: string; mouvementId?: string | null; files: File[] }) {
+  async uploadPieceJointe(contratId: string, payload: {
+    typePieceJointeId?: string;
+    customTypeLabel?: string;
+    mouvementId?: string | null;
+    files: File[];
+  }) {
     const formData = new FormData();
-    formData.append("typePieceJointeId", payload.typePieceJointeId);
+    if (payload.typePieceJointeId) {
+      formData.append("typePieceJointeId", payload.typePieceJointeId);
+    }
+    if (payload.customTypeLabel?.trim()) {
+      formData.append("customTypeLabel", payload.customTypeLabel.trim());
+    }
     if (payload.mouvementId) {
       formData.append("mouvementId", payload.mouvementId);
     }

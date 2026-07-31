@@ -4738,10 +4738,27 @@ public class ContratService {
                 .valeurNeuf(contratGarantie.getValeurNeuf())
                 .valeurGlace(contratGarantie.getValeurGlace())
                 .taux(contratGarantie.getTaux())
+                .primeAnnuelle(resolvePrimeAnnuelle(contratGarantie))
                 .primeNette(contratGarantie.getPrime())
                 .tauxFranchise(contratGarantie.getTauxFranchise())
                 .franchiseMinimale(contratGarantie.getFranchiseMinimale())
                 .build();
+    }
+
+    private BigDecimal resolvePrimeAnnuelle(ContratGarantie contratGarantie) {
+        BigDecimal primeNette = contratGarantie.getPrime();
+        if (primeNette == null) {
+            return null;
+        }
+        BigDecimal prorata = calculGarantieService.resolveProrata(
+                contratGarantie.getContrat(),
+                contratGarantie.getVehicule(),
+                contratGarantie.getRemorque()
+        );
+        if (prorata == null || prorata.compareTo(BigDecimal.ZERO) <= 0) {
+            return primeNette;
+        }
+        return primeNette.divide(prorata, 2, RoundingMode.HALF_UP);
     }
 
     private <T> Integer indexOfIdentity(List<T> source, T target) {

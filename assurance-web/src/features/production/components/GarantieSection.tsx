@@ -198,7 +198,11 @@ export function GarantieSection({
               const manualCapital = canEnterManualCapital(garantie, item, selectedLine);
               const displayCapital = guaranteeCapitalValue(garantie, selectedLine, selectedVehicle, item);
               const estimatedPrime = automaticPricing && checked && !isRc ? estimatePrime(selectedLine, displayCapital) : undefined;
-              const rcPrime = isRc ? resolveRcPrime(preview, selected, garanties, lignes, vehicules) : undefined;
+              const previewLine = automaticPricing && checked
+                ? guaranteePreviewLine(preview, garantie.id, item?.vehiculeIndex ?? 0)
+                : undefined;
+              const annualPrime = previewLine?.primeAnnuelle ?? estimatedPrime;
+              const netPrime = previewLine?.primeNette;
 
               return (
                 <tr
@@ -339,8 +343,8 @@ export function GarantieSection({
                           Boolean(garantie.avecFranchiseMinimale)
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">{isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? "-" : money(estimatedPrime)}</td>
-                      <td className="px-3 py-2 text-right font-medium">{isRc ? autoPrimeDisplay(rcPrime) : estimatedPrime == null ? (checked ? "Calcul auto" : "-") : money(estimatedPrime)}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{checked ? autoPrimeDisplay(annualPrime) : "-"}</td>
+                      <td className="px-3 py-2 text-right font-medium">{checked ? autoPrimeDisplay(netPrime) : "-"}</td>
                     </>
                   ) : (
                     <>
@@ -851,28 +855,15 @@ function autoPrimeDisplay(value?: number) {
   return value == null ? "Calcul auto" : moneyAmount(value);
 }
 
-function resolveRcPrime(
+function guaranteePreviewLine(
   preview: QuittancePreview | null | undefined,
-  selected: GarantieInput[],
-  garanties: ReferenceOption[],
-  lignes: ReferenceOption[],
-  vehicules: VehiculeInput[]
+  garantieId: string,
+  vehiculeIndex: number
 ) {
-  const automobileNet = linePrimeNette(preview, "AUTOMOBILE");
-  if (automobileNet == null) {
-    return undefined;
-  }
-  const nonRcPrime = selected.reduce((total, item) => {
-    const garantie = garanties.find((option) => option.id === item.garantieId);
-    if (!garantie || Boolean(garantie.responsabiliteCivile) || String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE") {
-      return total;
-    }
-    const line = selectedLineFor(linesForGuarantee(lignes, garantie), item);
-    const vehicle = vehicules[item.vehiculeIndex ?? 0] ?? vehicules[0];
-    const capital = guaranteeCapitalValue(garantie, line, vehicle, item);
-    return total + (estimatePrime(line, capital) ?? 0);
-  }, 0);
-  return Math.max(0, automobileNet - nonRcPrime);
+  return preview?.garanties?.find((line) =>
+    String(line.garantieId ?? "") === String(garantieId)
+      && (line.vehiculeIndex ?? 0) === vehiculeIndex
+  );
 }
 
 function resolveRcCapital(vehicule: VehiculeInput | undefined, usages: ReferenceOption[]) {

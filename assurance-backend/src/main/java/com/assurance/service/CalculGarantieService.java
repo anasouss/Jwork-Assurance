@@ -54,15 +54,15 @@ public class CalculGarantieService {
     }
 
     public BigDecimal resolveProrata(Contrat contrat, Vehicule vehicule, Remorque remorque) {
-        BigDecimal coefficient = vehicule != null ? vehicule.getCoefficientProrata()
-                : remorque != null ? remorque.getCoefficientProrata() : null;
-        if (coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0) {
-            return coefficient;
-        }
         LocalDate dateEffet = vehicule != null ? vehicule.getDateEffet() : remorque != null ? remorque.getDateEffet() : null;
         LocalDate dateEcheance = vehicule != null ? vehicule.getDateEcheance() : remorque != null ? remorque.getDateEcheance() : null;
         if (dateEffet != null && dateEcheance != null) {
             return calculerProrata(dateEffet, dateEcheance);
+        }
+        BigDecimal coefficient = vehicule != null ? vehicule.getCoefficientProrata()
+                : remorque != null ? remorque.getCoefficientProrata() : null;
+        if (coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0) {
+            return coefficient;
         }
         return contrat == null ? BigDecimal.ONE : calculerProrata(contrat.getDateEffet(), contrat.getDateEcheance());
     }

@@ -66,6 +66,7 @@ public class QuittanceResponse {
         private BigDecimal valeurNeuf;
         private BigDecimal valeurGlace;
         private BigDecimal taux;
+        private BigDecimal primeAnnuelle;
         private BigDecimal primeNette;
         private BigDecimal tauxFranchise;
         private BigDecimal franchiseMinimale;

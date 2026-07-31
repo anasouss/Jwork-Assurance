@@ -781,6 +781,7 @@ export type QuittancePreview = {
     valeurNeuf?: number;
     valeurGlace?: number;
     taux?: number;
+    primeAnnuelle?: number;
     primeNette?: number;
     tauxFranchise?: number;
     franchiseMinimale?: number;

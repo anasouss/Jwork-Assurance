@@ -462,7 +462,7 @@ public class DataSeeder implements CommandLineRunner {
                         "0522474040",
                         "22341",
                         null,
-                        "SANLAM",
+                        "05",
                         "SANLAM"
                 ),
                 seedCompagnieAssurance(
@@ -486,7 +486,7 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         "34221",
                         null,
-                        "AXA",
+                        "38",
                         "AXA"
                 ),
                 seedCompagnieAssurance(
@@ -498,7 +498,7 @@ public class DataSeeder implements CommandLineRunner {
                         "0522957676",
                         null,
                         null,
-                        "ATLANTA",
+                        "01",
                         "ATLANTA"
                 ),
                 seedCompagnieAssurance(
@@ -522,7 +522,7 @@ public class DataSeeder implements CommandLineRunner {
                         "0522596850",
                         null,
                         null,
-                        "MATU",
+                        "90",
                         "MATU"
                 ),
                 seedCompagnieAssurance(

@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.ResetUserPasswordRequest;
 import com.assurance.dto.request.UpsertAgenceRequest;
+import com.assurance.dto.request.UpsertPlatformAdminRequest;
 import com.assurance.dto.request.UpsertRoleRequest;
 import com.assurance.dto.request.UpsertUtilisateurRequest;
 import com.assurance.dto.response.AdminAgenceResponse;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +38,69 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
+
+    @GetMapping("/platform-admins")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<List<AdminUtilisateurResponse>>> platformAdmins() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.listPlatformAdmins()));
+    }
+
+    @PostMapping("/platform-admins")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<AdminUtilisateurResponse>> createPlatformAdmin(
+            @Valid @RequestBody UpsertPlatformAdminRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.createPlatformAdmin(request), "Administrateur plateforme cree"));
+    }
+
+    @PutMapping("/platform-admins/{id}")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<AdminUtilisateurResponse>> updatePlatformAdmin(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertPlatformAdminRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.updatePlatformAdmin(id, request), "Administrateur plateforme modifie"));
+    }
+
+    @DeleteMapping("/platform-admins/{id}")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<Void>> deactivatePlatformAdmin(@PathVariable Long id) {
+        adminService.deactivatePlatformAdmin(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Administrateur plateforme desactive"));
+    }
+
+    @PutMapping("/platform-admins/{id}/password")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<Void>> resetPlatformAdminPassword(
+            @PathVariable Long id,
+            @Valid @RequestBody ResetUserPasswordRequest request
+    ) {
+        adminService.resetPlatformAdminPassword(id, request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Mot de passe modifie"));
+    }
+
+    @GetMapping("/platform-admins/{id}/sessions")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<List<SessionResponse>>> platformAdminSessions(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.listPlatformAdminSessions(id)));
+    }
+
+    @DeleteMapping("/platform-admins/{id}/sessions/{sessionId}")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<Void>> revokePlatformAdminSession(
+            @PathVariable Long id,
+            @PathVariable Long sessionId
+    ) {
+        adminService.revokePlatformAdminSession(id, sessionId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Session revoquee"));
+    }
+
+    @DeleteMapping("/platform-admins/{id}/sessions")
+    @PreAuthorize("hasAuthority('PERM_config:manage')")
+    public ResponseEntity<ApiResponse<Void>> revokeAllPlatformAdminSessions(@PathVariable Long id) {
+        adminService.revokeAllPlatformAdminSessions(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Toutes les sessions ont ete revoquees"));
+    }
 
     @GetMapping("/users")
     public ResponseEntity<ApiResponse<List<AdminUtilisateurResponse>>> users() {

@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.dto.request.ResetUserPasswordRequest;
 import com.assurance.dto.request.UpsertAgenceRequest;
+import com.assurance.dto.request.UpsertPlatformAdminRequest;
 import com.assurance.dto.request.UpsertRoleRequest;
 import com.assurance.dto.request.UpsertUtilisateurRequest;
 import com.assurance.dto.response.AdminAgenceResponse;
@@ -45,6 +46,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AdminService {
 
+    private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
+
     private static final long MAX_LOGO_SIZE = 4L * 1024L * 1024L;
     private static final int MAX_LOGO_WIDTH = 1600;
     private static final int MAX_LOGO_HEIGHT = 800;
@@ -55,6 +58,118 @@ public class AdminService {
     private final RefreshSessionRepository refreshSessionRepository;
     private final AgenceRepository agenceRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Transactional(readOnly = true)
+    public List<AdminUtilisateurResponse> listPlatformAdmins() {
+        requirePlatformAdmin(currentUser());
+        return utilisateurRepository
+                .findByRoleCodeIgnoreCaseOrderByNomAscPrenomAsc(SUPER_ADMIN_ROLE_CODE)
+                .stream()
+                .map(AdminUtilisateurResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public AdminUtilisateurResponse createPlatformAdmin(UpsertPlatformAdminRequest request) {
+        requirePlatformAdmin(currentUser());
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new BadRequestException("Mot de passe obligatoire");
+        }
+        if (utilisateurRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            throw new BadRequestException("Email deja utilise");
+        }
+        Role role = platformAdminRole();
+        Utilisateur user = Utilisateur.builder()
+                .agence(null)
+                .role(role)
+                .email(request.getEmail().trim().toLowerCase())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .prenom(request.getPrenom().trim())
+                .nom(request.getNom().trim())
+                .telephone(blankToNull(request.getTelephone()))
+                .actif(request.getActif() == null || request.getActif())
+                .build();
+        return AdminUtilisateurResponse.from(utilisateurRepository.save(user));
+    }
+
+    @Transactional
+    public AdminUtilisateurResponse updatePlatformAdmin(Long id, UpsertPlatformAdminRequest request) {
+        Utilisateur actor = currentUser();
+        requirePlatformAdmin(actor);
+        Utilisateur user = platformAdmin(id);
+        boolean active = request.getActif() == null || request.getActif();
+        validatePlatformAdminDeactivation(actor, user, active);
+        if (utilisateurRepository.existsByEmailIgnoreCaseAndIdNot(request.getEmail(), id)) {
+            throw new BadRequestException("Email deja utilise");
+        }
+        user.setAgence(null);
+        user.setRole(platformAdminRole());
+        user.setEmail(request.getEmail().trim().toLowerCase());
+        user.setPrenom(request.getPrenom().trim());
+        user.setNom(request.getNom().trim());
+        user.setTelephone(blankToNull(request.getTelephone()));
+        user.setActif(active);
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            refreshSessionRepository.revokeAllByUserId(id);
+        }
+        Utilisateur saved = utilisateurRepository.save(user);
+        if (!active) {
+            refreshSessionRepository.revokeAllByUserId(id);
+        }
+        return AdminUtilisateurResponse.from(saved);
+    }
+
+    @Transactional
+    public void deactivatePlatformAdmin(Long id) {
+        Utilisateur actor = currentUser();
+        requirePlatformAdmin(actor);
+        Utilisateur user = platformAdmin(id);
+        validatePlatformAdminDeactivation(actor, user, false);
+        user.setActif(false);
+        utilisateurRepository.save(user);
+        refreshSessionRepository.revokeAllByUserId(id);
+    }
+
+    @Transactional
+    public void resetPlatformAdminPassword(Long id, ResetUserPasswordRequest request) {
+        requirePlatformAdmin(currentUser());
+        Utilisateur user = platformAdmin(id);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        utilisateurRepository.save(user);
+        refreshSessionRepository.revokeAllByUserId(id);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> listPlatformAdminSessions(Long id) {
+        requirePlatformAdmin(currentUser());
+        platformAdmin(id);
+        return refreshSessionRepository
+                .findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByLastActivityAtDesc(id, LocalDateTime.now())
+                .stream()
+                .map(this::toSessionResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void revokePlatformAdminSession(Long id, Long sessionId) {
+        requirePlatformAdmin(currentUser());
+        platformAdmin(id);
+        RefreshSession session = refreshSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session", sessionId));
+        if (!session.getUser().getId().equals(id)) {
+            throw new BadRequestException("La session ne correspond pas a cet administrateur");
+        }
+        session.setRevoked(true);
+        refreshSessionRepository.save(session);
+    }
+
+    @Transactional
+    public void revokeAllPlatformAdminSessions(Long id) {
+        requirePlatformAdmin(currentUser());
+        platformAdmin(id);
+        refreshSessionRepository.revokeAllByUserId(id);
+    }
 
     @Transactional(readOnly = true)
     public List<AdminUtilisateurResponse> listUsers() {
@@ -504,6 +619,38 @@ public class AdminService {
         ensureAgencyUser(user);
         ensureManagedAgence(actor, user.getAgence());
         return user;
+    }
+
+    private void requirePlatformAdmin(Utilisateur actor) {
+        if (!isSuperAdmin(actor) || actor.getAgence() != null) {
+            throw new UnauthorizedException("Accès réservé aux administrateurs de la plateforme");
+        }
+    }
+
+    private Role platformAdminRole() {
+        return roleRepository.findByAgenceIsNullAndCode(SUPER_ADMIN_ROLE_CODE)
+                .orElseThrow(() -> new ResourceNotFoundException("Rôle administrateur plateforme introuvable"));
+    }
+
+    private Utilisateur platformAdmin(Long id) {
+        Utilisateur user = utilisateurRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Administrateur plateforme", id));
+        if (!isSuperAdmin(user) || user.getAgence() != null) {
+            throw new ResourceNotFoundException("Administrateur plateforme", id);
+        }
+        return user;
+    }
+
+    private void validatePlatformAdminDeactivation(Utilisateur actor, Utilisateur target, boolean active) {
+        if (active || !Boolean.TRUE.equals(target.getActif())) {
+            return;
+        }
+        if (actor.getId().equals(target.getId())) {
+            throw new BadRequestException("Vous ne pouvez pas désactiver votre propre compte");
+        }
+        if (utilisateurRepository.findByRoleCodeIgnoreCaseAndActifTrue(SUPER_ADMIN_ROLE_CODE).size() <= 1) {
+            throw new BadRequestException("Au moins un administrateur plateforme actif est obligatoire");
+        }
     }
 
     private void ensureAgencyUser(Utilisateur user) {

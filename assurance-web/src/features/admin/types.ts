@@ -70,6 +70,15 @@ export type UpsertAdminUserRequest = {
   actif: boolean;
 };
 
+export type UpsertPlatformAdminRequest = {
+  email: string;
+  password?: string;
+  prenom: string;
+  nom: string;
+  telephone?: string;
+  actif: boolean;
+};
+
 export type UpsertAdminRoleRequest = {
   agenceId?: string;
   code: string;

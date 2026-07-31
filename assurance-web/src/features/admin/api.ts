@@ -9,11 +9,57 @@ import type {
   UpsertAdminAgencyRequest,
   UpsertAdminRoleRequest,
   UpsertAdminUserRequest,
+  UpsertPlatformAdminRequest,
 } from "./types";
 
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
 
 export const adminApi = {
+  async platformAdmins() {
+    return unwrap(await apiFetch<ApiResponse<AdminUser[]>>("/api/v1/admin/platform-admins"));
+  },
+
+  async createPlatformAdmin(payload: UpsertPlatformAdminRequest) {
+    return unwrap(await apiFetch<ApiResponse<AdminUser>>("/api/v1/admin/platform-admins", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }));
+  },
+
+  async updatePlatformAdmin(id: string, payload: UpsertPlatformAdminRequest) {
+    return unwrap(await apiFetch<ApiResponse<AdminUser>>(`/api/v1/admin/platform-admins/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }));
+  },
+
+  async deactivatePlatformAdmin(id: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/platform-admins/${id}`, { method: "DELETE" }));
+  },
+
+  async resetPlatformAdminPassword(id: string, password: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/platform-admins/${id}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ password }),
+    }));
+  },
+
+  async platformAdminSessions(id: string) {
+    return unwrap(await apiFetch<ApiResponse<AdminUserSession[]>>(`/api/v1/admin/platform-admins/${id}/sessions`));
+  },
+
+  async revokePlatformAdminSession(userId: string, sessionId: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/platform-admins/${userId}/sessions/${sessionId}`, {
+      method: "DELETE",
+    }));
+  },
+
+  async revokeAllPlatformAdminSessions(userId: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/platform-admins/${userId}/sessions`, {
+      method: "DELETE",
+    }));
+  },
+
   async users() {
     return unwrap(await apiFetch<ApiResponse<AdminUser[]>>("/api/v1/admin/users"));
   },

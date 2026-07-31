@@ -98,7 +98,7 @@ export default function ContratShowPage() {
           mouvement={selectedMouvement}
         />
       ) : (
-      <div className="mx-auto w-full max-w-[1050px] border bg-white p-4 text-[11px] leading-snug text-slate-950 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      <div className="mx-auto min-h-[297mm] w-full max-w-[210mm] border bg-white p-3 text-[11px] leading-snug text-slate-950 shadow-sm sm:p-4 lg:p-[9mm] print:min-h-0 print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <header className="border-b-2 border-slate-900 pb-2">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -339,9 +339,9 @@ function VehicleSection({
           ["Usage", [vehicule.usageCode, vehicule.usageLibelle].filter(Boolean).join(" - ")],
           ["Marque", text(vehicule.marque)],
           ["Immatriculation", text(vehicule.immatriculation)],
+          ["Date de MC", formatDate(vehicule.datePremiereCirculation)],
           ["Carburant", text(vehicule.carburant)],
           ["Puissance fiscale", text(vehicule.puissanceFiscale)],
-          ["Date de MC", formatDate(vehicule.datePremiereCirculation)],
           ["Carrosserie", text(vehicule.carrosserie)],
           ["Nombre de places", text(vehicule.nombrePlaces)],
           ["CRM", text(vehicule.crm)],
@@ -532,11 +532,11 @@ function Section({ title, icon, children }: { title: string; icon?: ReactNode; c
 
 function InfoGrid({ items }: { items: [string, ReactNode][] }) {
   return (
-    <div className="grid gap-x-4 md:grid-cols-3">
+    <div className="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
       {items.map(([label, value]) => (
-        <div key={label} className="grid grid-cols-[92px_1fr] gap-1.5 border-b border-dashed border-slate-200 py-1 text-[10px]">
+        <div key={label} className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-1.5 border-b border-dashed border-slate-200 py-1 text-[10px]">
           <span className="font-bold uppercase text-slate-500">{label}</span>
-          <span className="font-semibold text-slate-950">{isBlankNode(value) ? "-" : value}</span>
+          <span className="min-w-0 break-words font-semibold text-slate-950">{isBlankNode(value) ? "-" : value}</span>
         </div>
       ))}
     </div>
@@ -960,22 +960,22 @@ function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossi
 }
 
 function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
-  ensurePdfSpace(ctx, 14);
+  ensurePdfSpace(ctx, 12);
   const { pdf } = ctx;
   pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(226, 232, 240);
-  pdf.rect(ctx.x, ctx.y, ctx.width, 6, "FD");
+  pdf.rect(ctx.x, ctx.y, ctx.width, 5, "FD");
   pdf.setFillColor(5, 150, 105);
-  pdf.rect(ctx.x, ctx.y, 0.8, 6, "F");
+  pdf.rect(ctx.x, ctx.y, 0.8, 5, "F");
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(6.5);
   pdf.setTextColor(2, 6, 23);
-  pdf.text(pdfSafe(title), ctx.x + 3, ctx.y + 4.1);
-  ctx.y += 7.5;
+  pdf.text(pdfSafe(title), ctx.x + 3, ctx.y + 3.5);
+  ctx.y += 6;
   draw();
   pdf.setDrawColor(226, 232, 240);
   pdf.line(ctx.x, ctx.y, ctx.x + ctx.width, ctx.y);
-  ctx.y += 3;
+  ctx.y += 2;
 }
 
 function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
@@ -984,7 +984,7 @@ function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
   for (let index = 0; index < items.length; index += 3) {
     const row = items.slice(index, index + 3);
     const wrapped = row.map(([, value]) => wrapPdfText(ctx, valueToPdfText(value), columnWidth * 0.58));
-    const rowHeight = Math.max(6, 2.5 + Math.max(...wrapped.map((lines) => lines.length)) * 2.7);
+    const rowHeight = Math.max(5, 2.1 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
     ensurePdfSpace(ctx, rowHeight);
     row.forEach(([label], columnIndex) => {
       drawPdfInfoCell(
@@ -1007,10 +1007,10 @@ function drawPdfInfoCell(ctx: PdfContext, label: string, lines: string[], x: num
   ctx.pdf.setFont("helvetica", "bold");
   ctx.pdf.setFontSize(5.5);
   ctx.pdf.setTextColor(100, 116, 139);
-  ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 3.2);
+  ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 2.9);
   ctx.pdf.setFontSize(6.3);
   ctx.pdf.setTextColor(2, 6, 23);
-  ctx.pdf.text(lines.length ? lines : ["-"], x + width * 0.4, y + 3.2, { maxWidth: width * 0.58 });
+  ctx.pdf.text(lines.length ? lines : ["-"], x + width * 0.4, y + 2.9, { maxWidth: width * 0.58 });
 }
 
 function drawPdfParties(
@@ -1132,7 +1132,7 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
   const tableWidth = ctx.width - 6;
   const totalWidth = widths.reduce((sum, width) => sum + width, 0);
   const actualWidths = widths.map((width) => (width / totalWidth) * tableWidth);
-  const headerHeight = 6;
+  const headerHeight = 5;
   ensurePdfSpace(ctx, headerHeight * 2);
   ctx.pdf.setFillColor(241, 245, 249);
   ctx.pdf.setDrawColor(226, 232, 240);
@@ -1142,14 +1142,14 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
   ctx.pdf.setFontSize(6);
   ctx.pdf.setTextColor(51, 65, 85);
   headers.forEach((header, index) => {
-    ctx.pdf.text(pdfSafe(header), cursorX, ctx.y + 4);
+    ctx.pdf.text(pdfSafe(header), cursorX, ctx.y + 3.4);
     cursorX += actualWidths[index];
   });
   ctx.y += headerHeight;
 
   for (const row of rows) {
     const wrapped = row.map((cell, index) => wrapPdfText(ctx, cell, actualWidths[index] - 3));
-    const rowHeight = Math.max(6, 2.7 + Math.max(...wrapped.map((lines) => lines.length)) * 2.8);
+    const rowHeight = Math.max(4.8, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
     ensurePdfSpace(ctx, rowHeight + 1);
     cursorX = tableX + 1.5;
     ctx.pdf.setDrawColor(226, 232, 240);
@@ -1161,13 +1161,13 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
       ctx.pdf.setTextColor(2, 6, 23);
       const align = index === 0 ? "left" : "right";
       const textX = align === "right" ? cursorX + actualWidths[index] - 2 : cursorX;
-      ctx.pdf.text(wrapped[index], textX, ctx.y + 3.8, { align, maxWidth: actualWidths[index] - 3 });
+      ctx.pdf.text(wrapped[index], textX, ctx.y + 3.2, { align, maxWidth: actualWidths[index] - 3 });
       cursorX += actualWidths[index];
     });
     ctx.y += rowHeight;
   }
   ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
-  ctx.y += 1.5;
+  ctx.y += 1;
 }
 
 function ensurePdfSpace(ctx: PdfContext, needed: number) {

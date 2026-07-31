@@ -2704,7 +2704,7 @@ public class ContratService {
                 List.of()
         );
         QuittanceCalculService.Resultat apres = calculerMontantsAvenant(contrat, typeMouvement, targets.garanties(), targets.vehicules(), targets.remorques());
-        QuittanceCalculService.Resultat differentiel = quittanceCalculService.difference(apres, avant);
+        QuittanceCalculService.Resultat differentiel = quittanceCalculService.differenceChangementVehicule(apres, avant);
         List<ContratGarantie> garantiesDifferentielles = garantiesDifferentiellesChangementVehicule(
                 garantiesAvantRestantes,
                 targets.garanties()

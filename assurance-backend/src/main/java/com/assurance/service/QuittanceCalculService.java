@@ -132,6 +132,31 @@ public class QuittanceCalculService {
         return withTotal(lignes, BigDecimal.ONE);
     }
 
+    public Resultat differenceChangementVehicule(Resultat apres, Resultat avant) {
+        Resultat differentiel = difference(apres, avant);
+        BigDecimal cnpacNouvelleAttestation = lignesParCategorie(apres).getOrDefault(
+                CategorieQuittance.AUTOMOBILE,
+                zeroLine(CategorieQuittance.AUTOMOBILE, 10)
+        ).cnpac();
+        List<Ligne> lignes = differentiel.lignes().stream()
+                .filter(ligne -> ligne.categorie() != CategorieQuittance.TOTAL)
+                .map(ligne -> ligne.categorie() == CategorieQuittance.AUTOMOBILE
+                        ? new Ligne(
+                                ligne.categorie(),
+                                ligne.ordre(),
+                                false,
+                                ligne.primeNette(),
+                                ligne.taxe(),
+                                ligne.taxeParafiscale(),
+                                ligne.accessoire(),
+                                cnpacNouvelleAttestation,
+                                ligne.primeTotale().add(cnpacNouvelleAttestation)
+                        )
+                        : ligne)
+                .toList();
+        return buildResult(lignes);
+    }
+
     private Ligne differenceLine(
             CategorieQuittance categorie,
             int ordre,
@@ -142,7 +167,34 @@ public class QuittanceCalculService {
             BigDecimal cnpac,
             BigDecimal primeTotale
     ) {
+        if (primeNette.compareTo(BigDecimal.ZERO) < 0) {
+            return new Ligne(
+                    categorie,
+                    ordre,
+                    false,
+                    primeNette,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    primeNette
+            );
+        }
         return new Ligne(categorie, ordre, false, primeNette, taxe, taxeParafiscale, accessoire, cnpac, primeTotale);
+    }
+
+    private Ligne zeroLine(CategorieQuittance categorie, int ordre) {
+        return new Ligne(
+                categorie,
+                ordre,
+                false,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+        );
     }
 
     public int compterUnitesCnpac(List<ContratGarantie> garanties, int fallback) {

@@ -113,7 +113,7 @@ export default function ContratShowPage() {
           </div>
         </header>
 
-        <main className="mt-3 grid gap-3">
+        <main className="mt-2 grid gap-2">
           <Section title="Contrat" icon={<FileText className="size-4" />}>
             <InfoGrid
               items={[
@@ -143,7 +143,7 @@ export default function ContratShowPage() {
             />
           </Section>
 
-          <Section title="Parties au contrat" icon={<UserRound className="size-4" />}>
+          <Section title="Clients" icon={<UserRound className="size-4" />}>
             <PartiesGrid
               souscripteur={souscripteur}
               proprietaire={proprietaire}
@@ -381,7 +381,7 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
   if (!garanties.length) return null;
   return (
     <Section title="Protection personnes">
-      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1.5 [&_th]:h-7 [&_th]:px-2">
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Garantie</TableHead>
@@ -413,7 +413,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
   if (!assistances.length) return null;
   return (
     <Section title="Assistance">
-      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1.5 [&_th]:h-7 [&_th]:px-2">
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Véhicule</TableHead>
@@ -443,25 +443,25 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return null;
   return (
-    <div className="mt-2 overflow-hidden border-t border-slate-300">
+    <div className="mt-1 overflow-hidden border-t border-slate-300">
       <Table className="text-[10px]">
         <TableHeader>
           <TableRow className="bg-slate-100">
-            <TableHead className="h-7 px-2">Garantie assurée</TableHead>
-            <TableHead className="h-7 px-2 text-right">Valeur assurée</TableHead>
-            <TableHead className="h-7 px-2 text-right">Taux</TableHead>
-            <TableHead className="h-7 px-2">Franchise</TableHead>
-            <TableHead className="h-7 px-2 text-right">{primeLabel}</TableHead>
+            <TableHead className="h-6 px-2">Garantie assurée</TableHead>
+            <TableHead className="h-6 px-2 text-right">Valeur assurée</TableHead>
+            <TableHead className="h-6 px-2 text-right">Taux</TableHead>
+            <TableHead className="h-6 px-2">Franchise</TableHead>
+            <TableHead className="h-6 px-2 text-right">{primeLabel}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {vehiculeGaranties.map((garantie) => (
             <TableRow key={garantie.contratGarantieId}>
-              <TableCell className="px-2 py-1.5 font-medium">{garantieLabel(garantie)}</TableCell>
-              <TableCell className="px-2 py-1.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
-              <TableCell className="px-2 py-1.5 text-right">{garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`}</TableCell>
-              <TableCell className="px-2 py-1.5">{franchiseLabel(garantie)}</TableCell>
-              <TableCell className="px-2 py-1.5 text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
+              <TableCell className="px-2 py-0.5 font-medium">{garantieLabel(garantie)}</TableCell>
+              <TableCell className="px-2 py-0.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
+              <TableCell className="px-2 py-0.5 text-right">{garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`}</TableCell>
+              <TableCell className="px-2 py-0.5">{franchiseLabel(garantie)}</TableCell>
+              <TableCell className="px-2 py-0.5 text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -488,7 +488,7 @@ function QuittanceSection({
     <Section title={movementLabel
       ? `${differential ? "Quittance différentielle" : "Quittance"} - ${movementLabel}`
       : "Quittance générale"}>
-      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1.5 [&_th]:h-7 [&_th]:px-2">
+      <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2">
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Catégorie</TableHead>
@@ -525,7 +525,7 @@ function Section({ title, icon, children }: { title: string; icon?: ReactNode; c
         {icon}
         {title}
       </div>
-      <div className="px-2 py-1.5">{children}</div>
+      <div className="px-2 py-1">{children}</div>
     </section>
   );
 }
@@ -534,7 +534,7 @@ function InfoGrid({ items }: { items: [string, ReactNode][] }) {
   return (
     <div className="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
       {items.map(([label, value]) => (
-        <div key={label} className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-1.5 border-b border-dashed border-slate-200 py-1 text-[10px]">
+        <div key={label} className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-1.5 border-b border-dashed border-slate-200 py-0.5 text-[10px]">
           <span className="font-bold uppercase text-slate-500">{label}</span>
           <span className="min-w-0 break-words font-semibold text-slate-950">{isBlankNode(value) ? "-" : value}</span>
         </div>
@@ -552,47 +552,39 @@ function PartiesGrid({
   proprietaire?: ClientResponse | null;
   conducteur?: ClientResponse | null;
 }) {
+  const parties = groupContractParties(souscripteur, proprietaire, conducteur);
   return (
-    <div className="grid border border-slate-200 md:grid-cols-3">
-      <PartyColumn title="Souscripteur" client={souscripteur} />
-      <PartyColumn
-        title="Propriétaire"
-        client={proprietaire}
-        sameAs={sameClientIdentity(proprietaire, souscripteur) ? "souscripteur" : undefined}
-      />
-      <PartyColumn
-        title="Conducteur"
-        client={conducteur}
-        sameAs={sameClientIdentity(conducteur, souscripteur)
-          ? "souscripteur"
-          : sameClientIdentity(conducteur, proprietaire) ? "propriétaire" : undefined}
-      />
+    <div className={`grid border border-slate-200 ${parties.length === 2 ? "md:grid-cols-2" : parties.length >= 3 ? "md:grid-cols-3" : ""}`}>
+      {parties.map((party) => (
+        <PartyColumn
+          key={`${party.roles.join("-")}-${party.client?.id ?? "empty"}`}
+          roles={party.roles}
+          client={party.client}
+          expanded={parties.length === 1}
+        />
+      ))}
     </div>
   );
 }
 
 function PartyColumn({
-  title,
+  roles,
   client,
-  sameAs,
+  expanded = false,
 }: {
-  title: string;
+  roles: string[];
   client?: ClientResponse | null;
-  sameAs?: string;
+  expanded?: boolean;
 }) {
   return (
     <div className="min-w-0 border-b border-slate-200 p-2 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-      <p className="text-[9px] font-bold uppercase text-emerald-700">{title}</p>
-      <p className="mt-0.5 truncate text-xs font-bold">{clientName(client)}</p>
-      {sameAs ? (
-        <p className="mt-1 text-[10px] italic text-slate-500">Même personne que le {sameAs}</p>
-      ) : (
-        <div className="mt-1 space-y-0.5 text-[10px] text-slate-700">
-          <p>{clientIdentity(client)}</p>
-          <p>{text(client?.adresse)}{client?.ville ? `, ${client.ville}` : ""}</p>
-          <p>Tél: {text(client?.telephone ?? client?.telephones?.find((tel) => tel.principal)?.numero)}</p>
-        </div>
-      )}
+      <p className="text-[9px] font-bold uppercase text-emerald-700">{roles.join(" · ")}</p>
+      <div className={expanded ? "mt-1 grid items-start gap-x-4 gap-y-1 text-[10px] text-slate-700 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_2fr_1fr]" : "mt-1 space-y-0.5 text-[10px] text-slate-700"}>
+        <p className="font-bold text-slate-950">{clientName(client)}</p>
+        <p>{clientIdentity(client)}</p>
+        <p>{text(client?.adresse)}{client?.ville ? `, ${client.ville}` : ""}</p>
+        <p>Tél: {text(client?.telephone ?? client?.telephones?.find((tel) => tel.principal)?.numero)}</p>
+      </div>
     </div>
   );
 }
@@ -716,6 +708,29 @@ function clientByRole(contrat: ContratSummary, role: string) {
 function sameClientIdentity(left?: ClientResponse | null, right?: ClientResponse | null) {
   if (!left || !right) return false;
   return String(left.id ?? "") === String(right.id ?? "") && Boolean(left.id);
+}
+
+function groupContractParties(
+  souscripteur?: ClientResponse | null,
+  proprietaire?: ClientResponse | null,
+  conducteur?: ClientResponse | null,
+) {
+  const groups: Array<{ client: ClientResponse; roles: string[] }> = [];
+  const candidates = [
+    { role: "Souscripteur", client: souscripteur },
+    { role: "Propriétaire", client: proprietaire },
+    { role: "Conducteur", client: conducteur },
+  ];
+  for (const candidate of candidates) {
+    if (!candidate.client) continue;
+    const existing = groups.find((group) => sameClientIdentity(group.client, candidate.client));
+    if (existing) {
+      existing.roles.push(candidate.role);
+    } else {
+      groups.push({ client: candidate.client, roles: [candidate.role] });
+    }
+  }
+  return groups;
 }
 
 function clientName(client?: ClientResponse | null) {
@@ -859,7 +874,7 @@ async function openContratPdf(params: {
     ]);
   });
 
-  drawPdfSection(ctx, "PARTIES AU CONTRAT", () => {
+  drawPdfSection(ctx, "CLIENTS", () => {
     drawPdfParties(ctx, params.souscripteur, params.proprietaire, params.conducteur);
   });
 
@@ -1019,57 +1034,66 @@ function drawPdfParties(
   proprietaire?: ClientResponse | null,
   conducteur?: ClientResponse | null,
 ) {
-  const parties: Array<{
-    title: string;
-    client?: ClientResponse | null;
-    sameAs?: string | null;
-  }> = [
-    { title: "Souscripteur", client: souscripteur },
-    {
-      title: "Propriétaire",
-      client: proprietaire,
-      sameAs: sameClientIdentity(proprietaire, souscripteur) ? "Même personne que le souscripteur" : null,
-    },
-    {
-      title: "Conducteur",
-      client: conducteur,
-      sameAs: sameClientIdentity(conducteur, souscripteur)
-        ? "Même personne que le souscripteur"
-        : sameClientIdentity(conducteur, proprietaire) ? "Même personne que le propriétaire" : null,
-    },
-  ];
-  const gap = 0;
-  const width = (ctx.width - 6 - gap * 2) / 3;
-  const content = parties.map((party) => {
-    const details = party.sameAs
-      ? [clientName(party.client), party.sameAs]
-      : [
-          clientName(party.client),
-          clientIdentity(party.client),
-          `${text(party.client?.adresse)}${party.client?.ville ? `, ${party.client.ville}` : ""}`,
-          `Tél: ${text(party.client?.telephone ?? party.client?.telephones?.find((tel) => tel.principal)?.numero)}`,
-        ];
-    return details.map((line) => wrapPdfText(ctx, line, width - 5));
-  });
-  const maxLines = Math.max(...content.map((lines) => lines.reduce((total, line) => total + line.length, 0)));
-  const height = Math.max(14, 7 + maxLines * 2.8);
-  ensurePdfSpace(ctx, height);
+  const parties = groupContractParties(souscripteur, proprietaire, conducteur);
+  if (!parties.length) return;
+  const availableWidth = ctx.width - 6;
   const startX = ctx.x + 3;
   const startY = ctx.y;
 
+  if (parties.length === 1) {
+    const party = parties[0];
+    const details = [
+      clientName(party.client),
+      clientIdentity(party.client),
+      `${text(party.client.adresse)}${party.client.ville ? `, ${party.client.ville}` : ""}`,
+      `Tél: ${text(party.client.telephone ?? party.client.telephones?.find((tel) => tel.principal)?.numero)}`,
+    ];
+    const widths = [0.2, 0.22, 0.4, 0.18].map((ratio) => availableWidth * ratio);
+    const wrapped = details.map((detail, index) => wrapPdfText(ctx, detail, widths[index] - 4));
+    const height = Math.max(11, 6 + Math.max(...wrapped.map((lines) => lines.length)) * 2.8);
+    ensurePdfSpace(ctx, height);
+    ctx.pdf.setDrawColor(203, 213, 225);
+    ctx.pdf.rect(startX, startY, availableWidth, height, "S");
+    ctx.pdf.setFont("helvetica", "bold");
+    ctx.pdf.setFontSize(5.8);
+    ctx.pdf.setTextColor(4, 120, 87);
+    ctx.pdf.text(pdfSafe(party.roles.join(" · ").toUpperCase()), startX + 2, startY + 3.5);
+    let x = startX + 2;
+    wrapped.forEach((lines, index) => {
+      ctx.pdf.setFont("helvetica", index === 0 ? "bold" : "normal");
+      ctx.pdf.setFontSize(index === 0 ? 7 : 6);
+      ctx.pdf.setTextColor(30, 41, 59);
+      ctx.pdf.text(lines, x, startY + 7, { maxWidth: widths[index] - 4 });
+      x += widths[index];
+    });
+    ctx.y = startY + height;
+    return;
+  }
+
+  const width = availableWidth / parties.length;
+  const content = parties.map((party) => [
+    clientName(party.client),
+    clientIdentity(party.client),
+    `${text(party.client.adresse)}${party.client.ville ? `, ${party.client.ville}` : ""}`,
+    `Tél: ${text(party.client.telephone ?? party.client.telephones?.find((tel) => tel.principal)?.numero)}`,
+  ].map((line) => wrapPdfText(ctx, line, width - 5)));
+  const maxLines = Math.max(...content.map((lines) => lines.reduce((total, line) => total + line.length, 0)));
+  const height = Math.max(14, 7 + maxLines * 2.8);
+  ensurePdfSpace(ctx, height);
+
   parties.forEach((party, index) => {
-    const x = startX + index * (width + gap);
+    const x = startX + index * width;
     ctx.pdf.setDrawColor(203, 213, 225);
     ctx.pdf.rect(x, startY, width, height, "S");
     ctx.pdf.setFont("helvetica", "bold");
     ctx.pdf.setFontSize(5.8);
     ctx.pdf.setTextColor(4, 120, 87);
-    ctx.pdf.text(pdfSafe(party.title.toUpperCase()), x + 2, startY + 3.5);
+    ctx.pdf.text(pdfSafe(party.roles.join(" · ").toUpperCase()), x + 2, startY + 3.5);
     let y = startY + 7;
     content[index].forEach((lines, lineIndex) => {
       ctx.pdf.setFont("helvetica", lineIndex === 0 ? "bold" : "normal");
       ctx.pdf.setFontSize(lineIndex === 0 ? 7 : 6);
-      ctx.pdf.setTextColor(lineIndex === 1 && party.sameAs ? 100 : 30, lineIndex === 1 && party.sameAs ? 116 : 41, lineIndex === 1 && party.sameAs ? 139 : 59);
+      ctx.pdf.setTextColor(30, 41, 59);
       ctx.pdf.text(lines, x + 2, y, { maxWidth: width - 4 });
       y += lines.length * 2.8;
     });

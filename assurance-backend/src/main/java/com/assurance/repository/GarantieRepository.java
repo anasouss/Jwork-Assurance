@@ -10,7 +10,12 @@ import java.util.Optional;
 
 public interface GarantieRepository extends JpaRepository<Garantie, Long> {
     @Override
-    @EntityGraph(attributePaths = "groupeExclusion")
+    @EntityGraph(attributePaths = {
+            "groupeExclusion",
+            "modesTarificationMultiple",
+            "modesAutorises",
+            "sourcesValeurAutorisees"
+    })
     List<Garantie> findAll(Sort sort);
 
     Optional<Garantie> findByCode(String code);

@@ -1451,7 +1451,7 @@ function TargetGuaranteesTable({
     }
     const lineOptions = automaticPricing ? matchingLines(lignes, garantie, target) : [];
     const selectedLine = selectedLineFor(lineOptions);
-    if (automaticPricing && checked) {
+    if (checked) {
       const warning = valueWarning(garantie, target, selectedLine);
       if (warning) {
         toast.error(warning);
@@ -1460,7 +1460,7 @@ function TargetGuaranteesTable({
     }
     const baseSelection = checked ? withoutExclusionConflicts(selected, garanties, target, garantie) : selected;
     const next = checked
-      ? [...baseSelection, { ...targetedInput(garantie, target, pricingMode), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
+      ? [...baseSelection, { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
       : selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)));
     setSelected(next);
     onRequestCalculation?.(target, garantie.id, next);
@@ -1520,10 +1520,10 @@ function TargetGuaranteesTable({
               const hasLine = isRc || lineOptions.length > 0;
               const disabled = isRc || (automaticPricing && (!grilleSelected || !hasLine));
               const editable = checked && !isRc;
-              const warning = automaticPricing && checked ? valueWarning(garantie, target, selectedLine) : "";
-              const sourceOptions = target.kind === "vehicule" ? availableTargetValueSources(garantie, target, selectedLine) : [];
+              const warning = checked ? valueWarning(garantie, target, selectedLine) : "";
+              const sourceOptions = target.kind === "vehicule" ? selectableTargetValueSources(garantie, target, selectedLine) : [];
               const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target, selectedLine) : "";
-              const manualValue = !automaticPricing || (defaultSource(garantie) === "MANUEL" && lineMode(selectedLine) !== "CAPITAL");
+              const manualValue = selectedSource === "MANUEL" && lineMode(selectedLine) !== "CAPITAL";
               const displayCapital = targetGuaranteeCapitalValue(garantie, selectedLine, target, item);
               const previewLine = previewGuaranteeLine(preview, garantie, target, item);
               const calculatedPrime = previewLine?.primeNette;
@@ -1548,12 +1548,34 @@ function TargetGuaranteesTable({
                   </td>
                   <td className="px-3 py-2">
                     {manualValue && !isRc ? (
-                      <MoneyInput
-                        disabled={!editable}
-                        className={cn(controlClass(editable), "text-right")}
-                        value={item?.valeurAssuree ?? item?.capital}
-                        onValueChange={(value) => update(garantie.id, { sourceValeurSelectionnee: "MANUEL", valeurAssuree: value, capital: value })}
-                      />
+                      <div className="grid gap-1">
+                        {sourceOptions.length > 1 ? (
+                          <Select
+                            value={selectedSource}
+                            disabled={!editable}
+                            onValueChange={(value) => update(garantie.id, {
+                              sourceValeurSelectionnee: value,
+                              valeurAssuree: undefined,
+                              capital: undefined,
+                            })}
+                          >
+                            <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}>
+                              <SelectValue placeholder="Source" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sourceOptions.map((source) => (
+                                <SelectItem key={source} value={source}>{targetSourceOptionLabel(source, target)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
+                        <MoneyInput
+                          disabled={!editable}
+                          className={cn(controlClass(editable), "text-right")}
+                          value={item?.valeurAssuree ?? item?.capital}
+                          onValueChange={(value) => update(garantie.id, { sourceValeurSelectionnee: "MANUEL", valeurAssuree: value, capital: value })}
+                        />
+                      </div>
                     ) : lineOptions.length > 1 && lineMode(selectedLine) === "CAPITAL" ? (
                       <Select
                         value={selectedLine?.id ?? ""}
@@ -1573,7 +1595,7 @@ function TargetGuaranteesTable({
                         value={selectedSource}
                         disabled={!editable}
                         onValueChange={(value) => {
-                          if (!hasTargetValue(target, value)) {
+                          if (value !== "MANUEL" && !hasTargetValue(target, value)) {
                             toast.error(`${sourceLabel(value)} requise`);
                             return;
                           }
@@ -1925,14 +1947,13 @@ function AssistanceTable({
   );
 }
 
-function targetedInput(garantie: ReferenceOption, target: Target, pricingMode: PricingMode = "AUTOMATIQUE_GRILLE"): GarantieInput {
-  const manualPricing = pricingMode !== "AUTOMATIQUE_GRILLE";
+function targetedInput(garantie: ReferenceOption, target: Target): GarantieInput {
   return {
     garantieId: garantie.id,
     vehiculeIndex: target.kind === "vehicule" ? target.index : undefined,
     remorqueIndex: target.kind === "remorque" ? target.index : undefined,
     modeSelectionne: String(garantie.modeParDefaut ?? "TAUX"),
-    sourceValeurSelectionnee: manualPricing ? "MANUEL" : defaultTargetSource(garantie, target),
+    sourceValeurSelectionnee: defaultTargetSource(garantie, target),
   };
 }
 
@@ -2039,9 +2060,7 @@ function selectedLineFor(lines: ReferenceOption[], item?: GarantieInput) {
 function targetLineSelectionPatch(garantie: ReferenceOption, line: ReferenceOption | undefined, target?: Target, pricingMode: PricingMode = "AUTOMATIQUE_GRILLE"): Partial<GarantieInput> {
   const manualPricing = pricingMode !== "AUTOMATIQUE_GRILLE";
   const mode = lineMode(line) || String(garantie.modeParDefaut ?? "TAUX");
-  const source = manualPricing
-    ? "MANUEL"
-    : mode === "CAPITAL"
+  const source = mode === "CAPITAL"
     ? "AUCUNE"
     : target ? defaultTargetSource(garantie, target, line) : defaultSource(garantie);
   return {
@@ -2163,9 +2182,15 @@ function valueWarning(garantie: ReferenceOption, target?: Target, line?: Referen
       if (allowedSources.some((allowedSource) => hasTargetValue(target, allowedSource))) {
         return validateValeurVenale(target) ?? "";
       }
+      if (manualTargetValueAllowed(garantie)) {
+        return "";
+      }
       return `${allowedSources.map(sourceLabel).join(" ou ")} requise`;
     }
     const source = configuredDefaultVehicleValueSource(garantie) || allowedSources[0];
+    if (source && !hasTargetValue(target, source) && manualTargetValueAllowed(garantie)) {
+      return "";
+    }
     if (source === "NEUF" && !target.valeurNeuf) {
       return "Valeur à neuf requise";
     }
@@ -2229,11 +2254,22 @@ function availableTargetValueSources(garantie: ReferenceOption, target: Target, 
   return allowedVehicleValueSources(garantie).filter((source) => hasTargetValue(target, source));
 }
 
+function selectableTargetValueSources(garantie: ReferenceOption, target: Target, line?: ReferenceOption) {
+  const sources = availableTargetValueSources(garantie, target, line);
+  if (lineMode(line) !== "CAPITAL" && manualTargetValueAllowed(garantie)) {
+    sources.push("MANUEL");
+  }
+  return sources;
+}
+
 function selectedTargetValueSource(garantie: ReferenceOption, item: GarantieInput | undefined, target: Target, line?: ReferenceOption) {
   if (lineMode(line) === "CAPITAL") {
     return "AUCUNE";
   }
   const selected = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
+  if (selected === "MANUEL" && manualTargetValueAllowed(garantie)) {
+    return selected;
+  }
   if (selected && selected !== "AUCUNE" && hasTargetValue(target, selected)) {
     return selected;
   }
@@ -2251,8 +2287,15 @@ function defaultTargetSource(garantie: ReferenceOption, target: Target, line?: R
   if (sourceWithValue) {
     return sourceWithValue;
   }
+  if (manualTargetValueAllowed(garantie)) {
+    return "MANUEL";
+  }
   const source = configuredDefaultVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 1 ? allowedVehicleValueSources(garantie)[0] : "");
   return source || (allowedVehicleValueSources(garantie).length > 0 ? allowedVehicleValueSources(garantie)[0] : defaultSource(garantie));
+}
+
+function manualTargetValueAllowed(garantie: ReferenceOption) {
+  return Boolean(garantie.saisieManuelleAutorisee);
 }
 
 function targetSourceOptionLabel(source: string, target: Target) {
@@ -2264,6 +2307,9 @@ function targetSourceOptionLabel(source: string, target: Target) {
   }
   if (source === "GLACE") {
     return `V.Glace: ${money(target.valeurGlace)}`;
+  }
+  if (source === "MANUEL") {
+    return "Saisie manuelle";
   }
   return sourceLabel(source);
 }

@@ -2519,6 +2519,13 @@ public class ContratService {
                             montantsOverride,
                             graph.garantiesAffichees()
                     );
+            if (graph.garantiesAffichees() != null) {
+                quittance.setTargetSummaries(buildDifferentialTargetSummaries(
+                        montantsOverride,
+                        graph.vehicules(),
+                        graph.remorques()
+                ));
+            }
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
             return quittance;
         }
@@ -3242,6 +3249,47 @@ public class ContratService {
         int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
         int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
         return quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
+    }
+
+    private List<QuittanceResponse.TargetSummary> buildDifferentialTargetSummaries(
+            QuittanceCalculService.Resultat resultat,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        if (resultat == null || (vehicules == null || vehicules.isEmpty()) && (remorques == null || remorques.isEmpty())) {
+            return List.of();
+        }
+        QuittanceCalculService.Ligne automobile = resultat.lignes().stream()
+                .filter(ligne -> ligne.categorie() == CategorieQuittance.AUTOMOBILE)
+                .findFirst()
+                .orElse(null);
+        QuittanceCalculService.Ligne corporel = resultat.lignes().stream()
+                .filter(ligne -> ligne.categorie() == CategorieQuittance.CORPOREL)
+                .findFirst()
+                .orElse(null);
+        QuittanceCalculService.Ligne evcat = resultat.lignes().stream()
+                .filter(ligne -> ligne.categorie() == CategorieQuittance.EVCAT)
+                .findFirst()
+                .orElse(null);
+        BigDecimal automobileNet = automobile == null ? BigDecimal.ZERO : automobile.primeNette();
+        BigDecimal corporelNet = corporel == null ? BigDecimal.ZERO : corporel.primeNette();
+        BigDecimal evcatNet = evcat == null ? BigDecimal.ZERO : evcat.primeNette();
+        boolean vehicule = vehicules != null && !vehicules.isEmpty();
+        return List.of(QuittanceResponse.TargetSummary.builder()
+                .kind(vehicule ? "VEHICULE" : "REMORQUE")
+                .vehiculeIndex(vehicule ? 0 : null)
+                .remorqueIndex(vehicule ? null : 0)
+                .primeNette(resultat.primeNette())
+                .primeNetteHorsEvcat(scale(automobileNet.add(corporelNet)))
+                .automobilePrimeNette(scale(automobileNet))
+                .corporelPrimeNette(scale(corporelNet))
+                .evcatPrimeNette(scale(evcatNet))
+                .taxe(resultat.taxe())
+                .taxeParafiscale(resultat.taxeParafiscale())
+                .accessoire(resultat.accessoire())
+                .cnpac(resultat.cnpac())
+                .primeTotale(resultat.primeTotale())
+                .build());
     }
 
     private QuittanceCalculService.Resultat calculerRetourPrime(AvenantGraph graph, AvenantRequest request) {

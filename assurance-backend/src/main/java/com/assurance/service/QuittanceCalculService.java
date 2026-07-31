@@ -142,9 +142,6 @@ public class QuittanceCalculService {
             BigDecimal cnpac,
             BigDecimal primeTotale
     ) {
-        if (primeNette.compareTo(BigDecimal.ZERO) < 0) {
-            return new Ligne(categorie, ordre, false, primeNette, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, primeNette);
-        }
         return new Ligne(categorie, ordre, false, primeNette, taxe, taxeParafiscale, accessoire, cnpac, primeTotale);
     }
 

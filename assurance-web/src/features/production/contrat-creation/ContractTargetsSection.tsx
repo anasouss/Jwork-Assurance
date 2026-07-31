@@ -111,6 +111,7 @@ export type ContractTargetsSectionProps = {
   vehicleSectionTitle?: string;
   remorqueSectionTitle?: string;
   guaranteeLayout?: "tariff" | "particulier";
+  primeColumnLabel?: string;
 };
 
 export function ContractTargetsSection({
@@ -170,6 +171,7 @@ export function ContractTargetsSection({
   vehicleSectionTitle = "Véhicules",
   remorqueSectionTitle = "Remorques",
   guaranteeLayout = "tariff",
+  primeColumnLabel = "Prime nette",
 }: ContractTargetsSectionProps) {
   const targets = useMemo<Target[]>(
     () => [
@@ -548,6 +550,7 @@ export function ContractTargetsSection({
                   dirtyCalculationKeys={dirtyCalculationKeys}
                   onRequestCalculation={requestTargetCalculation}
                   layout={guaranteeLayout}
+                  primeColumnLabel={primeColumnLabel}
                 />
                 <QuittanceTotalsSummary
                   preview={activeVehiculePreview}
@@ -698,6 +701,7 @@ export function ContractTargetsSection({
                   dirtyCalculationKeys={dirtyCalculationKeys}
                   onRequestCalculation={requestTargetCalculation}
                   layout={guaranteeLayout}
+                  primeColumnLabel={primeColumnLabel}
                 />
                 <QuittanceTotalsSummary
                   preview={activeRemorquePreview}
@@ -1444,6 +1448,7 @@ function TargetGuaranteesTable({
   dirtyCalculationKeys,
   onRequestCalculation,
   layout,
+  primeColumnLabel,
 }: {
   target: Target;
   garanties: ReferenceOption[];
@@ -1466,6 +1471,7 @@ function TargetGuaranteesTable({
   dirtyCalculationKeys?: string[];
   onRequestCalculation?: (target: Target, garantieId?: string, selectedGaranties?: GarantieInput[]) => void;
   layout: "tariff" | "particulier";
+  primeColumnLabel: string;
 }) {
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     const next = selected.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item));
@@ -1546,7 +1552,7 @@ function TargetGuaranteesTable({
               ) : (
                 <th className="w-56 px-3 py-3 text-left">Taux franchise / Min franchise</th>
               )}
-              {layout === "tariff" ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+              {layout === "tariff" ? <th className="w-40 px-3 py-3 text-left">{primeColumnLabel}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -1767,7 +1773,7 @@ function TargetGuaranteesTable({
                 <th className="w-40 px-3 py-3 text-left">Hospitalisation</th>
                 <th className="w-40 px-3 py-3 text-left">Frais funéraires</th>
                 <th className="w-48 px-3 py-3 text-left">Chirurgie</th>
-                {layout === "tariff" ? <th className="w-32 px-3 py-3 text-right">Prime nette</th> : null}
+                {layout === "tariff" ? <th className="w-32 px-3 py-3 text-right">{primeColumnLabel}</th> : null}
               </tr>
             </thead>
             <tbody>

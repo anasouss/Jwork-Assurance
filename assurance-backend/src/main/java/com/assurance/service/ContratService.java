@@ -2499,15 +2499,26 @@ public class ContratService {
         QuittanceCalculService.Resultat retourPrime = calculerRetourPrime(graph, request);
         QuittanceCalculService.Resultat montantsOverride = retourPrime != null ? retourPrime : graph.montantsOverride();
         if (montantsOverride != null) {
-            QuittanceResponse quittance = mouvementContratService.previsualiserMouvementSpecialise(
-                    graph.contrat(),
-                    graph.typeMouvement(),
-                    toMouvementRequest(request, graph.contrat()),
-                    graph.garanties(),
-                    graph.vehicules(),
-                    graph.remorques(),
-                    montantsOverride
-            );
+            QuittanceResponse quittance = graph.garantiesAffichees() == null
+                    ? mouvementContratService.previsualiserMouvementSpecialise(
+                            graph.contrat(),
+                            graph.typeMouvement(),
+                            toMouvementRequest(request, graph.contrat()),
+                            graph.garanties(),
+                            graph.vehicules(),
+                            graph.remorques(),
+                            montantsOverride
+                    )
+                    : mouvementContratService.previsualiserMouvementSpecialise(
+                            graph.contrat(),
+                            graph.typeMouvement(),
+                            toMouvementRequest(request, graph.contrat()),
+                            graph.garanties(),
+                            graph.vehicules(),
+                            graph.remorques(),
+                            montantsOverride,
+                            graph.garantiesAffichees()
+                    );
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
             return quittance;
         }
@@ -2675,9 +2686,22 @@ public class ContratService {
             throw new BadRequestException("Au moins une garantie est obligatoire pour le changement de vehicule");
         }
         validateAvenantAssistances(request, targets.vehicules());
-        QuittanceCalculService.Resultat avant = calculerMontantsAvenant(contrat, typeMouvement, garantiesAvant, vehiculesAvant, List.of());
+        List<ContratGarantie> garantiesAvantRestantes = garantiesAvant.stream()
+                .map(garantie -> garantieRetourPrime(contrat, request, garantie))
+                .toList();
+        QuittanceCalculService.Resultat avant = calculerMontantsAvenant(
+                contrat,
+                typeMouvement,
+                garantiesAvantRestantes,
+                vehiculesAvant,
+                List.of()
+        );
         QuittanceCalculService.Resultat apres = calculerMontantsAvenant(contrat, typeMouvement, targets.garanties(), targets.vehicules(), targets.remorques());
         QuittanceCalculService.Resultat differentiel = quittanceCalculService.difference(apres, avant);
+        List<ContratGarantie> garantiesDifferentielles = garantiesDifferentiellesChangementVehicule(
+                garantiesAvantRestantes,
+                targets.garanties()
+        );
         return new AvenantGraph(
                 contrat,
                 typeMouvement,
@@ -2685,8 +2709,40 @@ public class ContratService {
                 targets.remorques(),
                 targets.garanties(),
                 NatureSnapshotMouvement.APRES,
-                differentiel
+                differentiel,
+                garantiesDifferentielles
         );
+    }
+
+    private List<ContratGarantie> garantiesDifferentiellesChangementVehicule(
+            List<ContratGarantie> anciennesGaranties,
+            List<ContratGarantie> nouvellesGaranties
+    ) {
+        List<ContratGarantie> result = new ArrayList<>();
+        Set<ContratGarantie> anciennesConsommees = new LinkedHashSet<>();
+        for (ContratGarantie nouvelle : nouvellesGaranties == null ? List.<ContratGarantie>of() : nouvellesGaranties) {
+            ContratGarantie ancienne = (anciennesGaranties == null ? List.<ContratGarantie>of() : anciennesGaranties).stream()
+                    .filter(item -> !anciennesConsommees.contains(item))
+                    .filter(item -> sameGarantieEtClient(item, nouvelle))
+                    .findFirst()
+                    .orElse(null);
+            if (ancienne != null) {
+                anciennesConsommees.add(ancienne);
+            }
+            BigDecimal primeDifferentielle = zeroIfNull(nouvelle.getPrime())
+                    .subtract(zeroIfNull(ancienne == null ? null : ancienne.getPrime()));
+            result.add(copierGarantieAvecPrime(nouvelle, scale(primeDifferentielle)));
+        }
+        return result;
+    }
+
+    private boolean sameGarantieEtClient(ContratGarantie left, ContratGarantie right) {
+        Long leftGarantieId = left.getGarantie() == null ? null : left.getGarantie().getId();
+        Long rightGarantieId = right.getGarantie() == null ? null : right.getGarantie().getId();
+        Long leftClientId = left.getClient() == null ? null : left.getClient().getId();
+        Long rightClientId = right.getClient() == null ? null : right.getClient().getId();
+        return java.util.Objects.equals(leftGarantieId, rightGarantieId)
+                && java.util.Objects.equals(leftClientId, rightClientId);
     }
 
     private AvenantGraph resolveProvisoireAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request, boolean persist) {
@@ -5686,7 +5742,8 @@ public class ContratService {
             List<Remorque> remorques,
             List<ContratGarantie> garanties,
             NatureSnapshotMouvement snapshotNature,
-            QuittanceCalculService.Resultat montantsOverride
+            QuittanceCalculService.Resultat montantsOverride,
+            List<ContratGarantie> garantiesAffichees
     ) {
         private AvenantGraph(
                 Contrat contrat,
@@ -5696,7 +5753,7 @@ public class ContratService {
                 List<ContratGarantie> garanties,
                 NatureSnapshotMouvement snapshotNature
         ) {
-            this(contrat, typeMouvement, vehicules, remorques, garanties, snapshotNature, null);
+            this(contrat, typeMouvement, vehicules, remorques, garanties, snapshotNature, null, null);
         }
     }
 

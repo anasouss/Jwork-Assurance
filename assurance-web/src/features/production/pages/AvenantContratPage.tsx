@@ -1052,6 +1052,7 @@ export default function AvenantContratPage() {
           onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
           targetActionMode="save"
           previewAfterInfoSave={false}
+          primeColumnLabel={movementCode === "CHV_M" ? "Prime différentielle" : undefined}
           guaranteesAction={isVehicleTargetCreationCode(movementCode) ? (
             <Button
               type="button"
@@ -1090,7 +1091,11 @@ export default function AvenantContratPage() {
       )}
 
       <Card className="border-border/70 shadow-none">
-        <CardHeader><CardTitle>Quittance</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>
+            {movementCode === "CHV_M" ? "Quittance différentielle (nouveau - ancien restant)" : "Quittance"}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           <QuittancePreviewCard preview={preview} loading={previewMutation.isPending} />
         </CardContent>

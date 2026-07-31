@@ -125,7 +125,6 @@ export default function ContratShowPage() {
                 ["N° attestation", firstAttestation(contrat)],
                 ["Date d'effet", formatDate(selectedMouvement?.dateEffet ?? contrat.dateEffet)],
                 ["Date d'échéance", formatDate(selectedMouvement?.dateEcheance ?? contrat.dateEcheance)],
-                ["Type client", clientTypeLabel(souscripteur)],
                 ["Fractionnement", text(contrat.fractionnement)],
                 ...(souscripteur?.groupe?.libelle
                   ? [["Groupe client", souscripteur.groupe.libelle] as [string, ReactNode]]
@@ -360,7 +359,7 @@ function VehicleSection({
         />
       </Section>
       {hasGaranties ? (
-        <Section title={`Garanties véhicule ${index + 1}`}>
+        <Section title={(contrat.vehicules?.length ?? 0) > 1 ? `Garanties véhicule ${index + 1}` : "Garanties véhicule"}>
           <GarantiesTable
             garanties={garanties}
             primeLabel={replacementSnapshot ? "Prime différentielle" : "Prime nette"}
@@ -389,7 +388,7 @@ function RemorqueSection({ contrat, remorque, index }: { contrat: ContratSummary
         />
       </Section>
       {hasGaranties ? (
-        <Section title={`Garanties remorque ${index + 1}`}>
+        <Section title={(contrat.remorques?.length ?? 0) > 1 ? `Garanties remorque ${index + 1}` : "Garanties remorque"}>
           <GarantiesTable garanties={garanties} />
         </Section>
       ) : null}
@@ -469,7 +468,6 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
           <TableRow className="bg-slate-100">
             <TableHead className="h-6 px-2 text-[9px] uppercase">Garantie assurée</TableHead>
             <TableHead className="h-6 px-2 text-right text-[9px] uppercase">Valeur assurée</TableHead>
-            <TableHead className="h-6 px-2 text-right text-[9px] uppercase">Taux</TableHead>
             <TableHead className="h-6 px-2 text-[9px] uppercase">Franchise</TableHead>
             <TableHead className="h-6 px-2 text-right text-[9px] uppercase">{primeLabel}</TableHead>
           </TableRow>
@@ -479,7 +477,6 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
             <TableRow key={garantie.contratGarantieId}>
               <TableCell className="px-2 py-0.5 font-medium">{garantieLabel(garantie)}</TableCell>
               <TableCell className="px-2 py-0.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
-              <TableCell className="px-2 py-0.5 text-right">{garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`}</TableCell>
               <TableCell className="px-2 py-0.5">{franchiseLabel(garantie)}</TableCell>
               <TableCell className="px-2 py-0.5 text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
             </TableRow>
@@ -765,11 +762,6 @@ function clientIdentity(client?: ClientResponse | null) {
   return [client.cin ? `CIN ${client.cin}` : null, client.numeroPermis ? `Permis ${client.numeroPermis}` : null].filter(Boolean).join(" · ") || "-";
 }
 
-function clientTypeLabel(client?: ClientResponse | null) {
-  if (!client?.typeClient) return "-";
-  return client.typeClient === "PERSONNE_MORALE" ? "Personne morale" : "Particulier";
-}
-
 function productLabel(contrat: ContratSummary) {
   if (contrat.typeContrat === "CONVENTION") return "Convention";
   if (contrat.typeContrat === "FLOTTE") return "Flotte";
@@ -895,7 +887,6 @@ async function openContratPdf(params: {
       ["N° attestation", firstAttestation(params.contrat)],
       ["Date d'effet", formatDate(params.mouvement?.dateEffet ?? params.contrat.dateEffet)],
       ["Date d'échéance", formatDate(params.mouvement?.dateEcheance ?? params.contrat.dateEcheance)],
-      ["Type client", clientTypeLabel(params.souscripteur)],
       ["Fractionnement", text(params.contrat.fractionnement)],
     ]);
   });
@@ -923,7 +914,8 @@ async function openContratPdf(params: {
     });
     const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
     if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
-      drawPdfSection(ctx, `GARANTIES VÉHICULE ${index + 1}`, () => {
+      const title = (params.contrat.vehicules?.length ?? 0) > 1 ? `GARANTIES VÉHICULE ${index + 1}` : "GARANTIES VÉHICULE";
+      drawPdfSection(ctx, title, () => {
         drawPdfGaranties(
           ctx,
           garanties,
@@ -946,7 +938,8 @@ async function openContratPdf(params: {
     });
     const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.remorqueId ?? "") === String(remorque.remorqueId));
     if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
-      drawPdfSection(ctx, `GARANTIES REMORQUE ${index + 1}`, () => {
+      const title = (params.contrat.remorques?.length ?? 0) > 1 ? `GARANTIES REMORQUE ${index + 1}` : "GARANTIES REMORQUE";
+      drawPdfSection(ctx, title, () => {
         drawPdfGaranties(ctx, garanties);
       });
     }
@@ -1139,13 +1132,12 @@ function drawPdfParties(
 function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[], primeLabel = "Prime nette") {
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return;
-  drawPdfTable(ctx, ["Garantie assurée", "Valeur assurée", "Taux", "Franchise", primeLabel], vehiculeGaranties.map((garantie) => [
+  drawPdfTable(ctx, ["Garantie assurée", "Valeur assurée", "Franchise", primeLabel], vehiculeGaranties.map((garantie) => [
     garantieLabel(garantie),
     formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
-    garantie.taux == null ? "-" : `${moneyAmount(garantie.taux)} %`,
     franchiseLabel(garantie),
     formatMoney(garantie.prime),
-  ]), [58, 32, 22, 42, 26]);
+  ]), [68, 36, 48, 28]);
 }
 
 function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {

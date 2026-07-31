@@ -1444,7 +1444,7 @@ function ResponsiveRecordCell({
   valueClassName?: string;
 }) {
   return (
-    <td className="col-span-2 grid grid-cols-[minmax(7.5rem,0.8fr)_minmax(0,1.2fr)] items-center gap-3 border-t border-border/60 px-3 py-2 xl:table-cell xl:border-t-0">
+    <td className="col-span-2 grid grid-cols-1 gap-1 border-t border-border/60 px-3 py-2 sm:grid-cols-[minmax(7.5rem,0.8fr)_minmax(0,1.2fr)] sm:items-center sm:gap-3 xl:table-cell xl:border-t-0">
       <span className="text-xs font-medium text-muted-foreground xl:hidden">{label}</span>
       <div className={cn("min-w-0", valueClassName)}>{children}</div>
     </td>

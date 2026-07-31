@@ -22,6 +22,23 @@ import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
+function ResponsiveRecordCell({
+  label,
+  children,
+  valueClassName,
+}: {
+  label: string;
+  children: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <td className="col-span-2 grid grid-cols-1 gap-1 border-t border-border/60 px-3 py-2 sm:grid-cols-[minmax(7.5rem,0.8fr)_minmax(0,1.2fr)] sm:items-center sm:gap-3 xl:table-cell xl:border-t-0">
+      <span className="text-xs font-medium text-muted-foreground xl:hidden">{label}</span>
+      <div className={cn("min-w-0", valueClassName)}>{children}</div>
+    </td>
+  );
+}
+
 export function GarantieSection({
   garanties,
   selected,
@@ -154,12 +171,9 @@ export function GarantieSection({
         </div>
       ) : null}
       <div className="mb-2 text-sm font-semibold">Garanties véhicule</div>
-      <div className="overflow-x-auto rounded-md border">
-        <table className={cn(
-          "w-full border-collapse text-xs lg:text-sm",
-          showRateColumn ? "min-w-[760px] xl:min-w-[980px]" : "min-w-[680px] xl:min-w-[820px]"
-        )}>
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+      <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
+        <table className="block w-full border-collapse text-sm xl:table xl:min-w-[980px]">
+          <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
             <tr>
               <th className="w-12 px-3 py-3 text-left"></th>
               <th className="px-3 py-3 text-left">Garantie</th>
@@ -181,7 +195,7 @@ export function GarantieSection({
               {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="block xl:table-row-group">
             {vehiculeGaranties.map((garantie) => {
               const item = byId.get(garantie.id);
               const isRc = Boolean(garantie.responsabiliteCivile);
@@ -211,16 +225,16 @@ export function GarantieSection({
                 <tr
                   key={garantie.id}
                   className={cn(
-                    "border-t align-middle transition-colors",
+                    "grid w-full grid-cols-[2.5rem_minmax(0,1fr)] border-t align-middle transition-colors xl:table-row",
                     rowDisabled && "bg-muted/20 text-muted-foreground",
                     editable && "bg-background",
                     locked && "bg-amber-50/50 dark:bg-amber-950/20"
                   )}
                 >
-                  <td className="px-3 py-2">
+                  <td className="col-start-1 row-start-1 px-3 py-3 xl:table-cell xl:py-2">
                     <Checkbox checked={checked} disabled={isRc || !hasLine} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="col-start-2 row-start-1 min-w-0 px-2 py-3 xl:table-cell xl:px-3 xl:py-2">
                     <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {isRc ? <Badge>RC obligatoire</Badge> : null}
@@ -228,7 +242,7 @@ export function GarantieSection({
                     </div>
                   </td>
                   {vehiculeCount > 1 ? (
-                    <td className="px-3 py-2">
+                    <ResponsiveRecordCell label="Véhicule">
                       {isVehicleGuarantee && !isRc ? (
                         <Select
                           value={String(item?.vehiculeIndex ?? 0)}
@@ -256,11 +270,11 @@ export function GarantieSection({
                       ) : (
                         <span className="text-muted-foreground">Global</span>
                       )}
-                    </td>
+                    </ResponsiveRecordCell>
                   ) : null}
                   {automaticPricing ? (
                     <>
-                      <td className="px-3 py-2">
+                      <ResponsiveRecordCell label="Valeur assurée">
                         {manualValue && !isRc ? (
                           <MoneyInput
                             disabled={!editable}
@@ -314,8 +328,8 @@ export function GarantieSection({
                         ) : (
                           <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={isRc ? money(resolveRcCapital(selectedVehicle, usages)) : capitalDisplay(garantie, selectedLine, selectedVehicle, displayCapital, item)} />
                         )}
-                      </td>
-                      <td className="px-3 py-2">
+                      </ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Taux (%)">
                         {!isRc && lineOptions.length > 1 ? (
                           <Select
                             value={selectedLine?.id ?? ""}
@@ -338,20 +352,20 @@ export function GarantieSection({
                             {isRc ? "-" : rateDisplay(selectedLine)}
                           </span>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">
+                      </ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Taux franchise / Min franchise" valueClassName="text-right text-muted-foreground">
                         {franchiseDisplay(
                           selectedLine,
                           Boolean(garantie.avecFranchise),
                           Boolean(garantie.avecFranchiseMinimale)
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">{checked ? autoPrimeDisplay(annualPrime) : "-"}</td>
-                      <td className="px-3 py-2 text-right font-medium">{checked ? autoPrimeDisplay(netPrime) : "-"}</td>
+                      </ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Prime annuelle" valueClassName="text-right text-muted-foreground">{checked ? autoPrimeDisplay(annualPrime) : "-"}</ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Prime nette" valueClassName="text-right font-medium">{checked ? autoPrimeDisplay(netPrime) : "-"}</ResponsiveRecordCell>
                     </>
                   ) : (
                     <>
-                      <td className="px-3 py-2">
+                      <ResponsiveRecordCell label="Valeur assurée">
                         {isRc ? (
                           <Input
                             readOnly
@@ -445,27 +459,27 @@ export function GarantieSection({
                             value=""
                           />
                         )}
-                      </td>
+                      </ResponsiveRecordCell>
                       {showRateColumn ? (
-                        <td className="px-3 py-2">
+                        <ResponsiveRecordCell label="Taux (%)">
                           <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
-                        </td>
+                        </ResponsiveRecordCell>
                       ) : null}
-                      <td className="px-3 py-2">
+                      <ResponsiveRecordCell label="Taux franchise (%)">
                         <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
-                      </td>
-                      <td className="px-3 py-2">
+                      </ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Min franchise">
                         <MoneyInput
                           disabled={rowDisabled || isRc || !garantie.avecFranchiseMinimale}
                           className={controlClass(editable && Boolean(garantie.avecFranchiseMinimale))}
                           value={garantie.avecFranchiseMinimale ? item?.franchiseMinimale : undefined}
                           onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })}
                         />
-                      </td>
+                      </ResponsiveRecordCell>
                     </>
                   )}
                   {!automaticPricing && showLigneGrille ? (
-                    <td className="px-3 py-2">
+                    <ResponsiveRecordCell label="Ligne grille">
                       {!isRc ? (
                         <Select
                           value={item?.ligneGrilleTarifaireId ?? ""}
@@ -486,12 +500,12 @@ export function GarantieSection({
                       ) : (
                         <span className="text-muted-foreground">Calcul RC</span>
                       )}
-                    </td>
+                    </ResponsiveRecordCell>
                   ) : null}
                   {!automaticPricing && primeColumnEnabled ? (
-                    <td className="px-3 py-2">
+                    <ResponsiveRecordCell label="Prime nette">
                       <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
-                    </td>
+                    </ResponsiveRecordCell>
                   ) : null}
                 </tr>
               );
@@ -502,9 +516,9 @@ export function GarantieSection({
       {personneGaranties.length > 0 ? (
         <div className="mt-4">
           <div className="mb-2 text-sm font-semibold">Garanties personne</div>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full min-w-[820px] border-collapse text-xs lg:text-sm xl:min-w-[1120px]">
-              <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+          <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
+            <table className="block w-full border-collapse text-sm xl:table xl:min-w-[1120px]">
+              <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
                 <tr>
                   <th className="w-12 px-3 py-3 text-left"></th>
                   <th className="px-3 py-3 text-left">Garantie</th>
@@ -518,7 +532,7 @@ export function GarantieSection({
                   {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="block xl:table-row-group">
                 {personneGaranties.map((garantie) => {
                   const item = byId.get(garantie.id);
                   const checked = Boolean(item);
@@ -528,16 +542,16 @@ export function GarantieSection({
                   const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
 
                   return (
-                    <tr key={garantie.id} className={cn("border-t align-middle transition-colors", rowDisabled || !hasFormula ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
-                      <td className="px-3 py-2">
+                    <tr key={garantie.id} className={cn("grid w-full grid-cols-[2.5rem_minmax(0,1fr)] border-t align-middle transition-colors xl:table-row", rowDisabled || !hasFormula ? "bg-muted/20 text-muted-foreground" : "bg-background")}>
+                      <td className="col-start-1 row-start-1 px-3 py-3 xl:table-cell xl:py-2">
                         <Checkbox checked={checked} disabled={!hasFormula} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="col-start-2 row-start-1 min-w-0 px-2 py-3 xl:table-cell xl:px-3 xl:py-2">
                         <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                         {automaticPricing && !hasFormula ? <Badge variant="outline">Formule manquante</Badge> : null}
                       </td>
                       {automaticPricing ? (
-                        <td className="px-3 py-2">
+                        <ResponsiveRecordCell label="Formule">
                           <Select
                             value={item?.formuleGarantiePersonneId ?? selectedFormule?.id ?? ""}
                             disabled={!checked || formules.length <= 1}
@@ -559,20 +573,20 @@ export function GarantieSection({
                               ))}
                             </SelectContent>
                           </Select>
-                        </td>
+                        </ResponsiveRecordCell>
                       ) : null}
-                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantDeces) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces} onValueChange={(value) => update(garantie.id, { montantDeces: value })} />}</td>
-                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantInvalidite} onValueChange={(value) => update(garantie.id, { montantInvalidite: value })} />}</td>
-                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisMedicaux} onValueChange={(value) => update(garantie.id, { montantFraisMedicaux: value })} />}</td>
-                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</td>
-                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</td>
-                      <td className="px-3 py-2 text-right">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</td>
+                      <ResponsiveRecordCell label="Décès" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantDeces) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantDeces} onValueChange={(value) => update(garantie.id, { montantDeces: value })} />}</ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Invalidité" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantInvalidite} onValueChange={(value) => update(garantie.id, { montantInvalidite: value })} />}</ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Frais médicaux" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisMedicaux} onValueChange={(value) => update(garantie.id, { montantFraisMedicaux: value })} />}</ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Hospitalisation" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Frais funéraires" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</ResponsiveRecordCell>
+                      <ResponsiveRecordCell label="Chirurgie réparatrice" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</ResponsiveRecordCell>
                       {automaticPricing ? (
-                        <td className="px-3 py-2 text-right text-muted-foreground">{checked ? money(selectedFormule?.primeNette) : "-"}</td>
+                        <ResponsiveRecordCell label="Prime nette" valueClassName="text-right text-muted-foreground">{checked ? money(selectedFormule?.primeNette) : "-"}</ResponsiveRecordCell>
                       ) : primeColumnEnabled ? (
-                        <td className="px-3 py-2">
+                        <ResponsiveRecordCell label="Prime nette">
                           <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
-                        </td>
+                        </ResponsiveRecordCell>
                       ) : null}
                     </tr>
                   );
@@ -742,13 +756,13 @@ function AssistanceTable({
   }, [assistance.produitAssistanceId, onChange, selectedProductId]);
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
       <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
         <Checkbox checked={assistance.enabled} onCheckedChange={(checked) => onChange({ enabled: Boolean(checked) })} />
         <span>ASSISTANCE</span>
       </div>
-      <table className="w-full min-w-[820px] table-fixed border-collapse text-xs lg:text-sm xl:min-w-[1120px]">
-        <colgroup>
+      <table className="block w-full border-collapse text-sm xl:table xl:min-w-[1120px] xl:table-fixed">
+        <colgroup className="hidden xl:table-column-group">
           <col className="w-[150px]" />
           <col className="w-[150px]" />
           <col className="w-[120px]" />
@@ -758,7 +772,7 @@ function AssistanceTable({
           <col className="w-[230px]" />
           <col className="w-[90px]" />
         </colgroup>
-        <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+        <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
           <tr>
             <th className="px-3 py-3 text-left">Date effet</th>
             <th className="px-3 py-3 text-left">Date souscription</th>
@@ -770,33 +784,33 @@ function AssistanceTable({
             <th className="px-3 py-3 text-right">Prime</th>
           </tr>
         </thead>
-        <tbody>
-          <tr className={cn("border-t align-middle", !assistance.enabled && "bg-muted/20 text-muted-foreground")}>
-            <td className="px-3 py-2">
+        <tbody className="block xl:table-row-group">
+          <tr className={cn("grid w-full grid-cols-2 border-t align-middle xl:table-row", !assistance.enabled && "bg-muted/20 text-muted-foreground")}>
+            <ResponsiveRecordCell label="Date effet">
               <DatePicker disabled={!assistance.enabled} date={assistance.dateEffet} onSelect={(date) => updateDateEffet(toDateOnly(date))} />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Date souscription">
               <DatePicker disabled={!assistance.enabled} date={assistance.dateSouscription} onSelect={(date) => onChange({ dateSouscription: toDateOnly(date) })} />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Échéance">
               <EcheanceInput
                 disabled={!assistance.enabled}
                 value={assistance.echeanceCode ?? ""}
                 onValueChange={updateEcheance}
               />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Date échéance">
               <DatePicker disabled date={assistance.dateEcheance} onSelect={() => undefined} />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="N° contrat">
               <Input
                 disabled={!assistance.enabled}
                 value={assistance.numeroContratOuQuittance ?? ""}
                 placeholder="N° contrat"
                 onChange={(event) => onChange({ numeroContratOuQuittance: event.target.value })}
               />
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Compagnie">
               <Select
                 disabled={!assistance.enabled}
                 value={assistance.compagnieAssistanceId ?? ""}
@@ -809,8 +823,8 @@ function AssistanceTable({
                   ))}
                 </SelectContent>
               </Select>
-            </td>
-            <td className="px-3 py-2">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Produit">
               <Select
                 disabled={!assistance.enabled || filteredProducts.length === 0}
                 value={selectedProductId}
@@ -823,10 +837,10 @@ function AssistanceTable({
                   ))}
                 </SelectContent>
               </Select>
-            </td>
-            <td className="px-3 py-2 text-right font-medium">
+            </ResponsiveRecordCell>
+            <ResponsiveRecordCell label="Prime" valueClassName="text-right font-medium">
               {assistance.enabled && prime != null ? formatMoney(prime) : "-"}
-            </td>
+            </ResponsiveRecordCell>
           </tr>
         </tbody>
       </table>

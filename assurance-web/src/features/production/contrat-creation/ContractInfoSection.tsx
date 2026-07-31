@@ -57,6 +57,7 @@ export function ContractInfoSection({
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
   const showCategorieClient = form.typeContrat === "PARTICULIER" && !categorieClientId;
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
+  const isConventionInvoice = readOnlyConventionContext && form.modeReglement === "facture";
   const isFlotte = form.typeContrat === "FLOTTE";
   const showContratUsage = form.typeContrat !== "FLOTTE";
   const showNumeroAttestation = !isFlotte;
@@ -354,7 +355,12 @@ export function ContractInfoSection({
                     value={form.modeReglement}
                     onValueChange={(value) => {
                       form.setModeReglement(value);
-                      if (value !== "facture") {
+                      if (value === "facture") {
+                        form.setTypePayeurPrime("SOUSCRIPTEUR");
+                        form.setPayeurPrimeClientId("");
+                        form.setGroupeFacturationId("");
+                        form.setModeFacturation("DIRECTE");
+                      } else {
                         form.setNumeroBonCommande("");
                         form.setMontantBulletin("");
                       }
@@ -376,60 +382,64 @@ export function ContractInfoSection({
             ) : null}
           </>
         )}
-        <Field label="Payeur des primes" required error={form.validationErrors.payeurPrimeClientId}>
-          <Select
-            value={form.typePayeurPrime}
-            onValueChange={(value) => {
-              const type = value as TypePayeurPrime;
-              form.setTypePayeurPrime(type);
-              form.setPayeurPrimeClientId("");
-            }}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="SOUSCRIPTEUR">Lui-même</SelectItem>
-              {selectedGroup?.clientTresorerieId ? (
-                <SelectItem value="TRESORERIE_GROUPE">Trésorerie du groupe</SelectItem>
-              ) : null}
-              {selectedGroup?.membres.length ? (
-                <SelectItem value="MEMBRE_GROUPE">Autre membre du groupe</SelectItem>
-              ) : null}
-              <SelectItem value="TIERS_MANDATE">Autre personne</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        {selectedGroup ? (
-          <Field label="Groupe de facturation">
-            <Input value={`${selectedGroup.code} - ${selectedGroup.libelle}`} disabled />
-          </Field>
+        {!isConventionInvoice ? (
+          <>
+            <Field label="Payeur des primes" required error={form.validationErrors.payeurPrimeClientId}>
+              <Select
+                value={form.typePayeurPrime}
+                onValueChange={(value) => {
+                  const type = value as TypePayeurPrime;
+                  form.setTypePayeurPrime(type);
+                  form.setPayeurPrimeClientId("");
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SOUSCRIPTEUR">Lui-même</SelectItem>
+                  {selectedGroup?.clientTresorerieId ? (
+                    <SelectItem value="TRESORERIE_GROUPE">Trésorerie du groupe</SelectItem>
+                  ) : null}
+                  {selectedGroup?.membres.length ? (
+                    <SelectItem value="MEMBRE_GROUPE">Autre membre du groupe</SelectItem>
+                  ) : null}
+                  <SelectItem value="TIERS_MANDATE">Autre personne</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {selectedGroup ? (
+              <Field label="Groupe de facturation">
+                <Input value={`${selectedGroup.code} - ${selectedGroup.libelle}`} disabled />
+              </Field>
+            ) : null}
+            {form.typePayeurPrime === "MEMBRE_GROUPE" || form.typePayeurPrime === "TIERS_MANDATE" ? (
+              <Field label={form.typePayeurPrime === "MEMBRE_GROUPE" ? "Membre payeur" : "Autre payeur"} required>
+                <AutocompleteSelect
+                  value={form.payeurPrimeClientId}
+                  onValueChange={form.setPayeurPrimeClientId}
+                  onQueryChange={form.typePayeurPrime === "TIERS_MANDATE" ? setPayerSearch : undefined}
+                  options={payerOptions}
+                  placeholder={form.typePayeurPrime === "TIERS_MANDATE" ? "RC, CIN ou nom" : "Membre du groupe"}
+                  emptyText="Aucun client trouvé"
+                  invalidText="Sélectionnez un client existant."
+                />
+              </Field>
+            ) : null}
+            <Field label="Facturation" required error={form.validationErrors.groupeFacturationId}>
+              <Select
+                value={form.modeFacturation}
+                onValueChange={(value) => form.setModeFacturation(value as ModeFacturationContrat)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DIRECTE">Directe au payeur</SelectItem>
+                  {selectedGroup ? (
+                    <SelectItem value="CONSOLIDEE_GROUPE">Consolidée au groupe</SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+            </Field>
+          </>
         ) : null}
-        {form.typePayeurPrime === "MEMBRE_GROUPE" || form.typePayeurPrime === "TIERS_MANDATE" ? (
-          <Field label={form.typePayeurPrime === "MEMBRE_GROUPE" ? "Membre payeur" : "Autre payeur"} required>
-            <AutocompleteSelect
-              value={form.payeurPrimeClientId}
-              onValueChange={form.setPayeurPrimeClientId}
-              onQueryChange={form.typePayeurPrime === "TIERS_MANDATE" ? setPayerSearch : undefined}
-              options={payerOptions}
-              placeholder={form.typePayeurPrime === "TIERS_MANDATE" ? "RC, CIN ou nom" : "Membre du groupe"}
-              emptyText="Aucun client trouvé"
-              invalidText="Sélectionnez un client existant."
-            />
-          </Field>
-        ) : null}
-        <Field label="Facturation" required error={form.validationErrors.groupeFacturationId}>
-          <Select
-            value={form.modeFacturation}
-            onValueChange={(value) => form.setModeFacturation(value as ModeFacturationContrat)}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="DIRECTE">Directe au payeur</SelectItem>
-              {selectedGroup ? (
-                <SelectItem value="CONSOLIDEE_GROUPE">Consolidée au groupe</SelectItem>
-              ) : null}
-            </SelectContent>
-          </Select>
-        </Field>
       </div>
       <div className="mt-4 flex justify-end border-t pt-3">
         <Button

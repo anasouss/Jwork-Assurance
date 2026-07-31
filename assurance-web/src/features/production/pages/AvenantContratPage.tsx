@@ -1153,6 +1153,7 @@ export default function AvenantContratPage() {
                 usages={usages.data ?? []}
                 categoriesTransport={categoriesTransport.data ?? []}
                 queryScope={`avenant-${contratId}-${configuredGrille.id}`}
+                onSaved={() => setGrilleConfiguratorOpen(false)}
               />
             ) : (
               <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">

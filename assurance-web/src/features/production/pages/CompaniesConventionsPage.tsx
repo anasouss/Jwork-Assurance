@@ -403,6 +403,7 @@ export default function CompaniesConventionsPage() {
                 categoriesTransport={categoriesTransport.data ?? []}
                 allowedUsageIds={referenceStringArray(configuring ?? undefined, "usageIds")}
                 queryScope={`convention-${configuring?.id ?? configuredGrille.id}`}
+                onSaved={() => setConfiguring(null)}
               />
             ) : (
               <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">

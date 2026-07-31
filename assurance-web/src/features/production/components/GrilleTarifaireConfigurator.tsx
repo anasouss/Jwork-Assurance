@@ -25,6 +25,7 @@ type Props = {
   categoriesTransport: ReferenceOption[];
   allowedUsageIds?: string[];
   queryScope?: string;
+  onSaved?: () => void | Promise<void>;
 };
 
 type MatrixLine = UpsertLigneGrilleTarifaireRequest & {
@@ -45,6 +46,7 @@ export function GrilleTarifaireConfigurator({
   usages,
   allowedUsageIds,
   queryScope = "grille-config",
+  onSaved,
 }: Props) {
   const queryClient = useQueryClient();
   const [selectedUsageId, setSelectedUsageId] = useState("");
@@ -140,6 +142,7 @@ export function GrilleTarifaireConfigurator({
       await queryClient.invalidateQueries({ queryKey: ["lignes-grille"] });
       await queryClient.invalidateQueries({ queryKey: ["formules-garantie-personne"] });
       toast.success("Configuration de l'usage enregistrée");
+      await onSaved?.();
     },
     onError: showError,
   });

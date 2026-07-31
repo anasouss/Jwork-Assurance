@@ -279,6 +279,7 @@ export function useContratCreationForm(
     ? saisiePrimeNette ? "MANUELLE_AVEC_PRIME_NETTE" : "MANUELLE"
     : "AUTOMATIQUE_GRILLE";
   const contractUsageFallback = typeContrat === "FLOTTE" ? "" : usageId;
+  const isConventionInvoice = typeContrat === "CONVENTION" && modeReglement === "facture";
 
   const request = useMemo<CreateContratRequest>(() => ({
     agenceId: user?.agenceId ?? "",
@@ -298,12 +299,12 @@ export function useContratCreationForm(
     modeReglement: typeContrat === "CONVENTION" ? modeReglement : undefined,
     numeroBonCommande: typeContrat === "CONVENTION" && modeReglement === "facture" ? emptyToUndefined(numeroBonCommande) : undefined,
     montantBulletin: typeContrat === "CONVENTION" && modeReglement === "facture" ? positiveNumberOrUndefined(montantBulletin) : undefined,
-    typePayeurPrime,
-    payeurPrimeClientId: typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE"
+    typePayeurPrime: isConventionInvoice ? "SOUSCRIPTEUR" : typePayeurPrime,
+    payeurPrimeClientId: !isConventionInvoice && (typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE")
       ? emptyToUndefined(payeurPrimeClientId)
       : undefined,
-    groupeFacturationId: emptyToUndefined(groupeFacturationId),
-    modeFacturation,
+    groupeFacturationId: isConventionInvoice ? undefined : emptyToUndefined(groupeFacturationId),
+    modeFacturation: isConventionInvoice ? "DIRECTE" : modeFacturation,
     fractionnement,
     modeSaisieGaranties,
     saisiePrimeNette: typeContrat === "PARTICULIER" ? saisiePrimeNette : false,
@@ -364,6 +365,7 @@ export function useContratCreationForm(
     typeRenouvellement,
     modeTermeRenouvellement,
     modeReglement,
+    isConventionInvoice,
     numeroBonCommande,
     montantBulletin,
     typePayeurPrime,
@@ -560,10 +562,10 @@ export function useContratCreationForm(
     if (isFlotteLocationCategory && !positiveNumberOrUndefined(tauxRc)) {
       nextErrors.tauxRc = "Taux RC obligatoire.";
     }
-    if ((typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
+    if (!isConventionInvoice && (typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
       nextErrors.payeurPrimeClientId = "Payeur obligatoire.";
     }
-    if (modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
+    if (!isConventionInvoice && modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
       nextErrors.groupeFacturationId = "Groupe de facturation obligatoire.";
     }
     const today = dateOnly(new Date());
@@ -714,10 +716,10 @@ export function useContratCreationForm(
       if (isFlotteLocationCategory && !positiveNumberOrUndefined(tauxRc)) {
         nextErrors.tauxRc = "Taux RC obligatoire.";
       }
-      if ((typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
+      if (!isConventionInvoice && (typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
         nextErrors.payeurPrimeClientId = "Payeur obligatoire.";
       }
-      if (modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
+      if (!isConventionInvoice && modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
         nextErrors.groupeFacturationId = "Groupe de facturation obligatoire.";
       }
       if (typeContrat === "CONVENTION") {

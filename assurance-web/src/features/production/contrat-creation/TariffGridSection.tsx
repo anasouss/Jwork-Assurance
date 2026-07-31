@@ -239,6 +239,7 @@ export function TariffGridSection({
                 categoriesTransport={form.refs.categoriesTransport.data ?? []}
                 allowedUsageIds={allowedUsageIds}
                 queryScope={`flotte-${form.draftId ?? selectedGrille.id}`}
+                onSaved={() => setConfiguratorOpen(false)}
               />
             ) : null}
           </div>

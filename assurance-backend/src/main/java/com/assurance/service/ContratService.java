@@ -1348,6 +1348,16 @@ public class ContratService {
             return;
         }
 
+        if (contrat.getTypeContrat() == TypeContrat.CONVENTION
+                && "facture".equalsIgnoreCase(contrat.getModeReglement())) {
+            contrat.setTypePayeurPrime(TypePayeurPrime.SOUSCRIPTEUR);
+            contrat.setPayeurPrime(souscripteur);
+            contrat.setGroupeFacturation(null);
+            contrat.setModeFacturation(ModeFacturationContrat.DIRECTE);
+            contratRepository.save(contrat);
+            return;
+        }
+
         TypePayeurPrime typePayeur = request.getTypePayeurPrime() == null
                 ? TypePayeurPrime.SOUSCRIPTEUR
                 : request.getTypePayeurPrime();

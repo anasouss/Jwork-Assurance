@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save, Settings2 } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ClientSection } from "../components/ClientSection";
 import { GarantieSection } from "../components/GarantieSection";
-import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { ManualQuittanceSection } from "../components/ManualQuittanceSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { RemorqueSection } from "../components/RemorqueSection";
@@ -82,17 +80,11 @@ export function ContratFormLayout({
     ];
   }, [allowRemorques, order]);
   const [activeSection, setActiveSection] = useState<ContratSectionKey>("souscripteur");
-  const [grilleConfiguratorOpen, setGrilleConfiguratorOpen] = useState(false);
-  const configuredGrille = useMemo(
-    () => (form.refs.grilles.data ?? []).find((grille) => grille.id === form.grilleTarifaireId) ?? null,
-    [form.grilleTarifaireId, form.refs.grilles.data]
-  );
   const souscripteurGroupeId = form.clients.find((client) => client.role === "SOUSCRIPTEUR")?.groupeClientId ?? "";
   const souscripteurGroupe = useMemo(
     () => (form.groupesClients.data ?? []).find((groupe) => groupe.id === souscripteurGroupeId),
     [form.groupesClients.data, souscripteurGroupeId]
   );
-  const conventionLabel = String(form.selectedConvention?.libelle ?? form.selectedConvention?.intitule ?? "Convention");
 
   useEffect(() => {
     if (!workflowSections.includes(activeSection)) {
@@ -231,20 +223,6 @@ export function ContratFormLayout({
       produitsAssistance={form.refs.produitsAssistance.data ?? []}
       assistanceUsageId={form.usageId}
       assistanceCategorieClientId={assistanceCategorieClientId}
-      extraAction={
-        showConvention ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="border-white/50 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-            onClick={() => setGrilleConfiguratorOpen(true)}
-          >
-            <Settings2 className="size-4" />
-            Grille tarifaire
-          </Button>
-        ) : null
-      }
       onSaveSection={saveSectionAndAdvance}
       savedSections={form.savedSections}
       saving={form.saveDraftMutation.isPending}
@@ -405,34 +383,6 @@ export function ContratFormLayout({
         </Button>
       </div>
 
-      {showConvention ? (
-        <Sheet open={grilleConfiguratorOpen} onOpenChange={setGrilleConfiguratorOpen}>
-          <SheetContent side="right" className="w-[min(96vw,1180px)] overflow-y-auto sm:max-w-none">
-            <SheetHeader>
-              <SheetTitle>Configurer la grille convention</SheetTitle>
-              <SheetDescription>
-                {conventionLabel} · {configuredGrille?.libelle ?? "Grille tarifaire"}
-              </SheetDescription>
-            </SheetHeader>
-            <div className="px-4 pb-4">
-              {configuredGrille ? (
-                <GrilleTarifaireConfigurator
-                  grille={configuredGrille}
-                  garanties={form.refs.garanties.data ?? []}
-                  usages={form.refs.usages.data ?? []}
-                  categoriesTransport={form.refs.categoriesTransport.data ?? []}
-                  allowedUsageIds={form.conventionUsageIds}
-                  queryScope={`contrat-convention-${form.conventionId || configuredGrille.id}`}
-                />
-              ) : (
-                <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-                  Cette convention n'a pas encore de grille tarifaire assignée.
-                </div>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-      ) : null}
     </div>
   );
 }

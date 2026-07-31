@@ -1053,7 +1053,7 @@ export default function AvenantContratPage() {
           targetActionMode="save"
           previewAfterInfoSave={false}
           primeColumnLabel={movementCode === "CHV_M" ? "Prime différentielle" : undefined}
-          guaranteesAction={isVehicleTargetCreationCode(movementCode) ? (
+          garantiesExtraAction={isVehicleTargetCreationCode(movementCode) ? (
             <Button
               type="button"
               variant="outline"

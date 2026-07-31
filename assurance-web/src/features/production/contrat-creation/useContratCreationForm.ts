@@ -325,6 +325,7 @@ export function useContratCreationForm(
     })),
     vehicules: vehicules.map((vehicule) => ({
       ...vehicule,
+      coefficientProrata: undefined,
       usageId: vehicule.usageId || contractUsageFallback || undefined,
       dateEffet: vehicule.dateEffet || dateEffet,
       dateEcheance: vehicule.dateEcheance || dateEcheance,
@@ -334,6 +335,7 @@ export function useContratCreationForm(
       ? []
       : remorques.map((remorque) => ({
           ...remorque,
+          coefficientProrata: undefined,
           usageId: remorque.usageId || contractUsageFallback || undefined,
         })),
     garanties: typeContrat === "PARTICULIER"
@@ -1370,7 +1372,7 @@ function sectionLabel(section: SavableContratSectionKey) {
 function hydrateDraft(draft: ContratSummary) {
   const vehicleIdToIndex = new Map((draft.vehicules ?? []).map((vehicule, index) => [vehicule.vehiculeId, index]));
   const remorqueIdToIndex = new Map((draft.remorques ?? []).map((remorque, index) => [remorque.remorqueId, index]));
-  let clients = (draft.clients ?? []).length > 0
+  let clients: ClientInput[] = (draft.clients ?? []).length > 0
     ? (draft.clients ?? []).map((link) => {
         const role = asRole(link.role);
         return {
@@ -1582,7 +1584,6 @@ function shouldPersistClientInput(input: ClientInput) {
   }
   const client = input.client;
   return [
-    client.codeClient,
     client.cin,
     client.rc,
     client.nom,

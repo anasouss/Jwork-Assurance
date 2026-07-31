@@ -3553,7 +3553,6 @@ public class ContratService {
         request.setPayeurPrimeClientId(source.getPayeurPrime() == null ? null : source.getPayeurPrime().getId());
         request.setGroupeFacturationId(source.getGroupeFacturation() == null ? null : source.getGroupeFacturation().getId());
         request.setModeFacturation(source.getModeFacturation());
-        request.setReferenceMandatPayeur(source.getReferenceMandatPayeur());
         request.setPeriodicite(source.getPeriodicite());
         request.setFractionnement(source.getFractionnement());
         request.setTauxRc(source.getTauxRc());

@@ -21,7 +21,6 @@ export function emptyVehicule(usageId?: string): VehiculeInput {
     typeVehicule: "AUTOMOBILE",
     usageId,
     carburant: "ESSENCE",
-    coefficientProrata: 1,
   };
 }
 

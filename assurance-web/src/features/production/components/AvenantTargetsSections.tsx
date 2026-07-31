@@ -33,6 +33,7 @@ export function ParticulierAvenantTargetsSection({
       maxRemorques={1}
       pricingMode={props.pricingMode === "MANUELLE_AVEC_PRIME_NETTE" ? "MANUELLE_AVEC_PRIME_NETTE" : "MANUELLE"}
       remorqueSectionTitle="Remorque"
+      showAssistance={false}
       showRemorqueSection={showRemorque}
       showVehicleSection={targetMode !== "remorque"}
       singleRemorqueLayout

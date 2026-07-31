@@ -156,7 +156,8 @@ export default function AvenantContratPage() {
   );
   const movementDefinition = availableMovements.find((item) => normalizeCode(item.code) === movementCode);
   const movementAvailable = availableMovements.some((item) => normalizeCode(item.code) === movementCode);
-  const showAvenantAssistance = Boolean(movementDefinition?.autoriseAssistance);
+  const showAvenantAssistance = contrat?.typeContrat !== "PARTICULIER"
+    && Boolean(movementDefinition?.autoriseAssistance);
   const contratKindLabel = contrat?.typeContrat === "FLOTTE" ? "flotte" : contrat?.typeContrat === "CONVENTION" ? "convention" : "mono";
   const assistanceCategorieClientId = useMemo(
     () => resolveAssistanceCategorieClientId(contrat),
@@ -486,14 +487,18 @@ export default function AvenantContratPage() {
         request.remorques.length,
         garanties.data ?? []
       );
-      request.assistances = buildAvenantAssistances(targetAssistances);
+      if (showAvenantAssistance) {
+        request.assistances = buildAvenantAssistances(targetAssistances);
+      }
     }
     if (isGuaranteeModificationCode(movementCode)) {
       request.garanties = draftGaranties;
-      request.assistances = buildAvenantAssistances(targetAssistances, {
-        includeDisabled: true,
-        onlyModified: true,
-      });
+      if (showAvenantAssistance) {
+        request.assistances = buildAvenantAssistances(targetAssistances, {
+          includeDisabled: true,
+          onlyModified: true,
+        });
+      }
     }
     if (movementCode === "EXR_M") {
       request.remorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
@@ -562,12 +567,14 @@ export default function AvenantContratPage() {
       request.vehicules = normalizedVehicules;
       request.remorques = normalizedRemorques;
       request.garanties = garantiesRequest;
-      const assistanceError = assistanceValidationMessage(targetAssistances);
-      if (assistanceError) {
-        notify(assistanceError);
-        return null;
+      if (showAvenantAssistance) {
+        const assistanceError = assistanceValidationMessage(targetAssistances);
+        if (assistanceError) {
+          notify(assistanceError);
+          return null;
+        }
+        request.assistances = buildAvenantAssistances(targetAssistances);
       }
-      request.assistances = buildAvenantAssistances(targetAssistances);
     }
     if (isGuaranteeModificationCode(movementCode)) {
       if (!hasActiveTargets) {
@@ -579,10 +586,12 @@ export default function AvenantContratPage() {
         return null;
       }
       request.garanties = currentGaranties;
-      request.assistances = buildAvenantAssistances(targetAssistances, {
-        includeDisabled: true,
-        onlyModified: true,
-      });
+      if (showAvenantAssistance) {
+        request.assistances = buildAvenantAssistances(targetAssistances, {
+          includeDisabled: true,
+          onlyModified: true,
+        });
+      }
     }
     if (movementCode === "EXR_M") {
       const normalizedRemorques = remorques.map((item) => normalizeRemorque(item, dateEffet, request.dateEcheance));
@@ -710,7 +719,7 @@ export default function AvenantContratPage() {
       request.vehicules = normalizedVehicules;
       request.remorques = normalizedRemorques;
       request.garanties = garantiesRequest;
-      request.assistances = target.kind === "vehicule"
+      request.assistances = showAvenantAssistance && target.kind === "vehicule"
         ? buildAvenantAssistancesForTarget(targetAssistances, target.index)
         : [];
       return request;
@@ -847,7 +856,7 @@ export default function AvenantContratPage() {
         toast.error("Sélectionnez au moins une garantie pour cette cible");
         return false;
       }
-      if (target.kind === "vehicule") {
+      if (showAvenantAssistance && target.kind === "vehicule") {
         const assistanceError = assistanceValidationMessage({
           [`vehicule:${target.index}`]: targetAssistances[`vehicule:${target.index}`] ?? { enabled: false },
         });

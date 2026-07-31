@@ -97,6 +97,7 @@ export type ContractTargetsSectionProps = {
   assistanceCategorieClientId?: string;
   crmPartage?: boolean;
   crmPartageValeur?: string;
+  showVehicleCrm?: boolean;
   prospectionMode?: boolean;
   controleStockAttestation?: boolean;
   lockContractDates?: boolean;
@@ -157,6 +158,7 @@ export function ContractTargetsSection({
   assistanceCategorieClientId,
   crmPartage = false,
   crmPartageValeur = "",
+  showVehicleCrm = true,
   prospectionMode = false,
   controleStockAttestation = true,
   lockContractDates = false,
@@ -485,6 +487,7 @@ export function ContractTargetsSection({
                     sousClasses={sousClasses}
                     crmPartage={crmPartage}
                     crmPartageValeur={crmPartageValeur}
+                    showCrm={showVehicleCrm}
                     prospectionMode={prospectionMode}
                     controleStockAttestation={controleStockAttestation}
                     errors={errors}
@@ -1099,6 +1102,7 @@ function VehicleForm({
   sousClasses,
   crmPartage,
   crmPartageValeur,
+  showCrm,
   prospectionMode,
   controleStockAttestation,
   errors,
@@ -1115,6 +1119,7 @@ function VehicleForm({
   sousClasses: ReferenceOption[];
   crmPartage: boolean;
   crmPartageValeur: string;
+  showCrm: boolean;
   prospectionMode: boolean;
   controleStockAttestation: boolean;
   errors: Record<string, string>;
@@ -1294,14 +1299,16 @@ function VehicleForm({
         <Field label="Valeur glace">
           <MoneyInput className="text-right" value={vehicule.valeurGlace} onValueChange={(value) => update({ valeurGlace: value })} />
         </Field>
-        <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
-          <Input
-            value={crmPartage ? crmPartageValeur : vehicule.crm ?? ""}
-            readOnly={crmPartage}
-            className={cn("text-right", crmPartage ? "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400" : undefined)}
-            onChange={(event) => update({ crm: event.target.value })}
-          />
-        </Field>
+        {showCrm ? (
+          <Field label="CRM" required error={errors[`vehicules.${index}.crm`]}>
+            <Input
+              value={crmPartage ? crmPartageValeur : vehicule.crm ?? ""}
+              readOnly={crmPartage}
+              className={cn("text-right", crmPartage ? "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400" : undefined)}
+              onChange={(event) => update({ crm: event.target.value })}
+            />
+          </Field>
+        ) : null}
       </div>
       <div className="mt-3 flex items-center gap-2">
         <Checkbox

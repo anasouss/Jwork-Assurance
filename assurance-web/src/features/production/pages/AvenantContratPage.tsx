@@ -128,6 +128,11 @@ export default function AvenantContratPage() {
     queryFn: () => productionApi.getAvenantRectification(contratId, validatedMovementId!),
     enabled: Boolean(contratId && validatedMovementId),
   });
+  const savedMovementQuery = useQuery({
+    queryKey: ["contrat", contratId, validatedMovementId, "avenant-edit"],
+    queryFn: () => productionApi.getContrat(contratId, { mouvementId: validatedMovementId }),
+    enabled: Boolean(contratId && validatedMovementId),
+  });
   useEffect(() => {
     if (rectificationQuery.error) {
       toast.error(errorMessage(rectificationQuery.error));
@@ -240,6 +245,7 @@ export default function AvenantContratPage() {
   ].some((query) => query.isLoading);
   const initialLoading = contextQuery.isLoading
     || sourceQuery.isLoading
+    || savedMovementQuery.isLoading
     || referencesLoading
     || (
       contextQuery.isSuccess
@@ -342,7 +348,9 @@ export default function AvenantContratPage() {
   }, [contrat, movementCode]);
 
   useEffect(() => {
-    const sourceFetched = validatedMovementId ? rectificationQuery.isFetched : draftQuery.isFetched;
+    const sourceFetched = validatedMovementId
+      ? rectificationQuery.isFetched && savedMovementQuery.isFetched
+      : draftQuery.isFetched;
     if (!contrat || !sourceFetched || hydratedDraftCodeRef.current === hydrationKey) {
       return;
     }
@@ -401,6 +409,10 @@ export default function AvenantContratPage() {
       }
     }
     setDuplicataAttestationDrafts(nextDuplicataAttestations);
+    if (validatedMovementId) {
+      setPreview(savedMovementQuery.data?.quittanceGenerale ?? null);
+      setTargetPreview(null);
+    }
     setHydratedSourceKey(hydrationKey);
   }, [
     contrat,
@@ -413,6 +425,8 @@ export default function AvenantContratPage() {
     movementCode,
     rectificationQuery.data,
     rectificationQuery.isFetched,
+    savedMovementQuery.data,
+    savedMovementQuery.isFetched,
     validatedMovementId,
   ]);
 
@@ -786,9 +800,10 @@ export default function AvenantContratPage() {
   useEffect(() => {
     const hydrationKey = `${movementCode}:${validatedMovementId ?? "draft"}`;
     const hydratedRequest = validatedMovementId ? rectificationQuery.data : draftQuery.data?.request;
-    if (!isTargetCreationCode(movementCode)
+    if (validatedMovementId
+        || !isTargetCreationCode(movementCode)
         || !hydratedRequest
-        || hydratedDraftCodeRef.current !== hydrationKey
+        || hydratedSourceKey !== hydrationKey
         || previewedDraftCodeRef.current === hydrationKey) {
       return;
     }
@@ -802,10 +817,12 @@ export default function AvenantContratPage() {
     previewMutation.mutate(request);
   }, [
     draftQuery.data,
+    hydratedSourceKey,
     movementCode,
     rectificationQuery.data,
     validatedMovementId,
     dateEffet,
+    dateEcheance,
     vehicules,
     remorques,
     selectedGaranties,
@@ -1041,6 +1058,7 @@ export default function AvenantContratPage() {
           saving={saveMutation.isPending || draftMutation.isPending}
           crmPartage={Boolean(contrat?.crmPartage)}
           crmPartageValeur={contrat?.crmPartageValeur ?? ""}
+          showVehicleCrm={false}
           maxRemorques={null}
           targetAssistances={targetAssistances}
           setTargetAssistances={setTargetAssistances}

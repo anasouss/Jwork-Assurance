@@ -557,7 +557,7 @@ public class DataSeeder implements CommandLineRunner {
                 ),
                 seedCompagnieAssurance(
                         "MATU",
-                        "MUTUELLE D'ASSURANCES DES TRANSPORTEURS UNIS",
+                        "MATU",
                         "207-209, Boulevard Mohamed Bouziane",
                         "Casablanca",
                         "info@matu-assurance.ma",

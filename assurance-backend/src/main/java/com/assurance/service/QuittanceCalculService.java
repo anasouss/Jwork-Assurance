@@ -105,6 +105,10 @@ public class QuittanceCalculService {
     }
 
     public Resultat difference(Resultat apres, Resultat avant) {
+        return difference(apres, avant, false);
+    }
+
+    private Resultat difference(Resultat apres, Resultat avant, boolean autoriserTaxeNegative) {
         Map<CategorieQuittance, Ligne> apresParCategorie = lignesParCategorie(apres);
         Map<CategorieQuittance, Ligne> avantParCategorie = lignesParCategorie(avant);
         Set<CategorieQuittance> categories = new LinkedHashSet<>();
@@ -126,14 +130,15 @@ public class QuittanceCalculService {
                     moins(ligneApres != null ? ligneApres.taxeParafiscale() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.taxeParafiscale() : BigDecimal.ZERO),
                     moins(ligneApres != null ? ligneApres.accessoire() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.accessoire() : BigDecimal.ZERO),
                     moins(ligneApres != null ? ligneApres.cnpac() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.cnpac() : BigDecimal.ZERO),
-                    moins(ligneApres != null ? ligneApres.primeTotale() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.primeTotale() : BigDecimal.ZERO)
+                    moins(ligneApres != null ? ligneApres.primeTotale() : BigDecimal.ZERO, ligneAvant != null ? ligneAvant.primeTotale() : BigDecimal.ZERO),
+                    autoriserTaxeNegative
             ));
         }
         return withTotal(lignes, BigDecimal.ONE);
     }
 
     public Resultat differenceChangementVehicule(Resultat apres, Resultat avant) {
-        Resultat differentiel = difference(apres, avant);
+        Resultat differentiel = difference(apres, avant, true);
         BigDecimal cnpacNouvelleAttestation = lignesParCategorie(apres).getOrDefault(
                 CategorieQuittance.AUTOMOBILE,
                 zeroLine(CategorieQuittance.AUTOMOBILE, 10)
@@ -165,19 +170,21 @@ public class QuittanceCalculService {
             BigDecimal taxeParafiscale,
             BigDecimal accessoire,
             BigDecimal cnpac,
-            BigDecimal primeTotale
+            BigDecimal primeTotale,
+            boolean autoriserTaxeNegative
     ) {
         if (primeNette.compareTo(BigDecimal.ZERO) < 0) {
+            BigDecimal taxeApplicable = autoriserTaxeNegative ? taxe : BigDecimal.ZERO;
             return new Ligne(
                     categorie,
                     ordre,
                     false,
                     primeNette,
+                    taxeApplicable,
                     BigDecimal.ZERO,
                     BigDecimal.ZERO,
                     BigDecimal.ZERO,
-                    BigDecimal.ZERO,
-                    primeNette
+                    primeNette.add(taxeApplicable)
             );
         }
         return new Ligne(categorie, ordre, false, primeNette, taxe, taxeParafiscale, accessoire, cnpac, primeTotale);

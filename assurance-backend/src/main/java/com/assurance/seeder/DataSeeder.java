@@ -140,15 +140,14 @@ public class DataSeeder implements CommandLineRunner {
         seedCategorieTransport("CAR_LIGNE", "Car de ligne", "Cars et autocars de ligne");
 
         CompagnieAssurance matu = compagnieAssuranceRepository.findByCode("MATU").orElse(null);
-        CompagnieAssurance cat = compagnieAssuranceRepository.findByCode("CAT").orElse(null);
 
         GroupeUsageAttestation groupeA = seedGroupeUsageAttestation("A", "TOURISME", "#ffff00");
         GroupeUsageAttestation groupeC = seedGroupeUsageAttestation("C", "COMMERCE", "#00a2ff");
         GroupeUsageAttestation groupeE = seedGroupeUsageAttestation("E", "CYCLOMOTEUR", "#60f060");
         GroupeUsageAttestation groupeD = seedGroupeUsageAttestation("D", "DIVERS", null);
         GroupeUsageAttestation groupeP = seedGroupeUsageAttestation("P", "PROVISOIRE", "#d1009f");
-        GroupeUsageAttestation groupeB = seedGroupeUsageAttestation("B", "TPV", null, matu, cat);
-        GroupeUsageAttestation groupeF = seedGroupeUsageAttestation("F", "FRONTIERE", "#f58ac3", matu, cat);
+        GroupeUsageAttestation groupeB = seedGroupeUsageAttestation("B", "TPV", null, matu);
+        GroupeUsageAttestation groupeF = seedGroupeUsageAttestation("F", "FRONTIERE", "#f58ac3", matu);
 
         Usage usageA = seedUsage("A", "TOURISME", "Tourisme", groupeA, true, true, false, false, false, berline);
         Usage usageC1 = seedUsage("C1", "C1", "Commerce C1", groupeC, true, true, false, false, false, utilitaire);
@@ -484,18 +483,6 @@ public class DataSeeder implements CommandLineRunner {
     private List<CompagnieAssurance> seedCompagniesAssurance() {
         List<CompagnieAssurance> compagnies = List.of(
                 seedCompagnieAssurance(
-                        "WAFA",
-                        "WAFA ASSURANCE",
-                        "1, Boulevard Abdelmoumen",
-                        "Casablanca",
-                        null,
-                        "0522545555",
-                        "31719",
-                        "000083736000004",
-                        "WAFA",
-                        "WAFA"
-                ),
-                seedCompagnieAssurance(
                         "SANLAM",
                         "SANLAM MAROC",
                         "216, Boulevard Zerktouni",
@@ -506,18 +493,6 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         "05",
                         "SANLAM"
-                ),
-                seedCompagnieAssurance(
-                        "RMA",
-                        "ROYALE MAROCAINE D'ASSURANCE",
-                        "83, Avenue de l'Armee Royale",
-                        "Casablanca",
-                        null,
-                        "0522312163",
-                        "15207",
-                        "001530601000041",
-                        "RMA",
-                        "RMA"
                 ),
                 seedCompagnieAssurance(
                         "AXA",
@@ -544,18 +519,6 @@ public class DataSeeder implements CommandLineRunner {
                         "ATLANTA"
                 ),
                 seedCompagnieAssurance(
-                        "CAT",
-                        "CAT ASSURANCE ET REASSURANCE",
-                        null,
-                        "Casablanca",
-                        null,
-                        null,
-                        "68845",
-                        null,
-                        "CAT",
-                        null
-                ),
-                seedCompagnieAssurance(
                         "MATU",
                         "MATU",
                         "207-209, Boulevard Mohamed Bouziane",
@@ -566,30 +529,6 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         "90",
                         "MATU"
-                ),
-                seedCompagnieAssurance(
-                        "MAROCAINE_VIE",
-                        "MAROCAINE VIE",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        "MVIE",
-                        null
-                ),
-                seedCompagnieAssurance(
-                        "ATTAMINE_CHAABI",
-                        "MUTUELLE ATTAMINE CHAABI",
-                        "Angle Avenue Mohammed VI et Rue Houmane El Fatouaki",
-                        "Rabat",
-                        null,
-                        null,
-                        null,
-                        null,
-                        "ATC",
-                        null
                 )
         );
         for (int index = 0; index < compagnies.size(); index++) {

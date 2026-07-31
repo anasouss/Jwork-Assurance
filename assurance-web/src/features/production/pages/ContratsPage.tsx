@@ -497,7 +497,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
                   <DropdownMenuSubContent className="w-56">
                     <DropdownMenuItem onSelect={() => selectAvenant("EXG_M")}>Extension garanties</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => selectAvenant("MOG_M")}>Modification garanties</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("CHV_M")}>Changement véhicule</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => selectAvenant("EXR_M")}>Extension remorque</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => selectAvenant("PRO_M")}>Provisoire</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => selectAvenant("PRI_M")}>Précision</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => selectAvenant("DUP_M")}>Duplicata</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => selectAvenant("RES_M")}>Résiliation</DropdownMenuItem>

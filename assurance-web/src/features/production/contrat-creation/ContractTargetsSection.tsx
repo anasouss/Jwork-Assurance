@@ -1451,6 +1451,10 @@ function ResponsiveRecordCell({
   );
 }
 
+function GuaranteeTableCell({ children, className }: { children: ReactNode; className?: string }) {
+  return <td className={cn("px-2 py-2", className)}>{children}</td>;
+}
+
 function TargetGuaranteesTable({
   target,
   garanties,
@@ -1558,29 +1562,29 @@ function TargetGuaranteesTable({
 
   return (
     <div className="grid gap-4">
-      <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
+      <div className="overflow-x-auto rounded-md border">
         <div className="border-b px-3 py-2 text-sm font-semibold">
           {target.kind === "vehicule" ? "Garanties véhicule" : "Garanties remorque"}
         </div>
-        <table className="block w-full border-collapse text-sm xl:table xl:min-w-[860px]">
-          <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
+        <table className="w-full min-w-[720px] table-fixed border-collapse text-xs xl:min-w-[860px] xl:text-sm">
+          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="w-12 px-3 py-3 text-left" />
-              <th className="px-3 py-3 text-left">Garantie</th>
-              <th className="w-44 px-3 py-3 text-left">{layout === "particulier" ? "Valeur assurée" : "Capital / valeur"}</th>
-              {layout === "tariff" ? <th className="w-36 px-3 py-3 text-left">Taux (%)</th> : null}
+              <th className="w-10 px-2 py-3 text-left" />
+              <th className="w-16 px-2 py-3 text-left xl:w-auto"><span className="xl:hidden">Code</span><span className="hidden xl:inline">Garantie</span></th>
+              <th className="w-44 px-2 py-3 text-left">{layout === "particulier" ? "Valeur assurée" : "Capital / valeur"}</th>
+              {layout === "tariff" ? <th className="w-20 px-2 py-3 text-left xl:w-36">Taux (%)</th> : null}
               {layout === "particulier" ? (
                 <>
                   <th className="w-40 px-3 py-3 text-left">Taux franchise (%)</th>
                   <th className="w-44 px-3 py-3 text-left">Min franchise</th>
                 </>
               ) : (
-                <th className="w-56 px-3 py-3 text-left">Taux franchise / Min franchise</th>
+                <th className="w-28 px-2 py-3 text-left xl:w-56">Franchise</th>
               )}
-              {layout === "tariff" ? <th className="w-40 px-3 py-3 text-left">{primeColumnLabel}</th> : null}
+              {layout === "tariff" ? <th className="w-24 px-2 py-3 text-right xl:w-40">{primeColumnLabel}</th> : null}
             </tr>
           </thead>
-          <tbody className="block xl:table-row-group">
+          <tbody>
             {configuredGaranties.map((garantie) => {
               const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
               const checked = Boolean(item);
@@ -1603,20 +1607,23 @@ function TargetGuaranteesTable({
                 <tr
                   key={garantie.id}
                   className={cn(
-                    "grid w-full grid-cols-[2.5rem_minmax(0,1fr)] border-t align-middle transition-colors xl:table-row",
+                    "border-t align-middle transition-colors",
                     !checked && "bg-muted/20 text-muted-foreground",
                     checked && "bg-background",
                     isRc && "bg-amber-50/50 dark:bg-amber-950/20"
                   )}
                 >
-                  <td className="col-start-1 row-start-1 px-3 py-3 xl:table-cell xl:py-2">
+                  <td className="px-2 py-2">
                     <Checkbox checked={checked} disabled={disabled} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                   </td>
-                  <td className="col-start-2 row-start-1 min-w-0 px-2 py-3 xl:table-cell xl:px-3 xl:py-2">
-                    <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
+                  <td className="min-w-0 px-2 py-2">
+                    <div className="font-medium">
+                      <span className="xl:hidden">{garantie.code || garantie.libelle}</span>
+                      <span className="hidden xl:inline">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</span>
+                    </div>
                     {warning ? <div className="mt-1 text-xs text-destructive">{warning}</div> : null}
                   </td>
-                  <ResponsiveRecordCell label={layout === "particulier" ? "Valeur assurée" : "Capital / valeur"}>
+                  <GuaranteeTableCell>
                     {manualValue && !isRc ? (
                       <div className="grid gap-1">
                         {sourceOptions.length > 1 ? (
@@ -1688,8 +1695,8 @@ function TargetGuaranteesTable({
                     ) : (
                       <Input readOnly disabled className={cn(controlClass(false), "text-right")} value={capitalDisplay(garantie, selectedLine, target, displayCapital)} />
                     )}
-                  </ResponsiveRecordCell>
-                  {layout === "tariff" ? <ResponsiveRecordCell label="Taux (%)">
+                  </GuaranteeTableCell>
+                  {layout === "tariff" ? <GuaranteeTableCell>
                     {!automaticPricing && !isRc ? (
                       <Input
                         type="number"
@@ -1715,10 +1722,10 @@ function TargetGuaranteesTable({
                     ) : (
                       <span className="block rounded-md px-3 py-2 text-right text-muted-foreground">{isRc ? "-" : rateDisplay(selectedLine)}</span>
                     )}
-                  </ResponsiveRecordCell> : null}
+                  </GuaranteeTableCell> : null}
                   {layout === "particulier" ? (
                     <>
-                      <ResponsiveRecordCell label="Taux franchise (%)">
+                      <GuaranteeTableCell>
                         <Input
                           type="number"
                           disabled={!editable || !garantie.avecFranchise}
@@ -1726,17 +1733,17 @@ function TargetGuaranteesTable({
                           value={garantie.avecFranchise ? item?.tauxFranchise ?? "" : ""}
                           onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })}
                         />
-                      </ResponsiveRecordCell>
-                      <ResponsiveRecordCell label="Min franchise">
+                      </GuaranteeTableCell>
+                      <GuaranteeTableCell>
                         <MoneyInput
                           disabled={!editable || !garantie.avecFranchiseMinimale}
                           className={cn(controlClass(editable && Boolean(garantie.avecFranchiseMinimale)), "text-right")}
                           value={garantie.avecFranchiseMinimale ? item?.franchiseMinimale : undefined}
                           onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })}
                         />
-                      </ResponsiveRecordCell>
+                      </GuaranteeTableCell>
                     </>
-                  ) : <ResponsiveRecordCell label="Taux franchise / Min franchise" valueClassName="text-right text-muted-foreground">
+                  ) : <GuaranteeTableCell className="text-right text-muted-foreground">
                     {!automaticPricing && !isRc ? (
                       <div className="grid grid-cols-2 gap-2">
                         <Input
@@ -1758,8 +1765,8 @@ function TargetGuaranteesTable({
                       Boolean(garantie.avecFranchise),
                       Boolean(garantie.avecFranchiseMinimale)
                     )}
-                  </ResponsiveRecordCell>}
-                  {layout === "tariff" ? <ResponsiveRecordCell label={primeColumnLabel} valueClassName="text-right font-medium">
+                  </GuaranteeTableCell>}
+                  {layout === "tariff" ? <GuaranteeTableCell className="text-right font-medium">
                     {primeInputEnabled && !isRc ? (
                       <MoneyInput
                         disabled={!editable}
@@ -1768,13 +1775,13 @@ function TargetGuaranteesTable({
                         onValueChange={(value) => update(garantie.id, { prime: value })}
                       />
                     ) : checked || previewLine ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
-                  </ResponsiveRecordCell> : null}
+                  </GuaranteeTableCell> : null}
                 </tr>
               );
             })}
             {configuredGaranties.length === 0 ? (
-              <tr className="block xl:table-row">
-                <td colSpan={layout === "particulier" ? 5 : 6} className="block px-3 py-8 text-center text-sm text-muted-foreground xl:table-cell">
+              <tr>
+                <td colSpan={layout === "particulier" ? 5 : 6} className="px-3 py-8 text-center text-sm text-muted-foreground">
                   Aucune garantie véhicule configurée pour cet usage.
                 </td>
               </tr>

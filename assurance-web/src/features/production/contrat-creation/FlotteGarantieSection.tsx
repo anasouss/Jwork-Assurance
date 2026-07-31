@@ -178,7 +178,6 @@ export function FlotteGarantieSection({
                       <td className="px-3 py-2">
                         <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
                         <div className="mt-1 flex flex-wrap gap-1">
-                          {isRc ? <Badge>RC obligatoire</Badge> : null}
                           {!isRc && !grilleSelected ? <Badge variant="outline">Grille requise</Badge> : null}
                           {!isRc && grilleSelected && !hasLine ? <Badge variant="outline">Tarif manquant</Badge> : null}
                           {warning ? <Badge variant="destructive">{warning}</Badge> : null}

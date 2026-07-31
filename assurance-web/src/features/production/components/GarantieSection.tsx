@@ -39,6 +39,16 @@ function ResponsiveRecordCell({
   );
 }
 
+function GuaranteeTableCell({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <td className={cn("px-2 py-2", className)}>{children}</td>;
+}
+
 export function GarantieSection({
   garanties,
   selected,
@@ -171,19 +181,19 @@ export function GarantieSection({
         </div>
       ) : null}
       <div className="mb-2 text-sm font-semibold">Garanties véhicule</div>
-      <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
-        <table className="block w-full border-collapse text-sm xl:table xl:min-w-[980px]">
-          <thead className="hidden bg-muted/60 text-xs uppercase text-muted-foreground xl:table-header-group">
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full min-w-[720px] table-fixed border-collapse text-xs xl:min-w-[980px] xl:text-sm">
+          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="w-12 px-3 py-3 text-left"></th>
-              <th className="px-3 py-3 text-left">Garantie</th>
+              <th className="w-10 px-2 py-3 text-left"></th>
+              <th className="w-16 px-2 py-3 text-left xl:w-auto"><span className="xl:hidden">Code</span><span className="hidden xl:inline">Garantie</span></th>
               {vehiculeCount > 1 ? <th className="w-40 px-3 py-3 text-left">Véhicule</th> : null}
-              <th className="w-48 px-3 py-3 text-left">Valeur assurée</th>
-              {showRateColumn ? <th className="w-36 px-3 py-3 text-left">Taux (%)</th> : null}
+              <th className="w-44 px-2 py-3 text-left xl:w-48">Valeur assurée</th>
+              {showRateColumn ? <th className="w-20 px-2 py-3 text-left xl:w-36">Taux (%)</th> : null}
               {automaticPricing ? (
                 <>
-                  <th className="w-56 px-3 py-3 text-left">Taux franchise / Min franchise</th>
-                  <th className="w-40 px-3 py-3 text-left">Prime annuelle</th>
+                  <th className="w-28 px-2 py-3 text-left xl:w-56">Franchise</th>
+                  <th className="w-24 px-2 py-3 text-right xl:w-40">Prime annuelle</th>
                 </>
               ) : (
                 <>
@@ -192,10 +202,10 @@ export function GarantieSection({
                 </>
               )}
               {showLigneGrille ? <th className="w-56 px-3 py-3 text-left">Ligne grille</th> : null}
-              {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+              {automaticPricing || primeColumnEnabled ? <th className="w-24 px-2 py-3 text-right xl:w-40">Prime nette</th> : null}
             </tr>
           </thead>
-          <tbody className="block xl:table-row-group">
+          <tbody>
             {vehiculeGaranties.map((garantie) => {
               const item = byId.get(garantie.id);
               const isRc = Boolean(garantie.responsabiliteCivile);
@@ -225,24 +235,26 @@ export function GarantieSection({
                 <tr
                   key={garantie.id}
                   className={cn(
-                    "grid w-full grid-cols-[2.5rem_minmax(0,1fr)] border-t align-middle transition-colors xl:table-row",
+                    "border-t align-middle transition-colors",
                     rowDisabled && "bg-muted/20 text-muted-foreground",
                     editable && "bg-background",
                     locked && "bg-amber-50/50 dark:bg-amber-950/20"
                   )}
                 >
-                  <td className="col-start-1 row-start-1 px-3 py-3 xl:table-cell xl:py-2">
+                  <td className="px-2 py-2">
                     <Checkbox checked={checked} disabled={isRc || !hasLine} onCheckedChange={(value) => toggle(garantie, Boolean(value))} />
                   </td>
-                  <td className="col-start-2 row-start-1 min-w-0 px-2 py-3 xl:table-cell xl:px-3 xl:py-2">
-                    <div className="font-medium">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</div>
+                  <td className="min-w-0 px-2 py-2">
+                    <div className="font-medium">
+                      <span className="xl:hidden">{garantie.code || garantie.libelle}</span>
+                      <span className="hidden xl:inline">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</span>
+                    </div>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {isRc ? <Badge>RC obligatoire</Badge> : null}
                       {automaticPricing && !isRc && !hasLine ? <Badge variant="outline">Tarif manquant</Badge> : null}
                     </div>
                   </td>
                   {vehiculeCount > 1 ? (
-                    <ResponsiveRecordCell label="Véhicule">
+                    <GuaranteeTableCell>
                       {isVehicleGuarantee && !isRc ? (
                         <Select
                           value={String(item?.vehiculeIndex ?? 0)}
@@ -270,11 +282,11 @@ export function GarantieSection({
                       ) : (
                         <span className="text-muted-foreground">Global</span>
                       )}
-                    </ResponsiveRecordCell>
+                    </GuaranteeTableCell>
                   ) : null}
                   {automaticPricing ? (
                     <>
-                      <ResponsiveRecordCell label="Valeur assurée">
+                      <GuaranteeTableCell>
                         {manualValue && !isRc ? (
                           <MoneyInput
                             disabled={!editable}
@@ -328,8 +340,8 @@ export function GarantieSection({
                         ) : (
                           <Input readOnly disabled={rowDisabled} className={controlClass(editable)} value={isRc ? money(resolveRcCapital(selectedVehicle, usages)) : capitalDisplay(garantie, selectedLine, selectedVehicle, displayCapital, item)} />
                         )}
-                      </ResponsiveRecordCell>
-                      <ResponsiveRecordCell label="Taux (%)">
+                      </GuaranteeTableCell>
+                      <GuaranteeTableCell>
                         {!isRc && lineOptions.length > 1 ? (
                           <Select
                             value={selectedLine?.id ?? ""}
@@ -352,20 +364,20 @@ export function GarantieSection({
                             {isRc ? "-" : rateDisplay(selectedLine)}
                           </span>
                         )}
-                      </ResponsiveRecordCell>
-                      <ResponsiveRecordCell label="Taux franchise / Min franchise" valueClassName="text-right text-muted-foreground">
+                      </GuaranteeTableCell>
+                      <GuaranteeTableCell className="text-right text-muted-foreground">
                         {franchiseDisplay(
                           selectedLine,
                           Boolean(garantie.avecFranchise),
                           Boolean(garantie.avecFranchiseMinimale)
                         )}
-                      </ResponsiveRecordCell>
-                      <ResponsiveRecordCell label="Prime annuelle" valueClassName="text-right text-muted-foreground">{checked ? autoPrimeDisplay(annualPrime) : "-"}</ResponsiveRecordCell>
-                      <ResponsiveRecordCell label="Prime nette" valueClassName="text-right font-medium">{checked ? autoPrimeDisplay(netPrime) : "-"}</ResponsiveRecordCell>
+                      </GuaranteeTableCell>
+                      <GuaranteeTableCell className="text-right text-muted-foreground">{checked ? autoPrimeDisplay(annualPrime) : "-"}</GuaranteeTableCell>
+                      <GuaranteeTableCell className="text-right font-medium">{checked ? autoPrimeDisplay(netPrime) : "-"}</GuaranteeTableCell>
                     </>
                   ) : (
                     <>
-                      <ResponsiveRecordCell label="Valeur assurée">
+                      <GuaranteeTableCell>
                         {isRc ? (
                           <Input
                             readOnly
@@ -459,27 +471,27 @@ export function GarantieSection({
                             value=""
                           />
                         )}
-                      </ResponsiveRecordCell>
+                      </GuaranteeTableCell>
                       {showRateColumn ? (
-                        <ResponsiveRecordCell label="Taux (%)">
+                        <GuaranteeTableCell>
                           <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
-                        </ResponsiveRecordCell>
+                        </GuaranteeTableCell>
                       ) : null}
-                      <ResponsiveRecordCell label="Taux franchise (%)">
+                      <GuaranteeTableCell>
                         <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
-                      </ResponsiveRecordCell>
-                      <ResponsiveRecordCell label="Min franchise">
+                      </GuaranteeTableCell>
+                      <GuaranteeTableCell>
                         <MoneyInput
                           disabled={rowDisabled || isRc || !garantie.avecFranchiseMinimale}
                           className={controlClass(editable && Boolean(garantie.avecFranchiseMinimale))}
                           value={garantie.avecFranchiseMinimale ? item?.franchiseMinimale : undefined}
                           onValueChange={(value) => update(garantie.id, { franchiseMinimale: value })}
                         />
-                      </ResponsiveRecordCell>
+                      </GuaranteeTableCell>
                     </>
                   )}
                   {!automaticPricing && showLigneGrille ? (
-                    <ResponsiveRecordCell label="Ligne grille">
+                    <GuaranteeTableCell>
                       {!isRc ? (
                         <Select
                           value={item?.ligneGrilleTarifaireId ?? ""}
@@ -500,12 +512,12 @@ export function GarantieSection({
                       ) : (
                         <span className="text-muted-foreground">Calcul RC</span>
                       )}
-                    </ResponsiveRecordCell>
+                    </GuaranteeTableCell>
                   ) : null}
                   {!automaticPricing && primeColumnEnabled ? (
-                    <ResponsiveRecordCell label="Prime nette">
+                    <GuaranteeTableCell>
                       <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
-                    </ResponsiveRecordCell>
+                    </GuaranteeTableCell>
                   ) : null}
                 </tr>
               );

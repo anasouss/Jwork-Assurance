@@ -5326,12 +5326,6 @@ public class ContratService {
         if (sourceValeurSelectionnee == SourceValeurGarantie.GLACE && montants.valeurGlace() == null) {
             throw new BadRequestException("La garantie " + garantie.getCode() + " exige une valeur glace");
         }
-        if (contratManuel
-                && !saisiePrimeNette
-                && !Boolean.TRUE.equals(garantie.getResponsabiliteCivile())
-                && (montants.capital() == null || montants.taux() == null)) {
-            throw new BadRequestException("La garantie " + garantie.getCode() + " exige un capital et un taux");
-        }
         if (Boolean.TRUE.equals(garantie.getAvecCapital()) && montants.capital() == null) {
             throw new BadRequestException("La garantie " + garantie.getCode() + " exige un capital ou une valeur assuree");
         }

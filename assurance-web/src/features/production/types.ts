@@ -966,6 +966,7 @@ export type UpsertGarantieRequest = {
   sourceValeurParDefaut?: string;
   saisieManuelleAutorisee?: boolean;
   verrouillee?: boolean;
+  compagniesSansProrataIds?: string[];
   ordreAffichage?: number;
   actif?: boolean;
 };

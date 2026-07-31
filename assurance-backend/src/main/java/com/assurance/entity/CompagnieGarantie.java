@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "compagnie_garanties",
@@ -46,6 +47,11 @@ public class CompagnieGarantie extends BaseEntity {
     @Builder.Default
     @Column(name = "mode_variable", nullable = false)
     private Boolean modeVariable = false;
+
+    @Builder.Default
+    @ColumnDefault("true")
+    @Column(name = "prorata_applicable", nullable = false)
+    private Boolean prorataApplicable = true;
 
     @Builder.Default
     @Column(nullable = false)

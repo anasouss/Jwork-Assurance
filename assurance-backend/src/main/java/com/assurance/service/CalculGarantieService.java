@@ -6,6 +6,7 @@ import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
+import com.assurance.entity.Garantie;
 import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.entity.Remorque;
 import com.assurance.entity.TarifUsage;
@@ -14,6 +15,7 @@ import com.assurance.entity.Vehicule;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.repository.CapitalResponsabiliteCivileRepository;
+import com.assurance.repository.CompagnieGarantieRepository;
 import com.assurance.repository.LigneGrilleTarifaireRepository;
 import com.assurance.repository.TarifUsageRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ public class CalculGarantieService {
     private final TarifUsageRepository tarifUsageRepository;
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
+    private final CompagnieGarantieRepository compagnieGarantieRepository;
 
     public BigDecimal calculerProrata(LocalDate dateEffet, LocalDate dateEcheance) {
         if (dateEffet == null || dateEcheance == null || dateEcheance.isBefore(dateEffet)) {
@@ -65,6 +68,22 @@ public class CalculGarantieService {
             return coefficient;
         }
         return contrat == null ? BigDecimal.ONE : calculerProrata(contrat.getDateEffet(), contrat.getDateEcheance());
+    }
+
+    public BigDecimal resolveProrata(Contrat contrat, Vehicule vehicule, Remorque remorque, Garantie garantie) {
+        return isProrataApplicable(contrat, garantie)
+                ? resolveProrata(contrat, vehicule, remorque)
+                : BigDecimal.ONE;
+    }
+
+    public boolean isProrataApplicable(Contrat contrat, Garantie garantie) {
+        if (contrat == null || garantie == null || contrat.getCompagnieAssurance() == null) {
+            return true;
+        }
+        return compagnieGarantieRepository
+                .findByCompagnieAssuranceIdAndGarantieId(contrat.getCompagnieAssurance().getId(), garantie.getId())
+                .map(configuration -> !Boolean.FALSE.equals(configuration.getProrataApplicable()))
+                .orElse(true);
     }
 
     public BigDecimal appliquerProrata(BigDecimal montant, BigDecimal prorata) {
@@ -97,12 +116,12 @@ public class CalculGarantieService {
         return appliquerProrata(prime, prorata);
     }
 
-    public BigDecimal calculerPrimeResponsabiliteCivile(Contrat contrat, Vehicule vehicule, Remorque remorque) {
+    public BigDecimal calculerPrimeResponsabiliteCivile(Contrat contrat, Vehicule vehicule, Remorque remorque, Garantie garantie) {
         if (remorque != null) {
-            return calculerPrimeRcRemorque(contrat, remorque);
+            return calculerPrimeRcRemorque(contrat, remorque, garantie);
         }
         if (vehicule != null) {
-            return calculerPrimeRcVehicule(contrat, vehicule);
+            return calculerPrimeRcVehicule(contrat, vehicule, garantie);
         }
         return null;
     }
@@ -168,7 +187,7 @@ public class CalculGarantieService {
         return ligne.getFranchiseMinimale();
     }
 
-    private BigDecimal calculerPrimeRcVehicule(Contrat contrat, Vehicule vehicule) {
+    private BigDecimal calculerPrimeRcVehicule(Contrat contrat, Vehicule vehicule, Garantie garantie) {
         TarifUsage tarif = resolveTarifUsage(vehicule);
         if (tarif == null || tarif.getPrimeNette() == null) {
             return null;
@@ -178,17 +197,17 @@ public class CalculGarantieService {
         if (tarif.getPrimeParPlace() != null && nombrePlaces != null) {
             prime = prime.add(tarif.getPrimeParPlace().multiply(nombrePlaces));
         }
-        prime = prime.multiply(resolveProrata(contrat, vehicule, null));
+        prime = prime.multiply(resolveProrata(contrat, vehicule, null, garantie));
         prime = prime.multiply(resolveCrm(vehicule.getCrm()));
         prime = prime.multiply(resolveCoefficientSahara(contrat));
         prime = prime.multiply(resolveMultiplicateurRc(contrat, vehicule.getUsage()));
         return prime.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calculerPrimeRcRemorque(Contrat contrat, Remorque remorque) {
-        BigDecimal prorata = resolveProrata(contrat, null, remorque);
+    private BigDecimal calculerPrimeRcRemorque(Contrat contrat, Remorque remorque, Garantie garantie) {
+        BigDecimal prorata = resolveProrata(contrat, null, remorque, garantie);
         BigDecimal crm = resolveCrm(remorque.getCrm());
-        BigDecimal referenceRc = resolveReferenceRcVehicule(contrat);
+        BigDecimal referenceRc = resolveReferenceRcVehicule(contrat, garantie);
         if (referenceRc != null && referenceRc.compareTo(BigDecimal.ZERO) > 0) {
             return referenceRc
                     .multiply(resolveTauxRemorque(contrat))
@@ -207,13 +226,13 @@ public class CalculGarantieService {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal resolveReferenceRcVehicule(Contrat contrat) {
+    private BigDecimal resolveReferenceRcVehicule(Contrat contrat, Garantie garantie) {
         if (contrat == null || contrat.getVehicules() == null || contrat.getVehicules().isEmpty()) {
             return null;
         }
         return contrat.getVehicules().stream()
                 .filter(Objects::nonNull)
-                .map(vehicule -> calculerPrimeRcVehicule(contrat, vehicule))
+                .map(vehicule -> calculerPrimeRcVehicule(contrat, vehicule, garantie))
                 .filter(prime -> prime != null && prime.compareTo(BigDecimal.ZERO) > 0)
                 .max(Comparator.naturalOrder())
                 .orElse(null);

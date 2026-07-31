@@ -37,6 +37,7 @@ public class UpsertGarantieRequest {
     private SourceValeurGarantie sourceValeurParDefaut;
     private Boolean saisieManuelleAutorisee;
     private Boolean verrouillee;
+    private Set<Long> compagniesSansProrataIds;
     private Integer ordreAffichage;
     private Boolean actif;
 }

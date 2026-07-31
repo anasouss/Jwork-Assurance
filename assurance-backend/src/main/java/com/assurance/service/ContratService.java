@@ -3227,6 +3227,9 @@ public class ContratService {
     }
 
     private BigDecimal resolveProrataOrigine(Contrat contrat, ContratGarantie garantie) {
+        if (!calculGarantieService.isProrataApplicable(contrat, garantie.getGarantie())) {
+            return BigDecimal.ONE;
+        }
         BigDecimal coefficient = garantie.getVehicule() != null ? garantie.getVehicule().getCoefficientProrata()
                 : garantie.getRemorque() != null ? garantie.getRemorque().getCoefficientProrata() : null;
         if (coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0) {
@@ -3250,6 +3253,9 @@ public class ContratService {
         LocalDate dateEcheance = contrat.getDateEcheance();
         if (dateEcheance == null || dateDebutRetour == null || dateDebutRetour.isAfter(dateEcheance)) {
             return BigDecimal.ZERO;
+        }
+        if (!calculGarantieService.isProrataApplicable(contrat, garantie.getGarantie())) {
+            return BigDecimal.ONE;
         }
         return calculGarantieService.calculerProrata(dateDebutRetour, dateEcheance);
     }
@@ -4753,7 +4759,8 @@ public class ContratService {
         BigDecimal prorata = calculGarantieService.resolveProrata(
                 contratGarantie.getContrat(),
                 contratGarantie.getVehicule(),
-                contratGarantie.getRemorque()
+                contratGarantie.getRemorque(),
+                contratGarantie.getGarantie()
         );
         if (prorata == null || prorata.compareTo(BigDecimal.ZERO) <= 0) {
             return primeNette;
@@ -5161,7 +5168,7 @@ public class ContratService {
 
         if (modeSelectionne == ModeTarificationGarantie.PROTECTION && formuleGarantiePersonne != null) {
             BigDecimal primeProtection = contrat.getModeSaisieGaranties() == ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
-                    ? calculGarantieService.appliquerProrata(formuleGarantiePersonne.getPrimeNette(), calculGarantieService.resolveProrata(contrat, vehicule, remorque))
+                    ? calculGarantieService.appliquerProrata(formuleGarantiePersonne.getPrimeNette(), calculGarantieService.resolveProrata(contrat, vehicule, remorque, garantie))
                     : Boolean.TRUE.equals(contrat.getSaisiePrimeNette())
                     ? firstNonNull(input.getPrime(), formuleGarantiePersonne.getPrimeNette())
                     : null;
@@ -5270,7 +5277,7 @@ public class ContratService {
             BigDecimal taux
     ) {
         if (Boolean.TRUE.equals(garantie.getResponsabiliteCivile())) {
-            BigDecimal primeRc = calculGarantieService.calculerPrimeResponsabiliteCivile(contrat, vehicule, remorque);
+            BigDecimal primeRc = calculGarantieService.calculerPrimeResponsabiliteCivile(contrat, vehicule, remorque, garantie);
             if (primeRc == null) {
                 throw new BadRequestException("Tarif RC manquant pour la cible " + garantie.getCode());
             }
@@ -5282,7 +5289,7 @@ public class ContratService {
             }
             if (capital != null && taux != null) {
                 BigDecimal primeAnnuelle = capital.multiply(taux).divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
-                BigDecimal prorata = calculGarantieService.resolveProrata(contrat, vehicule, remorque);
+                BigDecimal prorata = calculGarantieService.resolveProrata(contrat, vehicule, remorque, garantie);
                 return scale(primeAnnuelle.multiply(prorata));
             }
             return null;
@@ -5291,7 +5298,7 @@ public class ContratService {
                 ligneGrilleTarifaire,
                 modeSelectionne,
                 capital,
-                calculGarantieService.resolveProrata(contrat, vehicule, remorque),
+                calculGarantieService.resolveProrata(contrat, vehicule, remorque, garantie),
                 remorque != null
         );
     }

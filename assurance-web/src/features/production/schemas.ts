@@ -132,6 +132,7 @@ export const garantieSchema = z.object({
   sourceValeurParDefaut: z.enum(["AUCUNE", "VENALE", "NEUF", "GLACE", "MANUEL"]),
   saisieManuelleAutorisee: z.boolean().optional(),
   verrouillee: z.boolean().optional(),
+  compagniesSansProrataIds: z.array(z.string()).optional(),
   ordreAffichage: z.number().int().min(0).optional(),
   actif: z.boolean().optional(),
 }).superRefine((value, context) => {

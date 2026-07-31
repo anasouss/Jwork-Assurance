@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface CompagnieGarantieRepository extends JpaRepository<CompagnieGarantie, Long> {
     Optional<CompagnieGarantie> findByCompagnieAssuranceIdAndGarantieId(Long compagnieAssuranceId, Long garantieId);
     List<CompagnieGarantie> findByCompagnieAssuranceIdAndActifTrue(Long compagnieAssuranceId);
+    List<CompagnieGarantie> findByGarantieId(Long garantieId);
 }

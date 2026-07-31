@@ -656,6 +656,7 @@ export function GarantiesSettingsPage() {
     queryFn: () => productionApi.referentiel("groupes-exclusion-garanties/parametrage"),
     staleTime: 60_000,
   });
+  const compagnies = useReference("compagnies-assurance");
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertGarantieRequest>(emptyGarantie());
@@ -774,6 +775,13 @@ export function GarantiesSettingsPage() {
           : current.sourceValeurParDefaut,
       };
     });
+  };
+
+  const setCompagnieProrata = (compagnieId: string, checked: boolean) => {
+    setPayload((current) => ({
+      ...current,
+      compagniesSansProrataIds: toggleArray(current.compagniesSansProrataIds ?? [], compagnieId, !checked),
+    }));
   };
 
   const applyType = (typeGarantie: string) => {
@@ -1032,6 +1040,20 @@ export function GarantiesSettingsPage() {
               </div>
             </div>
 
+            <div className="grid gap-3 rounded-md border p-3">
+              <div className="text-sm font-semibold">Prorata appliqué par compagnie</div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {(compagnies.data ?? []).map((compagnie) => (
+                  <Flag
+                    key={compagnie.id}
+                    label={`${compagnie.code ? `${compagnie.code} - ` : ""}${compagnie.libelle}`}
+                    checked={!(payload.compagniesSansProrataIds ?? []).includes(compagnie.id)}
+                    onChange={(checked) => setCompagnieProrata(compagnie.id, checked)}
+                  />
+                ))}
+              </div>
+            </div>
+
             <GarantieGrillePreview payload={payload} />
 
             <div className="flex gap-2">
@@ -1067,6 +1089,7 @@ export function GarantiesSettingsPage() {
                   <TableHead>Exclusion</TableHead>
                   <TableHead>Grille</TableHead>
                   <TableHead>Valeurs</TableHead>
+                  <TableHead>Prorata</TableHead>
                   <TableHead>Actif</TableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -1082,6 +1105,7 @@ export function GarantiesSettingsPage() {
                     <TableCell>{String(garantie.groupeExclusionCode ?? "-")}</TableCell>
                     <TableCell>{garantieTags(garantie).join(", ") || "-"}</TableCell>
                     <TableCell>{valueTags(garantie).join(", ") || "-"}</TableCell>
+                    <TableCell>{prorataCompanySummary(garantie, compagnies.data ?? [])}</TableCell>
                     <TableCell>{garantie.actif === false ? "Non" : "Oui"}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon-sm" onClick={() => { setEditing(garantie); setDialogOpen(true); }} aria-label={`Modifier ${garantie.libelle}`}>
@@ -1092,7 +1116,7 @@ export function GarantiesSettingsPage() {
                 ))}
                 {!garanties.isLoading && (garanties.data ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucune garantie.</TableCell>
+                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Aucune garantie.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -1798,6 +1822,7 @@ function emptyGarantie(): UpsertGarantieRequest {
     sourceValeurParDefaut: "AUCUNE",
     saisieManuelleAutorisee: false,
     verrouillee: false,
+    compagniesSansProrataIds: [],
     ordreAffichage: 100,
     actif: true,
   };
@@ -1846,6 +1871,7 @@ function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantie
     sourceValeurParDefaut: String(garantie.sourceValeurParDefaut ?? "AUCUNE"),
     saisieManuelleAutorisee: Boolean(garantie.saisieManuelleAutorisee),
     verrouillee: Boolean(garantie.verrouillee),
+    compagniesSansProrataIds: stringArray(garantie.compagniesSansProrataIds),
     ordreAffichage: toNumber(garantie.ordreAffichage),
     actif: garantie.actif !== false,
   };
@@ -1947,6 +1973,17 @@ function valueTags(garantie: ReferenceOption) {
     garantie.requiertValeurGlace ? "Glace" : null,
     garantie.saisieManuelleAutorisee ? "Manuelle" : null,
   ].filter(Boolean) as string[];
+}
+
+function prorataCompanySummary(garantie: ReferenceOption, compagnies: ReferenceOption[]) {
+  const disabledIds = new Set(stringArray(garantie.compagniesSansProrataIds));
+  if (!disabledIds.size) {
+    return "Toutes";
+  }
+  const labels = compagnies
+    .filter((compagnie) => disabledIds.has(compagnie.id))
+    .map((compagnie) => compagnie.code || compagnie.libelle);
+  return labels.length ? `Sauf ${labels.join(", ")}` : `${disabledIds.size} exception(s)`;
 }
 
 function modeLabel(mode: string) {

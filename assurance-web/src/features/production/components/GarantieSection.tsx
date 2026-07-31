@@ -496,31 +496,6 @@ export function GarantieSection({
           </tbody>
         </table>
       </div>
-      {showAssistanceRow ? (
-        assistanceDraft && setAssistanceDraft ? (
-          <div className="mt-4">
-            <AssistanceTable
-              assistance={assistanceDraft}
-              onChange={(patch) => {
-                const next = { ...assistanceDraft, ...patch };
-                setAssistanceDraft(next);
-                if (patch.enabled !== undefined) {
-                  setAssistanceEnabled?.(Boolean(patch.enabled));
-                }
-              }}
-              compagniesAssistance={compagniesAssistance}
-              produitsAssistance={produitsAssistance}
-              usageId={assistanceUsageId}
-              categorieClientId={assistanceCategorieClientId}
-            />
-          </div>
-        ) : (
-          <div className={cn("mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold", !assistanceEnabled && "bg-muted/20 text-muted-foreground")}>
-            <Checkbox checked={assistanceEnabled} onCheckedChange={(checked) => setAssistanceEnabled?.(Boolean(checked))} />
-            <span>ASSISTANCE</span>
-          </div>
-        )
-      ) : null}
       {personneGaranties.length > 0 ? (
         <div className="mt-4">
           <div className="mb-2 text-sm font-semibold">Garanties personne</div>
@@ -603,6 +578,31 @@ export function GarantieSection({
             </table>
           </div>
         </div>
+      ) : null}
+      {showAssistanceRow ? (
+        assistanceDraft && setAssistanceDraft ? (
+          <div className="mt-4">
+            <AssistanceTable
+              assistance={assistanceDraft}
+              onChange={(patch) => {
+                const next = { ...assistanceDraft, ...patch };
+                setAssistanceDraft(next);
+                if (patch.enabled !== undefined) {
+                  setAssistanceEnabled?.(Boolean(patch.enabled));
+                }
+              }}
+              compagniesAssistance={compagniesAssistance}
+              produitsAssistance={produitsAssistance}
+              usageId={assistanceUsageId}
+              categorieClientId={assistanceCategorieClientId}
+            />
+          </div>
+        ) : (
+          <div className={cn("mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold", !assistanceEnabled && "bg-muted/20 text-muted-foreground")}>
+            <Checkbox checked={assistanceEnabled} onCheckedChange={(checked) => setAssistanceEnabled?.(Boolean(checked))} />
+            <span>ASSISTANCE</span>
+          </div>
+        )
       ) : null}
       {showTotalsSummary ? (
         <GuaranteeTotalsSummary

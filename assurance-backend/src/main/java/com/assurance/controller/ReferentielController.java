@@ -27,6 +27,7 @@ import com.assurance.entity.Carburant;
 import com.assurance.entity.Carrosserie;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.CompagnieAssurance;
+import com.assurance.entity.CompagnieGarantie;
 import com.assurance.entity.Convention;
 import com.assurance.entity.Agence;
 import com.assurance.entity.FormuleGarantiePersonne;
@@ -87,6 +88,7 @@ public class ReferentielController {
     private final SousClasseRepository sousClasseRepository;
     private final GarantieRepository garantieRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
+    private final CompagnieGarantieRepository compagnieGarantieRepository;
     private final GrilleTarifaireRepository grilleTarifaireRepository;
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
     private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
@@ -726,16 +728,20 @@ public class ReferentielController {
     }
 
     @PostMapping("/garanties")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGarantie(@Valid @RequestBody UpsertGarantieRequest request) {
         garantieRepository.findByCode(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code garantie deja utilise");
         });
         Garantie garantie = new Garantie();
         applyGarantieRequest(garantie, request);
-        return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantieRepository.save(garantie)), "Garantie creee"));
+        garantieRepository.save(garantie);
+        applyCompagnieProrataRequest(garantie, request.getCompagniesSansProrataIds());
+        return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantie), "Garantie creee"));
     }
 
     @PutMapping("/garanties/{id}")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateGarantie(
             @PathVariable Long id,
             @Valid @RequestBody UpsertGarantieRequest request
@@ -748,7 +754,9 @@ public class ReferentielController {
             }
         });
         applyGarantieRequest(garantie, request);
-        return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantieRepository.save(garantie)), "Garantie modifiee"));
+        garantieRepository.save(garantie);
+        applyCompagnieProrataRequest(garantie, request.getCompagniesSansProrataIds());
+        return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantie), "Garantie modifiee"));
     }
 
     @GetMapping("/lignes-grille-tarifaire")
@@ -1354,9 +1362,34 @@ public class ReferentielController {
                 .putValue("sourcesValeurAutorisees", new LinkedHashSet<>(garantie.getSourcesValeurAutorisees()))
                 .putValue("saisieManuelleAutorisee", garantie.getSaisieManuelleAutorisee())
                 .putValue("verrouillee", garantie.getVerrouillee())
+                .putValue("compagniesSansProrataIds", compagnieGarantieRepository.findByGarantieId(garantie.getId()).stream()
+                        .filter(configuration -> Boolean.FALSE.equals(configuration.getProrataApplicable()))
+                        .map(configuration -> configuration.getCompagnieAssurance().getId())
+                        .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)))
                 .putValue("ordreAffichage", garantie.getOrdreAffichage())
                 .putValue("actif", garantie.getActif())
                 .map();
+    }
+
+    private void applyCompagnieProrataRequest(Garantie garantie, Set<Long> compagniesSansProrataIds) {
+        if (compagniesSansProrataIds == null) {
+            return;
+        }
+        Set<Long> disabledIds = new HashSet<>(compagniesSansProrataIds);
+        Map<Long, CompagnieGarantie> configurations = compagnieGarantieRepository.findByGarantieId(garantie.getId()).stream()
+                .collect(java.util.stream.Collectors.toMap(configuration -> configuration.getCompagnieAssurance().getId(), configuration -> configuration));
+        for (Long compagnieId : disabledIds) {
+            CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(compagnieId)
+                    .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", compagnieId));
+            configurations.computeIfAbsent(compagnieId, ignored -> CompagnieGarantie.builder()
+                    .compagnieAssurance(compagnie)
+                    .garantie(garantie)
+                    .build());
+        }
+        configurations.forEach((compagnieId, configuration) -> {
+            configuration.setProrataApplicable(!disabledIds.contains(compagnieId));
+            compagnieGarantieRepository.save(configuration);
+        });
     }
 
     private void applyGroupeExclusionGarantieRequest(GroupeExclusionGarantie groupe, UpsertGroupeExclusionGarantieRequest request) {

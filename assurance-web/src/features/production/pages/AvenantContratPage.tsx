@@ -250,7 +250,6 @@ export default function AvenantContratPage() {
   useEffect(() => {
     if (!contrat) return;
     const hydrateUsageFromExistingTarget = !isTargetCreationCode(movementCode);
-    setDateEffet((current) => current ?? contrat.dateEffet ?? undefined);
     setDateEcheance((current) => current ?? contrat.dateEcheance ?? undefined);
     setVehicules((current) => current.map((item) => ({
       ...item,
@@ -262,6 +261,7 @@ export default function AvenantContratPage() {
   }, [contrat, movementCode]);
 
   useEffect(() => {
+    setDateEffet(undefined);
     setPreview(null);
     setTargetPreview(null);
     setSelectedTargetIds([]);
@@ -352,7 +352,7 @@ export default function AvenantContratPage() {
       setHydratedSourceKey(hydrationKey);
       return;
     }
-    setDateEffet(request.dateEffet ?? contrat?.dateEffet ?? undefined);
+    setDateEffet(request.dateEffet ?? undefined);
     setDateEcheance(contrat?.dateEcheance ?? request.dateEcheance ?? undefined);
     setVehicules(request.vehicules?.length ? request.vehicules : movementCode === "EXR_M" ? [] : [{ ...DEFAULT_VEHICLE }]);
     setRemorques(request.remorques?.length ? request.remorques : movementCode === "EXR_M" ? [{}] : []);
@@ -980,11 +980,7 @@ export default function AvenantContratPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <Field label="Type">
-            <Select
-              value={movementCode}
-              disabled={contextQuery.isLoading || availableMovements.length === 0}
-              onValueChange={(value) => navigate(`/app/production/contrats/${contratId}/avenants/${value}`)}
-            >
+            <Select value={movementCode} disabled>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {availableMovements.map((item) => (

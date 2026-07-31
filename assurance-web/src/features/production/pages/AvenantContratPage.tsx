@@ -16,7 +16,7 @@ import { productionApi } from "../api";
 import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
-import { FlotteTargetsSection } from "../contrat-creation/FlotteTargetsSection";
+import { AvenantTargetsSection } from "../components/AvenantTargetsSections";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { toDateOnly } from "../date";
 import type { AssistanceDraft, AvenantRequest, ContratSummary, GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
@@ -217,6 +217,9 @@ export default function AvenantContratPage() {
     }
     return (usages.data ?? []).filter((usage) => configuredUsageIds.has(usage.id));
   }, [formulesPersonne.data, grilleTarifaireId, lignesGrille.data, usages.data]);
+  const avenantTargetUsages = contrat?.typeContrat === "PARTICULIER"
+    ? usages.data ?? []
+    : flotteTargetUsages;
 
   const hydrationKey = `${movementCode}:${validatedMovementId ?? "draft"}`;
   const sourceQuery = validatedMovementId ? rectificationQuery : draftQuery;
@@ -546,7 +549,7 @@ export default function AvenantContratPage() {
         : [];
       const garantiesRequest = ensureRcGaranties(currentGaranties, normalizedVehicules.length, normalizedRemorques.length, garanties.data ?? []);
       const invalidVehicule = normalizedVehicules
-        .map((item) => vehicleValidationMessage(item, flotteTargetUsages))
+        .map((item) => vehicleValidationMessage(item, avenantTargetUsages))
         .find(Boolean);
       if (invalidVehicule) {
         notify(invalidVehicule);
@@ -822,7 +825,7 @@ export default function AvenantContratPage() {
         contrat?.dateEcheance || dateEcheance,
         sharedCrm
       );
-      const validationMessage = vehicleValidationMessage(vehicule, flotteTargetUsages);
+      const validationMessage = vehicleValidationMessage(vehicule, avenantTargetUsages);
       if (validationMessage) {
         toast.error(validationMessage);
         return false;
@@ -998,7 +1001,15 @@ export default function AvenantContratPage() {
           </CardHeader>
         </Card>
       ) : isTargetCreationCode(movementCode) || isGuaranteeModificationCode(movementCode) ? (
-        <FlotteTargetsSection
+        <AvenantTargetsSection
+          contractType={contrat?.typeContrat}
+          targetMode={
+            movementCode === "EXR_M"
+              ? "remorque"
+              : isGuaranteeModificationCode(movementCode)
+                ? "existing"
+                : "vehicule"
+          }
           vehicules={vehicules}
           setVehicules={setVehicules}
           remorques={remorques}
@@ -1008,7 +1019,7 @@ export default function AvenantContratPage() {
           setSelectedGaranties={setSelectedGaranties}
           lignes={lignesGrille.data ?? []}
           formulesPersonne={formulesPersonne.data ?? []}
-          usages={flotteTargetUsages}
+          usages={avenantTargetUsages}
           compagnies={compagnies.data ?? []}
           compagnieAssuranceId={contrat?.compagnieAssuranceId}
           marques={marques.data ?? []}
@@ -1036,7 +1047,7 @@ export default function AvenantContratPage() {
           onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
           targetActionMode="save"
           previewAfterInfoSave={false}
-          garantiesExtraAction={isVehicleTargetCreationCode(movementCode) ? (
+          guaranteesAction={isVehicleTargetCreationCode(movementCode) ? (
             <Button
               type="button"
               variant="outline"

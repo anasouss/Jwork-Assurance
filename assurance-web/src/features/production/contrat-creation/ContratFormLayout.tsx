@@ -193,7 +193,7 @@ export function ContratFormLayout({
       showUsage={form.typeContrat !== "PARTICULIER" && !showConvention}
       showAttestation={form.typeContrat !== "PARTICULIER" && !showConvention}
       controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
-      showRemorqueFlag={showConvention}
+      showRemorqueFlag={showConvention || form.typeContrat === "PARTICULIER"}
       errors={form.validationErrors}
       onSaveSection={saveSectionAndAdvance}
       savedSections={form.savedSections}

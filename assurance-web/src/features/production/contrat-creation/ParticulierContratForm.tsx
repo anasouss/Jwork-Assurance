@@ -10,6 +10,7 @@ export function ParticulierContratForm({ form }: { form: ContratCreationFormStat
       showGrille={false}
       allowSaisiePrimeNette
       allowMultipleVehicules={false}
+      allowRemorques={false}
     />
   );
 }

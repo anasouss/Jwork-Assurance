@@ -313,7 +313,7 @@ export function useContratCreationForm(
     modeSaisieGaranties,
     saisiePrimeNette: typeContrat === "PARTICULIER" ? saisiePrimeNette : false,
     nombreVehicules: vehicules.length,
-    nombreRemorques: remorques.length,
+    nombreRemorques: typeContrat === "PARTICULIER" ? 0 : remorques.length,
     prospection: Boolean(options?.prospectionMode),
     assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled || assistanceDraft.enabled : false,
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
@@ -335,11 +335,15 @@ export function useContratCreationForm(
       dateEcheance: vehicule.dateEcheance || dateEcheance,
       crm: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : vehicule.crm,
     })),
-    remorques: remorques.map((remorque) => ({
-      ...remorque,
-      usageId: remorque.usageId || contractUsageFallback || undefined,
-    })),
-    garanties,
+    remorques: typeContrat === "PARTICULIER"
+      ? []
+      : remorques.map((remorque) => ({
+          ...remorque,
+          usageId: remorque.usageId || contractUsageFallback || undefined,
+        })),
+    garanties: typeContrat === "PARTICULIER"
+      ? garanties.filter((garantie) => garantie.remorqueIndex == null)
+      : garanties,
     quittances: typeContrat === "PARTICULIER"
       ? quittances.map((ligne) => ({
           ...ligne,

@@ -184,20 +184,21 @@ export default function ContratAssistancePage() {
                   <Input value={form.numeroContratOuQuittance ?? ""} onChange={(event) => setForm((current) => ({ ...current, numeroContratOuQuittance: event.target.value }))} />
                 </Field>
                 <Field label="Véhicule" required>
-                  <Select value={form.vehiculeId} onValueChange={(value) => setForm((current) => ({ ...current, vehiculeId: value, produitAssistanceId: undefined }))}>
-                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                    <SelectContent>
-                      {(context?.vehiculesEligibles ?? []).map((vehicule) => (
-                        <SelectItem key={vehicule.id} value={vehicule.id}>{vehicleLabel(vehicule)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {(context?.vehiculesEligibles ?? []).length === 1 ? (
+                    <Input value={vehicleLabel(context!.vehiculesEligibles[0])} disabled />
+                  ) : (
+                    <Select value={form.vehiculeId} disabled={(context?.vehiculesEligibles ?? []).length === 0} onValueChange={(value) => setForm((current) => ({ ...current, vehiculeId: value, produitAssistanceId: undefined }))}>
+                      <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                      <SelectContent>
+                        {(context?.vehiculesEligibles ?? []).map((vehicule) => (
+                          <SelectItem key={vehicule.id} value={vehicule.id}>{vehicleLabel(vehicule)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </Field>
                 <Field label="Type contrat assistance">
                   <Input value="Individuel" disabled />
-                </Field>
-                <Field label="Montant total">
-                  <Input value={selectedProduct?.montantTtc != null ? money(selectedProduct.montantTtc) : ""} disabled />
                 </Field>
                 <Field label="Date souscription" required>
                   <DatePicker date={form.dateSouscription} onSelect={(date) => setForm((current) => ({ ...current, dateSouscription: toDateOnly(date) }))} />
@@ -211,6 +212,11 @@ export default function ContratAssistancePage() {
                 <Field label="Date d'échéance">
                   <Input value={formatDate(computedDateEcheance)} disabled />
                 </Field>
+                <div className="lg:col-start-3">
+                  <Field label="Montant total">
+                    <Input value={selectedProduct?.montantTtc != null ? money(selectedProduct.montantTtc) : ""} disabled />
+                  </Field>
+                </div>
               </div>
 
               {selectedProduct ? (

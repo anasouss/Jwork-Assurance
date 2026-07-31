@@ -1344,6 +1344,7 @@ public class ReferentielController {
                 .putValue("groupeExclusionId", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getId() : null)
                 .putValue("groupeExclusionCode", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getCode() : null)
                 .putValue("groupeExclusionLibelle", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getLibelle() : null)
+                .putValue("groupeExclusionActif", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getActif() : null)
                 .putValue("typeGarantie", garantie.getTypeGarantie())
                 .putValue("obligatoire", garantie.getObligatoire())
                 .putValue("responsabiliteCivile", garantie.getResponsabiliteCivile())

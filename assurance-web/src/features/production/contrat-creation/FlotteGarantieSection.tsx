@@ -237,7 +237,7 @@ function sameTarget(item: GarantieInput, target?: Target) {
 
 function withoutExclusionConflicts(selected: GarantieInput[], garanties: ReferenceOption[], target: Target, garantie: ReferenceOption) {
   const groupeExclusionId = String(garantie.groupeExclusionId ?? "");
-  if (!groupeExclusionId) {
+  if (!groupeExclusionId || garantie.groupeExclusionActif === false) {
     return selected;
   }
   const incompatibleGarantieIds = new Set(

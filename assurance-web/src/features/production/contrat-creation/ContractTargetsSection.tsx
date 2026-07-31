@@ -1579,7 +1579,7 @@ function TargetGuaranteesTable({
                   <th className="w-44 px-3 py-3 text-left">Min franchise</th>
                 </>
               ) : (
-                <th className="w-28 px-2 py-3 text-left xl:w-56">Franchise</th>
+                <th className="w-28 px-2 py-3 text-right xl:w-56">Franchise</th>
               )}
               {layout === "tariff" ? <th className="w-24 px-2 py-3 text-right xl:w-40">{primeColumnLabel}</th> : null}
             </tr>
@@ -2063,7 +2063,7 @@ function sameTarget(item: GarantieInput, target?: Target) {
 
 function withoutExclusionConflicts(selected: GarantieInput[], garanties: ReferenceOption[], target: Target, garantie: ReferenceOption) {
   const groupeExclusionId = String(garantie.groupeExclusionId ?? "");
-  if (!groupeExclusionId) {
+  if (!groupeExclusionId || garantie.groupeExclusionActif === false) {
     return selected;
   }
   const incompatibleGarantieIds = new Set(

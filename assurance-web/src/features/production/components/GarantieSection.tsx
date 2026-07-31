@@ -128,6 +128,13 @@ export function GarantieSection({
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
   };
 
+  const updateVehicleTarget = (garantie: ReferenceOption, vehiculeIndex: number, patch: Partial<GarantieInput>) => {
+    const selectionWithoutConflicts = withoutExclusionConflicts(selected, garanties, garantie, vehiculeIndex);
+    setSelected(selectionWithoutConflicts.map((item) => (
+      item.garantieId === garantie.id ? { ...item, ...patch, vehiculeIndex } : item
+    )));
+  };
+
   const toggle = (garantie: ReferenceOption, checked: boolean) => {
     const type = String(garantie.typeGarantie ?? "VEHICULE");
     const isRc = Boolean(garantie.responsabiliteCivile);
@@ -145,11 +152,13 @@ export function GarantieSection({
         return;
       }
       const linePatch = lineSelectionPatch(garantie, line);
+      const vehiculeIndex = type === "VEHICULE" && vehiculeCount > 0 ? 0 : undefined;
+      const selectionWithoutConflicts = withoutExclusionConflicts(selected, garanties, garantie, vehiculeIndex);
       setSelected([
-        ...selected,
+        ...selectionWithoutConflicts,
         {
           garantieId: garantie.id,
-          vehiculeIndex: type === "VEHICULE" && vehiculeCount > 0 ? 0 : undefined,
+          vehiculeIndex,
           modeSelectionne: String(linePatch.modeSelectionne ?? garantie.modeParDefaut ?? (type === "PERSONNE" ? "PROTECTION" : "TAUX")),
           ...linePatch,
           sourceValeurSelectionnee: type === "VEHICULE"
@@ -192,7 +201,7 @@ export function GarantieSection({
               {showRateColumn ? <th className="w-20 px-2 py-3 text-left xl:w-36">Taux (%)</th> : null}
               {automaticPricing ? (
                 <>
-                  <th className="w-28 px-2 py-3 text-left xl:w-56">Franchise</th>
+                  <th className="w-28 px-2 py-3 text-right xl:w-56">Franchise</th>
                   <th className="w-24 px-2 py-3 text-right xl:w-40">Prime annuelle</th>
                 </>
               ) : (
@@ -266,8 +275,7 @@ export function GarantieSection({
                               toast.error(warning);
                               return;
                             }
-                            update(garantie.id, {
-                              vehiculeIndex: Number(value),
+                            updateVehicleTarget(garantie, Number(value), {
                               sourceValeurSelectionnee: initialVehicleValueSource(garantie, nextVehicle, selectedLine),
                               valeurAssuree: undefined,
                               capital: undefined,
@@ -1195,7 +1203,7 @@ function tariffLineLabel(line: ReferenceOption, index = 0) {
 function rateDisplay(line?: ReferenceOption) {
   const taux = numeric(line?.taux);
   if (lineMode(line) === "CAPITAL") {
-    return String(line?.libelle ?? "-");
+    return "";
   }
   return taux == null ? "-" : `${money(taux)} %`;
 }
@@ -1231,6 +1239,36 @@ function assistanceProductMatchesCategory(produit: ReferenceOption, categorieCli
   const productCategoryId = produit.categorieClientId == null ? "" : String(produit.categorieClientId);
   if (!productCategoryId) return true;
   return Boolean(categorieClientId) && productCategoryId === String(categorieClientId);
+}
+
+function withoutExclusionConflicts(
+  selected: GarantieInput[],
+  garanties: ReferenceOption[],
+  garantie: ReferenceOption,
+  vehiculeIndex?: number
+) {
+  const groupeExclusionId = String(garantie.groupeExclusionId ?? "");
+  if (!groupeExclusionId || garantie.groupeExclusionActif === false) {
+    return selected;
+  }
+  const incompatibleGarantieIds = new Set(
+    garanties
+      .filter((candidate) => candidate.id !== garantie.id && String(candidate.groupeExclusionId ?? "") === groupeExclusionId)
+      .map((candidate) => candidate.id)
+  );
+  if (incompatibleGarantieIds.size === 0) {
+    return selected;
+  }
+  const typeGarantie = String(garantie.typeGarantie ?? "VEHICULE");
+  return selected.filter((item) => {
+    if (!incompatibleGarantieIds.has(item.garantieId)) {
+      return true;
+    }
+    if (typeGarantie === "PERSONNE") {
+      return item.vehiculeIndex != null || item.remorqueIndex != null;
+    }
+    return item.remorqueIndex != null || (item.vehiculeIndex ?? 0) !== (vehiculeIndex ?? 0);
+  });
 }
 
 function numeric(value: unknown) {

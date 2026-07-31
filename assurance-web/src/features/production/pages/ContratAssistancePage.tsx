@@ -114,6 +114,14 @@ export default function ContratAssistancePage() {
       toast.error("Véhicule, compagnie et produit sont obligatoires.");
       return;
     }
+    if (!form.numeroContratOuQuittance?.trim()) {
+      toast.error("Le numéro de contrat/quittance est obligatoire.");
+      return;
+    }
+    if (!form.dateSouscription || !form.dateEffet || !form.echeanceCode) {
+      toast.error("Les dates de souscription, d'effet et l'échéance sont obligatoires.");
+      return;
+    }
     saveMutation.mutate({
       mouvementContratId: context?.mouvementContratId ?? mouvementId,
       vehiculeId: form.vehiculeId,
@@ -152,37 +160,6 @@ export default function ContratAssistancePage() {
           ) : (
             <>
               <div className="grid gap-3 lg:grid-cols-3">
-                <Field label="Police N°">
-                  <Input value={context?.numeroPolice ?? ""} disabled />
-                </Field>
-                <Field label="Échéance (JJ/MM)" required>
-                  <EcheanceInput value={form.echeanceCode} onValueChange={(value) => setForm((current) => ({ ...current, echeanceCode: value }))} />
-                </Field>
-                <Field label="Date d'échéance">
-                  <Input value={formatDate(computedDateEcheance)} disabled />
-                </Field>
-                <Field label="Type contrat assistance">
-                  <Input value="Individuel" disabled />
-                </Field>
-                <Field label="Véhicule" required>
-                  <Select value={form.vehiculeId} onValueChange={(value) => setForm((current) => ({ ...current, vehiculeId: value, produitAssistanceId: undefined }))}>
-                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                    <SelectContent>
-                      {(context?.vehiculesEligibles ?? []).map((vehicule) => (
-                        <SelectItem key={vehicule.id} value={vehicule.id}>{vehicleLabel(vehicule)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="N° contrat/quittance" required>
-                  <Input value={form.numeroContratOuQuittance ?? ""} onChange={(event) => setForm((current) => ({ ...current, numeroContratOuQuittance: event.target.value }))} />
-                </Field>
-                <Field label="Date d'effet" required>
-                  <DatePicker date={form.dateEffet} onSelect={(date) => setForm((current) => ({ ...current, dateEffet: toDateOnly(date) }))} />
-                </Field>
-                <Field label="Date souscription" required>
-                  <DatePicker date={form.dateSouscription} onSelect={(date) => setForm((current) => ({ ...current, dateSouscription: toDateOnly(date) }))} />
-                </Field>
                 <Field label="Compagnie d'assistance" required>
                   <Select value={form.compagnieAssistanceId} onValueChange={(value) => setForm((current) => ({ ...current, compagnieAssistanceId: value, produitAssistanceId: undefined }))}>
                     <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -203,8 +180,36 @@ export default function ContratAssistancePage() {
                     </SelectContent>
                   </Select>
                 </Field>
+                <Field label="N° contrat/quittance" required>
+                  <Input value={form.numeroContratOuQuittance ?? ""} onChange={(event) => setForm((current) => ({ ...current, numeroContratOuQuittance: event.target.value }))} />
+                </Field>
+                <Field label="Véhicule" required>
+                  <Select value={form.vehiculeId} onValueChange={(value) => setForm((current) => ({ ...current, vehiculeId: value, produitAssistanceId: undefined }))}>
+                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                    <SelectContent>
+                      {(context?.vehiculesEligibles ?? []).map((vehicule) => (
+                        <SelectItem key={vehicule.id} value={vehicule.id}>{vehicleLabel(vehicule)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Type contrat assistance">
+                  <Input value="Individuel" disabled />
+                </Field>
                 <Field label="Montant total">
                   <Input value={selectedProduct?.montantTtc != null ? money(selectedProduct.montantTtc) : ""} disabled />
+                </Field>
+                <Field label="Date souscription" required>
+                  <DatePicker date={form.dateSouscription} onSelect={(date) => setForm((current) => ({ ...current, dateSouscription: toDateOnly(date) }))} />
+                </Field>
+                <Field label="Date d'effet" required>
+                  <DatePicker date={form.dateEffet} onSelect={(date) => setForm((current) => ({ ...current, dateEffet: toDateOnly(date) }))} />
+                </Field>
+                <Field label="Échéance (JJ/MM)" required>
+                  <EcheanceInput value={form.echeanceCode} onValueChange={(value) => setForm((current) => ({ ...current, echeanceCode: value }))} />
+                </Field>
+                <Field label="Date d'échéance">
+                  <Input value={formatDate(computedDateEcheance)} disabled />
                 </Field>
               </div>
 

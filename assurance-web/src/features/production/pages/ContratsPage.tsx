@@ -901,7 +901,7 @@ function companyLabel(contrat: ContratSummary, companyMap: Map<string, Reference
 function conventionLabel(contrat: ContratSummary, conventionMap: Map<string, ReferenceOption>) {
   if (contrat.typeContrat !== "CONVENTION" || !contrat.conventionId) return undefined;
   const convention = conventionMap.get(String(contrat.conventionId));
-  return String(convention?.code ?? convention?.libelle ?? "");
+  return convention?.libelle ? String(convention.libelle) : undefined;
 }
 
 function eventLabel(contrat: ContratSummary, movement: MovementLine) {

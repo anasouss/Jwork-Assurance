@@ -356,7 +356,10 @@ export function ClientSection({
               </div>
               {isProprietaire ? (
                 <label className="mb-4 flex items-center gap-2 text-sm">
-                  <Checkbox checked={sameAsSouscripteur} onCheckedChange={(checked) => copySouscripteurToProprietaire(Boolean(checked))} />
+                  <Checkbox
+                    checked={sameAsSouscripteur}
+                    onCheckedChange={(checked) => copySouscripteurToProprietaire(Boolean(checked))}
+                  />
                   Le propriétaire est-il lui-même le souscripteur ?
                 </label>
               ) : null}
@@ -474,7 +477,7 @@ export function ClientSection({
                         disabled={!saharaAllowed}
                         onCheckedChange={(checked) => updateClient(index, { sahara: Boolean(checked) })}
                       />
-                      <span className="text-sm text-muted-foreground">Réduction saharienne</span>
+                      <span className="text-sm text-foreground">Réduction saharienne</span>
                     </div>
                     {item.client.sahara ? (
                       <Field label="Justificatif sahara">

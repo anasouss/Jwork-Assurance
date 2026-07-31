@@ -265,7 +265,7 @@ export function GrilleTarifaireConfigurator({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {usageTabs.map((usage) => {
             const active = usage.id === activeUsageId;
@@ -282,10 +282,6 @@ export function GrilleTarifaireConfigurator({
             );
           })}
         </div>
-        <Button type="button" disabled={!activeUsageId || saveConfiguration.isPending} onClick={submitMatrix}>
-          <Save className="size-4" />
-          Enregistrer l'usage
-        </Button>
       </div>
 
       <div className="rounded-md border">
@@ -415,6 +411,13 @@ export function GrilleTarifaireConfigurator({
           removeDraft={removePersonneDraft}
         />
       ) : null}
+
+      <div className="flex justify-end border-t pt-4">
+        <Button type="button" disabled={!activeUsageId || saveConfiguration.isPending} onClick={submitMatrix}>
+          <Save className="size-4" />
+          Enregistrer l'usage
+        </Button>
+      </div>
     </div>
   );
 }

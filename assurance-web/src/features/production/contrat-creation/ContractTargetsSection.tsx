@@ -822,9 +822,9 @@ function QuittanceTotalsSummary({
   const rows: [string, number | undefined][] = [
     ["TOTAL NET", scoped.totalNet],
     ["EVCAT", scoped.evcat],
-    ["TAXE", scoped.taxe],
+    ["TAXES", scoped.taxe],
     ["CNPAC", scoped.cnpac],
-    ["TOTAL À PAYER", scoped.totalAPayer],
+    ["TOTAL", scoped.totalAPayer],
   ];
   if (showPersonneTotals) {
     rows.splice(2, 0, ["PTA (Prime Personne)", scoped.pta], ["ACCESSOIRE", scoped.accessoire]);
@@ -839,7 +839,7 @@ function QuittanceTotalsSummary({
         <div key={label} className="grid grid-cols-[1fr_120px] border-b last:border-b-0">
           <div className="bg-muted/30 px-3 py-2 text-right text-xs font-semibold">{label}</div>
           <div className="px-3 py-2 text-right text-xs">
-            {loading ? <CalculationValue loading value={value} fallback="-" /> : value == null ? "-" : formatMoney(value)}
+            {loading ? <CalculationValue loading value={value} fallback="-" /> : value == null ? "-" : moneyAmount(value)}
           </div>
         </div>
       ))}

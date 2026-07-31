@@ -506,12 +506,12 @@ function QuittanceSection({
           {lignes.map((ligne) => (
             <TableRow key={`${ligne.categorie}-${ligne.ordre}`} className={ligne.globale ? "font-bold" : ""}>
               <TableCell>{ligne.globale ? "Total général" : ligne.categorie}</TableCell>
-              <TableCell className="text-right">{formatMoney(ligne.primeNette)}</TableCell>
-              <TableCell className="text-right">{formatMoney(ligne.taxe)}</TableCell>
-              <TableCell className="text-right">{formatMoney(ligne.taxeParafiscale)}</TableCell>
-              <TableCell className="text-right">{formatMoney(ligne.accessoire)}</TableCell>
-              <TableCell className="text-right">{formatMoney(ligne.cnpac)}</TableCell>
-              <TableCell className="text-right">{formatMoney(ligne.primeTotale)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(ligne.primeNette)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(ligne.taxe)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(ligne.taxeParafiscale)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(ligne.accessoire)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(ligne.cnpac)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(ligne.primeTotale)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -597,23 +597,23 @@ function FlotteQuittanceTable({ contrat }: { contrat: ContratSummary }) {
           <tr className="bg-slate-100 text-center font-bold text-blue-950">
             <th className="border border-slate-700 px-2 py-1 text-left">Catégorie</th>
             <th className="border border-slate-700 px-2 py-1">Prime nette</th>
-            <th className="border border-slate-700 px-2 py-1">Taxe</th>
+            <th className="border border-slate-700 px-2 py-1">Taxes</th>
             <th className="border border-slate-700 px-2 py-1">TPF</th>
             <th className="border border-slate-700 px-2 py-1">ACC</th>
             <th className="border border-slate-700 px-2 py-1">CNPAC</th>
-            <th className="border border-slate-700 px-2 py-1">Total à payer</th>
+            <th className="border border-slate-700 px-2 py-1">Total</th>
           </tr>
         </thead>
         <tbody>
           {lignes.map((ligne) => (
             <tr key={`${ligne.categorie}-${ligne.ordre}`} className={ligne.globale ? "font-bold" : ""}>
               <td className="border border-slate-700 px-2 py-1">{ligne.globale ? "TOTAL" : ligne.categorie}</td>
-              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.primeNette)}</td>
-              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.taxe)}</td>
-              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.taxeParafiscale)}</td>
-              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.accessoire)}</td>
-              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.cnpac)}</td>
-              <td className="border border-slate-700 px-2 py-1 text-right">{formatMoney(ligne.primeTotale)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.primeNette)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.taxe)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.taxeParafiscale)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.accessoire)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.cnpac)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.primeTotale)}</td>
             </tr>
           ))}
         </tbody>
@@ -1047,12 +1047,12 @@ function drawPdfQuittance(ctx: PdfContext, contrat: ContratSummary) {
   });
   drawPdfTable(ctx, ["Catégorie", "P. nette", "Taxes", "TPF", "Accessoires", "CNPAC", "Total"], lignes.map((ligne) => [
     ligne.globale ? "Total général" : text(ligne.categorie),
-    formatMoney(ligne.primeNette),
-    formatMoney(ligne.taxe),
-    formatMoney(ligne.taxeParafiscale),
-    formatMoney(ligne.accessoire),
-    formatMoney(ligne.cnpac),
-    formatMoney(ligne.primeTotale),
+    moneyAmount(ligne.primeNette),
+    moneyAmount(ligne.taxe),
+    moneyAmount(ligne.taxeParafiscale),
+    moneyAmount(ligne.accessoire),
+    moneyAmount(ligne.cnpac),
+    moneyAmount(ligne.primeTotale),
   ]), [28, 27, 27, 22, 30, 24, 22]);
 }
 

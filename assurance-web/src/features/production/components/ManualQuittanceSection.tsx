@@ -1,6 +1,6 @@
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
-import { formatMoney, numberOrZero, roundMoney } from "../utils/format";
+import { moneyAmount, numberOrZero, roundMoney } from "../utils/format";
 import type { QuittanceInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -23,7 +23,7 @@ type MoneyColumnKey = "primeNette" | "taxe" | "taxeParafiscale" | "accessoire" |
 
 const COLUMNS: { key: MoneyColumnKey; label: string }[] = [
   { key: "primeNette", label: "Prime nette" },
-  { key: "taxe", label: "Taxe" },
+  { key: "taxe", label: "Taxes" },
   { key: "taxeParafiscale", label: "TPF" },
   { key: "accessoire", label: "ACC" },
   { key: "cnpac", label: "CNPAC" },
@@ -49,7 +49,7 @@ export function ManualQuittanceSection({ lignes, setLignes, openSection, onSecti
   return (
     <SectionCard
       title="Quittances"
-      badge={formatMoney(totals.primeTotale)}
+      badge={moneyAmount(totals.primeTotale)}
       tone="production"
       defaultOpen={false}
       open={openSection === "quittances"}
@@ -79,17 +79,17 @@ export function ManualQuittanceSection({ lignes, setLignes, openSection, onSecti
                     />
                   </td>
                 ))}
-                <td className="px-3 py-2 text-right font-semibold">{formatMoney(totalLine(ligne))}</td>
+                <td className="px-3 py-2 text-right font-semibold">{moneyAmount(totalLine(ligne))}</td>
               </tr>
             ))}
             <tr className="border-t bg-muted/50 font-semibold">
               <td className="px-3 py-3">Total</td>
-              <td className="px-3 py-3 text-right">{formatMoney(totals.primeNette)}</td>
-              <td className="px-3 py-3 text-right">{formatMoney(totals.taxe)}</td>
-              <td className="px-3 py-3 text-right">{formatMoney(totals.taxeParafiscale)}</td>
-              <td className="px-3 py-3 text-right">{formatMoney(totals.accessoire)}</td>
-              <td className="px-3 py-3 text-right">{formatMoney(totals.cnpac)}</td>
-              <td className="px-3 py-3 text-right">{formatMoney(totals.primeTotale)}</td>
+              <td className="px-3 py-3 text-right">{moneyAmount(totals.primeNette)}</td>
+              <td className="px-3 py-3 text-right">{moneyAmount(totals.taxe)}</td>
+              <td className="px-3 py-3 text-right">{moneyAmount(totals.taxeParafiscale)}</td>
+              <td className="px-3 py-3 text-right">{moneyAmount(totals.accessoire)}</td>
+              <td className="px-3 py-3 text-right">{moneyAmount(totals.cnpac)}</td>
+              <td className="px-3 py-3 text-right">{moneyAmount(totals.primeTotale)}</td>
             </tr>
           </tbody>
         </table>

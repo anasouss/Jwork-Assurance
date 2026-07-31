@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { productionApi } from "../api";
-import { formatMoney } from "../utils/format";
+import { moneyAmount } from "../utils/format";
 
 export default function QuittancesPage() {
   const quittances = useQuery({ queryKey: ["elements-facturables"], queryFn: productionApi.listQuittances });
@@ -28,7 +28,7 @@ export default function QuittancesPage() {
                 <TableCell>{String(item.libelle ?? "-")}</TableCell>
                 <TableCell>{String(item.nature ?? "-")}</TableCell>
                 <TableCell>{String(item.statut ?? "-")}</TableCell>
-                <TableCell className="text-right">{formatMoney(Number(item.primeTotale ?? 0))}</TableCell>
+                <TableCell className="text-right">{moneyAmount(Number(item.primeTotale ?? 0))}</TableCell>
               </TableRow>
             ))}
           </TableBody>

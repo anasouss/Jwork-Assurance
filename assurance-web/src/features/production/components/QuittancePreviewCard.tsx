@@ -1,5 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatMoney } from "../utils/format";
+import { moneyAmount } from "../utils/format";
 import type { QuittancePreview } from "../types";
 
 export function QuittancePreviewCard({
@@ -18,11 +18,11 @@ export function QuittancePreviewCard({
           <TableRow>
             <TableHead>Catégorie</TableHead>
             <TableHead className="text-right">Prime nette</TableHead>
-            <TableHead className="text-right">Taxe</TableHead>
+            <TableHead className="text-right">Taxes</TableHead>
             <TableHead className="text-right">TPF</TableHead>
             <TableHead className="text-right">ACC</TableHead>
             <TableHead className="text-right">CNPAC</TableHead>
-            <TableHead className="text-right">Total à payer</TableHead>
+            <TableHead className="text-right">Total</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -107,5 +107,5 @@ function formatPreviewValue(value: number, loading: boolean, preview?: Quittance
   if (!preview) {
     return "-";
   }
-  return formatMoney(value);
+  return moneyAmount(value);
 }

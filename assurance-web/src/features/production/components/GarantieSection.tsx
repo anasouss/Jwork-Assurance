@@ -642,9 +642,9 @@ function GuaranteeTotalsSummary({
   const rows: [string, number | undefined][] = [
     ["TOTAL NET", summary?.totalNet],
     ["EVCAT", summary?.evcat],
-    ["TAXE", summary?.taxe],
+    ["TAXES", summary?.taxe],
     ["CNPAC", summary?.cnpac],
-    ["TOTAL À PAYER", summary?.totalAPayer],
+    ["TOTAL", summary?.totalAPayer],
   ];
   if (summary?.pta != null) {
     rows.splice(2, 0, ["PTA (Prime Personne)", summary.pta], ["ACCESSOIRE", summary.accessoire]);
@@ -659,7 +659,7 @@ function GuaranteeTotalsSummary({
         <div key={label} className="grid grid-cols-[1fr_160px] border-b last:border-b-0">
           <div className="bg-muted/20 px-3 py-2 text-right text-xs font-semibold uppercase">{label}</div>
           <div className="px-3 py-2 text-right text-xs font-semibold">
-            {loading ? "Calcul..." : value == null ? "-" : formatMoney(value)}
+            {loading ? "Calcul..." : value == null ? "-" : moneyAmount(value)}
           </div>
         </div>
       ))}

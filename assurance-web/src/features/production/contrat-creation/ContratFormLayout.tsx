@@ -217,6 +217,7 @@ export function ContratFormLayout({
       automaticPricing={showGrille}
       allowPrimeColumn={allowSaisiePrimeNette}
       primeColumnEnabled={form.saisiePrimeNette}
+      showRateColumn={form.typeContrat !== "PARTICULIER"}
       setPrimeColumnEnabled={form.setSaisiePrimeNette}
       preview={form.preview}
       previewing={form.previewMutation.isPending || form.autoPreviewMutation.isPending}

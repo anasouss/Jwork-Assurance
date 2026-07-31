@@ -35,6 +35,7 @@ export function GarantieSection({
   automaticPricing = false,
   allowPrimeColumn = false,
   primeColumnEnabled = false,
+  showRateColumn = true,
   setPrimeColumnEnabled,
   preview,
   previewing = false,
@@ -67,6 +68,7 @@ export function GarantieSection({
   automaticPricing?: boolean;
   allowPrimeColumn?: boolean;
   primeColumnEnabled?: boolean;
+  showRateColumn?: boolean;
   setPrimeColumnEnabled?: (value: boolean) => void;
   preview?: QuittancePreview | null;
   previewing?: boolean;
@@ -153,14 +155,14 @@ export function GarantieSection({
       ) : null}
       <div className="mb-2 text-sm font-semibold">Garanties véhicule</div>
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[980px] border-collapse text-sm">
+        <table className={cn("w-full border-collapse text-sm", showRateColumn ? "min-w-[980px]" : "min-w-[820px]")}>
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="w-12 px-3 py-3 text-left"></th>
               <th className="px-3 py-3 text-left">Garantie</th>
               {vehiculeCount > 1 ? <th className="w-40 px-3 py-3 text-left">Véhicule</th> : null}
               <th className="w-48 px-3 py-3 text-left">Valeur assurée</th>
-              <th className="w-36 px-3 py-3 text-left">Taux (%)</th>
+              {showRateColumn ? <th className="w-36 px-3 py-3 text-left">Taux (%)</th> : null}
               {automaticPricing ? (
                 <>
                   <th className="w-56 px-3 py-3 text-left">Taux franchise / Min franchise</th>
@@ -168,7 +170,7 @@ export function GarantieSection({
                 </>
               ) : (
                 <>
-                  <th className="w-40 px-3 py-3 text-left">Franchise (%)</th>
+                  <th className="w-40 px-3 py-3 text-left">Taux franchise (%)</th>
                   <th className="w-40 px-3 py-3 text-left">Min franchise</th>
                 </>
               )}
@@ -437,9 +439,11 @@ export function GarantieSection({
                           />
                         )}
                       </td>
-                      <td className="px-3 py-2">
-                        <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
-                      </td>
+                      {showRateColumn ? (
+                        <td className="px-3 py-2">
+                          <Input type="number" disabled={rowDisabled || isRc} className={controlClass(editable)} value={item?.taux ?? ""} onChange={(event) => update(garantie.id, { taux: numberValue(event.target.value) })} />
+                        </td>
+                      ) : null}
                       <td className="px-3 py-2">
                         <Input type="number" disabled={rowDisabled || isRc || !garantie.avecFranchise} className={controlClass(editable && Boolean(garantie.avecFranchise))} value={item?.tauxFranchise ?? ""} onChange={(event) => update(garantie.id, { tauxFranchise: numberValue(event.target.value) })} />
                       </td>

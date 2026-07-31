@@ -2003,9 +2003,10 @@ public class ContratService {
                 .sorted(Comparator.comparing(MouvementGarantie::getId))
                 .toList();
 
-        boolean creationCibles = "INC_F".equalsIgnoreCase(request.getCodeTypeMouvement())
-                || "EXR_M".equalsIgnoreCase(request.getCodeTypeMouvement());
-        if (creationCibles) {
+        boolean snapshotsCommeCibles = "INC_F".equalsIgnoreCase(request.getCodeTypeMouvement())
+                || "EXR_M".equalsIgnoreCase(request.getCodeTypeMouvement())
+                || "CHV_M".equalsIgnoreCase(request.getCodeTypeMouvement());
+        if (snapshotsCommeCibles) {
             request.setVehicules(vehiculeSnapshots.stream().map(this::toVehiculeInput).toList());
             request.setRemorques(remorqueSnapshots.stream().map(this::toRemorqueInput).toList());
         } else {
@@ -2016,11 +2017,11 @@ public class ContratService {
         }
 
         Map<Long, Integer> vehiculeIndexes = targetIndexes(
-                creationCibles ? vehiculeSnapshots.stream().map(MouvementVehicule::getVehicule).toList()
+                snapshotsCommeCibles ? vehiculeSnapshots.stream().map(MouvementVehicule::getVehicule).toList()
                         : activeVehicules(mouvement.getContrat())
         );
         Map<Long, Integer> remorqueIndexes = targetIndexes(
-                creationCibles ? remorqueSnapshots.stream().map(MouvementRemorque::getRemorque).toList()
+                snapshotsCommeCibles ? remorqueSnapshots.stream().map(MouvementRemorque::getRemorque).toList()
                         : activeRemorques(mouvement.getContrat())
         );
         request.setGaranties(garantieSnapshots.stream()

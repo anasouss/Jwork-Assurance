@@ -51,6 +51,7 @@ export default function ContratShowPage() {
   const compagnie = optionLabel(compagniesQuery.data, contrat.compagnieAssuranceId);
   const convention = optionLabel(conventionsQuery.data, contrat.conventionId);
   const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
+  const isVehicleReplacement = String(selectedMouvement?.code ?? "").toUpperCase() === "CHV_M";
   const selectedActNumber = selectedMouvement?.numeroMouvement ?? "1";
   const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement ? `-acte-${selectedActNumber}` : ""}.pdf`;
   const openPdf = async () => {
@@ -158,6 +159,7 @@ export default function ContratShowPage() {
               contrat={contrat}
               vehicule={vehicule}
               index={index}
+              replacementSnapshot={isVehicleReplacement}
             />
           ))}
 
@@ -172,7 +174,11 @@ export default function ContratShowPage() {
 
           <PersonnesSection garanties={personneGaranties(contrat)} />
           <AssistancesSection assistances={contrat.assistances ?? []} />
-          <QuittanceSection contrat={contrat} movementLabel={selectedMouvement?.libelle} />
+          <QuittanceSection
+            contrat={contrat}
+            movementLabel={selectedMouvement?.libelle}
+            differential={isVehicleReplacement}
+          />
         </main>
       </div>
       )}
@@ -316,7 +322,17 @@ function FlottePolicySheet({
   );
 }
 
-function VehicleSection({ contrat, vehicule, index }: { contrat: ContratSummary; vehicule: Vehicule; index: number }) {
+function VehicleSection({
+  contrat,
+  vehicule,
+  index,
+  replacementSnapshot = false,
+}: {
+  contrat: ContratSummary;
+  vehicule: Vehicule;
+  index: number;
+  replacementSnapshot?: boolean;
+}) {
   const garanties = (contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
   return (
     <Section title={`Véhicule ${index + 1}`} icon={<Car className="size-4" />}>
@@ -336,7 +352,10 @@ function VehicleSection({ contrat, vehicule, index }: { contrat: ContratSummary;
           ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
         ]}
       />
-      <GarantiesTable garanties={garanties} />
+      <GarantiesTable
+        garanties={garanties}
+        primeLabel={replacementSnapshot ? "Prime nette (nouveau)" : "Prime nette"}
+      />
     </Section>
   );
 }
@@ -422,7 +441,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
   );
 }
 
-function GarantiesTable({ garanties }: { garanties: Garantie[] }) {
+function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: Garantie[]; primeLabel?: string }) {
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return null;
   return (
@@ -434,7 +453,7 @@ function GarantiesTable({ garanties }: { garanties: Garantie[] }) {
             <TableHead className="text-right">Valeur assurée</TableHead>
             <TableHead className="text-right">Taux</TableHead>
             <TableHead>Franchise</TableHead>
-            <TableHead className="text-right">Prime nette</TableHead>
+            <TableHead className="text-right">{primeLabel}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -453,14 +472,24 @@ function GarantiesTable({ garanties }: { garanties: Garantie[] }) {
   );
 }
 
-function QuittanceSection({ contrat, movementLabel }: { contrat: ContratSummary; movementLabel?: string | null }) {
+function QuittanceSection({
+  contrat,
+  movementLabel,
+  differential = false,
+}: {
+  contrat: ContratSummary;
+  movementLabel?: string | null;
+  differential?: boolean;
+}) {
   const lignes = (contrat.quittanceGenerale?.lignes ?? []).filter((ligne) => {
     const categorie = String(ligne.categorie ?? "").toUpperCase();
     return categorie !== "CORPOREL" || personneGaranties(contrat).length > 0;
   });
   if (!lignes.length) return null;
   return (
-    <Section title={movementLabel ? `Quittance - ${movementLabel}` : "Quittance générale"}>
+    <Section title={movementLabel
+      ? `${differential ? "Quittance différentielle" : "Quittance"} - ${movementLabel}`
+      : "Quittance générale"}>
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-100">

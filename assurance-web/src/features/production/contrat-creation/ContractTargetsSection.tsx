@@ -1607,7 +1607,7 @@ function TargetGuaranteesTable({
                 <tr
                   key={garantie.id}
                   className={cn(
-                    "border-t align-middle transition-colors",
+                    "border-t align-middle transition-colors hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20",
                     !checked && "bg-muted/20 text-muted-foreground",
                     checked && "bg-background",
                     isRc && "bg-amber-50/50 dark:bg-amber-950/20"

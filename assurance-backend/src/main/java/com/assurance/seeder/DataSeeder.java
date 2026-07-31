@@ -62,6 +62,18 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        normalizePlatformAdministrators();
+        Permission referentielView = seedPermission(
+                "referentiel:view",
+                "Consulter les référentiels",
+                "referentiel"
+        );
+        Permission referentielManage = seedPermission(
+                "referentiel:manage",
+                "Gérer les référentiels",
+                "referentiel"
+        );
+        grantReferentielPermissionsToAdministrators(referentielView, referentielManage);
         if (hasBootstrapData()) {
             return;
         }
@@ -245,7 +257,7 @@ public class DataSeeder implements CommandLineRunner {
                         .systemRole(true)
                         .build()
         ));
-        superAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, garantieManage, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, agenceView, agenceCreate, userView, userManage, roleView, roleManage, configView, configManage));
+        superAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, garantieManage, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, agenceView, agenceCreate, userView, userManage, roleView, roleManage, configView, configManage, referentielView, referentielManage));
         roleRepository.save(superAdmin);
 
         Role agenceAdmin = roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENCY_ADMIN").orElseGet(() -> roleRepository.save(
@@ -256,7 +268,7 @@ public class DataSeeder implements CommandLineRunner {
                         .systemRole(true)
                         .build()
         ));
-        agenceAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, userView, userManage, roleView, roleManage));
+        agenceAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, userView, userManage, roleView, roleManage, referentielView, referentielManage));
         roleRepository.save(agenceAdmin);
 
         roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENT").orElseGet(() -> roleRepository.save(
@@ -305,7 +317,7 @@ public class DataSeeder implements CommandLineRunner {
 
         userRepository.findByEmail(adminEmail).orElseGet(() -> userRepository.save(
                 Utilisateur.builder()
-                        .agence(agenceDefaut)
+                        .agence(null)
                         .role(superAdmin)
                         .email(adminEmail)
                         .password(passwordEncoder.encode(adminPassword))
@@ -314,6 +326,36 @@ public class DataSeeder implements CommandLineRunner {
                         .actif(true)
                         .build()
         ));
+    }
+
+    private void normalizePlatformAdministrators() {
+        List<Utilisateur> platformAdministrators = userRepository
+                .findByRole_CodeIgnoreCaseOrderByNomAscPrenomAsc("SUPER_ADMIN");
+        boolean changed = false;
+        for (Utilisateur administrator : platformAdministrators) {
+            if (administrator.getAgence() != null) {
+                administrator.setAgence(null);
+                changed = true;
+            }
+        }
+        if (changed) {
+            userRepository.saveAll(platformAdministrators);
+        }
+    }
+
+    private void grantReferentielPermissionsToAdministrators(Permission view, Permission manage) {
+        List<Role> administratorRoles = roleRepository.findAll().stream()
+                .filter(role -> "SUPER_ADMIN".equalsIgnoreCase(role.getCode())
+                        || "AGENCY_ADMIN".equalsIgnoreCase(role.getCode()))
+                .toList();
+        boolean changed = false;
+        for (Role role : administratorRoles) {
+            changed |= role.getPermissions().add(view);
+            changed |= role.getPermissions().add(manage);
+        }
+        if (changed) {
+            roleRepository.saveAll(administratorRoles);
+        }
     }
 
     private boolean hasBootstrapData() {

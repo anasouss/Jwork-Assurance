@@ -338,48 +338,62 @@ function VehicleSection({
   replacementSnapshot?: boolean;
 }) {
   const garanties = (contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
+  const hasGaranties = garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   return (
-    <Section title={`Véhicule ${index + 1}`} icon={<Car className="size-4" />}>
-      <InfoGrid
-        items={[
-          ["Usage", [vehicule.usageCode, vehicule.usageLibelle].filter(Boolean).join(" - ")],
-          ["Marque", text(vehicule.marque)],
-          ["Immatriculation", text(vehicule.immatriculation)],
-          ["Date de MC", formatDate(vehicule.datePremiereCirculation)],
-          ["Carburant", text(vehicule.carburant)],
-          ["Puissance fiscale", text(vehicule.puissanceFiscale)],
-          ["Carrosserie", text(vehicule.carrosserie)],
-          ["Nombre de places", text(vehicule.nombrePlaces)],
-          ["CRM", text(vehicule.crm)],
-          ["Valeur à neuf", formatOptionalAmount(vehicule.valeurNeuf)],
-          ["Valeur vénale", formatOptionalAmount(vehicule.valeurVenale)],
-          ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
-        ]}
-      />
-      <GarantiesTable
-        garanties={garanties}
-        primeLabel={replacementSnapshot ? "Prime différentielle" : "Prime nette"}
-      />
-    </Section>
+    <>
+      <Section title={`Véhicule ${index + 1}`} icon={<Car className="size-4" />}>
+        <InfoGrid
+          items={[
+            ["Usage", [vehicule.usageCode, vehicule.usageLibelle].filter(Boolean).join(" - ")],
+            ["Marque", text(vehicule.marque)],
+            ["Immatriculation", text(vehicule.immatriculation)],
+            ["Date de MC", formatDate(vehicule.datePremiereCirculation)],
+            ["Carburant", text(vehicule.carburant)],
+            ["Puissance fiscale", text(vehicule.puissanceFiscale)],
+            ["Carrosserie", text(vehicule.carrosserie)],
+            ["Nombre de places", text(vehicule.nombrePlaces)],
+            ["CRM", text(vehicule.crm)],
+            ["Valeur à neuf", formatOptionalAmount(vehicule.valeurNeuf)],
+            ["Valeur vénale", formatOptionalAmount(vehicule.valeurVenale)],
+            ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
+          ]}
+        />
+      </Section>
+      {hasGaranties ? (
+        <Section title={`Garanties véhicule ${index + 1}`}>
+          <GarantiesTable
+            garanties={garanties}
+            primeLabel={replacementSnapshot ? "Prime différentielle" : "Prime nette"}
+          />
+        </Section>
+      ) : null}
+    </>
   );
 }
 
 function RemorqueSection({ contrat, remorque, index }: { contrat: ContratSummary; remorque: Remorque; index: number }) {
   const garanties = (contrat.garanties ?? []).filter((garantie) => String(garantie.remorqueId ?? "") === String(remorque.remorqueId));
+  const hasGaranties = garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   return (
-    <Section title={`Remorque ${index + 1}`} icon={<Car className="size-4" />}>
-      <InfoGrid
-        items={[
-          ["Usage", [remorque.usageCode, remorque.usageLibelle].filter(Boolean).join(" - ")],
-          ["Marque", text(remorque.marque)],
-          ["Immatriculation", text(remorque.immatriculation)],
-          ["PTC", text(remorque.ptc)],
-          ["Date de MC", formatDate(remorque.dateMiseEnCirculation)],
-          ["Valeur assurée", formatOptionalAmount(remorque.valeurAssuree)],
-        ]}
-      />
-      <GarantiesTable garanties={garanties} />
-    </Section>
+    <>
+      <Section title={`Remorque ${index + 1}`} icon={<Car className="size-4" />}>
+        <InfoGrid
+          items={[
+            ["Usage", [remorque.usageCode, remorque.usageLibelle].filter(Boolean).join(" - ")],
+            ["Marque", text(remorque.marque)],
+            ["Immatriculation", text(remorque.immatriculation)],
+            ["PTC", text(remorque.ptc)],
+            ["Date de MC", formatDate(remorque.dateMiseEnCirculation)],
+            ["Valeur assurée", formatOptionalAmount(remorque.valeurAssuree)],
+          ]}
+        />
+      </Section>
+      {hasGaranties ? (
+        <Section title={`Garanties remorque ${index + 1}`}>
+          <GarantiesTable garanties={garanties} />
+        </Section>
+      ) : null}
+    </>
   );
 }
 
@@ -449,7 +463,7 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return null;
   return (
-    <div className="mt-2 overflow-hidden border-t border-slate-300">
+    <div className="overflow-hidden">
       <Table className="text-[10px]">
         <TableHeader>
           <TableRow className="bg-slate-100">
@@ -538,7 +552,7 @@ function Section({ title, icon, children }: { title: string; icon?: ReactNode; c
 
 function InfoGrid({ items }: { items: [string, ReactNode][] }) {
   return (
-    <div className="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-x-3 sm:grid-cols-3 md:grid-cols-5">
       {items.map(([label, value]) => (
         <div key={label} className="flex min-w-0 flex-col border-b border-dashed border-slate-200 py-1">
           <span className="text-[8px] font-bold uppercase leading-tight text-slate-500">{label}</span>
@@ -906,13 +920,17 @@ async function openContratPdf(params: {
         ["Valeur vénale", formatOptionalAmount(vehicule.valeurVenale)],
         ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
       ]);
-      const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
-      drawPdfGaranties(
-        ctx,
-        garanties,
-        String(params.mouvement?.code ?? "").toUpperCase() === "CHV_M" ? "Prime différentielle" : "Prime nette",
-      );
     });
+    const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
+    if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
+      drawPdfSection(ctx, `GARANTIES VÉHICULE ${index + 1}`, () => {
+        drawPdfGaranties(
+          ctx,
+          garanties,
+          String(params.mouvement?.code ?? "").toUpperCase() === "CHV_M" ? "Prime différentielle" : "Prime nette",
+        );
+      });
+    }
   }
 
   for (const [index, remorque] of (params.contrat.remorques ?? []).entries()) {
@@ -925,9 +943,13 @@ async function openContratPdf(params: {
         ["Date de MC", formatDate(remorque.dateMiseEnCirculation)],
         ["Valeur assurée", formatOptionalAmount(remorque.valeurAssuree)],
       ]);
-      const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.remorqueId ?? "") === String(remorque.remorqueId));
-      drawPdfGaranties(ctx, garanties);
     });
+    const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.remorqueId ?? "") === String(remorque.remorqueId));
+    if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
+      drawPdfSection(ctx, `GARANTIES REMORQUE ${index + 1}`, () => {
+        drawPdfGaranties(ctx, garanties);
+      });
+    }
   }
 
   const personnes = personneGaranties(params.contrat);
@@ -1006,12 +1028,13 @@ function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
 }
 
 function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
-  const columnGap = 3;
-  const columnWidth = (ctx.width - 6 - columnGap * 2) / 3;
-  for (let index = 0; index < items.length; index += 3) {
-    const row = items.slice(index, index + 3);
-    const wrapped = row.map(([, value]) => wrapPdfText(ctx, valueToPdfText(value), columnWidth * 0.58));
-    const rowHeight = Math.max(5, 2.1 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
+  const columnCount = 5;
+  const columnGap = 2;
+  const columnWidth = (ctx.width - 6 - columnGap * (columnCount - 1)) / columnCount;
+  for (let index = 0; index < items.length; index += columnCount) {
+    const row = items.slice(index, index + columnCount);
+    const wrapped = row.map(([, value]) => wrapPdfText(ctx, valueToPdfText(value), columnWidth));
+    const rowHeight = Math.max(7, 4.5 + Math.max(...wrapped.map((lines) => lines.length)) * 2.3);
     ensurePdfSpace(ctx, rowHeight);
     row.forEach(([label], columnIndex) => {
       drawPdfInfoCell(
@@ -1034,10 +1057,10 @@ function drawPdfInfoCell(ctx: PdfContext, label: string, lines: string[], x: num
   ctx.pdf.setFont("helvetica", "bold");
   ctx.pdf.setFontSize(5.5);
   ctx.pdf.setTextColor(100, 116, 139);
-  ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 2.9);
+  ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 2.5, { maxWidth: width });
   ctx.pdf.setFontSize(6.3);
   ctx.pdf.setTextColor(2, 6, 23);
-  ctx.pdf.text(lines.length ? lines : ["-"], x + width * 0.4, y + 2.9, { maxWidth: width * 0.58 });
+  ctx.pdf.text(lines.length ? lines : ["-"], x, y + 5.3, { maxWidth: width });
 }
 
 function drawPdfParties(

@@ -22,6 +22,7 @@ import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.PieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
 import com.assurance.repository.TypePieceJointeRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -35,6 +36,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
@@ -61,8 +64,21 @@ public class PieceJointeService {
     private final TypePieceJointeRepository typePieceJointeRepository;
     private final PieceJointeRepository pieceJointeRepository;
 
-    @Value("${app.storage.pieces-jointes-dir:uploads/pieces-jointes}")
+    @Value("${app.storage.pieces-jointes-dir:/data/assurance/pieces-jointes}")
     private String piecesJointesDir;
+
+    @PostConstruct
+    void initializeStorage() {
+        Path root = storageRoot();
+        try {
+            Files.createDirectories(root);
+        } catch (IOException error) {
+            throw new IllegalStateException("Impossible d'initialiser le stockage des pieces jointes: " + root, error);
+        }
+        if (!Files.isWritable(root)) {
+            throw new IllegalStateException("Le stockage des pieces jointes n'est pas accessible en ecriture: " + root);
+        }
+    }
 
     @Transactional(readOnly = true)
     public List<TypePieceJointeResponse> listTypes(Long agenceId, boolean includeInactive) {
@@ -161,13 +177,14 @@ public class PieceJointeService {
             throw new BadRequestException("Aucun fichier selectionne");
         }
         StoredUpload stored = storeFiles(agenceId, contrat, mouvement, type, files.stream().filter(file -> !file.isEmpty()).toList());
+        deleteOnRollback(stored.path());
         PieceJointe piece = pieceJointeRepository.save(PieceJointe.builder()
                 .contrat(contrat)
                 .mouvementContrat(mouvement)
                 .typePieceJointe(type)
                 .nomFichier(stored.fileName())
                 .contentType(stored.contentType())
-                .cheminStockage(stored.path().toString())
+                .cheminStockage(stored.storageKey())
                 .tailleOctets(stored.size())
                 .build());
         return toPieceResponse(piece);
@@ -181,7 +198,7 @@ public class PieceJointeService {
         if (!contrat.getId().equals(piece.getContrat().getId())) {
             throw new ResourceNotFoundException("PieceJointe", pieceId);
         }
-        Path path = Path.of(piece.getCheminStockage()).normalize();
+        Path path = resolveStoredPath(piece);
         if (!Files.isRegularFile(path)) {
             throw new ResourceNotFoundException("PieceJointe", pieceId);
         }
@@ -201,10 +218,7 @@ public class PieceJointeService {
             throw new ResourceNotFoundException("PieceJointe", pieceId);
         }
         pieceJointeRepository.delete(piece);
-        try {
-            Files.deleteIfExists(Path.of(piece.getCheminStockage()).normalize());
-        } catch (IOException ignored) {
-        }
+        deleteAfterCommit(resolveStoredPath(piece));
     }
 
     private Contrat resolveContrat(Long agenceId, Long contratId) {
@@ -256,11 +270,11 @@ public class PieceJointeService {
 
     private StoredUpload storeFiles(Long agenceId, Contrat contrat, MouvementContrat mouvement, TypePieceJointe type, List<MultipartFile> files) {
         try {
-            Path folder = Path.of(piecesJointesDir)
-                    .resolve(String.valueOf(agenceId))
+            Path folderKey = Path.of(String.valueOf(agenceId))
                     .resolve(String.valueOf(contrat.getId()))
                     .resolve(mouvement == null ? "contrat" : "mouvement-" + mouvement.getId())
                     .normalize();
+            Path folder = resolveStorageKey(folderKey);
             Files.createDirectories(folder);
             if (files.size() > 1) {
                 if (!files.stream().allMatch(this::isImage)) {
@@ -270,16 +284,79 @@ public class PieceJointeService {
                 Path target = folder.resolve(fileName);
                 byte[] pdf = imagesToPdf(files);
                 Files.write(target, pdf);
-                return new StoredUpload(target, fileName, MediaType.APPLICATION_PDF_VALUE, (long) pdf.length);
+                return new StoredUpload(target, folderKey.resolve(fileName).toString(), fileName, MediaType.APPLICATION_PDF_VALUE, (long) pdf.length);
             }
             MultipartFile file = files.get(0);
             String extension = extension(file.getOriginalFilename(), file.getContentType());
             String fileName = storageName(type.getLibelle(), extension);
             Path target = folder.resolve(fileName);
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-            return new StoredUpload(target, fileName, file.getContentType(), file.getSize());
+            return new StoredUpload(target, folderKey.resolve(fileName).toString(), fileName, file.getContentType(), file.getSize());
         } catch (IOException error) {
             throw new BadRequestException("Stockage de la piece jointe impossible");
+        }
+    }
+
+    private Path storageRoot() {
+        return Path.of(piecesJointesDir).toAbsolutePath().normalize();
+    }
+
+    private Path resolveStorageKey(Path storageKey) {
+        if (storageKey.isAbsolute()) {
+            throw new IllegalStateException("Une cle de stockage relative est obligatoire");
+        }
+        Path root = storageRoot();
+        Path resolved = root.resolve(storageKey).normalize();
+        if (!resolved.startsWith(root)) {
+            throw new IllegalStateException("La cle de stockage sort du repertoire autorise");
+        }
+        return resolved;
+    }
+
+    private Path resolveStoredPath(PieceJointe piece) {
+        String storageKey = piece.getCheminStockage();
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new ResourceNotFoundException("PieceJointe", piece.getId());
+        }
+        try {
+            return resolveStorageKey(Path.of(storageKey));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            throw new ResourceNotFoundException("PieceJointe", piece.getId());
+        }
+    }
+
+    private void deleteOnRollback(Path path) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    deleteQuietly(path);
+                }
+            }
+        });
+    }
+
+    private void deleteAfterCommit(Path path) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            deleteQuietly(path);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                deleteQuietly(path);
+            }
+        });
+    }
+
+    private void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
+            // The database remains authoritative; orphan cleanup can safely retry later.
         }
     }
 
@@ -388,7 +465,7 @@ public class PieceJointeService {
                 .build();
     }
 
-    private record StoredUpload(Path path, String fileName, String contentType, Long size) {
+    private record StoredUpload(Path path, String storageKey, String fileName, String contentType, Long size) {
     }
 
     @Builder

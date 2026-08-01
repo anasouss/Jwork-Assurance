@@ -1,5 +1,6 @@
 package com.assurance.entity;
 
+import com.assurance.enums.CritereSelectionTarif;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeGarantie;
@@ -112,6 +113,11 @@ public class Garantie extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "mode_par_defaut", length = 40)
     private ModeTarificationGarantie modeParDefaut;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "critere_selection_tarif", nullable = false, length = 40)
+    private CritereSelectionTarif critereSelectionTarif = CritereSelectionTarif.TAUX_PRIME;
 
     @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)

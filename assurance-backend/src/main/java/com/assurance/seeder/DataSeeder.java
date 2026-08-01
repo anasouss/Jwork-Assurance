@@ -3,6 +3,7 @@ package com.assurance.seeder;
 import com.assurance.entity.*;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
+import com.assurance.enums.CritereSelectionTarif;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.SourceValeurGarantie;
@@ -627,6 +628,7 @@ public class DataSeeder implements CommandLineRunner {
                         .avecCapital(avecCapital)
                         .avecFranchise(avecFranchise)
                         .avecFranchiseMinimale(defaultAvecFranchiseMinimale(code, avecFranchise))
+                        .critereSelectionTarif(defaultCritereSelectionTarif(code))
                         .tarificationMultiple(tarificationMultiple)
                         .ordreAffichage(ordreAffichage)
                         .actif(true)
@@ -652,6 +654,9 @@ public class DataSeeder implements CommandLineRunner {
         garantie.getModesTarificationMultiple().addAll(defaultModesTarificationMultiple(code, tarificationMultiple, modeParDefaut));
         garantie.setOrdreAffichage(ordreAffichage);
         garantie.setModeParDefaut(modeParDefaut);
+        if (garantie.getCritereSelectionTarif() == null) {
+            garantie.setCritereSelectionTarif(defaultCritereSelectionTarif(code));
+        }
         if (garantie.getModesAutorises() == null) {
             garantie.setModesAutorises(new LinkedHashSet<>());
         }
@@ -668,6 +673,12 @@ public class DataSeeder implements CommandLineRunner {
         garantie.setGroupeExclusion(groupeExclusion);
         garantie.setActif(true);
         return garantieRepository.save(garantie);
+    }
+
+    private CritereSelectionTarif defaultCritereSelectionTarif(String code) {
+        return "DV".equalsIgnoreCase(code)
+                ? CritereSelectionTarif.TAUX_FRANCHISE
+                : CritereSelectionTarif.TAUX_PRIME;
     }
 
     private GroupeExclusionGarantie seedGroupeExclusionGarantie(String code, String libelle, TypeGarantie typeGarantie) {

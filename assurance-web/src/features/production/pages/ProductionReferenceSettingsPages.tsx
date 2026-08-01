@@ -648,6 +648,10 @@ const MODES_TARIFICATION = ["TAUX", "CAPITAL", "PRIME_FIXE", "PROTECTION"] as co
 const VEHICULE_MODES_TARIFICATION = MODES_TARIFICATION.filter((mode) => mode !== "PROTECTION");
 const SOURCES_VALEUR = ["VENALE", "NEUF", "GLACE", "MANUEL"] as const;
 const SOURCES_VALEUR_WITH_NONE = ["AUCUNE", ...SOURCES_VALEUR] as const;
+const CRITERES_SELECTION_TARIF = [
+  { value: "TAUX_PRIME", label: "Taux de prime" },
+  { value: "TAUX_FRANCHISE", label: "Taux de franchise" },
+] as const;
 
 export function GarantiesSettingsPage() {
   const queryClient = useQueryClient();
@@ -969,7 +973,11 @@ export function GarantiesSettingsPage() {
               <Flag label="Responsabilité civile" checked={payload.responsabiliteCivile} onChange={(value) => update({ responsabiliteCivile: value })} />
               <Flag label="Défense et recours" checked={payload.defenseRecours} onChange={(value) => update({ defenseRecours: value })} />
               <Flag label="Avec capital" checked={payload.avecCapital} onChange={(value) => update({ avecCapital: value })} />
-              <Flag label="Taux franchise" checked={payload.avecFranchise} onChange={(value) => update({ avecFranchise: value, avecFranchiseMinimale: value ? payload.avecFranchiseMinimale : false })} />
+              <Flag label="Taux franchise" checked={payload.avecFranchise} onChange={(value) => update({
+                avecFranchise: value,
+                avecFranchiseMinimale: value ? payload.avecFranchiseMinimale : false,
+                critereSelectionTarif: value ? payload.critereSelectionTarif : "TAUX_PRIME",
+              })} />
               <Flag label="Franchise minimale" checked={payload.avecFranchiseMinimale} onChange={(value) => update({ avecFranchiseMinimale: value, avecFranchise: value ? true : payload.avecFranchise })} />
               <Flag label="Tarification multiple" checked={(payload.modesTarificationMultiple ?? []).length > 0} onChange={setTarificationMultiple} />
               <Flag label="Saisie manuelle" checked={payload.saisieManuelleAutorisee} onChange={setManualEntryAllowed} />
@@ -995,6 +1003,25 @@ export function GarantiesSettingsPage() {
                     <SelectTrigger><SelectValue placeholder="Mode" /></SelectTrigger>
                     <SelectContent>
                       {(payload.modesAutorises ?? []).filter((mode) => availableModesForType(payload.typeGarantie).includes(mode)).map((mode) => <SelectItem key={mode} value={mode}>{modeLabel(mode)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Valeur du sélecteur tarifaire">
+                  <Select
+                    value={payload.critereSelectionTarif ?? "TAUX_PRIME"}
+                    onValueChange={(value) => update({ critereSelectionTarif: value as UpsertGarantieRequest["critereSelectionTarif"] })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CRITERES_SELECTION_TARIF.map((critere) => (
+                        <SelectItem
+                          key={critere.value}
+                          value={critere.value}
+                          disabled={critere.value === "TAUX_FRANCHISE" && (!payload.avecFranchise || !(payload.modesAutorises ?? []).includes("TAUX"))}
+                        >
+                          {critere.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </Field>
@@ -1093,6 +1120,7 @@ export function GarantiesSettingsPage() {
                   <TableHead>Libellé</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Mode</TableHead>
+                  <TableHead>Sélection</TableHead>
                   <TableHead>Exclusion</TableHead>
                   <TableHead>Grille</TableHead>
                   <TableHead>Valeurs</TableHead>
@@ -1109,6 +1137,7 @@ export function GarantiesSettingsPage() {
                     <TableCell>{garantie.libelle}</TableCell>
                     <TableCell>{String(garantie.typeGarantie ?? "VEHICULE")}</TableCell>
                     <TableCell>{String(garantie.modeParDefaut ?? "-")}</TableCell>
+                    <TableCell>{garantie.critereSelectionTarif === "TAUX_FRANCHISE" ? "Taux de franchise" : "Taux de prime"}</TableCell>
                     <TableCell>{String(garantie.groupeExclusionCode ?? "-")}</TableCell>
                     <TableCell>{garantieTags(garantie).join(", ") || "-"}</TableCell>
                     <TableCell>{valueTags(garantie).join(", ") || "-"}</TableCell>
@@ -1123,7 +1152,7 @@ export function GarantiesSettingsPage() {
                 ))}
                 {!garanties.isLoading && (garanties.data ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Aucune garantie.</TableCell>
+                    <TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Aucune garantie.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -1826,6 +1855,7 @@ function emptyGarantie(): UpsertGarantieRequest {
     modesTarificationMultiple: [],
     modesAutorises: ["TAUX"],
     modeParDefaut: "TAUX",
+    critereSelectionTarif: "TAUX_PRIME",
     sourcesValeurAutorisees: [],
     sourceValeurParDefaut: "AUCUNE",
     saisieManuelleAutorisee: false,
@@ -1875,6 +1905,7 @@ function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantie
     modesTarificationMultiple: stringArray(garantie.modesTarificationMultiple),
     modesAutorises: stringArray(garantie.modesAutorises, String(garantie.modeParDefaut ?? "TAUX")),
     modeParDefaut: String(garantie.modeParDefaut ?? "TAUX"),
+    critereSelectionTarif: garantie.critereSelectionTarif === "TAUX_FRANCHISE" ? "TAUX_FRANCHISE" : "TAUX_PRIME",
     sourcesValeurAutorisees: stringArray(garantie.sourcesValeurAutorisees),
     sourceValeurParDefaut: String(garantie.sourceValeurParDefaut ?? "AUCUNE"),
     saisieManuelleAutorisee: Boolean(garantie.saisieManuelleAutorisee),
@@ -1902,6 +1933,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
       groupeExclusionId: payload.groupeExclusionId || undefined,
       modesAutorises: ["PROTECTION"],
       modeParDefaut: "PROTECTION",
+      critereSelectionTarif: "TAUX_PRIME",
       sourcesValeurAutorisees: [],
       sourceValeurParDefaut: "AUCUNE",
       saisieManuelleAutorisee: false,
@@ -1933,6 +1965,9 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     groupeExclusionId: payload.groupeExclusionId || undefined,
     modesAutorises: normalizedModes,
     modeParDefaut,
+    critereSelectionTarif: payload.critereSelectionTarif === "TAUX_FRANCHISE" && payload.avecFranchise && normalizedModes.includes("TAUX")
+      ? "TAUX_FRANCHISE"
+      : "TAUX_PRIME",
     avecFranchiseMinimale: Boolean(payload.avecFranchise && payload.avecFranchiseMinimale),
     tarificationMultiple: normalizedMultipleModes.length > 0,
     modesTarificationMultiple: normalizedMultipleModes,

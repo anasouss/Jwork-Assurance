@@ -127,6 +127,7 @@ export const garantieSchema = z.object({
   modesTarificationMultiple: z.array(z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"])).optional(),
   modesAutorises: z.array(z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"])).min(1, "Au moins un mode est obligatoire"),
   modeParDefaut: z.enum(["TAUX", "CAPITAL", "PROTECTION", "PRIME_FIXE"]),
+  critereSelectionTarif: z.enum(["TAUX_PRIME", "TAUX_FRANCHISE"]),
   sourcesValeurAutorisees: z.array(z.enum(["VENALE", "NEUF", "GLACE", "MANUEL"])).optional(),
   sourceValeurParDefaut: z.enum(["AUCUNE", "VENALE", "NEUF", "GLACE", "MANUEL"]),
   saisieManuelleAutorisee: z.boolean().optional(),
@@ -143,6 +144,9 @@ export const garantieSchema = z.object({
   }
   if (value.typeGarantie === "VEHICULE" && (value.modeParDefaut === "PROTECTION" || value.modesAutorises.includes("PROTECTION"))) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Le mode PROTECTION est réservé aux garanties personne" });
+  }
+  if (value.critereSelectionTarif === "TAUX_FRANCHISE" && (value.typeGarantie !== "VEHICULE" || !value.avecFranchise || !value.modesAutorises.includes("TAUX"))) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["critereSelectionTarif"], message: "Ce critère nécessite une garantie véhicule tarifée au taux avec franchise" });
   }
   const invalidMultipleMode = (value.modesTarificationMultiple ?? []).find((mode) => !value.modesAutorises.includes(mode));
   if (invalidMultipleMode) {

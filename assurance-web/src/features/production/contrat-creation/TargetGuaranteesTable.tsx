@@ -18,6 +18,7 @@ import { previewGuaranteeLine } from "./target-calculation";
 import { TargetAssistanceTable } from "./TargetAssistanceTable";
 import { guaranteeCalculationKey } from "./contract-target-key";
 import type { ContractPricingMode, ContractTarget } from "./ContractTargetsSection";
+import { tariffSelectionLabel } from "./tariff-selection-label";
 
 type Target = ContractTarget;
 type PricingMode = ContractPricingMode;
@@ -316,7 +317,7 @@ export function TargetGuaranteesTable({
                       >
                         <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}><SelectValue placeholder="Option" /></SelectTrigger>
                         <SelectContent>
-                          {lineOptions.map((line, index) => <SelectItem key={line.id} value={line.id}>{tariffLineLabel(line, index)}</SelectItem>)}
+                          {lineOptions.map((line, index) => <SelectItem key={line.id} value={line.id}>{tariffSelectionLabel(line, index)}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     ) : (
@@ -585,19 +586,6 @@ function capitalDisplay(garantie: ReferenceOption, line: ReferenceOption | undef
 function capitalLineLabel(line: ReferenceOption) {
   const capital = toNumber(line.capital);
   return capital == null ? String(line.libelle ?? "Formule") : money(capital);
-}
-
-function tariffLineLabel(line: ReferenceOption, index = 0) {
-  const mode = lineMode(line);
-  const taux = toNumber(line.taux);
-  if (mode === "TAUX" && taux != null) {
-    return `${money(taux)} %`;
-  }
-  if (mode === "CAPITAL") {
-    const label = String(line.libelle ?? "");
-    return label.toLowerCase().includes("formule") ? label : `Formule ${index + 1}`;
-  }
-  return taux == null ? "" : `${money(taux)} %`;
 }
 
 function rateDisplay(line?: ReferenceOption) {

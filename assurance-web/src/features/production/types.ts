@@ -12,6 +12,7 @@ export type ReferenceOption = {
   actif?: boolean | null;
   compagnieAssuranceId?: string | null;
   compagnieAssuranceLibelle?: string | null;
+  critereSelectionTarif?: "TAUX_PRIME" | "TAUX_FRANCHISE" | null;
   [key: string]: unknown;
 };
 
@@ -1000,6 +1001,7 @@ export type UpsertGarantieRequest = {
   modesTarificationMultiple?: string[];
   modesAutorises?: string[];
   modeParDefaut?: string;
+  critereSelectionTarif?: "TAUX_PRIME" | "TAUX_FRANCHISE";
   sourcesValeurAutorisees?: string[];
   sourceValeurParDefaut?: string;
   saisieManuelleAutorisee?: boolean;

@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import com.assurance.enums.CritereSelectionTarif;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeGarantie;
@@ -33,6 +34,7 @@ public class UpsertGarantieRequest {
     private Set<ModeTarificationGarantie> modesTarificationMultiple;
     private Set<ModeTarificationGarantie> modesAutorises;
     private ModeTarificationGarantie modeParDefaut;
+    private CritereSelectionTarif critereSelectionTarif;
     private Set<SourceValeurGarantie> sourcesValeurAutorisees;
     private SourceValeurGarantie sourceValeurParDefaut;
     private Boolean saisieManuelleAutorisee;

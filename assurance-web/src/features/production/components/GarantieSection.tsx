@@ -21,6 +21,7 @@ import { formatMoney, money, moneyAmount, numberValue, roundMoney } from "../uti
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
+import { tariffSelectionLabel } from "../contrat-creation/tariff-selection-label";
 
 function ResponsiveRecordCell({
   label,
@@ -364,7 +365,7 @@ export function GarantieSection({
                           >
                             <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Option" /></SelectTrigger>
                             <SelectContent>
-                              {lineOptions.map((line, index) => <SelectItem key={line.id} value={line.id}>{tariffLineLabel(line, index)}</SelectItem>)}
+                              {lineOptions.map((line, index) => <SelectItem key={line.id} value={line.id}>{tariffSelectionLabel(line, index)}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         ) : (
@@ -1185,19 +1186,6 @@ function sourceOptionLabel(source: string, vehicule?: VehiculeInput) {
 function capitalLineLabel(line: ReferenceOption) {
   const capital = numeric(line.capital);
   return capital == null ? String(line.libelle ?? "Option") : money(capital);
-}
-
-function tariffLineLabel(line: ReferenceOption, index = 0) {
-  const mode = lineMode(line);
-  const taux = numeric(line.taux);
-  if (mode === "TAUX" && taux != null) {
-    return `${money(taux)} %`;
-  }
-  if (mode === "CAPITAL") {
-    const label = String(line.libelle ?? "");
-    return label.toLowerCase().includes("formule") ? label : `Formule ${index + 1}`;
-  }
-  return String(line.libelle ?? rateDisplay(line));
 }
 
 function rateDisplay(line?: ReferenceOption) {

@@ -43,6 +43,7 @@ import com.assurance.entity.TarifProduitAssistance;
 import com.assurance.entity.TarifUsage;
 import com.assurance.entity.Usage;
 import com.assurance.enums.ModeTarificationGarantie;
+import com.assurance.enums.CritereSelectionTarif;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeEcheanceConvention;
 import com.assurance.enums.TypeGarantie;
@@ -772,28 +773,7 @@ public class ReferentielController {
         return ResponseEntity.ok(ApiResponse.success(ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndActifTrue(grilleId).stream()
                 .filter(ligne -> usageId == null || ligne.getUsage() == null || ligne.getUsage().getId().equals(usageId))
                 .filter(ligne -> garantieId == null || ligne.getGarantie().getId().equals(garantieId))
-                .map(ligne -> option(ligne.getId(), null, ligne.getLibelleOption() != null ? ligne.getLibelleOption() : ligne.getGarantie().getLibelle())
-                        .putValue("garantieId", ligne.getGarantie().getId())
-                        .putValue("garantieCode", ligne.getGarantie().getCode())
-                        .putValue("garantieLibelle", ligne.getGarantie().getLibelle())
-                        .putValue("usageId", ligne.getUsage() != null ? ligne.getUsage().getId() : null)
-                        .putValue("categorieTransportId", ligne.getCategorieTransport() != null ? ligne.getCategorieTransport().getId() : null)
-                        .putValue("modeTarification", ligne.getModeTarification())
-                        .putValue("puissanceFiscaleMin", ligne.getPuissanceFiscaleMin())
-                        .putValue("puissanceFiscaleMax", ligne.getPuissanceFiscaleMax())
-                        .putValue("nombrePlacesMin", ligne.getNombrePlacesMin())
-                        .putValue("nombrePlacesMax", ligne.getNombrePlacesMax())
-                        .putValue("ptcMin", ligne.getPtcMin())
-                        .putValue("ptcMax", ligne.getPtcMax())
-                        .putValue("sousClasse", ligne.getSousClasse())
-                        .putValue("carburant", ligne.getCarburant())
-                        .putValue("prime", ligne.getPrime())
-                        .putValue("capital", ligne.getCapital())
-                        .putValue("taux", ligne.getTaux())
-                        .putValue("tauxFranchise", ligne.getTauxFranchise())
-                        .putValue("franchiseMinimale", ligne.getFranchiseMinimale())
-                        .putValue("ordreAffichage", ligne.getOrdreAffichage())
-                        .map())
+                .map(this::toLigneResponse)
                 .toList()));
     }
 
@@ -1278,6 +1258,16 @@ public class ReferentielController {
             modesTarificationMultiple.add(modeParDefaut);
         }
 
+        CritereSelectionTarif critereSelectionTarif = request.getCritereSelectionTarif() == null
+                ? CritereSelectionTarif.TAUX_PRIME
+                : request.getCritereSelectionTarif();
+        if (critereSelectionTarif == CritereSelectionTarif.TAUX_FRANCHISE
+                && (typeGarantie != TypeGarantie.VEHICULE
+                || !Boolean.TRUE.equals(request.getAvecFranchise())
+                || !modes.contains(ModeTarificationGarantie.TAUX))) {
+            throw new BadRequestException("Le taux de franchise ne peut piloter que la selection d'une garantie vehicule tarifee au taux avec franchise");
+        }
+
         LinkedHashSet<SourceValeurGarantie> sources = new LinkedHashSet<>(
                 request.getSourcesValeurAutorisees() == null ? Set.of() : request.getSourcesValeurAutorisees()
         );
@@ -1320,6 +1310,7 @@ public class ReferentielController {
         garantie.getModesTarificationMultiple().clear();
         garantie.getModesTarificationMultiple().addAll(modesTarificationMultiple);
         garantie.setModeParDefaut(modeParDefaut);
+        garantie.setCritereSelectionTarif(critereSelectionTarif);
         garantie.getModesAutorises().clear();
         garantie.getModesAutorises().addAll(modes);
         garantie.setSourceValeurParDefaut(sourceParDefaut);
@@ -1358,6 +1349,7 @@ public class ReferentielController {
                 .putValue("tarificationMultiple", garantie.getTarificationMultiple())
                 .putValue("modesTarificationMultiple", new LinkedHashSet<>(garantie.getModesTarificationMultiple()))
                 .putValue("modeParDefaut", garantie.getModeParDefaut())
+                .putValue("critereSelectionTarif", garantie.getCritereSelectionTarif())
                 .putValue("modesAutorises", new LinkedHashSet<>(garantie.getModesAutorises()))
                 .putValue("sourceValeurParDefaut", garantie.getSourceValeurParDefaut())
                 .putValue("sourcesValeurAutorisees", new LinkedHashSet<>(garantie.getSourcesValeurAutorisees()))
@@ -1729,6 +1721,7 @@ public class ReferentielController {
                 .putValue("garantieId", ligne.getGarantie() != null ? ligne.getGarantie().getId() : null)
                 .putValue("garantieCode", ligne.getGarantie() != null ? ligne.getGarantie().getCode() : null)
                 .putValue("garantieLibelle", ligne.getGarantie() != null ? ligne.getGarantie().getLibelle() : null)
+                .putValue("critereSelectionTarif", ligne.getGarantie() != null ? ligne.getGarantie().getCritereSelectionTarif() : CritereSelectionTarif.TAUX_PRIME)
                 .putValue("usageId", ligne.getUsage() != null ? ligne.getUsage().getId() : null)
                 .putValue("categorieTransportId", ligne.getCategorieTransport() != null ? ligne.getCategorieTransport().getId() : null)
                 .putValue("modeTarification", ligne.getModeTarification())

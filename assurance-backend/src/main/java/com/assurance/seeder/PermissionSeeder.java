@@ -31,6 +31,8 @@ public class PermissionSeeder implements CommandLineRunner {
 
             permission("client:view", "Consulter les clients", "client"),
             permission("client:create", "Creer un client", "client"),
+            permission("client:manage", "Gerer les clients et leurs groupes", "client"),
+            permission("vehicule:view", "Rechercher les vehicules", "vehicule"),
 
             permission("garantie:view", "Consulter les garanties", "garantie"),
             restricted("garantie:manage", "Gerer les garanties", "garantie"),

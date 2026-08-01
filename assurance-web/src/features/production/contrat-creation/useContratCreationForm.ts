@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useAuthStore } from "@/store/auth-store";
 import { productionApi } from "../api";
 import { computeDateEcheanceFromCode, computeDateEcheanceFromMonths } from "../date";
 import { contratSchema } from "../schemas";
@@ -34,7 +33,6 @@ export function useContratCreationForm(
   draftId?: string,
   options?: { prospectionMode?: boolean; renewalMode?: boolean }
 ) {
-  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [numeroPolice, setNumeroPolice] = useState("");
@@ -299,7 +297,6 @@ export function useContratCreationForm(
   const isConventionInvoice = typeContrat === "CONVENTION" && modeReglement === "facture";
 
   const request = useMemo<CreateContratRequest>(() => ({
-    agenceId: user?.agenceId ?? "",
     typeContrat,
     numeroPolice,
     numeroAttestation: typeContrat === "FLOTTE" ? undefined : numeroAttestation,
@@ -332,15 +329,17 @@ export function useContratCreationForm(
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
-    clients: clients.filter(shouldPersistClientInput).map((client) => ({
-      ...client,
-      client: {
-        ...client.client,
-        agenceId: user?.agenceId ?? "",
-        telephone: principalTelephone(client.client.telephones),
-        telephones: (client.client.telephones ?? []).filter((telephone) => telephone.numero.trim()),
-      },
-    })),
+    clients: clients.filter(shouldPersistClientInput).map((client) => {
+      const { agenceId: _ignoredTenant, ...safeClient } = client.client as ClientInput["client"] & { agenceId?: string };
+      return {
+        ...client,
+        client: {
+          ...safeClient,
+          telephone: principalTelephone(client.client.telephones),
+          telephones: (client.client.telephones ?? []).filter((telephone) => telephone.numero.trim()),
+        },
+      };
+    }),
     vehicules: vehicules.map((vehicule) => ({
       ...vehicule,
       coefficientProrata: undefined,
@@ -366,7 +365,6 @@ export function useContratCreationForm(
         }))
       : undefined,
   }), [
-    user?.agenceId,
     typeContrat,
     numeroPolice,
     numeroAttestation,
@@ -1310,7 +1308,7 @@ function canAutoPreview(typeContrat: TypeContrat, request: CreateContratRequest)
     return false;
   }
   const hasContractReference = Boolean(request.prospection) || Boolean(request.numeroPolice);
-  if (!request.agenceId || !hasContractReference || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
+  if (!hasContractReference || !request.grilleTarifaireId || !request.dateEffet || !request.dateEcheance) {
     return false;
   }
   if (typeContrat === "CONVENTION" && !request.conventionId) {
@@ -1420,7 +1418,6 @@ function hydrateDraft(draft: ContratSummary) {
           client: {
             ...emptyClient(role).client,
             ...(link.client ?? {}),
-            agenceId: link.client?.agenceId,
             typeClient: link.client?.typeClient ?? emptyClient(role).client.typeClient,
             telephones: (link.client?.telephones ?? []).map((telephone) => ({
               numero: telephone.numero,

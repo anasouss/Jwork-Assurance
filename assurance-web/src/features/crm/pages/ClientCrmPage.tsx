@@ -52,7 +52,9 @@ import type {
 
 export default function ClientCrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const agenceId = useAuthStore((state) => state.user?.agenceId ?? "");
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const canCreateClient = permissions.includes("client:create");
+  const canManageClients = permissions.includes("client:manage") || canCreateClient;
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
@@ -113,20 +115,24 @@ export default function ClientCrmPage() {
           <p className="text-sm text-muted-foreground">Identité, organisation, contrats, documents et situation comptable.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => setGroupDialogOpen(true)}>
-            <Users className="size-4" />
-            Nouveau groupe
-          </Button>
+          {canManageClients ? (
+            <Button type="button" variant="outline" onClick={() => setGroupDialogOpen(true)}>
+              <Users className="size-4" />
+              Nouveau groupe
+            </Button>
+          ) : null}
           {selectedClientId ? (
             <Button type="button" variant="outline" onClick={() => setClientPickerOpen(true)}>
               <Search className="size-4" />
               Changer de client
             </Button>
           ) : null}
-          <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setClientDialogOpen(true)}>
-            <Plus className="size-4" />
-            Nouveau client
-          </Button>
+          {canCreateClient ? (
+            <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setClientDialogOpen(true)}>
+              <Plus className="size-4" />
+              Nouveau client
+            </Button>
+          ) : null}
         </div>
       </header>
 
@@ -157,6 +163,7 @@ export default function ClientCrmPage() {
           activeTab={activeTab}
           onTabChange={changeTab}
           onAssignGroup={() => setAssignmentOpen(true)}
+          canManageClients={canManageClients}
         />
       ) : (
         <section className="grid min-h-80 place-items-center rounded-lg border bg-card p-6 text-center">
@@ -196,7 +203,6 @@ export default function ClientCrmPage() {
       <ClientDialog
         open={clientDialogOpen}
         onOpenChange={setClientDialogOpen}
-        agenceId={agenceId}
         groupes={groupesQuery.data ?? []}
         onSaved={async (clientId) => {
           await refreshCrm();
@@ -326,13 +332,11 @@ type ClientDraft = ClientInput["client"] & {
 function ClientDialog({
   open,
   onOpenChange,
-  agenceId,
   groupes,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  agenceId: string;
   groupes: GroupeClient[];
   onSaved: (clientId: string) => Promise<void>;
 }) {
@@ -353,7 +357,6 @@ function ClientDialog({
   const createMutation = useMutation({
     mutationFn: async () => {
       const client = await productionApi.createClient({
-        agenceId,
         typeClient: draft.typeClient,
         civilite: clean(draft.civilite),
         prenom: clean(draft.prenom),
@@ -386,8 +389,7 @@ function ClientDialog({
   });
   const physical = draft.typeClient === "PERSONNE_PHYSIQUE";
   const valid = Boolean(
-    agenceId
-      && draft.villeId
+    draft.villeId
       && draft.adresse?.trim()
       && draft.telephone?.trim()
       && (physical
@@ -541,11 +543,13 @@ function ClientDetail({
   activeTab,
   onTabChange,
   onAssignGroup,
+  canManageClients,
 }: {
   detail: Awaited<ReturnType<typeof productionApi.getClientCrm>>;
   activeTab: PortfolioTab;
   onTabChange: (tab: string) => void;
   onAssignGroup: () => void;
+  canManageClients: boolean;
 }) {
   const client = detail.client;
   const documentsQuery = useQuery({
@@ -592,9 +596,11 @@ function ClientDetail({
           <Button asChild type="button" variant="outline" className="border-amber-200 text-amber-950 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-100 dark:hover:bg-amber-950/30">
             <Link to={accountingUrl}><ReceiptText className="size-4" />Relevés et factures</Link>
           </Button>
-          <Button type="button" variant="outline" onClick={onAssignGroup} className="border-violet-200 text-violet-950 hover:bg-violet-50 dark:border-violet-900 dark:text-violet-100 dark:hover:bg-violet-950/30">
-            <Users className="size-4" />Gérer le groupe
-          </Button>
+          {canManageClients ? (
+            <Button type="button" variant="outline" onClick={onAssignGroup} className="border-violet-200 text-violet-950 hover:bg-violet-50 dark:border-violet-900 dark:text-violet-100 dark:hover:bg-violet-950/30">
+              <Users className="size-4" />Gérer le groupe
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -627,7 +633,12 @@ function ClientDetail({
               <Info label="Organisation" value={client.groupe?.libelle ?? "Client indépendant"} />
             </dl>
           </PortfolioSection>
-          <PortfolioSection title="Organisation et groupe" icon={<Building2 className="size-4" />} tone="violet" action={<Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button>}>
+          <PortfolioSection
+            title="Organisation et groupe"
+            icon={<Building2 className="size-4" />}
+            tone="violet"
+            action={canManageClients ? <Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button> : undefined}
+          >
             {detail.groupes.length ? detail.groupes.map((groupe) => (
               <div key={groupe.id} className="border-b py-3 first:pt-0 last:border-0 last:pb-0">
                 <div className="font-medium">{groupe.code} - {groupe.libelle}</div>

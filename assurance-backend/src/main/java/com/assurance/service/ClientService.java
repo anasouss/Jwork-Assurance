@@ -34,12 +34,13 @@ public class ClientService {
     private final GroupeClientService groupeClientService;
 
     @Transactional
-    public ClientResponse create(CreateClientRequest request) {
+    public ClientResponse create(Long agenceId, CreateClientRequest request) {
+        bindAgence(request, agenceId);
         validateStandaloneClient(request);
-        Client client = createEntity(request);
+        Client client = createEntity(agenceId, request);
         if (request.getGroupeClientId() != null) {
             groupeClientService.assign(
-                    request.getAgenceId(),
+                    agenceId,
                     client.getId(),
                     request.getGroupeClientId(),
                     request.getRelationGroupe(),
@@ -82,18 +83,16 @@ public class ClientService {
     }
 
     @Transactional
-    public Client createEntity(CreateClientRequest request) {
-        if (request.getAgenceId() == null) {
-            throw new BadRequestException("L'agence est obligatoire");
-        }
+    public Client createEntity(Long agenceId, CreateClientRequest request) {
+        bindAgence(request, agenceId);
         if (request.getTypeClient() == null) {
             throw new BadRequestException("Le type client est obligatoire");
         }
-        assertIdentityAvailable(request.getAgenceId(), null, request);
-        Agence agence = agenceRepository.findById(request.getAgenceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Agence", request.getAgenceId()));
+        assertIdentityAvailable(agenceId, null, request);
+        Agence agence = agenceRepository.findById(agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         Client clientParent = request.getClientParentId() == null ? null :
-                clientRepository.findByAgenceIdAndId(request.getAgenceId(), request.getClientParentId())
+                clientRepository.findByAgenceIdAndId(agenceId, request.getClientParentId())
                         .orElseThrow(() -> new ResourceNotFoundException("Client parent", request.getClientParentId()));
         Ville ville = request.getVilleId() == null ? null :
                 villeRepository.findById(request.getVilleId())
@@ -140,6 +139,13 @@ public class ClientService {
         client = clientRepository.save(client);
         saveTelephones(client, request);
         return client;
+    }
+
+    private void bindAgence(CreateClientRequest request, Long agenceId) {
+        if (agenceId == null) {
+            throw new BadRequestException("Aucune agence active pour cette operation");
+        }
+        request.setAgenceId(agenceId);
     }
 
     @Transactional

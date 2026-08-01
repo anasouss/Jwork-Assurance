@@ -60,16 +60,19 @@ public class ContratController {
     @PostMapping
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<ContratResponse>> create(@Valid @RequestBody CreateContratRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.create(request), "Contrat cree"));
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.create(TenantContext.getCurrentAgence(), request),
+                "Contrat cree"
+        ));
     }
 
     @PostMapping("/drafts")
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<ContratResponse>> createDraft(@RequestBody CreateContratRequest request) {
-        if (request.getAgenceId() == null) {
-            request.setAgenceId(TenantContext.getCurrentAgence());
-        }
-        return ResponseEntity.ok(ApiResponse.success(contratService.createDraft(request), "Brouillon cree"));
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.createDraft(TenantContext.getCurrentAgence(), request),
+                "Brouillon cree"
+        ));
     }
 
     @GetMapping("/drafts/{id}")
@@ -133,10 +136,9 @@ public class ContratController {
     @PostMapping("/previsualisation-quittance")
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserQuittanceCreation(@RequestBody CreateContratRequest request) {
-        if (request.getAgenceId() == null) {
-            request.setAgenceId(TenantContext.getCurrentAgence());
-        }
-        return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserQuittance(request)));
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.previsualiserQuittance(TenantContext.getCurrentAgence(), request)
+        ));
     }
 
     @PostMapping("/{id}/renouvellements/brouillon")

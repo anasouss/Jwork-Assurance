@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.assurance.enums.RelationGroupeClient;
 import com.assurance.enums.TypeClient;
 import jakarta.validation.constraints.NotBlank;
@@ -11,7 +12,7 @@ import java.util.List;
 
 @Data
 public class CreateClientRequest {
-    @NotNull
+    @JsonIgnore
     private Long agenceId;
 
     @NotNull

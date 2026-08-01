@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.assurance.enums.Fractionnement;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.CategorieQuittance;
@@ -21,7 +22,7 @@ import java.util.List;
 
 @Data
 public class CreateContratRequest {
-    @NotNull
+    @JsonIgnore
     private Long agenceId;
 
     private Long compagnieAssuranceId;

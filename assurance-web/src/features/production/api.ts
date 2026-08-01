@@ -405,7 +405,6 @@ export const productionApi = {
   },
 
   async createClient(request: ClientInput["client"] & {
-    agenceId: string;
     groupeClientId?: string;
     relationGroupe?: RelationGroupeClient;
   }) {

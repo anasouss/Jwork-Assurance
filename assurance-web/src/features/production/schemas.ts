@@ -10,7 +10,6 @@ const optionalNumber = z
   });
 
 export const contratSchema = z.object({
-  agenceId: z.string().min(1, "Agence obligatoire"),
   typeContrat: z.enum(["PARTICULIER", "CONVENTION", "FLOTTE"]),
   numeroPolice: z.string().optional(),
   compagnieAssuranceId: z.string().optional(),

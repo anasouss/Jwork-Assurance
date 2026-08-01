@@ -93,8 +93,26 @@ public class ContratService {
     private final AttestationStockService attestationStockService;
     private final EcheanceService echeanceService;
 
+    private void bindAgence(CreateContratRequest request, Long agenceId) {
+        if (agenceId == null) {
+            throw new BadRequestException("Aucune agence active pour cette operation");
+        }
+        request.setAgenceId(agenceId);
+    }
+
+    private GrilleTarifaire requireAccessibleGrilleTarifaire(Long agenceId, Long grilleId) {
+        return grilleTarifaireRepository.findAccessibleById(agenceId, grilleId)
+                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", grilleId));
+    }
+
+    private LigneGrilleTarifaire requireAccessibleLigneGrilleTarifaire(Long agenceId, Long ligneId) {
+        return ligneGrilleTarifaireRepository.findAccessibleById(agenceId, ligneId)
+                .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", ligneId));
+    }
+
     @Transactional
-    public ContratResponse create(CreateContratRequest request) {
+    public ContratResponse create(Long agenceId, CreateContratRequest request) {
+        bindAgence(request, agenceId);
         return createContrat(request);
     }
 
@@ -137,10 +155,8 @@ public class ContratService {
     }
 
     @Transactional
-    public ContratResponse createDraft(CreateContratRequest request) {
-        if (request.getAgenceId() == null) {
-            throw new BadRequestException("L'agence est obligatoire");
-        }
+    public ContratResponse createDraft(Long agenceId, CreateContratRequest request) {
+        bindAgence(request, agenceId);
         if (request.getTypeContrat() == null) {
             throw new BadRequestException("Le type de contrat est obligatoire");
         }
@@ -166,7 +182,7 @@ public class ContratService {
     @Transactional
     public ContratResponse updateDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
-        request.setAgenceId(agenceId);
+        bindAgence(request, agenceId);
         enforceRenewalPeriod(contrat, request);
         if (isCorrectionAffaireNouvelle(contrat)) {
             return appliquerCorrectionAffaireNouvelle(contrat, request);
@@ -298,7 +314,7 @@ public class ContratService {
     @Transactional
     public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
-        request.setAgenceId(agenceId);
+        bindAgence(request, agenceId);
         Contrat contratOrigine = contrat.getContratOrigine();
         boolean correctionContratActif = isCorrectionAffaireNouvelle(contrat);
         if (contratOrigine != null) {
@@ -372,8 +388,7 @@ public class ContratService {
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
         GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
-                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
-                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+                requireAccessibleGrilleTarifaire(request.getAgenceId(), request.getGrilleTarifaireId());
         ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
         boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
                 || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
@@ -646,8 +661,7 @@ public class ContratService {
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
         GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
-                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
-                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+                requireAccessibleGrilleTarifaire(request.getAgenceId(), request.getGrilleTarifaireId());
         ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
         boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
                 || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
@@ -774,8 +788,7 @@ public class ContratService {
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
         GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
-                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
-                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+                requireAccessibleGrilleTarifaire(request.getAgenceId(), request.getGrilleTarifaireId());
         ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
         boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
                 || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
@@ -814,8 +827,7 @@ public class ContratService {
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
         GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
-                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
-                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+                requireAccessibleGrilleTarifaire(request.getAgenceId(), request.getGrilleTarifaireId());
         ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
         boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
                 || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
@@ -1303,9 +1315,6 @@ public class ContratService {
                 continue;
             }
             if (input.getClient() != null) {
-                if (input.getClient().getAgenceId() == null) {
-                    input.getClient().setAgenceId(agenceId);
-                }
                 client = clientService.updateEntity(agenceId, client.getId(), input.getClient());
             }
             applyClientGroupAssignment(agenceId, input, client, contrat.getDateEffet());
@@ -1510,17 +1519,11 @@ public class ContratService {
             }
             return null;
         }
-        if (input.getClient().getAgenceId() == null) {
-            input.getClient().setAgenceId(agenceId);
-        }
-        if (!agenceId.equals(input.getClient().getAgenceId())) {
-            throw new BadRequestException("Le client inline doit appartenir a l'agence du contrat");
-        }
         Client existing = existingClients.get(clientDraftKey(input.getRole(), input.isPrincipalPourRole()));
         if (existing != null) {
             return clientService.updateEntity(agenceId, existing.getId(), input.getClient());
         }
-        return clientService.createEntity(input.getClient());
+        return clientService.createEntity(agenceId, input.getClient());
     }
 
     private String clientDraftKey(com.assurance.enums.RoleClientContrat role, boolean principal) {
@@ -1617,8 +1620,7 @@ public class ContratService {
             Vehicule vehicule = input.getVehiculeIndex() == null ? null : resolveVehicule(vehiculesCrees, input.getVehiculeIndex(), "Garantie");
             Remorque remorque = input.getRemorqueIndex() == null ? null : resolveRemorque(remorquesCreees, input.getRemorqueIndex(), "Garantie");
             LigneGrilleTarifaire ligne = input.getLigneGrilleTarifaireId() == null ? null :
-                        ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
-                            .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
+                    requireAccessibleLigneGrilleTarifaire(request.getAgenceId(), input.getLigneGrilleTarifaireId());
             FormuleGarantiePersonne formule = input.getFormuleGarantiePersonneId() == null ? null :
                     formuleGarantiePersonneRepository.findById(input.getFormuleGarantiePersonneId())
                             .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", input.getFormuleGarantiePersonneId()));
@@ -4415,7 +4417,8 @@ public class ContratService {
     }
 
     @Transactional(readOnly = true)
-    public QuittanceResponse previsualiserQuittance(CreateContratRequest request) {
+    public QuittanceResponse previsualiserQuittance(Long agenceId, CreateContratRequest request) {
+        bindAgence(request, agenceId);
         Agence agence = agenceRepository.findById(request.getAgenceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", request.getAgenceId()));
         CompagnieAssurance compagnie = request.getCompagnieAssuranceId() == null ? null :
@@ -4428,8 +4431,7 @@ public class ContratService {
                 usageRepository.findById(request.getUsageId())
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
         GrilleTarifaire grilleTarifaire = request.getGrilleTarifaireId() == null ? null :
-                grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
-                        .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
+                requireAccessibleGrilleTarifaire(request.getAgenceId(), request.getGrilleTarifaireId());
         ModeSaisieGarantieContrat modeSaisieGaranties = resolveModeSaisieGaranties(request);
         boolean saisiePrimeNette = Boolean.TRUE.equals(request.getSaisiePrimeNette())
                 || modeSaisieGaranties == ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE;
@@ -4515,13 +4517,7 @@ public class ContratService {
         if (input.getClient() == null) {
             throw new BadRequestException("Le role " + input.getRole() + " doit renseigner clientId ou client");
         }
-        if (input.getClient().getAgenceId() == null) {
-            input.getClient().setAgenceId(agenceId);
-        }
-        if (!agenceId.equals(input.getClient().getAgenceId())) {
-            throw new BadRequestException("Le client inline doit appartenir a l'agence du contrat");
-        }
-        return clientService.createEntity(input.getClient());
+        return clientService.createEntity(agenceId, input.getClient());
     }
 
     private Client resolveClientForPreview(Long agenceId, CreateContratRequest.ClientInput input) {
@@ -6272,8 +6268,8 @@ public class ContratService {
             Remorque remorque
     ) {
         if (input.getLigneGrilleTarifaireId() != null) {
-            return ligneGrilleTarifaireRepository.findById(input.getLigneGrilleTarifaireId())
-                    .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", input.getLigneGrilleTarifaireId()));
+            Long agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
+            return requireAccessibleLigneGrilleTarifaire(agenceId, input.getLigneGrilleTarifaireId());
         }
         if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
                 || contrat.getGrilleTarifaire() == null

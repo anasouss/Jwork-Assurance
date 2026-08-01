@@ -378,7 +378,6 @@ export type ClientInput = {
   relationGroupe?: RelationGroupeClient;
   retirerGroupesActifs?: boolean;
   client: {
-    agenceId?: string;
     typeClient: TypeClient;
     civilite?: string;
     prenom?: string;
@@ -406,6 +405,7 @@ export type ClientInput = {
 
 export type ClientResponse = ClientInput["client"] & {
   id: string;
+  agenceId?: string | null;
   clientParentId?: string | null;
   codeClient?: string | null;
   nomAffichage?: string | null;
@@ -730,7 +730,6 @@ export type UpsertCarteVerteRequest = {
 };
 
 export type CreateContratRequest = {
-  agenceId: string;
   compagnieAssuranceId?: string;
   conventionId?: string;
   usageId?: string;

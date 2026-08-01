@@ -8,6 +8,7 @@ import com.assurance.service.GroupeClientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,16 +27,19 @@ public class GroupeClientController {
     private final GroupeClientService groupeClientService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_quittance:view')")
     public ResponseEntity<ApiResponse<List<GroupeClientResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(groupeClientService.list(TenantContext.getCurrentAgence())));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_quittance:view')")
     public ResponseEntity<ApiResponse<GroupeClientResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(groupeClientService.get(TenantContext.getCurrentAgence(), id)));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
     public ResponseEntity<ApiResponse<GroupeClientResponse>> create(@Valid @RequestBody UpsertGroupeClientRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 groupeClientService.create(TenantContext.getCurrentAgence(), request),
@@ -44,6 +48,7 @@ public class GroupeClientController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
     public ResponseEntity<ApiResponse<GroupeClientResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpsertGroupeClientRequest request

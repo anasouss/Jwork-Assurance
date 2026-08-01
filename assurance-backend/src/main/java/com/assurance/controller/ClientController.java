@@ -13,6 +13,7 @@ import com.assurance.service.GroupeClientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +34,7 @@ public class ClientController {
     private final GroupeClientService groupeClientService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ClientPageResponse>> list(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Long groupeId,
@@ -45,6 +47,7 @@ public class ClientController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_client:view')")
     public ResponseEntity<ApiResponse<ClientCrmResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 clientCrmService.get(TenantContext.getCurrentAgence(), id)
@@ -52,6 +55,7 @@ public class ClientController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ClientResponse>> search(
             @RequestParam(required = false) String cin,
             @RequestParam(required = false) String rc
@@ -62,12 +66,16 @@ public class ClientController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_client:create')")
     public ResponseEntity<ApiResponse<ClientResponse>> create(@Valid @RequestBody CreateClientRequest request) {
-        request.setAgenceId(TenantContext.getCurrentAgence());
-        return ResponseEntity.ok(ApiResponse.success(clientService.create(request), "Client créé"));
+        return ResponseEntity.ok(ApiResponse.success(
+                clientService.create(TenantContext.getCurrentAgence(), request),
+                "Client créé"
+        ));
     }
 
     @PutMapping("/{id}/groupe")
+    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
     public ResponseEntity<ApiResponse<ClientResponse.GroupeView>> assignGroup(
             @PathVariable Long id,
             @Valid @RequestBody AssignGroupeClientRequest request
@@ -79,6 +87,7 @@ public class ClientController {
     }
 
     @DeleteMapping("/{id}/groupes/{membershipId}")
+    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
     public ResponseEntity<ApiResponse<Void>> endGroupMembership(
             @PathVariable Long id,
             @PathVariable Long membershipId

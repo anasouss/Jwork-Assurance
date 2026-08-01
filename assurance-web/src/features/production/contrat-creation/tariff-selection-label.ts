@@ -4,7 +4,9 @@ import { money, toNumber } from "../utils/format";
 export function tariffSelectionLabel(line: ReferenceOption, index = 0) {
   if (line.critereSelectionTarif === "TAUX_FRANCHISE") {
     const tauxFranchise = toNumber(line.tauxFranchise);
-    return tauxFranchise == null ? "Franchise non définie" : `${money(tauxFranchise)} %`;
+    if (tauxFranchise != null) {
+      return `${money(tauxFranchise)} %`;
+    }
   }
 
   const mode = String(line.modeTarification ?? "").toUpperCase();

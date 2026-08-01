@@ -726,14 +726,21 @@ export function GarantiesSettingsPage() {
       }
       const modeParDefaut = modes.includes(current.modeParDefaut ?? "") ? current.modeParDefaut : modes[0];
       const modesTarificationMultiple = (current.modesTarificationMultiple ?? []).filter((item) => modes.includes(item));
-      return { ...current, modesAutorises: modes, modeParDefaut, modesTarificationMultiple, tarificationMultiple: modesTarificationMultiple.length > 0 };
+      return {
+        ...current,
+        modesAutorises: modes,
+        modeParDefaut,
+        modesTarificationMultiple,
+        tarificationMultiple: modesTarificationMultiple.length > 0,
+        critereSelectionTarif: modesTarificationMultiple.includes("TAUX") ? current.critereSelectionTarif : "TAUX_PRIME",
+      };
     });
   };
 
   const setTarificationMultiple = (checked: boolean) => {
     setPayload((current) => {
       if (!checked) {
-        return { ...current, tarificationMultiple: false, modesTarificationMultiple: [] };
+        return { ...current, tarificationMultiple: false, modesTarificationMultiple: [], critereSelectionTarif: "TAUX_PRIME" };
       }
       const fallbackMode = current.modeParDefaut && current.modeParDefaut !== "PROTECTION"
         ? current.modeParDefaut
@@ -742,6 +749,7 @@ export function GarantiesSettingsPage() {
         ...current,
         tarificationMultiple: Boolean(fallbackMode),
         modesTarificationMultiple: fallbackMode ? [fallbackMode] : [],
+        critereSelectionTarif: fallbackMode === "TAUX" ? current.critereSelectionTarif : "TAUX_PRIME",
       };
     });
   };
@@ -756,6 +764,7 @@ export function GarantiesSettingsPage() {
         ...current,
         tarificationMultiple: modesTarificationMultiple.length > 0,
         modesTarificationMultiple,
+        critereSelectionTarif: modesTarificationMultiple.includes("TAUX") ? current.critereSelectionTarif : "TAUX_PRIME",
       };
     });
   };
@@ -808,6 +817,7 @@ export function GarantiesSettingsPage() {
         requiertValeurNeuf: false,
         requiertValeurGlace: false,
         avecFranchise: false,
+        critereSelectionTarif: "TAUX_PRIME",
         avecCapital: true,
         tarificationMultiple: false,
         modesTarificationMultiple: [],
@@ -818,6 +828,7 @@ export function GarantiesSettingsPage() {
       typeGarantie,
       modesAutorises: ["TAUX"],
       modeParDefaut: "TAUX",
+      critereSelectionTarif: "TAUX_PRIME",
       tarificationMultiple: false,
       modesTarificationMultiple: [],
     });
@@ -1006,25 +1017,27 @@ export function GarantiesSettingsPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Valeur du sélecteur tarifaire">
-                  <Select
-                    value={payload.critereSelectionTarif ?? "TAUX_PRIME"}
-                    onValueChange={(value) => update({ critereSelectionTarif: value as UpsertGarantieRequest["critereSelectionTarif"] })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CRITERES_SELECTION_TARIF.map((critere) => (
-                        <SelectItem
-                          key={critere.value}
-                          value={critere.value}
-                          disabled={critere.value === "TAUX_FRANCHISE" && (!payload.avecFranchise || !(payload.modesAutorises ?? []).includes("TAUX"))}
-                        >
-                          {critere.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+                {(payload.modesTarificationMultiple ?? []).includes("TAUX") ? (
+                  <Field label="Valeur du sélecteur tarifaire">
+                    <Select
+                      value={payload.critereSelectionTarif ?? "TAUX_PRIME"}
+                      onValueChange={(value) => update({ critereSelectionTarif: value as UpsertGarantieRequest["critereSelectionTarif"] })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CRITERES_SELECTION_TARIF.map((critere) => (
+                          <SelectItem
+                            key={critere.value}
+                            value={critere.value}
+                            disabled={critere.value === "TAUX_FRANCHISE" && !payload.avecFranchise}
+                          >
+                            {critere.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                ) : null}
                 {(payload.modesAutorises ?? []).filter((mode) => mode !== "PROTECTION").length > 0 ? (
                   <div className="grid gap-2">
                     <div className="text-xs font-medium text-muted-foreground">Modes avec plusieurs formules</div>
@@ -1137,7 +1150,11 @@ export function GarantiesSettingsPage() {
                     <TableCell>{garantie.libelle}</TableCell>
                     <TableCell>{String(garantie.typeGarantie ?? "VEHICULE")}</TableCell>
                     <TableCell>{String(garantie.modeParDefaut ?? "-")}</TableCell>
-                    <TableCell>{garantie.critereSelectionTarif === "TAUX_FRANCHISE" ? "Taux de franchise" : "Taux de prime"}</TableCell>
+                    <TableCell>
+                      {stringArray(garantie.modesTarificationMultiple).includes("TAUX")
+                        ? (garantie.critereSelectionTarif === "TAUX_FRANCHISE" ? "Taux de franchise" : "Taux de prime")
+                        : "-"}
+                    </TableCell>
                     <TableCell>{String(garantie.groupeExclusionCode ?? "-")}</TableCell>
                     <TableCell>{garantieTags(garantie).join(", ") || "-"}</TableCell>
                     <TableCell>{valueTags(garantie).join(", ") || "-"}</TableCell>
@@ -1965,7 +1982,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     groupeExclusionId: payload.groupeExclusionId || undefined,
     modesAutorises: normalizedModes,
     modeParDefaut,
-    critereSelectionTarif: payload.critereSelectionTarif === "TAUX_FRANCHISE" && payload.avecFranchise && normalizedModes.includes("TAUX")
+    critereSelectionTarif: payload.critereSelectionTarif === "TAUX_FRANCHISE" && payload.avecFranchise && normalizedModes.includes("TAUX") && normalizedMultipleModes.includes("TAUX")
       ? "TAUX_FRANCHISE"
       : "TAUX_PRIME",
     avecFranchiseMinimale: Boolean(payload.avecFranchise && payload.avecFranchiseMinimale),

@@ -23,4 +23,14 @@ describe("tariffSelectionLabel", () => {
       tauxFranchise: 3,
     })).toBe("3 %");
   });
+
+  it("falls back to the premium rate for malformed legacy configuration", () => {
+    expect(tariffSelectionLabel({
+      id: "legacy-line",
+      libelle: "Défense et recours",
+      modeTarification: "TAUX",
+      critereSelectionTarif: "TAUX_FRANCHISE",
+      taux: 2,
+    })).toBe("2 %");
+  });
 });

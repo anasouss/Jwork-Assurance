@@ -1264,8 +1264,9 @@ public class ReferentielController {
         if (critereSelectionTarif == CritereSelectionTarif.TAUX_FRANCHISE
                 && (typeGarantie != TypeGarantie.VEHICULE
                 || !Boolean.TRUE.equals(request.getAvecFranchise())
-                || !modes.contains(ModeTarificationGarantie.TAUX))) {
-            throw new BadRequestException("Le taux de franchise ne peut piloter que la selection d'une garantie vehicule tarifee au taux avec franchise");
+                || !modes.contains(ModeTarificationGarantie.TAUX)
+                || !modesTarificationMultiple.contains(ModeTarificationGarantie.TAUX))) {
+            throw new BadRequestException("Le taux de franchise ne peut piloter qu'un selecteur multi-formules d'une garantie vehicule tarifee au taux avec franchise");
         }
 
         LinkedHashSet<SourceValeurGarantie> sources = new LinkedHashSet<>(
@@ -1721,7 +1722,7 @@ public class ReferentielController {
                 .putValue("garantieId", ligne.getGarantie() != null ? ligne.getGarantie().getId() : null)
                 .putValue("garantieCode", ligne.getGarantie() != null ? ligne.getGarantie().getCode() : null)
                 .putValue("garantieLibelle", ligne.getGarantie() != null ? ligne.getGarantie().getLibelle() : null)
-                .putValue("critereSelectionTarif", ligne.getGarantie() != null ? ligne.getGarantie().getCritereSelectionTarif() : CritereSelectionTarif.TAUX_PRIME)
+                .putValue("critereSelectionTarif", effectiveCritereSelectionTarif(ligne.getGarantie()))
                 .putValue("usageId", ligne.getUsage() != null ? ligne.getUsage().getId() : null)
                 .putValue("categorieTransportId", ligne.getCategorieTransport() != null ? ligne.getCategorieTransport().getId() : null)
                 .putValue("modeTarification", ligne.getModeTarification())
@@ -1741,6 +1742,18 @@ public class ReferentielController {
                 .putValue("ordreAffichage", ligne.getOrdreAffichage())
                 .putValue("actif", ligne.getActif())
                 .map();
+    }
+
+    private CritereSelectionTarif effectiveCritereSelectionTarif(Garantie garantie) {
+        if (garantie != null
+                && garantie.getCritereSelectionTarif() == CritereSelectionTarif.TAUX_FRANCHISE
+                && garantie.getTypeGarantie() == TypeGarantie.VEHICULE
+                && Boolean.TRUE.equals(garantie.getAvecFranchise())
+                && garantie.getModesTarificationMultiple() != null
+                && garantie.getModesTarificationMultiple().contains(ModeTarificationGarantie.TAUX)) {
+            return CritereSelectionTarif.TAUX_FRANCHISE;
+        }
+        return CritereSelectionTarif.TAUX_PRIME;
     }
 
     private Map<String, Object> toFormulePersonneResponse(FormuleGarantiePersonne formule) {

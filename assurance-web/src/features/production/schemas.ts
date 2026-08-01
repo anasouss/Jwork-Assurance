@@ -145,8 +145,8 @@ export const garantieSchema = z.object({
   if (value.typeGarantie === "VEHICULE" && (value.modeParDefaut === "PROTECTION" || value.modesAutorises.includes("PROTECTION"))) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Le mode PROTECTION est réservé aux garanties personne" });
   }
-  if (value.critereSelectionTarif === "TAUX_FRANCHISE" && (value.typeGarantie !== "VEHICULE" || !value.avecFranchise || !value.modesAutorises.includes("TAUX"))) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["critereSelectionTarif"], message: "Ce critère nécessite une garantie véhicule tarifée au taux avec franchise" });
+  if (value.critereSelectionTarif === "TAUX_FRANCHISE" && (value.typeGarantie !== "VEHICULE" || !value.avecFranchise || !value.modesAutorises.includes("TAUX") || !(value.modesTarificationMultiple ?? []).includes("TAUX"))) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["critereSelectionTarif"], message: "Ce critère nécessite un sélecteur multi-formules tarifé au taux avec franchise" });
   }
   const invalidMultipleMode = (value.modesTarificationMultiple ?? []).find((mode) => !value.modesAutorises.includes(mode));
   if (invalidMultipleMode) {

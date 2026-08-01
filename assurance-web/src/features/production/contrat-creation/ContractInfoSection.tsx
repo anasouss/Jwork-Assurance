@@ -56,7 +56,7 @@ export function ContractInfoSection({
   const souscripteurIndex = form.clients.findIndex((client) => client.role === "SOUSCRIPTEUR");
   const souscripteur = souscripteurIndex >= 0 ? form.clients[souscripteurIndex] : undefined;
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
-  const showCategorieClient = form.typeContrat === "PARTICULIER";
+  const showCategorieClient = form.typeContrat === "PARTICULIER" && !categorieClientId;
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
   const isConventionInvoice = readOnlyConventionContext && form.modeReglement === "facture";
   const isFlotte = form.typeContrat === "FLOTTE";

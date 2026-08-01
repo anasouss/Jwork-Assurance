@@ -47,6 +47,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
     @Query(value = """
             select c.id
             from Contrat c
+            left join c.compagnieAssurance compagnie
             where c.agence.id = :agenceId
               and c.prospection = false
               and not exists (
@@ -57,7 +58,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and renewal.prospection = false
               )
               and (:typeContrat is null or c.typeContrat = :typeContrat)
-              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:compagnieId is null or compagnie.id = :compagnieId)
               and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
                     select 1 from ContratClient cc
@@ -67,8 +68,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                     lower(coalesce(c.numeroContrat, '')) like concat('%', :search, '%') or
                     lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
                     lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.nom, '')) like concat('%', :search, '%') or
                     exists (
                         select 1 from ContratClient cc
                         where cc.contrat = c and (
@@ -93,6 +94,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             countQuery = """
             select count(c.id)
             from Contrat c
+            left join c.compagnieAssurance compagnie
             where c.agence.id = :agenceId
               and c.prospection = false
               and not exists (
@@ -103,7 +105,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and renewal.prospection = false
               )
               and (:typeContrat is null or c.typeContrat = :typeContrat)
-              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:compagnieId is null or compagnie.id = :compagnieId)
               and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
                     select 1 from ContratClient cc
@@ -113,8 +115,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                     lower(coalesce(c.numeroContrat, '')) like concat('%', :search, '%') or
                     lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
                     lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.nom, '')) like concat('%', :search, '%') or
                     exists (
                         select 1 from ContratClient cc
                         where cc.contrat = c and (
@@ -151,10 +153,11 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
     @Query(value = """
             select c.id
             from Contrat c
+            left join c.compagnieAssurance compagnie
             where c.agence.id = :agenceId
               and c.prospection = true
               and c.typeContrat = com.assurance.enums.TypeContrat.FLOTTE
-              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:compagnieId is null or compagnie.id = :compagnieId)
               and (:dateDu is null or c.createdAt >= :dateDu)
               and (:dateAuExclusive is null or c.createdAt < :dateAuExclusive)
               and (:numeroDevis is null or
@@ -162,8 +165,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                     lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroDevis, '%'))
               and (:search is null or
                     lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.nom, '')) like concat('%', :search, '%') or
                     exists (
                         select 1 from ContratClient cc
                         where cc.contrat = c and (
@@ -181,10 +184,11 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             countQuery = """
             select count(c.id)
             from Contrat c
+            left join c.compagnieAssurance compagnie
             where c.agence.id = :agenceId
               and c.prospection = true
               and c.typeContrat = com.assurance.enums.TypeContrat.FLOTTE
-              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:compagnieId is null or compagnie.id = :compagnieId)
               and (:dateDu is null or c.createdAt >= :dateDu)
               and (:dateAuExclusive is null or c.createdAt < :dateAuExclusive)
               and (:numeroDevis is null or
@@ -192,8 +196,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                     lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroDevis, '%'))
               and (:search is null or
                     lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
-                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(compagnie.nom, '')) like concat('%', :search, '%') or
                     exists (
                         select 1 from ContratClient cc
                         where cc.contrat = c and (

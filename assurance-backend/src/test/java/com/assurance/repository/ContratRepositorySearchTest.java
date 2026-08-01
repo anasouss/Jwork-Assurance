@@ -1,9 +1,12 @@
 package com.assurance.repository;
 
+import com.assurance.entity.Agence;
+import com.assurance.entity.Contrat;
 import com.assurance.enums.TypeContrat;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
@@ -20,6 +23,66 @@ class ContratRepositorySearchTest {
 
     @Autowired
     private ContratRepository repository;
+
+    @Autowired
+    private TestEntityManager entityManager;
+
+    @Test
+    void includesIncompleteDraftWithoutCompanyWhenNoCompanyFilterIsApplied() {
+        Agence agence = entityManager.persist(Agence.builder()
+                .code("DRAFT-SEARCH")
+                .nom("Draft search")
+                .build());
+        Contrat draft = entityManager.persist(Contrat.builder()
+                .agence(agence)
+                .typeContrat(TypeContrat.PARTICULIER)
+                .prospection(false)
+                .brouillon(true)
+                .build());
+        entityManager.flush();
+
+        var contracts = repository.searchCurrentContractIds(
+                agence.getId(),
+                null,
+                "EFFET",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                PageRequest.of(0, 25)
+        );
+
+        assertThat(contracts.getContent()).containsExactly(draft.getId());
+    }
+
+    @Test
+    void includesIncompleteProspectionWithoutCompanyWhenNoCompanyFilterIsApplied() {
+        Agence agence = entityManager.persist(Agence.builder()
+                .code("PROSPECTION-SEARCH")
+                .nom("Prospection search")
+                .build());
+        Contrat prospection = entityManager.persist(Contrat.builder()
+                .agence(agence)
+                .typeContrat(TypeContrat.FLOTTE)
+                .prospection(true)
+                .brouillon(true)
+                .build());
+        entityManager.flush();
+
+        var prospections = repository.searchProspectionIds(
+                agence.getId(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                PageRequest.of(0, 25)
+        );
+
+        assertThat(prospections.getContent()).containsExactly(prospection.getId());
+    }
 
     @Test
     void contractAndProspectionSearchQueriesAreValid() {

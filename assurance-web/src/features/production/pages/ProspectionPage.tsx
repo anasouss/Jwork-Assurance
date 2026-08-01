@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FilePlus2, LifeBuoy, MoreHorizontal, Pencil, Search, ShieldCheck, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Download, FilePlus2, LifeBuoy, MoreHorizontal, Pencil, Search, ShieldCheck, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,15 +12,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { contractKeys, referenceKeys } from "@/lib/query-keys";
+import { useAuthStore } from "@/store/auth-store";
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { ProspectionConversionDialog } from "../components/prospections/ProspectionConversionDialog";
+import { ProspectionDeleteDialog } from "../components/prospections/ProspectionDeleteDialog";
 import { ProspectionPdfDialog } from "../components/prospections/ProspectionPdfDialog";
 import { Field } from "../components/Field";
 import { toDateOnly } from "../date";
@@ -41,6 +45,9 @@ export default function ProspectionPage() {
   const [page, setPage] = useState(() => prospectionPageFromSearchParams(searchParams));
   const [pdfTargetId, setPdfTargetId] = useState<string | null>(null);
   const [convertTargetId, setConvertTargetId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ContratListItem | null>(null);
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const canDeleteProspection = permissions.includes("contrat:delete") || permissions.includes("contrat:update");
 
   const listParams = useMemo(() => ({
     compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
@@ -63,6 +70,23 @@ export default function ProspectionPage() {
   const usages = useQuery({
     queryKey: referenceKeys.list("usages"),
     queryFn: () => referenceApi.list("usages"),
+  });
+  const deleteProspection = useMutation({
+    mutationFn: (contratId: string) => contractApi.deleteContrat(contratId),
+    onSuccess: async () => {
+      const moveToPreviousPage = page > 0 && prospections.data?.items.length === 1;
+      if (moveToPreviousPage) {
+        const previousPage = page - 1;
+        setPage(previousPage);
+        setSearchParams(prospectionSearchParams(appliedFilters, previousPage), { replace: true });
+      }
+      setDeleteTarget(null);
+      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      toast.success("Devis supprimé");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Le devis ne peut pas être supprimé");
+    },
   });
 
   const applyFilters = (next: ProspectionFilters) => {
@@ -161,6 +185,7 @@ export default function ProspectionPage() {
                       contrat={contrat}
                       onDownload={() => setPdfTargetId(contrat.id)}
                       onConvert={() => setConvertTargetId(contrat.id)}
+                      onDelete={canDeleteProspection ? () => setDeleteTarget(contrat) : undefined}
                     />
                   ))
                 ) : (
@@ -205,6 +230,17 @@ export default function ProspectionPage() {
           await queryClient.invalidateQueries({ queryKey: contractKeys.all });
         }}
       />
+      <ProspectionDeleteDialog
+        open={Boolean(deleteTarget)}
+        devisLabel={deleteTarget ? dossierNumber(deleteTarget) : undefined}
+        pending={deleteProspection.isPending}
+        onOpenChange={(open) => {
+          if (!open && !deleteProspection.isPending) setDeleteTarget(null);
+        }}
+        onConfirm={() => {
+          if (deleteTarget) deleteProspection.mutate(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }
@@ -213,10 +249,12 @@ function ProspectionRow({
   contrat,
   onDownload,
   onConvert,
+  onDelete,
 }: {
   contrat: ContratListItem;
   onDownload: () => void;
   onConvert: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <tr className="border-b transition-colors hover:bg-emerald-50/40">
@@ -233,6 +271,7 @@ function ProspectionRow({
           <DropdownMenuTrigger asChild>
             <Button type="button" size="icon" className="h-8 w-8 bg-sky-600 hover:bg-sky-700">
               <MoreHorizontal className="size-4" />
+              <span className="sr-only">Actions du devis</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -256,6 +295,15 @@ function ProspectionRow({
               <ShieldCheck className="size-4" />
               Convertir en contrat
             </DropdownMenuItem>
+            {onDelete ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                  <Trash2 className="size-4" />
+                  Supprimer
+                </DropdownMenuItem>
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </Cell>

@@ -66,6 +66,12 @@ public class AttestationStock extends BaseEntity {
     @Column(name = "date_utilisation")
     private LocalDateTime dateUtilisation;
 
+    @Column(name = "date_annulation")
+    private LocalDateTime dateAnnulation;
+
+    @Column(name = "motif_annulation", length = 1000)
+    private String motifAnnulation;
+
     @Column(name = "numero_dossier", length = 80)
     private String numeroDossier;
 

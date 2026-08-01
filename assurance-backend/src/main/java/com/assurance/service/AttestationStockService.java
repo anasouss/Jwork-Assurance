@@ -1,5 +1,6 @@
 package com.assurance.service;
 
+import com.assurance.dto.request.CancelAttestationStockRequest;
 import com.assurance.dto.request.UpdateAttestationStockSettingsRequest;
 import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
 import com.assurance.dto.response.AttestationStockDashboardResponse;
@@ -256,13 +257,40 @@ public class AttestationStockService {
     }
 
     @Transactional(readOnly = true)
-    public List<AttestationStockItemResponse> rechercher(Long compagnieId, Long groupeUsageAttestationId, StatutAttestationStock statut, String numero, Integer limit) {
+    public List<AttestationStockItemResponse> rechercher(Long agenceId, Long compagnieId, Long groupeUsageAttestationId, StatutAttestationStock statut, String numero, Integer limit) {
         int size = limit == null ? 100 : Math.max(1, Math.min(limit, 500));
         String numeroFiltre = hasText(numero) ? numero.trim() : null;
-        return attestationStockRepository.searchGestionStock(numeroFiltre, compagnieId, groupeUsageAttestationId, statut, PageRequest.of(0, size))
+        return attestationStockRepository.searchGestionStock(agenceId, numeroFiltre, compagnieId, groupeUsageAttestationId, statut, PageRequest.of(0, size))
                 .stream()
                 .map(this::toItemResponse)
                 .toList();
+    }
+
+    @Transactional
+    public AttestationStockItemResponse annuler(Long agenceId, Long attestationId, CancelAttestationStockRequest request) {
+        AttestationStock attestation = attestationStockRepository
+                .findGestionnableByIdAndAgenceIdForUpdate(attestationId, agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("AttestationStock", attestationId));
+        if (attestation.getStatut() != StatutAttestationStock.DISPONIBLE) {
+            throw new BadRequestException("Seule une attestation disponible peut etre annulee");
+        }
+
+        String motif = request.getMotif().trim();
+        attestation.setStatut(StatutAttestationStock.ANNULEE);
+        attestation.setDateAnnulation(LocalDateTime.now());
+        attestation.setMotifAnnulation(motif);
+        attestationStockRepository.save(attestation);
+        enregistrerMouvement(
+                attestation,
+                TypeMouvementStockAttestation.ANNULATION,
+                null,
+                null,
+                attestation.getNumero(),
+                null,
+                motif
+        );
+        recalculerSeuil(attestation);
+        return toItemResponse(attestation);
     }
 
     @Transactional(readOnly = true)
@@ -412,6 +440,18 @@ public class AttestationStockService {
             String numeroAvant,
             String numeroApres
     ) {
+        enregistrerMouvement(attestation, typeMouvement, contrat, mouvementContrat, numeroAvant, numeroApres, null);
+    }
+
+    private void enregistrerMouvement(
+            AttestationStock attestation,
+            TypeMouvementStockAttestation typeMouvement,
+            Contrat contrat,
+            MouvementContrat mouvementContrat,
+            String numeroAvant,
+            String numeroApres,
+            String notes
+    ) {
         mouvementStockAttestationRepository.save(MouvementStockAttestation.builder()
                 .attestationStock(attestation)
                 .typeMouvement(typeMouvement)
@@ -420,6 +460,7 @@ public class AttestationStockService {
                 .numeroAvant(numeroAvant)
                 .numeroApres(numeroApres)
                 .dateMouvement(LocalDateTime.now())
+                .notes(notes)
                 .build());
     }
 
@@ -488,6 +529,8 @@ public class AttestationStockService {
                 .serie(attestation.getSerie())
                 .statut(attestation.getStatut())
                 .dateUtilisation(attestation.getDateUtilisation())
+                .dateAnnulation(attestation.getDateAnnulation())
+                .motifAnnulation(attestation.getMotifAnnulation())
                 .assure(resolveAssure(contrat))
                 .numeroDossier(attestation.getNumeroDossier())
                 .numeroPolice(attestation.getNumeroPolice())

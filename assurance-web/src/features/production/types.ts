@@ -143,6 +143,8 @@ export type AttestationStockItem = {
   serie?: string | null;
   statut: AttestationStockStatus;
   dateUtilisation?: string | null;
+  dateAnnulation?: string | null;
+  motifAnnulation?: string | null;
   assure?: string | null;
   numeroDossier?: string | null;
   numeroPolice?: string | null;

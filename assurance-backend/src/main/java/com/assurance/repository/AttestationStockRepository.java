@@ -131,6 +131,7 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and lot.actif = true
               and livraison.actif = true
               and livraison.validee = true
+              and livraison.agence.id = :agenceId
               and (:numero is null or upper(a.numero) like upper(concat('%', :numero, '%')))
               and (:compagnieId is null or a.compagnieAssurance.id = :compagnieId)
               and (:groupeUsageAttestationId is null or a.groupeUsageAttestation.id = :groupeUsageAttestationId)
@@ -138,11 +139,31 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
             order by a.numero asc
             """)
     List<AttestationStock> searchGestionStock(
+            @Param("agenceId") Long agenceId,
             @Param("numero") String numero,
             @Param("compagnieId") Long compagnieId,
             @Param("groupeUsageAttestationId") Long groupeUsageAttestationId,
             @Param("statut") StatutAttestationStock statut,
             Pageable pageable
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select a from AttestationStock a
+            join fetch a.compagnieAssurance
+            join fetch a.groupeUsageAttestation
+            join fetch a.lot lot
+            join fetch lot.livraison livraison
+            where a.id = :id
+              and a.actif = true
+              and lot.actif = true
+              and livraison.actif = true
+              and livraison.validee = true
+              and livraison.agence.id = :agenceId
+            """)
+    Optional<AttestationStock> findGestionnableByIdAndAgenceIdForUpdate(
+            @Param("id") Long id,
+            @Param("agenceId") Long agenceId
     );
 
     Optional<AttestationStock> findByNumeroIgnoreCase(String numero);

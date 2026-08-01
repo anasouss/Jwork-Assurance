@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, CheckCircle2, ClipboardList, Eye, PackagePlus, Plus, Search, Settings2, Truck } from "lucide-react";
+import { Ban, Boxes, CheckCircle2, ClipboardList, Eye, PackagePlus, Plus, Search, Settings2, Truck } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ import { productionApi } from "../api";
 import { toDateOnly } from "../date";
 import type {
   AttestationStockCompanyUsage,
+  AttestationStockItem,
   AttestationStockStatus,
   LivraisonAttestation,
   ReferenceOption,
@@ -114,6 +115,8 @@ function AttestationStockDashboardPage() {
     statut: "DISPONIBLE" as AttestationStockStatus | typeof ALL_VALUE,
     numero: "",
   });
+  const [attestationToCancel, setAttestationToCancel] = useState<AttestationStockItem | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [seuilForm, setSeuilForm] = useState({
     id: "",
     compagnieAssuranceId: "",
@@ -152,6 +155,22 @@ function AttestationStockDashboardPage() {
       await queryClient.invalidateQueries({ queryKey: ["attestations-stock", "dashboard"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Mise à jour impossible"),
+  });
+
+  const cancelAttestation = useMutation({
+    mutationFn: () => {
+      if (!attestationToCancel) {
+        throw new Error("Aucune attestation sélectionnée");
+      }
+      return productionApi.cancelAttestationStock(attestationToCancel.id, { motif: cancelReason.trim() });
+    },
+    onSuccess: async () => {
+      setAttestationToCancel(null);
+      setCancelReason("");
+      toast.success("Attestation annulée");
+      await queryClient.invalidateQueries({ queryKey: ["attestations-stock"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Annulation de l’attestation impossible"),
   });
 
   const saveSeuil = useMutation({
@@ -411,8 +430,8 @@ function AttestationStockDashboardPage() {
               </Button>
             </div>
           </div>
-          <div className="rounded-md border">
-            <Table>
+          <div className="overflow-x-auto rounded-md border">
+            <Table className="min-w-[1100px]">
               <TableHeader className="bg-emerald-700 text-white [&_th]:text-white">
                 <TableRow className="hover:bg-emerald-700">
                   <TableHead>Compagnie</TableHead>
@@ -421,7 +440,9 @@ function AttestationStockDashboardPage() {
                   <TableHead className="text-center">N° police</TableHead>
                   <TableHead>N° attestation</TableHead>
                   <TableHead className="text-center">Date d’effet</TableHead>
-                  <TableHead className="text-right">État</TableHead>
+                  <TableHead>Motif d’annulation</TableHead>
+                  <TableHead>État</TableHead>
+                  <TableHead className="w-16 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -433,14 +454,35 @@ function AttestationStockDashboardPage() {
                     <TableCell className="text-center">{attestation.numeroPolice ?? "-"}</TableCell>
                     <TableCell className="font-medium">{attestation.numero}</TableCell>
                     <TableCell className="text-center">{formatDate(attestation.dateEffet)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="max-w-64 truncate" title={attestation.motifAnnulation ?? undefined}>
+                      {attestation.motifAnnulation ?? "-"}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant={stockStatusVariant(attestation.statut)}>{stockStatusLabel(attestation.statut)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {attestation.statut === "DISPONIBLE" ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          title="Annuler l’attestation"
+                          onClick={() => {
+                            setAttestationToCancel(attestation);
+                            setCancelReason("");
+                          }}
+                        >
+                          <Ban className="size-4" />
+                          <span className="sr-only">Annuler l’attestation</span>
+                        </Button>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
                 {(attestations.data ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={9} className="h-24 text-center text-sm text-muted-foreground">
                       Aucune attestation pour ces filtres.
                     </TableCell>
                   </TableRow>
@@ -450,6 +492,56 @@ function AttestationStockDashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={attestationToCancel !== null}
+        onOpenChange={(open) => {
+          if (!open && !cancelAttestation.isPending) {
+            setAttestationToCancel(null);
+            setCancelReason("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Annuler l’attestation</DialogTitle>
+            <DialogDescription>
+              L’attestation {attestationToCancel?.numero} ne pourra plus être utilisée ni comptée comme disponible.
+            </DialogDescription>
+          </DialogHeader>
+          <Field label="Motif d’annulation">
+            <Textarea
+              value={cancelReason}
+              maxLength={1000}
+              rows={4}
+              placeholder="Ex. attestation perdue, détériorée ou inutilisable"
+              onChange={(event) => setCancelReason(event.target.value)}
+            />
+          </Field>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={cancelAttestation.isPending}
+              onClick={() => {
+                setAttestationToCancel(null);
+                setCancelReason("");
+              }}
+            >
+              Fermer
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!cancelReason.trim() || cancelAttestation.isPending}
+              onClick={() => cancelAttestation.mutate()}
+            >
+              <Ban className="size-4" />
+              Confirmer l’annulation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -636,6 +636,15 @@ export const productionApi = {
     );
   },
 
+  async cancelAttestationStock(id: string, payload: { motif: string }) {
+    return unwrap(
+      await apiFetch<ApiResponse<AttestationStockItem>>(`/api/v1/attestations-stock/attestations/${id}/annuler`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
   async updateAttestationsStockSettings(payload: { controleStockActif: boolean }) {
     return unwrap(
       await apiFetch<ApiResponse<{ controleStockActif: boolean }>>("/api/v1/attestations-stock/settings", {

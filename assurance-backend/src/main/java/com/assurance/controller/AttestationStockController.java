@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.AddLotAttestationRequest;
 import com.assurance.dto.request.AddLotsAttestationRequest;
+import com.assurance.dto.request.CancelAttestationStockRequest;
 import com.assurance.dto.request.CreateLivraisonAttestationRequest;
 import com.assurance.dto.request.UpdateAttestationStockSettingsRequest;
 import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
@@ -60,7 +61,25 @@ public class AttestationStockController {
             @RequestParam(defaultValue = "100") Integer limit
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                attestationStockService.rechercher(compagnieAssuranceId, groupeUsageAttestationId, statut, numero, limit)
+                attestationStockService.rechercher(
+                        TenantContext.getCurrentAgence(),
+                        compagnieAssuranceId,
+                        groupeUsageAttestationId,
+                        statut,
+                        numero,
+                        limit
+                )
+        ));
+    }
+
+    @PostMapping("/attestations/{id}/annuler")
+    public ResponseEntity<ApiResponse<AttestationStockItemResponse>> annulerAttestation(
+            @PathVariable Long id,
+            @Valid @RequestBody CancelAttestationStockRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.annuler(TenantContext.getCurrentAgence(), id, request),
+                "Attestation annulee"
         ));
     }
 

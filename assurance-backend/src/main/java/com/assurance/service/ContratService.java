@@ -26,6 +26,7 @@ import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
+import com.assurance.enums.TypeImpactMouvement;
 import com.assurance.enums.TypeMouvementStockAttestation;
 import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
@@ -4370,11 +4371,14 @@ public class ContratService {
                     .toList();
             List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository
                     .findByMouvementContratId(selectedMouvement.getId());
+            boolean differentialMovement = selectedMouvement.getTypeMouvement() != null
+                    && selectedMouvement.getTypeMouvement().getTypeImpact() == TypeImpactMouvement.DIFFERENTIEL;
             boolean hasDifferentialSnapshots = garantieSnapshots.stream()
                     .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL);
             garanties = garantieSnapshots.stream()
-                    .filter(snapshot -> !hasDifferentialSnapshots
-                            || snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL)
+                    .filter(snapshot -> differentialMovement || hasDifferentialSnapshots
+                            ? snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL
+                            : snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                     .sorted(Comparator.comparing(MouvementGarantie::getId))
                     .map(this::toGarantieView)
                     .toList();
@@ -4665,11 +4669,13 @@ public class ContratService {
                 .distinct()
                 .toList();
         List<MouvementGarantie> snapshots = mouvementGarantieRepository.findByMouvementContratId(mouvement.getId());
+        boolean differentialMovement = mouvement.getTypeMouvement() != null
+                && mouvement.getTypeMouvement().getTypeImpact() == TypeImpactMouvement.DIFFERENTIEL;
         boolean hasDifferentialSnapshots = snapshots.stream()
                 .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL);
 
         return snapshots.stream()
-                .filter(snapshot -> hasDifferentialSnapshots
+                .filter(snapshot -> differentialMovement || hasDifferentialSnapshots
                         ? snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL
                         : snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                 .sorted(Comparator.comparing(MouvementGarantie::getId))

@@ -431,7 +431,7 @@ export default function AvenantContratPage() {
   ]);
 
   const previewMutation = useMutation({
-    mutationFn: (request: AvenantRequest) => productionApi.previewAvenant(contratId, request),
+    mutationFn: (request: AvenantRequest) => productionApi.previewAvenant(contratId, request, validatedMovementId),
     onSuccess: (data, request) => {
       if (globalPreviewRequestKeyRef.current === JSON.stringify(request)) {
         setPreview(data);
@@ -445,7 +445,7 @@ export default function AvenantContratPage() {
       target: FlotteSectionTarget;
       requestKey: string;
       onSuccess?: () => void;
-    }) => productionApi.previewAvenant(contratId, request),
+    }) => productionApi.previewAvenant(contratId, request, validatedMovementId),
     onSuccess: (data, variables) => {
       if (targetPreviewRequestKeyRef.current !== variables.requestKey) {
         return;

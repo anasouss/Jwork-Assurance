@@ -321,6 +321,28 @@ public class MouvementContratService {
     }
 
     @Transactional
+    public void remplacerSnapshotsChangementVehicule(
+            Long mouvementId,
+            List<Vehicule> vehiculesAvant,
+            List<ContratGarantie> garantiesAvant,
+            List<Vehicule> vehiculesApres,
+            List<ContratGarantie> garantiesApres
+    ) {
+        MouvementContrat mouvement = mouvementContratRepository.findById(mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        mouvementVehiculeRepository.deleteByMouvementContratId(mouvementId);
+        mouvementGarantieRepository.deleteByMouvementContratId(mouvementId);
+        mouvementVehiculeRepository.flush();
+        mouvementGarantieRepository.flush();
+        mouvement.getVehicules().clear();
+        mouvement.getGaranties().clear();
+        snapshotVehicules(mouvement, vehiculesAvant, NatureSnapshotMouvement.AVANT);
+        snapshotGaranties(mouvement, garantiesAvant, NatureSnapshotMouvement.AVANT);
+        snapshotVehicules(mouvement, vehiculesApres, NatureSnapshotMouvement.APRES);
+        snapshotGaranties(mouvement, garantiesApres, NatureSnapshotMouvement.APRES);
+    }
+
+    @Transactional
     public QuittanceResponse creerMouvement(Long agenceId, Long contratId, MouvementContratRequest request) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());

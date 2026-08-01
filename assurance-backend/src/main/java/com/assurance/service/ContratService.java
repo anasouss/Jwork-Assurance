@@ -2004,10 +2004,12 @@ public class ContratService {
 
         List<MouvementVehicule> vehiculeSnapshots = mouvementVehiculeRepository
                 .findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                 .sorted(Comparator.comparing(MouvementVehicule::getId))
                 .toList();
         List<MouvementRemorque> remorqueSnapshots = mouvementRemorqueRepository
                 .findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                 .sorted(Comparator.comparing(MouvementRemorque::getId))
                 .toList();
         List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository
@@ -2360,6 +2362,8 @@ public class ContratService {
         List<MouvementVehicule> vehiculeSnapshots = mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId());
         List<MouvementRemorque> remorqueSnapshots = mouvementRemorqueRepository.findByMouvementContratId(mouvement.getId());
         List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository.findByMouvementContratId(mouvement.getId());
+        boolean changementVehicule = mouvement.getTypeMouvement() != null
+                && "CHV_M".equalsIgnoreCase(mouvement.getTypeMouvement().getCode());
 
         List<Vehicule> vehiculesToSave = new ArrayList<>();
         for (MouvementVehicule snapshot : vehiculeSnapshots) {
@@ -2371,7 +2375,7 @@ public class ContratService {
                 snapshot.getVehicule().setActif(actif);
             }
             if (snapshot.getNature() == NatureSnapshotMouvement.COURANT
-                    || snapshot.getNature() == NatureSnapshotMouvement.AVANT) {
+                    || snapshot.getNature() == NatureSnapshotMouvement.AVANT && !changementVehicule) {
                 restoreVehiculeSnapshot(snapshot);
             }
             vehiculesToSave.add(snapshot.getVehicule());
@@ -2498,8 +2502,20 @@ public class ContratService {
 
     @Transactional(readOnly = true)
     public QuittanceResponse previsualiserAvenant(Long agenceId, Long contratId, AvenantRequest request) {
+        return previsualiserAvenant(agenceId, contratId, request, null);
+    }
+
+    @Transactional(readOnly = true)
+    public QuittanceResponse previsualiserAvenant(
+            Long agenceId,
+            Long contratId,
+            AvenantRequest request,
+        Long mouvementId
+    ) {
         if (isModificationGarantiesAvenant(request)) {
-            AvenantModificationGraph graph = resolveModificationGarantiesAvenant(agenceId, contratId, request, false);
+            AvenantModificationGraph graph = resolveModificationGarantiesAvenantForPreview(
+                    agenceId, contratId, request, mouvementId
+            );
             validateAvenantAssistances(request, graph.vehicules());
             QuittanceResponse quittance = mouvementContratService.previsualiserMouvementSpecialise(
                     graph.contrat(),
@@ -2514,7 +2530,7 @@ public class ContratService {
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
             return quittance;
         }
-        AvenantGraph graph = resolveAvenantGraph(agenceId, contratId, request, false);
+        AvenantGraph graph = resolveAvenantGraphForPreview(agenceId, contratId, request, mouvementId);
         validateAvenantAssistances(request, graph.vehicules());
         QuittanceCalculService.Resultat retourPrime = calculerRetourPrime(graph, request);
         QuittanceCalculService.Resultat montantsOverride = retourPrime != null ? retourPrime : graph.montantsOverride();
@@ -2621,6 +2637,15 @@ public class ContratService {
                         montantsOverride
                 );
         if (quittance.getMouvementContratId() != null && graph.garantiesAffichees() != null) {
+            if ("CHV_M".equalsIgnoreCase(graph.typeMouvement().getCode())) {
+                mouvementContratService.remplacerSnapshotsChangementVehicule(
+                        quittance.getMouvementContratId(),
+                        graph.vehiculesAvant(),
+                        graph.garantiesAvant(),
+                        graph.vehicules(),
+                        graph.garanties()
+                );
+            }
             mouvementContratService.ajouterSnapshotsGarantiesDifferentielles(
                     quittance.getMouvementContratId(),
                     graph.garantiesAffichees()
@@ -2687,6 +2712,48 @@ public class ContratService {
         };
     }
 
+    private AvenantGraph resolveAvenantGraphForPreview(
+            Long agenceId,
+            Long contratId,
+            AvenantRequest request,
+            Long mouvementId
+    ) {
+        AvenantGraph currentGraph = resolveAvenantGraph(agenceId, contratId, request, false);
+        if (mouvementId == null || !"CHV_M".equalsIgnoreCase(currentGraph.typeMouvement().getCode())) {
+            return currentGraph;
+        }
+
+        MouvementContrat mouvement = resolveRectifiableMovement(agenceId, currentGraph.contrat(), mouvementId);
+        if (!currentGraph.typeMouvement().getCode().equalsIgnoreCase(mouvement.getTypeMouvement().getCode())) {
+            throw new BadRequestException("Le type de l'avenant rectifie ne peut pas etre modifie");
+        }
+        List<Vehicule> vehiculesAvant = mouvementVehiculeRepository.findByMouvementContratId(mouvementId).stream()
+                .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
+                .sorted(Comparator.comparing(MouvementVehicule::getId))
+                .map(MouvementVehicule::getVehicule)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<ContratGarantie> garantiesAvant = mouvementGarantieRepository.findByMouvementContratId(mouvementId).stream()
+                .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
+                .sorted(Comparator.comparing(MouvementGarantie::getId))
+                .map(MouvementGarantie::getContratGarantie)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (vehiculesAvant.isEmpty() || garantiesAvant.isEmpty()) {
+            throw new BadRequestException("Cet ancien changement de vehicule ne contient pas les snapshots AVANT requis pour la rectification");
+        }
+        return resolveChangementVehiculeAvenant(
+                currentGraph.contrat(),
+                currentGraph.typeMouvement(),
+                request,
+                false,
+                vehiculesAvant,
+                garantiesAvant
+        );
+    }
+
     private AvenantGraph resolveIncorporationAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request, boolean persist) {
         if ((request.getVehicules() == null || request.getVehicules().isEmpty())
                 && (request.getRemorques() == null || request.getRemorques().isEmpty())) {
@@ -2703,16 +2770,31 @@ public class ContratService {
     }
 
     private AvenantGraph resolveChangementVehiculeAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request, boolean persist) {
+        return resolveChangementVehiculeAvenant(contrat, typeMouvement, request, persist, null, null);
+    }
+
+    private AvenantGraph resolveChangementVehiculeAvenant(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            AvenantRequest request,
+            boolean persist,
+            List<Vehicule> vehiculesAvantOverride,
+            List<ContratGarantie> garantiesAvantOverride
+    ) {
         if (request.getVehicules() == null || request.getVehicules().size() != 1) {
             throw new BadRequestException("Un seul vehicule est obligatoire pour le changement de vehicule");
         }
         if (request.getRemorques() != null && !request.getRemorques().isEmpty()) {
             throw new BadRequestException("Le changement de vehicule ne doit pas contenir de remorque");
         }
-        List<Vehicule> vehiculesAvant = activeVehicules(contrat);
-        List<ContratGarantie> garantiesAvant = activeGaranties(contrat).stream()
-                .filter(garantie -> garantie.getRemorque() == null)
-                .toList();
+        List<Vehicule> vehiculesAvant = vehiculesAvantOverride == null
+                ? activeVehicules(contrat)
+                : vehiculesAvantOverride;
+        List<ContratGarantie> garantiesAvant = garantiesAvantOverride == null
+                ? activeGaranties(contrat).stream()
+                        .filter(garantie -> garantie.getRemorque() == null)
+                        .toList()
+                : garantiesAvantOverride;
         if (vehiculesAvant.isEmpty()) {
             throw new BadRequestException("Aucun vehicule actif disponible pour le changement de vehicule");
         }
@@ -2747,7 +2829,9 @@ public class ContratService {
                 targets.garanties(),
                 NatureSnapshotMouvement.APRES,
                 differentiel,
-                garantiesDifferentielles
+                garantiesDifferentielles,
+                vehiculesAvant,
+                garantiesAvant
         );
     }
 
@@ -3144,6 +3228,45 @@ public class ContratService {
     }
 
     private AvenantModificationGraph resolveModificationGarantiesAvenant(Long agenceId, Long contratId, AvenantRequest request, boolean persist) {
+        return resolveModificationGarantiesAvenant(agenceId, contratId, request, persist, null);
+    }
+
+    private AvenantModificationGraph resolveModificationGarantiesAvenantForPreview(
+            Long agenceId,
+            Long contratId,
+            AvenantRequest request,
+            Long mouvementId
+    ) {
+        if (mouvementId == null) {
+            return resolveModificationGarantiesAvenant(agenceId, contratId, request, false);
+        }
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        MouvementContrat mouvement = resolveRectifiableMovement(agenceId, contrat, mouvementId);
+        if (request == null || !hasText(request.getCodeTypeMouvement())
+                || !request.getCodeTypeMouvement().equalsIgnoreCase(mouvement.getTypeMouvement().getCode())) {
+            throw new BadRequestException("Le type de l'avenant rectifie ne peut pas etre modifie");
+        }
+        List<ContratGarantie> garantiesAvant = mouvementGarantieRepository.findByMouvementContratId(mouvementId).stream()
+                .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
+                .sorted(Comparator.comparing(MouvementGarantie::getId))
+                .map(MouvementGarantie::getContratGarantie)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (garantiesAvant.isEmpty()) {
+            throw new BadRequestException("Cet ancien avenant ne contient pas les snapshots AVANT requis pour la rectification");
+        }
+        return resolveModificationGarantiesAvenant(agenceId, contratId, request, false, garantiesAvant);
+    }
+
+    private AvenantModificationGraph resolveModificationGarantiesAvenant(
+            Long agenceId,
+            Long contratId,
+            AvenantRequest request,
+            boolean persist,
+            List<ContratGarantie> anciennesGarantiesOverride
+    ) {
         if (request == null || request.getDateEffet() == null) {
             throw new BadRequestException("La date d'effet de l'avenant est obligatoire");
         }
@@ -3162,7 +3285,9 @@ public class ContratService {
         }
         List<Vehicule> vehicules = activeVehicules(contrat);
         List<Remorque> remorques = activeRemorques(contrat);
-        List<ContratGarantie> anciennesGaranties = activeGaranties(contrat);
+        List<ContratGarantie> anciennesGaranties = anciennesGarantiesOverride == null
+                ? activeGaranties(contrat)
+                : anciennesGarantiesOverride;
         if (vehicules.isEmpty() && remorques.isEmpty()) {
             throw new BadRequestException("Aucune cible active disponible pour cet avenant");
         }
@@ -4362,10 +4487,12 @@ public class ContratService {
             garanties = garantiesActives.stream().map(this::toGarantieView).toList();
         } else {
             vehicules = mouvementVehiculeRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
+                    .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                     .sorted(Comparator.comparing(MouvementVehicule::getId))
                     .map(this::toVehiculeView)
                     .toList();
             remorques = mouvementRemorqueRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
+                    .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                     .sorted(Comparator.comparing(MouvementRemorque::getId))
                     .map(this::toRemorqueView)
                     .toList();
@@ -4657,12 +4784,14 @@ public class ContratService {
         }
 
         List<Vehicule> vehicules = mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                 .sorted(Comparator.comparing(MouvementVehicule::getId))
                 .map(MouvementVehicule::getVehicule)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         List<Remorque> remorques = mouvementRemorqueRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                 .sorted(Comparator.comparing(MouvementRemorque::getId))
                 .map(MouvementRemorque::getRemorque)
                 .filter(Objects::nonNull)
@@ -5908,7 +6037,9 @@ public class ContratService {
             List<ContratGarantie> garanties,
             NatureSnapshotMouvement snapshotNature,
             QuittanceCalculService.Resultat montantsOverride,
-            List<ContratGarantie> garantiesAffichees
+            List<ContratGarantie> garantiesAffichees,
+            List<Vehicule> vehiculesAvant,
+            List<ContratGarantie> garantiesAvant
     ) {
         private AvenantGraph(
                 Contrat contrat,
@@ -5918,7 +6049,7 @@ public class ContratService {
                 List<ContratGarantie> garanties,
                 NatureSnapshotMouvement snapshotNature
         ) {
-            this(contrat, typeMouvement, vehicules, remorques, garanties, snapshotNature, null, null);
+            this(contrat, typeMouvement, vehicules, remorques, garanties, snapshotNature, null, null, List.of(), List.of());
         }
     }
 

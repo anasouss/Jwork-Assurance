@@ -247,9 +247,9 @@ export const productionApi = {
     );
   },
 
-  async previewAvenant(contratId: string, request: AvenantRequest) {
+  async previewAvenant(contratId: string, request: AvenantRequest, mouvementId?: string | null) {
     return unwrap(
-      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/previsualisation-quittance`, {
+      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/previsualisation-quittance${buildQueryString({ mouvementId })}`, {
         method: "POST",
         body: JSON.stringify(request),
       })

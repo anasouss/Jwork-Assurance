@@ -329,9 +329,12 @@ public class ContratController {
     @PostMapping("/{id}/avenants/previsualisation-quittance")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserAvenant(
             @PathVariable Long id,
+            @RequestParam(required = false) Long mouvementId,
             @Valid @RequestBody AvenantRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserAvenant(TenantContext.getCurrentAgence(), id, request)));
+        return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserAvenant(
+                TenantContext.getCurrentAgence(), id, request, mouvementId
+        )));
     }
 
     @PostMapping("/{id}/avenants")

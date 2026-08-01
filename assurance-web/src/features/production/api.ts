@@ -19,6 +19,7 @@ import type {
   ElementFacturable,
   EcheanceAutomobileResponse,
   AvenantContext,
+  AvenantDetail,
   AvenantDraft,
   AvenantRequest,
   LivraisonAttestation,
@@ -218,20 +219,28 @@ export const productionApi = {
   },
 
   async getAvenantContext(contratId: string) {
-    return unwrap(await apiFetch<ApiResponse<AvenantContext>>(`/api/v1/contrats/${contratId}/avenants`));
+    return unwrap(await apiFetch<ApiResponse<AvenantContext>>(`/api/v1/contrats/${contratId}/avenants/context`));
+  },
+
+  async getAvenantDetail(contratId: string, mouvementId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<AvenantDetail>>(
+        `/api/v1/contrats/${contratId}/avenants/${mouvementId}`
+      )
+    );
   },
 
   async getAvenantDraft(contratId: string, codeTypeMouvement: string) {
     return unwrap(
       await apiFetch<ApiResponse<AvenantDraft | null>>(
-        `/api/v1/contrats/${contratId}/avenants/brouillon${buildQueryString({ code: codeTypeMouvement })}`
+        `/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(codeTypeMouvement)}/brouillon`
       )
     );
   },
 
   async saveAvenantDraft(contratId: string, request: AvenantRequest) {
     return unwrap(
-      await apiFetch<ApiResponse<AvenantDraft>>(`/api/v1/contrats/${contratId}/avenants/brouillon`, {
+      await apiFetch<ApiResponse<AvenantDraft>>(`/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(request.codeTypeMouvement)}/brouillon`, {
         method: "PUT",
         body: JSON.stringify(request),
       })
@@ -241,7 +250,7 @@ export const productionApi = {
   async deleteAvenantDraft(contratId: string, codeTypeMouvement: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(
-        `/api/v1/contrats/${contratId}/avenants/brouillon${buildQueryString({ code: codeTypeMouvement })}`,
+        `/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(codeTypeMouvement)}/brouillon`,
         { method: "DELETE" }
       )
     );
@@ -249,7 +258,7 @@ export const productionApi = {
 
   async previewAvenant(contratId: string, request: AvenantRequest, mouvementId?: string | null) {
     return unwrap(
-      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/previsualisation-quittance${buildQueryString({ mouvementId })}`, {
+      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(request.codeTypeMouvement)}/preview${buildQueryString({ mouvementId })}`, {
         method: "POST",
         body: JSON.stringify(request),
       })
@@ -258,7 +267,7 @@ export const productionApi = {
 
   async createAvenant(contratId: string, request: AvenantRequest) {
     return unwrap(
-      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants`, {
+      await apiFetch<ApiResponse<QuittancePreview>>(`/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(request.codeTypeMouvement)}`, {
         method: "POST",
         body: JSON.stringify(request),
       })
@@ -276,7 +285,7 @@ export const productionApi = {
   async rectifyAvenant(contratId: string, mouvementId: string, request: AvenantRequest) {
     return unwrap(
       await apiFetch<ApiResponse<QuittancePreview>>(
-        `/api/v1/contrats/${contratId}/avenants/${mouvementId}/rectification`,
+        `/api/v1/contrats/${contratId}/avenants/${mouvementId}/${encodeURIComponent(request.codeTypeMouvement)}/rectification`,
         {
           method: "PUT",
           body: JSON.stringify(request),

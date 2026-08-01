@@ -7,6 +7,7 @@ import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.response.AssistanceContratResponse;
+import com.assurance.dto.response.AvenantDetailResponse;
 import com.assurance.dto.response.AvenantDraftSummaryResponse;
 import com.assurance.dto.response.ClientResponse;
 import com.assurance.dto.response.ContratResponse;
@@ -1933,7 +1934,33 @@ public class ContratService {
     public ContratResponse getAvenantContext(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
-        return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)), true, null, false);
+        return toResponse(ensureNumeroDossier(ensureNumeroDevis(contrat)), false, null, false, false);
+    }
+
+    @Transactional(readOnly = true)
+    public AvenantDetailResponse getAvenantDetail(Long agenceId, Long contratId, Long mouvementId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        MouvementContrat mouvement = requireAvenantMovement(agenceId, contrat, mouvementId);
+        return AvenantDetailResponse.builder()
+                .contratId(contrat.getId())
+                .mouvement(toMouvementView(mouvement, 1))
+                .donneesEnregistrees(toAvenantRequest(mouvement))
+                .impactFinancier(buildSavedQuittanceMouvement(contrat, mouvementId))
+                .build();
+    }
+
+    private MouvementContrat requireAvenantMovement(Long agenceId, Contrat contrat, Long mouvementId) {
+        MouvementContrat mouvement = mouvementContratRepository.findByContratIdAndId(contrat.getId(), mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        if (mouvement.getAgence() == null || !agenceId.equals(mouvement.getAgence().getId())) {
+            throw new ResourceNotFoundException("MouvementContrat", mouvementId);
+        }
+        if (mouvement.getTypeMouvement() == null
+                || mouvement.getTypeMouvement().getCategorie() != CategorieMouvementContrat.AVENANT) {
+            throw new BadRequestException("Le mouvement demande n'est pas un avenant");
+        }
+        return mouvement;
     }
 
     @Transactional(readOnly = true)
@@ -4857,6 +4884,16 @@ public class ContratService {
     }
 
     private ContratResponse toResponse(Contrat contrat, boolean includeTargetSummaries, Long selectedMouvementId, boolean fallbackInactiveForView) {
+        return toResponse(contrat, includeTargetSummaries, selectedMouvementId, fallbackInactiveForView, true);
+    }
+
+    private ContratResponse toResponse(
+            Contrat contrat,
+            boolean includeTargetSummaries,
+            Long selectedMouvementId,
+            boolean fallbackInactiveForView,
+            boolean includeFinancialHistory
+    ) {
         List<ContratResponse.ClientLink> clients = new ArrayList<>();
         for (ContratClient link : contrat.getClients()) {
             clients.add(ContratResponse.ClientLink.builder()
@@ -4908,51 +4945,40 @@ public class ContratService {
                     .toList();
         }
 
-        List<MouvementContrat> mouvementsActifs = contrat.getMouvements().stream()
-                .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
-                .sorted(Comparator
-                        .comparing(MouvementContrat::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(MouvementContrat::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .toList();
         List<ContratResponse.MouvementView> mouvements = new ArrayList<>();
-        for (int mouvementIndex = 0; mouvementIndex < mouvementsActifs.size(); mouvementIndex++) {
-            MouvementContrat mouvement = mouvementsActifs.get(mouvementIndex);
-            mouvements.add(ContratResponse.MouvementView.builder()
-                    .id(mouvement.getId())
-                    .code(mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)
-                    .libelle(mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getLibelle() : null)
-                    .categorie(mouvement.getTypeMouvement() != null && mouvement.getTypeMouvement().getCategorie() != null ? mouvement.getTypeMouvement().getCategorie().name() : null)
-                    .statut(mouvement.getStatut() != null ? mouvement.getStatut().name() : null)
-                    .numeroMouvement(numeroActeAffiche(mouvement, mouvementIndex + 1))
-                    .dateEffet(mouvement.getDateEffet())
-                    .dateEcheance(mouvement.getDateEcheance())
-                    .primeNette(mouvement.getPrimeNette())
-                    .taxe(mouvement.getTaxe())
-                    .taxeParafiscale(mouvement.getTaxeParafiscale())
-                    .accessoire(mouvement.getAccessoire())
-                    .cnpac(mouvement.getCnpac())
-                    .primeTotale(mouvement.getPrimeTotale())
-                    .build());
+        if (includeFinancialHistory) {
+            List<MouvementContrat> mouvementsActifs = contrat.getMouvements().stream()
+                    .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
+                    .sorted(Comparator
+                            .comparing(MouvementContrat::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                            .thenComparing(MouvementContrat::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                    .toList();
+            for (int mouvementIndex = 0; mouvementIndex < mouvementsActifs.size(); mouvementIndex++) {
+                MouvementContrat mouvement = mouvementsActifs.get(mouvementIndex);
+                mouvements.add(toMouvementView(mouvement, mouvementIndex + 1));
+            }
         }
 
         List<ContratResponse.ElementFacturableView> elementsFacturables = new ArrayList<>();
-        for (ElementFacturable element : contrat.getElementsFacturables()) {
-            elementsFacturables.add(ContratResponse.ElementFacturableView.builder()
-                    .id(element.getId())
-                    .mouvementContratId(element.getMouvementContrat() != null ? element.getMouvementContrat().getId() : null)
-                    .nature(element.getNature() != null ? element.getNature().name() : null)
-                    .statut(element.getStatut() != null ? element.getStatut().name() : null)
-                    .referenceSource(element.getReferenceSource())
-                    .libelle(element.getLibelle())
-                    .dateDebut(element.getDateDebut())
-                    .dateFin(element.getDateFin())
-                    .primeNette(element.getPrimeNette())
-                    .taxe(element.getTaxe())
-                    .taxeParafiscale(element.getTaxeParafiscale())
-                    .accessoire(element.getAccessoire())
-                    .cnpac(element.getCnpac())
-                    .primeTotale(element.getPrimeTotale())
-                    .build());
+        if (includeFinancialHistory) {
+            for (ElementFacturable element : contrat.getElementsFacturables()) {
+                elementsFacturables.add(ContratResponse.ElementFacturableView.builder()
+                        .id(element.getId())
+                        .mouvementContratId(element.getMouvementContrat() != null ? element.getMouvementContrat().getId() : null)
+                        .nature(element.getNature() != null ? element.getNature().name() : null)
+                        .statut(element.getStatut() != null ? element.getStatut().name() : null)
+                        .referenceSource(element.getReferenceSource())
+                        .libelle(element.getLibelle())
+                        .dateDebut(element.getDateDebut())
+                        .dateFin(element.getDateFin())
+                        .primeNette(element.getPrimeNette())
+                        .taxe(element.getTaxe())
+                        .taxeParafiscale(element.getTaxeParafiscale())
+                        .accessoire(element.getAccessoire())
+                        .cnpac(element.getCnpac())
+                        .primeTotale(element.getPrimeTotale())
+                        .build());
+            }
         }
         List<AssistanceContratResponse> assistances = (selectedMouvement == null
                 ? assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
@@ -4963,9 +4989,11 @@ public class ContratService {
                 .stream()
                 .map(this::toAssistanceResponse)
                 .toList();
-        QuittanceResponse quittanceGenerale = selectedMouvementId == null
-                ? buildQuittanceGenerale(contrat, includeTargetSummaries)
-                : buildSavedQuittanceMouvement(contrat, selectedMouvementId);
+        QuittanceResponse quittanceGenerale = !includeFinancialHistory
+                ? null
+                : selectedMouvementId == null
+                        ? buildQuittanceGenerale(contrat, includeTargetSummaries)
+                        : buildSavedQuittanceMouvement(contrat, selectedMouvementId);
         List<QuittanceResponse.TargetSummary> targetSummaries = quittanceGenerale == null
                 ? List.of()
                 : quittanceGenerale.getTargetSummaries();
@@ -5044,6 +5072,30 @@ public class ContratService {
             return numero.trim();
         }
         return String.valueOf(positionChronologique);
+    }
+
+    private ContratResponse.MouvementView toMouvementView(
+            MouvementContrat mouvement,
+            int fallbackPosition
+    ) {
+        return ContratResponse.MouvementView.builder()
+                .id(mouvement.getId())
+                .code(mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)
+                .libelle(mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getLibelle() : null)
+                .categorie(mouvement.getTypeMouvement() != null && mouvement.getTypeMouvement().getCategorie() != null
+                        ? mouvement.getTypeMouvement().getCategorie().name()
+                        : null)
+                .statut(mouvement.getStatut() != null ? mouvement.getStatut().name() : null)
+                .numeroMouvement(numeroActeAffiche(mouvement, fallbackPosition))
+                .dateEffet(mouvement.getDateEffet())
+                .dateEcheance(mouvement.getDateEcheance())
+                .primeNette(mouvement.getPrimeNette())
+                .taxe(mouvement.getTaxe())
+                .taxeParafiscale(mouvement.getTaxeParafiscale())
+                .accessoire(mouvement.getAccessoire())
+                .cnpac(mouvement.getCnpac())
+                .primeTotale(mouvement.getPrimeTotale())
+                .build();
     }
 
     private AssistanceContratResponse toAssistanceResponse(AssistanceContrat assistance) {

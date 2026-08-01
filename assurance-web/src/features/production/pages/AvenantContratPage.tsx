@@ -130,9 +130,9 @@ export default function AvenantContratPage() {
     queryFn: () => productionApi.getAvenantRectification(contratId, validatedMovementId!),
     enabled: Boolean(contratId && validatedMovementId),
   });
-  const savedMovementQuery = useQuery({
-    queryKey: ["contrat", contratId, validatedMovementId, "avenant-edit"],
-    queryFn: () => productionApi.getContrat(contratId, { mouvementId: validatedMovementId }),
+  const savedAvenantQuery = useQuery({
+    queryKey: ["avenant-detail", contratId, validatedMovementId],
+    queryFn: () => productionApi.getAvenantDetail(contratId, validatedMovementId!),
     enabled: Boolean(contratId && validatedMovementId),
   });
   useEffect(() => {
@@ -247,7 +247,7 @@ export default function AvenantContratPage() {
   ].some((query) => query.isLoading);
   const initialLoading = contextQuery.isLoading
     || sourceQuery.isLoading
-    || savedMovementQuery.isLoading
+    || savedAvenantQuery.isLoading
     || referencesLoading
     || (
       contextQuery.isSuccess
@@ -351,7 +351,7 @@ export default function AvenantContratPage() {
 
   useEffect(() => {
     const sourceFetched = validatedMovementId
-      ? rectificationQuery.isFetched && savedMovementQuery.isFetched
+      ? rectificationQuery.isFetched && savedAvenantQuery.isFetched
       : draftQuery.isFetchedAfterMount;
     if (!contrat || !sourceFetched || hydratedDraftCodeRef.current === hydrationKey) {
       return;
@@ -428,7 +428,7 @@ export default function AvenantContratPage() {
     }
     setDuplicataAttestationDrafts(nextDuplicataAttestations);
     if (validatedMovementId) {
-      setPreview(savedMovementQuery.data?.quittanceGenerale ?? null);
+      setPreview(savedAvenantQuery.data?.impactFinancier ?? null);
       setTargetPreview(null);
     }
     setHydratedSourceKey(hydrationKey);
@@ -443,8 +443,8 @@ export default function AvenantContratPage() {
     movementCode,
     rectificationQuery.data,
     rectificationQuery.isFetched,
-    savedMovementQuery.data,
-    savedMovementQuery.isFetched,
+    savedAvenantQuery.data,
+    savedAvenantQuery.isFetched,
     validatedMovementId,
   ]);
 

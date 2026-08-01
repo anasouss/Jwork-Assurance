@@ -324,6 +324,30 @@ export type AvenantContext = {
   mouvementsDisponibles: MouvementDisponible[];
 };
 
+export type AvenantMovement = {
+  id: string;
+  code?: string | null;
+  libelle?: string | null;
+  categorie?: string | null;
+  statut?: string | null;
+  numeroMouvement?: string | null;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  primeNette?: number | null;
+  taxe?: number | null;
+  taxeParafiscale?: number | null;
+  accessoire?: number | null;
+  cnpac?: number | null;
+  primeTotale?: number | null;
+};
+
+export type AvenantDetail = {
+  contratId: string;
+  mouvement: AvenantMovement;
+  donneesEnregistrees: AvenantRequest;
+  impactFinancier?: QuittancePreview | null;
+};
+
 export type Quittance = QuittancePreview & {
   id?: string;
   contratId?: string;

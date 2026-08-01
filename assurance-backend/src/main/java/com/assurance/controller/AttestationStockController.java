@@ -26,6 +26,7 @@ import com.assurance.service.LivraisonAttestationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,11 +49,13 @@ public class AttestationStockController {
     private final UsageRepository usageRepository;
 
     @GetMapping("/dashboard")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<AttestationStockDashboardResponse>> dashboard() {
         return ResponseEntity.ok(ApiResponse.success(attestationStockService.dashboard(TenantContext.getCurrentAgence())));
     }
 
     @GetMapping("/attestations")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<AttestationStockItemResponse>>> attestations(
             @RequestParam(required = false) Long compagnieAssuranceId,
             @RequestParam(required = false) Long groupeUsageAttestationId,
@@ -73,6 +76,7 @@ public class AttestationStockController {
     }
 
     @PostMapping("/attestations/{id}/annuler")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:cancel', 'PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<AttestationStockItemResponse>> annulerAttestation(
             @PathVariable Long id,
             @Valid @RequestBody CancelAttestationStockRequest request
@@ -84,11 +88,13 @@ public class AttestationStockController {
     }
 
     @GetMapping("/settings")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<AttestationStockSettingsResponse>> settings() {
         return ResponseEntity.ok(ApiResponse.success(attestationStockService.settings(TenantContext.getCurrentAgence())));
     }
 
     @PutMapping("/settings")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<AttestationStockSettingsResponse>> updateSettings(
             @RequestBody UpdateAttestationStockSettingsRequest request
     ) {
@@ -99,11 +105,13 @@ public class AttestationStockController {
     }
 
     @GetMapping("/seuils")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<SeuilStockAttestationResponse>>> seuils() {
         return ResponseEntity.ok(ApiResponse.success(attestationStockService.listerSeuils()));
     }
 
     @PostMapping("/seuils")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<SeuilStockAttestationResponse>> creerSeuil(
             @Valid @RequestBody UpsertSeuilStockAttestationRequest request
     ) {
@@ -111,6 +119,7 @@ public class AttestationStockController {
     }
 
     @PutMapping("/seuils/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<SeuilStockAttestationResponse>> modifierSeuil(
             @PathVariable Long id,
             @Valid @RequestBody UpsertSeuilStockAttestationRequest request
@@ -119,6 +128,7 @@ public class AttestationStockController {
     }
 
     @PostMapping("/livraisons")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> creerLivraison(
             @Valid @RequestBody CreateLivraisonAttestationRequest request
     ) {
@@ -129,6 +139,7 @@ public class AttestationStockController {
     }
 
     @GetMapping("/livraisons")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<LivraisonAttestationResponse>>> listerLivraisons(
             @RequestParam(required = false) SourceLivraisonAttestation source
     ) {
@@ -136,6 +147,7 @@ public class AttestationStockController {
     }
 
     @PostMapping("/livraisons/{id}/lots")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> ajouterLot(
             @PathVariable Long id,
             @Valid @RequestBody AddLotAttestationRequest request
@@ -147,6 +159,7 @@ public class AttestationStockController {
     }
 
     @PostMapping("/livraisons/{id}/reception")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> ajouterLots(
             @PathVariable Long id,
             @Valid @RequestBody AddLotsAttestationRequest request
@@ -158,6 +171,7 @@ public class AttestationStockController {
     }
 
     @PostMapping("/livraisons/{id}/valider")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> valider(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 livraisonAttestationService.valider(id),
@@ -166,6 +180,7 @@ public class AttestationStockController {
     }
 
     @GetMapping("/disponibles")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<List<String>>> disponibles(
             @RequestParam Long contratId,
             @RequestParam Long usageId,
@@ -179,6 +194,7 @@ public class AttestationStockController {
     }
 
     @GetMapping("/suggestions")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<List<String>>> suggestions(
             @RequestParam Long compagnieAssuranceId,
             @RequestParam Long usageId,
@@ -190,6 +206,7 @@ public class AttestationStockController {
     }
 
     @GetMapping("/validation")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<AttestationNumeroValidationResponse>> validation(
             @RequestParam Long compagnieAssuranceId,
             @RequestParam Long usageId,

@@ -4,12 +4,10 @@ import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.CreateRenouvellementDraftRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.DevisPdfFilterRequest;
-import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.ApiResponse;
-import com.assurance.dto.response.AvenantDraftResponse;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.CarteVerteContextResponse;
@@ -17,12 +15,10 @@ import com.assurance.dto.response.CarteVerteResponse;
 import com.assurance.dto.response.ContratActionsResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.EcheanceAutomobileResponse;
-import com.assurance.dto.response.AvenantContextResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
-import com.assurance.service.AvenantDraftService;
 import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
@@ -34,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,7 +50,6 @@ import java.util.List;
 public class ContratController {
 
     private final ContratService contratService;
-    private final AvenantDraftService avenantDraftService;
     private final ContratActionService contratActionService;
     private final AssistanceContratService assistanceContratService;
     private final CarteVerteService carteVerteService;
@@ -62,11 +58,13 @@ public class ContratController {
     private final EcheanceProductionService echeanceProductionService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<ContratResponse>> create(@Valid @RequestBody CreateContratRequest request) {
         return ResponseEntity.ok(ApiResponse.success(contratService.create(request), "Contrat cree"));
     }
 
     @PostMapping("/drafts")
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<ContratResponse>> createDraft(@RequestBody CreateContratRequest request) {
         if (request.getAgenceId() == null) {
             request.setAgenceId(TenantContext.getCurrentAgence());
@@ -75,16 +73,19 @@ public class ContratController {
     }
 
     @GetMapping("/drafts/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> getDraft(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(contratService.getDraft(TenantContext.getCurrentAgence(), id)));
     }
 
     @PutMapping("/drafts/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> updateDraft(@PathVariable Long id, @RequestBody CreateContratRequest request) {
         return ResponseEntity.ok(ApiResponse.success(contratService.updateDraft(TenantContext.getCurrentAgence(), id, request), "Brouillon enregistre"));
     }
 
     @PutMapping("/drafts/{id}/vehicules/{index}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftVehicule(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -94,6 +95,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}/vehicules/{index}/garanties")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftVehiculeGaranties(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -103,6 +105,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}/remorques/{index}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftRemorque(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -112,6 +115,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}/remorques/{index}/garanties")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftRemorqueGaranties(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -121,11 +125,13 @@ public class ContratController {
     }
 
     @PostMapping("/drafts/{id}/finaliser")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> finalizeDraft(@PathVariable Long id, @Valid @RequestBody CreateContratRequest request) {
         return ResponseEntity.ok(ApiResponse.success(contratService.finalizeDraft(TenantContext.getCurrentAgence(), id, request), "Contrat cree"));
     }
 
     @PostMapping("/previsualisation-quittance")
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserQuittanceCreation(@RequestBody CreateContratRequest request) {
         if (request.getAgenceId() == null) {
             request.setAgenceId(TenantContext.getCurrentAgence());
@@ -134,6 +140,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/renouvellements/brouillon")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> createRenouvellementDraft(
             @PathVariable Long id,
             @Valid @RequestBody CreateRenouvellementDraftRequest request
@@ -149,16 +156,19 @@ public class ContratController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<ContratResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(contratService.list(TenantContext.getCurrentAgence())));
     }
 
     @GetMapping("/prospections")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<ContratResponse>>> listProspections() {
         return ResponseEntity.ok(ApiResponse.success(contratService.listProspections(TenantContext.getCurrentAgence())));
     }
 
     @GetMapping("/echeances/automobile")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<ApiResponse<EcheanceAutomobileResponse>> echeancesAutomobile(
             @RequestParam LocalDate dateDu,
             @RequestParam LocalDate dateAu,
@@ -181,6 +191,7 @@ public class ContratController {
     }
 
     @GetMapping("/echeances/automobile/export")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<byte[]> exportEcheancesAutomobile(
             @RequestParam LocalDate dateDu,
             @RequestParam LocalDate dateAu,
@@ -203,6 +214,7 @@ public class ContratController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<ApiResponse<ContratResponse>> get(
             @PathVariable Long id,
             @RequestParam(required = false) Long mouvementId
@@ -211,18 +223,21 @@ public class ContratController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:delete', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         contratService.deleteContrat(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Contrat supprime"));
     }
 
     @DeleteMapping("/{id}/mouvements/{mouvementId}")
+    @PreAuthorize("hasAnyAuthority('PERM_avenant:delete', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<Void>> deleteMouvement(@PathVariable Long id, @PathVariable Long mouvementId) {
         contratService.deleteMouvement(TenantContext.getCurrentAgence(), id, mouvementId);
         return ResponseEntity.ok(ApiResponse.success(null, "Mouvement supprime"));
     }
 
     @PostMapping("/{id}/convertir-prospection")
+    @PreAuthorize("hasAuthority('PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> convertirProspection(
             @PathVariable Long id,
             @RequestBody(required = false) ConvertirProspectionRequest request
@@ -231,6 +246,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/devis-pdf")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<byte[]> devisPdf(@PathVariable Long id, @RequestBody(required = false) DevisPdfFilterRequest request) {
         byte[] pdf = devisPdfService.generate(TenantContext.getCurrentAgence(), id, request);
         return ResponseEntity.ok()
@@ -240,16 +256,19 @@ public class ContratController {
     }
 
     @GetMapping("/{id}/actions")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<ApiResponse<ContratActionsResponse>> actions(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(contratActionService.getActions(TenantContext.getCurrentAgence(), id)));
     }
 
     @GetMapping("/{id}/quittances")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<QuittanceResponse>>> quittances(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.listQuittances(TenantContext.getCurrentAgence(), id)));
     }
 
     @PostMapping("/{id}/mouvements/previsualisation-quittance")
+    @PreAuthorize("hasAuthority('PERM_contrat:update')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserQuittance(
             @PathVariable Long id,
             @Valid @RequestBody MouvementContratRequest request
@@ -258,6 +277,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/mouvements")
+    @PreAuthorize("hasAuthority('PERM_contrat:update')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> creerMouvement(
             @PathVariable Long id,
             @Valid @RequestBody MouvementContratRequest request
@@ -265,87 +285,8 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.creerMouvement(TenantContext.getCurrentAgence(), id, request), "Mouvement cree"));
     }
 
-    @GetMapping("/{id}/avenants")
-    public ResponseEntity<ApiResponse<AvenantContextResponse>> contexteAvenant(@PathVariable Long id) {
-        ContratActionsResponse actions = contratActionService.getActions(TenantContext.getCurrentAgence(), id);
-        return ResponseEntity.ok(ApiResponse.success(AvenantContextResponse.builder()
-                .contrat(contratService.getAvenantContext(TenantContext.getCurrentAgence(), id))
-                .mouvementsDisponibles(actions.getMouvementsDisponibles())
-                .build()));
-    }
-
-    @GetMapping("/{id}/avenants/brouillon")
-    public ResponseEntity<ApiResponse<AvenantDraftResponse>> brouillonAvenant(
-            @PathVariable Long id,
-            @RequestParam String code
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(
-                avenantDraftService.get(TenantContext.getCurrentAgence(), id, code)
-        ));
-    }
-
-    @PutMapping("/{id}/avenants/brouillon")
-    public ResponseEntity<ApiResponse<AvenantDraftResponse>> enregistrerBrouillonAvenant(
-            @PathVariable Long id,
-            @RequestBody AvenantRequest request
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(
-                avenantDraftService.save(TenantContext.getCurrentAgence(), id, request),
-                "Brouillon d'avenant enregistre"
-        ));
-    }
-
-    @DeleteMapping("/{id}/avenants/brouillon")
-    public ResponseEntity<ApiResponse<Void>> supprimerBrouillonAvenant(
-            @PathVariable Long id,
-            @RequestParam String code
-    ) {
-        avenantDraftService.delete(TenantContext.getCurrentAgence(), id, code);
-        return ResponseEntity.ok(ApiResponse.success(null, "Brouillon d'avenant supprime"));
-    }
-
-    @GetMapping("/{id}/avenants/{mouvementId}/rectification")
-    public ResponseEntity<ApiResponse<AvenantRequest>> rectificationAvenant(
-            @PathVariable Long id,
-            @PathVariable Long mouvementId
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(
-                contratService.getAvenantRectification(TenantContext.getCurrentAgence(), id, mouvementId)
-        ));
-    }
-
-    @PutMapping("/{id}/avenants/{mouvementId}/rectification")
-    public ResponseEntity<ApiResponse<QuittanceResponse>> rectifierAvenant(
-            @PathVariable Long id,
-            @PathVariable Long mouvementId,
-            @Valid @RequestBody AvenantRequest request
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(
-                contratService.rectifierAvenant(TenantContext.getCurrentAgence(), id, mouvementId, request),
-                "Avenant rectifie"
-        ));
-    }
-
-    @PostMapping("/{id}/avenants/previsualisation-quittance")
-    public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserAvenant(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long mouvementId,
-            @Valid @RequestBody AvenantRequest request
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.previsualiserAvenant(
-                TenantContext.getCurrentAgence(), id, request, mouvementId
-        )));
-    }
-
-    @PostMapping("/{id}/avenants")
-    public ResponseEntity<ApiResponse<QuittanceResponse>> creerAvenant(
-            @PathVariable Long id,
-            @Valid @RequestBody AvenantRequest request
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(contratService.creerAvenant(TenantContext.getCurrentAgence(), id, request), "Avenant cree"));
-    }
-
     @PostMapping("/{id}/assistances")
+    @PreAuthorize("hasAnyAuthority('PERM_assistance:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<AssistanceContratResponse>> upsertAssistance(
             @PathVariable Long id,
             @Valid @RequestBody UpsertAssistanceContratRequest request
@@ -354,6 +295,7 @@ public class ContratController {
     }
 
     @GetMapping("/{id}/assistances")
+    @PreAuthorize("hasAnyAuthority('PERM_assistance:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<AssistanceContratContextResponse>> assistanceContext(
             @PathVariable Long id,
             @RequestParam(required = false) Long mouvementId,
@@ -363,12 +305,14 @@ public class ContratController {
     }
 
     @DeleteMapping("/{id}/assistances/{assistanceId}")
+    @PreAuthorize("hasAnyAuthority('PERM_assistance:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<Void>> deleteAssistance(@PathVariable Long id, @PathVariable Long assistanceId) {
         assistanceContratService.deactivate(TenantContext.getCurrentAgence(), id, assistanceId);
         return ResponseEntity.ok(ApiResponse.success(null, "Assistance supprimee"));
     }
 
     @GetMapping("/{id}/cartes-vertes")
+    @PreAuthorize("hasAnyAuthority('PERM_carte-verte:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<CarteVerteContextResponse>> carteVerteContext(
             @PathVariable Long id,
             @RequestParam(required = false) Long mouvementId
@@ -377,6 +321,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/cartes-vertes")
+    @PreAuthorize("hasAnyAuthority('PERM_carte-verte:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<CarteVerteResponse>> upsertCarteVerte(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCarteVerteRequest request
@@ -385,6 +330,7 @@ public class ContratController {
     }
 
     @DeleteMapping("/{id}/cartes-vertes/{carteVerteId}")
+    @PreAuthorize("hasAnyAuthority('PERM_carte-verte:manage', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<Void>> deleteCarteVerte(@PathVariable Long id, @PathVariable Long carteVerteId) {
         carteVerteService.deactivate(TenantContext.getCurrentAgence(), id, carteVerteId);
         return ResponseEntity.ok(ApiResponse.success(null, "Carte verte supprimee"));

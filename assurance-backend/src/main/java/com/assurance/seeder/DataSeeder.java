@@ -1,7 +1,6 @@
 package com.assurance.seeder;
 
 import com.assurance.entity.*;
-import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
 import com.assurance.enums.ModeTarificationGarantie;
@@ -9,7 +8,6 @@ import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
-import com.assurance.enums.TypeImpactMouvement;
 import com.assurance.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,7 +48,6 @@ public class DataSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final ParametreApplicationRepository parametreApplicationRepository;
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
-    private final TypeMouvementContratRepository typeMouvementContratRepository;
     private final RegleAffectationQuittanceRepository regleAffectationQuittanceRepository;
 
     @Value("${app.seed.admin-email:admin@jway.ma}")
@@ -199,49 +196,6 @@ public class DataSeeder implements CommandLineRunner {
         seedParametreApplication("DR_MODE_VARIABLE", "BOOLEAN", "false", "Autorise le mode variable pour Defense et Recours");
         seedParametreApplication("RVE_TAUX_ZERO_AUTORISE", "BOOLEAN", "false", "Autorise les lignes RVE a taux zero");
         seedParametreApplication("ENABLE_ATTESTATION_STOCK_CHECK", "BOOLEAN", "1", "Active le controle du stock des attestations pendant la production");
-
-        seedTypeMouvement("AN", "Affaire nouvelle", CategorieMouvementContrat.AFFAIRE_NOUVELLE, TypeImpactMouvement.NORMAL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION, TypeContrat.FLOTTE), false, false, true, true, false, true, true, true, true, false, false, 10);
-        seedTypeMouvement("REN", "Renouvellement", CategorieMouvementContrat.RENOUVELLEMENT, TypeImpactMouvement.NORMAL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION, TypeContrat.FLOTTE), true, true, true, true, false, true, true, true, true, false, true, 20);
-
-        seedTypeMouvement("EXG_M", "Extension garanties", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), true, true, false, false, false, true, true, false, false, false, false, 110);
-        seedTypeMouvement("MOG_M", "Modification garanties", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), true, true, false, false, false, true, true, false, false, false, false, 120);
-        seedTypeMouvement("CHV_M", "Changement vehicule", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), true, true, true, false, false, true, true, true, true, false, false, 130);
-        seedTypeMouvement("EXR_M", "Extension remorque", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), true, false, false, true, false, true, true, true, true, false, false, 140);
-        seedTypeMouvement("PRI_M", "Precision immatriculation", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.CNPAC_SEUL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), false, false, true, false, true, true, false, false, true, false, false, 150);
-        seedTypeMouvement("DUP_M", "Duplicata", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.CNPAC_SEUL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), false, false, false, false, true, true, false, false, true, false, false, 160);
-        seedTypeMouvement("PRO_M", "Provisoire", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.NORMAL,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), true, true, true, false, false, true, true, true, true, false, false, 170);
-        seedTypeMouvement("RES_M", "Resiliation", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.RETOUR_PRIME,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), false, false, false, false, false, true, false, false, false, true, false, 180);
-        seedTypeMouvement("RCH_M", "Resiliation a l'echeance", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.ZERO,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), false, false, false, false, false, true, false, false, false, true, false, 190);
-        seedTypeMouvement("ANN_M", "Annulation", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.RETOUR_PRIME,
-                List.of(TypeContrat.PARTICULIER, TypeContrat.CONVENTION), false, false, false, false, false, true, false, false, false, true, false, 200);
-
-        seedTypeMouvement("INC_F", "Incorporation flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
-                List.of(TypeContrat.FLOTTE), true, true, true, true, false, true, true, true, true, false, false, 310);
-        seedTypeMouvement("MOG_F", "Modification garanties flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
-                List.of(TypeContrat.FLOTTE), true, true, true, true, false, true, true, false, false, false, false, 315);
-        seedTypeMouvement("RET_F", "Retrait flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.RETOUR_PRIME,
-                List.of(TypeContrat.FLOTTE), true, false, true, true, false, true, false, false, false, false, false, 320);
-        seedTypeMouvement("EXR_F", "Extension remorque flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.DIFFERENTIEL,
-                List.of(TypeContrat.FLOTTE), false, false, false, true, false, true, false, false, false, false, false, 325);
-        seedTypeMouvement("RES_F", "Resiliation flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.RETOUR_PRIME,
-                List.of(TypeContrat.FLOTTE), false, false, false, false, false, true, false, false, false, true, false, 330);
-        seedTypeMouvement("RCH_F", "Resiliation a l'echeance flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.ZERO,
-                List.of(TypeContrat.FLOTTE), false, false, false, false, false, true, false, false, false, false, false, 335);
-        seedTypeMouvement("PRI_F", "Precision immatriculation flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.CNPAC_SEUL,
-                List.of(TypeContrat.FLOTTE), false, false, true, false, true, true, false, false, true, false, false, 340);
-        seedTypeMouvement("DUP_F", "Duplicata flotte", CategorieMouvementContrat.AVENANT, TypeImpactMouvement.CNPAC_SEUL,
-                List.of(TypeContrat.FLOTTE), false, false, false, false, true, true, false, false, true, false, false, 350);
 
         seedCategorieClient("GRAND_PUBLIC", "GRAND PUBLIC");
         CategorieClient location = seedCategorieClient("LOCATION", "LOCATION");
@@ -908,57 +862,6 @@ public class DataSeeder implements CommandLineRunner {
         capitalRc.setCapital(capital);
         capitalRc.setActif(true);
         return capitalResponsabiliteCivileRepository.save(capitalRc);
-    }
-
-    private TypeMouvementContrat seedTypeMouvement(
-            String code,
-            String libelle,
-            CategorieMouvementContrat categorie,
-            TypeImpactMouvement typeImpact,
-            List<TypeContrat> typesContrat,
-            boolean modifieGaranties,
-            boolean garantiesEditables,
-            boolean modifieVehicule,
-            boolean modifieRemorque,
-            boolean cnpacSeul,
-            boolean genereQuittance,
-            boolean autoriseAssistance,
-            boolean autoriseCarteVerte,
-            boolean consommeAttestation,
-            boolean clotureContrat,
-            boolean renouvelleContrat,
-            int ordreAffichage
-    ) {
-        TypeMouvementContrat typeMouvement = typeMouvementContratRepository.findByCodeIgnoreCase(code).orElseGet(() ->
-                typeMouvementContratRepository.save(TypeMouvementContrat.builder()
-                        .code(code)
-                        .libelle(libelle)
-                        .categorie(categorie)
-                        .actif(true)
-                        .build())
-        );
-        typeMouvement.setLibelle(libelle);
-        typeMouvement.setCategorie(categorie);
-        typeMouvement.setTypeImpact(typeImpact);
-        if (typeMouvement.getTypesContratAutorises() == null) {
-            typeMouvement.setTypesContratAutorises(new LinkedHashSet<>());
-        }
-        typeMouvement.getTypesContratAutorises().clear();
-        typeMouvement.getTypesContratAutorises().addAll(typesContrat);
-        typeMouvement.setModifieGaranties(modifieGaranties);
-        typeMouvement.setGarantiesEditables(garantiesEditables);
-        typeMouvement.setModifieVehicule(modifieVehicule);
-        typeMouvement.setModifieRemorque(modifieRemorque);
-        typeMouvement.setCnpacSeul(cnpacSeul);
-        typeMouvement.setGenereQuittance(genereQuittance);
-        typeMouvement.setAutoriseAssistance(autoriseAssistance);
-        typeMouvement.setAutoriseCarteVerte(autoriseCarteVerte);
-        typeMouvement.setConsommeAttestation(consommeAttestation);
-        typeMouvement.setClotureContrat(clotureContrat);
-        typeMouvement.setRenouvelleContrat(renouvelleContrat);
-        typeMouvement.setOrdreAffichage(ordreAffichage);
-        typeMouvement.setActif(true);
-        return typeMouvementContratRepository.save(typeMouvement);
     }
 
 }

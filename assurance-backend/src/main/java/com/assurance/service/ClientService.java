@@ -26,6 +26,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ClientService {
 
+    private static final String CLIENT_CODE_PREFIX = "C";
+
     private final AgenceRepository agenceRepository;
     private final ClientRepository clientRepository;
     private final ClientTelephoneRepository clientTelephoneRepository;
@@ -110,7 +112,6 @@ public class ClientService {
                 .ville(ville)
                 .categorieClient(categorieClient)
                 .typeClient(request.getTypeClient())
-                .codeClient(request.getCodeClient())
                 .civilite(request.getCivilite())
                 .prenom(request.getPrenom())
                 .nom(request.getNom())
@@ -137,6 +138,7 @@ public class ClientService {
                 .justificatifSahara(request.getJustificatifSahara())
                 .build();
         client = clientRepository.save(client);
+        client.setCodeClient(generateClientCode(client.getId()));
         saveTelephones(client, request);
         return client;
     }
@@ -259,7 +261,9 @@ public class ClientService {
         client.setVille(ville);
         client.setCategorieClient(categorieClient);
         client.setTypeClient(request.getTypeClient());
-        client.setCodeClient(request.getCodeClient());
+        if (isBlank(client.getCodeClient())) {
+            client.setCodeClient(generateClientCode(client.getId()));
+        }
         client.setCivilite(request.getCivilite());
         client.setPrenom(request.getPrenom());
         client.setNom(request.getNom());
@@ -284,6 +288,13 @@ public class ClientService {
         client.setConducteurHabituel(request.getConducteurHabituel() == null ? true : request.getConducteurHabituel());
         client.setSahara(request.getSahara() == null ? false : request.getSahara());
         client.setJustificatifSahara(request.getJustificatifSahara());
+    }
+
+    static String generateClientCode(Long clientId) {
+        if (clientId == null) {
+            throw new IllegalArgumentException("L'identifiant client est obligatoire");
+        }
+        return CLIENT_CODE_PREFIX + String.format("%06d", clientId);
     }
 
     private String resolveTelephonePrincipal(CreateClientRequest request) {

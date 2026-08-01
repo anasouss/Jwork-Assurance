@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,7 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "clients", indexes = {
+@Table(name = "clients", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_client_code", columnNames = "code_client")
+}, indexes = {
         @Index(name = "idx_client_agence", columnList = "agence_id"),
         @Index(name = "idx_client_type", columnList = "type_client"),
         @Index(name = "idx_client_cin", columnList = "cin"),

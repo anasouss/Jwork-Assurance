@@ -118,6 +118,7 @@ export function useContratCreationForm(
     const usages = refs.usages.data ?? [];
     if (typeContrat === "FLOTTE" || typeContrat === "PARTICULIER") {
       if (!categorieClientId) return [];
+      if (categorieUsageIds.length === 0) return usages;
       const allowedIds = new Set(categorieUsageIds);
       return usages.filter((usage) => allowedIds.has(usage.id));
     }
@@ -154,6 +155,7 @@ export function useContratCreationForm(
       return;
     }
     if (!selectedCategorieClient) return;
+    if (categorieUsageIds.length === 0) return;
     const allowedIds = new Set(categorieUsageIds);
     if (usageId && !allowedIds.has(usageId)) {
       setUsageId("");

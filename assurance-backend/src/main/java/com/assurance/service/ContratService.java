@@ -5710,8 +5710,9 @@ public class ContratService {
         if (!Boolean.TRUE.equals(categorie.getActif())) {
             throw new BadRequestException("La categorie client selectionnee est inactive");
         }
-        boolean usageAutoriseCategorie = categorie.getUsages() != null
-                && categorie.getUsages().stream().anyMatch(autorise -> autorise.getId().equals(usage.getId()));
+        boolean categorieRestreinte = categorie.getUsages() != null && !categorie.getUsages().isEmpty();
+        boolean usageAutoriseCategorie = !categorieRestreinte
+                || categorie.getUsages().stream().anyMatch(autorise -> autorise.getId().equals(usage.getId()));
         if (!usageAutoriseCategorie) {
             throw new BadRequestException("L'usage selectionne ne correspond pas a la categorie client");
         }

@@ -273,7 +273,7 @@ export default function AvenantContratPage() {
     setSelectedTargetIds([]);
     setPrecisionDrafts({});
     setDuplicataAttestationDrafts({});
-    if (movementCode === "INC_F") {
+    if (isVehicleTargetCreationCode(movementCode)) {
       setVehicules([{ ...DEFAULT_VEHICLE }]);
       setRemorques([]);
       setSelectedGaranties([]);
@@ -294,7 +294,7 @@ export default function AvenantContratPage() {
   }, [movementCode, targets]);
 
   useEffect(() => {
-    if ((!isGuaranteeModificationCode(movementCode) && !isVehicleTargetCreationCode(movementCode)) || !contrat) return;
+    if (!isGuaranteeModificationCode(movementCode) || !contrat) return;
     const mappedVehicules = (contrat.vehicules ?? []).map<VehiculeInput>((item) => ({
       vehiculeId: item.vehiculeId,
       typeVehicule: item.typeVehicule as VehiculeInput["typeVehicule"],

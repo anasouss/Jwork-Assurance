@@ -361,9 +361,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const rectificationPath = movement.mouvementId && movement.code
     ? `${avenantPath(contrat, movement.code)}?mouvementId=${movement.mouvementId}`
     : null;
+  const latestMovementId = sortedMouvements(contrat)[0]?.id;
   const canRectifyMovement = !child
     && !terminal
     && Boolean(rectificationPath)
+    && String(movement.mouvementId ?? "") === String(latestMovementId ?? "")
     && !movement.isSynthetic
     && !isInitialContractMovement(movement)
     && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";

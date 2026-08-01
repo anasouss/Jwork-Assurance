@@ -245,6 +245,38 @@ public class MouvementContratService {
             NatureSnapshotMouvement snapshotNature,
             QuittanceCalculService.Resultat montants
     ) {
+        return creerMouvementSpecialise(
+                contrat, typeMouvement, request, garanties, vehicules, remorques, snapshotNature, montants, true
+        );
+    }
+
+    @Transactional
+    public QuittanceResponse creerMouvementSpecialiseAvecAttestationsDifferees(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            NatureSnapshotMouvement snapshotNature,
+            QuittanceCalculService.Resultat montants
+    ) {
+        return creerMouvementSpecialise(
+                contrat, typeMouvement, request, garanties, vehicules, remorques, snapshotNature, montants, false
+        );
+    }
+
+    private QuittanceResponse creerMouvementSpecialise(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            MouvementContratRequest request,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            NatureSnapshotMouvement snapshotNature,
+            QuittanceCalculService.Resultat montants,
+            boolean consommerStock
+    ) {
         LocalDate dateEffet = request.getDateEffet() != null ? request.getDateEffet() : contrat.getDateEffet();
         LocalDate dateEcheance = request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance();
 
@@ -271,7 +303,7 @@ public class MouvementContratService {
         snapshotRemorques(mouvement, remorques, snapshotNature);
         snapshotGaranties(mouvement, garanties, snapshotNature);
 
-        if (Boolean.TRUE.equals(typeMouvement.getConsommeAttestation())) {
+        if (consommerStock && Boolean.TRUE.equals(typeMouvement.getConsommeAttestation())) {
             consommerAttestations(contrat, mouvement, vehicules, remorques);
         }
 
@@ -293,6 +325,22 @@ public class MouvementContratService {
             contratRepository.save(contrat);
         }
         return quittance == null ? toPreviewResponse(contrat, typeMouvement, request, montants, garanties, vehicules, remorques) : toResponse(quittance);
+    }
+
+    @Transactional
+    public void finaliserAttestationsDifferees(
+            Long mouvementId,
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        MouvementContrat mouvement = mouvementContratRepository.findById(mouvementId)
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", mouvementId));
+        if (Boolean.TRUE.equals(mouvement.getTypeMouvement().getConsommeAttestation())) {
+            consommerAttestations(contrat, mouvement, vehicules, remorques);
+        }
+        snapshotVehicules(mouvement, vehicules, NatureSnapshotMouvement.APRES);
+        snapshotRemorques(mouvement, remorques, NatureSnapshotMouvement.APRES);
     }
 
     @Transactional

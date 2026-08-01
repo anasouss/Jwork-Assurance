@@ -1962,6 +1962,16 @@ public class ContratService {
                 .noneMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)) {
             throw new BadRequestException("Cet ancien avenant ne contient pas l'etat garanties avant modification et ne peut pas etre rectifie automatiquement.");
         }
+        if ("CHV_M".equalsIgnoreCase(originalCode)) {
+            boolean hasVehiculeBefore = mouvementVehiculeRepository.findByMouvementContratId(mouvementId).stream()
+                    .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT);
+            boolean hasGarantiesBefore = mouvementGarantieRepository.findByMouvementContratId(mouvementId).stream()
+                    .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT);
+            if (!hasVehiculeBefore || !hasGarantiesBefore) {
+                throw new BadRequestException("Cet ancien changement de vehicule ne contient pas les snapshots AVANT requis pour la rectification.");
+            }
+        }
+        assertTargetIdentitySnapshots(mouvement);
 
         libererStockMouvement(contrat, mouvement);
         desactiverDependancesMouvement(mouvementId);
@@ -2021,7 +2031,8 @@ public class ContratService {
 
         boolean snapshotsCommeCibles = "INC_F".equalsIgnoreCase(request.getCodeTypeMouvement())
                 || "EXR_M".equalsIgnoreCase(request.getCodeTypeMouvement())
-                || "CHV_M".equalsIgnoreCase(request.getCodeTypeMouvement());
+                || "CHV_M".equalsIgnoreCase(request.getCodeTypeMouvement())
+                || "PRO_M".equalsIgnoreCase(request.getCodeTypeMouvement());
         if (snapshotsCommeCibles) {
             request.setVehicules(vehiculeSnapshots.stream().map(this::toVehiculeInput).toList());
             request.setRemorques(remorqueSnapshots.stream().map(this::toRemorqueInput).toList());
@@ -2048,6 +2059,10 @@ public class ContratService {
         if ("PRI_F".equalsIgnoreCase(request.getCodeTypeMouvement())
                 || "PRI_M".equalsIgnoreCase(request.getCodeTypeMouvement())) {
             request.setPrecisions(toPrecisionInputs(vehiculeSnapshots, remorqueSnapshots));
+        }
+        if ("DUP_F".equalsIgnoreCase(request.getCodeTypeMouvement())
+                || "DUP_M".equalsIgnoreCase(request.getCodeTypeMouvement())) {
+            request.setAttestations(toAttestationInputs(vehiculeSnapshots, remorqueSnapshots));
         }
         return request;
     }
@@ -2171,9 +2186,9 @@ public class ContratService {
             }
             AvenantRequest.TargetPrecision precision = new AvenantRequest.TargetPrecision();
             precision.setVehiculeId(snapshot.getVehicule().getId());
-            precision.setImmatriculation(snapshot.getVehicule().getImmatriculation());
-            precision.setImmatriculationProvisoire(snapshot.getVehicule().getImmatriculationProvisoire());
-            precision.setNumeroAttestation(snapshot.getVehicule().getNumeroAttestation());
+            precision.setImmatriculation(snapshot.getImmatriculation());
+            precision.setImmatriculationProvisoire(snapshot.getImmatriculationProvisoire());
+            precision.setNumeroAttestation(snapshot.getNumeroAttestation());
             result.add(precision);
         }
         for (MouvementRemorque snapshot : remorques) {
@@ -2182,9 +2197,35 @@ public class ContratService {
             }
             AvenantRequest.TargetPrecision precision = new AvenantRequest.TargetPrecision();
             precision.setRemorqueId(snapshot.getRemorque().getId());
-            precision.setImmatriculation(snapshot.getRemorque().getImmatriculation());
-            precision.setNumeroAttestation(snapshot.getRemorque().getNumeroAttestation());
+            precision.setImmatriculation(snapshot.getImmatriculation());
+            precision.setNumeroAttestation(snapshot.getNumeroAttestation());
             result.add(precision);
+        }
+        return result;
+    }
+
+    private List<AvenantRequest.TargetAttestation> toAttestationInputs(
+            List<MouvementVehicule> vehicules,
+            List<MouvementRemorque> remorques
+    ) {
+        List<AvenantRequest.TargetAttestation> result = new ArrayList<>();
+        for (MouvementVehicule snapshot : vehicules) {
+            if (snapshot.getVehicule() == null) {
+                continue;
+            }
+            AvenantRequest.TargetAttestation attestation = new AvenantRequest.TargetAttestation();
+            attestation.setVehiculeId(snapshot.getVehicule().getId());
+            attestation.setNumeroAttestation(snapshot.getNumeroAttestation());
+            result.add(attestation);
+        }
+        for (MouvementRemorque snapshot : remorques) {
+            if (snapshot.getRemorque() == null) {
+                continue;
+            }
+            AvenantRequest.TargetAttestation attestation = new AvenantRequest.TargetAttestation();
+            attestation.setRemorqueId(snapshot.getRemorque().getId());
+            attestation.setNumeroAttestation(snapshot.getNumeroAttestation());
+            result.add(attestation);
         }
         return result;
     }
@@ -2280,6 +2321,7 @@ public class ContratService {
             throw new BadRequestException("L'affaire nouvelle ne se supprime pas depuis les actions. Supprimez le contrat brouillon ou creez un avenant d'annulation.");
         }
         assertNoBlockingMovementReferences(mouvement.getId());
+        assertTargetIdentitySnapshots(mouvement);
         libererStockMouvement(contrat, mouvement);
         rollbackCurrentStateForMovementDeletion(mouvement);
         deleteMovementGeneratedData(mouvement.getId());
@@ -2325,6 +2367,26 @@ public class ContratService {
         }
     }
 
+    private void assertTargetIdentitySnapshots(MouvementContrat mouvement) {
+        if (mouvement == null || mouvement.getId() == null || mouvement.getTypeMouvement() == null
+                || !isPrecisionOrDuplicata(mouvement.getTypeMouvement().getCode())) {
+            return;
+        }
+        boolean hasBefore = mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
+                || mouvementRemorqueRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT);
+        boolean hasAfter = mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.APRES)
+                || mouvementRemorqueRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.APRES);
+        if (!hasBefore || !hasAfter) {
+            throw new BadRequestException(
+                    "Cet ancien mouvement ne contient pas les snapshots AVANT/APRES requis pour une restauration fiable."
+            );
+        }
+    }
+
     private void deleteMovementGeneratedData(Long mouvementId) {
         List<AssistanceContrat> assistances = assistanceContratRepository
                 .findByMouvementContratIdOrderByCreatedAtDesc(mouvementId);
@@ -2364,6 +2426,8 @@ public class ContratService {
         List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository.findByMouvementContratId(mouvement.getId());
         boolean changementVehicule = mouvement.getTypeMouvement() != null
                 && "CHV_M".equalsIgnoreCase(mouvement.getTypeMouvement().getCode());
+        boolean identiteCible = mouvement.getTypeMouvement() != null
+                && isPrecisionOrDuplicata(mouvement.getTypeMouvement().getCode());
 
         List<Vehicule> vehiculesToSave = new ArrayList<>();
         for (MouvementVehicule snapshot : vehiculeSnapshots) {
@@ -2371,6 +2435,9 @@ public class ContratService {
                 continue;
             }
             Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
+            if (identiteCible && snapshot.getNature() == NatureSnapshotMouvement.APRES) {
+                actif = null;
+            }
             if (actif != null) {
                 snapshot.getVehicule().setActif(actif);
             }
@@ -2390,6 +2457,9 @@ public class ContratService {
                 continue;
             }
             Boolean actif = actifApresSuppressionSnapshot(snapshot.getNature());
+            if (identiteCible && snapshot.getNature() == NatureSnapshotMouvement.APRES) {
+                actif = null;
+            }
             if (actif != null) {
                 snapshot.getRemorque().setActif(actif);
             }
@@ -2510,7 +2580,7 @@ public class ContratService {
             Long agenceId,
             Long contratId,
             AvenantRequest request,
-        Long mouvementId
+            Long mouvementId
     ) {
         if (isModificationGarantiesAvenant(request)) {
             AvenantModificationGraph graph = resolveModificationGarantiesAvenantForPreview(
@@ -2527,6 +2597,7 @@ public class ContratService {
                     graph.differentiel(),
                     graph.garantiesDifferentielles()
             );
+            quittance.setTargetSummaries(graph.targetSummaries());
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
             return quittance;
         }
@@ -2534,8 +2605,11 @@ public class ContratService {
         validateAvenantAssistances(request, graph.vehicules());
         QuittanceCalculService.Resultat retourPrime = calculerRetourPrime(graph, request);
         QuittanceCalculService.Resultat montantsOverride = retourPrime != null ? retourPrime : graph.montantsOverride();
+        List<ContratGarantie> garantiesAffichees = retourPrime != null
+                ? garantiesRetourDifferentielles(graph, request)
+                : graph.garantiesAffichees();
         if (montantsOverride != null) {
-            QuittanceResponse quittance = graph.garantiesAffichees() == null
+            QuittanceResponse quittance = garantiesAffichees == null
                     ? mouvementContratService.previsualiserMouvementSpecialise(
                             graph.contrat(),
                             graph.typeMouvement(),
@@ -2553,14 +2627,12 @@ public class ContratService {
                             graph.vehicules(),
                             graph.remorques(),
                             montantsOverride,
-                            graph.garantiesAffichees()
+                            garantiesAffichees
                     );
-            if (graph.garantiesAffichees() != null) {
-                quittance.setTargetSummaries(buildDifferentialTargetSummaries(
-                        montantsOverride,
-                        graph.vehicules(),
-                        graph.remorques()
-                ));
+            if (garantiesAffichees != null) {
+                quittance.setTargetSummaries(retourPrime != null
+                        ? returnTargetSummaries(graph, request, montantsOverride)
+                        : differentialTargetSummaries(graph, montantsOverride));
             }
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
             return quittance;
@@ -2602,6 +2674,13 @@ public class ContratService {
                         quittance.getMouvementContratId(),
                         graph.garantiesDifferentielles()
                 );
+                replaceMovementTargetSummaries(
+                        quittance,
+                        graph.targetSummaries(),
+                        graph.contrat(),
+                        graph.vehicules(),
+                        graph.remorques()
+                );
             }
             quittance.setAssistances(persistAvenantAssistances(
                     graph.contrat(),
@@ -2616,27 +2695,50 @@ public class ContratService {
         validateAvenantAssistances(request, graph.vehicules());
         QuittanceCalculService.Resultat retourPrime = calculerRetourPrime(graph, request);
         QuittanceCalculService.Resultat montantsOverride = retourPrime != null ? retourPrime : graph.montantsOverride();
-        QuittanceResponse quittance = montantsOverride == null
-                ? mouvementContratService.creerMouvementSpecialise(
-                        graph.contrat(),
-                        graph.typeMouvement(),
-                        toMouvementRequest(request, graph.contrat()),
-                        graph.garanties(),
-                        graph.vehicules(),
-                        graph.remorques(),
-                        graph.snapshotNature()
-                )
-                : mouvementContratService.creerMouvementSpecialise(
-                        graph.contrat(),
-                        graph.typeMouvement(),
-                        toMouvementRequest(request, graph.contrat()),
-                        graph.garanties(),
-                        graph.vehicules(),
-                        graph.remorques(),
-                        graph.snapshotNature(),
-                        montantsOverride
-                );
-        if (quittance.getMouvementContratId() != null && graph.garantiesAffichees() != null) {
+        List<ContratGarantie> garantiesAffichees = retourPrime != null
+                ? garantiesRetourDifferentielles(graph, request)
+                : graph.garantiesAffichees();
+        boolean attestationsDifferees = isPrecisionOrDuplicata(graph.typeMouvement().getCode());
+        if (attestationsDifferees && montantsOverride == null) {
+            montantsOverride = calculerMontantsAvenant(
+                    graph.contrat(), graph.typeMouvement(), graph.garanties(), graph.vehicules(), graph.remorques()
+            );
+        }
+        QuittanceResponse quittance;
+        if (attestationsDifferees) {
+            quittance = mouvementContratService.creerMouvementSpecialiseAvecAttestationsDifferees(
+                    graph.contrat(),
+                    graph.typeMouvement(),
+                    toMouvementRequest(request, graph.contrat()),
+                    graph.garanties(),
+                    graph.vehicules(),
+                    graph.remorques(),
+                    graph.snapshotNature(),
+                    montantsOverride
+            );
+        } else if (montantsOverride == null) {
+            quittance = mouvementContratService.creerMouvementSpecialise(
+                    graph.contrat(),
+                    graph.typeMouvement(),
+                    toMouvementRequest(request, graph.contrat()),
+                    graph.garanties(),
+                    graph.vehicules(),
+                    graph.remorques(),
+                    graph.snapshotNature()
+            );
+        } else {
+            quittance = mouvementContratService.creerMouvementSpecialise(
+                    graph.contrat(),
+                    graph.typeMouvement(),
+                    toMouvementRequest(request, graph.contrat()),
+                    graph.garanties(),
+                    graph.vehicules(),
+                    graph.remorques(),
+                    graph.snapshotNature(),
+                    montantsOverride
+            );
+        }
+        if (quittance.getMouvementContratId() != null && garantiesAffichees != null) {
             if ("CHV_M".equalsIgnoreCase(graph.typeMouvement().getCode())) {
                 mouvementContratService.remplacerSnapshotsChangementVehicule(
                         quittance.getMouvementContratId(),
@@ -2648,7 +2750,16 @@ public class ContratService {
             }
             mouvementContratService.ajouterSnapshotsGarantiesDifferentielles(
                     quittance.getMouvementContratId(),
-                    graph.garantiesAffichees()
+                    garantiesAffichees
+            );
+            replaceMovementTargetSummaries(
+                    quittance,
+                    retourPrime != null
+                            ? returnTargetSummaries(graph, request, montantsOverride)
+                            : differentialTargetSummaries(graph, montantsOverride),
+                    graph.contrat(),
+                    graph.vehicules(),
+                    graph.remorques()
             );
         }
         quittance.setAssistances(persistAvenantAssistances(
@@ -2658,6 +2769,11 @@ public class ContratService {
                 quittance.getMouvementContratId()
         ));
         applyAvenantCurrentState(graph, request);
+        if (attestationsDifferees && quittance.getMouvementContratId() != null) {
+            mouvementContratService.finaliserAttestationsDifferees(
+                    quittance.getMouvementContratId(), graph.contrat(), graph.vehicules(), graph.remorques()
+            );
+        }
         deleteAvenantDraft(graph.contrat(), request);
         return quittance;
     }
@@ -2718,14 +2834,31 @@ public class ContratService {
             AvenantRequest request,
             Long mouvementId
     ) {
-        AvenantGraph currentGraph = resolveAvenantGraph(agenceId, contratId, request, false);
-        if (mouvementId == null || !"CHV_M".equalsIgnoreCase(currentGraph.typeMouvement().getCode())) {
-            return currentGraph;
+        if (mouvementId == null) {
+            return resolveAvenantGraph(agenceId, contratId, request, false);
         }
 
-        MouvementContrat mouvement = resolveRectifiableMovement(agenceId, currentGraph.contrat(), mouvementId);
-        if (!currentGraph.typeMouvement().getCode().equalsIgnoreCase(mouvement.getTypeMouvement().getCode())) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        MouvementContrat mouvement = resolveRectifiableMovement(agenceId, contrat, mouvementId);
+        if (request == null || !hasText(request.getCodeTypeMouvement())
+                || !request.getCodeTypeMouvement().equalsIgnoreCase(mouvement.getTypeMouvement().getCode())) {
             throw new BadRequestException("Le type de l'avenant rectifie ne peut pas etre modifie");
+        }
+        validateAvenantDates(contrat, request);
+        String code = mouvement.getTypeMouvement().getCode().trim().toUpperCase(Locale.ROOT);
+        if ("RET_F".equals(code)
+                || "RES_F".equals(code)
+                || "RES_M".equals(code)
+                || "ANN_M".equals(code)
+                || "RCH_F".equals(code)
+                || "RCH_M".equals(code)) {
+            return savedMovementGraphForPreview(contrat, mouvement);
+        }
+
+        AvenantGraph currentGraph = resolveAvenantGraph(agenceId, contratId, request, false);
+        if (!"CHV_M".equals(code)) {
+            return currentGraph;
         }
         List<Vehicule> vehiculesAvant = mouvementVehiculeRepository.findByMouvementContratId(mouvementId).stream()
                 .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
@@ -2754,6 +2887,38 @@ public class ContratService {
         );
     }
 
+    private AvenantGraph savedMovementGraphForPreview(Contrat contrat, MouvementContrat mouvement) {
+        List<Vehicule> vehicules = mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.DIFFERENTIEL)
+                .sorted(Comparator.comparing(MouvementVehicule::getId))
+                .map(MouvementVehicule::getVehicule)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<Remorque> remorques = mouvementRemorqueRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.DIFFERENTIEL)
+                .sorted(Comparator.comparing(MouvementRemorque::getId))
+                .map(MouvementRemorque::getRemorque)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<ContratGarantie> garanties = mouvementGarantieRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.DIFFERENTIEL)
+                .sorted(Comparator.comparing(MouvementGarantie::getId))
+                .map(MouvementGarantie::getContratGarantie)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        return new AvenantGraph(
+                contrat,
+                mouvement.getTypeMouvement(),
+                vehicules,
+                remorques,
+                garanties,
+                NatureSnapshotMouvement.COURANT
+        );
+    }
+
     private AvenantGraph resolveIncorporationAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request, boolean persist) {
         if ((request.getVehicules() == null || request.getVehicules().isEmpty())
                 && (request.getRemorques() == null || request.getRemorques().isEmpty())) {
@@ -2766,7 +2931,25 @@ public class ContratService {
             throw new BadRequestException("Au moins une garantie est obligatoire pour l'incorporation");
         }
         validateAvenantAssistances(request, targets.vehicules());
-        return new AvenantGraph(contrat, typeMouvement, targets.vehicules(), targets.remorques(), targets.garanties(), NatureSnapshotMouvement.AJOUT);
+        QuittanceCalculService.Resultat montants = calculerMontantsAvenant(
+                contrat,
+                typeMouvement,
+                targets.garanties(),
+                targets.vehicules(),
+                targets.remorques()
+        );
+        return new AvenantGraph(
+                contrat,
+                typeMouvement,
+                targets.vehicules(),
+                targets.remorques(),
+                targets.garanties(),
+                NatureSnapshotMouvement.AJOUT,
+                montants,
+                targets.garanties(),
+                List.of(),
+                List.of()
+        );
     }
 
     private AvenantGraph resolveChangementVehiculeAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request, boolean persist) {
@@ -3016,7 +3199,28 @@ public class ContratService {
             throw new BadRequestException("Selectionnez au moins une remorque pour l'extension");
         }
         List<ContratGarantie> garanties = activeGarantiesForTargets(contrat, List.of(), remorques);
-        return new AvenantGraph(contrat, typeMouvement, List.of(), remorques, garanties, NatureSnapshotMouvement.COURANT);
+        List<ContratGarantie> garantiesRestantes = garanties.stream()
+                .map(garantie -> garantieRetourPrime(contrat, request, garantie))
+                .toList();
+        QuittanceCalculService.Resultat montants = calculerMontantsAvenant(
+                contrat,
+                typeMouvement,
+                garantiesRestantes,
+                List.of(),
+                remorques
+        );
+        return new AvenantGraph(
+                contrat,
+                typeMouvement,
+                List.of(),
+                remorques,
+                garanties,
+                NatureSnapshotMouvement.COURANT,
+                montants,
+                garantiesRestantes,
+                List.of(),
+                List.of()
+        );
     }
 
     private AvenantGraph resolveResiliationAvenant(Contrat contrat, TypeMouvementContrat typeMouvement) {
@@ -3037,8 +3241,8 @@ public class ContratService {
         if (vehicules.isEmpty() && remorques.isEmpty()) {
             throw new BadRequestException("Selectionnez au moins un vehicule ou une remorque pour la precision");
         }
-        applyPrecisionAttestations(typeMouvement, request, vehicules, remorques, persist);
-        return new AvenantGraph(contrat, typeMouvement, vehicules, remorques, List.of(), NatureSnapshotMouvement.COURANT);
+        applyPrecisionAttestations(typeMouvement, request, vehicules, remorques, false);
+        return new AvenantGraph(contrat, typeMouvement, vehicules, remorques, List.of(), NatureSnapshotMouvement.AVANT);
     }
 
     private void applyPrecisionAttestations(
@@ -3085,8 +3289,8 @@ public class ContratService {
     private AvenantGraph resolveDuplicataAvenant(Contrat contrat, TypeMouvementContrat typeMouvement, AvenantRequest request, boolean persist) {
         List<Vehicule> vehicules = selectedActiveVehicules(contrat, request.getVehiculeIds(), true);
         List<Remorque> remorques = selectedActiveRemorques(contrat, request.getRemorqueIds(), true);
-        applyDuplicataAttestations(typeMouvement, request, vehicules, remorques, persist);
-        return new AvenantGraph(contrat, typeMouvement, vehicules, remorques, List.of(), NatureSnapshotMouvement.COURANT);
+        applyDuplicataAttestations(typeMouvement, request, vehicules, remorques, false);
+        return new AvenantGraph(contrat, typeMouvement, vehicules, remorques, List.of(), NatureSnapshotMouvement.AVANT);
     }
 
     private void applyDuplicataAttestations(
@@ -3166,6 +3370,11 @@ public class ContratService {
         if ("PRI_F".equals(code) || "PRI_M".equals(code)) {
             appliquerPrecisionAvenant(graph.contrat(), request);
         }
+        if ("DUP_F".equals(code) || "DUP_M".equals(code)) {
+            applyDuplicataAttestations(graph.typeMouvement(), request, graph.vehicules(), graph.remorques(), true);
+            vehiculeRepository.saveAll(graph.vehicules());
+            remorqueRepository.saveAll(graph.remorques());
+        }
         if ("CHV_M".equals(code)) {
             desactiverActifsHorsNouveaux(graph.contrat(), graph.vehicules(), graph.remorques(), graph.garanties());
         }
@@ -3225,6 +3434,14 @@ public class ContratService {
                 ? request.getCodeTypeMouvement().trim().toUpperCase(Locale.ROOT)
                 : "";
         return "MOG_F".equals(code) || "MOG_M".equals(code) || "EXG_M".equals(code);
+    }
+
+    private boolean isPrecisionOrDuplicata(String code) {
+        String normalized = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
+        return "PRI_F".equals(normalized)
+                || "PRI_M".equals(normalized)
+                || "DUP_F".equals(normalized)
+                || "DUP_M".equals(normalized);
     }
 
     private AvenantModificationGraph resolveModificationGarantiesAvenant(Long agenceId, Long contratId, AvenantRequest request, boolean persist) {
@@ -3296,10 +3513,41 @@ public class ContratService {
         if (nouvellesGaranties.isEmpty()) {
             throw new BadRequestException("Au moins une garantie est obligatoire pour la modification");
         }
-        QuittanceCalculService.Resultat avant = calculerMontantsAvenant(contrat, typeMouvement, anciennesGaranties, vehicules, remorques);
-        QuittanceCalculService.Resultat apres = calculerMontantsAvenant(contrat, typeMouvement, nouvellesGaranties, vehicules, remorques);
+        List<ContratGarantie> anciennesGarantiesRestantes = anciennesGaranties.stream()
+                .map(garantie -> garantieRetourPrime(contrat, request, garantie))
+                .toList();
+        List<ContratGarantie> nouvellesGarantiesRestantes = nouvellesGaranties.stream()
+                .map(garantie -> garantieRetourPrime(contrat, request, garantie))
+                .toList();
+        QuittanceCalculService.Resultat avant = calculerMontantsAvenant(
+                contrat,
+                typeMouvement,
+                anciennesGarantiesRestantes,
+                vehicules,
+                remorques
+        );
+        QuittanceCalculService.Resultat apres = calculerMontantsAvenant(
+                contrat,
+                typeMouvement,
+                nouvellesGarantiesRestantes,
+                vehicules,
+                remorques
+        );
         QuittanceCalculService.Resultat differentiel = quittanceCalculService.difference(apres, avant);
-        List<ContratGarantie> garantiesDifferentielles = garantiesDifferentielles(anciennesGaranties, nouvellesGaranties);
+        List<ContratGarantie> garantiesDifferentielles = garantiesDifferentielles(
+                anciennesGarantiesRestantes,
+                nouvellesGarantiesRestantes
+        );
+        List<QuittanceResponse.TargetSummary> targetSummaries = reconcileTargetSummaries(
+                elementFacturableCibleService.calculerDifference(
+                        contrat,
+                        anciennesGarantiesRestantes,
+                        nouvellesGarantiesRestantes,
+                        vehicules,
+                        remorques
+                ),
+                differentiel
+        );
         if (persist) {
             for (ContratGarantie garantie : anciennesGaranties) {
                 garantie.setActif(false);
@@ -3307,7 +3555,17 @@ public class ContratService {
             contratGarantieRepository.saveAll(anciennesGaranties);
             nouvellesGaranties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques);
         }
-        return new AvenantModificationGraph(contrat, typeMouvement, vehicules, remorques, anciennesGaranties, nouvellesGaranties, differentiel, garantiesDifferentielles);
+        return new AvenantModificationGraph(
+                contrat,
+                typeMouvement,
+                vehicules,
+                remorques,
+                anciennesGaranties,
+                nouvellesGaranties,
+                differentiel,
+                garantiesDifferentielles,
+                targetSummaries
+        );
     }
 
     private List<ContratGarantie> garantiesDifferentielles(
@@ -3447,6 +3705,96 @@ public class ContratService {
                 .build());
     }
 
+    private List<QuittanceResponse.TargetSummary> differentialTargetSummaries(
+            AvenantGraph graph,
+            QuittanceCalculService.Resultat resultat
+    ) {
+        if (graph == null || graph.garantiesAffichees() == null) {
+            return List.of();
+        }
+        if ("CHV_M".equalsIgnoreCase(graph.typeMouvement().getCode())) {
+            return buildDifferentialTargetSummaries(resultat, graph.vehicules(), graph.remorques());
+        }
+        return reconcileTargetSummaries(
+                elementFacturableCibleService.calculerDifference(
+                        graph.contrat(),
+                        List.of(),
+                        graph.garantiesAffichees(),
+                        graph.vehicules(),
+                        graph.remorques()
+                ),
+                resultat
+        );
+    }
+
+    private List<QuittanceResponse.TargetSummary> reconcileTargetSummaries(
+            List<QuittanceResponse.TargetSummary> summaries,
+            QuittanceCalculService.Resultat resultat
+    ) {
+        if (summaries == null || summaries.isEmpty() || resultat == null) {
+            return summaries == null ? List.of() : summaries;
+        }
+        List<QuittanceResponse.TargetSummary> reconciled = new ArrayList<>(summaries);
+        QuittanceResponse.TargetSummary last = reconciled.get(reconciled.size() - 1);
+        BigDecimal automobile = lignePrime(resultat, CategorieQuittance.AUTOMOBILE);
+        BigDecimal corporel = lignePrime(resultat, CategorieQuittance.CORPOREL);
+        BigDecimal evcat = lignePrime(resultat, CategorieQuittance.EVCAT);
+        last.setPrimeNette(adjustLast(reconciled, QuittanceResponse.TargetSummary::getPrimeNette, resultat.primeNette()));
+        last.setPrimeNetteHorsEvcat(adjustLast(
+                reconciled,
+                QuittanceResponse.TargetSummary::getPrimeNetteHorsEvcat,
+                scale(automobile.add(corporel))
+        ));
+        last.setAutomobilePrimeNette(adjustLast(reconciled, QuittanceResponse.TargetSummary::getAutomobilePrimeNette, automobile));
+        last.setCorporelPrimeNette(adjustLast(reconciled, QuittanceResponse.TargetSummary::getCorporelPrimeNette, corporel));
+        last.setEvcatPrimeNette(adjustLast(reconciled, QuittanceResponse.TargetSummary::getEvcatPrimeNette, evcat));
+        last.setTaxe(adjustLast(reconciled, QuittanceResponse.TargetSummary::getTaxe, resultat.taxe()));
+        last.setTaxeParafiscale(adjustLast(reconciled, QuittanceResponse.TargetSummary::getTaxeParafiscale, resultat.taxeParafiscale()));
+        last.setAccessoire(adjustLast(reconciled, QuittanceResponse.TargetSummary::getAccessoire, resultat.accessoire()));
+        last.setCnpac(adjustLast(reconciled, QuittanceResponse.TargetSummary::getCnpac, resultat.cnpac()));
+        last.setPrimeTotale(adjustLast(reconciled, QuittanceResponse.TargetSummary::getPrimeTotale, resultat.primeTotale()));
+        return reconciled;
+    }
+
+    private BigDecimal adjustLast(
+            List<QuittanceResponse.TargetSummary> summaries,
+            java.util.function.Function<QuittanceResponse.TargetSummary, BigDecimal> getter,
+            BigDecimal expected
+    ) {
+        BigDecimal preceding = summaries.stream()
+                .limit(Math.max(0, summaries.size() - 1L))
+                .map(getter)
+                .map(this::zeroIfNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return scale(zeroIfNull(expected).subtract(preceding));
+    }
+
+    private BigDecimal lignePrime(QuittanceCalculService.Resultat resultat, CategorieQuittance categorie) {
+        return resultat.lignes().stream()
+                .filter(ligne -> ligne.categorie() == categorie)
+                .map(QuittanceCalculService.Ligne::primeNette)
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
+    }
+
+    private void replaceMovementTargetSummaries(
+            QuittanceResponse quittance,
+            List<QuittanceResponse.TargetSummary> summaries,
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        if (quittance == null || quittance.getElementFacturableId() == null) {
+            return;
+        }
+        ElementFacturable element = elementFacturableRepository.findById(quittance.getElementFacturableId())
+                .orElseThrow(() -> new ResourceNotFoundException("ElementFacturable", quittance.getElementFacturableId()));
+        elementFacturableCibleRepository.deleteByElementFacturableId(element.getId());
+        elementFacturableCibleRepository.flush();
+        elementFacturableCibleService.genererDepuisResumes(element, contrat, summaries, vehicules, remorques);
+        quittance.setTargetSummaries(summaries == null ? List.of() : summaries);
+    }
+
     private QuittanceCalculService.Resultat calculerRetourPrime(AvenantGraph graph, AvenantRequest request) {
         String code = graph.typeMouvement().getCode() == null ? "" : graph.typeMouvement().getCode().trim().toUpperCase(Locale.ROOT);
         if (!"RET_F".equals(code) && !"RES_F".equals(code) && !"RES_M".equals(code) && !"ANN_M".equals(code)) {
@@ -3456,6 +3804,29 @@ public class ContratService {
                 .map(garantie -> garantieRetourPrime(graph.contrat(), request, garantie))
                 .toList();
         return calculerMontantsAvenant(graph.contrat(), graph.typeMouvement(), garantiesRetour, graph.vehicules(), graph.remorques());
+    }
+
+    private List<ContratGarantie> garantiesRetourDifferentielles(AvenantGraph graph, AvenantRequest request) {
+        return graph.garanties().stream()
+                .map(garantie -> garantieRetourPrime(graph.contrat(), request, garantie))
+                .map(garantie -> copierGarantieAvecPrime(garantie, scale(zeroIfNull(garantie.getPrime()).negate())))
+                .toList();
+    }
+
+    private List<QuittanceResponse.TargetSummary> returnTargetSummaries(
+            AvenantGraph graph,
+            AvenantRequest request,
+            QuittanceCalculService.Resultat resultat
+    ) {
+        List<ContratGarantie> restantes = graph.garanties().stream()
+                .map(garantie -> garantieRetourPrime(graph.contrat(), request, garantie))
+                .toList();
+        return reconcileTargetSummaries(
+                elementFacturableCibleService.calculerDifference(
+                        graph.contrat(), restantes, List.of(), graph.vehicules(), graph.remorques()
+                ),
+                resultat
+        );
     }
 
     private ContratGarantie garantieRetourPrime(Contrat contrat, AvenantRequest request, ContratGarantie source) {
@@ -6061,7 +6432,8 @@ public class ContratService {
             List<ContratGarantie> anciennesGaranties,
             List<ContratGarantie> nouvellesGaranties,
             QuittanceCalculService.Resultat differentiel,
-            List<ContratGarantie> garantiesDifferentielles
+            List<ContratGarantie> garantiesDifferentielles,
+            List<QuittanceResponse.TargetSummary> targetSummaries
     ) {
     }
 

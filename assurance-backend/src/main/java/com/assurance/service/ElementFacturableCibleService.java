@@ -39,6 +39,37 @@ public class ElementFacturableCibleService {
                 .toList();
     }
 
+    public List<QuittanceResponse.TargetSummary> calculerDifference(
+            Contrat contrat,
+            List<ContratGarantie> garantiesAvant,
+            List<ContratGarantie> garantiesApres,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        List<QuittanceResponse.TargetSummary> summaries = new ArrayList<>();
+        List<Vehicule> sourceVehicules = vehicules == null ? List.of() : vehicules;
+        for (int index = 0; index < sourceVehicules.size(); index++) {
+            Vehicule vehicule = sourceVehicules.get(index);
+            QuittanceCalculService.Resultat difference = differenceForTarget(
+                    contrat, garantiesAvant, garantiesApres, vehicule, null
+            );
+            if (difference != null) {
+                summaries.add(toResponse(KIND_VEHICULE, index, null, difference));
+            }
+        }
+        List<Remorque> sourceRemorques = remorques == null ? List.of() : remorques;
+        for (int index = 0; index < sourceRemorques.size(); index++) {
+            Remorque remorque = sourceRemorques.get(index);
+            QuittanceCalculService.Resultat difference = differenceForTarget(
+                    contrat, garantiesAvant, garantiesApres, null, remorque
+            );
+            if (difference != null) {
+                summaries.add(toResponse(KIND_REMORQUE, null, index, difference));
+            }
+        }
+        return summaries;
+    }
+
     public List<ElementFacturableCible> generer(
             ElementFacturable elementFacturable,
             Contrat contrat,
@@ -48,6 +79,26 @@ public class ElementFacturableCibleService {
     ) {
         List<ElementFacturableCible> cibles = buildRows(contrat, garanties, vehicules, remorques).stream()
                 .map(row -> toEntity(elementFacturable, contrat, row))
+                .toList();
+        return elementFacturableCibleRepository.saveAll(cibles);
+    }
+
+    public List<ElementFacturableCible> genererDepuisResumes(
+            ElementFacturable elementFacturable,
+            Contrat contrat,
+            List<QuittanceResponse.TargetSummary> summaries,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        List<ElementFacturableCible> cibles = (summaries == null ? List.<QuittanceResponse.TargetSummary>of() : summaries)
+                .stream()
+                .map(summary -> toEntity(
+                        elementFacturable,
+                        contrat,
+                        summary,
+                        resolveVehicule(summary, vehicules),
+                        resolveRemorque(summary, remorques)
+                ))
                 .toList();
         return elementFacturableCibleRepository.saveAll(cibles);
     }
@@ -110,6 +161,39 @@ public class ElementFacturableCibleService {
         return new Row(kind, vehiculeIndex, remorqueIndex, vehicule, remorque, summary);
     }
 
+    private QuittanceCalculService.Resultat differenceForTarget(
+            Contrat contrat,
+            List<ContratGarantie> garantiesAvant,
+            List<ContratGarantie> garantiesApres,
+            Vehicule vehicule,
+            Remorque remorque
+    ) {
+        List<ContratGarantie> avant = targetGaranties(garantiesAvant, vehicule, remorque);
+        List<ContratGarantie> apres = targetGaranties(garantiesApres, vehicule, remorque);
+        if (avant.isEmpty() && apres.isEmpty()) {
+            return null;
+        }
+        QuittanceCalculService.Resultat calculVide = quittanceCalculService.calculer(contrat, null, List.of(), 0);
+        QuittanceCalculService.Resultat zero = quittanceCalculService.difference(calculVide, calculVide);
+        QuittanceCalculService.Resultat calculAvant = avant.isEmpty()
+                ? zero
+                : quittanceCalculService.calculer(contrat, null, avant, hasRcGarantie(avant) ? 1 : 0);
+        QuittanceCalculService.Resultat calculApres = apres.isEmpty()
+                ? zero
+                : quittanceCalculService.calculer(contrat, null, apres, hasRcGarantie(apres) ? 1 : 0);
+        return quittanceCalculService.difference(calculApres, calculAvant);
+    }
+
+    private List<ContratGarantie> targetGaranties(
+            List<ContratGarantie> garanties,
+            Vehicule vehicule,
+            Remorque remorque
+    ) {
+        return (garanties == null ? List.<ContratGarantie>of() : garanties).stream()
+                .filter(garantie -> vehicule != null ? sameVehicule(garantie, vehicule) : sameRemorque(garantie, remorque))
+                .toList();
+    }
+
     private ElementFacturableCible toEntity(ElementFacturable elementFacturable, Contrat contrat, Row row) {
         QuittanceResponse.TargetSummary summary = row.summary();
         return ElementFacturableCible.builder()
@@ -119,6 +203,34 @@ public class ElementFacturableCibleService {
                 .remorque(row.remorque())
                 .kind(row.kind())
                 .targetIndex(row.targetIndex())
+                .primeNette(summary.getPrimeNette())
+                .primeNetteHorsEvcat(summary.getPrimeNetteHorsEvcat())
+                .automobilePrimeNette(summary.getAutomobilePrimeNette())
+                .corporelPrimeNette(summary.getCorporelPrimeNette())
+                .evcatPrimeNette(summary.getEvcatPrimeNette())
+                .taxe(summary.getTaxe())
+                .taxeParafiscale(summary.getTaxeParafiscale())
+                .accessoire(summary.getAccessoire())
+                .cnpac(summary.getCnpac())
+                .primeTotale(summary.getPrimeTotale())
+                .actif(true)
+                .build();
+    }
+
+    private ElementFacturableCible toEntity(
+            ElementFacturable elementFacturable,
+            Contrat contrat,
+            QuittanceResponse.TargetSummary summary,
+            Vehicule vehicule,
+            Remorque remorque
+    ) {
+        return ElementFacturableCible.builder()
+                .elementFacturable(elementFacturable)
+                .contrat(contrat)
+                .vehicule(vehicule)
+                .remorque(remorque)
+                .kind(summary.getKind())
+                .targetIndex(summary.getVehiculeIndex() != null ? summary.getVehiculeIndex() : summary.getRemorqueIndex())
                 .primeNette(summary.getPrimeNette())
                 .primeNetteHorsEvcat(summary.getPrimeNetteHorsEvcat())
                 .automobilePrimeNette(summary.getAutomobilePrimeNette())
@@ -159,6 +271,45 @@ public class ElementFacturableCibleService {
                 .cnpac(hasRc ? calcul.cnpac() : BigDecimal.ZERO)
                 .primeTotale(hasRc ? calcul.primeTotale() : scale(calcul.primeTotale().subtract(calcul.cnpac())))
                 .build();
+    }
+
+    private QuittanceResponse.TargetSummary toResponse(
+            String kind,
+            Integer vehiculeIndex,
+            Integer remorqueIndex,
+            QuittanceCalculService.Resultat calcul
+    ) {
+        QuittanceCalculService.Ligne automobile = ligne(calcul, CategorieQuittance.AUTOMOBILE);
+        QuittanceCalculService.Ligne corporel = ligne(calcul, CategorieQuittance.CORPOREL);
+        QuittanceCalculService.Ligne evcat = ligne(calcul, CategorieQuittance.EVCAT);
+        BigDecimal automobileNet = value(automobile == null ? null : automobile.primeNette());
+        BigDecimal corporelNet = value(corporel == null ? null : corporel.primeNette());
+        BigDecimal evcatNet = value(evcat == null ? null : evcat.primeNette());
+        return QuittanceResponse.TargetSummary.builder()
+                .kind(kind)
+                .vehiculeIndex(vehiculeIndex)
+                .remorqueIndex(remorqueIndex)
+                .primeNette(calcul.primeNette())
+                .primeNetteHorsEvcat(scale(automobileNet.add(corporelNet)))
+                .automobilePrimeNette(scale(automobileNet))
+                .corporelPrimeNette(scale(corporelNet))
+                .evcatPrimeNette(scale(evcatNet))
+                .taxe(calcul.taxe())
+                .taxeParafiscale(calcul.taxeParafiscale())
+                .accessoire(calcul.accessoire())
+                .cnpac(calcul.cnpac())
+                .primeTotale(calcul.primeTotale())
+                .build();
+    }
+
+    private Vehicule resolveVehicule(QuittanceResponse.TargetSummary summary, List<Vehicule> vehicules) {
+        Integer index = summary == null ? null : summary.getVehiculeIndex();
+        return index != null && vehicules != null && index >= 0 && index < vehicules.size() ? vehicules.get(index) : null;
+    }
+
+    private Remorque resolveRemorque(QuittanceResponse.TargetSummary summary, List<Remorque> remorques) {
+        Integer index = summary == null ? null : summary.getRemorqueIndex();
+        return index != null && remorques != null && index >= 0 && index < remorques.size() ? remorques.get(index) : null;
     }
 
     private QuittanceResponse.TargetSummary toResponse(ElementFacturableCible cible) {

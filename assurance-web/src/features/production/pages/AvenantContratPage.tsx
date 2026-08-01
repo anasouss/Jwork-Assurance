@@ -1071,7 +1071,7 @@ export default function AvenantContratPage() {
           onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
           targetActionMode="save"
           previewAfterInfoSave={false}
-          primeColumnLabel={movementCode === "CHV_M" ? "Prime différentielle" : undefined}
+          primeColumnLabel={isDifferentialCode(movementCode) ? "Prime différentielle" : undefined}
           guaranteesAction={isVehicleTargetCreationCode(movementCode) ? (
             <Button
               type="button"
@@ -1112,7 +1112,7 @@ export default function AvenantContratPage() {
       <Card className="border-border/70 shadow-none">
         <CardHeader>
           <CardTitle>
-            {movementCode === "CHV_M" ? "Quittance différentielle (nouveau - ancien restant)" : "Quittance"}
+            {isDifferentialCode(movementCode) ? "Quittance différentielle" : "Quittance"}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1614,6 +1614,14 @@ function normalizeCode(code?: string | null) {
 
 function isGuaranteeModificationCode(code: string) {
   return code === "MOG_F" || code === "MOG_M" || code === "EXG_M";
+}
+
+function isDifferentialCode(code: string) {
+  return code === "CHV_M"
+    || code === "INC_F"
+    || code === "EXR_F"
+    || code === "EXR_M"
+    || isGuaranteeModificationCode(code);
 }
 
 function isPrecisionCode(code: string) {

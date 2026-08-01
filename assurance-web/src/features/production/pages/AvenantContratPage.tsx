@@ -344,8 +344,8 @@ export default function AvenantContratPage() {
       valeurAssuree: item.valeurAssuree ?? undefined,
     }));
     setVehicules(mappedVehicules.length ? mappedVehicules : [{ ...DEFAULT_VEHICLE }]);
-    setRemorques(movementCode === "INC_F" ? mappedRemorques : []);
-    setSelectedGaranties(mapCurrentGaranties(contrat.garanties ?? [], mappedVehicules, movementCode === "INC_F" ? mappedRemorques : []));
+    setRemorques(mappedRemorques);
+    setSelectedGaranties(mapCurrentGaranties(contrat.garanties ?? [], mappedVehicules, mappedRemorques));
     setTargetAssistances(mapCurrentAssistances(contrat.assistances ?? [], mappedVehicules));
   }, [contrat, movementCode]);
 

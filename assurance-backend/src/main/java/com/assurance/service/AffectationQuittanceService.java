@@ -36,12 +36,18 @@ import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.RegleAffectationQuittanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -50,6 +56,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -78,6 +85,7 @@ public class AffectationQuittanceService {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final BigDecimal ZERO = new BigDecimal("0.00");
     private static final LocalDate OPEN_ENDED_DATE = LocalDate.of(9999, 12, 31);
+    private static final DateTimeFormatter EXPORT_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final QuittanceRepository quittanceRepository;
     private final LigneQuittanceRepository ligneQuittanceRepository;
@@ -165,6 +173,178 @@ public class AffectationQuittanceService {
                         .build())
                 .rows(rows)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] export(
+            Long agenceId,
+            Long compagnieId,
+            TypeContrat typeContrat,
+            Boolean avecQuittance,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search
+    ) {
+        validateTenant(agenceId);
+        if (compagnieId == null
+                && typeContrat == null
+                && avecQuittance == null
+                && dateDu == null
+                && dateAu == null
+                && trimToNull(search) == null) {
+            throw new BadRequestException("Renseignez au moins un critère avant d'exporter");
+        }
+        if (dateDu != null && dateAu != null && dateDu.isAfter(dateAu)) {
+            throw new BadRequestException("La date effet du doit être antérieure ou égale à la date effet au");
+        }
+
+        List<AffectationQuittanceResponse> rows = new ArrayList<>();
+        int page = 0;
+        AffectationQuittancePageResponse result;
+        do {
+            result = search(
+                    agenceId,
+                    compagnieId,
+                    typeContrat,
+                    avecQuittance,
+                    dateDu,
+                    dateAu,
+                    search,
+                    page,
+                    100
+            );
+            rows.addAll(result.getRows());
+            page++;
+        } while (page < result.getPage().getTotalPages());
+
+        return createExportWorkbook(rows);
+    }
+
+    private byte[] createExportWorkbook(List<AffectationQuittanceResponse> rows) {
+        String[] headers = {
+                "Type de contrat", "Produit", "Dossier", "Mouvement", "Nature", "Souscripteur",
+                "Police", "Compagnie", "Date d'effet", "Date d'échéance", "Prime nette", "Taxes",
+                "Accessoires", "Montant TTC", "Montant affecté", "Écart",
+                "N° quittance compagnie", "Statut"
+        };
+
+        try (Workbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Affectation quittances");
+            CellStyle headerStyle = createExportHeaderStyle(workbook);
+            CellStyle moneyStyle = createExportMoneyStyle(workbook);
+
+            Row header = sheet.createRow(0);
+            for (int column = 0; column < headers.length; column++) {
+                Cell cell = header.createCell(column);
+                cell.setCellValue(headers[column]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIndex = 1;
+            for (AffectationQuittanceResponse item : rows) {
+                Row row = sheet.createRow(rowIndex++);
+                int column = 0;
+                setExportText(row, column++, typeContratLabel(item.getTypeContrat()));
+                setExportText(row, column++, item.getProduit());
+                setExportText(row, column++, item.getDossier());
+                setExportText(row, column++, item.getMouvement());
+                setExportText(row, column++, natureLabel(item.getNature()));
+                setExportText(row, column++, item.getSouscripteur());
+                setExportText(row, column++, item.getPolice());
+                setExportText(row, column++, item.getCompagnie());
+                setExportText(row, column++, formatExportDate(item.getDateEffet()));
+                setExportText(row, column++, formatExportDate(item.getDateEcheance()));
+                setExportMoney(row, column++, item.getPrimeNette(), moneyStyle);
+                setExportMoney(row, column++, item.getMontantTaxes(), moneyStyle);
+                setExportMoney(row, column++, item.getAccessoires(), moneyStyle);
+                setExportMoney(row, column++, item.getMontantTtc(), moneyStyle);
+                setExportMoney(row, column++, item.getMontantAffecte(), moneyStyle);
+                setExportMoney(row, column++, item.getEcart(), moneyStyle);
+                setExportText(row, column++, item.getNumerosQuittanceCompagnie());
+                setExportText(row, column, statusLabel(item.getStatutAffectation()));
+            }
+
+            int[] widths = {18, 22, 22, 24, 20, 26, 18, 22, 15, 17, 16, 16, 16, 17, 18, 16, 28, 24};
+            for (int column = 0; column < widths.length; column++) {
+                sheet.setColumnWidth(column, widths[column] * 256);
+            }
+            sheet.createFreezePane(0, 1);
+            sheet.setAutoFilter(new CellRangeAddress(
+                    0,
+                    Math.max(0, sheet.getLastRowNum()),
+                    0,
+                    headers.length - 1
+            ));
+
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException exception) {
+            throw new BadRequestException("Génération du fichier Excel impossible");
+        }
+    }
+
+    private CellStyle createExportHeaderStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.DARK_GREEN.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.WHITE.getIndex());
+        style.setFont(font);
+        return style;
+    }
+
+    private CellStyle createExportMoneyStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+        return style;
+    }
+
+    private void setExportText(Row row, int column, String value) {
+        row.createCell(column).setCellValue(value == null ? "" : value);
+    }
+
+    private void setExportMoney(Row row, int column, BigDecimal value, CellStyle style) {
+        Cell cell = row.createCell(column);
+        if (value != null) {
+            cell.setCellValue(value.doubleValue());
+        }
+        cell.setCellStyle(style);
+    }
+
+    private String formatExportDate(LocalDate value) {
+        return value == null ? "" : value.format(EXPORT_DATE_FORMAT);
+    }
+
+    private String typeContratLabel(TypeContrat value) {
+        if (value == null) return "";
+        return switch (value) {
+            case PARTICULIER -> "Mono";
+            case CONVENTION -> "Convention";
+            case FLOTTE -> "Flotte";
+        };
+    }
+
+    private String natureLabel(NatureAffectationQuittance value) {
+        if (value == null) return "";
+        return switch (value) {
+            case AFFAIRE_NOUVELLE -> "Affaire nouvelle";
+            case AVENANT -> "Avenant";
+            case RENOUVELLEMENT -> "Renouvellement";
+            case CARTE_VERTE -> "Carte verte";
+        };
+    }
+
+    private String statusLabel(StatutAffectationQuittance value) {
+        if (value == null) return "";
+        return switch (value) {
+            case NON_AFFECTEE -> "Non affectée";
+            case PARTIELLEMENT_AFFECTEE -> "Partiellement affectée";
+            case AFFECTEE -> "Affectée";
+            case AVEC_ECART -> "Avec écart";
+        };
     }
 
     @Transactional(readOnly = true)

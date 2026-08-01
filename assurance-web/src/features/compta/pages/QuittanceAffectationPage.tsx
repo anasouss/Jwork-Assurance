@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, RotateCcw, Search, Settings2 } from "lucide-react";
+import { Download, Eye, RotateCcw, Search, Settings2 } from "lucide-react";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,8 @@ export default function QuittanceAffectationPage() {
   const canConfigure = permissions.includes("quittance:manage") || permissions.includes("config:manage");
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [searched, setSearched] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedQuittanceId, setSelectedQuittanceId] = useState<string>();
   const [allocationOpen, setAllocationOpen] = useState(false);
@@ -73,7 +76,7 @@ export default function QuittanceAffectationPage() {
     queryFn: comptaApi.companies,
   });
   const params = useMemo(
-    () => ({
+    () => !searched ? null : ({
       compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
       typeContrat: appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
       avecQuittance: appliedFilters.nature === "ALL"
@@ -85,11 +88,15 @@ export default function QuittanceAffectationPage() {
       page,
       size: PAGE_SIZE,
     }),
-    [appliedFilters, page]
+    [appliedFilters, page, searched]
   );
   const quittances = useQuery({
     queryKey: ["compta", "affectation-quittances", params],
-    queryFn: () => comptaApi.searchQuittances(params),
+    queryFn: () => {
+      if (!params) throw new Error("Critères de recherche manquants");
+      return comptaApi.searchQuittances(params);
+    },
+    enabled: Boolean(params),
   });
 
   const rows = quittances.data?.rows ?? [];
@@ -97,16 +104,34 @@ export default function QuittanceAffectationPage() {
   const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
   const currentPage = Math.min(pageInfo?.number ?? page, totalPages - 1);
   const missingRules = rows.filter((row) => !row.regle).length;
+  const canSearch = hasMeaningfulFilter(filters);
+  const hasDateError = Boolean(filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu);
 
   function applyFilters() {
+    if (!canSearch || hasDateError) return;
     setPage(0);
     setAppliedFilters(filters);
+    setSearched(true);
   }
 
   function resetFilters() {
     setFilters(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
     setPage(0);
+    setSearched(false);
+  }
+
+  async function exportRows() {
+    if (!searched || !pageInfo?.totalElements) return;
+    setExporting(true);
+    try {
+      const blob = await comptaApi.exportQuittances(toApiFilters(appliedFilters));
+      downloadBlob(blob, `affectation-quittances-${toDateOnly(new Date())}.xlsx`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export Excel impossible");
+    } finally {
+      setExporting(false);
+    }
   }
 
   function openAllocation(row: QuittanceAllocation) {
@@ -130,19 +155,30 @@ export default function QuittanceAffectationPage() {
             Rapprochement des quittances de production avec les références et montants compagnie.
           </p>
         </div>
-        {canConfigure ? (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            variant="outline"
-            onClick={() => {
-              setRuleTarget(undefined);
-              setRulesOpen(true);
-            }}
+            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={!searched || !pageInfo?.totalElements || exporting}
+            onClick={exportRows}
           >
-            <Settings2 className="size-4" />
-            Configuration
+            <Download className="size-4" />
+            {exporting ? "Export..." : "Exporter Excel"}
           </Button>
-        ) : null}
+          {canConfigure ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setRuleTarget(undefined);
+                setRulesOpen(true);
+              }}
+            >
+              <Settings2 className="size-4" />
+              Configuration
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <Card className="min-w-0 border-border/70 shadow-none">
@@ -205,7 +241,7 @@ export default function QuittanceAffectationPage() {
               </Select>
             </FilterField>
             <div className="flex items-end gap-2">
-              <Button type="button" size="icon" title="Afficher" onClick={applyFilters}>
+              <Button type="button" size="icon" title="Afficher" disabled={!canSearch || hasDateError} onClick={applyFilters}>
                 <Search className="size-4" />
               </Button>
               <Button type="button" size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}>
@@ -223,6 +259,11 @@ export default function QuittanceAffectationPage() {
               />
             </FilterField>
           </div>
+          {hasDateError ? (
+            <p className="mt-2 text-sm font-medium text-destructive">
+              La date effet du doit être antérieure ou égale à la date effet au.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -235,12 +276,14 @@ export default function QuittanceAffectationPage() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Quittances trouvées" value={String(pageInfo?.totalElements ?? 0)} />
-        <Metric label="TTC de la page" value={money(quittances.data?.summary.montantTtc ?? 0)} />
-        <Metric label="Montant affecté de la page" value={money(quittances.data?.summary.montantAffecte ?? 0)} />
-        <Metric label="Configuration manquante sur la page" value={String(missingRules)} warning={missingRules > 0} />
-      </div>
+      {searched ? (
+        <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Quittances trouvées" value={String(pageInfo?.totalElements ?? 0)} />
+          <Metric label="TTC de la page" value={money(quittances.data?.summary.montantTtc ?? 0)} />
+          <Metric label="Montant affecté de la page" value={money(quittances.data?.summary.montantAffecte ?? 0)} />
+          <Metric label="Configuration manquante sur la page" value={String(missingRules)} warning={missingRules > 0} />
+        </div>
+      ) : null}
 
       <Card className="min-w-0 border-border/70 shadow-none">
         <CardContent className="min-w-0 p-0">
@@ -263,7 +306,13 @@ export default function QuittanceAffectationPage() {
                 </tr>
               </thead>
               <tbody>
-                {quittances.isLoading ? (
+                {!searched ? (
+                  <tr>
+                    <td colSpan={12} className="px-3 py-12 text-center text-muted-foreground">
+                      Renseignez au moins un critère puis lancez la recherche.
+                    </td>
+                  </tr>
+                ) : quittances.isLoading ? (
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={index} className="border-b">
                       <td colSpan={12} className="px-3 py-3"><Skeleton className="h-9 w-full" /></td>
@@ -334,37 +383,39 @@ export default function QuittanceAffectationPage() {
             </table>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
-            <div className="text-sm text-muted-foreground">
-              Page {currentPage + 1} / {totalPages} · {pageInfo?.totalElements ?? 0} résultat(s)
+          {searched ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage + 1} / {totalPages} · {pageInfo?.totalElements ?? 0} résultat(s)
+              </div>
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      aria-disabled={currentPage <= 0 || quittances.isLoading}
+                      className={currentPage <= 0 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((current) => Math.max(0, current - 1));
+                      }}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      aria-disabled={currentPage >= totalPages - 1 || quittances.isLoading}
+                      className={currentPage >= totalPages - 1 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((current) => Math.min(totalPages - 1, current + 1));
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
-            <Pagination className="mx-0 w-auto justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    aria-disabled={currentPage <= 0 || quittances.isLoading}
-                    className={currentPage <= 0 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setPage((current) => Math.max(0, current - 1));
-                    }}
-                  />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    aria-disabled={currentPage >= totalPages - 1 || quittances.isLoading}
-                    className={currentPage >= totalPages - 1 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setPage((current) => Math.min(totalPages - 1, current + 1));
-                    }}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -468,4 +519,35 @@ function money(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value)} MAD`;
+}
+
+function hasMeaningfulFilter(filters: Filters) {
+  return filters.compagnieId !== "ALL"
+    || filters.typeContrat !== "ALL"
+    || filters.nature !== "ALL"
+    || Boolean(filters.dateDu)
+    || Boolean(filters.dateAu)
+    || Boolean(filters.search.trim());
+}
+
+function toApiFilters(filters: Filters) {
+  return {
+    compagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+    typeContrat: filters.typeContrat === "ALL" ? undefined : filters.typeContrat,
+    avecQuittance: filters.nature === "ALL" ? undefined : filters.nature === "AVEC_QUITTANCE",
+    dateDu: filters.dateDu || undefined,
+    dateAu: filters.dateAu || undefined,
+    search: filters.search.trim() || undefined,
+  };
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

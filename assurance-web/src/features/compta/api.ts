@@ -45,6 +45,17 @@ export const comptaApi = {
     return { ...page, rows: page.rows.map(normalizeAllocation) };
   },
 
+  async exportQuittances(params: {
+    compagnieId?: string;
+    typeContrat?: TypeContrat;
+    avecQuittance?: boolean;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+  }) {
+    return apiFetchBlob(`/api/v1/compta/quittances/export${buildQueryString(params)}`);
+  },
+
   async allocation(quittanceId: string, avecRetenue?: boolean) {
     return normalizeAllocation(unwrap(
       await apiFetch<ApiResponse<QuittanceAllocation>>(

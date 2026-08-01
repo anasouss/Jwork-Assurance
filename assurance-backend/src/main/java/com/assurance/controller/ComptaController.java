@@ -84,6 +84,36 @@ public class ComptaController {
         )));
     }
 
+    @GetMapping("/quittances/export")
+    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    public ResponseEntity<byte[]> exportQuittances(
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(required = false) Boolean avecQuittance,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) String search
+    ) {
+        byte[] file = affectationQuittanceService.export(
+                TenantContext.getCurrentAgence(),
+                compagnieId,
+                typeContrat,
+                avecQuittance,
+                dateDu,
+                dateAu,
+                search
+        );
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=affectation-quittances-" + LocalDate.now() + ".xlsx"
+                )
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ))
+                .body(file);
+    }
+
     @GetMapping("/quittances/{quittanceId}/affectation")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<AffectationQuittanceResponse>> affectation(

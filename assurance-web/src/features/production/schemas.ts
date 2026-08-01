@@ -145,6 +145,21 @@ export const garantieSchema = z.object({
   if (value.typeGarantie === "VEHICULE" && (value.modeParDefaut === "PROTECTION" || value.modesAutorises.includes("PROTECTION"))) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["modeParDefaut"], message: "Le mode PROTECTION est réservé aux garanties personne" });
   }
+  if (value.responsabiliteCivile && value.defenseRecours) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["responsabiliteCivile"], message: "Une garantie ne peut pas être à la fois RC et défense et recours" });
+  }
+  if (value.typeGarantie === "PERSONNE" && (value.responsabiliteCivile || value.defenseRecours || value.avecFranchise || value.avecFranchiseMinimale || value.saisieManuelleAutorisee)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["typeGarantie"], message: "Ces options sont réservées aux garanties véhicule" });
+  }
+  if (value.avecFranchise && !value.modesAutorises.includes("TAUX")) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["avecFranchise"], message: "Le taux de franchise nécessite le mode TAUX" });
+  }
+  if (value.avecFranchiseMinimale && !value.avecFranchise) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["avecFranchiseMinimale"], message: "La franchise minimale nécessite un taux de franchise" });
+  }
+  if (value.saisieManuelleAutorisee && !value.avecCapital) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["saisieManuelleAutorisee"], message: "La saisie manuelle nécessite une valeur assurée" });
+  }
   if (value.critereSelectionTarif === "TAUX_FRANCHISE" && (value.typeGarantie !== "VEHICULE" || !value.avecFranchise || !value.modesAutorises.includes("TAUX") || !(value.modesTarificationMultiple ?? []).includes("TAUX"))) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["critereSelectionTarif"], message: "Ce critère nécessite un sélecteur multi-formules tarifé au taux avec franchise" });
   }

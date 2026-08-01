@@ -672,6 +672,9 @@ export function GarantiesSettingsPage() {
   const [editingGroupeExclusion, setEditingGroupeExclusion] = useState<ReferenceOption | null>(null);
   const [groupeExclusionDialogOpen, setGroupeExclusionDialogOpen] = useState(false);
   const [groupeExclusionPayload, setGroupeExclusionPayload] = useState<UpsertGroupeExclusionGarantieRequest>(emptyGroupeExclusionGarantie());
+  const isVehicleGuarantee = payload.typeGarantie !== "PERSONNE";
+  const hasRateMode = isVehicleGuarantee && (payload.modesAutorises ?? []).includes("TAUX");
+  const businessTreatment = payload.responsabiliteCivile ? "RC" : payload.defenseRecours ? "DEFENSE_RECOURS" : "STANDARD";
 
   useEffect(() => {
     setPayload(editing ? normalizeGarantiePayload(garantiePayloadFromReference(editing)) : emptyGarantie());
@@ -726,6 +729,7 @@ export function GarantiesSettingsPage() {
       }
       const modeParDefaut = modes.includes(current.modeParDefaut ?? "") ? current.modeParDefaut : modes[0];
       const modesTarificationMultiple = (current.modesTarificationMultiple ?? []).filter((item) => modes.includes(item));
+      const hasRate = modes.includes("TAUX");
       return {
         ...current,
         modesAutorises: modes,
@@ -733,23 +737,8 @@ export function GarantiesSettingsPage() {
         modesTarificationMultiple,
         tarificationMultiple: modesTarificationMultiple.length > 0,
         critereSelectionTarif: modesTarificationMultiple.includes("TAUX") ? current.critereSelectionTarif : "TAUX_PRIME",
-      };
-    });
-  };
-
-  const setTarificationMultiple = (checked: boolean) => {
-    setPayload((current) => {
-      if (!checked) {
-        return { ...current, tarificationMultiple: false, modesTarificationMultiple: [], critereSelectionTarif: "TAUX_PRIME" };
-      }
-      const fallbackMode = current.modeParDefaut && current.modeParDefaut !== "PROTECTION"
-        ? current.modeParDefaut
-        : (current.modesAutorises ?? []).find((mode) => mode !== "PROTECTION");
-      return {
-        ...current,
-        tarificationMultiple: Boolean(fallbackMode),
-        modesTarificationMultiple: fallbackMode ? [fallbackMode] : [],
-        critereSelectionTarif: fallbackMode === "TAUX" ? current.critereSelectionTarif : "TAUX_PRIME",
+        avecFranchise: hasRate ? current.avecFranchise : false,
+        avecFranchiseMinimale: hasRate ? current.avecFranchiseMinimale : false,
       };
     });
   };
@@ -816,9 +805,13 @@ export function GarantiesSettingsPage() {
         requiertValeurVenale: false,
         requiertValeurNeuf: false,
         requiertValeurGlace: false,
+        responsabiliteCivile: false,
+        defenseRecours: false,
         avecFranchise: false,
+        avecFranchiseMinimale: false,
         critereSelectionTarif: "TAUX_PRIME",
         avecCapital: true,
+        saisieManuelleAutorisee: false,
         tarificationMultiple: false,
         modesTarificationMultiple: [],
       });
@@ -829,6 +822,12 @@ export function GarantiesSettingsPage() {
       modesAutorises: ["TAUX"],
       modeParDefaut: "TAUX",
       critereSelectionTarif: "TAUX_PRIME",
+      responsabiliteCivile: false,
+      defenseRecours: false,
+      avecFranchise: false,
+      avecFranchiseMinimale: false,
+      avecCapital: false,
+      saisieManuelleAutorisee: false,
       tarificationMultiple: false,
       modesTarificationMultiple: [],
     });
@@ -981,22 +980,53 @@ export function GarantiesSettingsPage() {
 
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <Flag label="Obligatoire" checked={payload.obligatoire} onChange={(value) => update({ obligatoire: value })} />
-              <Flag label="Responsabilité civile" checked={payload.responsabiliteCivile} onChange={(value) => update({ responsabiliteCivile: value })} />
-              <Flag label="Défense et recours" checked={payload.defenseRecours} onChange={(value) => update({ defenseRecours: value })} />
-              <Flag label="Avec capital" checked={payload.avecCapital} onChange={(value) => update({ avecCapital: value })} />
-              <Flag label="Taux franchise" checked={payload.avecFranchise} onChange={(value) => update({
-                avecFranchise: value,
-                avecFranchiseMinimale: value ? payload.avecFranchiseMinimale : false,
-                critereSelectionTarif: value ? payload.critereSelectionTarif : "TAUX_PRIME",
-              })} />
-              <Flag label="Franchise minimale" checked={payload.avecFranchiseMinimale} onChange={(value) => update({ avecFranchiseMinimale: value, avecFranchise: value ? true : payload.avecFranchise })} />
-              <Flag label="Tarification multiple" checked={(payload.modesTarificationMultiple ?? []).length > 0} onChange={setTarificationMultiple} />
-              <Flag label="Saisie manuelle" checked={payload.saisieManuelleAutorisee} onChange={setManualEntryAllowed} />
+              {isVehicleGuarantee ? (
+                <Field label="Traitement métier">
+                  <Select
+                    value={businessTreatment}
+                    onValueChange={(value) => update({
+                      responsabiliteCivile: value === "RC",
+                      defenseRecours: value === "DEFENSE_RECOURS",
+                    })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="STANDARD">Standard</SelectItem>
+                      <SelectItem value="RC">Responsabilité civile</SelectItem>
+                      <SelectItem value="DEFENSE_RECOURS">Défense et recours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : null}
+              {isVehicleGuarantee ? (
+                <Flag label="Capital / valeur assurée" checked={payload.avecCapital} onChange={(value) => update({
+                  avecCapital: value,
+                  saisieManuelleAutorisee: value ? payload.saisieManuelleAutorisee : false,
+                  sourcesValeurAutorisees: value
+                    ? payload.sourcesValeurAutorisees
+                    : (payload.sourcesValeurAutorisees ?? []).filter((source) => source !== "MANUEL"),
+                  sourceValeurParDefaut: !value && payload.sourceValeurParDefaut === "MANUEL" ? "AUCUNE" : payload.sourceValeurParDefaut,
+                })} />
+              ) : null}
+              {hasRateMode ? (
+                <Flag label="Taux de franchise" checked={payload.avecFranchise} onChange={(value) => update({
+                  avecFranchise: value,
+                  avecFranchiseMinimale: value ? payload.avecFranchiseMinimale : false,
+                  critereSelectionTarif: value ? payload.critereSelectionTarif : "TAUX_PRIME",
+                })} />
+              ) : null}
+              {hasRateMode && payload.avecFranchise ? (
+                <Flag label="Franchise minimale" checked={payload.avecFranchiseMinimale} onChange={(value) => update({ avecFranchiseMinimale: value })} />
+              ) : null}
+              {isVehicleGuarantee && payload.avecCapital ? (
+                <Flag label="Saisie manuelle de la valeur" checked={payload.saisieManuelleAutorisee} onChange={setManualEntryAllowed} />
+              ) : null}
               <Flag label="Verrouillée" checked={payload.verrouillee} onChange={(value) => update({ verrouillee: value })} />
               <Flag label="Active" checked={payload.actif} onChange={(value) => update({ actif: value })} />
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-2">
+            {isVehicleGuarantee ? (
+              <div className="grid gap-3 lg:grid-cols-2">
               <div className="grid gap-3 rounded-md border p-3">
                 <div className="text-sm font-semibold">Modes de tarification</div>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -1085,7 +1115,8 @@ export function GarantiesSettingsPage() {
                   </Select>
                 </Field>
               </div>
-            </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-3 rounded-md border p-3">
               <div className="text-sm font-semibold">Prorata appliqué par compagnie</div>
@@ -1954,6 +1985,8 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
       sourcesValeurAutorisees: [],
       sourceValeurParDefaut: "AUCUNE",
       saisieManuelleAutorisee: false,
+      responsabiliteCivile: false,
+      defenseRecours: false,
       requiertValeurVenale: false,
       requiertValeurNeuf: false,
       requiertValeurGlace: false,
@@ -1965,7 +1998,11 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     };
   }
 
-  const saisieManuelleAutorisee = Boolean(payload.saisieManuelleAutorisee);
+  const avecCapital = Boolean(payload.avecCapital);
+  const hasRateMode = normalizedModes.includes("TAUX");
+  const avecFranchise = Boolean(hasRateMode && payload.avecFranchise);
+  const saisieManuelleAutorisee = Boolean(avecCapital && payload.saisieManuelleAutorisee);
+  const responsabiliteCivile = Boolean(payload.responsabiliteCivile);
   const sourcesValeurAutorisees = (payload.sourcesValeurAutorisees ?? [])
     .filter((source) => SOURCES_VALEUR.includes(source as typeof SOURCES_VALEUR[number]))
     .filter((source) => source !== "MANUEL");
@@ -1982,10 +2019,14 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     groupeExclusionId: payload.groupeExclusionId || undefined,
     modesAutorises: normalizedModes,
     modeParDefaut,
-    critereSelectionTarif: payload.critereSelectionTarif === "TAUX_FRANCHISE" && payload.avecFranchise && normalizedModes.includes("TAUX") && normalizedMultipleModes.includes("TAUX")
+    responsabiliteCivile,
+    defenseRecours: !responsabiliteCivile && Boolean(payload.defenseRecours),
+    avecCapital,
+    avecFranchise,
+    critereSelectionTarif: payload.critereSelectionTarif === "TAUX_FRANCHISE" && avecFranchise && normalizedMultipleModes.includes("TAUX")
       ? "TAUX_FRANCHISE"
       : "TAUX_PRIME",
-    avecFranchiseMinimale: Boolean(payload.avecFranchise && payload.avecFranchiseMinimale),
+    avecFranchiseMinimale: Boolean(avecFranchise && payload.avecFranchiseMinimale),
     tarificationMultiple: normalizedMultipleModes.length > 0,
     modesTarificationMultiple: normalizedMultipleModes,
     sourcesValeurAutorisees,

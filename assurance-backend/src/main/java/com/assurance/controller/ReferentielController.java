@@ -1247,6 +1247,26 @@ public class ReferentielController {
         if (typeGarantie == TypeGarantie.VEHICULE && (modeParDefaut == ModeTarificationGarantie.PROTECTION || modes.contains(ModeTarificationGarantie.PROTECTION))) {
             throw new BadRequestException("Le mode PROTECTION est reserve aux garanties personne");
         }
+        if (Boolean.TRUE.equals(request.getResponsabiliteCivile()) && Boolean.TRUE.equals(request.getDefenseRecours())) {
+            throw new BadRequestException("Une garantie ne peut pas etre a la fois RC et defense et recours");
+        }
+        if (typeGarantie == TypeGarantie.PERSONNE
+                && (Boolean.TRUE.equals(request.getResponsabiliteCivile())
+                || Boolean.TRUE.equals(request.getDefenseRecours())
+                || Boolean.TRUE.equals(request.getAvecFranchise())
+                || Boolean.TRUE.equals(request.getAvecFranchiseMinimale())
+                || Boolean.TRUE.equals(request.getSaisieManuelleAutorisee()))) {
+            throw new BadRequestException("Les traitements vehicule, franchises et saisies de valeur ne sont pas autorises pour une garantie personne");
+        }
+        if (Boolean.TRUE.equals(request.getAvecFranchise()) && !modes.contains(ModeTarificationGarantie.TAUX)) {
+            throw new BadRequestException("Le taux de franchise necessite le mode TAUX");
+        }
+        if (Boolean.TRUE.equals(request.getAvecFranchiseMinimale()) && !Boolean.TRUE.equals(request.getAvecFranchise())) {
+            throw new BadRequestException("La franchise minimale necessite un taux de franchise");
+        }
+        if (Boolean.TRUE.equals(request.getSaisieManuelleAutorisee()) && !Boolean.TRUE.equals(request.getAvecCapital())) {
+            throw new BadRequestException("La saisie manuelle necessite une valeur assuree");
+        }
         LinkedHashSet<ModeTarificationGarantie> modesTarificationMultiple = new LinkedHashSet<>(
                 request.getModesTarificationMultiple() == null ? Set.of() : request.getModesTarificationMultiple()
         );

@@ -122,6 +122,8 @@ export default function AvenantContratPage() {
     queryKey: ["avenant-draft", contratId, movementCode],
     queryFn: () => productionApi.getAvenantDraft(contratId, movementCode),
     enabled: Boolean(contratId) && !validatedMovementId,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const rectificationQuery = useQuery({
     queryKey: ["avenant-rectification", contratId, validatedMovementId],
@@ -284,7 +286,7 @@ export default function AvenantContratPage() {
       setRemorques([{}]);
       setSelectedGaranties([]);
     }
-  }, [movementCode]);
+  }, [movementCode, validatedMovementId]);
 
   useEffect(() => {
     if (!isDuplicataCode(movementCode) || targets.length === 0) {
@@ -350,20 +352,36 @@ export default function AvenantContratPage() {
   useEffect(() => {
     const sourceFetched = validatedMovementId
       ? rectificationQuery.isFetched && savedMovementQuery.isFetched
-      : draftQuery.isFetched;
+      : draftQuery.isFetchedAfterMount;
     if (!contrat || !sourceFetched || hydratedDraftCodeRef.current === hydrationKey) {
       return;
     }
     hydratedDraftCodeRef.current = hydrationKey;
     const request = validatedMovementId ? rectificationQuery.data : draftQuery.data?.request;
     if (!request) {
+      if (isVehicleTargetCreationCode(movementCode)) {
+        setVehicules([{ ...DEFAULT_VEHICLE }]);
+        setRemorques([]);
+        setSelectedGaranties([]);
+        setTargetAssistances({});
+      }
+      if (movementCode === "EXR_M") {
+        setVehicules([]);
+        setRemorques([{}]);
+        setSelectedGaranties([]);
+      }
       setHydratedSourceKey(hydrationKey);
       return;
     }
     setDateEffet(request.dateEffet ?? undefined);
     setDateEcheance(contrat?.dateEcheance ?? request.dateEcheance ?? undefined);
-    setVehicules(request.vehicules?.length ? request.vehicules : movementCode === "EXR_M" ? [] : [{ ...DEFAULT_VEHICLE }]);
-    setRemorques(request.remorques?.length ? request.remorques : movementCode === "EXR_M" ? [{}] : []);
+    if (isVehicleTargetCreationCode(movementCode)) {
+      setVehicules(request.vehicules?.length ? request.vehicules : [{ ...DEFAULT_VEHICLE }]);
+      setRemorques(movementCode === "INC_F" && request.remorques?.length ? request.remorques : []);
+    } else if (movementCode === "EXR_M") {
+      setVehicules([]);
+      setRemorques(request.remorques?.length ? request.remorques : [{}]);
+    }
     setSelectedGaranties(request.garanties ?? []);
     const currentAssistances = isGuaranteeModificationCode(movementCode)
       ? mapCurrentAssistances(
@@ -471,6 +489,7 @@ export default function AvenantContratPage() {
       return productionApi.createAvenant(contratId, request);
     },
     onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ["avenant-draft", contratId, movementCode], exact: true });
       await queryClient.invalidateQueries({ queryKey: ["contrats"] });
       await queryClient.invalidateQueries({ queryKey: ["avenant-context", contratId] });
       toast.success(validatedMovementId ? "Avenant modifié" : "Avenant enregistré");

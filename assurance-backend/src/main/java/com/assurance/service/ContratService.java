@@ -80,6 +80,8 @@ public class ContratService {
     private final MouvementGarantieRepository mouvementGarantieRepository;
     private final QuittanceRepository quittanceRepository;
     private final LigneQuittanceRepository ligneQuittanceRepository;
+    private final AffectationQuittanceCompagnieRepository affectationQuittanceCompagnieRepository;
+    private final LigneDocumentClientRepository ligneDocumentClientRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final ElementFacturableCibleRepository elementFacturableCibleRepository;
     private final PieceJointeRepository pieceJointeRepository;
@@ -2315,6 +2317,9 @@ public class ContratService {
                 .anyMatch(quittance -> Boolean.TRUE.equals(quittance.getPayee()))) {
             throw new BadRequestException("Impossible de supprimer ce mouvement : une quittance est déjà payée.");
         }
+        if (ligneDocumentClientRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Impossible de supprimer ce mouvement : une quittance est déjà liée à un document client.");
+        }
     }
 
     private void deleteMovementGeneratedData(Long mouvementId) {
@@ -2331,6 +2336,8 @@ public class ContratService {
             carteVerteRepository.flush();
         }
         for (Quittance quittance : quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId)) {
+            affectationQuittanceCompagnieRepository.deleteByQuittanceId(quittance.getId());
+            affectationQuittanceCompagnieRepository.flush();
             ligneQuittanceRepository.deleteByQuittanceId(quittance.getId());
             quittanceRepository.delete(quittance);
         }
@@ -4634,8 +4641,40 @@ public class ContratService {
                         .sorted(Comparator.comparing(LigneQuittance::getOrdre, Comparator.nullsLast(Comparator.naturalOrder())))
                         .map(this::toSavedQuittanceLigneResponse)
                         .toList())
+                .garanties(buildSavedQuittanceGaranties(quittance))
                 .targetSummaries(targetSummaries)
                 .build();
+    }
+
+    private List<QuittanceResponse.GarantieLigne> buildSavedQuittanceGaranties(Quittance quittance) {
+        MouvementContrat mouvement = quittance.getMouvementContrat();
+        if (mouvement == null) {
+            return List.of();
+        }
+
+        List<Vehicule> vehicules = mouvementVehiculeRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .sorted(Comparator.comparing(MouvementVehicule::getId))
+                .map(MouvementVehicule::getVehicule)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<Remorque> remorques = mouvementRemorqueRepository.findByMouvementContratId(mouvement.getId()).stream()
+                .sorted(Comparator.comparing(MouvementRemorque::getId))
+                .map(MouvementRemorque::getRemorque)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<MouvementGarantie> snapshots = mouvementGarantieRepository.findByMouvementContratId(mouvement.getId());
+        boolean hasDifferentialSnapshots = snapshots.stream()
+                .anyMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL);
+
+        return snapshots.stream()
+                .filter(snapshot -> hasDifferentialSnapshots
+                        ? snapshot.getNature() == NatureSnapshotMouvement.DIFFERENTIEL
+                        : snapshot.getNature() != NatureSnapshotMouvement.AVANT)
+                .sorted(Comparator.comparing(MouvementGarantie::getId))
+                .map(snapshot -> toQuittanceGarantieResponse(snapshot, vehicules, remorques))
+                .toList();
     }
 
     private boolean isContratQuittanceGenerale(Quittance quittance) {
@@ -4895,6 +4934,35 @@ public class ContratService {
                 .primeNette(contratGarantie.getPrime())
                 .tauxFranchise(contratGarantie.getTauxFranchise())
                 .franchiseMinimale(contratGarantie.getFranchiseMinimale())
+                .build();
+    }
+
+    private QuittanceResponse.GarantieLigne toQuittanceGarantieResponse(
+            MouvementGarantie snapshot,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        Garantie garantie = snapshot.getGarantie();
+        LigneGrilleTarifaire ligne = snapshot.getLigneGrilleTarifaire();
+        return QuittanceResponse.GarantieLigne.builder()
+                .garantieId(garantie == null ? null : garantie.getId())
+                .code(garantie == null ? null : garantie.getCode())
+                .libelle(garantie == null ? null : garantie.getLibelle())
+                .typeGarantie(garantie == null || garantie.getTypeGarantie() == null ? null : garantie.getTypeGarantie().name())
+                .vehiculeIndex(indexOfIdentity(vehicules, snapshot.getVehicule()))
+                .remorqueIndex(indexOfIdentity(remorques, snapshot.getRemorque()))
+                .ligneGrilleTarifaireId(ligne == null ? null : ligne.getId())
+                .modeSelectionne(snapshot.getModeSelectionne() == null ? null : snapshot.getModeSelectionne().name())
+                .sourceValeurSelectionnee(snapshot.getSourceValeurSelectionnee() == null ? null : snapshot.getSourceValeurSelectionnee().name())
+                .formuleGarantiePersonneId(snapshot.getFormuleGarantiePersonne() == null ? null : snapshot.getFormuleGarantiePersonne().getId())
+                .capital(snapshot.getCapital())
+                .valeurVenale(snapshot.getValeurVenale())
+                .valeurNeuf(snapshot.getValeurNeuf())
+                .valeurGlace(snapshot.getValeurGlace())
+                .taux(snapshot.getTaux())
+                .primeNette(snapshot.getPrime())
+                .tauxFranchise(snapshot.getTauxFranchise())
+                .franchiseMinimale(snapshot.getFranchiseMinimale())
                 .build();
     }
 

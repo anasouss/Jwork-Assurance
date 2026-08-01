@@ -13,6 +13,13 @@ import java.util.List;
 public interface LigneDocumentClientRepository extends JpaRepository<LigneDocumentClient, Long> {
 
     @Query("""
+            select count(l)
+            from LigneDocumentClient l
+            where l.quittance.mouvementContrat.id = :mouvementId
+            """)
+    long countByMouvementContratId(@Param("mouvementId") Long mouvementId);
+
+    @Query("""
             select l.quittance.id
             from LigneDocumentClient l
             where l.quittance.id in :quittanceIds

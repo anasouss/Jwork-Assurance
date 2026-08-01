@@ -750,7 +750,7 @@ export default function AvenantContratPage() {
   };
 
   useEffect(() => {
-    if (initialLoading || saveMutation.isPending) {
+    if (initialLoading || saveMutation.isPending || validatedMovementId) {
       return;
     }
     const request = buildRequest(true);
@@ -782,6 +782,7 @@ export default function AvenantContratPage() {
   }, [
     initialLoading,
     saveMutation.isPending,
+    validatedMovementId,
     movementCode,
     contratId,
     contrat?.dateEcheance,

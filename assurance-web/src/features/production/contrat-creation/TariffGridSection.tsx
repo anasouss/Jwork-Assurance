@@ -36,7 +36,7 @@ export function TariffGridSection({
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
   );
   const selectedGrille = filteredGrilles.find((grille) => grille.id === form.grilleTarifaireId) ?? null;
-  const usageOptions = form.availableUsages.length > 0 ? form.availableUsages : form.refs.usages.data ?? [];
+  const usageOptions = form.availableUsages;
   const allowedUsageIds = usageOptions.map((usage) => usage.id);
 
   const lignes = useQuery({
@@ -58,11 +58,9 @@ export function TariffGridSection({
     for (const formule of formules.data ?? []) {
       if (formule.usageId) usageIds.add(String(formule.usageId));
     }
-    const allowed = allowedUsageIds.length ? new Set(allowedUsageIds) : null;
-    const usages = usageOptions.length > 0 ? usageOptions : form.refs.usages.data ?? [];
-    const configuredUsages = usages.filter((usage) => usageIds.has(usage.id));
-    return allowed ? configuredUsages.filter((usage) => allowed.has(usage.id)) : configuredUsages;
-  }, [allowedUsageIds, form.refs.usages.data, formules.data, lignes.data, usageOptions]);
+    const allowed = new Set(allowedUsageIds);
+    return usageOptions.filter((usage) => usageIds.has(usage.id) && allowed.has(usage.id));
+  }, [allowedUsageIds, formules.data, lignes.data, usageOptions]);
 
   const activeUsageId = selectedUsageId || usageTabs[0]?.id || "";
   const activeUsage = usageTabs.find((usage) => usage.id === activeUsageId) ?? null;

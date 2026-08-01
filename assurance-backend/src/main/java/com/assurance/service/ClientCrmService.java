@@ -126,6 +126,7 @@ public class ClientCrmService {
                     .modeFacturation(contrat.getModeFacturation() == null ? "DIRECTE" : contrat.getModeFacturation().name())
                     .primeTotale(primeTotale)
                     .mouvements(mouvementsByContrat.getOrDefault(contrat.getId(), List.of()).stream()
+                            .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
                             .map(this::toMouvementView)
                             .toList())
                     .build());

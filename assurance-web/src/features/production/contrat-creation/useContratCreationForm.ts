@@ -99,28 +99,26 @@ export function useContratCreationForm(
     () => referenceStringArray(selectedConvention, "usageIds"),
     [selectedConvention]
   );
-  const flotteCategorieClientId = useMemo(() => {
+  const categorieClientId = useMemo(() => {
     const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE")?.client.categorieClientId;
     const souscripteur = clients.find((client) => client.role === "SOUSCRIPTEUR")?.client.categorieClientId;
-    return proprietaire || souscripteur || "";
-  }, [clients]);
-  const selectedFlotteCategorie = useMemo(
-    () => refs.categoriesClient.data?.find((item) => item.id === flotteCategorieClientId) ?? null,
-    [flotteCategorieClientId, refs.categoriesClient.data]
+    return typeContrat === "FLOTTE" ? proprietaire || souscripteur || "" : souscripteur || "";
+  }, [clients, typeContrat]);
+  const selectedCategorieClient = useMemo(
+    () => refs.categoriesClient.data?.find((item) => item.id === categorieClientId) ?? null,
+    [categorieClientId, refs.categoriesClient.data]
   );
-  const isFlotteLocationCategory = typeContrat === "FLOTTE" && String(selectedFlotteCategorie?.code ?? "").trim().toUpperCase() === "LOCATION";
-  const flotteUsageIds = useMemo(
-    () => referenceStringArray(selectedFlotteCategorie, "usageIds"),
-    [selectedFlotteCategorie]
+  const isFlotteLocationCategory = typeContrat === "FLOTTE" && String(selectedCategorieClient?.code ?? "").trim().toUpperCase() === "LOCATION";
+  const categorieUsageIds = useMemo(
+    () => referenceStringArray(selectedCategorieClient, "usageIds"),
+    [selectedCategorieClient]
   );
 
   const availableUsages = useMemo(() => {
     const usages = refs.usages.data ?? [];
-    if (typeContrat === "FLOTTE") {
-      if (!flotteCategorieClientId || flotteUsageIds.length === 0) {
-        return usages;
-      }
-      const allowedIds = new Set(flotteUsageIds);
+    if (typeContrat === "FLOTTE" || typeContrat === "PARTICULIER") {
+      if (!categorieClientId) return [];
+      const allowedIds = new Set(categorieUsageIds);
       return usages.filter((usage) => allowedIds.has(usage.id));
     }
     if (typeContrat !== "CONVENTION") {
@@ -131,7 +129,7 @@ export function useContratCreationForm(
     }
     const allowedIds = new Set(conventionUsageIds);
     return usages.filter((usage) => allowedIds.has(usage.id));
-  }, [conventionId, conventionUsageIds, flotteCategorieClientId, flotteUsageIds, refs.usages.data, selectedConvention, typeContrat]);
+  }, [categorieClientId, categorieUsageIds, conventionId, conventionUsageIds, refs.usages.data, selectedConvention, typeContrat]);
 
   useEffect(() => {
     if (typeContrat !== "CONVENTION" || !usageId || !selectedConvention) {
@@ -142,20 +140,37 @@ export function useContratCreationForm(
     }
     setUsageId("");
     setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
+    setRemorques((current) => current.map((remorque) => ({ ...remorque, usageId: "" })));
   }, [conventionUsageIds, selectedConvention, typeContrat, usageId]);
 
   useEffect(() => {
-    if (typeContrat !== "FLOTTE" || flotteUsageIds.length === 0) {
+    if (typeContrat !== "FLOTTE" && typeContrat !== "PARTICULIER") {
       return;
     }
-    const allowedIds = new Set(flotteUsageIds);
+    if (!categorieClientId) {
+      setUsageId("");
+      setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
+      setRemorques((current) => current.map((remorque) => ({ ...remorque, usageId: "" })));
+      return;
+    }
+    if (!selectedCategorieClient) return;
+    const allowedIds = new Set(categorieUsageIds);
+    if (usageId && !allowedIds.has(usageId)) {
+      setUsageId("");
+    }
     setVehicules((current) => {
       const next = current.map((vehicule) => (
         vehicule.usageId && !allowedIds.has(vehicule.usageId) ? { ...vehicule, usageId: "" } : vehicule
       ));
       return next.some((vehicule, index) => vehicule.usageId !== current[index]?.usageId) ? next : current;
     });
-  }, [flotteUsageIds, typeContrat]);
+    setRemorques((current) => {
+      const next = current.map((remorque) => (
+        remorque.usageId && !allowedIds.has(remorque.usageId) ? { ...remorque, usageId: "" } : remorque
+      ));
+      return next.some((remorque, index) => remorque.usageId !== current[index]?.usageId) ? next : current;
+    });
+  }, [categorieClientId, categorieUsageIds, selectedCategorieClient, typeContrat, usageId]);
 
   const grilleUsageFilter = typeContrat === "CONVENTION" ? usageId : undefined;
   const selectedConventionTypeEcheance = selectedConvention?.typeEcheance;
@@ -573,6 +588,9 @@ export function useContratCreationForm(
       if (typeContrat === "FLOTTE" && item.role === "PROPRIETAIRE" && !item.client.categorieClientId) {
         nextErrors[`clients.${index}.client.categorieClientId`] = "Catégorie obligatoire.";
       }
+      if (typeContrat === "PARTICULIER" && item.role === "SOUSCRIPTEUR" && !item.client.categorieClientId) {
+        nextErrors[`clients.${index}.client.categorieClientId`] = "Catégorie obligatoire.";
+      }
       if (item.role === "PROPRIETAIRE" && !hasTelephone(item.client.telephones)) {
         nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
       }
@@ -703,6 +721,18 @@ export function useContratCreationForm(
         });
     }
     if (section === "contrat") {
+      if (typeContrat === "PARTICULIER") {
+        const souscripteurEntry = request.clients
+          .map((item, index) => ({ item, index }))
+          .find(({ item }) => item.role === "SOUSCRIPTEUR");
+        if (souscripteurEntry) {
+          requireField(
+            `clients.${souscripteurEntry.index}.client.categorieClientId`,
+            souscripteurEntry.item.client.categorieClientId,
+            "Catégorie obligatoire."
+          );
+        }
+      }
       requireField("compagnieAssuranceId", compagnieAssuranceId, "Compagnie obligatoire.");
       if (!options?.prospectionMode) {
         requireField("numeroPolice", numeroPolice, "N° police obligatoire.");
@@ -933,12 +963,14 @@ export function useContratCreationForm(
     setConventionId("");
     setUsageId("");
     setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
+    setRemorques((current) => current.map((remorque) => ({ ...remorque, usageId: "" })));
   };
 
   const setConventionForContrat = (value: string) => {
     if (value !== conventionId) {
       setUsageId("");
       setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: "" })));
+      setRemorques((current) => current.map((remorque) => ({ ...remorque, usageId: "" })));
     }
     setConventionId(value);
     const convention = refs.conventions.data?.find((item) => item.id === value);

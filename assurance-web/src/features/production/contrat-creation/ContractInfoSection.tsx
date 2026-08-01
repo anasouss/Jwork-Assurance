@@ -53,9 +53,10 @@ export function ContractInfoSection({
   );
   const selectedUsage = (form.refs.usages.data ?? []).find((item) => item.id === form.usageId);
   const selectedConvention = filteredConventions.find((item) => item.id === form.conventionId);
-  const souscripteur = form.clients.find((client) => client.role === "SOUSCRIPTEUR");
+  const souscripteurIndex = form.clients.findIndex((client) => client.role === "SOUSCRIPTEUR");
+  const souscripteur = souscripteurIndex >= 0 ? form.clients[souscripteurIndex] : undefined;
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
-  const showCategorieClient = form.typeContrat === "PARTICULIER" && !categorieClientId;
+  const showCategorieClient = form.typeContrat === "PARTICULIER";
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
   const isConventionInvoice = readOnlyConventionContext && form.modeReglement === "facture";
   const isFlotte = form.typeContrat === "FLOTTE";
@@ -108,7 +109,13 @@ export function ContractInfoSection({
     >
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {showCategorieClient ? (
-          <Field label="Catégorie">
+          <Field
+            label="Catégorie"
+            required
+            error={souscripteurIndex >= 0
+              ? form.validationErrors[`clients.${souscripteurIndex}.client.categorieClientId`]
+              : undefined}
+          >
             <Select
               value={categorieClientId}
               onValueChange={(value) =>

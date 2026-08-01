@@ -50,6 +50,7 @@ public class ContratService {
     private final AgenceRepository agenceRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final ConventionRepository conventionRepository;
+    private final CategorieClientRepository categorieClientRepository;
     private final ClientRepository clientRepository;
     private final ContratRepository contratRepository;
     private final NumeroDossierSequenceRepository numeroDossierSequenceRepository;
@@ -421,12 +422,14 @@ public class ContratService {
         contrat = contratRepository.save(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), Map.of(), true);
+        validateUsageForClientCategory(contrat, usageContrat);
         applyContractBilling(contrat, request, true);
 
         List<Vehicule> vehiculesCrees = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            validateUsageForClientCategory(contrat, usage);
             Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
             Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), true);
             CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
@@ -469,6 +472,7 @@ public class ContratService {
         for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            validateUsageForClientCategory(contrat, usage);
             Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
             Remorque remorque = remorqueRepository.save(Remorque.builder()
                     .contrat(contrat)
@@ -672,6 +676,7 @@ public class ContratService {
         contratClientRepository.flush();
         contrat.getClients().clear();
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, true);
+        validateUsageForClientCategory(contrat, contrat.getUsage());
     }
 
     private List<Vehicule> remplacerVehiculesCorrection(Contrat contrat, CreateContratRequest request) {
@@ -884,6 +889,7 @@ public class ContratService {
         clearDraftChildren(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
+        validateUsageForClientCategory(contrat, contrat.getUsage());
         applyContractBilling(contrat, request, finalMode);
 
         Usage usageContrat = contrat.getUsage();
@@ -897,6 +903,7 @@ public class ContratService {
             }
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            validateUsageForClientCategory(contrat, usage);
             Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
             Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), true);
             CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
@@ -939,6 +946,7 @@ public class ContratService {
         for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            validateUsageForClientCategory(contrat, usage);
             Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
             Remorque remorque = remorqueRepository.save(Remorque.builder()
                     .contrat(contrat)
@@ -1171,6 +1179,7 @@ public class ContratService {
         if (usage == null) {
             throw new BadRequestException("Usage vehicule obligatoire");
         }
+        validateUsageForClientCategory(contrat, usage);
         if (Boolean.TRUE.equals(usage.getByCarburantAndPf())
                 && (!hasText(input.getCarburant()) || !hasText(input.getPuissanceFiscale()))) {
             throw new BadRequestException("Carburant et puissance fiscale obligatoires pour cet usage");
@@ -1189,6 +1198,7 @@ public class ContratService {
     private void applyVehiculeInput(Contrat contrat, Vehicule vehicule, CreateContratRequest.VehiculeInput input) {
         Usage usage = input.getUsageId() == null ? contrat.getUsage() : usageRepository.findById(input.getUsageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+        validateUsageForClientCategory(contrat, usage);
         Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
         Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), true);
         CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
@@ -1234,6 +1244,7 @@ public class ContratService {
     private void applyRemorqueInput(Contrat contrat, Remorque remorque, CreateContratRequest.RemorqueInput input) {
         Usage usage = input.getUsageId() == null ? contrat.getUsage() : usageRepository.findById(input.getUsageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+        validateUsageForClientCategory(contrat, usage);
         Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), false);
         remorque.setUsage(usage);
         remorque.setMarque(marque);
@@ -1957,6 +1968,9 @@ public class ContratService {
                 .anyMatch(quittance -> Boolean.TRUE.equals(quittance.getPayee()))) {
             throw new BadRequestException("Une quittance de cet avenant est payee. Utilisez un mouvement comptable de correction.");
         }
+        if (ligneDocumentClientRepository.countByMouvementContratId(mouvementId) > 0) {
+            throw new BadRequestException("Une quittance de cet avenant est deja liee a un document client et ne peut pas etre rectifiee.");
+        }
         if (isModificationGarantiesAvenant(request)
                 && mouvementGarantieRepository.findByMouvementContratId(mouvementId).stream()
                 .noneMatch(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)) {
@@ -2285,6 +2299,10 @@ public class ContratService {
             element.setStatut(StatutElementFacturable.ANNULE);
             elementFacturableRepository.save(element);
         }
+        for (Quittance quittance : quittanceRepository.findByMouvementContratIdOrderByCreatedAtDesc(mouvementId)) {
+            affectationQuittanceCompagnieRepository.deleteByQuittanceId(quittance.getId());
+        }
+        affectationQuittanceCompagnieRepository.flush();
     }
 
     private String appendNote(String current, String addition) {
@@ -4428,6 +4446,7 @@ public class ContratService {
                 .build();
 
         buildPreviewClientLinks(contrat, request.getClients(), request.getAgenceId());
+        validateUsageForClientCategory(contrat, usageContrat);
 
         List<Vehicule> vehicules = buildVehiculesPreview(request, contrat, usageContrat);
         contrat.getVehicules().addAll(vehicules);
@@ -4486,11 +4505,16 @@ public class ContratService {
         if (input.getClient() == null) {
             throw new BadRequestException("Le role " + input.getRole() + " doit renseigner clientId ou client");
         }
+        CategorieClient categorieClient = input.getClient().getCategorieClientId() == null
+                ? null
+                : categorieClientRepository.findByIdWithUsages(input.getClient().getCategorieClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", input.getClient().getCategorieClientId()));
         return Client.builder()
                 .typeClient(input.getClient().getTypeClient())
                 .prenom(input.getClient().getPrenom())
                 .nom(input.getClient().getNom())
                 .raisonSociale(input.getClient().getRaisonSociale())
+                .categorieClient(categorieClient)
                 .sahara(input.getClient().getSahara() == null ? false : input.getClient().getSahara())
                 .build();
     }
@@ -4500,6 +4524,7 @@ public class ContratService {
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            validateUsageForClientCategory(contrat, usage);
             Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), false);
             Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), false);
             CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
@@ -4542,6 +4567,7 @@ public class ContratService {
         for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
+            validateUsageForClientCategory(contrat, usage);
             Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), false);
             remorques.add(Remorque.builder()
                     .contrat(contrat)
@@ -5655,6 +5681,68 @@ public class ContratService {
         if (request.getMontantBulletin() == null || request.getMontantBulletin().signum() <= 0) {
             throw new BadRequestException("Montant du bulletin obligatoire");
         }
+    }
+
+    private void validateUsageForClientCategory(Contrat contrat, Usage usage) {
+        if (usage == null) {
+            return;
+        }
+        if (!Boolean.TRUE.equals(usage.getActif())) {
+            throw new BadRequestException("L'usage selectionne est inactif");
+        }
+
+        CategorieClient categorie = resolveUsageCategorieClient(contrat);
+        if (contrat.getConvention() != null) {
+            boolean usageAutoriseConvention = contrat.getConvention().getUsages() != null
+                    && contrat.getConvention().getUsages().stream()
+                    .anyMatch(autorise -> autorise.getId().equals(usage.getId()));
+            if (!usageAutoriseConvention) {
+                throw new BadRequestException("L'usage selectionne n'est pas autorise par la convention");
+            }
+        }
+
+        if (categorie == null) {
+            if (contrat.getTypeContrat() == TypeContrat.PARTICULIER || contrat.getTypeContrat() == TypeContrat.FLOTTE) {
+                throw new BadRequestException("La categorie client est obligatoire avant de selectionner un usage");
+            }
+            return;
+        }
+        if (!Boolean.TRUE.equals(categorie.getActif())) {
+            throw new BadRequestException("La categorie client selectionnee est inactive");
+        }
+        boolean usageAutoriseCategorie = categorie.getUsages() != null
+                && categorie.getUsages().stream().anyMatch(autorise -> autorise.getId().equals(usage.getId()));
+        if (!usageAutoriseCategorie) {
+            throw new BadRequestException("L'usage selectionne ne correspond pas a la categorie client");
+        }
+    }
+
+    private CategorieClient resolveUsageCategorieClient(Contrat contrat) {
+        if (contrat.getConvention() != null && contrat.getConvention().getCategorieClient() != null) {
+            return contrat.getConvention().getCategorieClient();
+        }
+        com.assurance.enums.RoleClientContrat preferredRole = contrat.getTypeContrat() == TypeContrat.FLOTTE
+                ? com.assurance.enums.RoleClientContrat.PROPRIETAIRE
+                : com.assurance.enums.RoleClientContrat.SOUSCRIPTEUR;
+        CategorieClient preferred = categorieClientForRole(contrat, preferredRole);
+        if (preferred != null || contrat.getTypeContrat() != TypeContrat.FLOTTE) {
+            return preferred;
+        }
+        return categorieClientForRole(contrat, com.assurance.enums.RoleClientContrat.SOUSCRIPTEUR);
+    }
+
+    private CategorieClient categorieClientForRole(
+            Contrat contrat,
+            com.assurance.enums.RoleClientContrat role
+    ) {
+        return (contrat.getClients() == null ? List.<ContratClient>of() : contrat.getClients()).stream()
+                .filter(link -> link.getRole() == role)
+                .map(ContratClient::getClient)
+                .filter(Objects::nonNull)
+                .map(Client::getCategorieClient)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private ModeSaisieGarantieContrat resolveModeSaisieGaranties(CreateContratRequest request) {

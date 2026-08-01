@@ -174,7 +174,7 @@ export function ContratFormLayout({
     <VehiculeSection
       vehicules={form.vehicules}
       setVehicules={form.setVehicules}
-      usages={form.refs.usages.data ?? []}
+      usages={form.availableUsages}
       compagnies={form.refs.compagnies.data ?? []}
       compagnieAssuranceId={form.compagnieAssuranceId}
       marques={form.refs.marques.data ?? []}
@@ -282,7 +282,7 @@ export function ContratFormLayout({
     <RemorqueSection
       remorques={form.remorques}
       setRemorques={form.setRemorques}
-      usages={form.refs.usages.data ?? []}
+      usages={form.availableUsages}
       compagnies={form.refs.compagnies.data ?? []}
       compagnieAssuranceId={form.compagnieAssuranceId}
       marques={form.refs.marques.data ?? []}

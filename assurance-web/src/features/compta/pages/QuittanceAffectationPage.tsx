@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Eye, RotateCcw, Search, Settings2 } from "lucide-react";
 import { toast } from "sonner";
@@ -54,14 +54,16 @@ const DEFAULT_FILTERS: Filters = {
 const PAGE_SIZE = 25;
 
 export default function QuittanceAffectationPage() {
+  const [urlParams, setUrlParams] = useSearchParams();
+  const [initialState] = useState(() => searchStateFromUrl(urlParams));
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canAffect = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
   const canConfigure = permissions.includes("quittance:manage") || permissions.includes("config:manage");
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [searched, setSearched] = useState(false);
+  const [filters, setFilters] = useState<Filters>(initialState.filters);
+  const [appliedFilters, setAppliedFilters] = useState<Filters>(initialState.filters);
+  const [searched, setSearched] = useState(initialState.searched);
   const [exporting, setExporting] = useState(false);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(initialState.page);
   const [selectedQuittanceId, setSelectedQuittanceId] = useState<string>();
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -112,6 +114,7 @@ export default function QuittanceAffectationPage() {
     setPage(0);
     setAppliedFilters(filters);
     setSearched(true);
+    setUrlParams(toUrlParams(filters, 0), { replace: true });
   }
 
   function resetFilters() {
@@ -119,6 +122,12 @@ export default function QuittanceAffectationPage() {
     setAppliedFilters(DEFAULT_FILTERS);
     setPage(0);
     setSearched(false);
+    setUrlParams(new URLSearchParams(), { replace: true });
+  }
+
+  function goToPage(nextPage: number) {
+    setPage(nextPage);
+    setUrlParams(toUrlParams(appliedFilters, nextPage), { replace: true });
   }
 
   async function exportRows() {
@@ -155,17 +164,8 @@ export default function QuittanceAffectationPage() {
             Rapprochement des quittances de production avec les références et montants compagnie.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            className="bg-emerald-600 hover:bg-emerald-700"
-            disabled={!searched || !pageInfo?.totalElements || exporting}
-            onClick={exportRows}
-          >
-            <Download className="size-4" />
-            {exporting ? "Export..." : "Exporter Excel"}
-          </Button>
-          {canConfigure ? (
+        {canConfigure ? (
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="outline"
@@ -177,8 +177,8 @@ export default function QuittanceAffectationPage() {
               <Settings2 className="size-4" />
               Configuration
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       <Card className="min-w-0 border-border/70 shadow-none">
@@ -286,6 +286,19 @@ export default function QuittanceAffectationPage() {
       ) : null}
 
       <Card className="min-w-0 border-border/70 shadow-none">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 border-b py-3">
+          <CardTitle className="text-base">Quittances</CardTitle>
+          <Button
+            type="button"
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={!searched || !pageInfo?.totalElements || exporting}
+            onClick={exportRows}
+          >
+            <Download className="size-4" />
+            {exporting ? "Export..." : "Exporter Excel"}
+          </Button>
+        </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
             <table className="w-full min-w-[1480px] border-collapse text-sm">
@@ -397,7 +410,7 @@ export default function QuittanceAffectationPage() {
                       className={currentPage <= 0 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
                       onClick={(event) => {
                         event.preventDefault();
-                        setPage((current) => Math.max(0, current - 1));
+                        goToPage(Math.max(0, currentPage - 1));
                       }}
                     />
                   </PaginationItem>
@@ -408,7 +421,7 @@ export default function QuittanceAffectationPage() {
                       className={currentPage >= totalPages - 1 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
                       onClick={(event) => {
                         event.preventDefault();
-                        setPage((current) => Math.min(totalPages - 1, current + 1));
+                        goToPage(Math.min(totalPages - 1, currentPage + 1));
                       }}
                     />
                   </PaginationItem>
@@ -528,6 +541,44 @@ function hasMeaningfulFilter(filters: Filters) {
     || Boolean(filters.dateDu)
     || Boolean(filters.dateAu)
     || Boolean(filters.search.trim());
+}
+
+function searchStateFromUrl(params: URLSearchParams) {
+  const typeContrat = params.get("typeContrat");
+  const nature = params.get("nature");
+  const filters: Filters = {
+    compagnieId: params.get("compagnieId") || "ALL",
+    typeContrat: typeContrat === "PARTICULIER" || typeContrat === "CONVENTION" || typeContrat === "FLOTTE"
+      ? typeContrat
+      : "ALL",
+    nature: nature === "AVEC_QUITTANCE" || nature === "SANS_QUITTANCE" ? nature : "ALL",
+    dateDu: validDateParam(params.get("dateDu")),
+    dateAu: validDateParam(params.get("dateAu")),
+    search: params.get("search")?.trim() || "",
+  };
+  const requestedPage = Number.parseInt(params.get("page") || "1", 10);
+  const searched = hasMeaningfulFilter(filters);
+  return {
+    filters,
+    searched,
+    page: searched && Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage - 1 : 0,
+  };
+}
+
+function toUrlParams(filters: Filters, page: number) {
+  const params = new URLSearchParams();
+  if (filters.compagnieId !== "ALL") params.set("compagnieId", filters.compagnieId);
+  if (filters.typeContrat !== "ALL") params.set("typeContrat", filters.typeContrat);
+  if (filters.nature !== "ALL") params.set("nature", filters.nature);
+  if (filters.dateDu) params.set("dateDu", filters.dateDu);
+  if (filters.dateAu) params.set("dateAu", filters.dateAu);
+  if (filters.search.trim()) params.set("search", filters.search.trim());
+  if (page > 0) params.set("page", String(page + 1));
+  return params;
+}
+
+function validDateParam(value: string | null) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
 
 function toApiFilters(filters: Filters) {

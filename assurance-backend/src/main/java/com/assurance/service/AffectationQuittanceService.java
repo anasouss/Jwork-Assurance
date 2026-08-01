@@ -38,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FillPatternType;
@@ -47,6 +48,7 @@ import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
@@ -222,16 +224,15 @@ public class AffectationQuittanceService {
 
     private byte[] createExportWorkbook(List<AffectationQuittanceResponse> rows) {
         String[] headers = {
-                "Type de contrat", "Produit", "Dossier", "Mouvement", "Nature", "Souscripteur",
-                "Police", "Compagnie", "Date d'effet", "Date d'échéance", "Prime nette", "Taxes",
-                "Accessoires", "Montant TTC", "Montant affecté", "Écart",
-                "N° quittance compagnie", "Statut"
+                "Produit", "Mouvement", "Souscripteur", "Police", "Date effet", "Date échéance",
+                "Prime nette", "Taxes", "Montant TTC", "N° quittance compagnie", "Statut"
         };
 
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Affectation quittances");
             CellStyle headerStyle = createExportHeaderStyle(workbook);
+            CellStyle textStyle = createExportTextStyle(workbook);
             CellStyle moneyStyle = createExportMoneyStyle(workbook);
 
             Row header = sheet.createRow(0);
@@ -244,28 +245,22 @@ public class AffectationQuittanceService {
             int rowIndex = 1;
             for (AffectationQuittanceResponse item : rows) {
                 Row row = sheet.createRow(rowIndex++);
+                row.setHeightInPoints(30);
                 int column = 0;
-                setExportText(row, column++, typeContratLabel(item.getTypeContrat()));
-                setExportText(row, column++, item.getProduit());
-                setExportText(row, column++, item.getDossier());
-                setExportText(row, column++, item.getMouvement());
-                setExportText(row, column++, natureLabel(item.getNature()));
-                setExportText(row, column++, item.getSouscripteur());
-                setExportText(row, column++, item.getPolice());
-                setExportText(row, column++, item.getCompagnie());
-                setExportText(row, column++, formatExportDate(item.getDateEffet()));
-                setExportText(row, column++, formatExportDate(item.getDateEcheance()));
+                setExportText(row, column++, joinExportLines(productLabel(item), item.getDossier()), textStyle);
+                setExportText(row, column++, joinExportLines(item.getMouvement(), natureLabel(item.getNature())), textStyle);
+                setExportText(row, column++, item.getSouscripteur(), textStyle);
+                setExportText(row, column++, item.getPolice(), textStyle);
+                setExportText(row, column++, formatExportDate(item.getDateEffet()), textStyle);
+                setExportText(row, column++, formatExportDate(item.getDateEcheance()), textStyle);
                 setExportMoney(row, column++, item.getPrimeNette(), moneyStyle);
                 setExportMoney(row, column++, item.getMontantTaxes(), moneyStyle);
-                setExportMoney(row, column++, item.getAccessoires(), moneyStyle);
                 setExportMoney(row, column++, item.getMontantTtc(), moneyStyle);
-                setExportMoney(row, column++, item.getMontantAffecte(), moneyStyle);
-                setExportMoney(row, column++, item.getEcart(), moneyStyle);
-                setExportText(row, column++, item.getNumerosQuittanceCompagnie());
-                setExportText(row, column, statusLabel(item.getStatutAffectation()));
+                setExportText(row, column++, item.getNumerosQuittanceCompagnie(), textStyle);
+                setExportText(row, column, statusLabel(item.getStatutAffectation()), textStyle);
             }
 
-            int[] widths = {18, 22, 22, 24, 20, 26, 18, 22, 15, 17, 16, 16, 16, 17, 18, 16, 28, 24};
+            int[] widths = {28, 28, 26, 18, 16, 16, 17, 17, 17, 28, 24};
             for (int column = 0; column < widths.length; column++) {
                 sheet.setColumnWidth(column, widths[column] * 256);
             }
@@ -289,6 +284,8 @@ public class AffectationQuittanceService {
         style.setFillForegroundColor(IndexedColors.DARK_GREEN.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        applyExportBorders(style);
         Font font = workbook.createFont();
         font.setBold(true);
         font.setColor(IndexedColors.WHITE.getIndex());
@@ -296,14 +293,37 @@ public class AffectationQuittanceService {
         return style;
     }
 
-    private CellStyle createExportMoneyStyle(Workbook workbook) {
+    private CellStyle createExportTextStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
-        style.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setWrapText(true);
+        applyExportBorders(style);
         return style;
     }
 
-    private void setExportText(Row row, int column, String value) {
-        row.createCell(column).setCellValue(value == null ? "" : value);
+    private CellStyle createExportMoneyStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00 \"MAD\""));
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        applyExportBorders(style);
+        return style;
+    }
+
+    private void applyExportBorders(CellStyle style) {
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setTopBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setRightBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setBottomBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setLeftBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
+    }
+
+    private void setExportText(Row row, int column, String value, CellStyle style) {
+        Cell cell = row.createCell(column);
+        cell.setCellValue(value == null ? "" : value);
+        cell.setCellStyle(style);
     }
 
     private void setExportMoney(Row row, int column, BigDecimal value, CellStyle style) {
@@ -318,13 +338,20 @@ public class AffectationQuittanceService {
         return value == null ? "" : value.format(EXPORT_DATE_FORMAT);
     }
 
-    private String typeContratLabel(TypeContrat value) {
-        if (value == null) return "";
-        return switch (value) {
+    private String productLabel(AffectationQuittanceResponse item) {
+        if (item.getTypeContrat() == null) return "";
+        return switch (item.getTypeContrat()) {
             case PARTICULIER -> "Mono";
-            case CONVENTION -> "Convention";
+            case CONVENTION -> firstNonBlank(item.getProduit(), "Convention");
             case FLOTTE -> "Flotte";
         };
+    }
+
+    private String joinExportLines(String primary, String secondary) {
+        String first = trimToNull(primary);
+        String second = trimToNull(secondary);
+        if (first == null) return second == null ? "" : second;
+        return second == null ? first : first + "\n" + second;
     }
 
     private String natureLabel(NatureAffectationQuittance value) {

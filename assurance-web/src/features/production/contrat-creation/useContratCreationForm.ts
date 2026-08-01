@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { productionApi } from "../api";
+import { contractKeys } from "@/lib/query-keys";
+import { clientApi } from "../api/clients";
+import { contractCreationApi } from "../api/contract-creation";
+import { contractServiceApi } from "../api/contract-services";
+import { referenceApi } from "../api/references";
 import { computeDateEcheanceFromCode, computeDateEcheanceFromMonths } from "../date";
 import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
@@ -186,25 +190,25 @@ export function useContratCreationForm(
 
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId, grilleUsageFilter],
-    queryFn: () => productionApi.lignesGrille({ grilleId: grilleTarifaireId, usageId: grilleUsageFilter }),
+    queryFn: () => referenceApi.pricingLines({ grilleId: grilleTarifaireId, usageId: grilleUsageFilter }),
     enabled: Boolean(grilleTarifaireId),
   });
 
   const groupesClients = useQuery({
     queryKey: ["groupes-clients"],
-    queryFn: productionApi.listGroupesClients,
+    queryFn: clientApi.listGroupesClients,
     staleTime: 60_000,
   });
 
   const formulesPersonne = useQuery({
     queryKey: ["formules-garantie-personne", grilleTarifaireId, grilleUsageFilter],
-    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: grilleTarifaireId, usageId: grilleUsageFilter }),
+    queryFn: () => referenceApi.personGuaranteeFormulas({ grilleId: grilleTarifaireId, usageId: grilleUsageFilter }),
     enabled: Boolean(grilleTarifaireId),
   });
 
   const draftQuery = useQuery({
     queryKey: ["contrat-draft", draftId],
-    queryFn: () => productionApi.getContratDraft(draftId ?? ""),
+    queryFn: () => contractCreationApi.getContratDraft(draftId ?? ""),
     enabled: Boolean(draftId),
   });
   const correctionMode = String(draftQuery.data?.statut ?? "").toUpperCase() === "ACTIVE"
@@ -330,7 +334,8 @@ export function useContratCreationForm(
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
     clients: clients.filter(shouldPersistClientInput).map((client) => {
-      const { agenceId: _ignoredTenant, ...safeClient } = client.client as ClientInput["client"] & { agenceId?: string };
+      const safeClient = { ...client.client } as ClientInput["client"] & { agenceId?: string };
+      delete safeClient.agenceId;
       return {
         ...client,
         client: {
@@ -416,7 +421,7 @@ export function useContratCreationForm(
   }, [request]);
 
   const previewMutation = useMutation({
-    mutationFn: productionApi.previewQuittance,
+    mutationFn: contractCreationApi.previewQuittance,
     onSuccess: (data) => {
       setPreview(data);
       setTargetPreview(null);
@@ -425,30 +430,32 @@ export function useContratCreationForm(
   });
 
   const targetPreviewMutation = useMutation({
-    mutationFn: productionApi.previewQuittance,
+    mutationFn: contractCreationApi.previewQuittance,
     onSuccess: setTargetPreview,
     onError: (error) => toast.error(error instanceof Error ? error.message : "Calcul impossible"),
   });
 
   const autoPreviewMutation = useMutation({
-    mutationFn: productionApi.previewQuittance,
+    mutationFn: contractCreationApi.previewQuittance,
     onSuccess: (data) => {
       setPreview(data);
       setTargetPreview(null);
     },
     onError: () => setPreview(null),
   });
+  const runAutoPreview = useEffectEvent((payload: CreateContratRequest) => {
+    autoPreviewMutation.mutate(payload);
+  });
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateContratRequest) =>
-      draftId ? productionApi.finalizeContratDraft(draftId, payload) : productionApi.createContrat(payload),
+      draftId ? contractCreationApi.finalizeContratDraft(draftId, payload) : contractCreationApi.createContrat(payload),
     onSuccess: async (contrat) => {
-      await queryClient.invalidateQueries({ queryKey: ["contrats"] });
+      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
       if (draftId) {
         await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
       }
       if (options?.prospectionMode) {
-        await queryClient.invalidateQueries({ queryKey: ["prospections"] });
         toast.success("Devis créé");
         navigate("/app/production/prospection");
         return;
@@ -480,7 +487,7 @@ export function useContratCreationForm(
       if (!draftId) {
         throw new Error("Brouillon introuvable pour enregistrer cette section");
       }
-      return productionApi.updateContratDraft(draftId, payload);
+      return contractCreationApi.updateContratDraft(draftId, payload);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
@@ -494,16 +501,16 @@ export function useContratCreationForm(
         throw new Error("Brouillon introuvable pour enregistrer cette section");
       }
       if (target.kind === "vehicule" && part === "info") {
-        return productionApi.saveDraftVehicule(draftId, target.index, request.vehicules[target.index]);
+        return contractCreationApi.saveDraftVehicule(draftId, target.index, request.vehicules[target.index]);
       }
       if (target.kind === "vehicule") {
-        const draft = await productionApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
+        const draft = await contractCreationApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
         return syncDraftVehiculeAssistance(draftId, draft, target, targetAssistances[targetKey(target)]);
       }
       if (part === "info") {
-        return productionApi.saveDraftRemorque(draftId, target.index, request.remorques[target.index]);
+        return contractCreationApi.saveDraftRemorque(draftId, target.index, request.remorques[target.index]);
       }
-      return productionApi.saveDraftRemorqueGaranties(draftId, target.index, targetGaranties(request.garanties, target));
+      return contractCreationApi.saveDraftRemorqueGaranties(draftId, target.index, targetGaranties(request.garanties, target));
     },
     onSuccess: async (draft, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
@@ -950,9 +957,11 @@ export function useContratCreationForm(
       return;
     }
     const timeout = window.setTimeout(() => {
-      autoPreviewMutation.mutate(request);
+      runAutoPreview(request);
     }, 600);
     return () => window.clearTimeout(timeout);
+  // `runAutoPreview` is an Effect Event and must not be an effect dependency.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request, typeContrat]);
 
   const setCompagnieForContrat = (value: string) => {
@@ -1046,7 +1055,7 @@ export function useContratCreationForm(
     if (computed && computed !== dateEcheance) {
       setDateEcheance(computed);
     }
-  }, [conventionUsesPeriodicite, dateEffet, fractionnement, showContractEcheance]);
+  }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement, showContractEcheance]);
 
   return {
     typeContrat,
@@ -1156,7 +1165,7 @@ export type ContratCreationFormState = ReturnType<typeof useContratCreationForm>
 function useReference(path: string) {
   return useQuery<ReferenceOption[]>({
     queryKey: ["referentiel", path],
-    queryFn: () => productionApi.referentiel(path),
+    queryFn: () => referenceApi.list(path),
     staleTime: 60_000,
   });
 }
@@ -1352,8 +1361,8 @@ async function syncDraftVehiculeAssistance(
     if (!assistanceId) {
       return draft;
     }
-    await productionApi.deleteAssistance(draftId, String(assistanceId));
-    return productionApi.getContratDraft(draftId);
+    await contractServiceApi.deleteAssistance(draftId, String(assistanceId));
+    return contractCreationApi.getContratDraft(draftId);
   }
   if (!vehiculeId) {
     throw new Error("Enregistrez les informations véhicule avant l'assistance.");
@@ -1361,7 +1370,7 @@ async function syncDraftVehiculeAssistance(
   if (!assistance.compagnieAssistanceId || !assistance.produitAssistanceId) {
     throw new Error("Compagnie et produit assistance obligatoires.");
   }
-  await productionApi.saveAssistance(draftId, {
+  await contractServiceApi.saveAssistance(draftId, {
     vehiculeId: String(vehiculeId),
     compagnieAssistanceId: assistance.compagnieAssistanceId,
     produitAssistanceId: assistance.produitAssistanceId,
@@ -1370,7 +1379,7 @@ async function syncDraftVehiculeAssistance(
     echeanceCode: emptyToUndefined(assistance.echeanceCode ?? ""),
     numeroContratOuQuittance: emptyToUndefined(assistance.numeroContratOuQuittance ?? ""),
   });
-  return productionApi.getContratDraft(draftId);
+  return contractCreationApi.getContratDraft(draftId);
 }
 
 function findDraftAssistanceForVehicule(draft: ContratSummary, vehiculeId?: string | number | null) {

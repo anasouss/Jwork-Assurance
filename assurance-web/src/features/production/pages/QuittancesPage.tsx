@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { accountingApi } from "../api/accounting";
 import { moneyAmount } from "../utils/format";
 
 export default function QuittancesPage() {
-  const quittances = useQuery({ queryKey: ["elements-facturables"], queryFn: productionApi.listQuittances });
+  const quittances = useQuery({
+    queryKey: ["elements-facturables"],
+    queryFn: accountingApi.listBillableItems,
+  });
   const rows = (quittances.data ?? []) as Record<string, unknown>[];
   return (
     <Card className="border-border/70 shadow-none">

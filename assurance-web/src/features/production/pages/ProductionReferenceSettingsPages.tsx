@@ -20,7 +20,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { productionApi } from "../api";
+import { referenceApi } from "../api/references";
+import { referenceAdminApi } from "../api/reference-admin";
 import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeExclusionGarantieSchema, groupeUsageAttestationSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { numberValue, toNumber } from "../utils/format";
@@ -32,8 +33,8 @@ export function MarquesSettingsPage() {
       title="Marques"
       description="Référentiel des marques véhicule."
       path="marques"
-      create={productionApi.createMarque}
-      update={productionApi.updateMarque}
+      create={referenceAdminApi.createBrand}
+      update={referenceAdminApi.updateBrand}
       pageSize={10}
     />
   );
@@ -45,8 +46,8 @@ export function CarrosseriesSettingsPage() {
       title="Carrosseries"
       description="Référentiel des carrosseries véhicule."
       path="carrosseries"
-      create={productionApi.createCarrosserie}
-      update={productionApi.updateCarrosserie}
+      create={referenceAdminApi.createBodyType}
+      update={referenceAdminApi.updateBodyType}
     />
   );
 }
@@ -57,8 +58,8 @@ export function CarburantsSettingsPage() {
       title="Carburants"
       description="Types de carburant utilisés par les véhicules et les tarifs RC."
       path="carburants"
-      create={productionApi.createCarburant}
-      update={productionApi.updateCarburant}
+      create={referenceAdminApi.createFuel}
+      update={referenceAdminApi.updateFuel}
     />
   );
 }
@@ -69,8 +70,8 @@ export function SousClassesSettingsPage() {
       title="Sous-classes"
       description="Référentiel des sous-classes Skay, utilisé par les usages qui tarifent sur sous-classe."
       path="sous-classes"
-      create={productionApi.createSousClasse}
-      update={productionApi.updateSousClasse}
+      create={referenceAdminApi.createSubclass}
+      update={referenceAdminApi.updateSubclass}
     />
   );
 }
@@ -93,7 +94,9 @@ export function CategoriesTransportSettingsPage() {
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: TransportCategoryPayload }) =>
-      id ? productionApi.updateCategorieTransport(id, cleanTextPayload(value)) : productionApi.createCategorieTransport(cleanTextPayload(value)),
+      id
+        ? referenceAdminApi.updateCategoryTransport(id, cleanTextPayload(value))
+        : referenceAdminApi.createCategoryTransport(cleanTextPayload(value)),
     onSuccess: async () => {
       setEditing(null);
       setDialogOpen(false);
@@ -168,7 +171,7 @@ export function CategoriesClientSettingsPage() {
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertCategorieClientRequest }) =>
-      id ? productionApi.updateCategorieClient(id, value) : productionApi.createCategorieClient(value),
+      id ? referenceAdminApi.updateClientCategory(id, value) : referenceAdminApi.createClientCategory(value),
     onSuccess: async () => {
       setEditing(null);
       setDialogOpen(false);
@@ -292,7 +295,9 @@ export function GroupesUsageAttestationSettingsPage() {
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertGroupeUsageAttestationRequest }) =>
-      id ? productionApi.updateGroupeUsageAttestation(id, cleanTextPayload(value)) : productionApi.createGroupeUsageAttestation(cleanTextPayload(value)),
+      id
+        ? referenceAdminApi.updateAttestationUsageGroup(id, cleanTextPayload(value))
+        : referenceAdminApi.createAttestationUsageGroup(cleanTextPayload(value)),
     onSuccess: async () => {
       setEditing(null);
       setDialogOpen(false);
@@ -522,7 +527,7 @@ export function UsagesSettingsPage() {
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertUsageRequest }) =>
-      id ? productionApi.updateUsage(id, value) : productionApi.createUsage(value),
+      id ? referenceAdminApi.updateUsage(id, value) : referenceAdminApi.createUsage(value),
     onSuccess: async () => {
       setEditing(null);
       setDialogOpen(false);
@@ -648,12 +653,12 @@ export function GarantiesSettingsPage() {
   const queryClient = useQueryClient();
   const garanties = useQuery({
     queryKey: ["referentiel", "garanties-parametrage"],
-    queryFn: productionApi.garantiesParametrage,
+    queryFn: referenceApi.configuredGuarantees,
     staleTime: 60_000,
   });
   const groupesExclusion = useQuery({
     queryKey: ["referentiel", "groupes-exclusion-garanties-parametrage"],
-    queryFn: () => productionApi.referentiel("groupes-exclusion-garanties/parametrage"),
+    queryFn: () => referenceApi.list("groupes-exclusion-garanties/parametrage"),
     staleTime: 60_000,
   });
   const compagnies = useReference("compagnies-assurance");
@@ -674,7 +679,7 @@ export function GarantiesSettingsPage() {
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertGarantieRequest }) =>
-      id ? productionApi.updateGarantie(id, value) : productionApi.createGarantie(value),
+      id ? referenceAdminApi.updateGuarantee(id, value) : referenceAdminApi.createGuarantee(value),
     onSuccess: async () => {
       setEditing(null);
       setDialogOpen(false);
@@ -686,7 +691,9 @@ export function GarantiesSettingsPage() {
   });
   const saveGroupeExclusion = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertGroupeExclusionGarantieRequest }) =>
-      id ? productionApi.updateGroupeExclusionGarantie(id, value) : productionApi.createGroupeExclusionGarantie(value),
+      id
+        ? referenceAdminApi.updateGuaranteeExclusionGroup(id, value)
+        : referenceAdminApi.createGuaranteeExclusionGroup(value),
     onSuccess: async () => {
       setEditingGroupeExclusion(null);
       setGroupeExclusionDialogOpen(false);
@@ -1138,6 +1145,7 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
   const mode = modes.includes(payload.modeParDefaut ?? "") ? payload.modeParDefaut! : modes[0] ?? allowed[0] ?? "TAUX";
   const multipleModes = (payload.modesTarificationMultiple ?? []).filter((item) => modes.includes(item));
   const multiple = multipleModes.length > 0;
+  const modesKey = modes.join("|");
   const [enabled, setEnabled] = useState(true);
   const [vehicleRows, setVehicleRows] = useState<PreviewVehicleRow[]>(() => [emptyPreviewVehicleRow(mode)]);
   const [personneRows, setPersonneRows] = useState<PreviewPersonneRow[]>(() => [emptyPreviewPersonneRow()]);
@@ -1148,7 +1156,7 @@ function GarantieGrillePreview({ payload }: { payload: UpsertGarantieRequest }) 
     setEnabled(true);
     setVehicleRows([emptyPreviewVehicleRow(mode)]);
     setPersonneRows([emptyPreviewPersonneRow()]);
-  }, [code, isPersonne, mode, multiple, modes.join("|")]);
+  }, [code, isPersonne, mode, modesKey, multiple]);
 
   const updateVehicleRow = (id: string, patch: Partial<PreviewVehicleRow>) => {
     setVehicleRows((rows) => rows.map((row) => row.id === id ? { ...row, ...patch } : row));
@@ -1775,7 +1783,7 @@ function UsageMultiSelect({
 function useReference(path: string) {
   return useQuery({
     queryKey: ["referentiel", path],
-    queryFn: () => productionApi.referentiel(path),
+    queryFn: () => referenceApi.list(path),
     staleTime: 60_000,
   });
 }

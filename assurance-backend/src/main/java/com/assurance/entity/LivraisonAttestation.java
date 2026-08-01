@@ -36,7 +36,7 @@ import java.util.List;
 public class LivraisonAttestation extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "agence_id")
+    @JoinColumn(name = "agence_id", nullable = false)
     private Agence agence;
 
     @ManyToOne(fetch = FetchType.LAZY)

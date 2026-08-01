@@ -37,6 +37,8 @@ jwt:
   refresh-token-expiration-mobile: ${JWT_REFRESH_EXPIRATION_MOBILE:7776000000}
 
 app:
+  security:
+    refresh-cookie-secure: ${APP_REFRESH_COOKIE_SECURE:true}
   storage:
     pieces-jointes-dir: ${APP_STORAGE_PIECES_JOINTES_DIR:/data/assurance/pieces-jointes}
   cors:

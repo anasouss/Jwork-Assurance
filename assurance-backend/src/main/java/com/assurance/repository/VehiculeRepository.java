@@ -6,12 +6,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface VehiculeRepository extends JpaRepository<Vehicule, Long> {
     void deleteByContratId(Long contratId);
 
     List<Vehicule> findByContratIdOrderByCreatedAtAsc(Long contratId);
+
+    List<Vehicule> findByContratIdInOrderByCreatedAtAsc(Collection<Long> contratIds);
 
     @Query("""
             select v

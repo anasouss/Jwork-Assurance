@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { productionApi } from "../api";
+import { attestationStockApi } from "../api/attestation-stock";
 import type { AttestationNumeroValidation, ReferenceOption } from "../types";
 
 type Props = {
@@ -61,7 +61,7 @@ export function AttestationNumberInput({
     let cancelled = false;
     setLoading(true);
     const timer = window.setTimeout(() => {
-      productionApi.validateAttestationNumero({
+      attestationStockApi.validateAttestationNumero({
         compagnieAssuranceId: compagnieAssuranceId ?? undefined,
         usageId: usageId ?? undefined,
         numero,

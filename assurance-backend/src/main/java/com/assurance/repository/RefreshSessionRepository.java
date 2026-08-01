@@ -1,7 +1,9 @@
 package com.assurance.repository;
 
 import com.assurance.entity.RefreshSession;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,10 @@ import java.util.Optional;
 public interface RefreshSessionRepository extends JpaRepository<RefreshSession, Long> {
 
     Optional<RefreshSession> findByToken(String token);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select rt from RefreshSession rt where rt.token = :token")
+    Optional<RefreshSession> findByTokenForUpdate(@Param("token") String token);
 
     List<RefreshSession> findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByLastActivityAtDesc(
             Long userId,

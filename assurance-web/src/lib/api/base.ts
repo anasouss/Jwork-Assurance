@@ -1,28 +1,28 @@
 import type { ApiResponse, AuthResponse } from "@/lib/types";
-import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
+import { clearAuth, getAccessToken, getStoredAuth, saveAuth } from "@/lib/auth";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<AuthResponse> | null = null;
+
+const AUTH_REQUEST_HEADERS = { "X-Auth-Request": "1" } as const;
+
+type NetworkErrorMapper = (error: unknown) => Error;
 
 async function clearRefreshCookie(): Promise<void> {
   await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken: getRefreshToken() }),
+    credentials: "include",
+    headers: AUTH_REQUEST_HEADERS,
   }).catch(() => {});
 }
 
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    throw new Error("Refresh token missing");
-  }
+async function requestRefreshedSession(): Promise<AuthResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
+    credentials: "include",
+    headers: AUTH_REQUEST_HEADERS,
   });
   if (!response.ok) {
     throw new Error("Refresh failed");
@@ -32,12 +32,26 @@ async function refreshAccessToken(): Promise<string> {
     throw new Error(data.message ?? "Refresh failed");
   }
   saveAuth(data.data);
-  return data.data.accessToken;
+  return data.data;
 }
 
-async function getOrRefreshAccessToken(): Promise<string> {
+async function withRefreshLock<T>(callback: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    return navigator.locks.request("assurance-refresh-session", callback);
+  }
+  return callback();
+}
+
+export async function refreshAuthSession(): Promise<AuthResponse> {
   if (!refreshPromise) {
-    refreshPromise = refreshAccessToken().finally(() => {
+    const tokenBeforeLock = getAccessToken();
+    refreshPromise = withRefreshLock(async () => {
+      const currentAuth = getStoredAuth();
+      if (currentAuth && currentAuth.accessToken !== tokenBeforeLock) {
+        return currentAuth;
+      }
+      return requestRefreshedSession();
+    }).finally(() => {
       refreshPromise = null;
     });
   }
@@ -48,51 +62,11 @@ export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const headers = new Headers(options.headers);
-  const accessToken = getAccessToken();
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
-  headers.set("Accept-Language", "fr");
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    let newToken: string;
-    try {
-      newToken = await getOrRefreshAccessToken();
-    } catch (error) {
-      void clearRefreshCookie();
-      clearAuth();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      throw error instanceof Error ? error : new Error("Session expired");
-    }
-
-    headers.set("Authorization", `Bearer ${newToken}`);
-    const retry = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      headers,
-    });
-    if (!retry.ok) {
-      const errorData = await retry.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${retry.status}`);
-    }
-    return normalizeApiIds(await retry.json()) as T;
-  }
-
+  const response = await authenticatedRequest(path, options);
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `HTTP ${response.status}`);
+    throw new Error(await responseErrorMessage(response));
   }
-
+  if (response.status === 204) return undefined as T;
   return normalizeApiIds(await response.json()) as T;
 }
 
@@ -100,46 +74,10 @@ export async function apiFetchBlob(
   path: string,
   options: RequestInit = {}
 ): Promise<Blob> {
-  const headers = new Headers(options.headers);
-  const accessToken = getAccessToken();
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
-  headers.set("Accept-Language", "fr");
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    let newToken: string;
-    try {
-      newToken = await getOrRefreshAccessToken();
-    } catch (error) {
-      void clearRefreshCookie();
-      clearAuth();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      throw error instanceof Error ? error : new Error("Session expired");
-    }
-
-    headers.set("Authorization", `Bearer ${newToken}`);
-    const retry = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      headers,
-    });
-    if (!retry.ok) {
-      throw new Error(await responseErrorMessage(retry));
-    }
-    return await retry.blob();
-  }
-
+  const response = await authenticatedRequest(path, options);
   if (!response.ok) {
     throw new Error(await responseErrorMessage(response));
   }
-
   return await response.blob();
 }
 
@@ -157,60 +95,76 @@ export async function apiUpload<T>(
   path: string,
   formData: FormData
 ): Promise<T> {
-  const headers = new Headers();
-  const accessToken = getAccessToken();
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
-  headers.set("Accept-Language", "fr");
-  // Don't set Content-Type for FormData - browser will set it with boundary
-
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await authenticatedRequest(
+    path,
+    {
       method: "POST",
-      headers,
       body: formData,
-    });
-  } catch (error) {
-    throw toUploadNetworkError(error);
-  }
-
-  if (response.status === 401) {
-    try {
-      const newToken = await getOrRefreshAccessToken();
-      headers.set("Authorization", `Bearer ${newToken}`);
-      let retry: Response;
-      try {
-        retry = await fetch(`${API_BASE_URL}${path}`, {
-          method: "POST",
-          headers,
-          body: formData,
-        });
-      } catch (error) {
-        throw toUploadNetworkError(error);
-      }
-      if (!retry.ok) {
-        const errorData = await retry.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${retry.status}`);
-      }
-      return (await retry.json()) as T;
-    } catch {
-      void clearRefreshCookie();
-      clearAuth();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      throw new Error("Session expired");
-    }
-  }
-
+    },
+    toUploadNetworkError
+  );
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `HTTP ${response.status}`);
+    throw new Error(await responseErrorMessage(response));
+  }
+  if (response.status === 204) return undefined as T;
+  return normalizeApiIds(await response.json()) as T;
+}
+
+async function authenticatedRequest(
+  path: string,
+  options: RequestInit,
+  mapNetworkError?: NetworkErrorMapper
+): Promise<Response> {
+  const requestToken = getAccessToken();
+  let response = await executeRequest(path, options, requestToken, mapNetworkError);
+  if (response.status !== 401) return response;
+
+  const latestToken = getAccessToken();
+  if (latestToken && latestToken !== requestToken) {
+    response = await executeRequest(path, options, latestToken, mapNetworkError);
+    if (response.status !== 401) return response;
   }
 
-  return normalizeApiIds(await response.json()) as T;
+  let session: AuthResponse;
+  try {
+    session = await refreshAuthSession();
+  } catch (error) {
+    expireBrowserSession();
+    throw error instanceof Error ? error : new Error("Session expired");
+  }
+
+  response = await executeRequest(path, options, session.accessToken, mapNetworkError);
+  if (response.status === 401) {
+    expireBrowserSession();
+  }
+  return response;
+}
+
+async function executeRequest(
+  path: string,
+  options: RequestInit,
+  accessToken: string | null,
+  mapNetworkError?: NetworkErrorMapper
+): Promise<Response> {
+  const headers = new Headers(options.headers);
+  headers.set("Accept-Language", "fr");
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  if (options.body && !isFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  try {
+    return await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  } catch (error) {
+    throw mapNetworkError ? mapNetworkError(error) : error;
+  }
+}
+
+function expireBrowserSession() {
+  void clearRefreshCookie();
+  clearAuth();
+  if (typeof window !== "undefined") window.location.href = "/login";
 }
 
 export function normalizeApiIds(value: unknown): unknown {

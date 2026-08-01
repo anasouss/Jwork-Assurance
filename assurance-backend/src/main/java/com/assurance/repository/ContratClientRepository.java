@@ -13,4 +13,7 @@ public interface ContratClientRepository extends JpaRepository<ContratClient, Lo
 
     @EntityGraph(attributePaths = {"client"})
     List<ContratClient> findByContratIdInAndRole(Collection<Long> contratIds, RoleClientContrat role);
+
+    @EntityGraph(attributePaths = {"client"})
+    List<ContratClient> findByContratIdIn(Collection<Long> contratIds);
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { productionApi } from "../api";
+import { clientApi } from "../api/clients";
 import type { VehiculeResponse } from "../types";
 
 type LookupStatus = "idle" | "loading" | "found" | "new" | "error";
@@ -45,7 +45,7 @@ export function VehicleRegistrationLookupInput({
     setLookup({ status: "loading", message: "Recherche du véhicule..." });
 
     try {
-      const found = await productionApi.searchVehicule({ immatriculation: registration });
+      const found = await clientApi.searchVehicule({ immatriculation: registration });
       if (requestId !== requestSequence.current) {
         return;
       }

@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { contractApi } from "../api/contracts";
+import { referenceApi } from "../api/references";
+import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
 import { formatMoney, moneyAmount, text } from "../utils/format";
 import type { AssistanceContrat, ClientResponse, ContratSummary, ReferenceOption } from "../types";
 import type { jsPDF as JsPDF } from "jspdf";
@@ -23,20 +25,20 @@ export default function ContratShowPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const contratQuery = useQuery({
     queryKey: ["contrat", contratId, mouvementId],
-    queryFn: () => productionApi.getContrat(contratId, { mouvementId }),
+    queryFn: () => contractApi.getContrat(contratId, { mouvementId }),
     enabled: Boolean(contratId),
   });
   const compagniesQuery = useQuery({
     queryKey: ["referentiel", "compagnies-assurance", "contrat-show"],
-    queryFn: () => productionApi.referentiel("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
   });
   const conventionsQuery = useQuery({
     queryKey: ["referentiel", "conventions", "contrat-show"],
-    queryFn: () => productionApi.referentiel("conventions"),
+    queryFn: () => referenceApi.list("conventions"),
   });
 
   if (contratQuery.isLoading) {
-    return <Card><CardContent className="p-8 text-center text-muted-foreground">Chargement du dossier...</CardContent></Card>;
+    return <ProductionFormSkeleton variant="contract" />;
   }
 
   if (!contratQuery.data) {

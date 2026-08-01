@@ -7,6 +7,11 @@ import { MoneyInput } from "../components/MoneyInput";
 import { SectionCard } from "../components/SectionCard";
 import { numberValue } from "../utils/format";
 import type { GarantieInput, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
+import {
+  removeGuaranteeExclusionConflicts as withoutExclusionConflicts,
+  sameGuaranteeTarget as sameTarget,
+  targetedGuaranteeInput,
+} from "./guarantee-selection";
 
 type Target = {
   kind: "vehicule" | "remorque";
@@ -99,7 +104,7 @@ export function FlotteGarantieSection({
   };
 
   const toggle = (target: Target, garantie: ReferenceOption, checked: boolean) => {
-    if (Boolean(garantie.responsabiliteCivile)) {
+    if (garantie.responsabiliteCivile) {
       return;
     }
     if (checked) {
@@ -219,36 +224,7 @@ export function FlotteGarantieSection({
 }
 
 function targetedInput(garantie: ReferenceOption, target: Target): GarantieInput {
-  return {
-    garantieId: garantie.id,
-    vehiculeIndex: target.kind === "vehicule" ? target.index : undefined,
-    remorqueIndex: target.kind === "remorque" ? target.index : undefined,
-    modeSelectionne: String(garantie.modeParDefaut ?? "TAUX"),
-    sourceValeurSelectionnee: defaultSource(garantie),
-  };
-}
-
-function sameTarget(item: GarantieInput, target?: Target) {
-  if (!target) {
-    return false;
-  }
-  return target.kind === "vehicule" ? item.vehiculeIndex === target.index : item.remorqueIndex === target.index;
-}
-
-function withoutExclusionConflicts(selected: GarantieInput[], garanties: ReferenceOption[], target: Target, garantie: ReferenceOption) {
-  const groupeExclusionId = String(garantie.groupeExclusionId ?? "");
-  if (!groupeExclusionId || garantie.groupeExclusionActif === false) {
-    return selected;
-  }
-  const incompatibleGarantieIds = new Set(
-    garanties
-      .filter((candidate) => candidate.id !== garantie.id && String(candidate.groupeExclusionId ?? "") === groupeExclusionId)
-      .map((candidate) => candidate.id)
-  );
-  if (incompatibleGarantieIds.size === 0) {
-    return selected;
-  }
-  return selected.filter((item) => !(sameTarget(item, target) && incompatibleGarantieIds.has(item.garantieId)));
+  return targetedGuaranteeInput(garantie, target, defaultSource(garantie));
 }
 
 function targetKey(target?: Target) {

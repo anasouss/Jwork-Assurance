@@ -15,6 +15,7 @@ import com.assurance.security.UserPrincipal;
 import com.assurance.util.DeviceInfoParser;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -23,6 +24,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 
 @Service
@@ -35,8 +40,11 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${jwt.refresh-token-expiration-web}")
+    private long refreshTokenExpiration;
+
     @Transactional
-    public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
+    public AuthSessionResult login(LoginRequest request, HttpServletRequest httpRequest) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
@@ -49,8 +57,11 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse refreshToken(String token, HttpServletRequest httpRequest) {
-        RefreshSession refreshToken = refreshTokenRepository.findByToken(token)
+    public AuthSessionResult refreshToken(String token, HttpServletRequest httpRequest) {
+        if (token == null || token.isBlank()) {
+            throw new UnauthorizedException("Refresh token missing");
+        }
+        RefreshSession refreshToken = refreshTokenRepository.findByTokenForUpdate(hashRefreshToken(token))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
         if (!refreshToken.isValid()) {
             throw new UnauthorizedException("Refresh token expired");
@@ -65,7 +76,7 @@ public class AuthService {
         if (token == null || token.isBlank()) {
             return;
         }
-        refreshTokenRepository.findByToken(token).ifPresent(found -> {
+        refreshTokenRepository.findByToken(hashRefreshToken(token)).ifPresent(found -> {
             found.setRevoked(true);
             refreshTokenRepository.save(found);
         });
@@ -111,13 +122,13 @@ public class AuthService {
         refreshTokenRepository.revokeAllByUserId(userId);
     }
 
-    private AuthResponse createSession(Utilisateur user, HttpServletRequest request) {
+    private AuthSessionResult createSession(Utilisateur user, HttpServletRequest request) {
         String accessToken = tokenProvider.generateAccessToken(user);
         String refreshTokenValue = tokenProvider.generateRefreshToken();
         RefreshSession refreshToken = RefreshSession.builder()
                 .user(user)
-                .token(refreshTokenValue)
-                .expiresAt(LocalDateTime.now().plusSeconds(30L * 24 * 60 * 60))
+                .token(hashRefreshToken(refreshTokenValue))
+                .expiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000))
                 .ipAddress(DeviceInfoParser.getClientIp(request))
                 .userAgent(DeviceInfoParser.buildUserAgent(request))
                 .deviceName(DeviceInfoParser.parseDeviceName(request))
@@ -126,9 +137,8 @@ public class AuthService {
                 .build();
         refreshTokenRepository.save(refreshToken);
 
-        return AuthResponse.builder()
+        AuthResponse response = AuthResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshTokenValue)
                 .sessionId(refreshToken.getId())
                 .tokenType("Bearer")
                 .expiresIn(tokenProvider.getAccessTokenExpirationInSeconds())
@@ -143,5 +153,19 @@ public class AuthService {
                         .permissions(user.getPermissions())
                         .build())
                 .build();
+        return new AuthSessionResult(response, refreshTokenValue);
+    }
+
+    public record AuthSessionResult(AuthResponse response, String refreshToken) {
+    }
+
+    private String hashRefreshToken(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available", exception);
+        }
     }
 }

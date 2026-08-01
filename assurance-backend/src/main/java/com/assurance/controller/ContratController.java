@@ -13,8 +13,11 @@ import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.CarteVerteContextResponse;
 import com.assurance.dto.response.CarteVerteResponse;
 import com.assurance.dto.response.ContratActionsResponse;
+import com.assurance.dto.response.ContratListGroupResponse;
+import com.assurance.dto.response.ContratListItemResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.EcheanceAutomobileResponse;
+import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
@@ -22,6 +25,7 @@ import com.assurance.service.AssistanceContratService;
 import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
+import com.assurance.service.ContratSearchService;
 import com.assurance.service.DevisPdfService;
 import com.assurance.service.EcheanceProductionService;
 import com.assurance.service.MouvementContratService;
@@ -50,6 +54,7 @@ import java.util.List;
 public class ContratController {
 
     private final ContratService contratService;
+    private final ContratSearchService contratSearchService;
     private final ContratActionService contratActionService;
     private final AssistanceContratService assistanceContratService;
     private final CarteVerteService carteVerteService;
@@ -159,14 +164,54 @@ public class ContratController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_contrat:view')")
-    public ResponseEntity<ApiResponse<List<ContratResponse>>> list() {
-        return ResponseEntity.ok(ApiResponse.success(contratService.list(TenantContext.getCurrentAgence())));
+    public ResponseEntity<ApiResponse<PagedResponse<ContratListGroupResponse>>> list(
+            @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(defaultValue = "EFFET") String typeDate,
+            @RequestParam(required = false) LocalDate dateDu,
+            @RequestParam(required = false) LocalDate dateAu,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) String numeroPolice,
+            @RequestParam(required = false) Long clientId,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "25") Integer size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(contratSearchService.searchContracts(
+                TenantContext.getCurrentAgence(),
+                typeContrat,
+                typeDate,
+                dateDu,
+                dateAu,
+                search,
+                compagnieId,
+                numeroPolice,
+                clientId,
+                page,
+                size
+        )));
     }
 
     @GetMapping("/prospections")
     @PreAuthorize("hasAuthority('PERM_contrat:view')")
-    public ResponseEntity<ApiResponse<List<ContratResponse>>> listProspections() {
-        return ResponseEntity.ok(ApiResponse.success(contratService.listProspections(TenantContext.getCurrentAgence())));
+    public ResponseEntity<ApiResponse<PagedResponse<ContratListItemResponse>>> listProspections(
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) LocalDate dateDu,
+            @RequestParam(required = false) LocalDate dateAu,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String numeroDevis,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "25") Integer size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(contratSearchService.searchProspections(
+                TenantContext.getCurrentAgence(),
+                compagnieId,
+                dateDu,
+                dateAu,
+                search,
+                numeroDevis,
+                page,
+                size
+        )));
     }
 
     @GetMapping("/echeances/automobile")

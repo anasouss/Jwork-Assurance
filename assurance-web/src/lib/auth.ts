@@ -1,75 +1,59 @@
-﻿import type { AuthResponse, AuthUser } from "@/lib/types";
+import type { AuthResponse, AuthUser } from "@/lib/types";
 
-let accessToken: string | null = null;
-let refreshToken: string | null = null;
-let storedUser: AuthUser | null = null;
-let sessionId: string | null = null;
-const STORAGE_KEY = "assurance_auth";
+let storedAuth: AuthResponse | null = null;
+let authChannel: BroadcastChannel | null = null;
+
+type AuthListener = (auth: AuthResponse | null) => void;
+const authListeners = new Set<AuthListener>();
+
+function applyAuth(auth: AuthResponse | null) {
+  storedAuth = auth;
+  authListeners.forEach((listener) => listener(storedAuth));
+}
+
+function getAuthChannel() {
+  if (
+    authChannel ||
+    typeof window === "undefined" ||
+    typeof BroadcastChannel === "undefined"
+  ) {
+    return authChannel;
+  }
+  authChannel = new BroadcastChannel("assurance-auth");
+  authChannel.addEventListener("message", (event: MessageEvent<AuthResponse | null>) => {
+    applyAuth(event.data);
+  });
+  return authChannel;
+}
 
 export function saveAuth(auth: AuthResponse) {
-  accessToken = auth.accessToken;
-  refreshToken = auth.refreshToken ?? refreshToken;
-  storedUser = auth.user ?? null;
-  sessionId = auth.sessionId == null ? null : String(auth.sessionId);
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      accessToken,
-      refreshToken,
-      storedUser,
-      sessionId,
-    })
-  );
+  applyAuth(auth);
+  getAuthChannel()?.postMessage(auth);
 }
 
 export function clearAuth() {
-  accessToken = null;
-  refreshToken = null;
-  storedUser = null;
-  sessionId = null;
-  localStorage.removeItem(STORAGE_KEY);
+  applyAuth(null);
+  getAuthChannel()?.postMessage(null);
 }
 
 export function getAccessToken() {
-  hydrateAuthFromStorage();
-  return accessToken;
-}
-
-export function getRefreshToken() {
-  hydrateAuthFromStorage();
-  return refreshToken;
+  return storedAuth?.accessToken ?? null;
 }
 
 export function getStoredUser(): AuthUser | null {
-  hydrateAuthFromStorage();
-  return storedUser;
+  return storedAuth?.user ?? null;
 }
 
 export function getSessionId() {
-  hydrateAuthFromStorage();
-  return sessionId;
+  return storedAuth?.sessionId ?? null;
 }
 
-export function hydrateAuthFromStorage() {
-  if (accessToken || storedUser) {
-    return;
-  }
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return;
-  }
-  try {
-    const parsed = JSON.parse(raw) as {
-      accessToken?: string | null;
-      refreshToken?: string | null;
-      storedUser?: AuthUser | null;
-      sessionId?: string | null;
-    };
-    accessToken = parsed.accessToken ?? null;
-    refreshToken = parsed.refreshToken ?? null;
-    storedUser = parsed.storedUser ?? null;
-    sessionId = parsed.sessionId ?? null;
-  } catch {
-    clearAuth();
-  }
+export function getStoredAuth(): AuthResponse | null {
+  return storedAuth;
+}
+
+export function subscribeToAuth(listener: AuthListener) {
+  authListeners.add(listener);
+  getAuthChannel();
+  return () => authListeners.delete(listener);
 }

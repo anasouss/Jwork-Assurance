@@ -1,6 +1,6 @@
 import type { ApiResponse, AuthResponse, AuthSession } from "@/lib/types";
-import { API_BASE_URL, apiFetch, normalizeApiIds } from "./base";
-import { clearAuth, getRefreshToken, saveAuth } from "@/lib/auth";
+import { API_BASE_URL, apiFetch, normalizeApiIds, refreshAuthSession } from "./base";
+import { clearAuth, saveAuth } from "@/lib/auth";
 
 export type LoginRequest = {
   email: string;
@@ -13,7 +13,11 @@ export const authApi = {
     try {
       response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Request": "1",
+        },
         body: JSON.stringify(data),
       });
     } catch {
@@ -29,43 +33,20 @@ export const authApi = {
       throw new Error(result.message || "Échec de la connexion");
     }
 
-    const auth = normalizeAuthResponse(result.data);
-    saveAuth(auth);
-    return auth;
+    saveAuth(result.data);
+    return result.data;
   },
 
   async refresh(): Promise<AuthResponse> {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) {
-      throw new Error("Aucune session enregistree");
-    }
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || "Échec du rafraîchissement");
-    }
-
-    const result = normalizeApiIds(await response.json()) as ApiResponse<AuthResponse>;
-    if (!result.success) {
-      throw new Error(result.message || "Échec du rafraîchissement");
-    }
-
-    const auth = normalizeAuthResponse(result.data);
-    saveAuth(auth);
-    return auth;
+    return await refreshAuthSession();
   },
 
   async logout(): Promise<void> {
     try {
       await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: getRefreshToken() }),
+        credentials: "include",
+        headers: { "X-Auth-Request": "1" },
       });
     } finally {
       clearAuth();
@@ -110,23 +91,4 @@ async function loginErrorMessage(response: Response): Promise<string> {
 
   const errorData = await response.json().catch(() => ({}));
   return errorData.message || "Échec de la connexion";
-}
-
-function normalizeAuthResponse(auth: AuthResponse): AuthResponse {
-  const fullName = auth.user.fullName || [auth.user.firstName, auth.user.lastName].filter(Boolean).join(" ") || auth.user.email;
-  const [firstName = fullName, ...rest] = fullName.split(" ");
-  return {
-    ...auth,
-    user: {
-      ...auth.user,
-      firstName: auth.user.firstName ?? firstName,
-      lastName: auth.user.lastName ?? rest.join(" "),
-      fullName,
-      roleName: auth.user.roleName ?? auth.user.roleCode,
-      permissions: auth.user.permissions ?? [],
-      language: "fr",
-      onboardingCompleted: true,
-      clientPortalEnabled: false,
-    },
-  };
 }

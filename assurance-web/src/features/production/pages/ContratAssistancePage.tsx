@@ -19,7 +19,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { EcheanceInput } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { productionApi } from "../api";
+import { contractServiceApi } from "../api/contract-services";
 import { computeDateEcheanceFromCode, toDateOnly } from "../date";
 import type { AssistanceContratContext, UpsertAssistanceContratRequest } from "../types";
 
@@ -42,7 +42,7 @@ export default function ContratAssistancePage() {
   const [assistanceToDelete, setAssistanceToDelete] = useState<AssistanceContratContext["assistances"][number] | null>(null);
   const contextQuery = useQuery({
     queryKey: ["contrat-assistance", contratId, mouvementId, form.dateSouscription],
-    queryFn: () => productionApi.getAssistanceContext(contratId, { mouvementId, dateSouscription: form.dateSouscription }),
+    queryFn: () => contractServiceApi.getAssistanceContext(contratId, { mouvementId, dateSouscription: form.dateSouscription }),
     enabled: Boolean(contratId),
   });
   const context = contextQuery.data;
@@ -86,7 +86,7 @@ export default function ContratAssistancePage() {
   }, [filteredProducts, form.produitAssistanceId]);
 
   const saveMutation = useMutation({
-    mutationFn: (request: UpsertAssistanceContratRequest) => productionApi.saveAssistance(contratId, request),
+    mutationFn: (request: UpsertAssistanceContratRequest) => contractServiceApi.saveAssistance(contratId, request),
     onSuccess: async () => {
       setForm((current) => ({
         dateEffet: current.dateEffet,
@@ -100,7 +100,7 @@ export default function ContratAssistancePage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (assistanceId: string) => productionApi.deleteAssistance(contratId, assistanceId),
+    mutationFn: (assistanceId: string) => contractServiceApi.deleteAssistance(contratId, assistanceId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-assistance", contratId] });
       setAssistanceToDelete(null);

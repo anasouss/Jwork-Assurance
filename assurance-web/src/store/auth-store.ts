@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type { AuthUser } from "@/lib/types";
-import { clearAuth, getAccessToken, getStoredUser } from "@/lib/auth";
+import { clearAuth, getAccessToken, getStoredUser, subscribeToAuth } from "@/lib/auth";
 import { authApi } from "@/lib/api/auth";
+import { queryClient } from "@/lib/query-client";
 
 type AuthState = {
   user: AuthUser | null;
@@ -13,9 +14,18 @@ type AuthState = {
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
-  updateUserLanguage: (language: string) => void;
-  markOnboardingComplete: () => void;
 };
+
+let hydrationPromise: ReturnType<typeof authApi.refresh> | null = null;
+
+function restoreSession() {
+  if (!hydrationPromise) {
+    hydrationPromise = authApi.refresh().finally(() => {
+      hydrationPromise = null;
+    });
+  }
+  return hydrationPromise;
+}
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
@@ -24,19 +34,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: false,
   error: null,
   clearError: () => set({ error: null }),
-  updateUserLanguage: (language: string) => {
-    set((state) => {
-      if (state.user) {
-        return { user: { ...state.user, language } };
-      }
-      return state;
-    });
-  },
-  markOnboardingComplete: () => {
-    set((state) => ({
-      user: state.user ? { ...state.user, onboardingCompleted: true } : null,
-    }));
-  },
   hydrate: async () => {
     set({ isLoading: true, error: null });
     const storedUser = getStoredUser();
@@ -50,7 +47,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
     try {
-      const auth = await authApi.refresh();
+      const auth = await restoreSession();
       set({
         user: auth.user,
         isAuthenticated: true,
@@ -74,6 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({
         user: auth.user,
         isAuthenticated: true,
+        isHydrated: true,
         isLoading: false,
       });
       return true;
@@ -87,7 +85,27 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   logout: async () => {
     await authApi.logout();
-    clearAuth();
-    set({ user: null, isAuthenticated: false });
+    set({ user: null, isAuthenticated: false, isHydrated: true });
   },
 }));
+
+subscribeToAuth((auth) => {
+  if (!auth) {
+    queryClient.clear();
+    useAuthStore.setState({
+      user: null,
+      isAuthenticated: false,
+      isHydrated: true,
+      isLoading: false,
+    });
+    return;
+  }
+
+  useAuthStore.setState({
+    user: auth.user,
+    isAuthenticated: true,
+    isHydrated: true,
+    isLoading: false,
+    error: null,
+  });
+});

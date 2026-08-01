@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { pricingApi } from "../api/pricing";
+import { referenceApi } from "../api/references";
 import { bulkTarifUsageSchema, tarifUsageSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { MoneyInput } from "../components/MoneyInput";
@@ -51,7 +52,7 @@ export default function TarifUsageSettingsPage() {
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertTarifUsageRequest }) =>
-      id ? productionApi.updateTarifUsage(id, value) : productionApi.createTarifUsage(value),
+      id ? pricingApi.updateUsageRate(id, value) : pricingApi.createUsageRate(value),
     onSuccess: async () => {
       setEditing(null);
       setPayload(emptyTarifUsage());
@@ -63,7 +64,7 @@ export default function TarifUsageSettingsPage() {
   });
 
   const remove = useMutation({
-    mutationFn: productionApi.deleteTarifUsage,
+    mutationFn: pricingApi.deleteUsageRate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "tarifs-usage"] });
       toast.success("Tarif usage supprimé");
@@ -72,7 +73,7 @@ export default function TarifUsageSettingsPage() {
   });
 
   const bulk = useMutation({
-    mutationFn: productionApi.bulkUpdateTarifUsagePrimeNette,
+    mutationFn: pricingApi.bulkUpdateUsageNetPremium,
     onSuccess: async (result) => {
       setSelectedIds([]);
       setBulkDialogOpen(false);
@@ -414,7 +415,7 @@ function Flag({ label, checked, onChange }: { label: string; checked?: boolean; 
 function useReference(path: string) {
   return useQuery({
     queryKey: ["referentiel", path],
-    queryFn: () => productionApi.referentiel(path),
+    queryFn: () => referenceApi.list(path),
     staleTime: 60_000,
   });
 }

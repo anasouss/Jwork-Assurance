@@ -11,7 +11,7 @@ import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { SectionCard } from "./SectionCard";
 import { Field } from "./Field";
 import { toDateOnly } from "../date";
-import { productionApi } from "../api";
+import { clientApi } from "../api/clients";
 import type { ClientInput, ClientResponse, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -217,7 +217,7 @@ export function ClientSection({
     }
     setLookupByIndex((current) => ({ ...current, [index]: { status: "loading", message: "Recherche du client..." } }));
     try {
-      const found = await productionApi.searchClient({ cin, rc });
+      const found = await clientApi.searchClient({ cin, rc });
       if (found) {
         fillExistingClient(index, found);
         setLookupByIndex((current) => ({

@@ -37,7 +37,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { useAuthStore } from "@/store/auth-store";
-import { productionApi } from "@/features/production/api";
+import { clientApi } from "@/features/production/api/clients";
+import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "@/features/compta/api";
 import type { ClientDocument } from "@/features/compta/types";
@@ -69,12 +70,12 @@ export default function ClientCrmPage() {
 
   const groupesQuery = useQuery({
     queryKey: ["groupes-clients"],
-    queryFn: productionApi.listGroupesClients,
+    queryFn: clientApi.listGroupesClients,
     staleTime: 60_000,
   });
   const clientsQuery = useQuery({
     queryKey: ["crm-clients", deferredQuery, groupeId, page],
-    queryFn: () => productionApi.listClients({
+    queryFn: () => clientApi.listClients({
       query: deferredQuery || undefined,
       groupeId: groupeId === "TOUS" ? undefined : groupeId,
       page,
@@ -84,7 +85,7 @@ export default function ClientCrmPage() {
   });
   const detailQuery = useQuery({
     queryKey: ["crm-client", selectedClientId],
-    queryFn: () => productionApi.getClientCrm(selectedClientId),
+    queryFn: () => clientApi.getClientCrm(selectedClientId),
     enabled: Boolean(selectedClientId),
   });
 
@@ -343,20 +344,20 @@ function ClientDialog({
   const [draft, setDraft] = useState<ClientDraft>(() => emptyClientDraft());
   const villesQuery = useQuery({
     queryKey: ["referentiel", "villes"],
-    queryFn: () => productionApi.referentiel("villes"),
+    queryFn: () => referenceApi.list("villes"),
     staleTime: 60_000,
     enabled: open,
   });
   const categoriesQuery = useQuery({
     queryKey: ["referentiel", "categories-client"],
-    queryFn: () => productionApi.referentiel("categories-client"),
+    queryFn: () => referenceApi.list("categories-client"),
     staleTime: 60_000,
     enabled: open,
   });
   const update = (patch: Partial<ClientDraft>) => setDraft((current) => ({ ...current, ...patch }));
   const createMutation = useMutation({
     mutationFn: async () => {
-      const client = await productionApi.createClient({
+      const client = await clientApi.createClient({
         typeClient: draft.typeClient,
         civilite: clean(draft.civilite),
         prenom: clean(draft.prenom),
@@ -545,7 +546,7 @@ function ClientDetail({
   onAssignGroup,
   canManageClients,
 }: {
-  detail: Awaited<ReturnType<typeof productionApi.getClientCrm>>;
+  detail: Awaited<ReturnType<typeof clientApi.getClientCrm>>;
   activeTab: PortfolioTab;
   onTabChange: (tab: string) => void;
   onAssignGroup: () => void;
@@ -792,7 +793,7 @@ function WorkspaceLink({ to, icon, title, detail, tone }: {
 }
 
 function ContractsPortfolio({ contracts }: {
-  contracts: Awaited<ReturnType<typeof productionApi.getClientCrm>>["contrats"];
+  contracts: Awaited<ReturnType<typeof clientApi.getClientCrm>>["contrats"];
 }) {
   if (!contracts.length) return <EmptyState text="Aucun contrat n’est associé à ce client." />;
 
@@ -939,7 +940,7 @@ function GroupDialog({
   const [consolidated, setConsolidated] = useState(false);
   const clientsQuery = useQuery({
     queryKey: ["clients", "group-responsible-search", deferredSearch],
-    queryFn: () => productionApi.listClients({ query: deferredSearch, size: 25 }),
+    queryFn: () => clientApi.listClients({ query: deferredSearch, size: 25 }),
     enabled: open && deferredSearch.length >= 2,
   });
   const remoteOptions = (clientsQuery.data?.items ?? []).map((client) => ({
@@ -960,7 +961,7 @@ function GroupDialog({
     }
   };
   const createMutation = useMutation({
-    mutationFn: productionApi.createGroupeClient,
+    mutationFn: clientApi.createGroupeClient,
     onSuccess: async () => {
       await onSaved();
       toast.success("Groupe client créé");
@@ -1063,11 +1064,11 @@ function AssignmentDialog({
       const clientId = client?.id ?? "";
       if (groupId === "INDEPENDANT") {
         if (membershipId) {
-          await productionApi.endClientGroup(clientId, membershipId);
+          await clientApi.endClientGroup(clientId, membershipId);
         }
         return;
       }
-      await productionApi.assignClientGroup(clientId, {
+      await clientApi.assignClientGroup(clientId, {
         groupeClientId: groupId,
         typeRelation: relation,
         principal: true,
@@ -1229,7 +1230,7 @@ type ClientOption = {
   keywords: string;
 };
 
-function principalMembershipId(detail?: Awaited<ReturnType<typeof productionApi.getClientCrm>>) {
+function principalMembershipId(detail?: Awaited<ReturnType<typeof clientApi.getClientCrm>>) {
   if (!detail) return undefined;
   const clientId = detail.client.id;
   const principalGroupId = detail.client.groupe?.id;

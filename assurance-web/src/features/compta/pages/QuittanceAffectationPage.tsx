@@ -7,19 +7,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toDateOnly } from "@/features/production/date";
+import { downloadBlob } from "@/lib/download";
+import { accountingKeys, referenceKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { AffectationQuittanceDialog } from "../components/AffectationQuittanceDialog";
@@ -74,7 +68,7 @@ export default function QuittanceAffectationPage() {
   }>();
 
   const companies = useQuery({
-    queryKey: ["referentiel", "compagnies-assurance", "compta"],
+    queryKey: referenceKeys.list("compagnies-assurance"),
     queryFn: comptaApi.companies,
   });
   const params = useMemo(
@@ -93,7 +87,7 @@ export default function QuittanceAffectationPage() {
     [appliedFilters, page, searched]
   );
   const quittances = useQuery({
-    queryKey: ["compta", "affectation-quittances", params],
+    queryKey: accountingKeys.quittanceAllocations(params),
     queryFn: () => {
       if (!params) throw new Error("Critères de recherche manquants");
       return comptaApi.searchQuittances(params);
@@ -326,11 +320,7 @@ export default function QuittanceAffectationPage() {
                     </td>
                   </tr>
                 ) : quittances.isLoading ? (
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <tr key={index} className="border-b">
-                      <td colSpan={12} className="px-3 py-3"><Skeleton className="h-9 w-full" /></td>
-                    </tr>
-                  ))
+                  <TableRowsSkeleton colSpan={12} />
                 ) : rows.length ? (
                   rows.map((row) => (
                     <tr key={row.quittanceId} className="border-b transition-colors hover:bg-muted/40">
@@ -397,37 +387,14 @@ export default function QuittanceAffectationPage() {
           </div>
 
           {searched ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
-              <div className="text-sm text-muted-foreground">
-                Page {currentPage + 1} / {totalPages} · {pageInfo?.totalElements ?? 0} résultat(s)
-              </div>
-              <Pagination className="mx-0 w-auto justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      aria-disabled={currentPage <= 0 || quittances.isLoading}
-                      className={currentPage <= 0 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        goToPage(Math.max(0, currentPage - 1));
-                      }}
-                    />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      aria-disabled={currentPage >= totalPages - 1 || quittances.isLoading}
-                      className={currentPage >= totalPages - 1 || quittances.isLoading ? "pointer-events-none opacity-50" : undefined}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        goToPage(Math.min(totalPages - 1, currentPage + 1));
-                      }}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+            <ServerPagination
+              page={currentPage}
+              totalPages={totalPages}
+              totalElements={pageInfo?.totalElements ?? 0}
+              loading={quittances.isLoading}
+              className="border-t px-4 py-3"
+              onPageChange={goToPage}
+            />
           ) : null}
         </CardContent>
       </Card>
@@ -461,15 +428,6 @@ export default function QuittanceAffectationPage() {
         initialTypeContrat={ruleTarget?.typeContrat}
         initialRule={ruleTarget?.rule}
       />
-    </div>
-  );
-}
-
-function FilterField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid min-w-0 gap-1.5">
-      <Label className="text-xs uppercase">{label}</Label>
-      {children}
     </div>
   );
 }
@@ -590,15 +548,4 @@ function toApiFilters(filters: Filters) {
     dateAu: filters.dateAu || undefined,
     search: filters.search.trim() || undefined,
   };
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }

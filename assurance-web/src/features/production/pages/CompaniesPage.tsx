@@ -17,7 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { referenceApi } from "../api/references";
+import { referenceAdminApi } from "../api/reference-admin";
 import { Field } from "../components/Field";
 import { compagnieAssuranceSchema } from "../schemas";
 import type { ReferenceOption, UpsertCompagnieAssuranceRequest } from "../types";
@@ -27,7 +28,7 @@ export default function CompaniesPage() {
   const navigate = useNavigate();
   const compagnies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
-    queryFn: () => productionApi.referentiel("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
     staleTime: 60_000,
   });
   const [search, setSearch] = useState("");
@@ -62,7 +63,9 @@ export default function CompaniesPage() {
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertCompagnieAssuranceRequest }) =>
-      id ? productionApi.updateCompagnieAssurance(id, value) : productionApi.createCompagnieAssurance(value),
+      id
+        ? referenceAdminApi.updateInsuranceCompany(id, value)
+        : referenceAdminApi.createInsuranceCompany(value),
     onSuccess: async () => {
       setDialogOpen(false);
       setEditing(null);

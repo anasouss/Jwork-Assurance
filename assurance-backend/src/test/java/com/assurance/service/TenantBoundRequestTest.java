@@ -1,5 +1,6 @@
 package com.assurance.service;
 
+import com.assurance.controller.AttestationStockController;
 import com.assurance.controller.ClientController;
 import com.assurance.controller.GroupeClientController;
 import com.assurance.controller.VehiculeController;
@@ -41,8 +42,13 @@ class TenantBoundRequestTest {
     }
 
     @Test
-    void clientGroupAndVehicleEndpointsRequireMethodAuthorization() {
-        List.of(ClientController.class, GroupeClientController.class, VehiculeController.class)
+    void tenantBoundEndpointsRequireMethodAuthorization() {
+        List.of(
+                        AttestationStockController.class,
+                        ClientController.class,
+                        GroupeClientController.class,
+                        VehiculeController.class
+                )
                 .forEach(controller -> Arrays.stream(controller.getDeclaredMethods())
                         .filter(this::isEndpoint)
                         .forEach(method -> assertThat(method.getAnnotation(PreAuthorize.class))

@@ -7,6 +7,15 @@ import java.util.List;
 import java.util.Optional;
 
 public interface SeuilStockAttestationRepository extends JpaRepository<SeuilStockAttestation, Long> {
-    Optional<SeuilStockAttestation> findByCompagnieAssuranceIdAndGroupeUsageAttestationIdAndActifTrue(Long compagnieAssuranceId, Long groupeUsageAttestationId);
-    List<SeuilStockAttestation> findByActifTrueOrderByCompagnieAssuranceNomAscGroupeUsageAttestationCodeAsc();
+    Optional<SeuilStockAttestation> findByAgenceIdAndCompagnieAssuranceIdAndGroupeUsageAttestationIdAndActifTrue(
+            Long agenceId,
+            Long compagnieAssuranceId,
+            Long groupeUsageAttestationId
+    );
+
+    Optional<SeuilStockAttestation> findByIdAndAgenceIdAndActifTrue(Long id, Long agenceId);
+
+    List<SeuilStockAttestation> findByAgenceIdAndActifTrueOrderByCompagnieAssuranceNomAscGroupeUsageAttestationCodeAsc(
+            Long agenceId
+    );
 }

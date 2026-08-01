@@ -3,6 +3,7 @@ package com.assurance.repository;
 import com.assurance.entity.AttestationStock;
 import com.assurance.enums.StatutAttestationStock;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -24,11 +25,13 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and a.lot.actif = true
               and a.lot.livraison.actif = true
               and a.lot.livraison.validee = true
+              and a.lot.livraison.agence.id = :agenceId
               and a.compagnieAssurance.id = :compagnieId
               and a.groupeUsageAttestation.id = :groupeUsageAttestationId
             """)
     List<AttestationStock> findGestionnableForUpdate(
             @Param("numeros") Collection<String> numeros,
+            @Param("agenceId") Long agenceId,
             @Param("compagnieId") Long compagnieId,
             @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
     );
@@ -40,11 +43,13 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and a.lot.actif = true
               and a.lot.livraison.actif = true
               and a.lot.livraison.validee = true
+              and a.lot.livraison.agence.id = :agenceId
               and a.compagnieAssurance.id = :compagnieId
               and a.groupeUsageAttestation.id = :groupeUsageAttestationId
             """)
     List<AttestationStock> findGestionnable(
             @Param("numeros") Collection<String> numeros,
+            @Param("agenceId") Long agenceId,
             @Param("compagnieId") Long compagnieId,
             @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
     );
@@ -57,6 +62,7 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and a.lot.actif = true
               and a.lot.livraison.actif = true
               and a.lot.livraison.validee = true
+              and a.lot.livraison.agence.id = :agenceId
               and a.compagnieAssurance.id = :compagnieId
               and a.groupeUsageAttestation.id = :groupeUsageAttestationId
             order by a.numero asc
@@ -64,6 +70,7 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
     List<String> findDisponibles(
             @Param("fragment") String fragment,
             @Param("statut") StatutAttestationStock statut,
+            @Param("agenceId") Long agenceId,
             @Param("compagnieId") Long compagnieId,
             @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
     );
@@ -75,10 +82,12 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and a.lot.actif = true
               and a.lot.livraison.actif = true
               and a.lot.livraison.validee = true
+              and a.lot.livraison.agence.id = :agenceId
               and a.compagnieAssurance.id = :compagnieId
               and a.groupeUsageAttestation.id = :groupeUsageAttestationId
             """)
     long countDisponibles(
+            @Param("agenceId") Long agenceId,
             @Param("compagnieId") Long compagnieId,
             @Param("groupeUsageAttestationId") Long groupeUsageAttestationId
     );
@@ -90,9 +99,10 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and a.lot.actif = true
               and a.lot.livraison.actif = true
               and a.lot.livraison.validee = true
+              and a.lot.livraison.agence.id = :agenceId
             group by a.statut
             """)
-    List<Object[]> countByStatutForDashboard();
+    List<Object[]> countByStatutForDashboard(@Param("agenceId") Long agenceId);
 
     @Query("""
             select a.compagnieAssurance.id,
@@ -108,6 +118,7 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and a.lot.actif = true
               and a.lot.livraison.actif = true
               and a.lot.livraison.validee = true
+              and a.lot.livraison.agence.id = :agenceId
               and a.groupeUsageAttestation.visibleStock = true
               and a.groupeUsageAttestation.actif = true
             group by a.compagnieAssurance.id,
@@ -119,9 +130,9 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
                      a.statut
             order by a.compagnieAssurance.nom asc, a.groupeUsageAttestation.code asc
             """)
-    List<Object[]> countByCompanyAndGroupForDashboard();
+    List<Object[]> countByCompanyAndGroupForDashboard(@Param("agenceId") Long agenceId);
 
-    @Query("""
+    @Query(value = """
             select a from AttestationStock a
             join fetch a.compagnieAssurance
             join fetch a.groupeUsageAttestation
@@ -137,8 +148,19 @@ public interface AttestationStockRepository extends JpaRepository<AttestationSto
               and (:groupeUsageAttestationId is null or a.groupeUsageAttestation.id = :groupeUsageAttestationId)
               and (:statut is null or a.statut = :statut)
             order by a.numero asc
+            """, countQuery = """
+            select count(a) from AttestationStock a
+            where a.actif = true
+              and a.lot.actif = true
+              and a.lot.livraison.actif = true
+              and a.lot.livraison.validee = true
+              and a.lot.livraison.agence.id = :agenceId
+              and (:numero is null or upper(a.numero) like upper(concat('%', :numero, '%')))
+              and (:compagnieId is null or a.compagnieAssurance.id = :compagnieId)
+              and (:groupeUsageAttestationId is null or a.groupeUsageAttestation.id = :groupeUsageAttestationId)
+              and (:statut is null or a.statut = :statut)
             """)
-    List<AttestationStock> searchGestionStock(
+    Page<AttestationStock> searchGestionStock(
             @Param("agenceId") Long agenceId,
             @Param("numero") String numero,
             @Param("compagnieId") Long compagnieId,

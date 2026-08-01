@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
-import { productionApi } from "../api";
+import { assistanceProductApi } from "../api/assistance-products";
 import { resolveAssistanceTariffAmount } from "../assistance-pricing";
 import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberValue, roundMoney } from "../utils/format";
@@ -750,7 +750,7 @@ function AssistanceTable({
   const selectedProductId = selectedProduct?.id ?? "";
   const tarifsQuery = useQuery({
     queryKey: ["referentiel", "produits-assistance", selectedProductId, "tarifs"],
-    queryFn: () => productionApi.listTarifsProduitAssistance(selectedProductId),
+    queryFn: () => assistanceProductApi.listProductRates(selectedProductId),
     enabled: assistance.enabled && Boolean(selectedProductId),
     staleTime: 60_000,
   });

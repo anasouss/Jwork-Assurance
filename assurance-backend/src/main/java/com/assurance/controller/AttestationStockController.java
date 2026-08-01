@@ -12,6 +12,7 @@ import com.assurance.dto.response.AttestationStockDashboardResponse;
 import com.assurance.dto.response.AttestationStockItemResponse;
 import com.assurance.dto.response.AttestationStockSettingsResponse;
 import com.assurance.dto.response.LivraisonAttestationResponse;
+import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.SeuilStockAttestationResponse;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.Usage;
@@ -49,19 +50,20 @@ public class AttestationStockController {
     private final UsageRepository usageRepository;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<AttestationStockDashboardResponse>> dashboard() {
         return ResponseEntity.ok(ApiResponse.success(attestationStockService.dashboard(TenantContext.getCurrentAgence())));
     }
 
     @GetMapping("/attestations")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
-    public ResponseEntity<ApiResponse<List<AttestationStockItemResponse>>> attestations(
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_attestation-stock:manage')")
+    public ResponseEntity<ApiResponse<PagedResponse<AttestationStockItemResponse>>> attestations(
             @RequestParam(required = false) Long compagnieAssuranceId,
             @RequestParam(required = false) Long groupeUsageAttestationId,
             @RequestParam(required = false) StatutAttestationStock statut,
             @RequestParam(required = false) String numero,
-            @RequestParam(defaultValue = "100") Integer limit
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "25") Integer size
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 attestationStockService.rechercher(
@@ -70,13 +72,14 @@ public class AttestationStockController {
                         groupeUsageAttestationId,
                         statut,
                         numero,
-                        limit
+                        page,
+                        size
                 )
         ));
     }
 
     @PostMapping("/attestations/{id}/annuler")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:cancel', 'PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:cancel', 'PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<AttestationStockItemResponse>> annulerAttestation(
             @PathVariable Long id,
             @Valid @RequestBody CancelAttestationStockRequest request
@@ -88,13 +91,13 @@ public class AttestationStockController {
     }
 
     @GetMapping("/settings")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<AttestationStockSettingsResponse>> settings() {
         return ResponseEntity.ok(ApiResponse.success(attestationStockService.settings(TenantContext.getCurrentAgence())));
     }
 
     @PutMapping("/settings")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<AttestationStockSettingsResponse>> updateSettings(
             @RequestBody UpdateAttestationStockSettingsRequest request
     ) {
@@ -105,30 +108,38 @@ public class AttestationStockController {
     }
 
     @GetMapping("/seuils")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<List<SeuilStockAttestationResponse>>> seuils() {
-        return ResponseEntity.ok(ApiResponse.success(attestationStockService.listerSeuils()));
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.listerSeuils(TenantContext.getCurrentAgence())
+        ));
     }
 
     @PostMapping("/seuils")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<SeuilStockAttestationResponse>> creerSeuil(
             @Valid @RequestBody UpsertSeuilStockAttestationRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(attestationStockService.creerSeuil(request), "Seuil stock cree"));
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.creerSeuil(TenantContext.getCurrentAgence(), request),
+                "Seuil stock cree"
+        ));
     }
 
     @PutMapping("/seuils/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<SeuilStockAttestationResponse>> modifierSeuil(
             @PathVariable Long id,
             @Valid @RequestBody UpsertSeuilStockAttestationRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(attestationStockService.modifierSeuil(id, request), "Seuil stock modifie"));
+        return ResponseEntity.ok(ApiResponse.success(
+                attestationStockService.modifierSeuil(TenantContext.getCurrentAgence(), id, request),
+                "Seuil stock modifie"
+        ));
     }
 
     @PostMapping("/livraisons")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> creerLivraison(
             @Valid @RequestBody CreateLivraisonAttestationRequest request
     ) {
@@ -139,7 +150,7 @@ public class AttestationStockController {
     }
 
     @GetMapping("/livraisons")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_contrat:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<List<LivraisonAttestationResponse>>> listerLivraisons(
             @RequestParam(required = false) SourceLivraisonAttestation source
     ) {
@@ -147,34 +158,34 @@ public class AttestationStockController {
     }
 
     @PostMapping("/livraisons/{id}/lots")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> ajouterLot(
             @PathVariable Long id,
             @Valid @RequestBody AddLotAttestationRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                livraisonAttestationService.ajouterLot(id, request),
+                livraisonAttestationService.ajouterLot(TenantContext.getCurrentAgence(), id, request),
                 "Lot d'attestations ajoute"
         ));
     }
 
     @PostMapping("/livraisons/{id}/reception")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> ajouterLots(
             @PathVariable Long id,
             @Valid @RequestBody AddLotsAttestationRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                livraisonAttestationService.ajouterLots(id, request.getLots()),
+                livraisonAttestationService.ajouterLots(TenantContext.getCurrentAgence(), id, request.getLots()),
                 "Lots d'attestations ajoutes"
         ));
     }
 
     @PostMapping("/livraisons/{id}/valider")
-    @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<LivraisonAttestationResponse>> valider(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
-                livraisonAttestationService.valider(id),
+                livraisonAttestationService.valider(TenantContext.getCurrentAgence(), id),
                 "Livraison d'attestations validee"
         ));
     }

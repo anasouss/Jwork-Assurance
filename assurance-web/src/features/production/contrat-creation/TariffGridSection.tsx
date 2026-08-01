@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { pricingApi } from "../api/pricing";
+import { referenceApi } from "../api/references";
 import { Field } from "../components/Field";
 import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { GrilleTarifaireDialog } from "../components/GrilleTarifaireDialog";
@@ -41,12 +42,12 @@ export function TariffGridSection({
 
   const lignes = useQuery({
     queryKey: ["lignes-grille", "contrat-summary", form.grilleTarifaireId],
-    queryFn: () => productionApi.lignesGrille({ grilleId: form.grilleTarifaireId }),
+    queryFn: () => referenceApi.pricingLines({ grilleId: form.grilleTarifaireId }),
     enabled: Boolean(form.grilleTarifaireId),
   });
   const formules = useQuery({
     queryKey: ["formules-garantie-personne", "contrat-summary", form.grilleTarifaireId],
-    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: form.grilleTarifaireId }),
+    queryFn: () => referenceApi.personGuaranteeFormulas({ grilleId: form.grilleTarifaireId }),
     enabled: Boolean(form.grilleTarifaireId),
   });
 
@@ -82,7 +83,7 @@ export function TariffGridSection({
 
   const saveGrille = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: UpsertGrilleTarifaireRequest }) =>
-      id ? productionApi.updateGrilleTarifaire(id, payload) : productionApi.createGrilleTarifaire(payload),
+      id ? pricingApi.updateGrid(id, payload) : pricingApi.createGrid(payload),
     onSuccess: async (grille) => {
       form.setGrilleTarifaireId(grille.id);
       setGrilleDialogOpen(false);

@@ -32,6 +32,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
+  FilterField as SharedFilterField,
+  ServerPagination,
+  TableRowsSkeleton,
+} from "@/components/shared";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -40,19 +45,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { productionApi } from "@/features/production/api";
+import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
 import type { ClientResponse, GroupeClient } from "@/features/production/types";
 import { useAuthStore } from "@/store/auth-store";
@@ -131,7 +128,7 @@ export default function RelevesFacturesPage() {
 
   const clients = useQuery({
     queryKey: ["compta", "document-payers", "clients", deferredPayerSearch],
-    queryFn: () => productionApi.listClients({
+    queryFn: () => clientApi.listClients({
       query: deferredPayerSearch || undefined,
       page: 0,
       size: 30,
@@ -141,13 +138,13 @@ export default function RelevesFacturesPage() {
   });
   const groups = useQuery({
     queryKey: ["groupes-clients"],
-    queryFn: productionApi.listGroupesClients,
+    queryFn: clientApi.listGroupesClients,
     enabled: payerMode === "GROUPE",
     staleTime: 60_000,
   });
   const requestedClient = useQuery({
     queryKey: ["crm-client", requestedPayerId],
-    queryFn: () => productionApi.getClientCrm(requestedPayerId),
+    queryFn: () => clientApi.getClientCrm(requestedPayerId),
     enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
     staleTime: 30_000,
   });
@@ -1084,7 +1081,15 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
 }
 
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="grid content-start gap-1.5"><Label>{label}</Label>{children}</div>;
+  return (
+    <SharedFilterField
+      container="div"
+      label={label}
+      labelClassName="text-sm font-medium normal-case"
+    >
+      {children}
+    </SharedFilterField>
+  );
 }
 
 function SearchActions(props: { onApply: () => void; onReset: () => void }) {
@@ -1118,13 +1123,7 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 function LoadingRows({ columns }: { columns: number }) {
-  return Array.from({ length: 5 }).map((_, row) => (
-    <tr key={row} className="border-b">
-      {Array.from({ length: columns }).map((__, column) => (
-        <td key={column} className="px-3 py-3"><Skeleton className="h-5 w-full" /></td>
-      ))}
-    </tr>
-  ));
+  return <TableRowsSkeleton colSpan={columns} rows={5} />;
 }
 
 function PageFooter(props: {
@@ -1132,18 +1131,18 @@ function PageFooter(props: {
   onPrevious: () => void;
   onNext: () => void;
 }) {
+  const page = props.page?.number ?? 0;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
-      <span>
-        Page {(props.page?.number ?? 0) + 1} / {Math.max(1, props.page?.totalPages ?? 1)} · {props.page?.totalElements ?? 0} résultat(s)
-      </span>
-      <Pagination className="mx-0 w-auto">
-        <PaginationContent>
-          <PaginationItem><PaginationPrevious href="#" aria-disabled={props.page?.first ?? true} onClick={(event) => { event.preventDefault(); if (!props.page?.first) props.onPrevious(); }} /></PaginationItem>
-          <PaginationItem><PaginationNext href="#" aria-disabled={props.page?.last ?? true} onClick={(event) => { event.preventDefault(); if (!props.page?.last) props.onNext(); }} /></PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    </div>
+    <ServerPagination
+      className="border-t px-4 py-3"
+      page={page}
+      totalPages={props.page?.totalPages ?? 1}
+      totalElements={props.page?.totalElements ?? 0}
+      onPageChange={(nextPage) => {
+        if (nextPage < page) props.onPrevious();
+        if (nextPage > page) props.onNext();
+      }}
+    />
   );
 }
 

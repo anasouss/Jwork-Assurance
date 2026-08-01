@@ -18,8 +18,12 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "seuils_stock_attestation",
-        uniqueConstraints = @UniqueConstraint(name = "uk_seuil_stock_attestation_compagnie_groupe", columnNames = {"compagnie_assurance_id", "groupe_usage_attestation_id"}),
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_seuil_stock_attestation_agence_compagnie_groupe",
+                columnNames = {"agence_id", "compagnie_assurance_id", "groupe_usage_attestation_id"}
+        ),
         indexes = {
+                @Index(name = "idx_seuil_stock_attestation_agence", columnList = "agence_id"),
                 @Index(name = "idx_seuil_stock_attestation_compagnie", columnList = "compagnie_assurance_id"),
                 @Index(name = "idx_seuil_stock_attestation_groupe", columnList = "groupe_usage_attestation_id")
         })
@@ -29,6 +33,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SeuilStockAttestation extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "agence_id", nullable = false)
+    private Agence agence;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "compagnie_assurance_id", nullable = false)

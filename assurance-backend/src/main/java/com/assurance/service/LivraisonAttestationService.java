@@ -59,7 +59,7 @@ public class LivraisonAttestationService {
 
     @Transactional
     public LivraisonAttestationResponse creer(Long agenceId, CreateLivraisonAttestationRequest request) {
-        Agence agence = resolveAgence(agenceId, request.getAgenceId());
+        Agence agence = resolveAgence(agenceId);
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
         SourceLivraisonAttestation source = request.getSource() == null ? SourceLivraisonAttestation.COMMANDE : request.getSource();
@@ -115,13 +115,13 @@ public class LivraisonAttestationService {
     }
 
     @Transactional
-    public LivraisonAttestationResponse ajouterLot(Long livraisonId, AddLotAttestationRequest request) {
-        return ajouterLots(livraisonId, List.of(request));
+    public LivraisonAttestationResponse ajouterLot(Long agenceId, Long livraisonId, AddLotAttestationRequest request) {
+        return ajouterLots(agenceId, livraisonId, List.of(request));
     }
 
     @Transactional
-    public LivraisonAttestationResponse ajouterLots(Long livraisonId, List<AddLotAttestationRequest> requests) {
-        LivraisonAttestation livraison = findLivraison(livraisonId);
+    public LivraisonAttestationResponse ajouterLots(Long agenceId, Long livraisonId, List<AddLotAttestationRequest> requests) {
+        LivraisonAttestation livraison = findLivraison(agenceId, livraisonId);
         if (Boolean.TRUE.equals(livraison.getValidee()) || livraison.getStatut() == StatutLivraisonAttestation.REFUSEE) {
             throw new BadRequestException("Livraison attestation verrouillee");
         }
@@ -151,8 +151,8 @@ public class LivraisonAttestationService {
     }
 
     @Transactional
-    public LivraisonAttestationResponse valider(Long livraisonId) {
-        LivraisonAttestation livraison = findLivraison(livraisonId);
+    public LivraisonAttestationResponse valider(Long agenceId, Long livraisonId) {
+        LivraisonAttestation livraison = findLivraison(agenceId, livraisonId);
         recalculer(livraison);
         if (livraison.getQuantiteRecue() == null || livraison.getQuantiteRecue() <= 0) {
             throw new BadRequestException("Aucun lot recu pour cette livraison d'attestations");
@@ -408,16 +408,14 @@ public class LivraisonAttestationService {
                 .build();
     }
 
-    private LivraisonAttestation findLivraison(Long livraisonId) {
-        return livraisonAttestationRepository.findById(livraisonId)
-                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+    private LivraisonAttestation findLivraison(Long agenceId, Long livraisonId) {
+        return livraisonAttestationRepository.findByIdAndAgenceIdAndActifTrue(livraisonId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("LivraisonAttestation", livraisonId));
     }
 
-    private Agence resolveAgence(Long agenceIdCourante, Long agenceIdRequest) {
-        Long agenceId = agenceIdRequest != null ? agenceIdRequest : agenceIdCourante;
+    private Agence resolveAgence(Long agenceId) {
         if (agenceId == null) {
-            return null;
+            throw new BadRequestException("Agence courante introuvable");
         }
         return agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));

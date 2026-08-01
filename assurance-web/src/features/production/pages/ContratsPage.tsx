@@ -1,22 +1,14 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, ShieldCheck, X } from "lucide-react";
+import { ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { amendmentKeys, contractKeys, referenceKeys } from "@/lib/query-keys";
+import { FilterField as SharedFilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,32 +19,23 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
-import { productionApi } from "../api";
+import { avenantApi } from "../api/avenants";
+import { contractApi } from "../api/contracts";
+import { referenceApi } from "../api/references";
+import { ContractWorkflowDialogs } from "../components/contracts/ContractWorkflowDialogs";
+import {
+  DEFAULT_CONTRACT_FILTERS,
+  contractPageFromSearchParams,
+  contractFiltersFromSearchParams,
+  contractSearchParams,
+  type ContractFilters,
+} from "../contracts/contract-filters";
 import { toDateOnly } from "../date";
-import type { ContratSummary, ReferenceOption, TypeContrat } from "../types";
-
-type ContratFilters = {
-  typeContrat: "ALL" | TypeContrat;
-  typeDate: "EFFET" | "ECHEANCE";
-  du?: string;
-  au?: string;
-  codeClient: string;
-  compagnieId: "ALL" | string;
-  numeroPolice: string;
-  clientId: string;
-};
+import type { ContratListItem } from "../types";
 
 type MovementLine = {
   key: string;
@@ -67,53 +50,58 @@ type MovementLine = {
   isSynthetic?: boolean;
 };
 
-type ContractHistoryLine = {
-  contrat: ContratSummary;
-  movement: MovementLine;
-};
-
-type ContractHistoryGroup = {
-  key: string;
-  lines: ContractHistoryLine[];
-};
-
-const DEFAULT_FILTERS: ContratFilters = {
-  typeContrat: "ALL",
-  typeDate: "EFFET",
-  codeClient: "",
-  compagnieId: "ALL",
-  numeroPolice: "",
-  clientId: "",
+const VEHICLE_TYPE_LABELS: Record<string, string> = {
+  AUTOMOBILE: "Automobile",
+  CAMION: "Camion",
+  MOTO: "Moto",
+  BUS: "Bus",
+  TRACTEUR: "Tracteur",
+  AUTRE: "Autre",
 };
 
 export default function ContratsPage() {
-  const [searchParams] = useSearchParams();
-  const initialFilters = useMemo<ContratFilters>(() => ({
-    ...DEFAULT_FILTERS,
-    clientId: searchParams.get("clientId") ?? "",
-    codeClient: searchParams.get("client") ?? "",
-  }), [searchParams]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [initialFilters] = useState<ContractFilters>(() => contractFiltersFromSearchParams(searchParams));
+  const [page, setPage] = useState(() => contractPageFromSearchParams(searchParams));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [filters, setFilters] = useState<ContratFilters>(initialFilters);
-  const [appliedFilters, setAppliedFilters] = useState<ContratFilters>(initialFilters);
+  const [filters, setFilters] = useState<ContractFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<ContractFilters>(initialFilters);
   const canCreateContrat = useAuthStore((state) => state.user?.permissions?.includes("contrat:create") ?? false);
-  const contrats = useQuery({ queryKey: ["contrats"], queryFn: productionApi.listContrats });
+  const listParams = useMemo(() => ({
+    typeContrat: appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
+    typeDate: appliedFilters.typeDate,
+    dateDu: appliedFilters.du,
+    dateAu: appliedFilters.au,
+    search: appliedFilters.codeClient.trim() || undefined,
+    compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
+    numeroPolice: appliedFilters.numeroPolice.trim() || undefined,
+    clientId: appliedFilters.clientId || undefined,
+    page,
+    size: 25,
+  }), [appliedFilters, page]);
+  const contrats = useQuery({
+    queryKey: contractKeys.list(listParams),
+    queryFn: () => contractApi.listContrats(listParams),
+    placeholderData: (previous) => previous,
+  });
   const companies = useQuery({
-    queryKey: ["referentiel", "compagnies-assurance", "contrats"],
-    queryFn: () => productionApi.referentiel("compagnies-assurance"),
+    queryKey: referenceKeys.list("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
   });
-  const conventions = useQuery({
-    queryKey: ["referentiel", "conventions", "contrats"],
-    queryFn: () => productionApi.referentiel("conventions"),
-  });
-
-  const companyMap = useMemo(() => optionMap(companies.data), [companies.data]);
-  const conventionMap = useMemo(() => optionMap(conventions.data), [conventions.data]);
   const rows = useMemo(
-    () => contractHistoryGroups(contrats.data ?? [])
-      .filter((group) => group.lines.some(({ contrat }) => matchesFilters(contrat, appliedFilters, companyMap))),
-    [appliedFilters, companyMap, contrats.data]
+    () => (contrats.data?.items ?? []).map((group) => ({
+      key: group.key,
+      lines: group.contrats.flatMap((contrat) =>
+        movementLines(contrat).map((movement) => ({ contrat, movement }))
+      ),
+    })),
+    [contrats.data?.items]
   );
+  const applyFilters = (next: ContractFilters) => {
+    setPage(0);
+    setAppliedFilters(next);
+    setSearchParams(contractSearchParams(next, 0), { replace: true });
+  };
 
   return (
     <div className="grid min-w-0 gap-4 overflow-x-hidden">
@@ -132,7 +120,7 @@ export default function ContratsPage() {
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.1fr_1.1fr_1fr_1fr_1fr_1fr_1fr_auto]">
             <FilterField label="Type de contrat">
-              <Select value={filters.typeContrat} onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as ContratFilters["typeContrat"] }))}>
+              <Select value={filters.typeContrat} onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as ContractFilters["typeContrat"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Tous les contrats</SelectItem>
@@ -143,7 +131,7 @@ export default function ContratsPage() {
               </Select>
             </FilterField>
             <FilterField label="Type de date">
-              <Select value={filters.typeDate} onValueChange={(value) => setFilters((current) => ({ ...current, typeDate: value as ContratFilters["typeDate"] }))}>
+              <Select value={filters.typeDate} onValueChange={(value) => setFilters((current) => ({ ...current, typeDate: value as ContractFilters["typeDate"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EFFET">Date d'effet</SelectItem>
@@ -175,7 +163,7 @@ export default function ContratsPage() {
               <Input value={filters.numeroPolice} onChange={(event) => setFilters((current) => ({ ...current, numeroPolice: event.target.value }))} />
             </FilterField>
             <div className="flex items-end gap-2">
-              <Button type="button" className="h-9 px-4" onClick={() => setAppliedFilters(filters)}>
+              <Button type="button" className="h-9 px-4" onClick={() => applyFilters(filters)}>
                 <Search className="size-4" />
               </Button>
               <Button
@@ -184,8 +172,8 @@ export default function ContratsPage() {
                 size="icon"
                 className="h-9 w-9"
                 onClick={() => {
-                  setFilters(DEFAULT_FILTERS);
-                  setAppliedFilters(DEFAULT_FILTERS);
+                  setFilters(DEFAULT_CONTRACT_FILTERS);
+                  applyFilters(DEFAULT_CONTRACT_FILTERS);
                 }}
               >
                 <X className="size-4" />
@@ -219,9 +207,7 @@ export default function ContratsPage() {
               </thead>
               <tbody>
                 {contrats.isLoading ? (
-                  <tr>
-                    <td colSpan={14} className="px-3 py-8 text-center text-muted-foreground">Chargement des dossiers...</td>
-                  </tr>
+                  <TableRowsSkeleton rows={7} colSpan={14} />
                 ) : rows.length ? (
                   rows.map((group) => {
                     const current = group.lines[0];
@@ -232,8 +218,8 @@ export default function ContratsPage() {
                         <ContratRow
                           contrat={current.contrat}
                           movement={current.movement}
-                          companyLabel={companyLabel(current.contrat, companyMap)}
-                          conventionLabel={conventionLabel(current.contrat, conventionMap)}
+                          companyLabel={companyLabel(current.contrat)}
+                          conventionLabel={conventionLabel(current.contrat)}
                           movementCount={group.lines.length}
                           expanded={isExpanded}
                           canExpand={olderMovements.length > 0}
@@ -244,8 +230,8 @@ export default function ContratsPage() {
                             key={`${contrat.id}-${movement.key}`}
                             contrat={contrat}
                             movement={movement}
-                            companyLabel={companyLabel(contrat, companyMap)}
-                            conventionLabel={conventionLabel(contrat, conventionMap)}
+                            companyLabel={companyLabel(contrat)}
+                            conventionLabel={conventionLabel(contrat)}
                             movementCount={group.lines.length}
                             child
                           />
@@ -261,6 +247,17 @@ export default function ContratsPage() {
               </tbody>
             </table>
           </div>
+          <ServerPagination
+            className="border-t px-4 py-3"
+            page={contrats.data?.page.number ?? page}
+            totalPages={contrats.data?.page.totalPages ?? 1}
+            totalElements={contrats.data?.page.totalElements}
+            loading={contrats.isFetching}
+            onPageChange={(nextPage) => {
+              setPage(nextPage);
+              setSearchParams(contractSearchParams(appliedFilters, nextPage), { replace: true });
+            }}
+          />
         </CardContent>
       </Card>
     </div>
@@ -278,7 +275,7 @@ function ContratRow({
   child,
   onToggle,
 }: {
-  contrat: ContratSummary;
+  contrat: ContratListItem;
   movement: MovementLine;
   companyLabel: string;
   conventionLabel?: string;
@@ -288,6 +285,10 @@ function ContratRow({
   child?: boolean;
   onToggle?: () => void;
 }) {
+  const canViewContrat = useAuthStore(
+    (state) => state.user?.permissions?.includes("contrat:view") ?? false
+  );
+
   return (
     <tr className={cn("border-b transition-colors hover:bg-muted/40", child && "bg-emerald-100/70 hover:bg-emerald-100 dark:bg-emerald-950/25 dark:hover:bg-emerald-950/35")}>
       <TableCellStrong>{dossierNumber(contrat)}</TableCellStrong>
@@ -314,15 +315,17 @@ function ContratRow({
       <TableCell className="text-center"><StatusBadge statut={statusLabel(contrat, movement)} /></TableCell>
       <td className="px-2 py-2">
         <div className="flex items-center justify-center gap-2">
-          <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Visualiser">
-            <Link
-              to={showContratPath(contrat, movement)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Eye className="size-4" />
-            </Link>
-          </Button>
+          {canViewContrat ? (
+            <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Visualiser">
+              <Link
+                to={showContratPath(contrat, movement)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Eye className="size-4" />
+              </Link>
+            </Button>
+          ) : null}
           <RowActions contrat={contrat} movement={movement} child={child} />
           {canExpand ? (
             <Button type="button" size="icon" className="size-8 bg-blue-600 hover:bg-blue-700" onClick={onToggle} title={expanded ? "Masquer les mouvements" : `Afficher ${movementCount - 1} mouvement(s)`}>
@@ -335,9 +338,10 @@ function ContratRow({
   );
 }
 
-function RowActions({ contrat, movement, child }: { contrat: ContratSummary; movement: MovementLine; child?: boolean }) {
+function RowActions({ contrat, movement, child }: { contrat: ContratListItem; movement: MovementLine; child?: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [draftChoiceCode, setDraftChoiceCode] = useState<string | null>(null);
   const [renewalDialogOpen, setRenewalDialogOpen] = useState(false);
@@ -348,13 +352,26 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   const carteVertePath = `/app/production/contrats/${contrat.id}/cartes-vertes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const editPath = editContratPath(contrat);
   const terminal = isTerminalContratRow(contrat, movement);
+  const canUpdateContrat = permissions.includes("contrat:update");
+  const canCreateContrat = permissions.includes("contrat:create");
+  const canCreateAvenant = permissions.includes("avenant:create") || canUpdateContrat;
+  const canRectifyAvenant = permissions.includes("avenant:rectify") || canUpdateContrat;
+  const canDeleteContrat = permissions.includes("contrat:delete") || canUpdateContrat;
+  const canDeleteAvenant = permissions.includes("avenant:delete") || canUpdateContrat;
+  const canRenewContrat = permissions.includes("contrat:renew") || canUpdateContrat;
+  const canManageAssistance = permissions.includes("assistance:manage") || canUpdateContrat;
+  const canManageCarteVerte = permissions.includes("carte-verte:manage") || canUpdateContrat;
+  const canViewContrat = permissions.includes("contrat:view");
+  const canViewPieces = permissions.includes("piece-jointe:view") || permissions.includes("contrat:view");
   const hasActiveAvenants = (contrat.mouvements ?? []).some((item) => {
     const statut = String(item.statut ?? "").trim().toUpperCase();
     return !isInitialContractMovement(item) && statut !== "ANNULE";
   });
-  const canCreateMovement = !child && !terminal && !Boolean(contrat.renouvele) && isActiveContrat(contrat);
-  const canRenew = canCreateMovement && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
+  const canCreateMovement = canCreateAvenant && !child && !terminal && !contrat.renouvele && isActiveContrat(contrat);
+  const canRenew = canRenewContrat && !child && !terminal && !contrat.renouvele
+    && isActiveContrat(contrat) && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
   const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat))
+    && (canUpdateContrat || canCreateContrat)
     && !child
     && !terminal
     && !hasActiveAvenants;
@@ -363,27 +380,33 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     : null;
   const latestMovementId = sortedMouvements(contrat)[0]?.id;
   const canRectifyMovement = !child
+    && canRectifyAvenant
     && !terminal
     && Boolean(rectificationPath)
     && String(movement.mouvementId ?? "") === String(latestMovementId ?? "")
     && !movement.isSynthetic
     && !isInitialContractMovement(movement)
     && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";
-  const canDownload = !isTerminalMovementCode(movement.code);
+  const canDownload = canViewContrat && !isTerminalMovementCode(movement.code);
   const hasPrimaryActions = canEditDirectly || canCreateMovement;
-  const deleteMode = resolveDeleteMode(contrat, movement, child);
+  const resolvedDeleteMode = resolveDeleteMode(contrat, movement, child);
+  const deleteMode = resolvedDeleteMode === "CONTRAT" && canDeleteContrat
+    ? resolvedDeleteMode
+    : resolvedDeleteMode === "MOUVEMENT" && canDeleteAvenant
+      ? resolvedDeleteMode
+      : null;
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (deleteMode === "CONTRAT") {
-        return productionApi.deleteContrat(contrat.id);
+        return contractApi.deleteContrat(contrat.id);
       }
       if (deleteMode === "MOUVEMENT" && movement.mouvementId) {
-        return productionApi.deleteMouvement(contrat.id, movement.mouvementId);
+        return contractApi.deleteMouvement(contrat.id, movement.mouvementId);
       }
       return Promise.resolve();
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["contrats"] });
+      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
       setConfirmDeleteOpen(false);
       toast.success(deleteMode === "CONTRAT" ? "Contrat supprime" : "Avenant supprime");
     },
@@ -408,11 +431,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
     navigate(avenantPath(contrat, code));
   };
   const restartDraftMutation = useMutation({
-    mutationFn: (code: string) => productionApi.deleteAvenantDraft(contrat.id, code),
+    mutationFn: (code: string) => avenantApi.deleteAvenantDraft(contrat.id, code),
     onSuccess: async (_data, code) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["contrats"] }),
-        queryClient.invalidateQueries({ queryKey: ["avenant-draft", contrat.id, code] }),
+        queryClient.invalidateQueries({ queryKey: contractKeys.all }),
+        queryClient.invalidateQueries({ queryKey: amendmentKeys.draft(contrat.id, code) }),
       ]);
       setDraftChoiceCode(null);
       navigate(avenantPath(contrat, code));
@@ -423,9 +446,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
   });
   const renewalMutation = useMutation({
     mutationFn: (mode: "CABINET" | "COMPAGNIE") =>
-      productionApi.createRenouvellementDraft(contrat.id, mode),
+      contractApi.createRenouvellementDraft(contrat.id, mode),
     onSuccess: async (draft) => {
-      await queryClient.invalidateQueries({ queryKey: ["contrats"] });
+      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
       setRenewalDialogOpen(false);
       toast.success("Brouillon de renouvellement prêt");
       navigate(renewalDraftPath(draft));
@@ -451,7 +474,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          {avenantDrafts.length ? (
+          {canCreateAvenant && avenantDrafts.length ? (
             <>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
@@ -516,12 +539,16 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
               )}
-              <DropdownMenuItem asChild>
-                <Link to={assistancePath}>Contrat assistance</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to={carteVertePath}>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</Link>
-              </DropdownMenuItem>
+              {canManageAssistance ? (
+                <DropdownMenuItem asChild>
+                  <Link to={assistancePath}>Contrat assistance</Link>
+                </DropdownMenuItem>
+              ) : null}
+              {canManageCarteVerte ? (
+                <DropdownMenuItem asChild>
+                  <Link to={carteVertePath}>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</Link>
+                </DropdownMenuItem>
+              ) : null}
               {canRenew ? (
                 <DropdownMenuItem disabled={renewalMutation.isPending} onSelect={startRenewal}>
                   Renouvellement
@@ -531,9 +558,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           ) : null}
           {hasPrimaryActions ? <DropdownMenuSeparator /> : null}
           {canDownload ? <DropdownMenuItem>Télécharger</DropdownMenuItem> : null}
-          <DropdownMenuItem asChild>
-            <Link to={piecesPath}>Les pièces jointes</Link>
-          </DropdownMenuItem>
+          {canViewPieces ? (
+            <DropdownMenuItem asChild>
+              <Link to={piecesPath}>Les pièces jointes</Link>
+            </DropdownMenuItem>
+          ) : null}
           {deleteMode ? (
             <>
               <DropdownMenuSeparator />
@@ -550,129 +579,52 @@ function RowActions({ contrat, movement, child }: { contrat: ContratSummary; mov
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{deleteTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{deleteDescription}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteMutation.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                if (deleteMode) {
-                  deleteMutation.mutate();
-                }
-              }}
-            >
-              {deleteMutation.isPending ? "Traitement..." : "Confirmer"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <Dialog open={renewalDialogOpen} onOpenChange={(open) => {
-        if (!renewalMutation.isPending) setRenewalDialogOpen(open);
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Type de terme</DialogTitle>
-            <DialogDescription>Choisissez le mode de renouvellement à appliquer pour ce contrat.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2">
-            <button
-              type="button"
-              className={cn(
-                "grid grid-cols-[1fr_auto] gap-3 rounded-md border p-4 text-left transition-colors",
-                renewalTerm === "CABINET" ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40"
-              )}
-              onClick={() => setRenewalTerm("CABINET")}
-            >
-              <span className="grid gap-1">
-                <span className="font-semibold">Terme cabinet</span>
-                <span className="text-xs text-muted-foreground">Renouvellement interne avec contrôle du stock sur le numéro d’attestation.</span>
-                <Badge className="mt-1 w-fit bg-emerald-100 text-[10px] text-emerald-800 hover:bg-emerald-100">AVEC STOCK</Badge>
-              </span>
-              <ShieldCheck className="size-5 text-emerald-700" />
-            </button>
-            <button
-              type="button"
-              className={cn(
-                "grid grid-cols-[1fr_auto] gap-3 rounded-md border p-4 text-left transition-colors",
-                renewalTerm === "COMPAGNIE" ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40"
-              )}
-              onClick={() => setRenewalTerm("COMPAGNIE")}
-            >
-              <span className="grid gap-1">
-                <span className="font-semibold">Terme compagnie</span>
-                <span className="text-xs text-muted-foreground">Renouvellement sans contrôle du stock d’attestation selon les règles compagnie.</span>
-                <Badge className="mt-1 w-fit bg-amber-100 text-[10px] text-amber-800 hover:bg-amber-100">SANS STOCK</Badge>
-              </span>
-              <Building2 className="size-5 text-emerald-700" />
-            </button>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" disabled={renewalMutation.isPending} onClick={() => setRenewalDialogOpen(false)}>Annuler</Button>
-            <Button type="button" disabled={renewalMutation.isPending} onClick={() => renewalMutation.mutate(renewalTerm)}>
-              {renewalMutation.isPending ? "Préparation..." : "Continuer"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={Boolean(selectedDraft)} onOpenChange={(open) => {
-        if (!open && !restartDraftMutation.isPending) {
-          setDraftChoiceCode(null);
-        }
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Un brouillon existe déjà</AlertDialogTitle>
-            <AlertDialogDescription>
-              Un brouillon « {selectedDraft?.libelleTypeMouvement || selectedDraft?.codeTypeMouvement} » est déjà enregistré pour ce contrat. Vous pouvez continuer la saisie existante ou la supprimer et recommencer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={restartDraftMutation.isPending}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={restartDraftMutation.isPending || !selectedDraft}
-              onClick={(event) => {
-                event.preventDefault();
-                if (selectedDraft) {
-                  restartDraftMutation.mutate(selectedDraft.codeTypeMouvement);
-                }
-              }}
-            >
-              {restartDraftMutation.isPending ? "Suppression..." : "Supprimer et recommencer"}
-            </AlertDialogAction>
-            <AlertDialogAction
-              disabled={restartDraftMutation.isPending || !selectedDraft}
-              onClick={(event) => {
-                event.preventDefault();
-                if (selectedDraft) {
-                  const code = selectedDraft.codeTypeMouvement;
-                  setDraftChoiceCode(null);
-                  navigate(avenantPath(contrat, code));
-                }
-              }}
-            >
-              Continuer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ContractWorkflowDialogs
+        deleteDialog={{
+          open: confirmDeleteOpen,
+          title: deleteTitle,
+          description: deleteDescription,
+          pending: deleteMutation.isPending,
+          onOpenChange: setConfirmDeleteOpen,
+          onConfirm: () => {
+            if (deleteMode) deleteMutation.mutate();
+          },
+        }}
+        renewalDialog={{
+          open: renewalDialogOpen,
+          term: renewalTerm,
+          pending: renewalMutation.isPending,
+          onOpenChange: setRenewalDialogOpen,
+          onTermChange: setRenewalTerm,
+          onConfirm: () => renewalMutation.mutate(renewalTerm),
+        }}
+        draftDialog={{
+          draft: selectedDraft,
+          pending: restartDraftMutation.isPending,
+          onOpenChange: (open) => {
+            if (!open && !restartDraftMutation.isPending) setDraftChoiceCode(null);
+          },
+          onRestart: () => {
+            if (selectedDraft) restartDraftMutation.mutate(selectedDraft.codeTypeMouvement);
+          },
+          onContinue: () => {
+            if (!selectedDraft) return;
+            const code = selectedDraft.codeTypeMouvement;
+            setDraftChoiceCode(null);
+            navigate(avenantPath(contrat, code));
+          },
+        }}
+      />
     </>
   );
 }
 
-function showContratPath(contrat: ContratSummary, movement: MovementLine) {
+function showContratPath(contrat: ContratListItem, movement: MovementLine) {
   const query = movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : "";
   return `/app/production/contrats/${contrat.id}${query}`;
 }
 
-function editContratPath(contrat: ContratSummary) {
+function editContratPath(contrat: ContratListItem) {
   if (contrat.contratOrigineId) return renewalDraftPath(contrat);
   if (contrat.prospection && contrat.typeContrat === "FLOTTE") return `/app/production/prospection/devis/flotte/${contrat.id}`;
   if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;
@@ -680,22 +632,22 @@ function editContratPath(contrat: ContratSummary) {
   return `/app/production/ajouter-dossier/particulier/${contrat.id}`;
 }
 
-function renewalDraftPath(contrat: ContratSummary) {
+function renewalDraftPath(contrat: ContratListItem) {
   if (contrat.typeContrat === "FLOTTE") return `/app/production/renouvellements/flotte/${contrat.id}`;
   if (contrat.typeContrat === "CONVENTION") return `/app/production/renouvellements/convention/${contrat.id}`;
   return `/app/production/renouvellements/particulier/${contrat.id}`;
 }
 
-function isDirectlyEditable(contrat: ContratSummary) {
+function isDirectlyEditable(contrat: ContratListItem) {
   const statut = String(contrat.statut ?? "").toUpperCase();
   return statut.includes("DRAFT") && (Boolean(contrat.brouillon) || Boolean(contrat.prospection));
 }
 
-function isActiveContrat(contrat: ContratSummary) {
+function isActiveContrat(contrat: ContratListItem) {
   return String(contrat.statut ?? "").toUpperCase() === "ACTIVE" && !contrat.prospection && !contrat.brouillon;
 }
 
-function isTerminalContratRow(contrat: ContratSummary, movement: MovementLine) {
+function isTerminalContratRow(contrat: ContratListItem, movement: MovementLine) {
   const statut = String(contrat.statut ?? "").toUpperCase();
   return statut.includes("RESILI") || statut.includes("ANNU") || isTerminalMovementCode(movement.code);
 }
@@ -714,7 +666,7 @@ function isInitialContractMovement(movement: { code?: string | null; categorie?:
     || categorie === "RENOUVELLEMENT";
 }
 
-function resolveDeleteMode(contrat: ContratSummary, movement: MovementLine, child?: boolean): "CONTRAT" | "MOUVEMENT" | null {
+function resolveDeleteMode(contrat: ContratListItem, movement: MovementLine, child?: boolean): "CONTRAT" | "MOUVEMENT" | null {
   if (child) return null;
   if (String(movement.statut ?? "").toUpperCase() === "ANNULE") return null;
   if (movement.mouvementId && !movement.isSynthetic && !isInitialContractMovement(movement)) return "MOUVEMENT";
@@ -723,20 +675,22 @@ function resolveDeleteMode(contrat: ContratSummary, movement: MovementLine, chil
   return null;
 }
 
-function isDraftLikeSummary(contrat: ContratSummary) {
+function isDraftLikeSummary(contrat: ContratListItem) {
   return String(contrat.statut ?? "").toUpperCase().includes("DRAFT") || Boolean(contrat.brouillon) || Boolean(contrat.prospection);
 }
 
-function avenantPath(contrat: ContratSummary, code: string) {
+function avenantPath(contrat: ContratListItem, code: string) {
   return `/app/production/contrats/${contrat.id}/avenants/${code}`;
 }
 
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold uppercase text-slate-700 dark:text-neutral-300">
-      <span>{label}</span>
+    <SharedFilterField
+      label={label}
+      labelClassName="font-semibold text-slate-700 dark:text-neutral-300"
+    >
       {children}
-    </label>
+    </SharedFilterField>
   );
 }
 
@@ -752,35 +706,7 @@ function TableCellStrong({ children }: { children?: React.ReactNode }) {
   return <td className="px-3 py-2 align-middle font-medium">{children}</td>;
 }
 
-function matchesFilters(contrat: ContratSummary, filters: ContratFilters, companyMap: Map<string, ReferenceOption>) {
-  if (filters.typeContrat !== "ALL" && contrat.typeContrat !== filters.typeContrat) return false;
-  if (filters.compagnieId !== "ALL" && String(contrat.compagnieAssuranceId ?? "") !== filters.compagnieId) return false;
-  if (filters.numeroPolice.trim() && !includesNormalized(contrat.numeroPolice, filters.numeroPolice)) return false;
-
-  const movement = movementLines(contrat)[0];
-  const date = filters.typeDate === "EFFET" ? (movement.dateEffet ?? contrat.dateEffet) : (movement.dateEcheance ?? contrat.dateEcheance);
-  if (filters.du && (!date || date < filters.du)) return false;
-  if (filters.au && (!date || date > filters.au)) return false;
-
-  const clientSearch = filters.codeClient.trim();
-  if (filters.clientId && !contrat.clients?.some((client) => String(client.clientId) === filters.clientId)) {
-    return false;
-  }
-  if (clientSearch) {
-    const haystack = [
-      clientCode(contrat),
-      mainClient(contrat),
-      contrat.numeroContrat,
-      contrat.numeroPolice,
-      companyLabel(contrat, companyMap),
-    ].join(" ");
-    if (!includesNormalized(haystack, clientSearch)) return false;
-  }
-
-  return true;
-}
-
-function movementLines(contrat: ContratSummary): MovementLine[] {
+function movementLines(contrat: ContratListItem): MovementLine[] {
   const sorted = sortedMouvements(contrat);
   if (sorted.length) {
     return sorted.map((movement) => ({
@@ -808,46 +734,7 @@ function movementLines(contrat: ContratSummary): MovementLine[] {
   }];
 }
 
-function contractHistoryGroups(contrats: ContratSummary[]): ContractHistoryGroup[] {
-  const byId = new Map(contrats.map((contrat) => [String(contrat.id), contrat]));
-  const renewedContractIds = new Set(
-    contrats
-      .map((contrat) => contrat.contratOrigineId)
-      .filter((id): id is string => Boolean(id))
-      .map(String)
-  );
-  const leaves = contrats.filter((contrat) => !renewedContractIds.has(String(contrat.id)));
-  const groupedIds = new Set<string>();
-
-  const groups = leaves.map((latest) => {
-    const chain: ContratSummary[] = [];
-    const chainIds = new Set<string>();
-    let current: ContratSummary | undefined = latest;
-    while (current && !chainIds.has(String(current.id))) {
-      const currentId = String(current.id);
-      chain.push(current);
-      chainIds.add(currentId);
-      groupedIds.add(currentId);
-      current = current.contratOrigineId ? byId.get(String(current.contratOrigineId)) : undefined;
-    }
-
-    const lines = chain.flatMap((contrat) => movementLines(contrat).map((movement) => ({ contrat, movement })));
-    return { key: String(latest.id), lines };
-  });
-
-  for (const contrat of contrats) {
-    if (!groupedIds.has(String(contrat.id))) {
-      groups.push({
-        key: String(contrat.id),
-        lines: movementLines(contrat).map((movement) => ({ contrat, movement })),
-      });
-    }
-  }
-
-  return groups;
-}
-
-function sortedMouvements(contrat: ContratSummary) {
+function sortedMouvements(contrat: ContratListItem) {
   return [...(contrat.mouvements ?? [])]
     .filter((movement) => String(movement.statut ?? "").toUpperCase() !== "ANNULE")
     .sort((a, b) => {
@@ -861,7 +748,7 @@ function sortedMouvements(contrat: ContratSummary) {
     });
 }
 
-function sortedAvenantDrafts(contrat: ContratSummary) {
+function sortedAvenantDrafts(contrat: ContratListItem) {
   return [...(contrat.avenantDrafts ?? [])]
     .sort((a, b) => dateRank(b.updatedAt) - dateRank(a.updatedAt));
 }
@@ -870,62 +757,56 @@ function movementStatusRank(statut?: string | null) {
   return String(statut ?? "").toUpperCase() === "ANNULE" ? 1 : 0;
 }
 
-function optionMap(options?: ReferenceOption[]) {
-  return new Map((options ?? []).map((option) => [String(option.id), option]));
-}
-
-function dossierNumber(contrat: ContratSummary) {
+function dossierNumber(contrat: ContratListItem) {
   return contrat.numeroDossier ?? contrat.numeroContrat ?? contrat.numeroPolice ?? `#${contrat.id}`;
 }
 
-function clientCode(contrat: ContratSummary) {
+function clientCode(contrat: ContratListItem) {
   const client = contrat.clients?.find((item) => item.role === "SOUSCRIPTEUR") ?? contrat.clients?.[0];
-  return client?.client?.codeClient
-    ?? client?.client?.rc
-    ?? client?.client?.cin
+  return client?.codeClient
     ?? client?.nomAffichage
     ?? "-";
 }
 
-function mainClient(contrat: ContratSummary) {
+function mainClient(contrat: ContratListItem) {
   return contrat.clients?.find((client) => client.role === "SOUSCRIPTEUR")?.nomAffichage
     ?? contrat.clients?.[0]?.nomAffichage
     ?? "-";
 }
 
-function branchLabel(contrat: ContratSummary) {
-  return contrat.vehicules?.[0]?.typeVehicule === "AUTOMOBILE" || contrat.typeContrat ? "Automobile" : "-";
+function branchLabel(contrat: ContratListItem) {
+  return contrat.premierTypeVehicule
+    ? VEHICLE_TYPE_LABELS[contrat.premierTypeVehicule] ?? contrat.premierTypeVehicule
+    : "-";
 }
 
-function productLabel(contrat: ContratSummary) {
+function productLabel(contrat: ContratListItem) {
   if (contrat.typeContrat === "PARTICULIER") return "Mono";
   if (contrat.typeContrat === "FLOTTE") return "Flotte";
   return "Convention";
 }
 
-function companyLabel(contrat: ContratSummary, companyMap: Map<string, ReferenceOption>) {
-  const company = contrat.compagnieAssuranceId ? companyMap.get(String(contrat.compagnieAssuranceId)) : undefined;
-  return String(company?.code ?? company?.libelle ?? contrat.compagnieAssuranceId ?? "-");
+function companyLabel(contrat: ContratListItem) {
+  return String(contrat.compagnieCode ?? contrat.compagnieLibelle ?? contrat.compagnieAssuranceId ?? "-");
 }
 
-function conventionLabel(contrat: ContratSummary, conventionMap: Map<string, ReferenceOption>) {
+function conventionLabel(contrat: ContratListItem) {
   if (contrat.typeContrat !== "CONVENTION" || !contrat.conventionId) return undefined;
-  const convention = conventionMap.get(String(contrat.conventionId));
-  return convention?.libelle ? String(convention.libelle) : undefined;
+  return contrat.conventionLibelle ?? contrat.conventionCode ?? undefined;
 }
 
-function eventLabel(contrat: ContratSummary, movement: MovementLine) {
+function eventLabel(contrat: ContratListItem, movement: MovementLine) {
   if (movement.libelle) return titleCaseMovement(movement.libelle);
   if (contrat.contratOrigineId) return "Renouvellement";
   return "Affaire nouvelle";
 }
 
-function statusLabel(contrat: ContratSummary, movement: MovementLine) {
+function statusLabel(contrat: ContratListItem, movement: MovementLine) {
   if (movement.code?.toUpperCase().startsWith("RES")) return "RESILIE";
   return movement.statut ?? contrat.statut;
 }
 
-function TypeBadge({ type }: { type: ContratSummary["typeContrat"] }) {
+function TypeBadge({ type }: { type: ContratListItem["typeContrat"] }) {
   const label = type === "PARTICULIER" ? "P" : type === "FLOTTE" ? "F" : "C";
   const className = type === "PARTICULIER"
     ? "bg-sky-600 text-white hover:bg-sky-600"
@@ -976,10 +857,6 @@ function dateRank(value?: string | null) {
 function numericRank(value?: string | number | null) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function includesNormalized(value: unknown, search: string) {
-  return normalize(value).includes(normalize(search));
 }
 
 function normalize(value: unknown) {

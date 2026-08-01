@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { pricingApi } from "../api/pricing";
+import { referenceApi } from "../api/references";
 import { MoneyInput } from "./MoneyInput";
 import { numberValue, text, toNumber } from "../utils/format";
 import type {
@@ -55,13 +56,13 @@ export function GrilleTarifaireConfigurator({
 
   const lignes = useQuery({
     queryKey: ["lignes-grille", queryScope, grille.id],
-    queryFn: () => productionApi.lignesGrille({ grilleId: grille.id }),
+    queryFn: () => referenceApi.pricingLines({ grilleId: grille.id }),
     enabled: Boolean(grille.id),
   });
 
   const formules = useQuery({
     queryKey: ["formules-garantie-personne", queryScope, grille.id],
-    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: grille.id }),
+    queryFn: () => referenceApi.personGuaranteeFormulas({ grilleId: grille.id }),
     enabled: Boolean(grille.id),
   });
 
@@ -137,7 +138,7 @@ export function GrilleTarifaireConfigurator({
 
   const saveConfiguration = useMutation({
     mutationFn: (payload: UpsertGrilleUsageConfigurationRequest) =>
-      productionApi.replaceGrilleUsageConfiguration(grille.id, activeUsageId, payload),
+      pricingApi.replaceUsageConfiguration(grille.id, activeUsageId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["lignes-grille"] });
       await queryClient.invalidateQueries({ queryKey: ["formules-garantie-personne"] });
@@ -825,7 +826,7 @@ function hasRequiredPricing(draft: MatrixLine, garantie?: ReferenceOption) {
 
 function isConfigurableVehicleGarantie(garantie: ReferenceOption) {
   return text(garantie.typeGarantie) !== "PERSONNE"
-    && !Boolean(garantie.responsabiliteCivile);
+    && !garantie.responsabiliteCivile;
 }
 
 function canAddMultipleRows(garantie?: ReferenceOption, mode?: string) {

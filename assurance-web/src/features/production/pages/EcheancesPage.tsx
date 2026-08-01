@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownAZ, Download, Eye, MoreHorizontal, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   DropdownMenu,
@@ -13,16 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { productionApi } from "../api";
+import { downloadBlob } from "@/lib/download";
+import { contractKeys, referenceKeys } from "@/lib/query-keys";
+import { contractApi } from "../api/contracts";
+import { referenceApi } from "../api/references";
 import { toDateOnly } from "../date";
 import type { EcheanceAutomobileRow, TypeContrat } from "../types";
 
@@ -55,12 +51,12 @@ const DEFAULT_FILTERS: EcheanceFilters = {
 const PAGE_SIZE = 25;
 
 export default function EcheancesPage() {
-  const [urlParams] = useSearchParams();
+  const [urlParams, setUrlParams] = useSearchParams();
   const initialState = useMemo(() => initialEcheanceState(urlParams), [urlParams]);
   const [filters, setFilters] = useState<EcheanceFilters>(initialState.filters);
   const [appliedFilters, setAppliedFilters] = useState<EcheanceFilters>(initialState.filters);
   const [searched, setSearched] = useState(initialState.searched);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(initialState.page);
   const [exporting, setExporting] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
     key: "dateEcheance",
@@ -68,8 +64,8 @@ export default function EcheancesPage() {
   });
 
   const companies = useQuery({
-    queryKey: ["referentiel", "compagnies-assurance", "echeances"],
-    queryFn: () => productionApi.referentiel("compagnies-assurance"),
+    queryKey: referenceKeys.list("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
   });
 
   const searchParams = useMemo(() => {
@@ -80,12 +76,12 @@ export default function EcheancesPage() {
   }, [appliedFilters, page, searched]);
 
   const echeances = useQuery({
-    queryKey: ["echeances", "automobile", searchParams],
+    queryKey: contractKeys.dueDates(searchParams),
     queryFn: () => {
       if (!searchParams) {
         throw new Error("Parametres echeances manquants");
       }
-      return productionApi.searchEcheancesAutomobile(searchParams);
+      return contractApi.searchEcheancesAutomobile(searchParams);
     },
     enabled: Boolean(searchParams),
   });
@@ -101,6 +97,7 @@ export default function EcheancesPage() {
     setAppliedFilters(filters);
     setPage(0);
     setSearched(true);
+    setUrlParams(toUrlParams(filters, 0), { replace: true });
   }
 
   function resetSearch() {
@@ -108,6 +105,12 @@ export default function EcheancesPage() {
     setAppliedFilters(DEFAULT_FILTERS);
     setPage(0);
     setSearched(false);
+    setUrlParams(new URLSearchParams(), { replace: true });
+  }
+
+  function goToPage(nextPage: number) {
+    setPage(nextPage);
+    setUrlParams(toUrlParams(appliedFilters, nextPage), { replace: true });
   }
 
   function updateSort(key: SortKey) {
@@ -123,7 +126,7 @@ export default function EcheancesPage() {
     }
     setExporting(true);
     try {
-      const blob = await productionApi.exportEcheancesAutomobile(toSearchParams(appliedFilters));
+      const blob = await contractApi.exportEcheancesAutomobile(toSearchParams(appliedFilters));
       downloadBlob(blob, `echeances-automobile-${searchParams.dateDu}-${searchParams.dateAu}.xls`);
     } catch (error) {
       console.error("Export des echeances impossible", error);
@@ -144,19 +147,19 @@ export default function EcheancesPage() {
         </div>
         <CardContent className="grid gap-4 p-5">
           <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_1.3fr_auto_auto]">
-            <FilterField label="Date du">
+            <FilterField label="Date du" tone="emerald">
               <DatePicker
                 date={filters.dateDu}
                 onSelect={(date) => setFilters((current) => ({ ...current, dateDu: toDateOnly(date) }))}
               />
             </FilterField>
-            <FilterField label="Date au">
+            <FilterField label="Date au" tone="emerald">
               <DatePicker
                 date={filters.dateAu}
                 onSelect={(date) => setFilters((current) => ({ ...current, dateAu: toDateOnly(date) }))}
               />
             </FilterField>
-            <FilterField label="Compagnie">
+            <FilterField label="Compagnie" tone="emerald">
               <Select
                 value={filters.compagnieId}
                 onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}
@@ -170,7 +173,7 @@ export default function EcheancesPage() {
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label="Type contrat">
+            <FilterField label="Type contrat" tone="emerald">
               <Select
                 value={filters.typeContrat}
                 onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as EcheanceFilters["typeContrat"] }))}
@@ -184,7 +187,7 @@ export default function EcheancesPage() {
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label="RC / CIN / Nom">
+            <FilterField label="RC / CIN / Nom" tone="emerald">
               <Input
                 value={filters.search}
                 onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
@@ -266,11 +269,7 @@ export default function EcheancesPage() {
                 </thead>
                 <tbody>
                   {echeances.isLoading ? (
-                    <tr>
-                      <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
-                        Chargement des échéances...
-                      </td>
-                    </tr>
+                    <TableRowsSkeleton rows={8} colSpan={11} />
                   ) : echeances.isError ? (
                     <tr>
                       <td colSpan={11} className="px-3 py-8 text-center text-red-600">
@@ -289,55 +288,19 @@ export default function EcheancesPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-muted-foreground">
-                Page {currentPage + 1} / {totalPages}
-              </div>
-              <Pagination className="mx-0 w-auto justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        setPage((current) => Math.max(0, current - 1));
-                      }}
-                      aria-disabled={currentPage <= 0 || echeances.isLoading}
-                      className={currentPage <= 0 || echeances.isLoading ? "pointer-events-none opacity-50" : undefined}
-                    />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <span className="flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium">
-                      {currentPage + 1}
-                    </span>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        setPage((current) => Math.min(totalPages - 1, current + 1));
-                      }}
-                      aria-disabled={currentPage >= totalPages - 1 || echeances.isLoading}
-                      className={currentPage >= totalPages - 1 || echeances.isLoading ? "pointer-events-none opacity-50" : undefined}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+            <ServerPagination
+              page={currentPage}
+              totalPages={totalPages}
+              loading={echeances.isLoading}
+              showCurrentPage
+              className="border-t px-4 py-3"
+              labelClassName="text-xs"
+              onPageChange={goToPage}
+            />
           </CardContent>
         </Card>
       ) : null}
     </div>
-  );
-}
-
-function FilterField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="grid gap-1.5 text-xs font-semibold uppercase text-emerald-950 dark:text-emerald-100">
-      <span>{label}</span>
-      {children}
-    </label>
   );
 }
 
@@ -405,6 +368,7 @@ function toSearchParams(filters: EcheanceFilters): EcheanceSearchParams {
 function initialEcheanceState(params: URLSearchParams): {
   filters: EcheanceFilters;
   searched: boolean;
+  page: number;
 } {
   const filters: EcheanceFilters = {
     dateDu: params.get("dateDu") ?? undefined,
@@ -416,7 +380,24 @@ function initialEcheanceState(params: URLSearchParams): {
   return {
     filters,
     searched: Boolean(filters.dateDu && filters.dateAu),
+    page: positivePageIndex(params.get("page")),
   };
+}
+
+function toUrlParams(filters: EcheanceFilters, page: number) {
+  const params = new URLSearchParams();
+  if (filters.dateDu) params.set("dateDu", filters.dateDu);
+  if (filters.dateAu) params.set("dateAu", filters.dateAu);
+  if (filters.compagnieId !== "ALL") params.set("compagnieId", filters.compagnieId);
+  if (filters.typeContrat !== "ALL") params.set("typeContrat", filters.typeContrat);
+  if (filters.search.trim()) params.set("search", filters.search.trim());
+  if (page > 0) params.set("page", String(page + 1));
+  return params;
+}
+
+function positivePageIndex(value: string | null) {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(page) && page > 0 ? page - 1 : 0;
 }
 
 function toTypeContratFilter(value: string | null): EcheanceFilters["typeContrat"] {
@@ -450,15 +431,4 @@ function formatDateIso(value?: string | null) {
 
 function text(value?: string | null) {
   return value?.trim() || "-";
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }

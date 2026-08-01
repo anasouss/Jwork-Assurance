@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { assistanceProductApi } from "../api/assistance-products";
+import { referenceApi } from "../api/references";
 import { Field } from "../components/Field";
 import type { ReferenceOption, UpsertCompagnieAssistanceRequest } from "../types";
 
@@ -30,7 +31,7 @@ export default function AssistanceSettingsPage() {
 
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assistance", "settings"],
-    queryFn: () => productionApi.referentiel("compagnies-assistance", { includeInactive: "true" }),
+    queryFn: () => referenceApi.list("compagnies-assistance", { includeInactive: "true" }),
     staleTime: 60_000,
   });
 
@@ -50,7 +51,7 @@ export default function AssistanceSettingsPage() {
 
   const saveCompany = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertCompagnieAssistanceRequest }) =>
-      id ? productionApi.updateCompagnieAssistance(id, value) : productionApi.createCompagnieAssistance(value),
+      id ? assistanceProductApi.updateCompany(id, value) : assistanceProductApi.createCompany(value),
     onSuccess: async () => {
       setCompanyDialogOpen(false);
       setEditingCompany(null);
@@ -61,7 +62,7 @@ export default function AssistanceSettingsPage() {
   });
 
   const deleteCompany = useMutation({
-    mutationFn: (id: string) => productionApi.deleteCompagnieAssistance(id),
+    mutationFn: (id: string) => assistanceProductApi.deleteCompany(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "compagnies-assistance"] });
       toast.success("Compagnie d'assistance désactivée");

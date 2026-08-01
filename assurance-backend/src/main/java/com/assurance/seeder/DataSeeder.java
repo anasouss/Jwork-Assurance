@@ -28,6 +28,21 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
+    private static final Set<String> OPERATIONAL_ADMIN_PERMISSION_CODES = Set.of(
+            "avenant:view",
+            "avenant:create",
+            "avenant:draft",
+            "avenant:rectify",
+            "avenant:delete",
+            "client:view",
+            "client:create",
+            "client:manage",
+            "vehicule:view",
+            "attestation-stock:view",
+            "attestation-stock:manage",
+            "attestation-stock:cancel"
+    );
+
     private final PermissionRepository permissionRepository;
     private final RoleRepository roleRepository;
     private final AgenceRepository agenceRepository;
@@ -71,6 +86,7 @@ public class DataSeeder implements CommandLineRunner {
                 "referentiel"
         );
         grantReferentielPermissionsToAdministrators(referentielView, referentielManage);
+        grantOperationalPermissionsToAdministrators();
         if (hasBootstrapData()) {
             return;
         }
@@ -279,6 +295,7 @@ public class DataSeeder implements CommandLineRunner {
                         .actif(true)
                         .build()
         ));
+        grantOperationalPermissionsToAdministrators();
     }
 
     private void normalizePlatformAdministrators() {
@@ -305,6 +322,28 @@ public class DataSeeder implements CommandLineRunner {
         for (Role role : administratorRoles) {
             changed |= role.getPermissions().add(view);
             changed |= role.getPermissions().add(manage);
+        }
+        if (changed) {
+            roleRepository.saveAll(administratorRoles);
+        }
+    }
+
+    private void grantOperationalPermissionsToAdministrators() {
+        Set<Permission> permissions = permissionRepository.findAll().stream()
+                .filter(permission -> OPERATIONAL_ADMIN_PERMISSION_CODES.contains(permission.getCode()))
+                .collect(java.util.stream.Collectors.toSet());
+        if (permissions.size() != OPERATIONAL_ADMIN_PERMISSION_CODES.size()) {
+            throw new IllegalStateException("Operational permissions are incomplete");
+        }
+
+        List<Role> administratorRoles = roleRepository.findAll().stream()
+                .filter(role -> Boolean.TRUE.equals(role.getSystemRole()))
+                .filter(role -> "SUPER_ADMIN".equalsIgnoreCase(role.getCode())
+                        || "AGENCY_ADMIN".equalsIgnoreCase(role.getCode()))
+                .toList();
+        boolean changed = false;
+        for (Role role : administratorRoles) {
+            changed |= role.getPermissions().addAll(permissions);
         }
         if (changed) {
             roleRepository.saveAll(administratorRoles);

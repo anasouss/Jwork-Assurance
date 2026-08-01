@@ -8,7 +8,6 @@ import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.AvenantDetailResponse;
-import com.assurance.dto.response.AvenantDraftSummaryResponse;
 import com.assurance.dto.response.ClientResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
@@ -41,7 +40,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -1734,53 +1732,6 @@ public class ContratService {
                 .tauxFranchise(montants.tauxFranchise())
                 .franchiseMinimale(montants.franchiseMinimale())
                 .build());
-    }
-
-    @Transactional
-    public List<ContratResponse> list(Long agenceId) {
-        Map<Long, List<AvenantDraftSummaryResponse>> draftsByContrat = avenantDraftService.listSummaries(agenceId).stream()
-                .collect(java.util.stream.Collectors.groupingBy(AvenantDraftSummaryResponse::getContratId));
-        return contratRepository.findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(agenceId).stream()
-                .map(this::ensureNumeroDossier)
-                .sorted(Comparator.<Contrat, LocalDateTime>comparing(
-                        contrat -> latestContratActivityAt(contrat, draftsByContrat.getOrDefault(contrat.getId(), List.of())),
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                ).reversed())
-                .map(contrat -> {
-                    ContratResponse response = toListResponse(contrat);
-                    response.setAvenantDrafts(draftsByContrat.getOrDefault(contrat.getId(), List.of()));
-                    return response;
-                })
-                .toList();
-    }
-
-    private LocalDateTime latestContratActivityAt(
-            Contrat contrat,
-            List<AvenantDraftSummaryResponse> drafts
-    ) {
-        LocalDateTime latestMouvement = (contrat.getMouvements() == null ? List.<MouvementContrat>of() : contrat.getMouvements()).stream()
-                .map(MouvementContrat::getCreatedAt)
-                .filter(java.util.Objects::nonNull)
-                .max(Comparator.naturalOrder())
-                .orElse(null);
-        LocalDateTime latestDraft = drafts.stream()
-                .map(AvenantDraftSummaryResponse::getUpdatedAt)
-                .filter(java.util.Objects::nonNull)
-                .max(Comparator.naturalOrder())
-                .orElse(null);
-        return java.util.stream.Stream.of(contrat.getCreatedAt(), latestMouvement, latestDraft)
-                .filter(java.util.Objects::nonNull)
-                .max(Comparator.naturalOrder())
-                .orElse(null);
-    }
-
-    @Transactional
-    public List<ContratResponse> listProspections(Long agenceId) {
-        return contratRepository.findByAgenceIdAndProspectionTrueAndTypeContratOrderByCreatedAtDesc(agenceId, TypeContrat.FLOTTE).stream()
-                .map(this::ensureNumeroDevis)
-                .map(this::ensureNumeroDossier)
-                .map(this::toListResponse)
-                .toList();
     }
 
     @Transactional

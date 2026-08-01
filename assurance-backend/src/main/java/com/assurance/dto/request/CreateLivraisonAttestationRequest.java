@@ -14,8 +14,6 @@ import java.util.List;
 @Setter
 public class CreateLivraisonAttestationRequest {
 
-    private Long agenceId;
-
     @NotNull
     private Long compagnieAssuranceId;
 

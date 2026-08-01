@@ -4,6 +4,7 @@ import com.assurance.entity.AvenantDraft;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface AvenantDraftRepository extends JpaRepository<AvenantDraft, Long> {
@@ -15,6 +16,8 @@ public interface AvenantDraftRepository extends JpaRepository<AvenantDraft, Long
     );
 
     List<AvenantDraft> findByAgenceIdOrderByUpdatedAtDesc(Long agenceId);
+
+    List<AvenantDraft> findByAgenceIdAndContratIdInOrderByUpdatedAtDesc(Long agenceId, Collection<Long> contratIds);
 
     void deleteByContratId(Long contratId);
 

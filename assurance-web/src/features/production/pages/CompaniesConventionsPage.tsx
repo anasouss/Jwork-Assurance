@@ -20,7 +20,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { pricingApi } from "../api/pricing";
+import { referenceApi } from "../api/references";
+import { referenceAdminApi } from "../api/reference-admin";
 import { Field } from "../components/Field";
 import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { GrilleTarifaireDialog } from "../components/GrilleTarifaireDialog";
@@ -42,45 +44,45 @@ export default function CompaniesConventionsPage() {
 
   const compagnies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
-    queryFn: () => productionApi.referentiel("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
     staleTime: 60_000,
   });
 
   const categories = useQuery({
     queryKey: ["referentiel", "categories-client"],
-    queryFn: () => productionApi.referentiel("categories-client"),
+    queryFn: () => referenceApi.list("categories-client"),
     staleTime: 60_000,
   });
 
   const usages = useQuery({
     queryKey: ["referentiel", "usages"],
-    queryFn: () => productionApi.referentiel("usages"),
+    queryFn: () => referenceApi.list("usages"),
     staleTime: 60_000,
   });
 
   const garanties = useQuery({
     queryKey: ["referentiel", "garanties"],
-    queryFn: () => productionApi.referentiel("garanties"),
+    queryFn: () => referenceApi.list("garanties"),
     staleTime: 60_000,
   });
 
   const categoriesTransport = useQuery({
     queryKey: ["referentiel", "categories-transport"],
-    queryFn: () => productionApi.referentiel("categories-transport"),
+    queryFn: () => referenceApi.list("categories-transport"),
     staleTime: 60_000,
   });
 
   const grilles = useQuery({
     queryKey: ["referentiel", "grilles-tarifaires", payload.compagnieAssuranceId],
     queryFn: () => payload.compagnieAssuranceId
-      ? productionApi.referentiel("grilles-tarifaires", { compagnieAssuranceId: payload.compagnieAssuranceId })
+      ? referenceApi.list("grilles-tarifaires", { compagnieAssuranceId: payload.compagnieAssuranceId })
       : Promise.resolve([]),
     staleTime: 60_000,
   });
 
   const conventions = useQuery({
     queryKey: ["referentiel", "conventions"],
-    queryFn: () => productionApi.referentiel("conventions"),
+    queryFn: () => referenceApi.list("conventions"),
     staleTime: 60_000,
   });
 
@@ -123,7 +125,7 @@ export default function CompaniesConventionsPage() {
 
   const saveConvention = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertConventionRequest }) =>
-      id ? productionApi.updateConvention(id, value) : productionApi.createConvention(value),
+      id ? referenceAdminApi.updateConvention(id, value) : referenceAdminApi.createConvention(value),
     onSuccess: async () => {
       setDialogOpen(false);
       setEditing(null);
@@ -134,7 +136,7 @@ export default function CompaniesConventionsPage() {
   });
 
   const saveGrille = useMutation({
-    mutationFn: (value: UpsertGrilleTarifaireRequest) => productionApi.createGrilleTarifaire(value),
+    mutationFn: (value: UpsertGrilleTarifaireRequest) => pricingApi.createGrid(value),
     onSuccess: async (grille) => {
       setGrilleDialogOpen(false);
       setPayload((current) => ({ ...current, grilleTarifaireId: grille.id }));

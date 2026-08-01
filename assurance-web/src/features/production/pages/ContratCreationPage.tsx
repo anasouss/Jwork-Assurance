@@ -5,7 +5,8 @@ import { ArrowRight, Building2, Car, FilePlus2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { productionApi } from "../api";
+import { contractCreationApi } from "../api/contract-creation";
+import { referenceApi } from "../api/references";
 import { Field } from "../components/Field";
 import { useContratCreationForm } from "../contrat-creation/useContratCreationForm";
 import type { TypeContrat } from "../types";
@@ -35,13 +36,13 @@ export default function ContratCreationPage() {
   const shouldCheckConventionGrille = typeContrat === "CONVENTION" && Boolean(assignedGrilleId && form.usageId);
   const conventionGrilleLines = useQuery({
     queryKey: ["entry-convention-grille-lines", assignedGrilleId, form.usageId],
-    queryFn: () => productionApi.lignesGrille({ grilleId: assignedGrilleId, usageId: form.usageId }),
+    queryFn: () => referenceApi.pricingLines({ grilleId: assignedGrilleId, usageId: form.usageId }),
     enabled: shouldCheckConventionGrille,
     staleTime: 60_000,
   });
   const conventionPersonneFormules = useQuery({
     queryKey: ["entry-convention-personne-formules", assignedGrilleId, form.usageId],
-    queryFn: () => productionApi.formulesGarantiePersonne({ grilleId: assignedGrilleId, usageId: form.usageId }),
+    queryFn: () => referenceApi.personGuaranteeFormulas({ grilleId: assignedGrilleId, usageId: form.usageId }),
     enabled: shouldCheckConventionGrille,
     staleTime: 60_000,
   });
@@ -65,7 +66,7 @@ export default function ContratCreationPage() {
     (typeContrat !== "CONVENTION" || Boolean(form.compagnieAssuranceId && form.conventionId && form.usageId && !conventionStartBlockedReason));
 
   const createDraftMutation = useMutation({
-    mutationFn: productionApi.createContratDraft,
+    mutationFn: contractCreationApi.createContratDraft,
     onSuccess: (draft) => {
       if (prospectionMode) {
         navigate(`/app/production/prospection/devis/flotte/${draft.id}`);

@@ -1,21 +1,12 @@
-import { Fragment, useMemo, useState } from "react";
-import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState, type ReactNode } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FilePlus2, LifeBuoy, MoreHorizontal, Pencil, Search, ShieldCheck, X } from "lucide-react";
-import { toast } from "sonner";
+import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,145 +14,61 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { productionApi } from "../api";
-import { AttestationNumberInput } from "../components/AttestationNumberInput";
+import { contractKeys, referenceKeys } from "@/lib/query-keys";
+import { contractApi } from "../api/contracts";
+import { referenceApi } from "../api/references";
+import { ProspectionConversionDialog } from "../components/prospections/ProspectionConversionDialog";
+import { ProspectionPdfDialog } from "../components/prospections/ProspectionPdfDialog";
 import { Field } from "../components/Field";
 import { toDateOnly } from "../date";
-import type { AssistanceContrat, ContratSummary, ReferenceOption } from "../types";
-
-type Filters = {
-  compagnieId: "ALL" | string;
-  du?: string;
-  au?: string;
-  codeClient: string;
-  numeroDevis: string;
-};
-
-type DevisScope = "all" | "vehicles" | "usages";
-
-const DEFAULT_FILTERS: Filters = {
-  compagnieId: "ALL",
-  codeClient: "",
-  numeroDevis: "",
-};
+import {
+  DEFAULT_PROSPECTION_FILTERS,
+  prospectionFiltersFromSearchParams,
+  prospectionPageFromSearchParams,
+  prospectionSearchParams,
+  type ProspectionFilters,
+} from "../prospections/prospection-filters";
+import type { ContratListItem } from "../types";
 
 export default function ProspectionPage() {
   const queryClient = useQueryClient();
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [pdfTarget, setPdfTarget] = useState<ContratSummary | null>(null);
-  const [pdfScope, setPdfScope] = useState<DevisScope>("all");
-  const [selectedVehicules, setSelectedVehicules] = useState<string[]>([]);
-  const [selectedUsages, setSelectedUsages] = useState<string[]>([]);
-  const [convertTarget, setConvertTarget] = useState<ContratSummary | null>(null);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [numeroPolice, setNumeroPolice] = useState("");
-  const [attestations, setAttestations] = useState<Record<string, string>>({});
-  const [assistanceRefs, setAssistanceRefs] = useState<Record<string, string>>({});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [initialFilters] = useState(() => prospectionFiltersFromSearchParams(searchParams));
+  const [filters, setFilters] = useState<ProspectionFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<ProspectionFilters>(initialFilters);
+  const [page, setPage] = useState(() => prospectionPageFromSearchParams(searchParams));
+  const [pdfTargetId, setPdfTargetId] = useState<string | null>(null);
+  const [convertTargetId, setConvertTargetId] = useState<string | null>(null);
 
-  const prospections = useQuery({ queryKey: ["prospections"], queryFn: productionApi.listProspections });
+  const listParams = useMemo(() => ({
+    compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
+    dateDu: appliedFilters.du,
+    dateAu: appliedFilters.au,
+    search: appliedFilters.codeClient.trim() || undefined,
+    numeroDevis: appliedFilters.numeroDevis.trim() || undefined,
+    page,
+    size: 25,
+  }), [appliedFilters, page]);
+  const prospections = useQuery({
+    queryKey: contractKeys.prospections(listParams),
+    queryFn: () => contractApi.listProspections(listParams),
+    placeholderData: (previous) => previous,
+  });
   const companies = useQuery({
-    queryKey: ["referentiel", "compagnies-assurance", "prospections"],
-    queryFn: () => productionApi.referentiel("compagnies-assurance"),
+    queryKey: referenceKeys.list("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
   });
   const usages = useQuery({
-    queryKey: ["referentiel", "usages", "prospections"],
-    queryFn: () => productionApi.referentiel("usages"),
-  });
-  const assistanceContext = useQuery({
-    queryKey: ["prospection-assistances", convertTarget?.id],
-    queryFn: () => productionApi.getAssistanceContext(convertTarget!.id),
-    enabled: Boolean(convertTarget),
+    queryKey: referenceKeys.list("usages"),
+    queryFn: () => referenceApi.list("usages"),
   });
 
-  const companyMap = useMemo(() => optionMap(companies.data), [companies.data]);
-  const rows = useMemo(
-    () => (prospections.data ?? []).filter((contrat) => matchesFilters(contrat, appliedFilters, companyMap)),
-    [appliedFilters, companyMap, prospections.data]
-  );
-  const usageOptions = useMemo(() => uniqueUsages(pdfTarget), [pdfTarget]);
-
-  const convertMutation = useMutation({
-    mutationFn: () => {
-      if (!convertTarget) {
-        throw new Error("Aucun devis sélectionné");
-      }
-      return productionApi.convertProspection(convertTarget.id, {
-        numeroPolice,
-        vehicules: (convertTarget.vehicules ?? []).map((vehicule) => ({
-          vehiculeId: vehicule.vehiculeId,
-          numeroAttestation: attestations[`vehicule-${vehicule.vehiculeId}`],
-        })),
-        remorques: (convertTarget.remorques ?? []).map((remorque) => ({
-          remorqueId: remorque.remorqueId,
-          numeroAttestation: attestations[`remorque-${remorque.remorqueId}`],
-        })),
-        assistances: (assistanceContext.data?.assistances ?? []).map((assistance) => ({
-          assistanceId: assistance.id,
-          numeroContratOuQuittance: assistanceRefs[assistance.id],
-        })),
-      });
-    },
-    onSuccess: async () => {
-      toast.success("Devis converti en contrat");
-      setConvertTarget(null);
-      await queryClient.invalidateQueries({ queryKey: ["prospections"] });
-      await queryClient.invalidateQueries({ queryKey: ["contrats"] });
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Conversion impossible"),
-  });
-
-  const openPdfModal = (contrat: ContratSummary) => {
-    setPdfTarget(contrat);
-    setPdfScope("all");
-    setSelectedVehicules([]);
-    setSelectedUsages([]);
-  };
-
-  const generatePdf = async () => {
-    if (!pdfTarget) return;
-    if (pdfScope === "vehicles" && selectedVehicules.length === 0) {
-      toast.error("Sélectionnez au moins un véhicule");
-      return;
-    }
-    if (pdfScope === "usages" && selectedUsages.length === 0) {
-      toast.error("Sélectionnez au moins un usage");
-      return;
-    }
-    const previewWindow = window.open("about:blank", "_blank");
-    if (!previewWindow) {
-      toast.error("Autorisez les popups pour ouvrir le PDF dans un nouvel onglet");
-      return;
-    }
-    setGeneratingPdf(true);
-    try {
-      const blob = await productionApi.downloadDevisPdf(pdfTarget.id, {
-        vehiculeIds: pdfScope === "vehicles" ? selectedVehicules : undefined,
-        usageIds: pdfScope === "usages" ? selectedUsages : undefined,
-      });
-      const url = URL.createObjectURL(blob);
-      previewWindow.location.href = url;
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast.success("PDF ouvert");
-    } catch (error) {
-      previewWindow?.close();
-      toast.error(error instanceof Error ? error.message : "Génération du PDF impossible");
-    } finally {
-      setGeneratingPdf(false);
-    }
-  };
-
-  const openConvertModal = (contrat: ContratSummary) => {
-    setConvertTarget(contrat);
-    setNumeroPolice(contrat.numeroPolice ?? "");
-    setAttestations(Object.fromEntries([
-      ...(contrat.vehicules ?? []).map((vehicule) => [`vehicule-${vehicule.vehiculeId}`, vehicule.numeroAttestation ?? ""] as const),
-      ...(contrat.remorques ?? []).map((remorque) => [`remorque-${remorque.remorqueId}`, remorque.numeroAttestation ?? ""] as const),
-    ]));
-    setAssistanceRefs({});
+  const applyFilters = (next: ProspectionFilters) => {
+    setPage(0);
+    setAppliedFilters(next);
+    setSearchParams(prospectionSearchParams(next, 0), { replace: true });
   };
 
   return (
@@ -207,7 +114,7 @@ export default function ProspectionPage() {
               <Input value={filters.numeroDevis} onChange={(event) => setFilters((current) => ({ ...current, numeroDevis: event.target.value }))} />
             </Field>
             <div className="flex items-end gap-2">
-              <Button type="button" className="h-9 px-4" onClick={() => setAppliedFilters(filters)}>
+              <Button type="button" className="h-9 px-4" onClick={() => applyFilters(filters)}>
                 <Search className="size-4" />
               </Button>
               <Button
@@ -216,8 +123,8 @@ export default function ProspectionPage() {
                 size="icon"
                 className="h-9 w-9"
                 onClick={() => {
-                  setFilters(DEFAULT_FILTERS);
-                  setAppliedFilters(DEFAULT_FILTERS);
+                  setFilters(DEFAULT_PROSPECTION_FILTERS);
+                  applyFilters(DEFAULT_PROSPECTION_FILTERS);
                 }}
               >
                 <X className="size-4" />
@@ -246,15 +153,14 @@ export default function ProspectionPage() {
               </thead>
               <tbody>
                 {prospections.isLoading ? (
-                  <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Chargement des devis...</td></tr>
-                ) : rows.length ? (
-                  rows.map((contrat) => (
+                  <TableRowsSkeleton rows={6} colSpan={9} />
+                ) : prospections.data?.items.length ? (
+                  prospections.data.items.map((contrat) => (
                     <ProspectionRow
                       key={contrat.id}
                       contrat={contrat}
-                      companyLabel={companyLabel(contrat, companyMap)}
-                      onDownload={() => openPdfModal(contrat)}
-                      onConvert={() => openConvertModal(contrat)}
+                      onDownload={() => setPdfTargetId(contrat.id)}
+                      onConvert={() => setConvertTargetId(contrat.id)}
                     />
                   ))
                 ) : (
@@ -263,101 +169,52 @@ export default function ProspectionPage() {
               </tbody>
             </table>
           </div>
+          <ServerPagination
+            className="border-t px-4 py-3"
+            page={prospections.data?.page.number ?? page}
+            totalPages={prospections.data?.page.totalPages ?? 1}
+            totalElements={prospections.data?.page.totalElements}
+            loading={prospections.isFetching}
+            onPageChange={(nextPage) => {
+              setPage(nextPage);
+              setSearchParams(prospectionSearchParams(appliedFilters, nextPage), { replace: true });
+            }}
+          />
         </CardContent>
       </Card>
 
-      <Dialog open={Boolean(pdfTarget)} onOpenChange={(open) => !open && setPdfTarget(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Télécharger devis flotte</DialogTitle>
-          </DialogHeader>
-          <RadioGroup value={pdfScope} onValueChange={(value) => setPdfScope(value as DevisScope)}>
-            <RadioOption value="all" label="Tous les véhicules" />
-            <RadioOption value="vehicles" label="Véhicules spécifiques" />
-            {pdfScope === "vehicles" ? (
-              <Checklist
-                emptyText="Aucun véhicule."
-                items={(pdfTarget?.vehicules ?? []).map((vehicule) => ({
-                  id: vehicule.vehiculeId,
-                  label: vehicleLabel(vehicule),
-                }))}
-                values={selectedVehicules}
-                onChange={setSelectedVehicules}
-              />
-            ) : null}
-            <RadioOption value="usages" label="Usages spécifiques" />
-            {pdfScope === "usages" ? (
-              <Checklist emptyText="Aucun usage." items={usageOptions} values={selectedUsages} onChange={setSelectedUsages} />
-            ) : null}
-          </RadioGroup>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPdfTarget(null)}>Annuler</Button>
-            <Button type="button" onClick={generatePdf} disabled={generatingPdf}>
-              {generatingPdf ? "Génération..." : "Générer le PDF"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={Boolean(convertTarget)} onOpenChange={(open) => !open && setConvertTarget(null)}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Convertir en contrat</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="N° devis">
-                <Input value={convertTarget?.numeroDevis ?? convertTarget?.numeroPolice ?? ""} readOnly />
-              </Field>
-              <Field label="N° police" required>
-                <Input value={numeroPolice} onChange={(event) => setNumeroPolice(event.target.value)} />
-              </Field>
-            </div>
-            {(assistanceContext.data?.assistances ?? []).length ? (
-              <div className="grid gap-2">
-                <div className="text-sm font-semibold uppercase text-blue-700">Contrats assistance</div>
-                {(assistanceContext.data?.assistances ?? []).map((assistance) => (
-                  <Field key={assistance.id} label={assistanceLabel(assistance)} required>
-                    <Input
-                      value={assistanceRefs[assistance.id] ?? assistance.numeroContratOuQuittance ?? ""}
-                      onChange={(event) => setAssistanceRefs((current) => ({ ...current, [assistance.id]: event.target.value }))}
-                      placeholder="N contrat assistance"
-                    />
-                  </Field>
-                ))}
-              </div>
-            ) : null}
-            <div className="grid gap-2">
-              <div className="text-sm font-semibold uppercase text-blue-700">Numéros d'attestation par véhicule</div>
-              <AttestationInputs
-                contrat={convertTarget}
-                values={attestations}
-                onChange={setAttestations}
-                compagnies={companies.data ?? []}
-                usages={usages.data ?? []}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setConvertTarget(null)}>Annuler</Button>
-            <Button type="button" onClick={() => convertMutation.mutate()} disabled={convertMutation.isPending}>
-              {convertMutation.isPending ? "Conversion..." : "Convertir"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProspectionPdfDialog
+        key={pdfTargetId ?? "closed-pdf"}
+        contratId={pdfTargetId}
+        open={Boolean(pdfTargetId)}
+        onOpenChange={(open) => {
+          if (!open) setPdfTargetId(null);
+        }}
+      />
+      <ProspectionConversionDialog
+        key={convertTargetId ?? "closed-conversion"}
+        contratId={convertTargetId}
+        open={Boolean(convertTargetId)}
+        compagnies={companies.data ?? []}
+        usages={usages.data ?? []}
+        onOpenChange={(open) => {
+          if (!open) setConvertTargetId(null);
+        }}
+        onConverted={async () => {
+          setConvertTargetId(null);
+          await queryClient.invalidateQueries({ queryKey: contractKeys.all });
+        }}
+      />
     </div>
   );
 }
 
 function ProspectionRow({
   contrat,
-  companyLabel,
   onDownload,
   onConvert,
 }: {
-  contrat: ContratSummary;
-  companyLabel: string;
+  contrat: ContratListItem;
   onDownload: () => void;
   onConvert: () => void;
 }) {
@@ -368,7 +225,7 @@ function ProspectionRow({
       <Cell className="text-center uppercase">{clientCode(contrat)}</Cell>
       <Cell className="uppercase">{mainClient(contrat)}</Cell>
       <Cell className="text-center uppercase">{contrat.numeroDevis ?? contrat.numeroPolice ?? "-"}</Cell>
-      <Cell className="text-center">{companyLabel}</Cell>
+      <Cell className="text-center">{companyLabel(contrat)}</Cell>
       <Cell className="text-center">{formatDate(contrat.createdAt ?? contrat.dateEffet)}</Cell>
       <Cell className="text-center"><StatusBadge contrat={contrat} /></Cell>
       <Cell className="text-center">
@@ -406,115 +263,6 @@ function ProspectionRow({
   );
 }
 
-function AttestationInputs({
-  contrat,
-  values,
-  onChange,
-  compagnies,
-  usages,
-}: {
-  contrat: ContratSummary | null;
-  values: Record<string, string>;
-  onChange: (value: Record<string, string>) => void;
-  compagnies: ReferenceOption[];
-  usages: ReferenceOption[];
-}) {
-  const rows = [
-    ...(contrat?.vehicules ?? []).map((vehicule) => ({
-      key: `vehicule-${vehicule.vehiculeId}`,
-      usageId: vehicule.usageId ?? undefined,
-      usage: vehicule.usageCode ?? vehicule.usageLibelle ?? "Sans usage",
-      label: vehicleLabel(vehicule),
-      required: Boolean(vehicule.consommeAttestation),
-      currentNumero: vehicule.numeroAttestation ?? undefined,
-    })),
-    ...(contrat?.remorques ?? []).map((remorque) => ({
-      key: `remorque-${remorque.remorqueId}`,
-      usageId: remorque.usageId ?? undefined,
-      usage: remorque.usageCode ?? remorque.usageLibelle ?? "Remorques",
-      label: remorqueLabel(remorque),
-      required: Boolean(remorque.consommeAttestation),
-      currentNumero: remorque.numeroAttestation ?? undefined,
-    })),
-  ];
-  if (!rows.length) {
-    return <div className="rounded-md border px-3 py-4 text-sm text-muted-foreground">Aucun véhicule.</div>;
-  }
-  const grouped = rows.reduce<Map<string, typeof rows>>((map, row) => {
-    map.set(row.usage, [...(map.get(row.usage) ?? []), row]);
-    return map;
-  }, new Map());
-  return (
-    <div className="grid max-h-[340px] gap-4 overflow-y-auto rounded-md border p-3">
-      {[...grouped.entries()].map(([usage, usageRows]) => (
-        <Fragment key={usage}>
-          <div className="text-xs font-bold uppercase text-slate-700">{usage}</div>
-          <div className="grid gap-3">
-            {usageRows.map((row) => (
-              <Field key={row.key} label={row.label} required={row.required}>
-                <AttestationNumberInput
-                  value={values[row.key] ?? ""}
-                  onChange={(value) => onChange({ ...values, [row.key]: value })}
-                  compagnieAssuranceId={contrat?.compagnieAssuranceId}
-                  usageId={row.usageId}
-                  compagnies={compagnies}
-                  usages={usages}
-                  numeroCourant={row.currentNumero}
-                  required={row.required}
-                  placeholder="Numéro d'attestation"
-                />
-              </Field>
-            ))}
-          </div>
-        </Fragment>
-      ))}
-    </div>
-  );
-}
-
-function Checklist({
-  items,
-  values,
-  onChange,
-  emptyText,
-}: {
-  items: { id: string; label: string }[];
-  values: string[];
-  onChange: (values: string[]) => void;
-  emptyText: string;
-}) {
-  if (!items.length) {
-    return <div className="ml-7 rounded-md border px-3 py-4 text-sm text-muted-foreground">{emptyText}</div>;
-  }
-  return (
-    <div className="ml-7 grid max-h-64 gap-2 overflow-y-auto rounded-md border bg-background p-3">
-      {items.map((item) => {
-        const checked = values.includes(item.id);
-        return (
-          <label key={item.id} className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={checked}
-              onCheckedChange={(value) =>
-                onChange(value ? [...values, item.id] : values.filter((selected) => selected !== item.id))
-              }
-            />
-            <span>{item.label}</span>
-          </label>
-        );
-      })}
-    </div>
-  );
-}
-
-function RadioOption({ value, label }: { value: DevisScope; label: string }) {
-  return (
-    <label className="flex items-center gap-2 text-sm">
-      <RadioGroupItem value={value} />
-      <span>{label}</span>
-    </label>
-  );
-}
-
 function HeaderCell({ children }: { children: ReactNode }) {
   return <th className="px-3 py-3 text-center font-bold">{children}</th>;
 }
@@ -527,7 +275,7 @@ function TypeBadge() {
   return <Badge className="min-w-5 justify-center rounded bg-emerald-600 px-1.5 py-0.5 text-white hover:bg-emerald-600">F</Badge>;
 }
 
-function StatusBadge({ contrat }: { contrat: ContratSummary }) {
+function StatusBadge({ contrat }: { contrat: ContratListItem }) {
   const expired = Boolean(contrat.dateEcheance && contrat.dateEcheance < new Date().toISOString().slice(0, 10));
   return (
     <Badge className={cn("rounded px-2 py-0.5 text-[11px] text-white", expired ? "bg-amber-500 hover:bg-amber-500" : "bg-green-600 hover:bg-green-600")}>
@@ -536,71 +284,23 @@ function StatusBadge({ contrat }: { contrat: ContratSummary }) {
   );
 }
 
-function matchesFilters(contrat: ContratSummary, filters: Filters, companyMap: Map<string, ReferenceOption>) {
-  if (contrat.typeContrat !== "FLOTTE") return false;
-  if (filters.compagnieId !== "ALL" && String(contrat.compagnieAssuranceId ?? "") !== filters.compagnieId) return false;
-  if (filters.numeroDevis.trim() && !includesNormalized(contrat.numeroDevis ?? contrat.numeroPolice, filters.numeroDevis)) return false;
-  if (filters.du && (!contrat.createdAt || contrat.createdAt < filters.du)) return false;
-  if (filters.au && (!contrat.createdAt || contrat.createdAt > filters.au)) return false;
-  if (filters.codeClient.trim()) {
-    const haystack = [clientCode(contrat), mainClient(contrat), companyLabel(contrat, companyMap)].join(" ");
-    if (!includesNormalized(haystack, filters.codeClient)) return false;
-  }
-  return true;
-}
-
-function optionMap(options?: ReferenceOption[]) {
-  return new Map((options ?? []).map((option) => [String(option.id), option]));
-}
-
-function dossierNumber(contrat: ContratSummary) {
+function dossierNumber(contrat: ContratListItem) {
   return contrat.numeroDossier ?? contrat.numeroDevis ?? contrat.numeroPolice ?? `#${contrat.id}`;
 }
 
-function clientCode(contrat: ContratSummary) {
+function clientCode(contrat: ContratListItem) {
   const client = contrat.clients?.find((item) => item.role === "SOUSCRIPTEUR") ?? contrat.clients?.[0];
-  return client?.client?.codeClient
-    ?? client?.client?.rc
-    ?? client?.client?.cin
-    ?? client?.nomAffichage
-    ?? "-";
+  return client?.codeClient ?? client?.nomAffichage ?? "-";
 }
 
-function mainClient(contrat: ContratSummary) {
+function mainClient(contrat: ContratListItem) {
   return contrat.clients?.find((client) => client.role === "SOUSCRIPTEUR")?.nomAffichage
     ?? contrat.clients?.[0]?.nomAffichage
     ?? "-";
 }
 
-function companyLabel(contrat: ContratSummary, companyMap: Map<string, ReferenceOption>) {
-  const company = contrat.compagnieAssuranceId ? companyMap.get(String(contrat.compagnieAssuranceId)) : undefined;
-  return String(company?.libelle ?? company?.code ?? contrat.compagnieAssuranceId ?? "-");
-}
-
-function uniqueUsages(contrat: ContratSummary | null) {
-  const map = new Map<string, string>();
-  for (const vehicule of contrat?.vehicules ?? []) {
-    if (vehicule.usageId) {
-      map.set(vehicule.usageId, vehicule.usageCode ?? vehicule.usageLibelle ?? "Sans usage");
-    }
-  }
-  return [...map.entries()].map(([id, label]) => ({ id, label }));
-}
-
-function vehicleLabel(vehicule: NonNullable<ContratSummary["vehicules"]>[number]) {
-  const parts = [vehicule.marque, vehicule.immatriculation].filter(Boolean);
-  const base = parts.length ? parts.join(" - ") : `Véhicule #${vehicule.vehiculeId}`;
-  return vehicule.usageCode || vehicule.usageLibelle ? `${base} (${vehicule.usageCode ?? vehicule.usageLibelle})` : base;
-}
-
-function remorqueLabel(remorque: NonNullable<ContratSummary["remorques"]>[number]) {
-  const parts = [remorque.marque, remorque.immatriculation].filter(Boolean);
-  return parts.length ? parts.join(" - ") : `Remorque #${remorque.remorqueId}`;
-}
-
-function assistanceLabel(assistance: AssistanceContrat) {
-  const parts = [assistance.produit, assistance.vehiculeImmatriculation].filter(Boolean);
-  return parts.length ? parts.join(" - ") : `Assistance #${assistance.id}`;
+function companyLabel(contrat: ContratListItem) {
+  return contrat.compagnieLibelle ?? contrat.compagnieCode ?? contrat.compagnieAssuranceId ?? "-";
 }
 
 function formatDate(value?: string | null) {
@@ -608,16 +308,4 @@ function formatDate(value?: string | null) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return value;
   return `${match[3]}/${match[2]}/${match[1]}`;
-}
-
-function includesNormalized(value: unknown, search: string) {
-  return normalize(value).includes(normalize(search));
-}
-
-function normalize(value: unknown) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toUpperCase()
-    .trim();
 }

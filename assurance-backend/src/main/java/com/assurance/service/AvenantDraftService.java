@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Collection;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,18 @@ public class AvenantDraftService {
     @Transactional(readOnly = true)
     public List<AvenantDraftSummaryResponse> listSummaries(Long agenceId) {
         return avenantDraftRepository.findByAgenceIdOrderByUpdatedAtDesc(agenceId).stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvenantDraftSummaryResponse> listSummaries(Long agenceId, Collection<Long> contratIds) {
+        if (contratIds == null || contratIds.isEmpty()) {
+            return List.of();
+        }
+        return avenantDraftRepository
+                .findByAgenceIdAndContratIdInOrderByUpdatedAtDesc(agenceId, contratIds)
+                .stream()
                 .map(this::toSummaryResponse)
                 .toList();
     }

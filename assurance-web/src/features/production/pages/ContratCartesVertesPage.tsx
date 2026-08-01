@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { productionApi } from "../api";
+import { contractServiceApi } from "../api/contract-services";
 import { toDateOnly } from "../date";
 import type { CarteVerte, CarteVerteContext, UpsertCarteVerteRequest } from "../types";
 
@@ -27,7 +27,7 @@ export default function ContratCartesVertesPage() {
 
   const contextQuery = useQuery({
     queryKey: ["contrat-cartes-vertes", contratId, mouvementId],
-    queryFn: () => productionApi.getCarteVerteContext(contratId, { mouvementId }),
+    queryFn: () => contractServiceApi.getCarteVerteContext(contratId, { mouvementId }),
     enabled: Boolean(contratId),
   });
   const context = contextQuery.data;
@@ -55,7 +55,7 @@ export default function ContratCartesVertesPage() {
   }, [context]);
 
   const saveMutation = useMutation({
-    mutationFn: (request: UpsertCarteVerteRequest) => productionApi.saveCarteVerte(contratId, request),
+    mutationFn: (request: UpsertCarteVerteRequest) => contractServiceApi.saveCarteVerte(contratId, request),
     onSuccess: async () => {
       setForm((current) => ({
         dateEffet: current.dateEffet,
@@ -67,7 +67,7 @@ export default function ContratCartesVertesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (carteVerteId: string) => productionApi.deleteCarteVerte(contratId, carteVerteId),
+    mutationFn: (carteVerteId: string) => contractServiceApi.deleteCarteVerte(contratId, carteVerteId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-cartes-vertes", contratId] });
       toast.success("Carte verte supprimée");

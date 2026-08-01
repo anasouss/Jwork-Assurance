@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productionApi } from "../api";
+import { attachmentSettingsApi } from "../api/attachment-settings";
 import type { TypeClient, TypeContrat, TypePieceJointe, UpsertTypePieceJointeRequest } from "../types";
 
 const ALL = "__ALL__";
@@ -61,15 +61,15 @@ export default function PiecesJointesSettingsPage() {
 
   const typesQuery = useQuery({
     queryKey: ["pieces-jointes-types", true],
-    queryFn: () => productionApi.listTypesPieceJointe(true),
+    queryFn: () => attachmentSettingsApi.listTypes(true),
   });
   const mouvementsQuery = useQuery({
     queryKey: ["pieces-jointes-types-mouvements"],
-    queryFn: productionApi.listTypesMouvementPieceJointe,
+    queryFn: attachmentSettingsApi.listMovementTypes,
   });
 
   const mouvementMap = useMemo(() => new Map((mouvementsQuery.data ?? []).map((item) => [item.id, item])), [mouvementsQuery.data]);
-  const types = typesQuery.data ?? [];
+  const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
   const totalPages = Math.max(1, Math.ceil(types.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedTypes = useMemo(() => {
@@ -79,7 +79,7 @@ export default function PiecesJointesSettingsPage() {
 
   const saveMutation = useMutation({
     mutationFn: (payload: UpsertTypePieceJointeRequest) =>
-      editing ? productionApi.updateTypePieceJointe(editing.id, payload) : productionApi.createTypePieceJointe(payload),
+      editing ? attachmentSettingsApi.updateType(editing.id, payload) : attachmentSettingsApi.createType(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pieces-jointes-types"] });
       closeModal();
@@ -89,7 +89,7 @@ export default function PiecesJointesSettingsPage() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (type: TypePieceJointe) => productionApi.updateTypePieceJointe(type.id, typeToPayload(type, type.actif === false)),
+    mutationFn: (type: TypePieceJointe) => attachmentSettingsApi.updateType(type.id, typeToPayload(type, type.actif === false)),
     onSuccess: async (_, type) => {
       await queryClient.invalidateQueries({ queryKey: ["pieces-jointes-types"] });
       toast.success(type.actif === false ? "Type de pièce jointe activé" : "Type de pièce jointe désactivé");

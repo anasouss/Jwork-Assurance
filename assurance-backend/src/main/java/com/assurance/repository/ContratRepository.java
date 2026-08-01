@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public interface ContratRepository extends JpaRepository<Contrat, Long> {
     long countByAgenceIdAndProspectionFalseAndBrouillonFalseAndStatut(Long agenceId, StatutContrat statut);
@@ -40,11 +41,181 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
 
     List<Contrat> findByAgenceIdOrderByCreatedAtDesc(Long agenceId);
 
-    List<Contrat> findByAgenceIdAndProspectionFalseOrderByCreatedAtDesc(Long agenceId);
+    @EntityGraph(attributePaths = {"compagnieAssurance", "convention", "contratOrigine"})
+    List<Contrat> findByAgenceIdAndIdIn(Long agenceId, List<Long> ids);
 
-    List<Contrat> findByAgenceIdAndProspectionTrueOrderByCreatedAtDesc(Long agenceId);
+    @Query(value = """
+            select c.id
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = false
+              and not exists (
+                    select 1
+                    from Contrat renewal
+                    where renewal.contratOrigine = c
+                      and renewal.agence.id = :agenceId
+                      and renewal.prospection = false
+              )
+              and (:typeContrat is null or c.typeContrat = :typeContrat)
+              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
+              and (:clientId is null or exists (
+                    select 1 from ContratClient cc
+                    where cc.contrat = c and cc.client.id = :clientId
+              ))
+              and (:search is null or
+                    lower(coalesce(c.numeroContrat, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    exists (
+                        select 1 from ContratClient cc
+                        where cc.contrat = c and (
+                            lower(coalesce(cc.client.codeClient, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.cin, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.rc, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.ice, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%')
+                        )
+                    )
+              )
+              and (:dateDu is null or
+                    (:typeDate = 'EFFET' and c.dateEffet >= :dateDu) or
+                    (:typeDate = 'ECHEANCE' and c.dateEcheance >= :dateDu))
+              and (:dateAu is null or
+                    (:typeDate = 'EFFET' and c.dateEffet <= :dateAu) or
+                    (:typeDate = 'ECHEANCE' and c.dateEcheance <= :dateAu))
+            order by c.updatedAt desc, c.id desc
+            """,
+            countQuery = """
+            select count(c.id)
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = false
+              and not exists (
+                    select 1
+                    from Contrat renewal
+                    where renewal.contratOrigine = c
+                      and renewal.agence.id = :agenceId
+                      and renewal.prospection = false
+              )
+              and (:typeContrat is null or c.typeContrat = :typeContrat)
+              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
+              and (:clientId is null or exists (
+                    select 1 from ContratClient cc
+                    where cc.contrat = c and cc.client.id = :clientId
+              ))
+              and (:search is null or
+                    lower(coalesce(c.numeroContrat, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    exists (
+                        select 1 from ContratClient cc
+                        where cc.contrat = c and (
+                            lower(coalesce(cc.client.codeClient, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.cin, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.rc, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.ice, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%')
+                        )
+                    )
+              )
+              and (:dateDu is null or
+                    (:typeDate = 'EFFET' and c.dateEffet >= :dateDu) or
+                    (:typeDate = 'ECHEANCE' and c.dateEcheance >= :dateDu))
+              and (:dateAu is null or
+                    (:typeDate = 'EFFET' and c.dateEffet <= :dateAu) or
+                    (:typeDate = 'ECHEANCE' and c.dateEcheance <= :dateAu))
+            """)
+    Page<Long> searchCurrentContractIds(
+            @Param("agenceId") Long agenceId,
+            @Param("typeContrat") TypeContrat typeContrat,
+            @Param("typeDate") String typeDate,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu,
+            @Param("search") String search,
+            @Param("compagnieId") Long compagnieId,
+            @Param("numeroPolice") String numeroPolice,
+            @Param("clientId") Long clientId,
+            Pageable pageable
+    );
 
-    List<Contrat> findByAgenceIdAndProspectionTrueAndTypeContratOrderByCreatedAtDesc(Long agenceId, TypeContrat typeContrat);
+    @Query(value = """
+            select c.id
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = true
+              and c.typeContrat = com.assurance.enums.TypeContrat.FLOTTE
+              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:dateDu is null or c.createdAt >= :dateDu)
+              and (:dateAuExclusive is null or c.createdAt < :dateAuExclusive)
+              and (:numeroDevis is null or
+                    lower(coalesce(c.numeroDevis, '')) like concat('%', :numeroDevis, '%') or
+                    lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroDevis, '%'))
+              and (:search is null or
+                    lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    exists (
+                        select 1 from ContratClient cc
+                        where cc.contrat = c and (
+                            lower(coalesce(cc.client.codeClient, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.cin, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.rc, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%')
+                        )
+                    )
+              )
+            order by c.createdAt desc, c.id desc
+            """,
+            countQuery = """
+            select count(c.id)
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = true
+              and c.typeContrat = com.assurance.enums.TypeContrat.FLOTTE
+              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:dateDu is null or c.createdAt >= :dateDu)
+              and (:dateAuExclusive is null or c.createdAt < :dateAuExclusive)
+              and (:numeroDevis is null or
+                    lower(coalesce(c.numeroDevis, '')) like concat('%', :numeroDevis, '%') or
+                    lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroDevis, '%'))
+              and (:search is null or
+                    lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.code, '')) like concat('%', :search, '%') or
+                    lower(coalesce(c.compagnieAssurance.nom, '')) like concat('%', :search, '%') or
+                    exists (
+                        select 1 from ContratClient cc
+                        where cc.contrat = c and (
+                            lower(coalesce(cc.client.codeClient, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.cin, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.rc, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%')
+                        )
+                    )
+              )
+            """)
+    Page<Long> searchProspectionIds(
+            @Param("agenceId") Long agenceId,
+            @Param("compagnieId") Long compagnieId,
+            @Param("dateDu") LocalDateTime dateDu,
+            @Param("dateAuExclusive") LocalDateTime dateAuExclusive,
+            @Param("search") String search,
+            @Param("numeroDevis") String numeroDevis,
+            Pageable pageable
+    );
 
     @EntityGraph(attributePaths = {
             "agence",
@@ -175,11 +346,6 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             @Param("search") String search,
             Pageable pageable
     );
-
-    @EntityGraph(attributePaths = {
-            "compagnieAssurance"
-    })
-    List<Contrat> findByAgenceIdAndIdIn(Long agenceId, List<Long> ids);
 
     @EntityGraph(attributePaths = {
             "compagnieAssurance",

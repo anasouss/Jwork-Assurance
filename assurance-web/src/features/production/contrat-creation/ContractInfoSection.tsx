@@ -12,7 +12,7 @@ import { Field } from "../components/Field";
 import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { SectionCard } from "../components/SectionCard";
 import { toDateOnly } from "../date";
-import { productionApi } from "../api";
+import { clientApi } from "../api/clients";
 import type { CreateContratRequest, ModeFacturationContrat, TypePayeurPrime } from "../types";
 import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
@@ -41,7 +41,7 @@ export function ContractInfoSection({
   const deferredPayerSearch = useDeferredValue(payerSearch.trim());
   const payerClientsQuery = useQuery({
     queryKey: ["clients", "payer-search", deferredPayerSearch],
-    queryFn: () => productionApi.listClients({ query: deferredPayerSearch, size: 25 }),
+    queryFn: () => clientApi.listClients({ query: deferredPayerSearch, size: 25 }),
     enabled: form.typePayeurPrime === "TIERS_MANDATE" && deferredPayerSearch.length >= 2,
     staleTime: 30_000,
   });

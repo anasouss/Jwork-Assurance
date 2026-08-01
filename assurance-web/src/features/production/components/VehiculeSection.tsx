@@ -302,7 +302,7 @@ export function VehiculeSection({
                   <Checkbox
                     checked={Boolean(vehicule.organismeCredit)}
                     onCheckedChange={(checked) =>
-                      update(index, Boolean(checked)
+                      update(index, checked
                         ? { organismeCredit: true }
                         : { organismeCredit: false, nomOrganismeCredit: undefined, montantCredit: undefined, dateFinCredit: undefined })
                     }

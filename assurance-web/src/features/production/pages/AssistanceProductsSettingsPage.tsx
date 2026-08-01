@@ -30,7 +30,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toDateOnly } from "../date";
-import { productionApi } from "../api";
+import { assistanceProductApi } from "../api/assistance-products";
+import { referenceApi } from "../api/references";
 import { Field } from "../components/Field";
 import { MoneyInput } from "../components/MoneyInput";
 import type {
@@ -56,31 +57,31 @@ export default function AssistanceProductsSettingsPage() {
 
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assistance", "settings"],
-    queryFn: () => productionApi.referentiel("compagnies-assistance", { includeInactive: "true" }),
+    queryFn: () => referenceApi.list("compagnies-assistance", { includeInactive: "true" }),
     staleTime: 60_000,
   });
 
   const products = useQuery({
     queryKey: ["referentiel", "produits-assistance", "settings"],
-    queryFn: () => productionApi.referentiel("produits-assistance", { includeInactive: "true" }),
+    queryFn: () => referenceApi.list("produits-assistance", { includeInactive: "true" }),
     staleTime: 60_000,
   });
 
   const categories = useQuery({
     queryKey: ["referentiel", "categories-client"],
-    queryFn: () => productionApi.referentiel("categories-client"),
+    queryFn: () => referenceApi.list("categories-client"),
     staleTime: 60_000,
   });
 
   const usages = useQuery({
     queryKey: ["referentiel", "usages"],
-    queryFn: () => productionApi.referentiel("usages"),
+    queryFn: () => referenceApi.list("usages"),
     staleTime: 60_000,
   });
 
   const tarifs = useQuery({
     queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "tarifs"],
-    queryFn: () => tarifProduct ? productionApi.listTarifsProduitAssistance(tarifProduct.id) : Promise.resolve([]),
+    queryFn: () => tarifProduct ? assistanceProductApi.listProductRates(tarifProduct.id) : Promise.resolve([]),
     enabled: Boolean(tarifProduct),
     staleTime: 30_000,
   });
@@ -128,7 +129,7 @@ export default function AssistanceProductsSettingsPage() {
 
   const saveProduct = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertProduitAssistanceRequest }) =>
-      id ? productionApi.updateProduitAssistance(id, value) : productionApi.createProduitAssistance(value),
+      id ? assistanceProductApi.updateProduct(id, value) : assistanceProductApi.createProduct(value),
     onSuccess: async () => {
       setProductDialogOpen(false);
       setEditingProduct(null);
@@ -139,7 +140,7 @@ export default function AssistanceProductsSettingsPage() {
   });
 
   const deleteProduct = useMutation({
-    mutationFn: (id: string) => productionApi.deleteProduitAssistance(id),
+    mutationFn: (id: string) => assistanceProductApi.deleteProduct(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
       toast.success("Produit d'assistance désactivé");
@@ -150,8 +151,8 @@ export default function AssistanceProductsSettingsPage() {
   const saveTarif = useMutation({
     mutationFn: ({ productId, tarifId, value }: { productId: string; tarifId?: string; value: UpsertTarifProduitAssistanceRequest }) =>
       tarifId
-        ? productionApi.updateTarifProduitAssistance(productId, tarifId, value)
-        : productionApi.createTarifProduitAssistance(productId, value),
+        ? assistanceProductApi.updateProductRate(productId, tarifId, value)
+        : assistanceProductApi.createProductRate(productId, value),
     onSuccess: async () => {
       setEditingTarif(null);
       setTarifPayload(emptyTarif());
@@ -163,7 +164,7 @@ export default function AssistanceProductsSettingsPage() {
   });
 
   const deleteTarif = useMutation({
-    mutationFn: ({ productId, tarifId }: { productId: string; tarifId: string }) => productionApi.deleteTarifProduitAssistance(productId, tarifId),
+    mutationFn: ({ productId, tarifId }: { productId: string; tarifId: string }) => assistanceProductApi.deleteProductRate(productId, tarifId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "tarifs"] });

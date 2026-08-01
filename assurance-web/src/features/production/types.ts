@@ -459,6 +459,20 @@ export type ClientPage = {
   };
 };
 
+export type PageMetadata = {
+  number: number;
+  size: number;
+  totalPages: number;
+  totalElements: number;
+  first: boolean;
+  last: boolean;
+};
+
+export type PagedResponse<T> = {
+  items: T[];
+  page: PageMetadata;
+};
+
 export type ClientCrm = {
   client: ClientResponse;
   groupes: GroupeClient[];
@@ -766,7 +780,6 @@ export type CreateContratRequest = {
   vehicules: VehiculeInput[];
   remorques: RemorqueInput[];
   garanties: GarantieInput[];
-  assistances?: AssistanceDraft[];
   quittances?: QuittanceInput[];
 };
 
@@ -1249,4 +1262,45 @@ export type ContratSummary = {
   elementsFacturables?: ElementFacturable[];
   targetSummaries?: QuittancePreview["targetSummaries"];
   quittanceGenerale?: QuittancePreview | null;
+};
+
+export type ContratListItem = {
+  id: string;
+  numeroContrat?: string | null;
+  numeroDevis?: string | null;
+  numeroDossier?: string | null;
+  numeroPolice?: string | null;
+  createdAt?: string | null;
+  typeContrat: TypeContrat;
+  statut: string;
+  compagnieAssuranceId?: string | null;
+  compagnieCode?: string | null;
+  compagnieLibelle?: string | null;
+  conventionId?: string | null;
+  conventionCode?: string | null;
+  conventionLibelle?: string | null;
+  contratOrigineId?: string | null;
+  renouvele?: boolean | null;
+  modeTermeRenouvellement?: "CABINET" | "COMPAGNIE" | null;
+  renouvellementTermeCompagnieEligible?: boolean | null;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  typeRenouvellement?: string | null;
+  brouillon?: boolean | null;
+  prospection?: boolean | null;
+  premierTypeVehicule?: string | null;
+  clients?: {
+    clientId: string;
+    codeClient?: string | null;
+    nomAffichage?: string | null;
+    role: string;
+    principalPourRole: boolean;
+  }[];
+  mouvements?: NonNullable<ContratSummary["mouvements"]>;
+  avenantDrafts?: AvenantDraftSummary[];
+};
+
+export type ContratListGroup = {
+  key: string;
+  contrats: ContratListItem[];
 };

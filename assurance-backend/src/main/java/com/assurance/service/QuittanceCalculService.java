@@ -108,6 +108,31 @@ public class QuittanceCalculService {
         return difference(apres, avant, false);
     }
 
+    public Resultat differenceGaranties(Resultat apres, Resultat avant) {
+        Resultat differentiel = difference(apres, avant, false);
+        List<Ligne> lignes = differentiel.lignes().stream()
+                .filter(ligne -> ligne.categorie() != CategorieQuittance.TOTAL)
+                .map(ligne -> new Ligne(
+                        ligne.categorie(),
+                        ligne.ordre(),
+                        false,
+                        ligne.primeNette(),
+                        ligne.taxe(),
+                        ligne.taxeParafiscale(),
+                        ligne.accessoire(),
+                        BigDecimal.ZERO,
+                        total(
+                                ligne.primeNette(),
+                                ligne.taxe(),
+                                ligne.taxeParafiscale(),
+                                ligne.accessoire(),
+                                BigDecimal.ZERO
+                        )
+                ))
+                .toList();
+        return buildResult(lignes);
+    }
+
     private Resultat difference(Resultat apres, Resultat avant, boolean autoriserTaxeNegative) {
         Map<CategorieQuittance, Ligne> apresParCategorie = lignesParCategorie(apres);
         Map<CategorieQuittance, Ligne> avantParCategorie = lignesParCategorie(avant);

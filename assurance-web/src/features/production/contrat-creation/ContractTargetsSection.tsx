@@ -49,6 +49,7 @@ export type ContractTargetsSectionProps = {
   garanties: ReferenceOption[];
   selectedGaranties: GarantieInput[];
   setSelectedGaranties: Dispatch<SetStateAction<GarantieInput[]>>;
+  lockedGaranties?: GarantieInput[];
   lignes: ReferenceOption[];
   formulesPersonne: ReferenceOption[];
   usages: ReferenceOption[];
@@ -110,6 +111,7 @@ export function ContractTargetsSection({
   garanties,
   selectedGaranties,
   setSelectedGaranties,
+  lockedGaranties = [],
   lignes,
   formulesPersonne,
   usages,
@@ -524,6 +526,7 @@ export function ContractTargetsSection({
                   personneGaranties={personneGaranties}
                   selected={selectedGaranties}
                   setSelected={setSelectedGaranties}
+                  locked={lockedGaranties}
                   lignes={lignes}
                   formulesPersonne={formulesPersonne}
                   usages={usages}
@@ -675,6 +678,7 @@ export function ContractTargetsSection({
                   personneGaranties={personneGaranties}
                   selected={selectedGaranties}
                   setSelected={setSelectedGaranties}
+                  locked={lockedGaranties}
                   lignes={lignes}
                   formulesPersonne={formulesPersonne}
                   usages={usages}

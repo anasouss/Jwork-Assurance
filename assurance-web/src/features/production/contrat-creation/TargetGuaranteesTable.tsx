@@ -62,6 +62,7 @@ export function TargetGuaranteesTable({
   personneGaranties,
   selected,
   setSelected,
+  locked,
   lignes,
   formulesPersonne,
   usages,
@@ -85,6 +86,7 @@ export function TargetGuaranteesTable({
   personneGaranties: ReferenceOption[];
   selected: GarantieInput[];
   setSelected: Dispatch<SetStateAction<GarantieInput[]>>;
+  locked: GarantieInput[];
   lignes: ReferenceOption[];
   formulesPersonne: ReferenceOption[];
   usages: ReferenceOption[];
@@ -125,6 +127,10 @@ export function TargetGuaranteesTable({
       }
     }
     const baseSelection = checked ? withoutExclusionConflicts(selected, garanties, target, garantie) : selected;
+    if (checked && !preservesLockedGuarantees(baseSelection, locked)) {
+      toast.error("Cette garantie est incompatible avec une garantie existante de l'extension");
+      return;
+    }
     const next = checked
       ? [...baseSelection, { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
       : selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)));
@@ -135,6 +141,10 @@ export function TargetGuaranteesTable({
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
     const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
     const baseSelection = checked ? withoutExclusionConflicts(selected, personneGaranties, target, garantie) : selected;
+    if (checked && !preservesLockedGuarantees(baseSelection, locked)) {
+      toast.error("Cette garantie est incompatible avec une garantie existante de l'extension");
+      return;
+    }
     const next = checked
         ? [
             ...baseSelection,
@@ -189,12 +199,13 @@ export function TargetGuaranteesTable({
             {configuredGaranties.map((garantie) => {
               const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
               const checked = Boolean(item);
+              const guaranteeLocked = locked.some((lockedItem) => lockedItem.garantieId === garantie.id && sameTarget(lockedItem, target));
               const isRc = Boolean(garantie.responsabiliteCivile);
               const lineOptions = automaticPricing ? matchingLines(lignes, garantie, target) : [];
               const selectedLine = selectedLineFor(lineOptions, item);
               const hasLine = isRc || lineOptions.length > 0;
-              const disabled = isRc || (automaticPricing && (!grilleSelected || !hasLine));
-              const editable = checked && !isRc;
+              const disabled = guaranteeLocked || isRc || (automaticPricing && (!grilleSelected || !hasLine));
+              const editable = checked && !isRc && !guaranteeLocked;
               const warning = checked ? valueWarning(garantie, target, selectedLine) : "";
               const sourceOptions = target.kind === "vehicule" ? selectableTargetValueSources(garantie, target, selectedLine) : [];
               const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target, selectedLine) : "";
@@ -413,9 +424,11 @@ export function TargetGuaranteesTable({
               {configuredPersonneGaranties.map((garantie) => {
                 const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
                 const checked = Boolean(item);
+                const guaranteeLocked = locked.some((lockedItem) => lockedItem.garantieId === garantie.id && sameTarget(lockedItem, target));
+                const editable = checked && !guaranteeLocked;
                 const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];
-                const disabled = automaticPricing && (!grilleSelected || formules.length === 0);
+                const disabled = guaranteeLocked || (automaticPricing && (!grilleSelected || formules.length === 0));
                 const previewLine = previewGuaranteeLine(preview, garantie, target, item);
                 const calculatedPrime = previewLine?.primeNette;
                 const rowCalculating = checked && Boolean(previewing) && Boolean(dirtyCalculationKeys?.includes(guaranteeCalculationKey(target, garantie.id)));
@@ -439,7 +452,7 @@ export function TargetGuaranteesTable({
                       {automaticPricing ? (
                         <Select
                           value={item?.formuleGarantiePersonneId ?? selectedFormule?.id ?? ""}
-                          disabled={!checked || formules.length <= 1}
+                          disabled={!editable || formules.length <= 1}
                           onValueChange={(value) => {
                             const formule = formules.find((option) => option.id === value);
                             update(garantie.id, {
@@ -460,22 +473,22 @@ export function TargetGuaranteesTable({
                         </Select>
                       ) : (
                         <Input
-                          disabled={!checked}
+                          disabled={!editable}
                           className={controlClass(checked)}
                           value={item?.formule ?? ""}
                           onChange={(event) => update(garantie.id, { formule: event.target.value })}
                         />
                       )}
                     </ResponsiveRecordCell> : null}
-                    <ResponsiveRecordCell label="Décès">{automaticPricing ? money(selectedFormule?.montantDeces) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantDeces} onValueChange={(value) => update(garantie.id, { montantDeces: value })} />}</ResponsiveRecordCell>
-                    <ResponsiveRecordCell label="Invalidité">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantInvalidite} onValueChange={(value) => update(garantie.id, { montantInvalidite: value })} />}</ResponsiveRecordCell>
-                    <ResponsiveRecordCell label="Frais médicaux">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisMedicaux} onValueChange={(value) => update(garantie.id, { montantFraisMedicaux: value })} />}</ResponsiveRecordCell>
-                    <ResponsiveRecordCell label="Hospitalisation">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</ResponsiveRecordCell>
-                    <ResponsiveRecordCell label="Frais funéraires">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</ResponsiveRecordCell>
-                    <ResponsiveRecordCell label="Chirurgie">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Décès">{automaticPricing ? money(selectedFormule?.montantDeces) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantDeces} onValueChange={(value) => update(garantie.id, { montantDeces: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Invalidité">{automaticPricing ? money(selectedFormule?.montantInvalidite) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantInvalidite} onValueChange={(value) => update(garantie.id, { montantInvalidite: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Frais médicaux">{automaticPricing ? money(selectedFormule?.montantFraisMedicaux) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantFraisMedicaux} onValueChange={(value) => update(garantie.id, { montantFraisMedicaux: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Hospitalisation">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Frais funéraires">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</ResponsiveRecordCell>
+                    <ResponsiveRecordCell label="Chirurgie">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</ResponsiveRecordCell>
                     {layout === "tariff" ? <ResponsiveRecordCell label={primeColumnLabel} valueClassName="text-right">
                       {primeInputEnabled ? (
-                        <MoneyInput disabled={!checked} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
+                        <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
                       ) : checked || previewLine ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}
                     </ResponsiveRecordCell> : null}
                   </tr>
@@ -498,6 +511,19 @@ export function TargetGuaranteesTable({
       ) : null}
     </div>
   );
+}
+
+function preservesLockedGuarantees(candidate: GarantieInput[], locked: GarantieInput[]) {
+  return locked.every((lockedItem) => candidate.some((item) => (
+    item.garantieId === lockedItem.garantieId
+    && sameGuaranteeInputTarget(item, lockedItem)
+  )));
+}
+
+function sameGuaranteeInputTarget(left: GarantieInput, right: GarantieInput) {
+  return left.vehiculeIndex === right.vehiculeIndex
+    && left.remorqueIndex === right.remorqueIndex
+    && left.clientId === right.clientId;
 }
 
 function targetedInput(garantie: ReferenceOption, target: Target): GarantieInput {

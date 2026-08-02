@@ -32,6 +32,7 @@ import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.*;
+import com.assurance.service.avenant.AvenantExtensionGuaranteeValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,6 +91,7 @@ public class ContratService {
     private final MouvementStockAttestationRepository mouvementStockAttestationRepository;
     private final AttestationStockService attestationStockService;
     private final EcheanceService echeanceService;
+    private final AvenantExtensionGuaranteeValidator avenantExtensionGuaranteeValidator;
 
     private void bindAgence(CreateContratRequest request, Long agenceId) {
         if (agenceId == null) {
@@ -3511,6 +3513,12 @@ public class ContratService {
         if (nouvellesGaranties.isEmpty()) {
             throw new BadRequestException("Au moins une garantie est obligatoire pour la modification");
         }
+        if ("EXG_M".equalsIgnoreCase(request.getCodeTypeMouvement())) {
+            avenantExtensionGuaranteeValidator.validatePreservesExisting(
+                    anciennesGaranties,
+                    nouvellesGaranties
+            );
+        }
         List<ContratGarantie> anciennesGarantiesRestantes = anciennesGaranties.stream()
                 .map(garantie -> garantieRetourPrime(contrat, request, garantie))
                 .toList();
@@ -3531,7 +3539,7 @@ public class ContratService {
                 vehicules,
                 remorques
         );
-        QuittanceCalculService.Resultat differentiel = quittanceCalculService.difference(apres, avant);
+        QuittanceCalculService.Resultat differentiel = quittanceCalculService.differenceGaranties(apres, avant);
         List<ContratGarantie> garantiesDifferentielles = garantiesDifferentielles(
                 anciennesGarantiesRestantes,
                 nouvellesGarantiesRestantes

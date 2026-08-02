@@ -176,6 +176,12 @@ export default function AvenantContratPage() {
     })),
   ], [contrat?.remorques, contrat?.vehicules]);
   const hasActiveTargets = targets.length > 0;
+  const lockedExtensionGaranties = useMemo(
+    () => movementCode === "EXG_M" && contrat
+      ? mapCurrentGaranties(contrat.garanties ?? [], vehicules, remorques)
+      : [],
+    [contrat, movementCode, remorques, vehicules]
+  );
   const configuredGrille = useMemo(
     () => grilleTarifaireId
       ? (grilles.data ?? []).find((grille) => grille.id === grilleTarifaireId) ?? { id: grilleTarifaireId, libelle: "Grille tarifaire" }
@@ -1025,6 +1031,7 @@ export default function AvenantContratPage() {
           garanties={garanties.data ?? []}
           selectedGaranties={selectedGaranties}
           setSelectedGaranties={setSelectedGaranties}
+          lockedGaranties={lockedExtensionGaranties}
           lignes={lignesGrille.data ?? []}
           formulesPersonne={formulesPersonne.data ?? []}
           usages={avenantTargetUsages}

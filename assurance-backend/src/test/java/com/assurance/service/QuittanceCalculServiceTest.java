@@ -51,6 +51,24 @@ class QuittanceCalculServiceTest {
         assertThat(difference.primeTotale()).isEqualByComparingTo("-50.00");
     }
 
+    @Test
+    void guaranteeDifferenceNeverChargesCnpac() {
+        QuittanceCalculService.Resultat apres = result(
+                line(CategorieQuittance.AUTOMOBILE, "120", "12", "2.4", "34", "168.4")
+        );
+        QuittanceCalculService.Resultat avant = result(
+                line(CategorieQuittance.AUTOMOBILE, "100", "10", "2", "17", "129")
+        );
+
+        QuittanceCalculService.Resultat difference = service.differenceGaranties(apres, avant);
+
+        assertThat(difference.primeNette()).isEqualByComparingTo("20.00");
+        assertThat(difference.taxe()).isEqualByComparingTo("2.00");
+        assertThat(difference.taxeParafiscale()).isEqualByComparingTo("0.40");
+        assertThat(difference.cnpac()).isEqualByComparingTo("0.00");
+        assertThat(difference.primeTotale()).isEqualByComparingTo("22.40");
+    }
+
     private QuittanceCalculService.Resultat result(QuittanceCalculService.Ligne... lines) {
         List<QuittanceCalculService.Ligne> values = List.of(lines);
         return new QuittanceCalculService.Resultat(

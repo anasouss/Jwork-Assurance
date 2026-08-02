@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownAZ, Download, Eye, MoreHorizontal, RotateCcw, Search } from "lucide-react";
+import { ArrowDownAZ, Download, Eye, FilePenLine, FileText, MoreHorizontal, RefreshCw, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -19,8 +19,11 @@ import { downloadBlob } from "@/lib/download";
 import { contractKeys, referenceKeys } from "@/lib/query-keys";
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
+import { FinalizeRenewalDialog, PreTermePdfDialog } from "../components/echeances/PreTermeDialogs";
+import { usePreTermeActions } from "../components/echeances/usePreTermeActions";
 import { toDateOnly } from "../date";
 import type { EcheanceAutomobileRow, TypeContrat } from "../types";
+import { useAuthStore } from "@/store/auth-store";
 
 type EcheanceFilters = {
   dateDu?: string;
@@ -58,6 +61,11 @@ export default function EcheancesPage() {
   const [searched, setSearched] = useState(initialState.searched);
   const [page, setPage] = useState(initialState.page);
   const [exporting, setExporting] = useState(false);
+  const [pdfDraftId, setPdfDraftId] = useState<string | null>(null);
+  const [renewalRow, setRenewalRow] = useState<EcheanceAutomobileRow | null>(null);
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const canRenew = permissions.includes("contrat:renew") || permissions.includes("contrat:update");
+  const preTermeActions = usePreTermeActions();
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
     key: "dateEcheance",
     direction: "asc",
@@ -277,7 +285,17 @@ export default function EcheancesPage() {
                       </td>
                     </tr>
                   ) : rows.length ? (
-                    rows.map((row) => <EcheanceTableRow key={row.contratId} row={row} />)
+                    rows.map((row) => (
+                      <EcheanceTableRow
+                        key={row.contratId}
+                        row={row}
+                        canRenew={canRenew}
+                        preparing={preTermeActions.prepareMutation.isPending && preTermeActions.prepareMutation.variables === row.contratId}
+                        onEditPreTerme={() => preTermeActions.edit(row)}
+                        onPdf={() => setPdfDraftId(row.preTermeDraftId ?? null)}
+                        onRenew={() => setRenewalRow(row)}
+                      />
+                    ))
                   ) : (
                     <tr>
                       <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
@@ -300,6 +318,24 @@ export default function EcheancesPage() {
           </CardContent>
         </Card>
       ) : null}
+      <PreTermePdfDialog
+        draftId={pdfDraftId}
+        open={Boolean(pdfDraftId)}
+        onOpenChange={(open) => { if (!open) setPdfDraftId(null); }}
+      />
+      <FinalizeRenewalDialog
+        open={Boolean(renewalRow)}
+        companyTermEligible={Boolean(renewalRow?.renouvellementTermeCompagnieEligible)}
+        pending={preTermeActions.finalizeMutation.isPending}
+        onOpenChange={(open) => { if (!open) setRenewalRow(null); }}
+        onConfirm={(mode) => {
+          if (!renewalRow?.preTermeDraftId) return;
+          preTermeActions.finalizeMutation.mutate(
+            { draftId: renewalRow.preTermeDraftId, mode },
+            { onSuccess: () => setRenewalRow(null) }
+          );
+        }}
+      />
     </div>
   );
 }
@@ -316,7 +352,22 @@ function SortableTh({ label, column, sort, onSort }: { label: string; column: So
   );
 }
 
-function EcheanceTableRow({ row }: { row: EcheanceAutomobileRow }) {
+function EcheanceTableRow({
+  row,
+  canRenew,
+  preparing,
+  onEditPreTerme,
+  onPdf,
+  onRenew,
+}: {
+  row: EcheanceAutomobileRow;
+  canRenew: boolean;
+  preparing: boolean;
+  onEditPreTerme: () => void;
+  onPdf: () => void;
+  onRenew: () => void;
+}) {
+  const fleetRenewal = row.typeContrat === "FLOTTE" && canRenew;
   return (
     <tr className="border-b transition-colors hover:bg-emerald-50/60 dark:hover:bg-emerald-950/25">
       <td className="px-3 py-2 align-middle">{text(row.dossier)}</td>
@@ -348,6 +399,22 @@ function EcheanceTableRow({ row }: { row: EcheanceAutomobileRow }) {
                 Ouvrir le dossier
               </Link>
             </DropdownMenuItem>
+            {fleetRenewal ? (
+              <>
+                <DropdownMenuItem onSelect={onEditPreTerme} disabled={preparing}>
+                  <FilePenLine className="size-4" />
+                  Modifier pré-terme
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={onPdf} disabled={!row.preTermeDraftId}>
+                  <FileText className="size-4" />
+                  Éditer pré-terme
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={onRenew} disabled={!row.preTermeDraftId}>
+                  <RefreshCw className="size-4" />
+                  Renouveler
+                </DropdownMenuItem>
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </td>

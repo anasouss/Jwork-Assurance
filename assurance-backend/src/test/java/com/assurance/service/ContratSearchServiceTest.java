@@ -9,6 +9,7 @@ import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.VehiculeRepository;
+import com.assurance.service.renewal.RenewalPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +50,8 @@ class ContratSearchServiceTest {
                 contratClientRepository,
                 mouvementContratRepository,
                 vehiculeRepository,
-                avenantDraftService
+                avenantDraftService,
+                new RenewalPolicy()
         );
     }
 

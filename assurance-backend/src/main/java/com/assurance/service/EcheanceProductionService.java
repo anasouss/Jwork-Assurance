@@ -8,8 +8,10 @@ import com.assurance.entity.ContratClient;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.StatutContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.ContratRepository;
+import com.assurance.service.renewal.RenewalPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +41,7 @@ public class EcheanceProductionService {
     private static final int EXPORT_PAGE_SIZE = 500;
 
     private final ContratRepository contratRepository;
+    private final RenewalPolicy renewalPolicy;
 
     public EcheanceAutomobileResponse searchAutomobile(
             Long agenceId,
@@ -141,7 +144,7 @@ public class EcheanceProductionService {
         }
     }
 
-    private EcheanceAutomobileResponse.Row toRow(Contrat contrat) {
+    private EcheanceAutomobileResponse.Row toRow(Contrat contrat, Contrat preTermeDraft) {
         ContratClient link = souscripteur(contrat);
         Client client = link == null ? null : link.getClient();
         Vehicule vehicule = contrat.getTypeContrat() == TypeContrat.FLOTTE ? null : firstVehicule(contrat);
@@ -170,6 +173,8 @@ public class EcheanceProductionService {
                 ))
                 .telephone(primaryPhone(client))
                 .observation(observation(client, vehicule))
+                .preTermeDraftId(preTermeDraft == null ? null : preTermeDraft.getId())
+                .renouvellementTermeCompagnieEligible(renewalPolicy.isCompanyTermEligible(contrat))
                 .build();
     }
 
@@ -181,10 +186,18 @@ public class EcheanceProductionService {
         for (Contrat contrat : contratRepository.findByAgenceIdAndIdIn(agenceId, ids)) {
             contratsById.put(contrat.getId(), contrat);
         }
+        Map<Long, Contrat> draftsBySourceId = new HashMap<>();
+        for (Contrat draft : contratRepository.findByAgenceIdAndContratOrigineIdIn(agenceId, ids)) {
+            if (draft.getContratOrigine() != null
+                    && draft.getStatut() == StatutContrat.DRAFT
+                    && Boolean.TRUE.equals(draft.getBrouillon())) {
+                draftsBySourceId.put(draft.getContratOrigine().getId(), draft);
+            }
+        }
         return ids.stream()
                 .map(contratsById::get)
                 .filter(contrat -> contrat != null)
-                .map(this::toRow)
+                .map(contrat -> toRow(contrat, draftsBySourceId.get(contrat.getId())))
                 .toList();
     }
 

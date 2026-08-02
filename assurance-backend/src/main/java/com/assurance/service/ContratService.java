@@ -1,5 +1,7 @@
 package com.assurance.service;
 
+import com.assurance.service.renewal.RenewalPolicy;
+
 import com.assurance.dto.request.CreateClientRequest;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
@@ -92,6 +94,7 @@ public class ContratService {
     private final AttestationStockService attestationStockService;
     private final EcheanceService echeanceService;
     private final AvenantExtensionGuaranteeValidator avenantExtensionGuaranteeValidator;
+    private final RenewalPolicy renewalPolicy;
 
     private void bindAgence(CreateContratRequest request, Long agenceId) {
         if (agenceId == null) {
@@ -122,7 +125,7 @@ public class ContratService {
             Long contratOrigineId,
             ModeTermeRenouvellement modeTerme
     ) {
-        Contrat source = contratRepository.findByAgenceIdAndId(agenceId, contratOrigineId)
+        Contrat source = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, contratOrigineId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratOrigineId));
         validateRenewalSource(source, modeTerme);
 
@@ -152,6 +155,78 @@ public class ContratService {
         applyDraftRequest(draft, request);
         restoreRenewalDraftAssistances(draft, activeVehicules(draft), assistanceSnapshots);
         return toResponse(draft);
+    }
+
+    @Transactional
+    public ContratResponse finalizeRenouvellementDraft(
+            Long agenceId,
+            Long draftId,
+            ModeTermeRenouvellement modeTerme
+    ) {
+        Contrat draftReference = contratRepository.findByAgenceIdAndId(agenceId, draftId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", draftId));
+        Contrat sourceReference = draftReference.getContratOrigine();
+        if (sourceReference == null) {
+            throw new BadRequestException("Ce brouillon n'est pas un pré-terme");
+        }
+        Contrat source = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, sourceReference.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", sourceReference.getId()));
+        Contrat draft = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, draftId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", draftId));
+
+        if (draft.getStatut() == StatutContrat.ACTIVE
+                && !Boolean.TRUE.equals(draft.getBrouillon())
+                && Boolean.TRUE.equals(source.getRenouvele())) {
+            return toResponse(draft);
+        }
+        if (draft.getStatut() != StatutContrat.DRAFT || !Boolean.TRUE.equals(draft.getBrouillon())) {
+            throw new BadRequestException("Le pré-terme a déjà été finalisé ou n'est plus modifiable");
+        }
+
+        ModeTermeRenouvellement resolvedMode = modeTerme == null
+                ? ModeTermeRenouvellement.CABINET
+                : modeTerme;
+        validateRenewalSource(source, resolvedMode);
+        validatePersistedRenewalDraft(draft);
+
+        List<Vehicule> vehicules = activeVehicules(draft);
+        List<Remorque> remorques = activeRemorques(draft);
+        List<ContratGarantie> garanties = activeGaranties(draft);
+        draft.setModeTermeRenouvellement(resolvedMode);
+        if (!hasText(draft.getNumeroDossier())) {
+            draft.setNumeroDossier(nextNumeroDossier(draft.getAgence(), draft.getCompagnieAssurance(), draft.getDateEffet()));
+        }
+        draft.setProspection(false);
+        draft.setBrouillon(false);
+        draft.setStatut(StatutContrat.ACTIVE);
+        contratRepository.save(draft);
+
+        mouvementContratService.creerRenouvellement(draft, source, vehicules, remorques, garanties);
+        source.setRenouvele(true);
+        source.setStatut(StatutContrat.RENEWED);
+        contratRepository.save(source);
+        return toResponse(draft);
+    }
+
+    private void validatePersistedRenewalDraft(Contrat draft) {
+        if (draft.getCompagnieAssurance() == null) {
+            throw new BadRequestException("La compagnie est obligatoire dans le pré-terme");
+        }
+        if (draft.getDateEffet() == null || draft.getDateEcheance() == null) {
+            throw new BadRequestException("La période du pré-terme est incomplète");
+        }
+        if (draft.getDateEffet().isAfter(draft.getDateEcheance())) {
+            throw new BadRequestException("La période du pré-terme est invalide");
+        }
+        if (draft.getClients() == null || draft.getClients().isEmpty()) {
+            throw new BadRequestException("Le pré-terme doit contenir au moins un client");
+        }
+        if (activeVehicules(draft).isEmpty()) {
+            throw new BadRequestException("Le pré-terme doit contenir au moins un véhicule");
+        }
+        if (activeGaranties(draft).isEmpty()) {
+            throw new BadRequestException("Le pré-terme doit contenir au moins une garantie");
+        }
     }
 
     @Transactional
@@ -4123,7 +4198,7 @@ public class ContratService {
         ModeTermeRenouvellement resolvedMode = modeTerme == null
                 ? ModeTermeRenouvellement.CABINET
                 : modeTerme;
-        if (resolvedMode == ModeTermeRenouvellement.COMPAGNIE && !isRenewalCompanyTermEligible(source)) {
+        if (resolvedMode == ModeTermeRenouvellement.COMPAGNIE && !renewalPolicy.isCompanyTermEligible(source)) {
             throw new BadRequestException("Le terme compagnie est réservé aux échéances trimestrielles de fin de mois");
         }
     }
@@ -4159,17 +4234,6 @@ public class ContratService {
             input.setDateEffet(contrat.getDateEffet());
             input.setDateEcheance(contrat.getDateEcheance());
         }
-    }
-
-    private boolean isRenewalCompanyTermEligible(Contrat contrat) {
-        if (!"renouvelable".equalsIgnoreCase(blankToNull(contrat.getTypeRenouvellement()))
-                || contrat.getDateEcheance() == null) {
-            return false;
-        }
-        LocalDate echeance = contrat.getDateEcheance();
-        int month = echeance.getMonthValue();
-        return (month == 3 || month == 6 || month == 9 || month == 12)
-                && echeance.getDayOfMonth() == echeance.lengthOfMonth();
     }
 
     private CreateContratRequest buildRenewalDraftRequest(
@@ -4968,7 +5032,7 @@ public class ContratService {
                 .contratOrigineId(contrat.getContratOrigine() != null ? contrat.getContratOrigine().getId() : null)
                 .renouvele(contrat.getRenouvele())
                 .modeTermeRenouvellement(contrat.getModeTermeRenouvellement())
-                .renouvellementTermeCompagnieEligible(isRenewalCompanyTermEligible(contrat))
+                .renouvellementTermeCompagnieEligible(renewalPolicy.isCompanyTermEligible(contrat))
                 .usageId(contrat.getUsage() != null ? contrat.getUsage().getId() : null)
                 .usageCode(contrat.getUsage() != null ? contrat.getUsage().getCode() : null)
                 .usageLibelle(contrat.getUsage() != null ? contrat.getUsage().getLibelle() : null)

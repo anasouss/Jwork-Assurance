@@ -858,6 +858,8 @@ export type EcheanceAutomobileRow = {
   compagnie?: string | null;
   telephone?: string | null;
   observation?: string | null;
+  preTermeDraftId?: string | null;
+  renouvellementTermeCompagnieEligible: boolean;
 };
 
 export type EcheanceAutomobileResponse = {

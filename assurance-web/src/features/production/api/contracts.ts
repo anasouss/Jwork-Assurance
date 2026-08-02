@@ -68,6 +68,27 @@ export const contractApi = {
     );
   },
 
+  async finalizeRenouvellementDraft(
+    draftId: string,
+    modeTermeRenouvellement: "CABINET" | "COMPAGNIE"
+  ) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(
+        `/api/v1/contrats/renouvellements/${draftId}/finaliser`,
+        {
+          method: "POST",
+          body: JSON.stringify({ modeTermeRenouvellement }),
+        }
+      )
+    );
+  },
+
+  async downloadPreTermePdf(draftId: string, avecPrime: boolean) {
+    return apiFetchBlob(
+      `/api/v1/contrats/renouvellements/${draftId}/pre-terme-pdf${buildQueryString({ avecPrime })}`
+    );
+  },
+
   async deleteContrat(contratId: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(`/api/v1/contrats/${contratId}`, {

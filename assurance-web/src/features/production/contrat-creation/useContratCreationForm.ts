@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { contractKeys } from "@/lib/query-keys";
 import { clientApi } from "../api/clients";
@@ -8,6 +8,7 @@ import { contractCreationApi } from "../api/contract-creation";
 import { contractServiceApi } from "../api/contract-services";
 import { referenceApi } from "../api/references";
 import { computeDateEcheanceFromCode, computeDateEcheanceFromMonths } from "../date";
+import { renewalReturnPath } from "../renewals/navigation";
 import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
 import { emptyVehicule } from "../components/VehiculeSection";
@@ -39,6 +40,7 @@ export function useContratCreationForm(
 ) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [numeroPolice, setNumeroPolice] = useState("");
   const [numeroAttestation, setNumeroAttestation] = useState("");
   const [compagnieAssuranceId, setCompagnieAssuranceId] = useState("");
@@ -448,8 +450,14 @@ export function useContratCreationForm(
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateContratRequest) =>
-      draftId ? contractCreationApi.finalizeContratDraft(draftId, payload) : contractCreationApi.createContrat(payload),
+    mutationFn: (payload: CreateContratRequest) => {
+      if (draftId && options?.renewalMode) {
+        return contractCreationApi.updateContratDraft(draftId, payload);
+      }
+      return draftId
+        ? contractCreationApi.finalizeContratDraft(draftId, payload)
+        : contractCreationApi.createContrat(payload);
+    },
     onSuccess: async (contrat) => {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
       if (draftId) {
@@ -466,8 +474,8 @@ export function useContratCreationForm(
         return;
       }
       if (options?.renewalMode) {
-        toast.success("Contrat renouvelé");
-        navigate(`/app/production/contrats/${contrat.id}`);
+        toast.success("Pré-terme enregistré");
+        navigate(renewalReturnPath(searchParams.get("returnTo")));
         return;
       }
       toast.success("Contrat créé");
@@ -476,7 +484,7 @@ export function useContratCreationForm(
     onError: (error) => toast.error(error instanceof Error
       ? error.message
       : options?.renewalMode
-        ? "Renouvellement impossible"
+        ? "Enregistrement du pré-terme impossible"
         : correctionMode
           ? "Modification impossible"
           : "Création impossible"),

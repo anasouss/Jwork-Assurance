@@ -15,6 +15,7 @@ import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.VehiculeRepository;
+import com.assurance.service.renewal.RenewalPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +49,7 @@ public class ContratSearchService {
     private final MouvementContratRepository mouvementContratRepository;
     private final VehiculeRepository vehiculeRepository;
     private final AvenantDraftService avenantDraftService;
+    private final RenewalPolicy renewalPolicy;
 
     @Transactional(readOnly = true)
     public PagedResponse<ContratListGroupResponse> searchContracts(
@@ -224,7 +226,7 @@ public class ContratSearchService {
                 .contratOrigineId(contract.getContratOrigine() == null ? null : contract.getContratOrigine().getId())
                 .renouvele(contract.getRenouvele())
                 .modeTermeRenouvellement(contract.getModeTermeRenouvellement())
-                .renouvellementTermeCompagnieEligible(isRenewalCompanyTermEligible(contract))
+                .renouvellementTermeCompagnieEligible(renewalPolicy.isCompanyTermEligible(contract))
                 .dateEffet(contract.getDateEffet())
                 .dateEcheance(contract.getDateEcheance())
                 .typeRenouvellement(contract.getTypeRenouvellement())
@@ -316,14 +318,4 @@ public class ContratSearchService {
         return value == null || value.isBlank() ? null : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private boolean isRenewalCompanyTermEligible(Contrat contract) {
-        if (!"renouvelable".equalsIgnoreCase(contract.getTypeRenouvellement())
-                || contract.getDateEcheance() == null) {
-            return false;
-        }
-        LocalDate dueDate = contract.getDateEcheance();
-        int month = dueDate.getMonthValue();
-        return (month == 3 || month == 6 || month == 9 || month == 12)
-                && dueDate.getDayOfMonth() == dueDate.lengthOfMonth();
-    }
 }

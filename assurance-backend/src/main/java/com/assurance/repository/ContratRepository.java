@@ -8,7 +8,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +46,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
 
     @EntityGraph(attributePaths = {"compagnieAssurance", "convention", "contratOrigine"})
     List<Contrat> findByAgenceIdAndIdIn(Long agenceId, List<Long> ids);
+
+    List<Contrat> findByAgenceIdAndContratOrigineIdIn(Long agenceId, List<Long> contratOrigineIds);
 
     @Query(value = """
             select c.id
@@ -228,6 +233,10 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
     })
     Optional<Contrat> findByAgenceIdAndId(Long agenceId, Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Contrat c where c.agence.id = :agenceId and c.id = :id")
+    Optional<Contrat> findByAgenceIdAndIdForUpdate(@Param("agenceId") Long agenceId, @Param("id") Long id);
+
     Optional<Contrat> findFirstByAgenceIdAndContratOrigineIdAndStatutAndBrouillonTrueOrderByCreatedAtDesc(
             Long agenceId,
             Long contratOrigineId,
@@ -258,6 +267,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             where c.agence.id = :agenceId
               and c.prospection = false
               and c.brouillon = false
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
               and c.dateEcheance between :dateDu and :dateAu
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
@@ -303,6 +313,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             where c.agence.id = :agenceId
               and c.prospection = false
               and c.brouillon = false
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
               and c.dateEcheance between :dateDu and :dateAu
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)

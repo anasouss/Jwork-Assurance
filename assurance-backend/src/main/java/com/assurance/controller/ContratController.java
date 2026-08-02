@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.CreateRenouvellementDraftRequest;
+import com.assurance.dto.request.FinalizeRenouvellementRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.DevisPdfFilterRequest;
 import com.assurance.dto.request.MouvementContratRequest;
@@ -27,6 +28,7 @@ import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
 import com.assurance.service.ContratSearchService;
 import com.assurance.service.DevisPdfService;
+import com.assurance.service.PreTermeFlottePdfService;
 import com.assurance.service.EcheanceProductionService;
 import com.assurance.service.MouvementContratService;
 import jakarta.validation.Valid;
@@ -59,6 +61,7 @@ public class ContratController {
     private final AssistanceContratService assistanceContratService;
     private final CarteVerteService carteVerteService;
     private final DevisPdfService devisPdfService;
+    private final PreTermeFlottePdfService preTermeFlottePdfService;
     private final MouvementContratService mouvementContratService;
     private final EcheanceProductionService echeanceProductionService;
 
@@ -159,6 +162,22 @@ public class ContratController {
                         request.getModeTermeRenouvellement()
                 ),
                 "Brouillon de renouvellement prêt"
+        ));
+    }
+
+    @PostMapping("/renouvellements/{draftId}/finaliser")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<ContratResponse>> finalizeRenouvellementDraft(
+            @PathVariable Long draftId,
+            @Valid @RequestBody FinalizeRenouvellementRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.finalizeRenouvellementDraft(
+                        TenantContext.getCurrentAgence(),
+                        draftId,
+                        request.getModeTermeRenouvellement()
+                ),
+                "Contrat renouvelé"
         ));
     }
 
@@ -298,6 +317,19 @@ public class ContratController {
         byte[] pdf = devisPdfService.generate(TenantContext.getCurrentAgence(), id, request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=devis-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/renouvellements/{draftId}/pre-terme-pdf")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:renew', 'PERM_contrat:update')")
+    public ResponseEntity<byte[]> preTermePdf(
+            @PathVariable Long draftId,
+            @RequestParam(defaultValue = "false") boolean avecPrime
+    ) {
+        byte[] pdf = preTermeFlottePdfService.generate(TenantContext.getCurrentAgence(), draftId, avecPrime);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=pre-terme-" + draftId + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }

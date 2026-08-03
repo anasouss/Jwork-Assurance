@@ -61,7 +61,7 @@ public class ReleveClientPdfRenderer {
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             PdfFont tableHeader = PdfFontFactory.createFont(StandardFonts.TIMES_BOLD);
-            document.setFont(regular).setFontSize(8.5f).setFontColor(ColorConstants.BLACK);
+            document.setFont(regular).setFontSize(9.5f).setFontColor(ColorConstants.BLACK);
 
             writeLetterHead(document, pdf, source, bold);
             writeLetterIntroduction(document, source, regular, bold);
@@ -80,31 +80,31 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeLetterHead(Document document, PdfDocument pdf, DocumentClient source, PdfFont bold) {
-        Table top = new Table(new float[]{7.5f, 2.5f})
+        Table top = new Table(new float[]{7.8f, 2.2f})
                 .setWidth(UnitValue.createPercentValue(100));
-        Cell brand = borderless(new Cell()).setHeight(76).setVerticalAlignment(VerticalAlignment.TOP);
+        Cell brand = borderless(new Cell()).setHeight(98).setVerticalAlignment(VerticalAlignment.TOP);
         byte[] logo = logoContent(source.getAgence());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(150, 72);
+            image.scaleToFit(205, 94);
             brand.add(image);
         } else {
             brand.add(new Paragraph(source.getAgence().getNom())
                     .setFont(bold)
-                    .setFontSize(14)
+                    .setFontSize(17)
                     .setMargins(8, 0, 0, 8));
         }
         top.addCell(brand);
 
         PdfFormXObject qrObject = new BarcodeQRCode(source.getNumero()).createFormXObject(ColorConstants.BLACK, pdf);
-        Image qr = new Image(qrObject).setWidth(66).setHeight(66)
+        Image qr = new Image(qrObject).setWidth(86).setHeight(86)
                 .setHorizontalAlignment(HorizontalAlignment.CENTER);
         top.addCell(borderless(new Cell()).add(qr).setTextAlignment(TextAlignment.CENTER));
         document.add(top);
 
         document.add(new Paragraph(city(source.getAgence()) + " Le " + LONG_DATE_FORMAT.format(source.getDateEmission()))
                 .setTextAlignment(TextAlignment.RIGHT)
-                .setFontSize(8.5f)
+                .setFontSize(9.5f)
                 .setMarginTop(0)
                 .setMarginRight(38)
                 .setMarginBottom(1));
@@ -116,14 +116,14 @@ public class ReleveClientPdfRenderer {
         recipient.addCell(new Cell()
                 .add(new Paragraph(value(source.getPayeurNom()))
                 .setFont(bold)
-                .setFontSize(9.5f)
+                .setFontSize(11f)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMargin(0))
                 .setBorder(TABLE_BORDER)
                 .setPadding(3));
         recipient.addCell(new Cell()
                 .add(new Paragraph(address(source.getPayeurAdresse()))
-                        .setFontSize(8.5f)
+                        .setFontSize(9.5f)
                         .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))
                 .setMinHeight(40)
@@ -137,7 +137,7 @@ public class ReleveClientPdfRenderer {
 
     private void writeLetterIntroduction(Document document, DocumentClient source, PdfFont regular, PdfFont bold) {
         Paragraph subject = new Paragraph()
-                .setFontSize(9)
+                .setFontSize(10f)
                 .setMarginTop(0)
                 .setMarginLeft(7)
                 .setMarginBottom(21);
@@ -146,11 +146,11 @@ public class ReleveClientPdfRenderer {
         document.add(subject);
 
         document.add(new Paragraph("Chères Mesdames, Chers Messieurs,")
-                .setFontSize(9)
+                .setFontSize(10f)
                 .setMarginLeft(7)
                 .setMarginBottom(7));
         document.add(new Paragraph("Veuillez trouver ci-dessous le détail des primes relatives à vos contrats :")
-                .setFontSize(9)
+                .setFontSize(10f)
                 .setMarginLeft(7)
                 .setMarginBottom(14));
     }
@@ -167,7 +167,7 @@ public class ReleveClientPdfRenderer {
     }
 
     private Cell referenceCell(String text, PdfFont font, TextAlignment alignment) {
-        Paragraph paragraph = new Paragraph(text).setFontSize(8.5f).setMargin(0);
+        Paragraph paragraph = new Paragraph(text).setFontSize(9f).setMargin(0);
         if (font != null) {
             paragraph.setFont(font);
         }
@@ -222,7 +222,7 @@ public class ReleveClientPdfRenderer {
 
     private void addHeader(Table table, String text, PdfFont font) {
         table.addHeaderCell(new Cell()
-                .add(new Paragraph(text).setFont(font).setFontSize(6.9f).setMargin(0))
+                .add(new Paragraph(text).setFont(font).setFontSize(7.5f).setMargin(0))
                 .setFontColor(ColorConstants.BLUE)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
@@ -231,7 +231,7 @@ public class ReleveClientPdfRenderer {
     }
 
     private void addValue(Table table, String text, TextAlignment alignment, PdfFont font) {
-        Paragraph paragraph = new Paragraph(value(text)).setFontSize(6.5f).setMargin(0);
+        Paragraph paragraph = new Paragraph(value(text)).setFontSize(7.1f).setMargin(0);
         if (font != null) {
             paragraph.setFont(font);
         }
@@ -250,12 +250,12 @@ public class ReleveClientPdfRenderer {
                 .setMarginRight(134)
                 .setMarginTop(9);
         total.addCell(new Cell()
-                .add(new Paragraph("Total").setFont(regular).setFontSize(7.5f).setMargin(0))
+                .add(new Paragraph("Total").setFont(regular).setFontSize(8.5f).setMargin(0))
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBorder(TABLE_BORDER)
                 .setPadding(4));
         total.addCell(new Cell()
-                .add(new Paragraph(amount(source.getTotalDocument())).setFont(regular).setFontSize(7.5f).setMargin(0))
+                .add(new Paragraph(amount(source.getTotalDocument())).setFont(regular).setFontSize(8.5f).setMargin(0))
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setBorder(TABLE_BORDER)
                 .setPadding(4));
@@ -264,12 +264,12 @@ public class ReleveClientPdfRenderer {
 
     private void writePaymentText(Document document, DocumentClient source) {
         document.add(new Paragraph("Le montant total à régler s'élève à " + amount(source.getTotalDocument()) + " Dhs")
-                .setFontSize(8.5f)
+                .setFontSize(9.5f)
                 .setMarginLeft(7)
                 .setMarginTop(18)
                 .setMarginBottom(3));
         document.add(new Paragraph("Dès réception de votre règlement, nous vous ferons parvenir la (les) quittance(s) correspondante(s).")
-                .setFontSize(8.5f)
+                .setFontSize(9.5f)
                 .setMarginLeft(7)
                 .setMarginTop(0));
     }
@@ -324,7 +324,7 @@ public class ReleveClientPdfRenderer {
     private Paragraph footerParagraph(String text, PdfFont regular) {
         return new Paragraph(text)
                 .setFont(regular)
-                .setFontSize(6.7f)
+                .setFontSize(7.2f)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMargin(0)
                 .setMultipliedLeading(1.05f);

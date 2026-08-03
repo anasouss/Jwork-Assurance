@@ -35,5 +35,5 @@ export const attestationStockKeys = {
   searches: () => [...attestationStockKeys.all, "search"] as const,
   search: (params?: QueryParams) => [...attestationStockKeys.searches(), params ?? {}] as const,
   deliveries: () => ["livraisons-attestations"] as const,
-  deliveryList: (source: string) => [...attestationStockKeys.deliveries(), source] as const,
+  deliveryList: (source: string, params?: QueryParams) => [...attestationStockKeys.deliveries(), source, params ?? {}] as const,
 };

@@ -166,9 +166,25 @@ public class LivraisonAttestationService {
     }
 
     @Transactional(readOnly = true)
-    public List<LivraisonAttestationResponse> lister(Long agenceId, SourceLivraisonAttestation source) {
+    public List<LivraisonAttestationResponse> lister(
+            Long agenceId,
+            SourceLivraisonAttestation source,
+            Long compagnieAssuranceId,
+            Integer annee
+    ) {
         SourceLivraisonAttestation sourceEffective = source == null ? SourceLivraisonAttestation.COMMANDE : source;
-        return livraisonAttestationRepository.findByAgenceIdAndSourceAndActifTrueOrderByCreatedAtDesc(agenceId, sourceEffective)
+        if (annee != null && (annee < 1900 || annee > 2200)) {
+            throw new BadRequestException("L'année de réception est invalide");
+        }
+        LocalDate dateDu = annee == null ? null : LocalDate.of(annee, 1, 1);
+        LocalDate dateAu = annee == null ? null : LocalDate.of(annee, 12, 31);
+        return livraisonAttestationRepository.searchActive(
+                        agenceId,
+                        sourceEffective,
+                        compagnieAssuranceId,
+                        dateDu,
+                        dateAu
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();

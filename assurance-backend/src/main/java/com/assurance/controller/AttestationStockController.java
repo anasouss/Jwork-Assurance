@@ -152,9 +152,16 @@ public class AttestationStockController {
     @GetMapping("/livraisons")
     @PreAuthorize("hasAnyAuthority('PERM_attestation-stock:view', 'PERM_attestation-stock:manage')")
     public ResponseEntity<ApiResponse<List<LivraisonAttestationResponse>>> listerLivraisons(
-            @RequestParam(required = false) SourceLivraisonAttestation source
+            @RequestParam(required = false) SourceLivraisonAttestation source,
+            @RequestParam(required = false) Long compagnieAssuranceId,
+            @RequestParam(required = false) Integer annee
     ) {
-        return ResponseEntity.ok(ApiResponse.success(livraisonAttestationService.lister(TenantContext.getCurrentAgence(), source)));
+        return ResponseEntity.ok(ApiResponse.success(livraisonAttestationService.lister(
+                TenantContext.getCurrentAgence(),
+                source,
+                compagnieAssuranceId,
+                annee
+        )));
     }
 
     @PostMapping("/livraisons/{id}/lots")

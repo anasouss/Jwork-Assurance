@@ -9,6 +9,7 @@ import type { LivraisonSource } from "./AttestationDeliveryCreateDialog";
 type Props = {
   source: LivraisonSource;
   rows: LivraisonAttestation[];
+  loading?: boolean;
   selectedLivraisonId: string;
   validationPending: boolean;
   onView: (livraison: LivraisonAttestation) => void;
@@ -19,6 +20,7 @@ type Props = {
 export function AttestationDeliveryTable({
   source,
   rows,
+  loading = false,
   selectedLivraisonId,
   validationPending,
   onView,
@@ -48,7 +50,13 @@ export function AttestationDeliveryTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((livraison) => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
+                  {source === "COMMANDE" ? "Chargement des commandes..." : "Chargement des réceptions..."}
+                </TableCell>
+              </TableRow>
+            ) : rows.map((livraison) => (
               <TableRow key={livraison.id} className={selectedLivraisonId === livraison.id ? "bg-muted/50" : undefined}>
                 <TableCell className="min-w-52 align-top">
                   <div className="font-medium">
@@ -102,7 +110,7 @@ export function AttestationDeliveryTable({
                 </TableCell>
               </TableRow>
             ))}
-            {rows.length === 0 ? (
+            {!loading && rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
                   Aucun élément.

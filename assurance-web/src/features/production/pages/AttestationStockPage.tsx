@@ -18,6 +18,10 @@ import {
   type LivraisonSource,
 } from "../components/AttestationDeliveryCreateDialog";
 import { AttestationDeliveryDetailsDialog } from "../components/AttestationDeliveryDetailsDialog";
+import {
+  ALL_DELIVERY_FILTERS,
+  AttestationDeliveryFilters,
+} from "../components/AttestationDeliveryFilters";
 import { AttestationDeliveryTable } from "../components/AttestationDeliveryTable";
 import {
   AttestationReceptionDialog,
@@ -318,11 +322,25 @@ function AttestationStockDashboardPage() {
 
 function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
   const queryClient = useQueryClient();
+  const [urlParams, setUrlParams] = useSearchParams();
   const [createForm, setCreateForm] = useState(emptyCreateForm);
   const [lotForm, setLotForm] = useState(emptyLotForm);
   const [createOpen, setCreateOpen] = useState(false);
   const [receptionOpen, setReceptionOpen] = useState(false);
   const [detailsLivraison, setDetailsLivraison] = useState<LivraisonAttestation | null>(null);
+  const receptionFilters = useMemo(() => ({
+    compagnieAssuranceId: urlParams.get("compagnie") ?? ALL_DELIVERY_FILTERS,
+    annee: urlParams.get("annee") ?? ALL_DELIVERY_FILTERS,
+  }), [urlParams]);
+  const deliveryQuery = useMemo(() => ({
+    source,
+    compagnieAssuranceId: source === "RECEPTION_DIRECTE"
+      ? deliveryFilterOrUndefined(receptionFilters.compagnieAssuranceId)
+      : undefined,
+    annee: source === "RECEPTION_DIRECTE"
+      ? deliveryFilterOrUndefined(receptionFilters.annee)
+      : undefined,
+  }), [receptionFilters.annee, receptionFilters.compagnieAssuranceId, source]);
 
   const compagnies = useQuery({
     queryKey: referenceKeys.list("compagnies-assurance"),
@@ -333,8 +351,8 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
     queryFn: () => referenceApi.list("groupes-usage-attestation"),
   });
   const livraisons = useQuery({
-    queryKey: attestationStockKeys.deliveryList(source),
-    queryFn: () => attestationStockApi.listLivraisonsAttestation(source),
+    queryKey: attestationStockKeys.deliveryList(source, deliveryQuery),
+    queryFn: () => attestationStockApi.listLivraisonsAttestation(deliveryQuery),
   });
 
   const rows = useMemo(() => livraisons.data ?? [], [livraisons.data]);
@@ -534,6 +552,18 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
     }));
   }
 
+  function updateReceptionFilter(key: "compagnie" | "annee", value: string) {
+    setUrlParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value === ALL_DELIVERY_FILTERS) {
+        next.delete(key);
+      } else {
+        next.set(key, value);
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -559,9 +589,21 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
         </div>
       </div>
 
+      {source === "RECEPTION_DIRECTE" ? (
+        <AttestationDeliveryFilters
+          compagnieAssuranceId={receptionFilters.compagnieAssuranceId}
+          annee={receptionFilters.annee}
+          compagnies={compagnies.data ?? []}
+          onCompagnieChange={(value) => updateReceptionFilter("compagnie", value)}
+          onAnneeChange={(value) => updateReceptionFilter("annee", value)}
+          onReset={() => setUrlParams({})}
+        />
+      ) : null}
+
       <AttestationDeliveryTable
         source={source}
         rows={rows}
+        loading={livraisons.isLoading || livraisons.isFetching}
         selectedLivraisonId={lotForm.livraisonId}
         validationPending={validateLivraison.isPending}
         onView={setDetailsLivraison}
@@ -712,6 +754,10 @@ function usageColor(value: AttestationStockCompanyUsage | string | null | undefi
 
 function selectedOrUndefined(value: string) {
   return value === ALL_STOCK_FILTERS ? undefined : value;
+}
+
+function deliveryFilterOrUndefined(value: string) {
+  return value === ALL_DELIVERY_FILTERS ? undefined : value;
 }
 
 function groupAllowedForCompany(groupe: ReferenceOption, compagnieAssuranceId: string) {

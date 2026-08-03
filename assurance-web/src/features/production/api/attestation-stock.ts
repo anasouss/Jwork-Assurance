@@ -17,10 +17,18 @@ import type {
 import { unwrapApiResponse as unwrap } from "./response";
 
 export const attestationStockApi = {
-  async listLivraisonsAttestation(source: "COMMANDE" | "RECEPTION_DIRECTE" = "COMMANDE") {
+  async listLivraisonsAttestation(params: {
+    source?: "COMMANDE" | "RECEPTION_DIRECTE";
+    compagnieAssuranceId?: string;
+    annee?: string;
+  } = {}) {
     return unwrap(
       await apiFetch<ApiResponse<LivraisonAttestation[]>>(
-        `/api/v1/attestations-stock/livraisons${buildQueryString({ source })}`
+        `/api/v1/attestations-stock/livraisons${buildQueryString({
+          source: params.source ?? "COMMANDE",
+          compagnieAssuranceId: params.compagnieAssuranceId,
+          annee: params.annee,
+        })}`
       )
     );
   },

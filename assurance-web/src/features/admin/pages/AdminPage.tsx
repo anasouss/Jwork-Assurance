@@ -34,6 +34,7 @@ import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { adminApi } from "../api";
 import type {
@@ -1135,7 +1137,13 @@ function AgenciesPanel({
             <LabeledInput label="Patente" value={form.patente ?? ""} onChange={(value) => setForm({ ...form, patente: value })} />
             <LabeledInput label="ICE" value={form.ice ?? ""} onChange={(value) => setForm({ ...form, ice: value })} />
             <LabeledInput label="N° d’agrément" value={form.numeroAgrement ?? ""} onChange={(value) => setForm({ ...form, numeroAgrement: value })} />
-            <LabeledInput label="Date d’agrément" type="date" value={form.dateAgrement ?? ""} onChange={(value) => setForm({ ...form, dateAgrement: value })} />
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium">Date d’agrément</span>
+              <DatePicker
+                date={form.dateAgrement}
+                onSelect={(date) => setForm({ ...form, dateAgrement: toDateOnly(date) ?? "" })}
+              />
+            </label>
             <LabeledInput label="Banque" value={form.banque ?? ""} onChange={(value) => setForm({ ...form, banque: value })} />
             <label className="grid gap-1.5 text-sm sm:col-span-2">
               <span className="font-medium">RIB / N° de compte bancaire</span>

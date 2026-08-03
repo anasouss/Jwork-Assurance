@@ -261,7 +261,7 @@ function AttestationStockDashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {groupedByCompany.map((company) => (
               <StockPieCard
                 key={company.compagnieAssuranceId}
@@ -690,10 +690,10 @@ function StockPieCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="h-40">
+        <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={chartData} dataKey="disponible" nameKey="groupeUsageAttestationCode" innerRadius={42} outerRadius={68} paddingAngle={2}>
+              <Pie data={chartData} dataKey="disponible" nameKey="groupeUsageAttestationCode" innerRadius={56} outerRadius={90} paddingAngle={2}>
                 {chartData.map((entry) => (
                   <Cell
                     key={`${entry.compagnieAssuranceId}-${entry.groupeUsageAttestationId}`}

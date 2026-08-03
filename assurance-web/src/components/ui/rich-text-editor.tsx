@@ -4,7 +4,6 @@ import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, Eraser, Italic, List, ListOrdered, Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type RichTextEditorProps = {
@@ -103,29 +102,29 @@ export function RichTextEditor({
 
   return (
     <div className={cn("overflow-hidden rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring/40", className)}>
-      <div className="flex flex-wrap items-center gap-1 border-b bg-muted/40 p-1.5">
+      <div className="relative z-10 flex flex-wrap items-center gap-1 border-b bg-muted/40 p-1.5">
         {controls.map((control) => (
-          <Tooltip key={control.label}>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={control.active ? "secondary" : "ghost"}
-                size="icon-sm"
-                aria-label={control.label}
-                aria-pressed={control.active}
-                disabled={disabled || control.disabled}
-                onClick={control.run}
-              >
-                <control.icon />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{control.label}</TooltipContent>
-          </Tooltip>
+          <Button
+            key={control.label}
+            type="button"
+            variant={control.active ? "secondary" : "ghost"}
+            size="icon-sm"
+            className="relative size-8 flex-none"
+            title={control.label}
+            aria-label={control.label}
+            aria-pressed={control.active}
+            disabled={disabled || control.disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={control.run}
+          >
+            <control.icon />
+          </Button>
         ))}
       </div>
       <EditorContent
         editor={editor}
         className={cn(
+          "relative z-0 cursor-text",
           "[&_.tiptap_p.is-editor-empty:first-child::before]:pointer-events-none",
           "[&_.tiptap_p.is-editor-empty:first-child::before]:float-left",
           "[&_.tiptap_p.is-editor-empty:first-child::before]:h-0",

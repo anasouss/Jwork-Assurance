@@ -336,17 +336,17 @@ export default function AssistanceProductsSettingsPage() {
                 onChange={(usageIds) => setProductPayload((current) => ({ ...current, usageIds }))}
               />
             </Field>
-            <Field label="Prestations">
-              <RichTextEditor
-                value={productPayload.prestations ?? ""}
-                onChange={(prestations) => setProductPayload((current) => ({ ...current, prestations }))}
-              />
-            </Field>
             <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-neutral-700 dark:bg-neutral-950/70">
               <Checkbox checked={productPayload.actif !== false} onCheckedChange={(value) => setProductPayload((current) => ({ ...current, actif: Boolean(value) }))} />
               <span>Actif</span>
             </label>
           </div>
+          <Field label="Prestations">
+            <RichTextEditor
+              value={productPayload.prestations ?? ""}
+              onChange={(prestations) => setProductPayload((current) => ({ ...current, prestations }))}
+            />
+          </Field>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProductDialogOpen(false)}>Annuler</Button>
             <Button disabled={saveProduct.isPending} onClick={() => submitProduct(editingProduct, productPayload, saveProduct.mutate)}>

@@ -8,6 +8,7 @@ import com.itextpdf.barcodes.BarcodeQRCode;
 import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.geom.PageSize;
@@ -48,6 +49,7 @@ public class ReleveClientPdfRenderer {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yy");
     private static final DateTimeFormatter LONG_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final SolidBorder TABLE_BORDER = new SolidBorder(ColorConstants.BLACK, 0.7f);
+    private static final DeviceRgb TABLE_HEADER_COLOR = new DeviceRgb(20, 54, 88);
     private static final float PAGE_MARGIN = 10f;
 
     private final AgencyLogoStorageService agencyLogoStorageService;
@@ -82,11 +84,11 @@ public class ReleveClientPdfRenderer {
     private void writeLetterHead(Document document, PdfDocument pdf, DocumentClient source, PdfFont bold) {
         Table top = new Table(new float[]{7.8f, 2.2f})
                 .setWidth(UnitValue.createPercentValue(100));
-        Cell brand = borderless(new Cell()).setHeight(98).setVerticalAlignment(VerticalAlignment.TOP);
+        Cell brand = borderless(new Cell()).setHeight(124).setVerticalAlignment(VerticalAlignment.TOP);
         byte[] logo = logoContent(source.getAgence());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(205, 94);
+            image.scaleToFit(260, 120);
             brand.add(image);
         } else {
             brand.add(new Paragraph(source.getAgence().getNom())
@@ -97,7 +99,7 @@ public class ReleveClientPdfRenderer {
         top.addCell(brand);
 
         PdfFormXObject qrObject = new BarcodeQRCode(source.getNumero()).createFormXObject(ColorConstants.BLACK, pdf);
-        Image qr = new Image(qrObject).setWidth(86).setHeight(86)
+        Image qr = new Image(qrObject).setWidth(96).setHeight(96)
                 .setHorizontalAlignment(HorizontalAlignment.CENTER);
         top.addCell(borderless(new Cell()).add(qr).setTextAlignment(TextAlignment.CENTER));
         document.add(top);
@@ -221,16 +223,16 @@ public class ReleveClientPdfRenderer {
 
     private void addHeader(Table table, String text, PdfFont font) {
         table.addHeaderCell(new Cell()
-                .add(new Paragraph(text).setFont(font).setFontSize(7.5f).setMargin(0))
-                .setFontColor(ColorConstants.BLUE)
+                .add(new Paragraph(text).setFont(font).setFontSize(8f).setMargin(0))
+                .setFontColor(TABLE_HEADER_COLOR)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(TABLE_BORDER)
-                .setPadding(2.5f));
+                .setPadding(3.2f));
     }
 
     private void addValue(Table table, String text, TextAlignment alignment, PdfFont font) {
-        Paragraph paragraph = new Paragraph(value(text)).setFontSize(7.1f).setMargin(0);
+        Paragraph paragraph = new Paragraph(value(text)).setFontSize(7.6f).setMargin(0);
         if (font != null) {
             paragraph.setFont(font);
         }
@@ -239,7 +241,7 @@ public class ReleveClientPdfRenderer {
                 .setTextAlignment(alignment)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(TABLE_BORDER)
-                .setPadding(2.5f));
+                .setPadding(3.2f));
     }
 
     private void writeTotal(Document document, DocumentClient source, PdfFont bold) {

@@ -66,8 +66,8 @@ public class ReleveClientPdfRenderer {
             writeLetterHead(document, pdf, source, bold);
             writeLetterIntroduction(document, source, regular, bold);
             writeClientReference(document, source, bold);
-            writeStatementLines(document, source, regular, bold, tableHeader);
-            writeTotal(document, source, regular);
+            writeStatementLines(document, source, bold, tableHeader);
+            writeTotal(document, source, bold);
             writePaymentText(document, source);
             if (source.getStatut() == StatutDocumentClient.ANNULE) {
                 writeCancellation(document, source, bold);
@@ -182,7 +182,6 @@ public class ReleveClientPdfRenderer {
     private void writeStatementLines(
             Document document,
             DocumentClient source,
-            PdfFont regular,
             PdfFont bold,
             PdfFont tableHeader
     ) {
@@ -190,15 +189,15 @@ public class ReleveClientPdfRenderer {
                 .setWidth(UnitValue.createPercentValue(100))
                 .setKeepTogether(false);
         addHeader(table, "L’assuré", tableHeader);
-        addHeader(table, "Police N°", regular);
-        addHeader(table, "Du", regular);
-        addHeader(table, "Au", regular);
-        addHeader(table, "Prime Nette", regular);
-        addHeader(table, "Taxes", regular);
-        addHeader(table, "Montant\nTTC", regular);
-        addHeader(table, "Acompte", regular);
-        addHeader(table, "Reste à payer", regular);
-        addHeader(table, "Libellé", regular);
+        addHeader(table, "Police N°", tableHeader);
+        addHeader(table, "Du", tableHeader);
+        addHeader(table, "Au", tableHeader);
+        addHeader(table, "Prime Nette", tableHeader);
+        addHeader(table, "Taxes", tableHeader);
+        addHeader(table, "Montant\nTTC", tableHeader);
+        addHeader(table, "Acompte", tableHeader);
+        addHeader(table, "Reste à payer", tableHeader);
+        addHeader(table, "Libellé", tableHeader);
 
         source.getLignes().stream()
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
@@ -243,19 +242,19 @@ public class ReleveClientPdfRenderer {
                 .setPadding(2.5f));
     }
 
-    private void writeTotal(Document document, DocumentClient source, PdfFont regular) {
+    private void writeTotal(Document document, DocumentClient source, PdfFont bold) {
         Table total = new Table(new float[]{1.55f, 1})
                 .setWidth(UnitValue.createPercentValue(24))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
                 .setMarginRight(134)
                 .setMarginTop(9);
         total.addCell(new Cell()
-                .add(new Paragraph("Total").setFont(regular).setFontSize(8.5f).setMargin(0))
+                .add(new Paragraph("Total").setFont(bold).setFontSize(8.5f).setMargin(0))
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBorder(TABLE_BORDER)
                 .setPadding(4));
         total.addCell(new Cell()
-                .add(new Paragraph(amount(source.getTotalDocument())).setFont(regular).setFontSize(8.5f).setMargin(0))
+                .add(new Paragraph(amount(source.getTotalDocument())).setFont(bold).setFontSize(8.5f).setMargin(0))
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setBorder(TABLE_BORDER)
                 .setPadding(4));

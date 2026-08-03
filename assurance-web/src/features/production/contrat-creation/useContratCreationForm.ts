@@ -657,11 +657,12 @@ export function useContratCreationForm(
     }
   };
 
-  const handlePreviewTarget = (target: ContratTargetKey) => {
+  const handlePreviewTarget = (target: ContratTargetKey, nextGaranties?: GarantieInput[]) => {
     if (!validateTarget(target, "garanties")) {
       return;
     }
-    targetPreviewMutation.mutate(scopedTargetRequest(request, target));
+    const previewRequest = nextGaranties ? { ...request, garanties: nextGaranties } : request;
+    targetPreviewMutation.mutate(scopedTargetRequest(previewRequest, target));
   };
 
   const handleCreate = () => {

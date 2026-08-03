@@ -81,26 +81,29 @@ export const ColorPicker = ({
     selectedColor.alpha() * 100 || defaultColor.alpha() * 100
   );
   const [mode, setMode] = useState("hex");
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     if (value) {
-      const color = Color.rgb(value).rgb().object();
+      const color = Color(value);
 
-      setHue(color.r);
-      setSaturation(color.g);
-      setLightness(color.b);
-      setAlpha(color.a);
+      setHue(color.hue() || 0);
+      setSaturation(color.saturationl());
+      setLightness(color.lightness());
+      setAlpha(color.alpha() * 100);
     }
   }, [value]);
 
   useEffect(() => {
-    if (onChange) {
-      const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
-      const rgba = color.rgb().array();
+    const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
+    const rgba = color.rgb().array();
 
-      onChange([rgba[0], rgba[1], rgba[2], alpha / 100]);
-    }
-  }, [hue, saturation, lightness, alpha, onChange]);
+    onChangeRef.current([rgba[0], rgba[1], rgba[2], alpha / 100]);
+  }, [hue, saturation, lightness, alpha]);
 
   return (
     <ColorPickerContext.Provider
@@ -130,7 +133,15 @@ export const ColorPickerSelection = memo(
     const [isDragging, setIsDragging] = useState(false);
     const [positionX, setPositionX] = useState(0);
     const [positionY, setPositionY] = useState(0);
-    const { hue, setSaturation, setLightness } = useColorPicker();
+    const { hue, saturation, lightness, setSaturation, setLightness } = useColorPicker();
+
+    useEffect(() => {
+      if (isDragging) return;
+      const x = saturation / 100;
+      const topLightness = x < 0.01 ? 100 : 50 + 50 * (1 - x);
+      setPositionX(x);
+      setPositionY(Math.max(0, Math.min(1, 1 - lightness / topLightness)));
+    }, [isDragging, lightness, saturation]);
 
     const backgroundGradient = useMemo(() => {
       return `linear-gradient(0deg, rgba(0,0,0,1), rgba(0,0,0,0)),
@@ -138,11 +149,9 @@ export const ColorPickerSelection = memo(
             hsl(${hue}, 100%, 50%)`;
     }, [hue]);
 
-    const handlePointerMove = useCallback(
+    const updateFromPointer = useCallback(
       (event: PointerEvent) => {
-        if (!(isDragging && containerRef.current)) {
-          return;
-        }
+        if (!containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
         const x = Math.max(
           0,
@@ -160,7 +169,14 @@ export const ColorPickerSelection = memo(
 
         setLightness(lightness);
       },
-      [isDragging, setSaturation, setLightness]
+      [setSaturation, setLightness]
+    );
+
+    const handlePointerMove = useCallback(
+      (event: PointerEvent) => {
+        if (isDragging) updateFromPointer(event);
+      },
+      [isDragging, updateFromPointer]
     );
 
     useEffect(() => {
@@ -183,7 +199,7 @@ export const ColorPickerSelection = memo(
         onPointerDown={(e) => {
           e.preventDefault();
           setIsDragging(true);
-          handlePointerMove(e.nativeEvent);
+          updateFromPointer(e.nativeEvent);
         }}
         ref={containerRef}
         style={{

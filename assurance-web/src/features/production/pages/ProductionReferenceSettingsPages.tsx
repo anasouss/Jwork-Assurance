@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ColorPickerField } from "@/components/ui/color-picker-field";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -337,19 +338,10 @@ export function GroupesUsageAttestationSettingsPage() {
               <Input value={payload.libelle} onChange={(event) => setPayload((current) => ({ ...current, libelle: event.target.value }))} />
             </Field>
             <Field label="Couleur">
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  className="h-10 w-14 shrink-0 p-1"
-                  value={normalizeColor(payload.couleur)}
-                  onChange={(event) => setPayload((current) => ({ ...current, couleur: event.target.value }))}
-                />
-                <Input
-                  value={payload.couleur ?? ""}
-                  onChange={(event) => setPayload((current) => ({ ...current, couleur: event.target.value }))}
-                  placeholder="#059669"
-                />
-              </div>
+              <ColorPickerField
+                value={payload.couleur ?? ""}
+                onChange={(couleur) => setPayload((current) => ({ ...current, couleur }))}
+              />
             </Field>
             <Field label="Restriction compagnie">
               <CompanyRestrictionSelect

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Boxes, ClipboardList, Plus, Settings2, TriangleAlert, Truck } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DonutChart, type DonutChartDatum } from "@/components/ui/donut-chart";
 import { Switch } from "@/components/ui/switch";
 import { attestationStockApi } from "../api/attestation-stock";
 import { referenceApi } from "../api/references";
@@ -676,11 +676,18 @@ function StockPieCard({
   company: { compagnieAssuranceId: string; compagnieAssuranceNom: string; rows: AttestationStockCompanyUsage[] };
   onSelect: (item: AttestationStockCompanyUsage) => void;
 }) {
-  const chartData = company.rows.filter((item) => item.disponible > 0);
+  const chartData: DonutChartDatum[] = company.rows
+    .filter((item) => item.disponible > 0)
+    .map((item) => ({
+      key: item.groupeUsageAttestationId,
+      label: `${item.groupeUsageAttestationCode} - ${item.groupeUsageAttestationLibelle}`,
+      value: item.disponible,
+      color: usageColor(item),
+    }));
   const thresholdAlerts = company.rows.filter(
     (item) => item.stockFaible && item.minimumStock != null,
   );
-  const total = chartData.reduce((sum, item) => sum + item.disponible, 0);
+  const total = chartData.reduce((sum, item) => sum + item.value, 0);
   return (
     <Card className="border-border/70 shadow-none">
       <CardHeader className="pb-2">
@@ -690,36 +697,28 @@ function StockPieCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={chartData} dataKey="disponible" nameKey="groupeUsageAttestationCode" innerRadius={56} outerRadius={90} paddingAngle={2}>
-                {chartData.map((entry) => (
-                  <Cell
-                    key={`${entry.compagnieAssuranceId}-${entry.groupeUsageAttestationId}`}
-                    fill={usageColor(entry)}
-                    className="cursor-pointer"
-                    onClick={() => onSelect(entry)}
-                  />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => formatInteger(Number(value))} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <DonutChart
+          data={chartData}
+          emptyText="Aucun stock disponible."
+          valueFormatter={formatInteger}
+          onSelect={(usageId) => {
+            const selected = company.rows.find((item) => item.groupeUsageAttestationId === usageId);
+            if (selected) onSelect(selected);
+          }}
+        />
         {thresholdAlerts.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 border-t pt-3">
             {thresholdAlerts.map((item) => (
-            <button
-              key={`${item.compagnieAssuranceId}-${item.groupeUsageAttestationId}`}
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900 hover:bg-amber-100"
-              onClick={() => onSelect(item)}
-            >
-              <TriangleAlert className="size-3.5" />
-              <span className="font-medium">{item.groupeUsageAttestationCode}</span>
-              <span>{formatInteger(item.disponible)}/{formatInteger(item.minimumStock ?? 0)}</span>
-            </button>
+              <button
+                key={`${item.compagnieAssuranceId}-${item.groupeUsageAttestationId}`}
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900 hover:bg-amber-100"
+                onClick={() => onSelect(item)}
+              >
+                <TriangleAlert className="size-3.5" />
+                <span className="font-medium">{item.groupeUsageAttestationCode}</span>
+                <span>{formatInteger(item.disponible)}/{formatInteger(item.minimumStock ?? 0)}</span>
+              </button>
             ))}
           </div>
         ) : null}

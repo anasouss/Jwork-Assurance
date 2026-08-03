@@ -27,7 +27,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             String jwt = resolveToken(request);
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+            if (StringUtils.hasText(jwt)) {
+                if (!tokenProvider.validateToken(jwt)) {
+                    rejectInvalidToken(response);
+                    return;
+                }
                 try {
                     Long userId = tokenProvider.getUserIdFromToken(jwt);
                     UserDetails userDetails = userDetailsService.loadUserById(userId);
@@ -41,9 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         TenantContext.setCurrentAgence(principal.getAgenceId());
                     }
                 } catch (RuntimeException ex) {
-                    SecurityContextHolder.clearContext();
-                    TenantContext.clear();
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid authentication token");
+                    rejectInvalidToken(response);
                     return;
                 }
             }
@@ -59,5 +61,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return header.substring(7);
         }
         return null;
+    }
+
+    private void rejectInvalidToken(HttpServletResponse response) throws IOException {
+        SecurityContextHolder.clearContext();
+        TenantContext.clear();
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid authentication token");
     }
 }

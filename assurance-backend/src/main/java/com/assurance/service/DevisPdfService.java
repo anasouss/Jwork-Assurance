@@ -73,6 +73,7 @@ public class DevisPdfService {
 
     private final ContratRepository contratRepository;
     private final ElementFacturableCibleService elementFacturableCibleService;
+    private final RichTextPdfRenderer richTextPdfRenderer;
 
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long contratId, DevisPdfFilterRequest filter) {
@@ -381,7 +382,7 @@ public class DevisPdfService {
         for (Map.Entry<String, String> entry : productsAndPrestations.entrySet()) {
             DeviceRgb rowBackground = rowIndex % 2 == 0 ? null : TABLE_ROW_ALT_BG;
             table.addCell(valueCell(entry.getKey(), TextAlignment.LEFT, rowBackground).setKeepTogether(true));
-            table.addCell(valueCell(entry.getValue(), TextAlignment.LEFT, rowBackground).setKeepTogether(true));
+            table.addCell(richTextCell(entry.getValue(), rowBackground).setKeepTogether(true));
             rowIndex++;
         }
         document.add(table);
@@ -737,6 +738,19 @@ public class DevisPdfService {
                 .setTextAlignment(alignment)
                 .setBorder(new SolidBorder(TABLE_BORDER, 1))
                 .setPadding(3);
+        if (backgroundColor != null) {
+            cell.setBackgroundColor(backgroundColor);
+        }
+        return cell;
+    }
+
+    private Cell richTextCell(String text, DeviceRgb backgroundColor) {
+        Cell cell = new Cell()
+                .setFontSize(8.5f)
+                .setTextAlignment(TextAlignment.LEFT)
+                .setBorder(new SolidBorder(TABLE_BORDER, 1))
+                .setPadding(3);
+        richTextPdfRenderer.addTo(cell, text);
         if (backgroundColor != null) {
             cell.setBackgroundColor(backgroundColor);
         }

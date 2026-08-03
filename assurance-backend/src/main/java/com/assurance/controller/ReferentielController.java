@@ -51,6 +51,7 @@ import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.*;
 import com.assurance.security.TenantContext;
+import com.assurance.service.RichTextSanitizer;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -103,6 +104,7 @@ public class ReferentielController {
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final TarifProduitAssistanceRepository tarifProduitAssistanceRepository;
     private final AgenceRepository agenceRepository;
+    private final RichTextSanitizer richTextSanitizer;
 
     @GetMapping("/usages")
     @Transactional(readOnly = true)
@@ -1691,7 +1693,7 @@ public class ReferentielController {
         produit.setCategorieClient(categorieClient);
         produit.setLibelle(request.getLibelle().trim());
         produit.setType(blankToNull(request.getType()));
-        produit.setPrestations(blankToNull(request.getPrestations()));
+        produit.setPrestations(richTextSanitizer.sanitize(request.getPrestations()));
         if (produit.getUsages() == null) {
             produit.setUsages(new LinkedHashSet<>());
         }

@@ -25,9 +25,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toDateOnly } from "../date";
 import { assistanceProductApi } from "../api/assistance-products";
@@ -337,7 +337,10 @@ export default function AssistanceProductsSettingsPage() {
               />
             </Field>
             <Field label="Prestations">
-              <Textarea rows={6} value={productPayload.prestations ?? ""} onChange={(event) => setProductPayload((current) => ({ ...current, prestations: event.target.value }))} />
+              <RichTextEditor
+                value={productPayload.prestations ?? ""}
+                onChange={(prestations) => setProductPayload((current) => ({ ...current, prestations }))}
+              />
             </Field>
             <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-neutral-700 dark:bg-neutral-950/70">
               <Checkbox checked={productPayload.actif !== false} onCheckedChange={(value) => setProductPayload((current) => ({ ...current, actif: Boolean(value) }))} />

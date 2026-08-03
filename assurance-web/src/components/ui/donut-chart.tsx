@@ -88,7 +88,7 @@ export function DonutChart({
               fontSize={12}
               fontWeight={600}
               fill="currentColor"
-              formatter={(value: number) => valueFormatter(value)}
+              formatter={(value) => valueFormatter(Number(value ?? 0))}
             />
           ) : null}
         </Pie>

@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -68,7 +68,13 @@ export function useContratCreationForm(
   const [assistanceDraft, setAssistanceDraft] = useState<AssistanceDraft>({ enabled: false });
   const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [saisiePrimeNette, setSaisiePrimeNette] = useState(false);
-  const [clients, setClients] = useState<ClientInput[]>(() => initialClients(initialCategorieClientId));
+  const [clients, setClientsState] = useState<ClientInput[]>(() => initialClients(initialCategorieClientId));
+  const setClients = useCallback<Dispatch<SetStateAction<ClientInput[]>>>((next) => {
+    setClientsState((current) => withInitialCategorieClient(
+      typeof next === "function" ? next(current) : next,
+      initialCategorieClientId
+    ));
+  }, [initialCategorieClientId]);
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([emptyVehicule()]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [garanties, setGaranties] = useState<GarantieInput[]>([]);
@@ -1608,7 +1614,9 @@ function initialClients(categorieClientId?: string): ClientInput[] {
 }
 
 function withInitialCategorieClient(clients: ClientInput[], categorieClientId?: string): ClientInput[] {
-  if (!categorieClientId || clients.some((client) => client.role === "SOUSCRIPTEUR" && client.client.categorieClientId)) {
+  if (!categorieClientId || clients.some(
+    (client) => client.role === "SOUSCRIPTEUR" && client.client.categorieClientId === categorieClientId
+  )) {
     return clients;
   }
   return clients.map((client) =>

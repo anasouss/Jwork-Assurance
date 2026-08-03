@@ -467,6 +467,10 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
       toast.error("La date de réception est obligatoire");
       return;
     }
+    if (source === "RECEPTION_DIRECTE" && !createForm.referenceBl.trim()) {
+      toast.error("La référence BL est obligatoire");
+      return;
+    }
 
     createLivraison.mutate({
       compagnieAssuranceId: createForm.compagnieAssuranceId,

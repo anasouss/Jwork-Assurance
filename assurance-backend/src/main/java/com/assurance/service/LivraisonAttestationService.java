@@ -63,6 +63,10 @@ public class LivraisonAttestationService {
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
         SourceLivraisonAttestation source = request.getSource() == null ? SourceLivraisonAttestation.COMMANDE : request.getSource();
+        if (source == SourceLivraisonAttestation.RECEPTION_DIRECTE
+                && (request.getReferenceBl() == null || request.getReferenceBl().isBlank())) {
+            throw new BadRequestException("La reference BL est obligatoire pour une reception directe");
+        }
 
         LivraisonAttestation livraison = livraisonAttestationRepository.save(LivraisonAttestation.builder()
                 .agence(agence)
@@ -70,7 +74,7 @@ public class LivraisonAttestationService {
                 .source(source)
                 .dateDemande(source == SourceLivraisonAttestation.COMMANDE ? request.getDateDemande() : null)
                 .dateReception(source == SourceLivraisonAttestation.RECEPTION_DIRECTE ? request.getDateReception() : request.getDateReception())
-                .referenceBl(request.getReferenceBl())
+                .referenceBl(request.getReferenceBl() == null ? null : request.getReferenceBl().trim())
                 .commentaireDecision(request.getCommentaireDecision())
                 .quantiteDemandee(0)
                 .quantiteRecue(0)

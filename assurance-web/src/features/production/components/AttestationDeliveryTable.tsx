@@ -69,7 +69,9 @@ export function AttestationDeliveryTable({
               <TableRow key={livraison.id} className={selectedLivraisonId === livraison.id ? "bg-muted/50" : undefined}>
                 <TableCell className="min-w-52 align-top">
                   <div className="font-medium">
-                    {livraison.referenceCommande ?? livraison.referenceBl ?? livraison.id}
+                    {isDirectReception
+                      ? livraison.referenceBl ?? livraison.referenceCommande ?? livraison.id
+                      : livraison.referenceCommande ?? livraison.referenceBl ?? livraison.id}
                   </div>
                   {!isDirectReception ? (
                     <div className="mt-1 text-xs text-muted-foreground">{formatDate(livraison.dateDemande)}</div>

@@ -116,9 +116,13 @@ export function AttestationDeliveryCreateDialog({
                 )}
               />
             </Field>
-            <Field label={source === "COMMANDE" ? "Référence externe" : "Référence BL / réception"}>
+            <Field
+              label={source === "COMMANDE" ? "Référence externe (optionnelle)" : "Référence BL"}
+              required={source === "RECEPTION_DIRECTE"}
+            >
               <Input
                 value={form.referenceBl}
+                required={source === "RECEPTION_DIRECTE"}
                 onChange={(event) => onFormChange((current) => ({ ...current, referenceBl: event.target.value }))}
               />
             </Field>
@@ -155,10 +159,12 @@ export function AttestationDeliveryCreateDialog({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, required = false, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-muted-foreground">
+        {label}{required ? <span className="text-destructive"> *</span> : null}
+      </Label>
       {children}
     </div>
   );

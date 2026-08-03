@@ -54,28 +54,20 @@ import { toDateOnly } from "@/features/production/date";
 import type { ClientResponse, GroupeClient } from "@/features/production/types";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import {
+  DOCUMENT_DEFAULTS,
+  SOURCE_DEFAULTS,
+  releveSearchParams,
+  releveSearchStateFromParams,
+  type DocumentFilters,
+  type ReleveSearchState,
+  type SourceFilters,
+} from "../releve-filters";
 import type {
   ClientDocument,
   ClientDocumentSource,
-  ClientDocumentStatus,
   ClientDocumentType,
-  TypeContrat,
 } from "../types";
-
-type SourceFilters = {
-  typeContrat: "ALL" | TypeContrat;
-  dateDu: string;
-  dateAu: string;
-  search: string;
-};
-
-type DocumentFilters = {
-  type: "ALL" | ClientDocumentType;
-  statut: "ALL" | ClientDocumentStatus;
-  dateDu: string;
-  dateAu: string;
-  search: string;
-};
 
 type SelectedPayer = {
   type: "CLIENT" | "GROUPE";
@@ -87,35 +79,18 @@ type SelectedPayer = {
   memberCount?: number;
 };
 
-const SOURCE_DEFAULTS: SourceFilters = {
-  typeContrat: "ALL",
-  dateDu: "",
-  dateAu: "",
-  search: "",
-};
-const DOCUMENT_DEFAULTS: DocumentFilters = {
-  type: "ALL",
-  statut: "ALL",
-  dateDu: "",
-  dateAu: "",
-  search: "",
-};
 const PAGE_SIZE = 25;
 
 export default function RelevesFacturesPage() {
-  const [searchParams] = useSearchParams();
-  const requestedPayerType = searchParams.get("payeurType") === "GROUPE" ? "GROUPE" : "CLIENT";
-  const requestedPayerId = searchParams.get("payeurId") ?? "";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlState = useMemo(() => releveSearchStateFromParams(searchParams), [searchParams]);
+  const requestedPayerType = urlState.payerType;
+  const requestedPayerId = urlState.payerId;
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
   const canDelete = permissions.includes("quittance:manage");
-  const [tab, setTab] = useState("sources");
-  const [sourceFilters, setSourceFilters] = useState(SOURCE_DEFAULTS);
-  const [appliedSourceFilters, setAppliedSourceFilters] = useState(SOURCE_DEFAULTS);
-  const [sourcePage, setSourcePage] = useState(0);
-  const [documentFilters, setDocumentFilters] = useState(DOCUMENT_DEFAULTS);
-  const [appliedDocumentFilters, setAppliedDocumentFilters] = useState(DOCUMENT_DEFAULTS);
-  const [documentPage, setDocumentPage] = useState(0);
+  const [sourceFilters, setSourceFilters] = useState(urlState.sourceFilters);
+  const [documentFilters, setDocumentFilters] = useState(urlState.documentFilters);
   const [selected, setSelected] = useState<Record<string, ClientDocumentSource>>({});
   const [issueOpen, setIssueOpen] = useState(false);
   const [detailId, setDetailId] = useState<string>();
@@ -125,6 +100,12 @@ export default function RelevesFacturesPage() {
   const [payerSearch, setPayerSearch] = useState("");
   const deferredPayerSearch = useDeferredValue(payerSearch.trim());
   const [selectedPayer, setSelectedPayer] = useState<SelectedPayer>();
+
+  useEffect(() => {
+    setSourceFilters(urlState.sourceFilters);
+    setDocumentFilters(urlState.documentFilters);
+    setPayerMode(urlState.payerType);
+  }, [urlState]);
 
   const clients = useQuery({
     queryKey: ["compta", "document-payers", "clients", deferredPayerSearch],
@@ -152,24 +133,24 @@ export default function RelevesFacturesPage() {
   const sourceParams = useMemo(() => ({
     payeurType: selectedPayer?.type ?? payerMode,
     payeurId: selectedPayer?.id ?? "",
-    typeContrat: appliedSourceFilters.typeContrat === "ALL" ? undefined : appliedSourceFilters.typeContrat,
-    dateDu: appliedSourceFilters.dateDu || undefined,
-    dateAu: appliedSourceFilters.dateAu || undefined,
-    search: appliedSourceFilters.search.trim() || undefined,
-    page: sourcePage,
+    typeContrat: urlState.sourceFilters.typeContrat === "ALL" ? undefined : urlState.sourceFilters.typeContrat,
+    dateDu: urlState.sourceFilters.dateDu || undefined,
+    dateAu: urlState.sourceFilters.dateAu || undefined,
+    search: urlState.sourceFilters.search.trim() || undefined,
+    page: urlState.sourcePage,
     size: PAGE_SIZE,
-  }), [appliedSourceFilters, payerMode, selectedPayer, sourcePage]);
+  }), [payerMode, selectedPayer, urlState.sourceFilters, urlState.sourcePage]);
   const documentParams = useMemo(() => ({
     payeurType: selectedPayer?.type ?? payerMode,
     payeurId: selectedPayer?.id ?? "",
-    type: appliedDocumentFilters.type === "ALL" ? undefined : appliedDocumentFilters.type,
-    statut: appliedDocumentFilters.statut === "ALL" ? undefined : appliedDocumentFilters.statut,
-    dateDu: appliedDocumentFilters.dateDu || undefined,
-    dateAu: appliedDocumentFilters.dateAu || undefined,
-    search: appliedDocumentFilters.search.trim() || undefined,
-    page: documentPage,
+    type: urlState.documentFilters.type === "ALL" ? undefined : urlState.documentFilters.type,
+    statut: urlState.documentFilters.statut === "ALL" ? undefined : urlState.documentFilters.statut,
+    dateDu: urlState.documentFilters.dateDu || undefined,
+    dateAu: urlState.documentFilters.dateAu || undefined,
+    search: urlState.documentFilters.search.trim() || undefined,
+    page: urlState.documentPage,
     size: PAGE_SIZE,
-  }), [appliedDocumentFilters, documentPage, payerMode, selectedPayer]);
+  }), [payerMode, selectedPayer, urlState.documentFilters, urlState.documentPage]);
 
   const sources = useQuery({
     queryKey: ["compta", "client-document-sources", sourceParams],
@@ -179,26 +160,39 @@ export default function RelevesFacturesPage() {
   const documents = useQuery({
     queryKey: ["compta", "client-documents", documentParams],
     queryFn: () => comptaApi.searchClientDocuments(documentParams),
-    enabled: Boolean(selectedPayer) && tab === "documents",
+    enabled: Boolean(selectedPayer) && urlState.tab === "documents",
   });
 
   useEffect(() => {
     setSelected({});
   }, [sourceParams]);
 
-  function changePayer(payer?: SelectedPayer) {
+  function updateUrl(patch: Partial<ReleveSearchState>) {
+    setSearchParams(releveSearchParams({ ...urlState, ...patch }), { replace: true });
+  }
+
+  function changePayer(payer?: SelectedPayer, mode = payer?.type ?? payerMode) {
+    setPayerMode(mode);
     setSelectedPayer(payer);
     setSelected({});
-    setSourcePage(0);
-    setDocumentPage(0);
+    updateUrl({
+      payerType: mode,
+      payerId: payer?.id ?? "",
+      sourcePage: 0,
+      documentPage: 0,
+    });
   }
 
   useEffect(() => {
-    if (!requestedPayerId || selectedPayer?.id === requestedPayerId) return;
+    if (!requestedPayerId) {
+      if (selectedPayer) setSelectedPayer(undefined);
+      return;
+    }
+    if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
     if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
       const client = requestedClient.data.client;
       setPayerMode("CLIENT");
-      changePayer({
+      setSelectedPayer({
         type: "CLIENT",
         id: client.id,
         name: client.nomAffichage || "Client",
@@ -211,7 +205,7 @@ export default function RelevesFacturesPage() {
       const group = groups.data?.find((item) => item.id === requestedPayerId);
       if (!group) return;
       setPayerMode("GROUPE");
-      changePayer({
+      setSelectedPayer({
         type: "GROUPE",
         id: group.id,
         name: group.libelle,
@@ -242,25 +236,21 @@ export default function RelevesFacturesPage() {
   }
 
   function applySourceFilters() {
-    setSourcePage(0);
-    setAppliedSourceFilters(sourceFilters);
+    updateUrl({ sourceFilters, sourcePage: 0 });
   }
 
   function resetSourceFilters() {
     setSourceFilters(SOURCE_DEFAULTS);
-    setAppliedSourceFilters(SOURCE_DEFAULTS);
-    setSourcePage(0);
+    updateUrl({ sourceFilters: SOURCE_DEFAULTS, sourcePage: 0 });
   }
 
   function applyDocumentFilters() {
-    setDocumentPage(0);
-    setAppliedDocumentFilters(documentFilters);
+    updateUrl({ documentFilters, documentPage: 0 });
   }
 
   function resetDocumentFilters() {
     setDocumentFilters(DOCUMENT_DEFAULTS);
-    setAppliedDocumentFilters(DOCUMENT_DEFAULTS);
-    setDocumentPage(0);
+    updateUrl({ documentFilters: DOCUMENT_DEFAULTS, documentPage: 0 });
   }
 
   return (
@@ -286,14 +276,17 @@ export default function RelevesFacturesPage() {
         loading={clients.isFetching || groups.isFetching}
         onQueryChange={setPayerSearch}
         onModeChange={(mode) => {
-          setPayerMode(mode);
           setPayerSearch("");
-          changePayer();
+          changePayer(undefined, mode);
         }}
         onSelect={changePayer}
       />
 
-      {selectedPayer ? <Tabs value={tab} onValueChange={setTab}>
+      {selectedPayer ? (
+        <Tabs
+          value={urlState.tab}
+          onValueChange={(value) => updateUrl({ tab: value === "documents" ? "documents" : "sources" })}
+        >
         <TabsList>
           <TabsTrigger value="sources">
             <ReceiptText className="size-4" />
@@ -398,8 +391,8 @@ export default function RelevesFacturesPage() {
               </div>
               <PageFooter
                 page={sources.data?.page}
-                onPrevious={() => setSourcePage((current) => Math.max(0, current - 1))}
-                onNext={() => setSourcePage((current) => current + 1)}
+                onPrevious={() => updateUrl({ sourcePage: Math.max(0, urlState.sourcePage - 1) })}
+                onNext={() => updateUrl({ sourcePage: urlState.sourcePage + 1 })}
               />
             </CardContent>
           </Card>
@@ -416,14 +409,15 @@ export default function RelevesFacturesPage() {
             loading={documents.isLoading}
             rows={documents.data?.rows ?? []}
             page={documents.data?.page}
-            onPrevious={() => setDocumentPage((current) => Math.max(0, current - 1))}
-            onNext={() => setDocumentPage((current) => current + 1)}
+            onPrevious={() => updateUrl({ documentPage: Math.max(0, urlState.documentPage - 1) })}
+            onNext={() => updateUrl({ documentPage: urlState.documentPage + 1 })}
             onDetail={setDetailId}
             onCancel={canIssue ? setCancelTarget : undefined}
             onDelete={canDelete ? setDeleteTarget : undefined}
           />
         </TabsContent>
-      </Tabs> : (
+        </Tabs>
+      ) : (
         <div className="grid min-h-64 place-items-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
           <div className="max-w-md">
             <Users className="mx-auto mb-3 size-9 text-muted-foreground" />
@@ -442,7 +436,7 @@ export default function RelevesFacturesPage() {
         onIssued={() => {
           setSelected({});
           setIssueOpen(false);
-          setTab("documents");
+          updateUrl({ tab: "documents", documentPage: 0 });
         }}
       />
       <DocumentDetailDialog id={detailId} onOpenChange={(open) => !open && setDetailId(undefined)} />

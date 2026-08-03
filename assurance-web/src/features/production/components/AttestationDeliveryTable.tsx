@@ -27,6 +27,9 @@ export function AttestationDeliveryTable({
   onReceive,
   onValidate,
 }: Props) {
+  const isDirectReception = source === "RECEPTION_DIRECTE";
+  const columnCount = isDirectReception ? 5 : 7;
+
   return (
     <Card className="border-border/70 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -43,16 +46,22 @@ export function AttestationDeliveryTable({
               <TableHead>Référence</TableHead>
               <TableHead>Compagnie</TableHead>
               <TableHead>Usages</TableHead>
-              <TableHead className="text-right">Lots</TableHead>
-              <TableHead>Reçu</TableHead>
-              <TableHead>Statut</TableHead>
+              {isDirectReception ? (
+                <TableHead>Date de réception</TableHead>
+              ) : (
+                <>
+                  <TableHead className="text-right">Lots</TableHead>
+                  <TableHead>Reçu</TableHead>
+                  <TableHead>Statut</TableHead>
+                </>
+              )}
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={columnCount} className="h-24 text-center text-sm text-muted-foreground">
                   {source === "COMMANDE" ? "Chargement des commandes..." : "Chargement des réceptions..."}
                 </TableCell>
               </TableRow>
@@ -62,27 +71,36 @@ export function AttestationDeliveryTable({
                   <div className="font-medium">
                     {livraison.referenceCommande ?? livraison.referenceBl ?? livraison.id}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {livraison.source === "COMMANDE" ? livraison.dateDemande : livraison.dateReception}
-                  </div>
+                  {!isDirectReception ? (
+                    <div className="mt-1 text-xs text-muted-foreground">{formatDate(livraison.dateDemande)}</div>
+                  ) : null}
                 </TableCell>
                 <TableCell className="align-top">{livraison.compagnieAssuranceNom}</TableCell>
                 <TableCell className="align-top">
                   <div className="flex max-w-xl flex-wrap gap-1.5">
                     {livraison.lignes.map((ligne) => (
                       <Badge key={ligne.id} variant="secondary">
-                        {ligne.groupeUsageAttestationCode} {ligne.quantiteRecue}/{ligne.quantiteDemandee}
+                        {ligne.groupeUsageAttestationCode}{" "}
+                        {isDirectReception
+                          ? `· ${ligne.quantiteRecue}`
+                          : `${ligne.quantiteRecue}/${ligne.quantiteDemandee}`}
                       </Badge>
                     ))}
                   </div>
                 </TableCell>
-                <TableCell className="text-right align-top">{livraison.lots.length}</TableCell>
-                <TableCell className="align-top">
-                  {livraison.quantiteRecue}/{livraison.quantiteDemandee}
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge variant={statusVariant(livraison.statut)}>{statusLabel(livraison.statut)}</Badge>
-                </TableCell>
+                {isDirectReception ? (
+                  <TableCell className="align-top">{formatDate(livraison.dateReception)}</TableCell>
+                ) : (
+                  <>
+                    <TableCell className="text-right align-top">{livraison.lots.length}</TableCell>
+                    <TableCell className="align-top">
+                      {livraison.quantiteRecue}/{livraison.quantiteDemandee}
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Badge variant={statusVariant(livraison.statut)}>{statusLabel(livraison.statut)}</Badge>
+                    </TableCell>
+                  </>
+                )}
                 <TableCell className="text-right align-top">
                   <div className="flex justify-end gap-2">
                     <Button type="button" size="icon" variant="ghost" onClick={() => onView(livraison)} aria-label="Voir le détail">
@@ -112,7 +130,7 @@ export function AttestationDeliveryTable({
             ))}
             {!loading && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={columnCount} className="h-24 text-center text-sm text-muted-foreground">
                   Aucun élément.
                 </TableCell>
               </TableRow>
@@ -140,4 +158,10 @@ function statusLabel(statut: LivraisonAttestation["statut"]) {
     RECEPTION_COMPLETE: "Réception complète",
     VALIDEE: "Validée",
   }[statut];
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "-";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : value;
 }

@@ -61,7 +61,8 @@ class PreTermeFlottePdfServiceTest {
                 vehiculeRepository,
                 contratGarantieRepository,
                 assistanceContratRepository,
-                quittanceCalculService
+                quittanceCalculService,
+                new RichTextPdfRenderer()
         );
 
         Contrat draft = draft();

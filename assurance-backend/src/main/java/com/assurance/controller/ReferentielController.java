@@ -954,7 +954,7 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertCategorieClientRequest request
     ) {
-        CategorieClient categorie = categorieClientRepository.findById(id)
+        CategorieClient categorie = categorieClientRepository.findByIdWithUsages(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", id));
         categorieClientRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))

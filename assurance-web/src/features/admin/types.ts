@@ -55,6 +55,13 @@ export type AdminAgency = {
   telephone?: string | null;
   fax?: string | null;
   email?: string | null;
+  identifiantFiscal?: string | null;
+  patente?: string | null;
+  ice?: string | null;
+  numeroAgrement?: string | null;
+  dateAgrement?: string | null;
+  banque?: string | null;
+  rib?: string | null;
   logoDisponible: boolean;
   statut: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 };
@@ -96,5 +103,12 @@ export type UpsertAdminAgencyRequest = {
   telephone?: string;
   fax?: string;
   email?: string;
+  identifiantFiscal?: string;
+  patente?: string;
+  ice?: string;
+  numeroAgrement?: string;
+  dateAgrement?: string;
+  banque?: string;
+  rib?: string;
   statut: AdminAgency["statut"];
 };

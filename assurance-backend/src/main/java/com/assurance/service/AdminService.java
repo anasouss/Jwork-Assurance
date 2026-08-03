@@ -26,17 +26,12 @@ import com.assurance.repository.RoleRepository;
 import com.assurance.repository.UtilisateurRepository;
 import com.assurance.security.TenantContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -48,16 +43,13 @@ public class AdminService {
 
     private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
 
-    private static final long MAX_LOGO_SIZE = 4L * 1024L * 1024L;
-    private static final int MAX_LOGO_WIDTH = 1600;
-    private static final int MAX_LOGO_HEIGHT = 800;
-
     private final UtilisateurRepository utilisateurRepository;
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final RefreshSessionRepository refreshSessionRepository;
     private final AgenceRepository agenceRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AgencyLogoStorageService agencyLogoStorageService;
 
     @Transactional(readOnly = true)
     public List<AdminUtilisateurResponse> listPlatformAdmins() {
@@ -383,7 +375,10 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<AdminAgenceResponse> listAgencies() {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:view", "config:view");
+        requireAny(actor, "agence:view", "config:view", "agence:manage-self");
+        if (can(actor, "agence:manage-self") && !can(actor, "agence:view") && !can(actor, "config:view")) {
+            return List.of(AdminAgenceResponse.from(managedAgency(actor, requiredActorAgence(actor))));
+        }
         return agenceRepository.findAllByOrderByNomAsc().stream().map(AdminAgenceResponse::from).toList();
     }
 
@@ -402,6 +397,13 @@ public class AdminService {
                 .telephone(blankToNull(request.getTelephone()))
                 .fax(blankToNull(request.getFax()))
                 .email(blankToNull(request.getEmail()))
+                .identifiantFiscal(blankToNull(request.getIdentifiantFiscal()))
+                .patente(blankToNull(request.getPatente()))
+                .ice(blankToNull(request.getIce()))
+                .numeroAgrement(blankToNull(request.getNumeroAgrement()))
+                .dateAgrement(request.getDateAgrement())
+                .banque(blankToNull(request.getBanque()))
+                .rib(blankToNull(request.getRib()))
                 .statut(request.getStatut() == null ? StatutAgence.ACTIVE : request.getStatut())
                 .build();
         return AdminAgenceResponse.from(agenceRepository.save(agence));
@@ -410,41 +412,53 @@ public class AdminService {
     @Transactional
     public AdminAgenceResponse updateAgency(Long id, UpsertAgenceRequest request) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage");
-        Agence agence = agenceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Agence", id));
-        if (agenceRepository.existsByCodeIgnoreCaseAndIdNot(request.getCode(), id)) {
-            throw new BadRequestException("Code agence deja utilise");
+        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        Agence agence = managedAgency(actor, id);
+        boolean managesPlatformAgencies = can(actor, "agence:create") || can(actor, "config:manage");
+        if (managesPlatformAgencies) {
+            if (agenceRepository.existsByCodeIgnoreCaseAndIdNot(request.getCode(), id)) {
+                throw new BadRequestException("Code agence deja utilise");
+            }
+            agence.setCode(request.getCode().trim().toUpperCase());
+            agence.setStatut(request.getStatut() == null ? StatutAgence.ACTIVE : request.getStatut());
         }
-        agence.setCode(request.getCode().trim().toUpperCase());
         agence.setNom(request.getNom().trim());
         agence.setAdresse(blankToNull(request.getAdresse()));
         agence.setVille(blankToNull(request.getVille()));
         agence.setTelephone(blankToNull(request.getTelephone()));
         agence.setFax(blankToNull(request.getFax()));
         agence.setEmail(blankToNull(request.getEmail()));
-        agence.setStatut(request.getStatut() == null ? StatutAgence.ACTIVE : request.getStatut());
+        agence.setIdentifiantFiscal(blankToNull(request.getIdentifiantFiscal()));
+        agence.setPatente(blankToNull(request.getPatente()));
+        agence.setIce(blankToNull(request.getIce()));
+        agence.setNumeroAgrement(blankToNull(request.getNumeroAgrement()));
+        agence.setDateAgrement(request.getDateAgrement());
+        agence.setBanque(blankToNull(request.getBanque()));
+        agence.setRib(blankToNull(request.getRib()));
         return AdminAgenceResponse.from(agenceRepository.save(agence));
     }
 
     @Transactional
     public AdminAgenceResponse updateAgencyLogo(Long id, MultipartFile file) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage");
+        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
-        byte[] normalizedLogo = normalizeLogo(file);
-        agence.setLogoContenu(normalizedLogo);
-        agence.setLogoTypeMime("image/png");
-        agence.setLogoNomFichier("logo-" + agence.getCode().toLowerCase() + ".png");
+        String previousStorageKey = agence.getLogoCheminStockage();
+        AgencyLogoStorageService.StoredLogo stored = agencyLogoStorageService.store(agence.getId(), agence.getCode(), file);
+        agence.setLogoCheminStockage(stored.storageKey());
+        agence.setLogoTypeMime(stored.contentType());
+        agence.setLogoNomFichier(stored.fileName());
+        agencyLogoStorageService.deleteAfterCommit(previousStorageKey);
         return AdminAgenceResponse.from(agenceRepository.save(agence));
     }
 
     @Transactional
     public AdminAgenceResponse deleteAgencyLogo(Long id) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage");
+        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
-        agence.setLogoContenu(null);
+        agencyLogoStorageService.deleteAfterCommit(agence.getLogoCheminStockage());
+        agence.setLogoCheminStockage(null);
         agence.setLogoTypeMime(null);
         agence.setLogoNomFichier(null);
         return AdminAgenceResponse.from(agenceRepository.save(agence));
@@ -453,13 +467,13 @@ public class AdminService {
     @Transactional(readOnly = true)
     public AgencyLogo getAgencyLogo(Long id) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:view", "config:view");
+        requireAny(actor, "agence:view", "config:view", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
-        if (agence.getLogoContenu() == null || agence.getLogoContenu().length == 0) {
+        if (agence.getLogoCheminStockage() == null || agence.getLogoCheminStockage().isBlank()) {
             throw new ResourceNotFoundException("Logo agence introuvable");
         }
         return new AgencyLogo(
-                agence.getLogoContenu(),
+                agencyLogoStorageService.load(agence.getLogoCheminStockage()),
                 agence.getLogoTypeMime(),
                 agence.getLogoNomFichier()
         );
@@ -472,50 +486,7 @@ public class AdminService {
         return agence;
     }
 
-    private byte[] normalizeLogo(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BadRequestException("Le fichier logo est obligatoire");
-        }
-        if (file.getSize() > MAX_LOGO_SIZE) {
-            throw new BadRequestException("Le logo ne doit pas dépasser 4 Mo");
-        }
-        String contentType = file.getContentType();
-        if (!"image/png".equals(contentType) && !"image/jpeg".equals(contentType)) {
-            throw new BadRequestException("Le logo doit être au format PNG ou JPEG");
-        }
-        try {
-            BufferedImage source = ImageIO.read(file.getInputStream());
-            if (source == null || source.getWidth() < 32 || source.getHeight() < 32) {
-                throw new BadRequestException("Le fichier image est invalide ou trop petit");
-            }
-            double ratio = Math.min(
-                    1d,
-                    Math.min(
-                            (double) MAX_LOGO_WIDTH / source.getWidth(),
-                            (double) MAX_LOGO_HEIGHT / source.getHeight()
-                    )
-            );
-            int width = Math.max(1, (int) Math.round(source.getWidth() * ratio));
-            int height = Math.max(1, (int) Math.round(source.getHeight() * ratio));
-            BufferedImage normalized = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D graphics = normalized.createGraphics();
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            graphics.drawImage(source, 0, 0, width, height, null);
-            graphics.dispose();
-            try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-                if (!ImageIO.write(normalized, "png", output)) {
-                    throw new BadRequestException("Impossible de convertir le logo");
-                }
-                return output.toByteArray();
-            }
-        } catch (IOException exception) {
-            throw new BadRequestException("Impossible de lire le fichier logo");
-        }
-    }
-
-    public record AgencyLogo(byte[] content, String contentType, String filename) {
+    public record AgencyLogo(Resource resource, String contentType, String filename) {
     }
 
     private Utilisateur currentUser() {

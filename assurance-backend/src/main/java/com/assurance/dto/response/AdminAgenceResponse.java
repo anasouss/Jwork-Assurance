@@ -5,6 +5,8 @@ import com.assurance.enums.StatutAgence;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
 @Builder
 public class AdminAgenceResponse {
@@ -16,6 +18,13 @@ public class AdminAgenceResponse {
     private String telephone;
     private String fax;
     private String email;
+    private String identifiantFiscal;
+    private String patente;
+    private String ice;
+    private String numeroAgrement;
+    private LocalDate dateAgrement;
+    private String banque;
+    private String rib;
     private boolean logoDisponible;
     private StatutAgence statut;
 
@@ -29,7 +38,14 @@ public class AdminAgenceResponse {
                 .telephone(agence.getTelephone())
                 .fax(agence.getFax())
                 .email(agence.getEmail())
-                .logoDisponible(agence.getLogoContenu() != null && agence.getLogoContenu().length > 0)
+                .identifiantFiscal(agence.getIdentifiantFiscal())
+                .patente(agence.getPatente())
+                .ice(agence.getIce())
+                .numeroAgrement(agence.getNumeroAgrement())
+                .dateAgrement(agence.getDateAgrement())
+                .banque(agence.getBanque())
+                .rib(agence.getRib())
+                .logoDisponible(agence.getLogoCheminStockage() != null && !agence.getLogoCheminStockage().isBlank())
                 .statut(agence.getStatut())
                 .build();
     }

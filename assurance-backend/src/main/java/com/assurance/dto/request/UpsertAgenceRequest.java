@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
 public class UpsertAgenceRequest {
     @NotBlank
@@ -21,6 +23,13 @@ public class UpsertAgenceRequest {
 
     @Email
     private String email;
+    private String identifiantFiscal;
+    private String patente;
+    private String ice;
+    private String numeroAgrement;
+    private LocalDate dateAgrement;
+    private String banque;
+    private String rib;
 
     @NotNull
     private StatutAgence statut = StatutAgence.ACTIVE;

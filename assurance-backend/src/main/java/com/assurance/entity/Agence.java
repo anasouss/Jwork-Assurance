@@ -6,13 +6,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "agences", indexes = {
@@ -46,9 +47,29 @@ public class Agence extends BaseEntity {
     @Column(length = 150)
     private String email;
 
-    @Lob
-    @Column(name = "logo_contenu", columnDefinition = "LONGBLOB")
-    private byte[] logoContenu;
+    @Column(name = "identifiant_fiscal", length = 80)
+    private String identifiantFiscal;
+
+    @Column(length = 80)
+    private String patente;
+
+    @Column(length = 80)
+    private String ice;
+
+    @Column(name = "numero_agrement", length = 120)
+    private String numeroAgrement;
+
+    @Column(name = "date_agrement")
+    private LocalDate dateAgrement;
+
+    @Column(length = 120)
+    private String banque;
+
+    @Column(length = 120)
+    private String rib;
+
+    @Column(name = "logo_chemin_stockage", length = 500)
+    private String logoCheminStockage;
 
     @Column(name = "logo_type_mime", length = 50)
     private String logoTypeMime;

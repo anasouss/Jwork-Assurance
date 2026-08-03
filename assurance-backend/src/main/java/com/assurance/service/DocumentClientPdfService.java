@@ -55,6 +55,7 @@ public class DocumentClientPdfService {
 
     private final DocumentClientService documentClientService;
     private final ReleveClientPdfRenderer releveClientPdfRenderer;
+    private final AgencyLogoStorageService agencyLogoStorageService;
 
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long documentId) {
@@ -136,7 +137,7 @@ public class DocumentClientPdfService {
 
     private Cell brandCell(Agence agence, PdfFont bold) {
         Cell cell = borderless(new Cell()).setVerticalAlignment(VerticalAlignment.TOP);
-        byte[] logo = agence.getLogoContenu();
+        byte[] logo = logoContent(agence);
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
             image.scaleToFit(180, 72);
@@ -360,6 +361,10 @@ public class DocumentClientPdfService {
     private String amount(BigDecimal value) {
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.FRANCE);
         return new DecimalFormat("#,##0.00", symbols).format(value == null ? BigDecimal.ZERO : value);
+    }
+
+    private byte[] logoContent(Agence agency) {
+        return agencyLogoStorageService.loadBytesIfPresent(agency.getLogoCheminStockage());
     }
 
     private String join(String first, String second) {

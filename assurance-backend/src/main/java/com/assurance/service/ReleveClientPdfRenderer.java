@@ -29,6 +29,7 @@ import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
 import com.itextpdf.layout.property.VerticalAlignment;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
@@ -41,12 +42,15 @@ import java.util.Comparator;
 import java.util.Locale;
 
 @Component
+@RequiredArgsConstructor
 public class ReleveClientPdfRenderer {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yy");
     private static final DateTimeFormatter LONG_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final SolidBorder TABLE_BORDER = new SolidBorder(ColorConstants.BLACK, 0.7f);
     private static final float PAGE_MARGIN = 10f;
+
+    private final AgencyLogoStorageService agencyLogoStorageService;
 
     public byte[] render(DocumentClient source) throws Exception {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
@@ -79,7 +83,7 @@ public class ReleveClientPdfRenderer {
         Table top = new Table(new float[]{7.5f, 2.5f})
                 .setWidth(UnitValue.createPercentValue(100));
         Cell brand = borderless(new Cell()).setHeight(76).setVerticalAlignment(VerticalAlignment.TOP);
-        byte[] logo = source.getAgence().getLogoContenu();
+        byte[] logo = logoContent(source.getAgence());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
             image.scaleToFit(150, 72);
@@ -298,11 +302,19 @@ public class ReleveClientPdfRenderer {
             ));
             String contacts = contactLine(agency);
             String location = addressLine(agency);
+            String legal = legalLine(agency);
+            String bank = bankLine(agency);
             if (!contacts.isBlank()) {
                 canvas.add(footerParagraph(contacts, regular));
             }
             if (!location.isBlank()) {
                 canvas.add(footerParagraph(location, regular));
+            }
+            if (!legal.isBlank()) {
+                canvas.add(footerParagraph(legal, regular));
+            }
+            if (!bank.isBlank()) {
+                canvas.add(footerParagraph(bank, regular));
             }
             canvas.add(footerParagraph("Relevé " + source.getNumero(), regular));
             canvas.close();
@@ -327,8 +339,31 @@ public class ReleveClientPdfRenderer {
     }
 
     private String addressLine(Agence agency) {
-        String location = join(agency.getAdresse(), agency.getVille());
-        return location.isBlank() ? agency.getNom() : agency.getNom() + " - Adresse : " + location;
+        StringBuilder result = new StringBuilder();
+        append(result, "Adresse : ", join(agency.getAdresse(), agency.getVille()));
+        append(result, "IF : ", agency.getIdentifiantFiscal());
+        append(result, "Patente : ", agency.getPatente());
+        append(result, "ICE : ", agency.getIce());
+        return result.toString();
+    }
+
+    private String legalLine(Agence agency) {
+        if (agency.getNumeroAgrement() == null || agency.getNumeroAgrement().isBlank()) {
+            return "";
+        }
+        StringBuilder result = new StringBuilder("Intermédiaire d'assurances régi par la loi 17-99, portant code des assurances sous le n° d'agrément : ")
+                .append(agency.getNumeroAgrement().trim());
+        if (agency.getDateAgrement() != null) {
+            result.append(" du ").append(DATE_FORMAT.format(agency.getDateAgrement()));
+        }
+        return result.toString();
+    }
+
+    private String bankLine(Agence agency) {
+        StringBuilder result = new StringBuilder();
+        append(result, "N° de compte bancaire : ", agency.getRib());
+        append(result, "Banque : ", agency.getBanque());
+        return result.toString();
     }
 
     private void append(StringBuilder target, String label, String content) {
@@ -343,6 +378,10 @@ public class ReleveClientPdfRenderer {
 
     private String city(Agence agency) {
         return agency.getVille() == null || agency.getVille().isBlank() ? "" : agency.getVille().trim();
+    }
+
+    private byte[] logoContent(Agence agency) {
+        return agencyLogoStorageService.loadBytesIfPresent(agency.getLogoCheminStockage());
     }
 
     private String address(String address) {

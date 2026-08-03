@@ -67,8 +67,11 @@ export default function AdminPage() {
   const permissions = user?.permissions ?? [];
   const canManageUsers = permissions.includes("user:manage") || permissions.includes("config:manage");
   const canManageRoles = permissions.includes("role:manage") || permissions.includes("config:manage");
-  const canManageAgencies = permissions.includes("agence:create") || permissions.includes("config:manage");
+  const canManagePlatformAgencies = permissions.includes("agence:create") || permissions.includes("config:manage");
+  const canManageOwnAgency = permissions.includes("agence:manage-self");
+  const canManageAgencies = canManagePlatformAgencies || canManageOwnAgency;
   const canViewAgencies = permissions.includes("agence:view") || permissions.includes("config:view");
+  const canAccessAgencySettings = canViewAgencies || canManageOwnAgency;
   const isPlatformAdmin = user?.roleCode === "SUPER_ADMIN";
 
   const users = useQuery({ queryKey: ["admin", "users"], queryFn: adminApi.users, staleTime: 30_000 });
@@ -78,7 +81,7 @@ export default function AdminPage() {
     queryKey: ["admin", "agencies"],
     queryFn: adminApi.agencies,
     staleTime: 60_000,
-    enabled: canViewAgencies,
+    enabled: canAccessAgencySettings,
   });
   const platformAdmins = useQuery({
     queryKey: ["admin", "platform-admins"],
@@ -88,7 +91,7 @@ export default function AdminPage() {
   });
 
   const availableAgencies = useMemo<AdminAgency[]>(() => {
-    if (canViewAgencies) {
+    if (canAccessAgencySettings) {
       return agencies.data ?? [];
     }
     return user?.agenceId ? [{
@@ -98,7 +101,7 @@ export default function AdminPage() {
       logoDisponible: false,
       statut: "ACTIVE",
     }] : [];
-  }, [agencies.data, canViewAgencies, user?.agenceId, user?.agenceName]);
+  }, [agencies.data, canAccessAgencySettings, user?.agenceId, user?.agenceName]);
 
   return (
     <div className="grid gap-5">
@@ -132,7 +135,7 @@ export default function AdminPage() {
         <TabsList className="w-fit">
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="roles">Rôles & permissions</TabsTrigger>
-          {canViewAgencies ? <TabsTrigger value="agencies">Agences</TabsTrigger> : null}
+          {canAccessAgencySettings ? <TabsTrigger value="agencies">{canViewAgencies ? "Agences" : "Mon agence"}</TabsTrigger> : null}
           {isPlatformAdmin ? <TabsTrigger value="platform-admins">Administrateurs plateforme</TabsTrigger> : null}
         </TabsList>
 
@@ -160,11 +163,13 @@ export default function AdminPage() {
           />
         </TabsContent>
 
-        {canViewAgencies ? (
+        {canAccessAgencySettings ? (
           <TabsContent value="agencies">
             <AgenciesPanel
               agencies={agencies.data ?? []}
               canManage={canManageAgencies}
+              canCreate={canManagePlatformAgencies}
+              canEditPlatformFields={canManagePlatformAgencies}
               onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "agencies"] })}
             />
           </TabsContent>
@@ -976,7 +981,19 @@ function RolesPanel({
   );
 }
 
-function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgency[]; canManage: boolean; onChanged: () => void }) {
+function AgenciesPanel({
+  agencies,
+  canManage,
+  canCreate,
+  canEditPlatformFields,
+  onChanged,
+}: {
+  agencies: AdminAgency[];
+  canManage: boolean;
+  canCreate: boolean;
+  canEditPlatformFields: boolean;
+  onChanged: () => void;
+}) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<AdminAgency | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1022,12 +1039,12 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
 
   return (
     <div className="grid gap-4 rounded-lg border bg-card p-4">
-      <div className="flex justify-end">
-        <Button disabled={!canManage} onClick={() => { setEditing(null); setDialogOpen(true); }}>
+      {canCreate ? <div className="flex justify-end">
+        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
           <Plus className="size-4" />
           Ajouter agence
         </Button>
-      </div>
+      </div> : null}
       <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
@@ -1069,7 +1086,7 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier agence" : "Ajouter agence"}</DialogTitle>
             <DialogDescription>Les agences portent les utilisateurs, rôles agence et données de production.</DialogDescription>
@@ -1089,7 +1106,7 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
               }}
             />
             <div className="grid gap-3 sm:grid-cols-2">
-            <LabeledInput label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
+            <LabeledInput label="Code" value={form.code} disabled={Boolean(editing) && !canEditPlatformFields} onChange={(value) => setForm({ ...form, code: value })} />
             <LabeledInput label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
             <LabeledInput label="Ville" value={form.ville ?? ""} onChange={(value) => setForm({ ...form, ville: value })} />
             <LabeledInput label="Téléphone" value={form.telephone ?? ""} onChange={(value) => setForm({ ...form, telephone: value })} />
@@ -1097,7 +1114,7 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
             <LabeledInput label="Email" value={form.email ?? ""} onChange={(value) => setForm({ ...form, email: value })} />
             <label className="grid gap-1.5 text-sm">
               <span className="font-medium">Statut</span>
-              <Select value={form.statut} onValueChange={(value) => setForm({ ...form, statut: value as AdminAgency["statut"] })}>
+              <Select disabled={Boolean(editing) && !canEditPlatformFields} value={form.statut} onValueChange={(value) => setForm({ ...form, statut: value as AdminAgency["statut"] })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ACTIVE">Active</SelectItem>
@@ -1109,6 +1126,20 @@ function AgenciesPanel({ agencies, canManage, onChanged }: { agencies: AdminAgen
             <label className="grid gap-1.5 text-sm sm:col-span-2">
               <span className="font-medium">Adresse</span>
               <Textarea value={form.adresse ?? ""} onChange={(event) => setForm({ ...form, adresse: event.target.value })} />
+            </label>
+            <div className="sm:col-span-2 border-t pt-3">
+              <h3 className="font-medium">Informations légales et bancaires</h3>
+              <p className="text-xs text-muted-foreground">Ces informations apparaissent sur les relevés et documents de l’agence.</p>
+            </div>
+            <LabeledInput label="Identifiant fiscal" value={form.identifiantFiscal ?? ""} onChange={(value) => setForm({ ...form, identifiantFiscal: value })} />
+            <LabeledInput label="Patente" value={form.patente ?? ""} onChange={(value) => setForm({ ...form, patente: value })} />
+            <LabeledInput label="ICE" value={form.ice ?? ""} onChange={(value) => setForm({ ...form, ice: value })} />
+            <LabeledInput label="N° d’agrément" value={form.numeroAgrement ?? ""} onChange={(value) => setForm({ ...form, numeroAgrement: value })} />
+            <LabeledInput label="Date d’agrément" type="date" value={form.dateAgrement ?? ""} onChange={(value) => setForm({ ...form, dateAgrement: value })} />
+            <LabeledInput label="Banque" value={form.banque ?? ""} onChange={(value) => setForm({ ...form, banque: value })} />
+            <label className="grid gap-1.5 text-sm sm:col-span-2">
+              <span className="font-medium">RIB / N° de compte bancaire</span>
+              <Input value={form.rib ?? ""} onChange={(event) => setForm({ ...form, rib: event.target.value })} />
             </label>
             </div>
           </div>
@@ -1292,11 +1323,23 @@ function ResetPasswordDialog({
   );
 }
 
-function LabeledInput({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function LabeledInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  disabled = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  disabled?: boolean;
+}) {
   return (
     <label className="grid gap-1.5 text-sm">
       <span className="font-medium">{label}</span>
-      <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
@@ -1347,7 +1390,7 @@ function roleToForm(role: AdminRole): UpsertAdminRoleRequest {
 }
 
 function emptyAgency(): UpsertAdminAgencyRequest {
-  return { code: "", nom: "", adresse: "", ville: "", telephone: "", fax: "", email: "", statut: "ACTIVE" };
+  return { code: "", nom: "", adresse: "", ville: "", telephone: "", fax: "", email: "", identifiantFiscal: "", patente: "", ice: "", numeroAgrement: "", dateAgrement: "", banque: "", rib: "", statut: "ACTIVE" };
 }
 
 function agencyToForm(agence: AdminAgency): UpsertAdminAgencyRequest {
@@ -1359,6 +1402,13 @@ function agencyToForm(agence: AdminAgency): UpsertAdminAgencyRequest {
     telephone: agence.telephone ?? "",
     fax: agence.fax ?? "",
     email: agence.email ?? "",
+    identifiantFiscal: agence.identifiantFiscal ?? "",
+    patente: agence.patente ?? "",
+    ice: agence.ice ?? "",
+    numeroAgrement: agence.numeroAgrement ?? "",
+    dateAgrement: agence.dateAgrement ?? "",
+    banque: agence.banque ?? "",
+    rib: agence.rib ?? "",
     statut: agence.statut,
   };
 }

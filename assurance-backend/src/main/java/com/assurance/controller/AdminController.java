@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.core.io.Resource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -199,7 +200,7 @@ public class AdminController {
     }
 
     @GetMapping("/agencies/{id}/logo")
-    public ResponseEntity<byte[]> agencyLogo(@PathVariable Long id) {
+    public ResponseEntity<Resource> agencyLogo(@PathVariable Long id) {
         AdminService.AgencyLogo logo = adminService.getAgencyLogo(id);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(logo.contentType()))
@@ -207,7 +208,7 @@ public class AdminController {
                         HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.inline().filename(logo.filename()).build().toString()
                 )
-                .body(logo.content());
+                .body(logo.resource());
     }
 
     @DeleteMapping("/agencies/{id}/logo")

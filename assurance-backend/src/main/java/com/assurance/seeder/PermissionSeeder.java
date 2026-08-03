@@ -56,6 +56,7 @@ public class PermissionSeeder implements CommandLineRunner {
 
             restricted("agence:view", "Consulter les agences", "agence"),
             restricted("agence:create", "Creer une agence", "agence"),
+            permission("agence:manage-self", "Modifier les informations de son agence", "agence"),
             permission("user:view", "Consulter les utilisateurs", "admin"),
             permission("user:manage", "Gerer les utilisateurs", "admin"),
             permission("role:view", "Consulter les roles", "admin"),

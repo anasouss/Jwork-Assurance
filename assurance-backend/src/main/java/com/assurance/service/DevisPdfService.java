@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.DevisPdfFilterRequest;
+import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
@@ -70,6 +71,7 @@ public class DevisPdfService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final ContratRepository contratRepository;
+    private final ElementFacturableCibleService elementFacturableCibleService;
 
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long contratId, DevisPdfFilterRequest filter) {
@@ -90,6 +92,12 @@ public class DevisPdfService {
             List<AssistanceContrat> assistances = activeAssistancesFor(contrat, vehicules);
             Map<Long, List<ContratGarantie>> garantiesByVehicule = garantiesByVehicule(contrat, vehicules);
             Map<Long, BigDecimal> assistanceAmountByVehicule = assistanceAmountByVehicule(assistances);
+            Map<Long, BigDecimal> totalAmountByVehicule = totalAmountByVehicule(
+                    contrat,
+                    vehicules,
+                    garantiesByVehicule,
+                    assistanceAmountByVehicule
+            );
             Map<Long, Set<String>> assistanceProductsByVehicule = assistanceProductsByVehicule(assistances);
             List<String> garantieCodes = garantieCodes(contrat, vehicules, assistances);
             boolean hasDcCapitalColumn = garantieCodes.contains("DC");
@@ -98,7 +106,7 @@ public class DevisPdfService {
 
             writeHeader(document);
             writeContext(document, contrat);
-            writeTarif(document, vehicules, garantiesByVehicule, assistanceAmountByVehicule,
+            writeTarif(document, vehicules, garantiesByVehicule, totalAmountByVehicule,
                     assistanceProductsByVehicule, garantieCodes, hasDcCapitalColumn);
             writeLegend(document, garantieCodes, garantieOrder, garantieLabels);
 
@@ -176,7 +184,7 @@ public class DevisPdfService {
             Document document,
             List<Vehicule> vehicules,
             Map<Long, List<ContratGarantie>> garantiesByVehicule,
-            Map<Long, BigDecimal> assistanceAmountByVehicule,
+            Map<Long, BigDecimal> totalAmountByVehicule,
             Map<Long, Set<String>> assistanceProductsByVehicule,
             List<String> garantieCodes,
             boolean hasDcCapitalColumn
@@ -226,7 +234,7 @@ public class DevisPdfService {
             Map<String, List<ContratGarantie>> byCode = garanties.stream()
                     .filter(this::isSelectedGarantie)
                     .collect(Collectors.groupingBy(g -> g.getGarantie().getCode().toUpperCase(Locale.ROOT)));
-            BigDecimal vehicleTotal = totalGaranties(garanties).add(assistanceAmountByVehicule.getOrDefault(vehicule.getId(), BigDecimal.ZERO));
+            BigDecimal vehicleTotal = totalAmountByVehicule.getOrDefault(vehicule.getId(), BigDecimal.ZERO);
             grandTotal = grandTotal.add(vehicleTotal);
 
             table.addCell(valueCell(usageLabel(vehicule), TextAlignment.LEFT, rowBackground));
@@ -477,6 +485,40 @@ public class DevisPdfService {
         return amounts;
     }
 
+    private Map<Long, BigDecimal> totalAmountByVehicule(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            Map<Long, List<ContratGarantie>> garantiesByVehicule,
+            Map<Long, BigDecimal> assistanceAmountByVehicule
+    ) {
+        List<ContratGarantie> garanties = garantiesByVehicule.values().stream()
+                .flatMap(Collection::stream)
+                .toList();
+        List<QuittanceResponse.TargetSummary> summaries = elementFacturableCibleService.calculer(
+                contrat,
+                garanties,
+                vehicules,
+                List.of()
+        );
+        Map<Long, BigDecimal> totals = new LinkedHashMap<>();
+        for (QuittanceResponse.TargetSummary summary : summaries) {
+            Integer index = summary.getVehiculeIndex();
+            if (index == null || index < 0 || index >= vehicules.size()) {
+                continue;
+            }
+            Vehicule vehicule = vehicules.get(index);
+            totals.put(vehicule.getId(), nullToZero(summary.getPrimeTotale()));
+        }
+        for (Vehicule vehicule : vehicules) {
+            totals.merge(
+                    vehicule.getId(),
+                    assistanceAmountByVehicule.getOrDefault(vehicule.getId(), BigDecimal.ZERO),
+                    BigDecimal::add
+            );
+        }
+        return totals;
+    }
+
     private Map<Long, Set<String>> assistanceProductsByVehicule(List<AssistanceContrat> assistances) {
         Map<Long, Set<String>> products = new LinkedHashMap<>();
         for (AssistanceContrat assistance : assistances) {
@@ -550,14 +592,6 @@ public class DevisPdfService {
                     .orElse("X");
         }
         return "X";
-    }
-
-    private BigDecimal totalGaranties(List<ContratGarantie> garanties) {
-        return garanties.stream()
-                .filter(this::isSelectedGarantie)
-                .map(ContratGarantie::getPrime)
-                .map(this::nullToZero)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal capitalFor(List<ContratGarantie> garanties) {

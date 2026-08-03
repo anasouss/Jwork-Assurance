@@ -41,6 +41,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -334,20 +335,24 @@ public class DevisPdfService {
         }
 
         document.add(new Paragraph(toRoman(sectionIndex) + ". Les franchises").setBold().setFontSize(11));
-        Table table = new Table(new float[]{1.5f, 5.5f}).setWidth(UnitValue.createPercentValue(35));
+        float[] widths = new float[1 + usages.size()];
+        Arrays.fill(widths, 1.0f);
+        widths[0] = 1.5f;
+        Table table = new Table(widths).setWidth(UnitValue.createPercentValue(35));
         table.addCell(headerCell("Garanties", 1, 1));
-        table.addCell(headerCell("Franchises par usage", 1, 1));
+        for (Usage usage : usages) {
+            String code = value(usage.getCode(), usage.getLibelle());
+            table.addCell(headerCell("Usage " + code, 1, 1));
+        }
 
         for (int rowIndex = 0; rowIndex < codesWithFranchise.size(); rowIndex++) {
             String code = codesWithFranchise.get(rowIndex);
             DeviceRgb rowBackground = rowIndex % 2 == 0 ? null : TABLE_ROW_ALT_BG;
             table.addCell(valueCell(code, TextAlignment.CENTER, rowBackground).setBold());
-            Contrat contrat = vehicules.isEmpty() ? null : vehicules.get(0).getContrat();
-            String text = usages.stream()
-                    .map(usage -> usageLabel(contrat, usage) + ": " + franchiseFor(usage, code, vehicules, garantiesByVehicule))
-                    .filter(value -> !value.endsWith(": "))
-                    .collect(Collectors.joining(" / "));
-            table.addCell(valueCell(text, TextAlignment.CENTER, rowBackground));
+            for (Usage usage : usages) {
+                String franchise = franchiseFor(usage, code, vehicules, garantiesByVehicule);
+                table.addCell(valueCell(franchise.isBlank() ? "-" : franchise, TextAlignment.CENTER, rowBackground));
+            }
         }
         document.add(table);
         document.add(new Paragraph(" "));

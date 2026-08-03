@@ -54,10 +54,18 @@ public class DocumentClientPdfService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final DocumentClientService documentClientService;
+    private final ReleveClientPdfRenderer releveClientPdfRenderer;
 
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long documentId) {
         DocumentClient source = documentClientService.findDocument(agenceId, documentId);
+        if (source.getTypeDocument() == TypeDocumentClient.RELEVE) {
+            try {
+                return releveClientPdfRenderer.render(source);
+            } catch (Exception exception) {
+                throw new BadRequestException("La génération du PDF a échoué");
+            }
+        }
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(output));
             Document document = new Document(pdf, PageSize.A4);

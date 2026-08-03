@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Save, Settings2 } from "lucide-react";
 import { toast } from "sonner";
-import { amendmentKeys, contractKeys } from "@/lib/query-keys";
+import { amendmentKeys, attestationStockKeys, contractKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -453,8 +453,11 @@ export default function AvenantContratPage() {
     },
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: amendmentKeys.draft(contratId, movementCode), exact: true });
-      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      await queryClient.invalidateQueries({ queryKey: amendmentKeys.context(contratId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: contractKeys.all }),
+        queryClient.invalidateQueries({ queryKey: amendmentKeys.context(contratId) }),
+        queryClient.invalidateQueries({ queryKey: attestationStockKeys.all }),
+      ]);
       toast.success(validatedMovementId ? "Avenant modifié" : "Avenant enregistré");
       navigate("/app/production/contrats");
     },

@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { contractKeys } from "@/lib/query-keys";
+import { attestationStockKeys, contractKeys } from "@/lib/query-keys";
 import { clientApi } from "../api/clients";
 import { contractCreationApi } from "../api/contract-creation";
 import { contractServiceApi } from "../api/contract-services";
@@ -459,7 +459,10 @@ export function useContratCreationForm(
         : contractCreationApi.createContrat(payload);
     },
     onSuccess: async (contrat) => {
-      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: contractKeys.all }),
+        queryClient.invalidateQueries({ queryKey: attestationStockKeys.all }),
+      ]);
       if (draftId) {
         await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
       }

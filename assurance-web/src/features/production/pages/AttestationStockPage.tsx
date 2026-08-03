@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, ClipboardList, Plus, Settings2, Truck } from "lucide-react";
+import { Boxes, ClipboardList, Plus, Settings2, TriangleAlert, Truck } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -261,7 +261,7 @@ function AttestationStockDashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 xl:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {groupedByCompany.map((company) => (
               <StockPieCard
                 key={company.compagnieAssuranceId}
@@ -677,6 +677,9 @@ function StockPieCard({
   onSelect: (item: AttestationStockCompanyUsage) => void;
 }) {
   const chartData = company.rows.filter((item) => item.disponible > 0);
+  const thresholdAlerts = company.rows.filter(
+    (item) => item.stockFaible && item.minimumStock != null,
+  );
   const total = chartData.reduce((sum, item) => sum + item.disponible, 0);
   return (
     <Card className="border-border/70 shadow-none">
@@ -686,11 +689,11 @@ function StockPieCard({
           <Badge variant="outline">{formatInteger(total)}</Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-        <div className="h-56">
+      <CardContent className="space-y-3">
+        <div className="h-40">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={chartData} dataKey="disponible" nameKey="groupeUsageAttestationCode" innerRadius={54} outerRadius={92} paddingAngle={2}>
+              <Pie data={chartData} dataKey="disponible" nameKey="groupeUsageAttestationCode" innerRadius={42} outerRadius={68} paddingAngle={2}>
                 {chartData.map((entry) => (
                   <Cell
                     key={`${entry.compagnieAssuranceId}-${entry.groupeUsageAttestationId}`}
@@ -704,27 +707,22 @@ function StockPieCard({
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <div className="space-y-2">
-          {company.rows.map((item) => (
+        {thresholdAlerts.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 border-t pt-3">
+            {thresholdAlerts.map((item) => (
             <button
               key={`${item.compagnieAssuranceId}-${item.groupeUsageAttestationId}`}
               type="button"
-              className="flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm hover:bg-muted/50"
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900 hover:bg-amber-100"
               onClick={() => onSelect(item)}
             >
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: usageColor(item) }} />
-                <span className="truncate">
-                  {item.groupeUsageAttestationCode} · {item.groupeUsageAttestationLibelle}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                {item.stockFaible ? <Badge variant="destructive">Seuil</Badge> : null}
-                <span className="font-semibold">{formatInteger(item.disponible)}</span>
-              </span>
+              <TriangleAlert className="size-3.5" />
+              <span className="font-medium">{item.groupeUsageAttestationCode}</span>
+              <span>{formatInteger(item.disponible)}/{formatInteger(item.minimumStock ?? 0)}</span>
             </button>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

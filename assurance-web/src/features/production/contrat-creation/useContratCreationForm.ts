@@ -36,11 +36,12 @@ export type ContratTargetKey = { kind: "vehicule" | "remorque"; index: number };
 export function useContratCreationForm(
   typeContrat: TypeContrat,
   draftId?: string,
-  options?: { prospectionMode?: boolean; renewalMode?: boolean }
+  options?: { prospectionMode?: boolean; renewalMode?: boolean; initialCategorieClientId?: string }
 ) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const initialCategorieClientId = options?.initialCategorieClientId;
   const [numeroPolice, setNumeroPolice] = useState("");
   const [numeroAttestation, setNumeroAttestation] = useState("");
   const [compagnieAssuranceId, setCompagnieAssuranceId] = useState("");
@@ -67,7 +68,7 @@ export function useContratCreationForm(
   const [assistanceDraft, setAssistanceDraft] = useState<AssistanceDraft>({ enabled: false });
   const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [saisiePrimeNette, setSaisiePrimeNette] = useState(false);
-  const [clients, setClients] = useState<ClientInput[]>([emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")]);
+  const [clients, setClients] = useState<ClientInput[]>(() => initialClients(initialCategorieClientId));
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([emptyVehicule()]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [garanties, setGaranties] = useState<GarantieInput[]>([]);
@@ -248,14 +249,14 @@ export function useContratCreationForm(
     setAssistanceEnabled(hydrated.assistanceEnabled);
     setTargetAssistances(hydrated.targetAssistances);
     setSaisiePrimeNette(hydrated.saisiePrimeNette);
-    setClients(hydrated.clients);
+    setClients(withInitialCategorieClient(hydrated.clients, initialCategorieClientId));
     setVehicules(hydrated.vehicules);
     setRemorques(hydrated.remorques);
     setGaranties(hydrated.garanties);
     setPreview(hydrated.preview);
     setTargetPreview(hydrated.targetPreview);
     setHydratedDraftId(draftId);
-  }, [draftId, draftQuery.data, hydratedDraftId]);
+  }, [draftId, draftQuery.data, hydratedDraftId, initialCategorieClientId]);
 
   const initialLoading = Boolean(draftId) && (
     draftQuery.isLoading
@@ -1597,6 +1598,24 @@ function hydrateDraft(draft: ContratSummary) {
     preview: quittanceGeneraleFromDraft(draft),
     targetPreview: targetQuittanceGeneraleFromDraft(draft),
   };
+}
+
+function initialClients(categorieClientId?: string): ClientInput[] {
+  return withInitialCategorieClient(
+    [emptyClient("SOUSCRIPTEUR"), emptyClient("PROPRIETAIRE")],
+    categorieClientId
+  );
+}
+
+function withInitialCategorieClient(clients: ClientInput[], categorieClientId?: string): ClientInput[] {
+  if (!categorieClientId || clients.some((client) => client.role === "SOUSCRIPTEUR" && client.client.categorieClientId)) {
+    return clients;
+  }
+  return clients.map((client) =>
+    client.role === "SOUSCRIPTEUR"
+      ? { ...client, client: { ...client.client, categorieClientId } }
+      : client
+  );
 }
 
 function quittanceGeneraleFromDraft(draft: ContratSummary): QuittancePreview | null {

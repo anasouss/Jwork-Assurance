@@ -1,6 +1,7 @@
 package com.assurance.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.assurance.enums.GenreClient;
 import com.assurance.enums.RelationGroupeClient;
 import com.assurance.enums.TypeClient;
 import jakarta.validation.constraints.NotBlank;
@@ -24,7 +25,7 @@ public class CreateClientRequest {
     private Long villeId;
     private Long categorieClientId;
     private String codeClient;
-    private String civilite;
+    private GenreClient genre;
     private String prenom;
     private String nom;
     private String raisonSociale;

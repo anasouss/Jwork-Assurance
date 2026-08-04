@@ -12,7 +12,7 @@ import { SectionCard } from "./SectionCard";
 import { Field } from "./Field";
 import { toDateOnly } from "../date";
 import { clientApi } from "../api/clients";
-import type { ClientInput, ClientResponse, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
+import type { ClientInput, ClientResponse, GenreClient, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 type LookupStatus = "idle" | "loading" | "found" | "new" | "error";
@@ -171,7 +171,7 @@ export function ClientSection({
               client: {
                 ...client.client,
                 typeClient: found.typeClient,
-                civilite: found.civilite ?? undefined,
+                genre: found.genre ?? undefined,
                 prenom: found.prenom ?? undefined,
                 nom: found.nom ?? undefined,
                 raisonSociale: found.raisonSociale ?? undefined,
@@ -400,12 +400,12 @@ export function ClientSection({
                   </>
                 ) : (
                   <>
-                    <Field label="Intitulé" required error={errors[`clients.${index}.client.civilite`]}>
-                      <Select value={item.client.civilite ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { civilite: value })}>
+                    <Field label="Genre" required error={errors[`clients.${index}.client.genre`]}>
+                      <Select value={item.client.genre ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { genre: value as GenreClient })}>
                         <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="monsieur">Monsieur</SelectItem>
-                          <SelectItem value="madame">Madame</SelectItem>
+                          <SelectItem value="HOMME">Homme</SelectItem>
+                          <SelectItem value="FEMME">Femme</SelectItem>
                         </SelectContent>
                       </Select>
                     </Field>
@@ -550,12 +550,12 @@ export function ClientSection({
                   ) : null}
                   {!proprietorIsDriver && conducteur ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                      <Field label="Intitulé" required error={errors[`clients.${conducteur.clientIndex}.client.civilite`]}>
-                        <Select value={conducteur.client.client.civilite ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { civilite: value })}>
+                      <Field label="Genre" required error={errors[`clients.${conducteur.clientIndex}.client.genre`]}>
+                        <Select value={conducteur.client.client.genre ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { genre: value as GenreClient })}>
                           <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="monsieur">Monsieur</SelectItem>
-                            <SelectItem value="madame">Madame</SelectItem>
+                            <SelectItem value="HOMME">Homme</SelectItem>
+                            <SelectItem value="FEMME">Femme</SelectItem>
                           </SelectContent>
                         </Select>
                       </Field>

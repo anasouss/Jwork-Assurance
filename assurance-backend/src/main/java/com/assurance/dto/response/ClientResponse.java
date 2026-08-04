@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.GenreClient;
 import com.assurance.enums.TypeClient;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +18,7 @@ public class ClientResponse {
     private TypeClient typeClient;
     private String codeClient;
     private String nomAffichage;
-    private String civilite;
+    private GenreClient genre;
     private String prenom;
     private String nom;
     private String raisonSociale;

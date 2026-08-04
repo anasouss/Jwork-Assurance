@@ -1,5 +1,6 @@
 package com.assurance.entity;
 
+import com.assurance.enums.GenreClient;
 import com.assurance.enums.TypeClient;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -59,8 +60,9 @@ public class Client extends BaseEntity {
     @Column(name = "code_client", length = 60)
     private String codeClient;
 
-    @Column(length = 30)
-    private String civilite;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private GenreClient genre;
 
     @Column(name = "prenom", length = 100)
     private String prenom;

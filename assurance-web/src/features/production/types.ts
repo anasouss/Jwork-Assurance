@@ -365,6 +365,7 @@ export type Quittance = QuittancePreview & {
 
 export type TypeContrat = "PARTICULIER" | "CONVENTION" | "FLOTTE";
 export type TypeClient = "PERSONNE_PHYSIQUE" | "PERSONNE_MORALE";
+export type GenreClient = "HOMME" | "FEMME";
 export type RoleClientContrat = "SOUSCRIPTEUR" | "PROPRIETAIRE" | "CONDUCTEUR" | "BENEFICIAIRE";
 export type RelationGroupeClient = "TETE_GROUPE" | "FILIALE" | "SOCIETE_LIEE";
 export type TypePayeurPrime = "SOUSCRIPTEUR" | "TRESORERIE_GROUPE" | "MEMBRE_GROUPE" | "TIERS_MANDATE";
@@ -380,7 +381,7 @@ export type ClientInput = {
   retirerGroupesActifs?: boolean;
   client: {
     typeClient: TypeClient;
-    civilite?: string;
+    genre?: GenreClient;
     prenom?: string;
     nom?: string;
     raisonSociale?: string;

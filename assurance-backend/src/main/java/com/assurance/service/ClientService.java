@@ -55,9 +55,9 @@ public class ClientService {
 
     private void validateStandaloneClient(CreateClientRequest request) {
         if (request.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE) {
-            if (isBlank(request.getCivilite()) || isBlank(request.getPrenom()) || isBlank(request.getNom())
+            if (request.getGenre() == null || isBlank(request.getPrenom()) || isBlank(request.getNom())
                     || isBlank(request.getCin()) || request.getCinValidite() == null) {
-                throw new BadRequestException("La civilité, le nom, le prénom, le CIN et sa validité sont obligatoires");
+                throw new BadRequestException("Le genre, le nom, le prénom, le CIN et sa validité sont obligatoires");
             }
         } else if (request.getTypeClient() == TypeClient.PERSONNE_MORALE
                 && (isBlank(request.getRaisonSociale()) || isBlank(request.getRc()))) {
@@ -112,7 +112,7 @@ public class ClientService {
                 .ville(ville)
                 .categorieClient(categorieClient)
                 .typeClient(request.getTypeClient())
-                .civilite(request.getCivilite())
+                .genre(request.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE ? request.getGenre() : null)
                 .prenom(request.getPrenom())
                 .nom(request.getNom())
                 .raisonSociale(request.getRaisonSociale())
@@ -201,7 +201,7 @@ public class ClientService {
                 .typeClient(client.getTypeClient())
                 .codeClient(client.getCodeClient())
                 .nomAffichage(client.getNomAffichage())
-                .civilite(client.getCivilite())
+                .genre(client.getGenre())
                 .prenom(client.getPrenom())
                 .nom(client.getNom())
                 .raisonSociale(client.getRaisonSociale())
@@ -264,7 +264,7 @@ public class ClientService {
         if (isBlank(client.getCodeClient())) {
             client.setCodeClient(generateClientCode(client.getId()));
         }
-        client.setCivilite(request.getCivilite());
+        client.setGenre(request.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE ? request.getGenre() : null);
         client.setPrenom(request.getPrenom());
         client.setNom(request.getNom());
         client.setRaisonSociale(request.getRaisonSociale());

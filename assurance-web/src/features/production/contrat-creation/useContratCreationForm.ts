@@ -709,7 +709,7 @@ export function useContratCreationForm(
           requireField(`clients.${index}.client.rc`, client.rc, "RC obligatoire.");
           requireField(`clients.${index}.client.raisonSociale`, client.raisonSociale, "Raison sociale obligatoire.");
         } else {
-          requireField(`clients.${index}.client.civilite`, client.civilite, "Intitulé obligatoire.");
+          requireField(`clients.${index}.client.genre`, client.genre, "Genre obligatoire.");
           requireField(`clients.${index}.client.cin`, client.cin, "CIN obligatoire.");
           requireField(`clients.${index}.client.cinValidite`, client.cinValidite, "Validité CIN obligatoire.");
           requireField(`clients.${index}.client.nom`, client.nom, "Nom obligatoire.");
@@ -746,7 +746,7 @@ export function useContratCreationForm(
         .filter(({ item }) => item.role === "CONDUCTEUR")
         .forEach(({ item, index }) => {
           const client = item.client;
-          requireField(`clients.${index}.client.civilite`, client.civilite, "Intitulé conducteur obligatoire.");
+          requireField(`clients.${index}.client.genre`, client.genre, "Genre du conducteur obligatoire.");
           requireField(`clients.${index}.client.cin`, client.cin, "CIN conducteur obligatoire.");
           requireField(`clients.${index}.client.nom`, client.nom, "Nom conducteur obligatoire.");
           requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom conducteur obligatoire.");

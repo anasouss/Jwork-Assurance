@@ -359,7 +359,7 @@ function ClientDialog({
     mutationFn: async () => {
       const client = await clientApi.createClient({
         typeClient: draft.typeClient,
-        civilite: clean(draft.civilite),
+        genre: draft.genre,
         prenom: clean(draft.prenom),
         nom: clean(draft.nom),
         raisonSociale: clean(draft.raisonSociale),
@@ -394,7 +394,7 @@ function ClientDialog({
       && draft.adresse?.trim()
       && draft.telephone?.trim()
       && (physical
-        ? draft.civilite && draft.nom?.trim() && draft.prenom?.trim() && draft.cin?.trim() && draft.cinValidite
+        ? draft.genre && draft.nom?.trim() && draft.prenom?.trim() && draft.cin?.trim() && draft.cinValidite
         : draft.raisonSociale?.trim() && draft.rc?.trim())
   );
 
@@ -431,12 +431,12 @@ function ClientDialog({
           </Field>
           {physical ? (
             <>
-              <Field label="Civilité" required>
-                <Select value={draft.civilite ?? ""} onValueChange={(value) => update({ civilite: value })}>
+              <Field label="Genre" required>
+                <Select value={draft.genre ?? ""} onValueChange={(value) => update({ genre: value as NonNullable<ClientDraft["genre"]> })}>
                   <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="monsieur">Monsieur</SelectItem>
-                    <SelectItem value="madame">Madame</SelectItem>
+                    <SelectItem value="HOMME">Homme</SelectItem>
+                    <SelectItem value="FEMME">Femme</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>

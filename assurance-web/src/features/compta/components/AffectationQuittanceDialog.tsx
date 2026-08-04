@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import {
   Dialog,
   DialogContent,
@@ -294,13 +295,19 @@ export function AffectationQuittanceDialog({
                             </Button>
                           ) : null}
                         </div>
-                        <div className="flex flex-wrap items-end gap-3">
+                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                           <Field label="Fichier Excel (.xlsx)">
-                            <Input
-                              type="file"
-                              accept=".xlsx"
-                              onChange={(event) => {
-                                setFile(event.target.files?.[0] ?? null);
+                            <FileDropzone
+                              file={file}
+                              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                              title="Déposer le fichier Excel ici"
+                              description="Format .xlsx uniquement · un fichier à la fois"
+                              onFileChange={(selected) => {
+                                if (selected && !selected.name.toLowerCase().endsWith(".xlsx")) {
+                                  toast.error("Le fichier doit être au format .xlsx");
+                                  return;
+                                }
+                                setFile(selected);
                                 setImportPreview(null);
                                 setFleetLines([]);
                               }}

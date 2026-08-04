@@ -233,6 +233,7 @@ function FlottePolicySheet({
   const targetSummaries = contrat.targetSummaries ?? contrat.quittanceGenerale?.targetSummaries ?? [];
   const actLabel = mouvement?.libelle ?? latestEvent(contrat);
   const actNumber = mouvement?.numeroMouvement ?? "1";
+  const subscriberPays = isSubscriberPayer(contrat, souscripteur);
 
   return (
     <div className="w-full overflow-x-auto">
@@ -247,9 +248,13 @@ function FlottePolicySheet({
             <div><span className="font-bold text-blue-950">Assure : </span>{clientName(souscripteur)}</div>
             <div><span className="font-bold text-blue-950">Adresse : </span>{text(souscripteur?.adresse)}{souscripteur?.ville ? `, ${souscripteur.ville}` : ""}</div>
             <div>
-              <span className="font-bold text-blue-950">Payeur : </span>
-              {contrat.payeurPrimeNom ?? payerTypeLabel(contrat.typePayeurPrime)}
-              <span className="ml-3 font-bold text-blue-950">Facturation : </span>
+              {!subscriberPays ? (
+                <>
+                  <span className="font-bold text-blue-950">Payeur : </span>
+                  {contrat.payeurPrimeNom ?? payerTypeLabel(contrat.typePayeurPrime)}
+                </>
+              ) : null}
+              <span className={subscriberPays ? "font-bold text-blue-950" : "ml-3 font-bold text-blue-950"}>Facturation : </span>
               {billingModeLabel(contrat.modeFacturation)}
             </div>
           </div>

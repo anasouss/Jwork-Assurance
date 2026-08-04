@@ -120,15 +120,20 @@ public class FlottePolicePdfService {
 
     private void writeContext(Document document, ContratResponse contrat, ContratResponse.MouvementView mouvement) {
         ClientResponse subscriber = subscriber(contrat);
+        boolean subscriberPays = isSubscriberPayer(contrat, subscriber);
+        Paragraph billing = new Paragraph();
+        if (!subscriberPays) {
+            billing.add(new Text("Payeur : ").setBold().setFontColor(ACCENT))
+                    .add(safe(value(contrat.getPayeurPrimeNom(), "-")))
+                    .add("    ");
+        }
+        billing.add(new Text("Facturation : ").setBold().setFontColor(ACCENT))
+                .add(safe(billingMode(contrat)));
         Table info = new Table(new float[]{7, 3}).setWidth(UnitValue.createPercentValue(100));
         info.addCell(new Cell()
                 .add(labelValue("Assuré : ", clientName(subscriber)))
                 .add(labelValue("Adresse : ", clientAddress(subscriber)))
-                .add(new Paragraph()
-                        .add(new Text("Payeur : ").setBold().setFontColor(ACCENT))
-                        .add(safe(value(contrat.getPayeurPrimeNom(), clientName(subscriber))))
-                        .add(new Text("    Facturation : ").setBold().setFontColor(ACCENT))
-                        .add(safe(billingMode(contrat))))
+                .add(billing)
                 .setFontSize(7.5f)
                 .setBorder(new SolidBorder(SOFT_BORDER, 0.8f))
                 .setPadding(5));
@@ -486,6 +491,14 @@ public class FlottePolicePdfService {
         String address = value(client.getAdresse(), "");
         String city = value(client.getVille(), "");
         return address.isBlank() ? value(city, "-") : city.isBlank() ? address : address + ", " + city;
+    }
+
+    private boolean isSubscriberPayer(ContratResponse contrat, ClientResponse subscriber) {
+        if (contrat.getTypePayeurPrime() == null || "SOUSCRIPTEUR".equals(contrat.getTypePayeurPrime().name())) {
+            return true;
+        }
+        return contrat.getPayeurPrimeClientId() != null && subscriber != null && subscriber.getId() != null
+                && contrat.getPayeurPrimeClientId().equals(subscriber.getId());
     }
 
     private String billingMode(ContratResponse contrat) {

@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.entity.CompagnieAssurance;
+import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratGarantie;
@@ -36,7 +37,7 @@ class RegleFiscaleResolverTest {
         Garantie guarantee = guarantee(2L, "V", TypeGarantie.VEHICULE);
         Usage usage = usage(5L, "A");
         CompagnieAssurance company = company(3L);
-        Contrat contract = Contrat.builder().compagnieAssurance(company).typeContrat(TypeContrat.FLOTTE).build();
+        Contrat contract = Contrat.builder().brancheAssurance(branch(1L, "AUTOMOBILE")).compagnieAssurance(company).typeContrat(TypeContrat.FLOTTE).build();
         ContratGarantie contractGuarantee = ContratGarantie.builder()
                 .garantie(guarantee).vehicule(Vehicule.builder().usage(usage).build()).build();
 
@@ -57,7 +58,7 @@ class RegleFiscaleResolverTest {
     void explicitExemptionOverridesApplicableGeneralRule() {
         LocalDate effectDate = LocalDate.of(2026, 8, 4);
         Garantie guarantee = guarantee(2L, "PP", TypeGarantie.PERSONNE);
-        Contrat contract = Contrat.builder().typeContrat(TypeContrat.CONVENTION).build();
+        Contrat contract = Contrat.builder().brancheAssurance(branch(1L, "AUTOMOBILE")).typeContrat(TypeContrat.CONVENTION).build();
         ContratGarantie contractGuarantee = ContratGarantie.builder().garantie(guarantee).build();
         RegleFiscale general = guaranteeRule(1L, "GENERAL", null, null, null, "0.14", true, 0);
         RegleFiscale exemption = guaranteeRule(2L, "EXEMPT_PERSON", null, null, null, "0", false, 50);
@@ -78,7 +79,7 @@ class RegleFiscaleResolverTest {
         Garantie guarantee = guarantee(1L, "RC", TypeGarantie.VEHICULE);
         CategorieClient tpv = CategorieClient.builder().code("TPV").libelle("TPV").build();
         tpv.setId(3L);
-        Contrat contract = Contrat.builder().typeContrat(TypeContrat.FLOTTE).categorieClient(tpv).build();
+        Contrat contract = Contrat.builder().brancheAssurance(branch(1L, "AUTOMOBILE")).typeContrat(TypeContrat.FLOTTE).categorieClient(tpv).build();
         ContratGarantie contractGuarantee = ContratGarantie.builder().garantie(guarantee).build();
         RegleFiscale general = guaranteeRule(1L, "EVCAT_RC", null, guarantee, null, "0.035", true, 0);
         RegleFiscale categoryRule = guaranteeRule(2L, "EVCAT_RC_TPV", null, guarantee, null, "0.02", true, 0);
@@ -103,6 +104,27 @@ class RegleFiscaleResolverTest {
                 .isEmpty();
     }
 
+    @Test
+    void ruleFromAnotherInsuranceBranchIsIgnored() {
+        LocalDate effectDate = LocalDate.of(2026, 8, 4);
+        BrancheAssurance automobile = branch(1L, "AUTOMOBILE");
+        BrancheAssurance risquesDivers = branch(2L, "RISQUES_DIVERS");
+        Garantie guarantee = guarantee(1L, "RC", TypeGarantie.VEHICULE);
+        Contrat contract = Contrat.builder().brancheAssurance(automobile).typeContrat(TypeContrat.FLOTTE).build();
+        ContratGarantie contractGuarantee = ContratGarantie.builder().garantie(guarantee).build();
+        RegleFiscale automobileRule = guaranteeRule(1L, "AUTO", null, guarantee, null, "0.14", true, 0);
+        automobileRule.setBrancheAssurance(automobile);
+        RegleFiscale otherBranchRule = guaranteeRule(2L, "RD", null, guarantee, null, "0.20", true, 100);
+        otherBranchRule.setBrancheAssurance(risquesDivers);
+        when(repository.findActiveAt(effectDate)).thenReturn(List.of(automobileRule, otherBranchRule));
+
+        RegleFiscale resolved = resolver.catalogue(effectDate)
+                .forGuarantee(NatureRegleFiscale.TAXE_ASSURANCE, contract, contractGuarantee)
+                .orElseThrow();
+
+        assertThat(resolved.getCode()).isEqualTo("AUTO");
+    }
+
     private RegleFiscale guaranteeRule(Long id, String code, CompagnieAssurance company,
                                        Garantie guarantee, Usage usage, String value,
                                        boolean applicable, int priority) {
@@ -111,6 +133,7 @@ class RegleFiscaleResolverTest {
                 .modeCalcul(ModeCalculRegleFiscale.TAUX).valeur(new BigDecimal(value))
                 .baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
                 .categorieResultat(CategorieQuittance.AUTOMOBILE)
+                .brancheAssurance(branch(1L, "AUTOMOBILE"))
                 .compagnieAssurance(company).garantie(guarantee).usage(usage)
                 .dateDebut(LocalDate.of(2000, 1, 1)).applicable(applicable)
                 .priorite(priority).actif(true).build();
@@ -134,5 +157,11 @@ class RegleFiscaleResolverTest {
         CompagnieAssurance company = CompagnieAssurance.builder().code("COMPANY").nom("Company").build();
         company.setId(id);
         return company;
+    }
+
+    private BrancheAssurance branch(Long id, String code) {
+        BrancheAssurance branch = BrancheAssurance.builder().code(code).libelle(code).actif(true).build();
+        branch.setId(id);
+        return branch;
     }
 }

@@ -25,6 +25,7 @@ const categories: QuittanceCategory[] = ["AUTOMOBILE", "CORPOREL", "EVCAT"];
 
 export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }: Props) {
   const [form, setForm] = useState<UpsertFiscalRule>(() => emptyRule());
+  const branches = useReference("branches-assurance", open);
   const compagnies = useReference("compagnies-assurance", open);
   const categoriesClient = useReference("categories-client", open);
   const garanties = useQuery({
@@ -39,6 +40,12 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
   useEffect(() => {
     if (open) setForm(rule ? fromRule(rule) : emptyRule());
   }, [open, rule]);
+
+  useEffect(() => {
+    if (!open || rule || form.brancheAssuranceId || !branches.data?.length) return;
+    const automobile = branches.data.find((branch) => branch.code === "AUTOMOBILE") ?? branches.data[0];
+    setForm((current) => ({ ...current, brancheAssuranceId: automobile.id }));
+  }, [branches.data, form.brancheAssuranceId, open, rule]);
 
   const percentage = form.modeCalcul === "TAUX";
   const displayedValue = percentage ? percentageForInput(form.valeur) : form.valeur;
@@ -88,6 +95,10 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
             <CategorySelect value={form.categorieResultat} disabled={form.baseCalcul === "PRIME_CATEGORIE" || form.nature === "EVCAT" || form.nature === "CNPAC"}
               onChange={(categorieResultat) => setForm({ ...form, categorieResultat })} />
           </Field>
+          <Field label="Branche" required>
+              <RequiredReferenceSelect value={form.brancheAssuranceId} items={branches.data ?? []}
+              onChange={(brancheAssuranceId) => setForm({ ...form, brancheAssuranceId, garantieId: null })} />
+          </Field>
           <Field label="Compagnie">
             <ReferenceSelect value={form.compagnieAssuranceId} items={compagnies.data ?? []} onChange={(compagnieAssuranceId) => setForm({ ...form, compagnieAssuranceId })} />
           </Field>
@@ -100,7 +111,7 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
 
           {form.baseCalcul === "PRIME_GARANTIE" ? <>
             <Field label="Garantie">
-              <ReferenceSelect value={form.garantieId} items={garanties.data ?? []} onChange={(garantieId) => setForm({ ...form, garantieId, typeGarantie: null })} />
+              <ReferenceSelect value={form.garantieId} items={(garanties.data ?? []).filter((item) => item.brancheAssuranceId === form.brancheAssuranceId)} onChange={(garantieId) => setForm({ ...form, garantieId, typeGarantie: null })} />
             </Field>
             <Field label="Type de garantie">
               <EnumSelect nullable value={form.typeGarantie ?? NONE} onChange={(value) => setForm({ ...form, typeGarantie: value === NONE ? null : value as UpsertFiscalRule["typeGarantie"], garantieId: null })} options={guaranteeTypeOptions} />
@@ -167,6 +178,12 @@ function ReferenceSelect({ value, items, onChange }: { value?: string | null; it
   </SelectContent></Select>;
 }
 
+function RequiredReferenceSelect({ value, items, onChange }: { value: string; items: { id: string; code?: string | null; libelle: string }[]; onChange: (value: string) => void }) {
+  return <Select value={value} onValueChange={onChange}><SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>
+    {items.map((item) => <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>)}
+  </SelectContent></Select>;
+}
+
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return <div className="flex h-9 items-center justify-between rounded-md border px-3"><span className="text-sm font-medium">{label}</span><Switch checked={checked} onCheckedChange={onChange} /></div>;
 }
@@ -174,7 +191,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 function emptyRule(): UpsertFiscalRule {
   return { code: "", libelle: "", nature: "TAXE_ASSURANCE", modeCalcul: "TAUX", valeur: 0,
     baseCalcul: "PRIME_GARANTIE", categorieBase: null, categorieResultat: "AUTOMOBILE",
-    compagnieAssuranceId: null, categorieClientId: null, garantieId: null, typeGarantie: null, usageId: null,
+    brancheAssuranceId: "", compagnieAssuranceId: null, categorieClientId: null, garantieId: null, typeGarantie: null, usageId: null,
     groupeUsageAttestationId: null, typeContrat: null, dateDebut: toDateOnly(new Date()), dateFin: null,
     applicable: true, priorite: 0, actif: true, description: null, referenceReglementaire: null };
 }
@@ -189,6 +206,7 @@ function fromRule(rule: FiscalRule): UpsertFiscalRule {
     baseCalcul: rule.baseCalcul,
     categorieBase: rule.categorieBase,
     categorieResultat: rule.categorieResultat,
+    brancheAssuranceId: rule.brancheAssuranceId,
     compagnieAssuranceId: rule.compagnieAssuranceId,
     categorieClientId: rule.categorieClientId,
     garantieId: rule.garantieId,
@@ -223,7 +241,7 @@ function changeBase(form: UpsertFiscalRule, baseCalcul: FiscalRuleBase): UpsertF
 }
 
 function isValid(form: UpsertFiscalRule) {
-  return Boolean(form.code.trim() && form.libelle.trim() && form.dateDebut && form.categorieResultat && form.valeur >= 0
+  return Boolean(form.code.trim() && form.libelle.trim() && form.brancheAssuranceId && form.dateDebut && form.categorieResultat && form.valeur >= 0
     && (form.baseCalcul !== "PRIME_CATEGORIE" || form.categorieBase === form.categorieResultat)
     && (!form.dateFin || form.dateFin > form.dateDebut));
 }

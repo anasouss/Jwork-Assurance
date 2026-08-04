@@ -41,8 +41,9 @@ public class Garantie extends BaseEntity {
     @Column(length = 500)
     private String description;
 
-    @Column(length = 80)
-    private String branche;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branche_assurance_id")
+    private BrancheAssurance brancheAssurance;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupe_exclusion_id")

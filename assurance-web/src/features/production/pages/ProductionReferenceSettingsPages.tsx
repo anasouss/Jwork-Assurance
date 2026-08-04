@@ -658,6 +658,7 @@ export function GarantiesSettingsPage() {
     staleTime: 60_000,
   });
   const compagnies = useReference("compagnies-assurance");
+  const branches = useReference("branches-assurance");
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertGarantieRequest>(emptyGarantie());
@@ -671,6 +672,12 @@ export function GarantiesSettingsPage() {
   useEffect(() => {
     setPayload(editing ? normalizeGarantiePayload(garantiePayloadFromReference(editing)) : emptyGarantie());
   }, [editing]);
+
+  useEffect(() => {
+    if (editing || payload.brancheAssuranceId || !branches.data?.length) return;
+    const automobile = branches.data.find((branch) => branch.code === "AUTOMOBILE") ?? branches.data[0];
+    setPayload((current) => ({ ...current, brancheAssuranceId: automobile.id }));
+  }, [branches.data, editing, payload.brancheAssuranceId]);
 
   useEffect(() => {
     setGroupeExclusionPayload(editingGroupeExclusion ? groupeExclusionPayloadFromReference(editingGroupeExclusion) : emptyGroupeExclusionGarantie());
@@ -940,8 +947,13 @@ export function GarantiesSettingsPage() {
               <Field label="Libellé" required>
                 <Input value={payload.libelle} onChange={(event) => update({ libelle: event.target.value })} />
               </Field>
-              <Field label="Branche">
-                <Input value={payload.branche ?? ""} onChange={(event) => update({ branche: event.target.value })} />
+              <Field label="Branche" required>
+                <Select value={payload.brancheAssuranceId} onValueChange={(brancheAssuranceId) => update({ brancheAssuranceId })}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                  <SelectContent>
+                    {(branches.data ?? []).map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.code ? `${branch.code} - ` : ""}{branch.libelle}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Type">
                 <Select value={payload.typeGarantie ?? "VEHICULE"} onValueChange={applyType}>
@@ -1879,7 +1891,7 @@ function emptyGarantie(): UpsertGarantieRequest {
     code: "",
     libelle: "",
     description: "",
-    branche: "Automobile",
+    brancheAssuranceId: "",
     groupeExclusionId: undefined,
     typeGarantie: "VEHICULE",
     obligatoire: false,
@@ -1929,7 +1941,7 @@ function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantie
     code: garantie.code ?? "",
     libelle: garantie.libelle,
     description: String(garantie.description ?? ""),
-    branche: String(garantie.branche ?? "Automobile"),
+    brancheAssuranceId: garantie.brancheAssuranceId ? String(garantie.brancheAssuranceId) : "",
     groupeExclusionId: garantie.groupeExclusionId ? String(garantie.groupeExclusionId) : undefined,
     typeGarantie: String(garantie.typeGarantie ?? "VEHICULE"),
     obligatoire: Boolean(garantie.obligatoire),

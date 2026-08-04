@@ -117,7 +117,7 @@ export default function FiscalRulesSettingsPage() {
 }
 
 function scopeLabel(rule: FiscalRule) {
-  const parts = [rule.compagnieAssuranceLibelle, rule.categorieClientCode ? `Catégorie ${rule.categorieClientCode}` : null,
+  const parts = [rule.brancheAssuranceLibelle, rule.compagnieAssuranceLibelle, rule.categorieClientCode ? `Catégorie ${rule.categorieClientCode}` : null,
     rule.typeContrat ? contractLabels[rule.typeContrat] : null,
     rule.garantieCode ? `Garantie ${rule.garantieCode}` : null, rule.typeGarantie ? `Garanties ${rule.typeGarantie === "PERSONNE" ? "personne" : "véhicule"}` : null,
     rule.usageCode ? `Usage ${rule.usageCode}` : null, rule.groupeUsageAttestationCode ? `Groupe ${rule.groupeUsageAttestationCode}` : null].filter(Boolean);

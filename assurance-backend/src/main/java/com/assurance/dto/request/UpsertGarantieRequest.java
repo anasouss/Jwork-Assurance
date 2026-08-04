@@ -5,6 +5,7 @@ import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeGarantie;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.Set;
@@ -18,7 +19,8 @@ public class UpsertGarantieRequest {
     private String libelle;
 
     private String description;
-    private String branche;
+    @NotNull
+    private Long brancheAssuranceId;
     private Long groupeExclusionId;
     private TypeGarantie typeGarantie;
     private Boolean obligatoire;

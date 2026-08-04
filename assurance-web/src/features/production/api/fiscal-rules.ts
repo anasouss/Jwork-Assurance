@@ -19,6 +19,9 @@ export type FiscalRule = {
   baseCalcul: FiscalRuleBase;
   categorieBase?: QuittanceCategory | null;
   categorieResultat: QuittanceCategory;
+  brancheAssuranceId: string;
+  brancheAssuranceCode?: string | null;
+  brancheAssuranceLibelle?: string | null;
   compagnieAssuranceId?: string | null;
   compagnieAssuranceLibelle?: string | null;
   categorieClientId?: string | null;
@@ -46,6 +49,8 @@ export type FiscalRule = {
 export type UpsertFiscalRule = Omit<
   FiscalRule,
   | "id"
+  | "brancheAssuranceCode"
+  | "brancheAssuranceLibelle"
   | "compagnieAssuranceLibelle"
   | "categorieClientCode"
   | "categorieClientLibelle"
@@ -82,6 +87,7 @@ function normalizeRule(rule: FiscalRule): FiscalRule {
   return {
     ...rule,
     id: String(rule.id),
+    brancheAssuranceId: String(rule.brancheAssuranceId),
     compagnieAssuranceId: normalizeId(rule.compagnieAssuranceId),
     categorieClientId: normalizeId(rule.categorieClientId),
     garantieId: normalizeId(rule.garantieId),

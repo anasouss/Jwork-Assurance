@@ -27,6 +27,9 @@ public class ContratResponse {
     private TypeContrat typeContrat;
     private StatutContrat statut;
     private Long agenceId;
+    private Long brancheAssuranceId;
+    private String brancheAssuranceCode;
+    private String brancheAssuranceLibelle;
     private Long compagnieAssuranceId;
     private Long conventionId;
     private Long categorieClientId;

@@ -111,7 +111,7 @@ export const garantieSchema = z.object({
   code: z.string().min(1, "Code obligatoire"),
   libelle: z.string().min(2, "Libelle obligatoire"),
   description: z.string().optional(),
-  branche: z.string().optional(),
+  brancheAssuranceId: z.string().min(1, "Branche obligatoire"),
   groupeExclusionId: z.string().optional(),
   typeGarantie: z.enum(["VEHICULE", "PERSONNE"]),
   obligatoire: z.boolean().optional(),

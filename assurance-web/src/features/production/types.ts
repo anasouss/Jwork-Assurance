@@ -990,7 +990,7 @@ export type UpsertGarantieRequest = {
   code: string;
   libelle: string;
   description?: string;
-  branche?: string;
+  brancheAssuranceId: string;
   groupeExclusionId?: string;
   typeGarantie?: string;
   obligatoire?: boolean;

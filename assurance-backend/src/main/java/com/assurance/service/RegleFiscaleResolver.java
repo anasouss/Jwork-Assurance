@@ -69,6 +69,7 @@ public class RegleFiscaleResolver {
         }
 
         private boolean matches(RegleFiscale rule, Contrat contrat, ContratGarantie guarantee) {
+            if (!sameId(rule.getBrancheAssurance(), contrat.getBrancheAssurance())) return false;
             if (rule.getCompagnieAssurance() != null && !sameId(rule.getCompagnieAssurance(), contrat.getCompagnieAssurance())) return false;
             if (rule.getCategorieClient() != null && !sameId(rule.getCategorieClient(), contrat.getCategorieClient())) return false;
             if (rule.getTypeContrat() != null && rule.getTypeContrat() != contrat.getTypeContrat()) return false;
@@ -90,6 +91,7 @@ public class RegleFiscaleResolver {
         private static int specificity(RegleFiscale rule) {
             int score = 0;
             if (rule.getGarantie() != null) score += 64;
+            if (rule.getBrancheAssurance() != null) score += 48;
             if (rule.getCompagnieAssurance() != null) score += 32;
             if (rule.getCategorieClient() != null) score += 24;
             if (rule.getUsage() != null) score += 16;

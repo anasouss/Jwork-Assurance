@@ -83,6 +83,7 @@ import java.util.Set;
 public class ReferentielController {
 
     private final CategorieTransportRepository categorieTransportRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final UsageRepository usageRepository;
     private final MarqueRepository marqueRepository;
     private final CarrosserieRepository carrosserieRepository;
@@ -105,6 +106,14 @@ public class ReferentielController {
     private final TarifProduitAssistanceRepository tarifProduitAssistanceRepository;
     private final AgenceRepository agenceRepository;
     private final RichTextSanitizer richTextSanitizer;
+
+    @GetMapping("/branches-assurance")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> branchesAssurance() {
+        return ResponseEntity.ok(ApiResponse.success(brancheAssuranceRepository.findAllByActifTrueOrderByLibelleAsc().stream()
+                .map(branch -> option(branch.getId(), branch.getCode(), branch.getLibelle()).map())
+                .toList()));
+    }
 
     @GetMapping("/usages")
     @Transactional(readOnly = true)
@@ -675,14 +684,20 @@ public class ReferentielController {
     }
 
     @GetMapping("/garanties")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> garanties() {
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> garanties(
+            @RequestParam(defaultValue = "AUTOMOBILE") String brancheCode
+    ) {
         return ResponseEntity.ok(ApiResponse.success(garantieRepository.findAll(Sort.by("ordreAffichage", "code")).stream()
                 .filter(garantie -> Boolean.TRUE.equals(garantie.getActif()))
+                .filter(garantie -> garantie.getBrancheAssurance() != null
+                        && garantie.getBrancheAssurance().getCode().equalsIgnoreCase(brancheCode))
                 .map(this::toGarantieResponse)
                 .toList()));
     }
 
     @GetMapping("/garanties/parametrage")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> garantiesParametrage() {
         return ResponseEntity.ok(ApiResponse.success(garantieRepository.findAll(Sort.by("ordreAffichage", "code")).stream()
                 .map(this::toGarantieResponse)
@@ -1311,7 +1326,9 @@ public class ReferentielController {
         garantie.setCode(request.getCode());
         garantie.setLibelle(request.getLibelle());
         garantie.setDescription(blankToNull(request.getDescription()));
-        garantie.setBranche(blankToNull(request.getBranche()) == null ? "Automobile" : blankToNull(request.getBranche()));
+        garantie.setBrancheAssurance(brancheAssuranceRepository.findById(request.getBrancheAssuranceId())
+                .filter(branch -> Boolean.TRUE.equals(branch.getActif()))
+                .orElseThrow(() -> new ResourceNotFoundException("BrancheAssurance", request.getBrancheAssuranceId())));
         GroupeExclusionGarantie groupeExclusion = request.getGroupeExclusionId() == null ? null :
                 groupeExclusionGarantieRepository.findById(request.getGroupeExclusionId())
                         .orElseThrow(() -> new ResourceNotFoundException("GroupeExclusionGarantie", request.getGroupeExclusionId()));
@@ -1354,7 +1371,9 @@ public class ReferentielController {
     private Map<String, Object> toGarantieResponse(Garantie garantie) {
         return option(garantie.getId(), garantie.getCode(), garantie.getLibelle())
                 .putValue("description", garantie.getDescription())
-                .putValue("branche", garantie.getBranche())
+                .putValue("brancheAssuranceId", garantie.getBrancheAssurance() != null ? garantie.getBrancheAssurance().getId() : null)
+                .putValue("brancheCode", garantie.getBrancheAssurance() != null ? garantie.getBrancheAssurance().getCode() : null)
+                .putValue("brancheLibelle", garantie.getBrancheAssurance() != null ? garantie.getBrancheAssurance().getLibelle() : null)
                 .putValue("groupeExclusionId", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getId() : null)
                 .putValue("groupeExclusionCode", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getCode() : null)
                 .putValue("groupeExclusionLibelle", garantie.getGroupeExclusion() != null ? garantie.getGroupeExclusion().getLibelle() : null)

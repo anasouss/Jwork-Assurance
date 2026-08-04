@@ -50,6 +50,7 @@ import java.util.*;
 public class ContratService {
 
     private final AgenceRepository agenceRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final ConventionRepository conventionRepository;
     private final CategorieClientRepository categorieClientRepository;
@@ -111,6 +112,22 @@ public class ContratService {
     private LigneGrilleTarifaire requireAccessibleLigneGrilleTarifaire(Long agenceId, Long ligneId) {
         return ligneGrilleTarifaireRepository.findAccessibleById(agenceId, ligneId)
                 .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", ligneId));
+    }
+
+    private BrancheAssurance automobileBranch() {
+        return brancheAssuranceRepository.findByCodeIgnoreCase("AUTOMOBILE")
+                .filter(branch -> Boolean.TRUE.equals(branch.getActif()))
+                .orElseThrow(() -> new IllegalStateException("La branche Automobile n'est pas configurée"));
+    }
+
+    private Garantie requireGuaranteeForContract(Contrat contrat, Long guaranteeId) {
+        Garantie guarantee = garantieRepository.findById(guaranteeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Garantie", guaranteeId));
+        if (contrat.getBrancheAssurance() == null || guarantee.getBrancheAssurance() == null
+                || !Objects.equals(contrat.getBrancheAssurance().getId(), guarantee.getBrancheAssurance().getId())) {
+            throw new BadRequestException("La garantie ne correspond pas à la branche du contrat");
+        }
+        return guarantee;
     }
 
     @Transactional
@@ -239,6 +256,7 @@ public class ContratService {
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", request.getAgenceId()));
         Contrat contrat = Contrat.builder()
                 .agence(agence)
+                .brancheAssurance(automobileBranch())
                 .typeContrat(request.getTypeContrat())
                 .statut(StatutContrat.DRAFT)
                 .brouillon(true)
@@ -317,8 +335,7 @@ public class ContratService {
             if (input.getGarantieId() == null) {
                 continue;
             }
-            Garantie garantie = garantieRepository.findById(input.getGarantieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             registerGarantieExclusion(exclusions, garantie, vehicule, null, null);
             ContratGarantie contratGarantie = saveCalculatedDraftGarantieForTarget(contrat, input, vehicule, null);
             contrat.getGaranties().add(contratGarantie);
@@ -377,8 +394,7 @@ public class ContratService {
             if (input.getGarantieId() == null) {
                 continue;
             }
-            Garantie garantie = garantieRepository.findById(input.getGarantieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             registerGarantieExclusion(exclusions, garantie, null, remorque, null);
             ContratGarantie contratGarantie = saveCalculatedDraftGarantieForTarget(contrat, input, null, remorque);
             contrat.getGaranties().add(contratGarantie);
@@ -475,6 +491,7 @@ public class ContratService {
 
         Contrat contrat = Contrat.builder()
                 .agence(agence)
+                .brancheAssurance(automobileBranch())
                 .compagnieAssurance(compagnie)
                 .convention(convention)
                 .usage(usageContrat)
@@ -587,8 +604,7 @@ public class ContratService {
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
-            Garantie garantie = garantieRepository.findById(input.getGarantieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
@@ -933,6 +949,9 @@ public class ContratService {
             boolean saisiePrimeNette,
             ContractDates contractDates
     ) {
+        if (contrat.getBrancheAssurance() == null) {
+            contrat.setBrancheAssurance(automobileBranch());
+        }
         contrat.setCompagnieAssurance(compagnie);
         contrat.setConvention(convention);
         contrat.setUsage(usageContrat);
@@ -1643,8 +1662,7 @@ public class ContratService {
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
-            Garantie garantie = garantieRepository.findById(input.getGarantieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
@@ -1690,8 +1708,7 @@ public class ContratService {
             if (input.getGarantieId() == null) {
                 continue;
             }
-            Garantie garantie = garantieRepository.findById(input.getGarantieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
@@ -1745,8 +1762,7 @@ public class ContratService {
             Vehicule vehicule,
             Remorque remorque
     ) {
-        Garantie garantie = garantieRepository.findById(input.getGarantieId())
-                .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+        Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
         Client client = input.getClientId() == null ? null :
                 clientRepository.findByAgenceIdAndId(contrat.getAgence().getId(), input.getClientId())
                         .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
@@ -4484,6 +4500,7 @@ public class ContratService {
 
         Contrat contrat = Contrat.builder()
                 .agence(agence)
+                .brancheAssurance(automobileBranch())
                 .compagnieAssurance(compagnie)
                 .convention(convention)
                 .usage(usageContrat)
@@ -4663,8 +4680,7 @@ public class ContratService {
         List<ContratGarantie> garanties = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
-            Garantie garantie = garantieRepository.findById(input.getGarantieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Garantie", input.getGarantieId()));
+            Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
@@ -5051,6 +5067,9 @@ public class ContratService {
                 .typeContrat(contrat.getTypeContrat())
                 .statut(contrat.getStatut())
                 .agenceId(contrat.getAgence() != null ? contrat.getAgence().getId() : null)
+                .brancheAssuranceId(contrat.getBrancheAssurance() != null ? contrat.getBrancheAssurance().getId() : null)
+                .brancheAssuranceCode(contrat.getBrancheAssurance() != null ? contrat.getBrancheAssurance().getCode() : null)
+                .brancheAssuranceLibelle(contrat.getBrancheAssurance() != null ? contrat.getBrancheAssurance().getLibelle() : null)
                 .compagnieAssuranceId(contrat.getCompagnieAssurance() != null ? contrat.getCompagnieAssurance().getId() : null)
                 .conventionId(contrat.getConvention() != null ? contrat.getConvention().getId() : null)
                 .categorieClientId(contrat.getCategorieClient() != null ? contrat.getCategorieClient().getId() : null)

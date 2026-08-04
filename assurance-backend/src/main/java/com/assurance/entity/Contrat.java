@@ -59,6 +59,10 @@ public class Contrat extends BaseEntity {
     private CompagnieAssurance compagnieAssurance;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branche_assurance_id")
+    private BrancheAssurance brancheAssurance;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "convention_id")
     private Convention convention;
 

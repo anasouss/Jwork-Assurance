@@ -1,6 +1,7 @@
 package com.assurance.seeder;
 
 import com.assurance.entity.CategorieClient;
+import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.Garantie;
 import com.assurance.entity.RegleFiscale;
 import com.assurance.entity.Usage;
@@ -10,6 +11,7 @@ import com.assurance.enums.ModeCalculRegleFiscale;
 import com.assurance.enums.NatureRegleFiscale;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.repository.CategorieClientRepository;
+import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.GarantieRepository;
 import com.assurance.repository.RegleFiscaleRepository;
 import com.assurance.service.ParametreApplicationService;
@@ -31,6 +33,7 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
 
     private final RegleFiscaleRepository repository;
     private final GarantieRepository garantieRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final CategorieClientRepository categorieClientRepository;
     private final ParametreApplicationService parametreApplicationService;
 
@@ -92,6 +95,7 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
             legacyB1.setCode("EVCAT_RC_TPV");
             legacyB1.setLibelle("EVCAT RC - catégorie TPV");
             legacyB1.setCategorieClient(tpv);
+            legacyB1.setBrancheAssurance(automobileBranch());
             legacyB1.setUsage(null);
             legacyB1.setPriorite(200);
             legacyB1.setActif(true);
@@ -103,6 +107,7 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
                     .nature(NatureRegleFiscale.EVCAT).modeCalcul(ModeCalculRegleFiscale.TAUX)
                     .valeur(new BigDecimal(value)).baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
                     .categorieResultat(CategorieQuittance.EVCAT).garantie(rc).categorieClient(tpv)
+                    .brancheAssurance(automobileBranch())
                     .dateDebut(INITIAL_DATE).applicable(true).priorite(200).actif(true).build());
         }
 
@@ -128,6 +133,7 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
                 .code(code).libelle(label).nature(nature).modeCalcul(ModeCalculRegleFiscale.TAUX)
                 .valeur(new BigDecimal(value)).baseCalcul(BaseCalculRegleFiscale.PRIME_CATEGORIE)
                 .categorieBase(category).categorieResultat(category).dateDebut(INITIAL_DATE)
+                .brancheAssurance(automobileBranch())
                 .applicable(true).priorite(0).actif(true).build());
     }
 
@@ -145,7 +151,13 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
         repository.save(RegleFiscale.builder()
                 .code(code).libelle(label).nature(nature).modeCalcul(mode).valeur(new BigDecimal(value))
                 .baseCalcul(base).categorieResultat(resultCategory).garantie(guarantee)
+                .brancheAssurance(automobileBranch())
                 .typeGarantie(guaranteeType).usage(usage).dateDebut(INITIAL_DATE)
                 .applicable(true).priorite(priority).actif(true).build());
+    }
+
+    private BrancheAssurance automobileBranch() {
+        return brancheAssuranceRepository.findByCodeIgnoreCase("AUTOMOBILE")
+                .orElseThrow(() -> new IllegalStateException("La branche Automobile doit être initialisée avant les règles fiscales"));
     }
 }

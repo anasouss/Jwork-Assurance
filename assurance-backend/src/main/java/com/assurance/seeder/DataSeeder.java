@@ -51,6 +51,7 @@ public class DataSeeder implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final AgenceRepository agenceRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final GarantieRepository garantieRepository;
     private final GroupeExclusionGarantieRepository groupeExclusionGarantieRepository;
@@ -615,11 +616,13 @@ public class DataSeeder implements CommandLineRunner {
             boolean verrouillee,
             GroupeExclusionGarantie groupeExclusion
     ) {
+        BrancheAssurance brancheAutomobile = brancheAssuranceRepository.findByCodeIgnoreCase("AUTOMOBILE")
+                .orElseThrow(() -> new IllegalStateException("La branche Automobile doit être initialisée avant les garanties"));
         Garantie garantie = garantieRepository.findByCode(code).orElseGet(() ->
                 Garantie.builder()
                         .code(code)
                         .libelle(libelle)
-                        .branche("Automobile")
+                        .brancheAssurance(brancheAutomobile)
                         .typeGarantie(typeGarantie)
                         .obligatoire(obligatoire)
                         .responsabiliteCivile(responsabiliteCivile)
@@ -637,7 +640,7 @@ public class DataSeeder implements CommandLineRunner {
                         .build()
         );
         garantie.setLibelle(libelle);
-        garantie.setBranche("Automobile");
+        garantie.setBrancheAssurance(brancheAutomobile);
         garantie.setTypeGarantie(typeGarantie);
         garantie.setObligatoire(obligatoire);
         garantie.setResponsabiliteCivile(responsabiliteCivile);

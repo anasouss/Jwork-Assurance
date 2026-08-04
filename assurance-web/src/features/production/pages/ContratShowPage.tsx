@@ -237,7 +237,7 @@ function FlottePolicySheet({
 
   return (
     <div className="w-full overflow-x-auto">
-      <div className="mx-auto min-w-[1180px] max-w-[1320px] border bg-white p-4 text-[11px] leading-tight text-slate-950 shadow-sm">
+      <div className="mx-auto min-h-[210mm] w-[297mm] border bg-white p-[4mm] text-[11px] leading-tight text-slate-950 shadow-sm">
         <div className="mx-auto w-[470px] border border-slate-900 bg-slate-100 px-3 py-2 text-center text-slate-900">
           <div className="text-lg font-bold uppercase tracking-wide">Police flotte automobile</div>
           <div className="text-sm font-semibold">ACTE N {actNumber} : {text(actLabel)}</div>

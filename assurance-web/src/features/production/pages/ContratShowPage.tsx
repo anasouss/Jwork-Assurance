@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Car, FileText, FileTextIcon, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,8 +60,17 @@ export default function ContratShowPage() {
   const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement ? `-acte-${selectedActNumber}` : ""}.pdf`;
   const openPdf = async () => {
     if (generatingPdf) return;
+    const previewWindow = contrat.typeContrat === "FLOTTE" ? window.open("about:blank", "_blank") : null;
+    if (contrat.typeContrat === "FLOTTE" && !previewWindow) return;
     setGeneratingPdf(true);
     try {
+      if (contrat.typeContrat === "FLOTTE") {
+        const blob = await contractApi.downloadFlottePolicyPdf(contratId, mouvementId);
+        const url = URL.createObjectURL(blob);
+        previewWindow!.location.href = url;
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return;
+      }
       await openContratPdf({
         contrat,
         dossier,
@@ -72,6 +82,9 @@ export default function ContratShowPage() {
         mouvement: selectedMouvement,
         filename: pdfName,
       });
+    } catch (error) {
+      previewWindow?.close();
+      toast.error(error instanceof Error ? error.message : "Génération du PDF impossible");
     } finally {
       setGeneratingPdf(false);
     }

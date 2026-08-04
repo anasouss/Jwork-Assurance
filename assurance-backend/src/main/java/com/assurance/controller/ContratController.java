@@ -28,6 +28,7 @@ import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
 import com.assurance.service.ContratSearchService;
 import com.assurance.service.DevisPdfService;
+import com.assurance.service.FlottePolicePdfService;
 import com.assurance.service.PreTermeFlottePdfService;
 import com.assurance.service.EcheanceProductionService;
 import com.assurance.service.MouvementContratService;
@@ -61,6 +62,7 @@ public class ContratController {
     private final AssistanceContratService assistanceContratService;
     private final CarteVerteService carteVerteService;
     private final DevisPdfService devisPdfService;
+    private final FlottePolicePdfService flottePolicePdfService;
     private final PreTermeFlottePdfService preTermeFlottePdfService;
     private final MouvementContratService mouvementContratService;
     private final EcheanceProductionService echeanceProductionService;
@@ -317,6 +319,19 @@ public class ContratController {
         byte[] pdf = devisPdfService.generate(TenantContext.getCurrentAgence(), id, request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=devis-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/{id}/police-flotte-pdf")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
+    public ResponseEntity<byte[]> policeFlottePdf(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long mouvementId
+    ) {
+        byte[] pdf = flottePolicePdfService.generate(TenantContext.getCurrentAgence(), id, mouvementId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=police-flotte-" + id + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }

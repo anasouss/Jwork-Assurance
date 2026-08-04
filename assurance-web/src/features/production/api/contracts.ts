@@ -53,6 +53,14 @@ export const contractApi = {
     );
   },
 
+  async downloadFlottePolicyPdf(contratId: string, mouvementId?: string | null) {
+    return apiFetchBlob(
+      `/api/v1/contrats/${contratId}/police-flotte-pdf${buildQueryString({
+        mouvementId: mouvementId ?? undefined,
+      })}`
+    );
+  },
+
   async createRenouvellementDraft(
     contratId: string,
     modeTermeRenouvellement: "CABINET" | "COMPAGNIE"

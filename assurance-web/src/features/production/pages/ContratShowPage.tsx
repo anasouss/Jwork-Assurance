@@ -830,8 +830,8 @@ function garantieLabel(garantie: Garantie) {
 }
 
 function franchiseLabel(garantie: Garantie) {
-  const taux = Number(garantie.tauxFranchise) > 0 ? `${moneyAmount(garantie.tauxFranchise)} %` : null;
-  const min = Number(garantie.franchiseMinimale) > 0 ? `min ${moneyAmount(garantie.franchiseMinimale)} DH` : null;
+  const taux = Number(garantie.tauxFranchise) > 0 ? `${compactNumber(Number(garantie.tauxFranchise))} %` : null;
+  const min = Number(garantie.franchiseMinimale) > 0 ? `min ${compactNumber(Number(garantie.franchiseMinimale))} DH` : null;
   return [taux, min].filter(Boolean).join(" avec ") || "-";
 }
 

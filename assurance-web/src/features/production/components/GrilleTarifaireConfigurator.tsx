@@ -452,7 +452,7 @@ function PersonnesLinesTable({
           <TableRow>
             <TableHead className="w-10">#</TableHead>
             <TableHead className="w-24">Garantie</TableHead>
-            <TableHead className="w-40">Formule</TableHead>
+            <TableHead className="w-28">Formule</TableHead>
             <TableHead className="w-32 text-right">Décès</TableHead>
             <TableHead className="w-32 text-right">Invalidité</TableHead>
             <TableHead className="w-36 text-right">Frais médicaux</TableHead>
@@ -492,7 +492,7 @@ function PersonnesLinesTable({
                   ) : null}
                   <TableCell>
                     <Input
-                      className="h-9 min-w-36"
+                      className="h-9 w-28 min-w-0"
                       disabled={!groupEnabled}
                       value={draft.formule ?? ""}
                       onChange={(event) => updateDraft(draft.localKey, { formule: event.target.value })}

@@ -3,13 +3,10 @@ package com.assurance.service;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratGarantie;
 import com.assurance.entity.TypeMouvementContrat;
-import com.assurance.entity.Usage;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.NatureRegleFiscale;
-import com.assurance.enums.TypeGarantie;
 import com.assurance.enums.TypeImpactMouvement;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -19,7 +16,6 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -27,11 +23,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class QuittanceCalculService {
 
-    private final ParametreApplicationService parametreApplicationService;
     private final RegleFiscaleQuittanceEngine regleFiscaleEngine;
-
-    @Value("${app.fiscal-rules.enabled:false}")
-    private boolean fiscalRulesEnabled;
 
     public Resultat calculer(
             Contrat contrat,
@@ -49,89 +41,8 @@ public class QuittanceCalculService {
             int nombreUnitesCnpac,
             LocalDate dateEffet
     ) {
-        if (fiscalRulesEnabled) {
-            return calculerAvecReglesFiscales(
-                    contrat, typeMouvement, garanties, nombreUnitesCnpac, dateEffet);
-        }
-        return calculerAvecParametresLegacy(contrat, typeMouvement, garanties, nombreUnitesCnpac);
-    }
-
-    private Resultat calculerAvecParametresLegacy(
-            Contrat contrat,
-            TypeMouvementContrat typeMouvement,
-            List<ContratGarantie> garanties,
-            int nombreUnitesCnpac
-    ) {
-        Long agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
-        TypeImpactMouvement impact = typeMouvement == null || typeMouvement.getTypeImpact() == null ? TypeImpactMouvement.NORMAL : typeMouvement.getTypeImpact();
-        if (impact == TypeImpactMouvement.ZERO) {
-            return totalOnly(BigDecimal.ZERO);
-        }
-        if (impact == TypeImpactMouvement.CNPAC_SEUL || Boolean.TRUE.equals(typeMouvement != null ? typeMouvement.getCnpacSeul() : null)) {
-            BigDecimal cnpac = param(agenceId, "CNPAC").multiply(BigDecimal.valueOf(Math.max(1, nombreUnitesCnpac)));
-            Ligne ligne = new Ligne(CategorieQuittance.AUTOMOBILE, 10, false, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, cnpac, cnpac);
-            return withTotal(List.of(ligne), BigDecimal.ONE);
-        }
-
-        BigDecimal tauxTaxeRc = param(agenceId, "TAUX_TAXE_1");
-        BigDecimal tauxTaxeGarantie = param(agenceId, "TAUX_TAXE_2");
-        BigDecimal tauxTaxePf = param(agenceId, "TAUX_TAXE_PF");
-        BigDecimal tauxEvcatAutres = param(agenceId, "TAUX_EVCAT_2");
-        BigDecimal cnpacUnitaire = param(agenceId, "CNPAC");
-
-        BigDecimal netAuto = BigDecimal.ZERO;
-        BigDecimal taxeAuto = BigDecimal.ZERO;
-        BigDecimal accessoireAuto = BigDecimal.ZERO;
-        BigDecimal netCorporel = BigDecimal.ZERO;
-        BigDecimal taxeCorporel = BigDecimal.ZERO;
-        BigDecimal taxePfCorporel = BigDecimal.ZERO;
-        BigDecimal basePta = BigDecimal.ZERO;
-        BigDecimal accessoireCorporel = BigDecimal.ZERO;
-        BigDecimal netEvcat = BigDecimal.ZERO;
-        BigDecimal accessoireEvcat = BigDecimal.ZERO;
-
-        for (ContratGarantie contratGarantie : garanties == null ? List.<ContratGarantie>of() : garanties) {
-            if (contratGarantie == null || contratGarantie.getGarantie() == null) {
-                continue;
-            }
-            BigDecimal prime = zeroIfNull(contratGarantie.getPrime());
-            BigDecimal accessoire = zeroIfNull(contratGarantie.getAccessoire());
-            String codeGarantie = contratGarantie.getGarantie().getCode() == null ? "" : contratGarantie.getGarantie().getCode().trim().toUpperCase(Locale.ROOT);
-
-            if (contratGarantie.getGarantie().getTypeGarantie() == TypeGarantie.PERSONNE || "PC".equals(codeGarantie) || "PP".equals(codeGarantie) || "PTA".equals(codeGarantie)) {
-                netCorporel = netCorporel.add(prime);
-                taxeCorporel = taxeCorporel.add(prime.multiply(tauxTaxeGarantie));
-                basePta = basePta.add(prime);
-                accessoireCorporel = accessoireCorporel.add(accessoire);
-                continue;
-            }
-
-            if (Boolean.TRUE.equals(contratGarantie.getGarantie().getResponsabiliteCivile()) || "RC".equals(codeGarantie)) {
-                netAuto = netAuto.add(prime);
-                taxeAuto = taxeAuto.add(prime.multiply(tauxTaxeRc));
-                netEvcat = netEvcat.add(prime.multiply(resolveTauxEvcatRc(agenceId, contrat, contratGarantie)));
-            } else {
-                netAuto = netAuto.add(prime);
-                taxeAuto = taxeAuto.add(prime.multiply(tauxTaxeGarantie));
-                netEvcat = netEvcat.add(prime.multiply(tauxEvcatAutres));
-            }
-            accessoireAuto = accessoireAuto.add(accessoire);
-        }
-
-        BigDecimal taxePfAuto = netAuto.multiply(tauxTaxePf);
-        BigDecimal taxeEvcat = netEvcat.multiply(tauxTaxeGarantie);
-        BigDecimal taxePfEvcat = netEvcat.multiply(tauxTaxePf);
-        taxePfCorporel = basePta.multiply(tauxTaxePf);
-        BigDecimal cnpac = cnpacUnitaire.multiply(BigDecimal.valueOf(Math.max(1, nombreUnitesCnpac)));
-
-        List<Ligne> lignes = new ArrayList<>();
-        lignes.add(new Ligne(CategorieQuittance.AUTOMOBILE, 10, false, netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac, total(netAuto, taxeAuto, taxePfAuto, accessoireAuto, cnpac)));
-        lignes.add(new Ligne(CategorieQuittance.CORPOREL, 20, false, netCorporel, taxeCorporel, taxePfCorporel, accessoireCorporel, BigDecimal.ZERO, total(netCorporel, taxeCorporel, taxePfCorporel, accessoireCorporel, BigDecimal.ZERO)));
-        lignes.add(new Ligne(CategorieQuittance.EVCAT, 30, false, netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO, total(netEvcat, taxeEvcat, taxePfEvcat, accessoireEvcat, BigDecimal.ZERO)));
-        if (impact == TypeImpactMouvement.RETOUR_PRIME) {
-            return withRetourPrime(lignes);
-        }
-        return withTotal(lignes, BigDecimal.ONE);
+        return calculerAvecReglesFiscales(
+                contrat, typeMouvement, garanties, nombreUnitesCnpac, dateEffet);
     }
 
     public Resultat calculerAvecReglesFiscales(
@@ -431,18 +342,6 @@ public class QuittanceCalculService {
         );
     }
 
-    private BigDecimal resolveTauxEvcatRc(Long agenceId, Contrat contrat, ContratGarantie contratGarantie) {
-        Usage usage = contratGarantie.getVehicule() != null ? contratGarantie.getVehicule().getUsage()
-                : contratGarantie.getRemorque() != null ? contratGarantie.getRemorque().getUsage()
-                : contrat.getUsage();
-        String usageCode = usage == null || usage.getCode() == null ? "" : usage.getCode().trim().toUpperCase(Locale.ROOT);
-        String usageLibelle = usage == null || usage.getLibelle() == null ? "" : usage.getLibelle().trim().toUpperCase(Locale.ROOT);
-        if (usageCode.startsWith("B") || usageLibelle.contains("TAXI") || usageLibelle.contains("BUS") || usageLibelle.contains("TPV")) {
-            return param(agenceId, "TAUX_EVCAT_TPV_RC");
-        }
-        return param(agenceId, "TAUX_EVCAT_1");
-    }
-
     private BigDecimal total(BigDecimal primeNette, BigDecimal taxe, BigDecimal taxeParafiscale, BigDecimal accessoire, BigDecimal cnpac) {
         return primeNette.add(taxe).add(taxeParafiscale).add(accessoire).add(cnpac);
     }
@@ -489,14 +388,6 @@ public class QuittanceCalculService {
                 case CNPAC -> ligne.cnpac().signum() != 0;
             };
         }).toList();
-    }
-
-    private BigDecimal param(Long agenceId, String code) {
-        return parametreApplicationService.getDecimal(agenceId, code, BigDecimal.ZERO);
-    }
-
-    private BigDecimal zeroIfNull(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
     }
 
     private static BigDecimal scale(BigDecimal value) {

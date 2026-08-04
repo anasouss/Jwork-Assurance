@@ -162,6 +162,7 @@ public class ContratService {
         Contrat draft = Contrat.builder()
                 .agence(source.getAgence())
                 .contratOrigine(source)
+                .brancheAssurance(source.getBrancheAssurance())
                 .typeContrat(source.getTypeContrat())
                 .modeTermeRenouvellement(modeTerme)
                 .statut(StatutContrat.DRAFT)

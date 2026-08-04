@@ -255,6 +255,7 @@ function FlottePolicySheet({
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Usage</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Marque</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>N<br />d'immatric</th>
+              <th className="border border-slate-700 px-1 py-1" rowSpan={2}>N°<br />attestation</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Date de<br />MC</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>PF/PTC</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>ENERGIE</th>
@@ -292,6 +293,7 @@ function FlottePolicySheet({
                   <td className="border border-slate-700 px-1 py-1">{text(target.item.usageCode)}</td>
                   <td className="border border-slate-700 px-1 py-1">{text(target.item.marque)}</td>
                   <td className="border border-slate-700 px-1 py-1 text-center">{text(target.item.immatriculation)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-center">{text(target.item.numeroAttestation)}</td>
                   <td className="border border-slate-700 px-1 py-1 text-center">{formatDate(dateMiseEnCirculation)}</td>
                   <td className="border border-slate-700 px-1 py-1 text-center">{text(pfOuPtc)}</td>
                   <td className="border border-slate-700 px-1 py-1 text-center uppercase">{text(carburant)}</td>
@@ -310,7 +312,7 @@ function FlottePolicySheet({
               );
             })}
             <tr className="font-bold">
-              <td className="border border-slate-700 px-1 py-1 text-center" colSpan={6 + 3 + (hasDcCapital ? 1 : 0) + guaranteeCodes.length + (showAssistance ? 1 : 0)}>TOTAL</td>
+              <td className="border border-slate-700 px-1 py-1 text-center" colSpan={7 + 3 + (hasDcCapital ? 1 : 0) + guaranteeCodes.length + (showAssistance ? 1 : 0)}>TOTAL</td>
               <td className="border border-slate-700 px-1 py-1 text-right">{moneyAmount(totalAmount)}</td>
             </tr>
           </tbody>

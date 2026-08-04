@@ -1073,6 +1073,7 @@ public class AffectationQuittanceService {
                     BigDecimal accessoires = decimal(row, columns, "accessoires");
                     BigDecimal montantTtc = decimal(row, columns, "montantttc");
                     BigDecimal commission = decimal(row, columns, "commissionnette");
+                    BigDecimal netCompagnie = decimal(row, columns, "netcompagnie");
                     LocalDate lineEffectDate = date(row, columns, "dateeffet");
                     LocalDate lineEndDate = optionalDate(row, columns, "datefin");
                     validateAllocationPeriod(lineEffectDate, lineEndDate, quittance, number);
@@ -1098,7 +1099,7 @@ public class AffectationQuittanceService {
                             .avecRetenue(avecRetenue)
                             .tauxRetenue(retention.rate())
                             .montantRetenue(retention.amount())
-                            .netCompagnie(money(montantTtc.subtract(commission).add(retention.amount())))
+                            .netCompagnie(money(netCompagnie))
                             .build());
                 } catch (RuntimeException exception) {
                     errors.add("Ligne " + (rowIndex + 1) + " : " + exception.getMessage());
@@ -1152,6 +1153,7 @@ public class AffectationQuittanceService {
         resolveImportColumn(sourceColumns, columns, missing, "accessoires", regle.getExcelColonneAccessoires(), true);
         resolveImportColumn(sourceColumns, columns, missing, "montantttc", regle.getExcelColonneMontantTtc(), true);
         resolveImportColumn(sourceColumns, columns, missing, "commissionnette", regle.getExcelColonneCommissionNette(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "netcompagnie", regle.getExcelColonneNetCompagnie(), true);
         resolveImportColumn(sourceColumns, columns, missing, "acte", regle.getExcelColonneActe(), false);
         resolveImportColumn(sourceColumns, columns, missing, "categorie", regle.getExcelColonneCategorie(), false);
         resolveImportColumn(sourceColumns, columns, missing, "statut", regle.getExcelColonneStatut(), false);
@@ -1333,6 +1335,7 @@ public class AffectationQuittanceService {
         required.put("Accessoires", request.getExcelColonneAccessoires());
         required.put("Montant TTC", request.getExcelColonneMontantTtc());
         required.put("Commission nette", request.getExcelColonneCommissionNette());
+        required.put("Net compagnie", request.getExcelColonneNetCompagnie());
         List<String> missing = required.entrySet().stream()
                 .filter(entry -> trimToNull(entry.getValue()) == null)
                 .map(Map.Entry::getKey)
@@ -1352,6 +1355,7 @@ public class AffectationQuittanceService {
         registerExcelAliases(configuredAliases, "Accessoires", request.getExcelColonneAccessoires());
         registerExcelAliases(configuredAliases, "Montant TTC", request.getExcelColonneMontantTtc());
         registerExcelAliases(configuredAliases, "Commission nette", request.getExcelColonneCommissionNette());
+        registerExcelAliases(configuredAliases, "Net compagnie", request.getExcelColonneNetCompagnie());
         registerExcelAliases(configuredAliases, "Acte", request.getExcelColonneActe());
         registerExcelAliases(configuredAliases, "Catégorie", request.getExcelColonneCategorie());
         registerExcelAliases(configuredAliases, "Statut", request.getExcelColonneStatut());
@@ -1431,6 +1435,7 @@ public class AffectationQuittanceService {
         entity.setExcelColonneAccessoires(trimToNull(request.getExcelColonneAccessoires()));
         entity.setExcelColonneMontantTtc(trimToNull(request.getExcelColonneMontantTtc()));
         entity.setExcelColonneCommissionNette(trimToNull(request.getExcelColonneCommissionNette()));
+        entity.setExcelColonneNetCompagnie(trimToNull(request.getExcelColonneNetCompagnie()));
         entity.setExcelColonneActe(trimToNull(request.getExcelColonneActe()));
         entity.setExcelColonneCategorie(trimToNull(request.getExcelColonneCategorie()));
         entity.setExcelColonneStatut(trimToNull(request.getExcelColonneStatut()));
@@ -1465,6 +1470,7 @@ public class AffectationQuittanceService {
                 .excelColonneAccessoires(entity.getExcelColonneAccessoires())
                 .excelColonneMontantTtc(entity.getExcelColonneMontantTtc())
                 .excelColonneCommissionNette(entity.getExcelColonneCommissionNette())
+                .excelColonneNetCompagnie(entity.getExcelColonneNetCompagnie())
                 .excelColonneActe(entity.getExcelColonneActe())
                 .excelColonneCategorie(entity.getExcelColonneCategorie())
                 .excelColonneStatut(entity.getExcelColonneStatut())

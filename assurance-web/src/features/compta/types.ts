@@ -41,6 +41,7 @@ export type Rule = {
   excelColonneAccessoires?: string | null;
   excelColonneMontantTtc?: string | null;
   excelColonneCommissionNette?: string | null;
+  excelColonneNetCompagnie?: string | null;
   excelColonneActe?: string | null;
   excelColonneCategorie?: string | null;
   excelColonneStatut?: string | null;

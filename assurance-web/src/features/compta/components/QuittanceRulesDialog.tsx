@@ -71,6 +71,7 @@ type RuleForm = {
   excelColonneAccessoires: string;
   excelColonneMontantTtc: string;
   excelColonneCommissionNette: string;
+  excelColonneNetCompagnie: string;
   excelColonneActe: string;
   excelColonneCategorie: string;
   excelColonneStatut: string;
@@ -91,6 +92,7 @@ const DEFAULT_EXCEL_MAPPING = {
   excelColonneAccessoires: "Accessoires | Accessoire",
   excelColonneMontantTtc: "Montant TTC | TTC",
   excelColonneCommissionNette: "Commission nette",
+  excelColonneNetCompagnie: "Net compagnie | Net à payer compagnie",
   excelColonneActe: "Acte | Mouvement",
   excelColonneCategorie: "Catégorie | Categorie",
   excelColonneStatut: "Statut",
@@ -465,6 +467,12 @@ export function QuittanceRulesDialog({
                       onChange={(value) => setForm((current) => ({ ...current, excelColonneCommissionNette: value }))}
                     />
                     <ExcelTitleField
+                      label="Net compagnie"
+                      required
+                      value={form.excelColonneNetCompagnie}
+                      onChange={(value) => setForm((current) => ({ ...current, excelColonneNetCompagnie: value }))}
+                    />
+                    <ExcelTitleField
                       label="Acte"
                       value={form.excelColonneActe}
                       placeholder="Optionnel"
@@ -746,7 +754,8 @@ function isComplete(form: RuleForm) {
         form.excelColonneTaxes.trim() &&
         form.excelColonneAccessoires.trim() &&
         form.excelColonneMontantTtc.trim() &&
-        form.excelColonneCommissionNette.trim()
+        form.excelColonneCommissionNette.trim() &&
+        form.excelColonneNetCompagnie.trim()
       )
     );
   return Boolean(
@@ -784,6 +793,7 @@ function ruleToForm(rule: Rule): RuleForm {
     excelColonneAccessoires: rule.excelColonneAccessoires ?? "",
     excelColonneMontantTtc: rule.excelColonneMontantTtc ?? "",
     excelColonneCommissionNette: rule.excelColonneCommissionNette ?? "",
+    excelColonneNetCompagnie: rule.excelColonneNetCompagnie ?? "",
     excelColonneActe: rule.excelColonneActe ?? "",
     excelColonneCategorie: rule.excelColonneCategorie ?? "",
     excelColonneStatut: rule.excelColonneStatut ?? "",
@@ -824,6 +834,7 @@ function toRequest(form: RuleForm): RuleRequest {
     excelColonneAccessoires: isFleet ? form.excelColonneAccessoires.trim() || null : null,
     excelColonneMontantTtc: isFleet ? form.excelColonneMontantTtc.trim() || null : null,
     excelColonneCommissionNette: isFleet ? form.excelColonneCommissionNette.trim() || null : null,
+    excelColonneNetCompagnie: isFleet ? form.excelColonneNetCompagnie.trim() || null : null,
     excelColonneActe: isFleet ? form.excelColonneActe.trim() || null : null,
     excelColonneCategorie: isFleet ? form.excelColonneCategorie.trim() || null : null,
     excelColonneStatut: isFleet ? form.excelColonneStatut.trim() || null : null,

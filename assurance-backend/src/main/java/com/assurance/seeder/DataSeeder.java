@@ -455,6 +455,7 @@ public class DataSeeder implements CommandLineRunner {
             regle.setExcelColonneAccessoires("Accessoires | Accessoire");
             regle.setExcelColonneMontantTtc("Montant TTC | TTC");
             regle.setExcelColonneCommissionNette("Commission nette");
+            regle.setExcelColonneNetCompagnie("Net compagnie | Net à payer compagnie");
             regle.setExcelColonneActe("Acte | Mouvement");
             regle.setExcelColonneCategorie("Catégorie | Categorie");
             regle.setExcelColonneStatut("Statut");

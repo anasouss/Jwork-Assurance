@@ -119,6 +119,9 @@ public class RegleAffectationQuittance extends BaseEntity {
     @Column(name = "excel_colonne_commission_nette", length = 500)
     private String excelColonneCommissionNette;
 
+    @Column(name = "excel_colonne_net_compagnie", length = 500)
+    private String excelColonneNetCompagnie;
+
     @Column(name = "excel_colonne_acte", length = 500)
     private String excelColonneActe;
 

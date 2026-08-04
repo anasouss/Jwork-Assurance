@@ -39,6 +39,7 @@ public class RegleAffectationQuittanceResponse {
     private String excelColonneAccessoires;
     private String excelColonneMontantTtc;
     private String excelColonneCommissionNette;
+    private String excelColonneNetCompagnie;
     private String excelColonneActe;
     private String excelColonneCategorie;
     private String excelColonneStatut;

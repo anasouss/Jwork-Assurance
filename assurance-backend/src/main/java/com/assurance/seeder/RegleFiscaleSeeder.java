@@ -63,11 +63,11 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
         seedCategory("TAXE_EVCAT", "Taxe assurance sur EVCAT", NatureRegleFiscale.TAXE_ASSURANCE,
                 CategorieQuittance.EVCAT, taxeGarantie);
 
-        seedCategory("TPF_AUTOMOBILE", "Taxe parafiscale automobile", NatureRegleFiscale.TPF,
+        seedTpfPeriods("TPF_AUTOMOBILE", "Taxe parafiscale automobile",
                 CategorieQuittance.AUTOMOBILE, tpf);
-        seedCategory("TPF_CORPOREL", "Taxe parafiscale corporel", NatureRegleFiscale.TPF,
+        seedTpfPeriods("TPF_CORPOREL", "Taxe parafiscale corporel",
                 CategorieQuittance.CORPOREL, tpf);
-        seedCategory("TPF_EVCAT", "Taxe parafiscale EVCAT", NatureRegleFiscale.TPF,
+        seedTpfPeriods("TPF_EVCAT", "Taxe parafiscale EVCAT",
                 CategorieQuittance.EVCAT, tpf);
 
         seed("EVCAT_RC", "EVCAT - responsabilité civile", NatureRegleFiscale.EVCAT,
@@ -135,6 +135,30 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
                 .categorieBase(category).categorieResultat(category).dateDebut(INITIAL_DATE)
                 .brancheAssurance(automobileBranch())
                 .applicable(true).priorite(0).actif(true).build());
+    }
+
+    private void seedTpfPeriods(String code, String label, CategorieQuittance category, String currentValue) {
+        LocalDate currentStart = LocalDate.of(2026, 1, 1);
+        if (repository.findByCodeIgnoreCaseAndDateDebut(code, INITIAL_DATE).isEmpty()) {
+            repository.save(RegleFiscale.builder()
+                    .code(code).libelle(label).nature(NatureRegleFiscale.TPF)
+                    .modeCalcul(ModeCalculRegleFiscale.TAUX).valeur(new BigDecimal("0.01"))
+                    .baseCalcul(BaseCalculRegleFiscale.PRIME_CATEGORIE)
+                    .categorieBase(category).categorieResultat(category)
+                    .brancheAssurance(automobileBranch())
+                    .dateDebut(INITIAL_DATE).dateFin(currentStart.minusDays(1))
+                    .applicable(true).priorite(0).actif(true).build());
+        }
+        if (repository.findByCodeIgnoreCaseAndDateDebut(code, currentStart).isEmpty()) {
+            repository.save(RegleFiscale.builder()
+                    .code(code).libelle(label).nature(NatureRegleFiscale.TPF)
+                    .modeCalcul(ModeCalculRegleFiscale.TAUX).valeur(new BigDecimal(currentValue))
+                    .baseCalcul(BaseCalculRegleFiscale.PRIME_CATEGORIE)
+                    .categorieBase(category).categorieResultat(category)
+                    .brancheAssurance(automobileBranch())
+                    .dateDebut(currentStart)
+                    .applicable(true).priorite(0).actif(true).build());
+        }
     }
 
     private void seed(String code, String label, NatureRegleFiscale nature, BaseCalculRegleFiscale base,

@@ -1,17 +1,92 @@
 package com.assurance.service;
 
+import com.assurance.entity.Contrat;
+import com.assurance.entity.RegleFiscale;
+import com.assurance.entity.TypeMouvementContrat;
+import com.assurance.enums.BaseCalculRegleFiscale;
 import com.assurance.enums.CategorieQuittance;
+import com.assurance.enums.ModeCalculRegleFiscale;
+import com.assurance.enums.NatureRegleFiscale;
+import com.assurance.enums.TypeImpactMouvement;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class QuittanceCalculServiceTest {
 
-    private final QuittanceCalculService service = new QuittanceCalculService(null);
+    private final QuittanceCalculService service = new QuittanceCalculService(null, null);
+
+    @Test
+    void enabledFiscalRulesUseTheExplicitMovementEffectiveDate() {
+        RegleFiscaleQuittanceEngine engine = mock(RegleFiscaleQuittanceEngine.class);
+        QuittanceCalculService fiscalService = new QuittanceCalculService(null, engine);
+        ReflectionTestUtils.setField(fiscalService, "fiscalRulesEnabled", true);
+        Contrat contrat = new Contrat();
+        LocalDate movementDate = LocalDate.of(2027, 1, 15);
+        RegleFiscaleQuittanceEngine.Ligne line = new RegleFiscaleQuittanceEngine.Ligne(
+                CategorieQuittance.AUTOMOBILE, 10, new BigDecimal("100"), new BigDecimal("15.50"),
+                new BigDecimal("1.50"), BigDecimal.ZERO, new BigDecimal("17"), new BigDecimal("134"));
+        when(engine.calculer(eq(contrat), any(), eq(1), eq(movementDate)))
+                .thenReturn(new RegleFiscaleQuittanceEngine.Calcul(List.of(line), List.of()));
+
+        QuittanceCalculService.Resultat result = fiscalService.calculer(
+                contrat, null, List.of(), 1, movementDate);
+
+        assertThat(result.primeTotale()).isEqualByComparingTo("134.00");
+        verify(engine).calculer(eq(contrat), any(), eq(1), eq(movementDate));
+    }
+
+    @Test
+    void returnPremiumSnapshotsOnlyTheEvcatAmountActuallyReturned() {
+        RegleFiscaleQuittanceEngine engine = mock(RegleFiscaleQuittanceEngine.class);
+        QuittanceCalculService fiscalService = new QuittanceCalculService(null, engine);
+        ReflectionTestUtils.setField(fiscalService, "fiscalRulesEnabled", true);
+        Contrat contrat = new Contrat();
+        LocalDate movementDate = LocalDate.of(2027, 2, 1);
+        RegleFiscale taxRule = rule("TAX", NatureRegleFiscale.TAXE_ASSURANCE, CategorieQuittance.AUTOMOBILE);
+        RegleFiscale evcatRule = rule("EVCAT", NatureRegleFiscale.EVCAT, CategorieQuittance.EVCAT);
+        List<RegleFiscaleQuittanceEngine.Ligne> lines = List.of(
+                new RegleFiscaleQuittanceEngine.Ligne(CategorieQuittance.AUTOMOBILE, 10,
+                        new BigDecimal("100"), new BigDecimal("15"), new BigDecimal("1.5"),
+                        BigDecimal.ZERO, new BigDecimal("17"), new BigDecimal("133.5")),
+                new RegleFiscaleQuittanceEngine.Ligne(CategorieQuittance.EVCAT, 30,
+                        new BigDecimal("3.5"), new BigDecimal("0.49"), new BigDecimal("0.0525"),
+                        BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("4.0425"))
+        );
+        List<RegleFiscaleQuittanceEngine.Application> applications = List.of(
+                new RegleFiscaleQuittanceEngine.Application(taxRule, movementDate, 1L, 2L, null,
+                        new BigDecimal("100"), new BigDecimal("15")),
+                new RegleFiscaleQuittanceEngine.Application(evcatRule, movementDate, 1L, 2L, null,
+                        new BigDecimal("100"), new BigDecimal("3.5"))
+        );
+        when(engine.calculer(eq(contrat), any(), eq(1), eq(movementDate)))
+                .thenReturn(new RegleFiscaleQuittanceEngine.Calcul(lines, applications));
+        TypeMouvementContrat returnType = TypeMouvementContrat.builder()
+                .typeImpact(TypeImpactMouvement.RETOUR_PRIME)
+                .build();
+
+        QuittanceCalculService.Resultat result = fiscalService.calculer(
+                contrat, returnType, List.of(), 1, movementDate);
+
+        assertThat(result.taxe()).isZero();
+        assertThat(result.taxeParafiscale()).isZero();
+        assertThat(result.cnpac()).isZero();
+        assertThat(result.applications()).singleElement().satisfies(application -> {
+            assertThat(application.regle().getNature()).isEqualTo(NatureRegleFiscale.EVCAT);
+            assertThat(application.montantCalcule()).isEqualByComparingTo("-3.5");
+        });
+    }
 
     @Test
     void changementVehiculeKeepsNegativeTaxClearsTpfAndChargesNewCnpac() {
@@ -101,6 +176,19 @@ class QuittanceCalculServiceTest {
                 new BigDecimal(cnpac),
                 new BigDecimal(total)
         );
+    }
+
+    private RegleFiscale rule(String code, NatureRegleFiscale nature, CategorieQuittance category) {
+        return RegleFiscale.builder()
+                .code(code)
+                .libelle(code)
+                .nature(nature)
+                .modeCalcul(ModeCalculRegleFiscale.TAUX)
+                .baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
+                .categorieResultat(category)
+                .valeur(new BigDecimal("0.1"))
+                .dateDebut(LocalDate.of(2000, 1, 1))
+                .build();
     }
 
     private BigDecimal sum(

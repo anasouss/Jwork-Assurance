@@ -2707,7 +2707,7 @@ public class ContratService {
             if (garantiesAffichees != null) {
                 quittance.setTargetSummaries(retourPrime != null
                         ? returnTargetSummaries(graph, request, montantsOverride)
-                        : differentialTargetSummaries(graph, montantsOverride));
+                        : differentialTargetSummaries(graph, request, montantsOverride));
             }
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
             return quittance;
@@ -2776,7 +2776,8 @@ public class ContratService {
         boolean attestationsDifferees = isPrecisionOrDuplicata(graph.typeMouvement().getCode());
         if (attestationsDifferees && montantsOverride == null) {
             montantsOverride = calculerMontantsAvenant(
-                    graph.contrat(), graph.typeMouvement(), graph.garanties(), graph.vehicules(), graph.remorques()
+                    graph.contrat(), graph.typeMouvement(), graph.garanties(), graph.vehicules(), graph.remorques(),
+                    firstNonNull(request.getDateEffet(), graph.contrat().getDateEffet())
             );
         }
         QuittanceResponse quittance;
@@ -2831,7 +2832,7 @@ public class ContratService {
                     quittance,
                     retourPrime != null
                             ? returnTargetSummaries(graph, request, montantsOverride)
-                            : differentialTargetSummaries(graph, montantsOverride),
+                            : differentialTargetSummaries(graph, request, montantsOverride),
                     graph.contrat(),
                     graph.vehicules(),
                     graph.remorques()
@@ -3011,7 +3012,8 @@ public class ContratService {
                 typeMouvement,
                 targets.garanties(),
                 targets.vehicules(),
-                targets.remorques()
+                targets.remorques(),
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
         );
         return new AvenantGraph(
                 contrat,
@@ -3071,9 +3073,12 @@ public class ContratService {
                 typeMouvement,
                 garantiesAvantRestantes,
                 vehiculesAvant,
-                List.of()
+                List.of(),
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
         );
-        QuittanceCalculService.Resultat apres = calculerMontantsAvenant(contrat, typeMouvement, targets.garanties(), targets.vehicules(), targets.remorques());
+        QuittanceCalculService.Resultat apres = calculerMontantsAvenant(
+                contrat, typeMouvement, targets.garanties(), targets.vehicules(), targets.remorques(),
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet()));
         QuittanceCalculService.Resultat differentiel = quittanceCalculService.differenceChangementVehicule(apres, avant);
         List<ContratGarantie> garantiesDifferentielles = garantiesDifferentiellesChangementVehicule(
                 garantiesAvantRestantes,
@@ -3282,7 +3287,8 @@ public class ContratService {
                 typeMouvement,
                 garantiesRestantes,
                 List.of(),
-                remorques
+                remorques,
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
         );
         return new AvenantGraph(
                 contrat,
@@ -3605,14 +3611,16 @@ public class ContratService {
                 typeMouvement,
                 anciennesGarantiesRestantes,
                 vehicules,
-                remorques
+                remorques,
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
         );
         QuittanceCalculService.Resultat apres = calculerMontantsAvenant(
                 contrat,
                 typeMouvement,
                 nouvellesGarantiesRestantes,
                 vehicules,
-                remorques
+                remorques,
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
         );
         QuittanceCalculService.Resultat differentiel = quittanceCalculService.differenceGaranties(apres, avant);
         List<ContratGarantie> garantiesDifferentielles = garantiesDifferentielles(
@@ -3625,7 +3633,8 @@ public class ContratService {
                         anciennesGarantiesRestantes,
                         nouvellesGarantiesRestantes,
                         vehicules,
-                        remorques
+                        remorques,
+                        firstNonNull(request.getDateEffet(), contrat.getDateEffet())
                 ),
                 differentiel
         );
@@ -3738,11 +3747,12 @@ public class ContratService {
             TypeMouvementContrat typeMouvement,
             List<ContratGarantie> garanties,
             List<Vehicule> vehicules,
-            List<Remorque> remorques
+            List<Remorque> remorques,
+            LocalDate dateEffet
     ) {
         int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
         int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
-        return quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
+        return quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac, dateEffet);
     }
 
     private List<QuittanceResponse.TargetSummary> buildDifferentialTargetSummaries(
@@ -3788,6 +3798,7 @@ public class ContratService {
 
     private List<QuittanceResponse.TargetSummary> differentialTargetSummaries(
             AvenantGraph graph,
+            AvenantRequest request,
             QuittanceCalculService.Resultat resultat
     ) {
         if (graph == null || graph.garantiesAffichees() == null) {
@@ -3802,7 +3813,8 @@ public class ContratService {
                         List.of(),
                         graph.garantiesAffichees(),
                         graph.vehicules(),
-                        graph.remorques()
+                        graph.remorques(),
+                        firstNonNull(request.getDateEffet(), graph.contrat().getDateEffet())
                 ),
                 resultat
         );
@@ -3884,7 +3896,9 @@ public class ContratService {
         List<ContratGarantie> garantiesRetour = graph.garanties().stream()
                 .map(garantie -> garantieRetourPrime(graph.contrat(), request, garantie))
                 .toList();
-        return calculerMontantsAvenant(graph.contrat(), graph.typeMouvement(), garantiesRetour, graph.vehicules(), graph.remorques());
+        return calculerMontantsAvenant(
+                graph.contrat(), graph.typeMouvement(), garantiesRetour, graph.vehicules(), graph.remorques(),
+                firstNonNull(request.getDateEffet(), graph.contrat().getDateEffet()));
     }
 
     private List<ContratGarantie> garantiesRetourDifferentielles(AvenantGraph graph, AvenantRequest request) {
@@ -3904,7 +3918,8 @@ public class ContratService {
                 .toList();
         return reconcileTargetSummaries(
                 elementFacturableCibleService.calculerDifference(
-                        graph.contrat(), restantes, List.of(), graph.vehicules(), graph.remorques()
+                        graph.contrat(), restantes, List.of(), graph.vehicules(), graph.remorques(),
+                        firstNonNull(request.getDateEffet(), graph.contrat().getDateEffet())
                 ),
                 resultat
         );
@@ -4511,7 +4526,8 @@ public class ContratService {
         QuittanceCalculService.Resultat calcul = buildManualQuittanceResult(request);
         boolean quittanceManuelle = calcul != null;
         if (!quittanceManuelle) {
-            calcul = quittanceCalculService.calculer(contrat, null, garanties, unitesCnpac);
+            calcul = quittanceCalculService.calculer(
+                    contrat, null, garanties, unitesCnpac, contrat.getDateEffet());
         }
         return QuittanceResponse.builder()
                 .numeroContrat(contrat.getNumeroContrat())
@@ -4528,7 +4544,8 @@ public class ContratService {
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
                 .garanties(garanties.stream().map(garantie -> toQuittanceGarantieResponse(garantie, vehicules, remorques)).toList())
-                .targetSummaries(quittanceManuelle ? List.of() : elementFacturableCibleService.calculer(contrat, garanties, vehicules, remorques))
+                .targetSummaries(quittanceManuelle ? List.of() : elementFacturableCibleService.calculer(
+                        contrat, garanties, vehicules, remorques, contrat.getDateEffet()))
                 .build();
     }
 
@@ -5249,12 +5266,14 @@ public class ContratService {
             return null;
         }
         int unitesCnpac = countCnpacUnits(garantiesActives, vehiculesActifs, remorquesActives);
-        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, null, garantiesActives, unitesCnpac);
+        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(
+                contrat, null, garantiesActives, unitesCnpac, contrat.getDateEffet());
         List<QuittanceResponse.TargetSummary> targetSummaries = elementFacturableCibleService.calculer(
                 contrat,
                 garantiesActives,
                 vehiculesActifs,
-                remorquesActives
+                remorquesActives,
+                contrat.getDateEffet()
         );
         return QuittanceResponse.builder()
                 .numeroContrat(contrat.getNumeroContrat())

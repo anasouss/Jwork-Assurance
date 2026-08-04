@@ -37,6 +37,8 @@ jwt:
   refresh-token-expiration-mobile: ${JWT_REFRESH_EXPIRATION_MOBILE:7776000000}
 
 app:
+  fiscal-rules:
+    enabled: ${APP_FISCAL_RULES_ENABLED:false}
   security:
     refresh-cookie-secure: ${APP_REFRESH_COOKIE_SECURE:true}
   storage:

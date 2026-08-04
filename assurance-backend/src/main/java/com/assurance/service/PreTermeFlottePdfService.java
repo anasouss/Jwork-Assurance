@@ -583,7 +583,8 @@ public class PreTermeFlottePdfService {
             return BigDecimal.ZERO;
         }
         boolean hasRc = garanties.stream().anyMatch(this::isRc);
-        return quittanceCalculService.calculer(draft, null, garanties, hasRc ? 1 : 0).primeTotale();
+        return quittanceCalculService.calculer(
+                draft, null, garanties, hasRc ? 1 : 0, draft.getDateEffet()).primeTotale();
     }
 
     private boolean isSelectedGarantie(ContratGarantie item) {

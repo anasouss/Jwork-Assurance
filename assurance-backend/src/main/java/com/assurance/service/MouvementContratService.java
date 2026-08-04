@@ -170,7 +170,8 @@ public class MouvementContratService {
                 typeMouvement,
                 garantiesActives,
                 vehiculesActifs,
-                remorquesActives
+                remorquesActives,
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
         );
         return toPreviewResponse(contrat, typeMouvement, request, calcul, garantiesActives, vehiculesActifs, remorquesActives);
     }
@@ -189,7 +190,9 @@ public class MouvementContratService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
-        QuittanceCalculService.Resultat calcul = calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
+        QuittanceCalculService.Resultat calcul = calculerMontants(
+                contrat, typeMouvement, garanties, vehicules, remorques,
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet()));
         return toPreviewResponse(contrat, typeMouvement, request, calcul, garanties, vehicules, remorques);
     }
 
@@ -230,7 +233,9 @@ public class MouvementContratService {
             List<Remorque> remorques,
             NatureSnapshotMouvement snapshotNature
     ) {
-        QuittanceCalculService.Resultat montants = calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques);
+        QuittanceCalculService.Resultat montants = calculerMontants(
+                contrat, typeMouvement, garanties, vehicules, remorques,
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet()));
         return creerMouvementSpecialise(contrat, typeMouvement, request, garanties, vehicules, remorques, snapshotNature, montants);
     }
 
@@ -396,15 +401,17 @@ public class MouvementContratService {
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());
         refuserCreationGeneriqueSiPayloadSpecialiseRequis(typeMouvement);
 
+        LocalDate dateEffet = firstNonNull(request.getDateEffet(), contrat.getDateEffet());
+        LocalDate dateEcheance = firstNonNull(request.getDateEcheance(), contrat.getDateEcheance());
+
         QuittanceCalculService.Resultat montants = calculerMontants(
                 contrat,
                 typeMouvement,
                 activeGaranties(contrat),
                 activeVehicules(contrat),
-                activeRemorques(contrat)
+                activeRemorques(contrat),
+                dateEffet
         );
-        LocalDate dateEffet = request.getDateEffet() != null ? request.getDateEffet() : contrat.getDateEffet();
-        LocalDate dateEcheance = request.getDateEcheance() != null ? request.getDateEcheance() : contrat.getDateEcheance();
 
         MouvementContrat mouvement = mouvementContratRepository.save(MouvementContrat.builder()
                 .agence(contrat.getAgence())
@@ -814,6 +821,10 @@ public class MouvementContratService {
         }
     }
 
+    private <T> T firstNonNull(T value, T fallback) {
+        return value != null ? value : fallback;
+    }
+
     private QuittanceCalculService.Resultat calculerMontants(
             Contrat contrat,
             TypeMouvementContrat typeMouvement,
@@ -821,9 +832,20 @@ public class MouvementContratService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
+        return calculerMontants(contrat, typeMouvement, garanties, vehicules, remorques, contrat.getDateEffet());
+    }
+
+    private QuittanceCalculService.Resultat calculerMontants(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            LocalDate dateEffet
+    ) {
         int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
         int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
-        return quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
+        return quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac, dateEffet);
     }
 
     private QuittanceResponse toResponse(Quittance quittance) {
@@ -905,7 +927,8 @@ public class MouvementContratService {
                                 contrat,
                                 garanties,
                                 vehicules,
-                                remorques
+                                remorques,
+                                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
                         )
                         : List.of())
                 .build();

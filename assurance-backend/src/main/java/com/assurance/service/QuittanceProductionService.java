@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratGarantie;
+import com.assurance.entity.ApplicationRegleFiscaleQuittance;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.LigneQuittance;
 import com.assurance.entity.MouvementContrat;
@@ -16,6 +17,7 @@ import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.ElementFacturableCibleRepository;
 import com.assurance.repository.LigneQuittanceRepository;
 import com.assurance.repository.QuittanceRepository;
+import com.assurance.repository.ApplicationRegleFiscaleQuittanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +32,7 @@ public class QuittanceProductionService {
     private final ElementFacturableCibleRepository elementFacturableCibleRepository;
     private final QuittanceRepository quittanceRepository;
     private final LigneQuittanceRepository ligneQuittanceRepository;
+    private final ApplicationRegleFiscaleQuittanceRepository applicationRegleFiscaleRepository;
     private final ElementFacturableCibleService elementFacturableCibleService;
 
     public Quittance genererPourMouvement(
@@ -42,7 +45,8 @@ public class QuittanceProductionService {
     ) {
         int fallbackCnpac = Math.max(1, (vehicules == null ? 0 : vehicules.size()) + (remorques == null ? 0 : remorques.size()));
         int unitesCnpac = quittanceCalculService.compterUnitesCnpac(garanties, fallbackCnpac);
-        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, typeMouvement, garanties, unitesCnpac);
+        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(
+                contrat, typeMouvement, garanties, unitesCnpac, mouvement.getDateEffet());
         return genererPourMouvement(contrat, mouvement, typeMouvement, calcul, garanties, vehicules, remorques);
     }
 
@@ -121,6 +125,7 @@ public class QuittanceProductionService {
                     .build());
             quittance.getLignes().add(ligneQuittance);
         }
+        enregistrerApplications(quittance, calcul.applications());
 
         elementFacturableCibleService.generer(element, contrat, garanties, vehicules, remorques);
         contrat.getElementsFacturables().add(element);
@@ -173,6 +178,7 @@ public class QuittanceProductionService {
         quittance = quittanceRepository.save(quittance);
 
         ligneQuittanceRepository.deleteByQuittanceId(quittance.getId());
+        applicationRegleFiscaleRepository.deleteByQuittanceId(quittance.getId());
         ligneQuittanceRepository.flush();
         quittance.getLignes().clear();
         for (QuittanceCalculService.Ligne ligne : calcul.lignes()) {
@@ -190,11 +196,39 @@ public class QuittanceProductionService {
                     .build());
             quittance.getLignes().add(ligneQuittance);
         }
+        enregistrerApplications(quittance, calcul.applications());
 
         elementFacturableCibleRepository.deleteByElementFacturableId(element.getId());
         elementFacturableCibleRepository.flush();
         elementFacturableCibleService.generer(element, contrat, garanties, vehicules, remorques);
         return quittance;
+    }
+
+    private void enregistrerApplications(
+            Quittance quittance,
+            List<RegleFiscaleQuittanceEngine.Application> applications
+    ) {
+        if (applications == null || applications.isEmpty()) return;
+        applicationRegleFiscaleRepository.saveAll(applications.stream().map(application -> {
+            var rule = application.regle();
+            return ApplicationRegleFiscaleQuittance.builder()
+                    .quittance(quittance)
+                    .regleFiscale(rule)
+                    .codeRegle(rule.getCode())
+                    .libelleRegle(rule.getLibelle())
+                    .nature(rule.getNature())
+                    .modeCalcul(rule.getModeCalcul())
+                    .baseCalcul(rule.getBaseCalcul())
+                    .categorieResultat(rule.getCategorieResultat())
+                    .garantieId(application.garantieId())
+                    .vehiculeId(application.vehiculeId())
+                    .remorqueId(application.remorqueId())
+                    .dateEffet(application.dateEffet())
+                    .valeurRegle(rule.getValeur())
+                    .baseMontant(application.baseMontant())
+                    .montantCalcule(application.montantCalcule())
+                    .build();
+        }).toList());
     }
 
     private NatureElementFacturable resolveNature(TypeMouvementContrat typeMouvement) {

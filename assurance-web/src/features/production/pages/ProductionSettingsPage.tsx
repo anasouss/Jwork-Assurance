@@ -1,9 +1,17 @@
 import { Link } from "react-router-dom";
-import { BadgeCheck, Boxes, Car, FileText, Fuel, Layers3, ShieldCheck, Tags, Truck, UserRound, Wrench } from "lucide-react";
+import { BadgeCheck, Boxes, Calculator, Car, FileText, Fuel, Layers3, ShieldCheck, Tags, Truck, UserRound, Wrench } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth-store";
 
 const settings = [
+  {
+    title: "Règles fiscales",
+    description: "Taxes, TPF, EVCAT et CNPAC par période et périmètre.",
+    href: "/app/production/parametres/regles-fiscales",
+    icon: Calculator,
+    permission: "regle-fiscale:view",
+  },
   {
     title: "Tarifs par usage",
     description: "Barèmes RC par usage, puissance, PTC, places et sous-classe.",
@@ -73,6 +81,13 @@ const settings = [
 ];
 
 export default function ProductionSettingsPage() {
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const visibleSettings = settings.filter((item) => {
+    if (!item.permission) return true;
+    if (permissions.includes(item.permission)) return true;
+    return item.permission === "regle-fiscale:view"
+      && (permissions.includes("regle-fiscale:manage") || permissions.includes("config:manage"));
+  });
   return (
     <div className="grid gap-5">
       <div>
@@ -82,7 +97,7 @@ export default function ProductionSettingsPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {settings.map((item) => {
+        {visibleSettings.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} to={item.href} className="group">

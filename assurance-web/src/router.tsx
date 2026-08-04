@@ -205,6 +205,10 @@ export const router = createBrowserRouter([
         path: "production/parametres/pieces-jointes",
         lazy: lazyRoute(() => import("@/features/production/pages/PiecesJointesSettingsPage")),
       },
+      {
+        path: "production/parametres/regles-fiscales",
+        lazy: lazyRoute(() => import("@/features/production/pages/FiscalRulesSettingsPage")),
+      },
       { path: "*", lazy: lazyRoute(() => import("@/pages/app/AppNotFound")) },
     ],
   },

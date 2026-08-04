@@ -36,6 +36,10 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     anyOf: ["attestation-stock:view", "attestation-stock:manage"],
   },
   {
+    matches: startsWith("/app/production/parametres/regles-fiscales"),
+    anyOf: ["regle-fiscale:view", "regle-fiscale:manage", "config:manage"],
+  },
+  {
     matches: startsWith("/app/production/parametres"),
     anyOf: ["referentiel:view", "referentiel:manage"],
   },

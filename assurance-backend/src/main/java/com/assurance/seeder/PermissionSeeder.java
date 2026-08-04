@@ -42,6 +42,8 @@ public class PermissionSeeder implements CommandLineRunner {
             permission("quittance:view", "Consulter les quittances", "quittance"),
             permission("quittance:create", "Creer une quittance", "quittance"),
             permission("quittance:manage", "Gerer les regles de quittance", "quittance"),
+            permission("regle-fiscale:view", "Consulter les règles fiscales", "regle-fiscale"),
+            restricted("regle-fiscale:manage", "Gérer les règles fiscales", "regle-fiscale"),
 
             permission("assistance:view", "Consulter les assistances", "assistance"),
             permission("assistance:manage", "Gerer les assistances", "assistance"),

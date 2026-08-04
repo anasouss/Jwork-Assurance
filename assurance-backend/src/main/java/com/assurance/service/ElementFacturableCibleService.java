@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -34,7 +35,18 @@ public class ElementFacturableCibleService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
-        return buildRows(contrat, garanties, vehicules, remorques).stream()
+        return calculer(
+                contrat, garanties, vehicules, remorques, contrat == null ? null : contrat.getDateEffet());
+    }
+
+    public List<QuittanceResponse.TargetSummary> calculer(
+            Contrat contrat,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            LocalDate dateEffet
+    ) {
+        return buildRows(contrat, garanties, vehicules, remorques, dateEffet).stream()
                 .map(Row::summary)
                 .toList();
     }
@@ -46,12 +58,25 @@ public class ElementFacturableCibleService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
+        return calculerDifference(
+                contrat, garantiesAvant, garantiesApres, vehicules, remorques,
+                contrat == null ? null : contrat.getDateEffet());
+    }
+
+    public List<QuittanceResponse.TargetSummary> calculerDifference(
+            Contrat contrat,
+            List<ContratGarantie> garantiesAvant,
+            List<ContratGarantie> garantiesApres,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            LocalDate dateEffet
+    ) {
         List<QuittanceResponse.TargetSummary> summaries = new ArrayList<>();
         List<Vehicule> sourceVehicules = vehicules == null ? List.of() : vehicules;
         for (int index = 0; index < sourceVehicules.size(); index++) {
             Vehicule vehicule = sourceVehicules.get(index);
             QuittanceCalculService.Resultat difference = differenceForTarget(
-                    contrat, garantiesAvant, garantiesApres, vehicule, null
+                    contrat, garantiesAvant, garantiesApres, vehicule, null, dateEffet
             );
             if (difference != null) {
                 summaries.add(toResponse(KIND_VEHICULE, index, null, difference));
@@ -61,7 +86,7 @@ public class ElementFacturableCibleService {
         for (int index = 0; index < sourceRemorques.size(); index++) {
             Remorque remorque = sourceRemorques.get(index);
             QuittanceCalculService.Resultat difference = differenceForTarget(
-                    contrat, garantiesAvant, garantiesApres, null, remorque
+                    contrat, garantiesAvant, garantiesApres, null, remorque, dateEffet
             );
             if (difference != null) {
                 summaries.add(toResponse(KIND_REMORQUE, null, index, difference));
@@ -77,7 +102,8 @@ public class ElementFacturableCibleService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
-        List<ElementFacturableCible> cibles = buildRows(contrat, garanties, vehicules, remorques).stream()
+        List<ElementFacturableCible> cibles = buildRows(
+                contrat, garanties, vehicules, remorques, elementFacturable.getDateDebut()).stream()
                 .map(row -> toEntity(elementFacturable, contrat, row))
                 .toList();
         return elementFacturableCibleRepository.saveAll(cibles);
@@ -116,7 +142,8 @@ public class ElementFacturableCibleService {
             Contrat contrat,
             List<ContratGarantie> garanties,
             List<Vehicule> vehicules,
-            List<Remorque> remorques
+            List<Remorque> remorques,
+            LocalDate dateEffet
     ) {
         if (contrat == null) {
             return List.of();
@@ -130,7 +157,8 @@ public class ElementFacturableCibleService {
                     .filter(garantie -> sameVehicule(garantie, vehicule))
                     .toList();
             if (!targetGaranties.isEmpty()) {
-                rows.add(buildRow(contrat, targetGaranties, KIND_VEHICULE, index, null, vehicule, null));
+                rows.add(buildRow(
+                        contrat, targetGaranties, KIND_VEHICULE, index, null, vehicule, null, dateEffet));
             }
         }
         List<Remorque> sourceRemorques = remorques == null ? List.of() : remorques;
@@ -140,7 +168,8 @@ public class ElementFacturableCibleService {
                     .filter(garantie -> sameRemorque(garantie, remorque))
                     .toList();
             if (!targetGaranties.isEmpty()) {
-                rows.add(buildRow(contrat, targetGaranties, KIND_REMORQUE, null, index, null, remorque));
+                rows.add(buildRow(
+                        contrat, targetGaranties, KIND_REMORQUE, null, index, null, remorque, dateEffet));
             }
         }
         return rows;
@@ -153,10 +182,12 @@ public class ElementFacturableCibleService {
             Integer vehiculeIndex,
             Integer remorqueIndex,
             Vehicule vehicule,
-            Remorque remorque
+            Remorque remorque,
+            LocalDate dateEffet
     ) {
         boolean hasRc = hasRcGarantie(garanties);
-        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(contrat, null, garanties, hasRc ? 1 : 0);
+        QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(
+                contrat, null, garanties, hasRc ? 1 : 0, dateEffet);
         QuittanceResponse.TargetSummary summary = toResponse(kind, vehiculeIndex, remorqueIndex, calcul, hasRc);
         return new Row(kind, vehiculeIndex, remorqueIndex, vehicule, remorque, summary);
     }
@@ -166,21 +197,25 @@ public class ElementFacturableCibleService {
             List<ContratGarantie> garantiesAvant,
             List<ContratGarantie> garantiesApres,
             Vehicule vehicule,
-            Remorque remorque
+            Remorque remorque,
+            LocalDate dateEffet
     ) {
         List<ContratGarantie> avant = targetGaranties(garantiesAvant, vehicule, remorque);
         List<ContratGarantie> apres = targetGaranties(garantiesApres, vehicule, remorque);
         if (avant.isEmpty() && apres.isEmpty()) {
             return null;
         }
-        QuittanceCalculService.Resultat calculVide = quittanceCalculService.calculer(contrat, null, List.of(), 0);
+        QuittanceCalculService.Resultat calculVide = quittanceCalculService.calculer(
+                contrat, null, List.of(), 0, dateEffet);
         QuittanceCalculService.Resultat zero = quittanceCalculService.difference(calculVide, calculVide);
         QuittanceCalculService.Resultat calculAvant = avant.isEmpty()
                 ? zero
-                : quittanceCalculService.calculer(contrat, null, avant, hasRcGarantie(avant) ? 1 : 0);
+                : quittanceCalculService.calculer(
+                        contrat, null, avant, hasRcGarantie(avant) ? 1 : 0, dateEffet);
         QuittanceCalculService.Resultat calculApres = apres.isEmpty()
                 ? zero
-                : quittanceCalculService.calculer(contrat, null, apres, hasRcGarantie(apres) ? 1 : 0);
+                : quittanceCalculService.calculer(
+                        contrat, null, apres, hasRcGarantie(apres) ? 1 : 0, dateEffet);
         return quittanceCalculService.difference(calculApres, calculAvant);
     }
 

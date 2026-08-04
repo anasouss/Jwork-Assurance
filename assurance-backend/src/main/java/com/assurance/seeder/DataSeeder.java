@@ -42,7 +42,8 @@ public class DataSeeder implements CommandLineRunner {
             "attestation-stock:view",
             "attestation-stock:manage",
             "attestation-stock:cancel",
-            "agence:manage-self"
+            "agence:manage-self",
+            "regle-fiscale:view"
     );
 
     private final PermissionRepository permissionRepository;
@@ -199,7 +200,6 @@ public class DataSeeder implements CommandLineRunner {
         seedParametreApplication("MONTANT_CARTE_VERTE", "DECIMAL", "500.00", "Montant forfaitaire applique a une carte verte");
         seedParametreApplication("TAUX_EVCAT_1", "DECIMAL", "0.035", "Taux EVCAT applique a la RC hors TPV");
         seedParametreApplication("TAUX_EVCAT_2", "DECIMAL", "0.015", "Taux EVCAT applique aux autres garanties");
-        seedParametreApplication("TAUX_EVCAT_3", "DECIMAL", "0.02", "Taux EVCAT applique aux garanties personne");
         seedParametreApplication("TAUX_EVCAT_TPV_RC", "DECIMAL", "0.02", "Taux EVCAT applique a la RC TPV");
         seedParametreApplication("TAUX_TAXE_1", "DECIMAL", "0.155", "Taxe RC");
         seedParametreApplication("TAUX_TAXE_2", "DECIMAL", "0.14", "Taxe garanties");

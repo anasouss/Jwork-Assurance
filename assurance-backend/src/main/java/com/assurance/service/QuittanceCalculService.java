@@ -5,13 +5,16 @@ import com.assurance.entity.ContratGarantie;
 import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.Usage;
 import com.assurance.enums.CategorieQuittance;
+import com.assurance.enums.NatureRegleFiscale;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.enums.TypeImpactMouvement;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
@@ -25,8 +28,35 @@ import java.util.Set;
 public class QuittanceCalculService {
 
     private final ParametreApplicationService parametreApplicationService;
+    private final RegleFiscaleQuittanceEngine regleFiscaleEngine;
+
+    @Value("${app.fiscal-rules.enabled:false}")
+    private boolean fiscalRulesEnabled;
 
     public Resultat calculer(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<ContratGarantie> garanties,
+            int nombreUnitesCnpac
+    ) {
+        return calculer(contrat, typeMouvement, garanties, nombreUnitesCnpac, contrat.getDateEffet());
+    }
+
+    public Resultat calculer(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<ContratGarantie> garanties,
+            int nombreUnitesCnpac,
+            LocalDate dateEffet
+    ) {
+        if (fiscalRulesEnabled) {
+            return calculerAvecReglesFiscales(
+                    contrat, typeMouvement, garanties, nombreUnitesCnpac, dateEffet);
+        }
+        return calculerAvecParametresLegacy(contrat, typeMouvement, garanties, nombreUnitesCnpac);
+    }
+
+    private Resultat calculerAvecParametresLegacy(
             Contrat contrat,
             TypeMouvementContrat typeMouvement,
             List<ContratGarantie> garanties,
@@ -104,6 +134,42 @@ public class QuittanceCalculService {
         return withTotal(lignes, BigDecimal.ONE);
     }
 
+    public Resultat calculerAvecReglesFiscales(
+            Contrat contrat,
+            TypeMouvementContrat typeMouvement,
+            List<ContratGarantie> garanties,
+            int nombreUnitesCnpac,
+            LocalDate dateEffet
+    ) {
+        TypeImpactMouvement impact = typeMouvement == null || typeMouvement.getTypeImpact() == null
+                ? TypeImpactMouvement.NORMAL : typeMouvement.getTypeImpact();
+        if (impact == TypeImpactMouvement.ZERO) {
+            return totalOnly(BigDecimal.ZERO);
+        }
+        if (impact == TypeImpactMouvement.CNPAC_SEUL
+                || Boolean.TRUE.equals(typeMouvement != null ? typeMouvement.getCnpacSeul() : null)) {
+            RegleFiscaleQuittanceEngine.Application application =
+                    regleFiscaleEngine.calculerCnpac(contrat, nombreUnitesCnpac, dateEffet);
+            CategorieQuittance categorie = application.regle().getCategorieResultat();
+            BigDecimal cnpac = application.montantCalcule();
+            Ligne ligne = new Ligne(categorie, ordre(categorie), false, BigDecimal.ZERO, BigDecimal.ZERO,
+                    BigDecimal.ZERO, BigDecimal.ZERO, cnpac, cnpac);
+            return withTotal(List.of(ligne), BigDecimal.ONE, List.of(application));
+        }
+
+        RegleFiscaleQuittanceEngine.Calcul calcul =
+                regleFiscaleEngine.calculer(contrat, garanties, nombreUnitesCnpac, dateEffet);
+        List<Ligne> lignes = calcul.lignes().stream()
+                .map(ligne -> new Ligne(ligne.categorie(), ligne.ordre(), false, ligne.primeNette(),
+                        ligne.taxe(), ligne.taxeParafiscale(), ligne.accessoire(), ligne.cnpac(),
+                        ligne.primeTotale()))
+                .toList();
+        if (impact == TypeImpactMouvement.RETOUR_PRIME) {
+            return withRetourPrime(lignes, calcul.applications());
+        }
+        return withTotal(lignes, BigDecimal.ONE, calcul.applications());
+    }
+
     public Resultat difference(Resultat apres, Resultat avant) {
         return difference(apres, avant, false);
     }
@@ -130,7 +196,7 @@ public class QuittanceCalculService {
                         )
                 ))
                 .toList();
-        return buildResult(lignes);
+        return buildResult(lignes, applicationsSansNature(differentiel.applications(), NatureRegleFiscale.CNPAC));
     }
 
     private Resultat difference(Resultat apres, Resultat avant, boolean autoriserTaxeNegative) {
@@ -159,7 +225,26 @@ public class QuittanceCalculService {
                     autoriserTaxeNegative
             ));
         }
-        return withTotal(lignes, BigDecimal.ONE);
+        List<RegleFiscaleQuittanceEngine.Application> applications = new ArrayList<>();
+        if (apres != null && apres.applications() != null) {
+            applications.addAll(apres.applications());
+        }
+        if (avant != null && avant.applications() != null) {
+            avant.applications().stream()
+                    .map(application -> application.multiplier(BigDecimal.valueOf(-1)))
+                    .forEach(applications::add);
+        }
+        Resultat resultat = withTotal(lignes, BigDecimal.ONE, applications);
+        return new Resultat(
+                resultat.lignes(),
+                applicationsPourLignes(resultat.lignes(), resultat.applications()),
+                resultat.primeNette(),
+                resultat.taxe(),
+                resultat.taxeParafiscale(),
+                resultat.accessoire(),
+                resultat.cnpac(),
+                resultat.primeTotale()
+        );
     }
 
     public Resultat differenceChangementVehicule(Resultat apres, Resultat avant) {
@@ -184,7 +269,14 @@ public class QuittanceCalculService {
                         )
                         : ligne)
                 .toList();
-        return buildResult(lignes);
+        List<RegleFiscaleQuittanceEngine.Application> applications =
+                applicationsSansNature(differentiel.applications(), NatureRegleFiscale.CNPAC);
+        if (apres != null && apres.applications() != null) {
+            apres.applications().stream()
+                    .filter(application -> application.regle().getNature() == NatureRegleFiscale.CNPAC)
+                    .forEach(applications::add);
+        }
+        return buildResult(lignes, applicationsPourLignes(lignes, applications));
     }
 
     private Ligne differenceLine(
@@ -274,20 +366,50 @@ public class QuittanceCalculService {
     }
 
     private Resultat withTotal(List<Ligne> source, BigDecimal signe) {
+        return withTotal(source, signe, List.of());
+    }
+
+    private Resultat withTotal(
+            List<Ligne> source,
+            BigDecimal signe,
+            List<RegleFiscaleQuittanceEngine.Application> applications
+    ) {
         List<Ligne> lignes = source.stream()
                 .map(ligne -> ligne.multiplier(signe))
                 .toList();
-        return buildResult(lignes);
+        List<RegleFiscaleQuittanceEngine.Application> applicationsSignees = applications == null ? List.of()
+                : applications.stream().map(application -> application.multiplier(signe)).toList();
+        return buildResult(lignes, applicationsSignees);
     }
 
     private Resultat withRetourPrime(List<Ligne> source) {
+        return withRetourPrime(source, List.of());
+    }
+
+    private Resultat withRetourPrime(
+            List<Ligne> source,
+            List<RegleFiscaleQuittanceEngine.Application> applications
+    ) {
         List<Ligne> lignes = source.stream()
                 .map(Ligne::retourPrime)
                 .toList();
-        return buildResult(lignes);
+        List<RegleFiscaleQuittanceEngine.Application> applicationsRetour = applications == null
+                ? List.of()
+                : applications.stream()
+                        .filter(application -> application.regle().getNature() == NatureRegleFiscale.EVCAT)
+                        .map(application -> application.multiplier(BigDecimal.valueOf(-1)))
+                        .toList();
+        return buildResult(lignes, applicationsRetour);
     }
 
     private Resultat buildResult(List<Ligne> lignes) {
+        return buildResult(lignes, List.of());
+    }
+
+    private Resultat buildResult(
+            List<Ligne> lignes,
+            List<RegleFiscaleQuittanceEngine.Application> applications
+    ) {
         BigDecimal primeNette = lignes.stream().map(Ligne::primeNette).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal taxe = lignes.stream().map(Ligne::taxe).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal taxeParafiscale = lignes.stream().map(Ligne::taxeParafiscale).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -299,6 +421,7 @@ public class QuittanceCalculService {
         toutesLignes.add(new Ligne(CategorieQuittance.TOTAL, 99, true, primeNette, taxe, taxeParafiscale, accessoire, cnpac, primeTotale));
         return new Resultat(
                 toutesLignes,
+                applications == null ? List.of() : List.copyOf(applications),
                 scale(primeNette),
                 scale(taxe),
                 scale(taxeParafiscale),
@@ -324,6 +447,50 @@ public class QuittanceCalculService {
         return primeNette.add(taxe).add(taxeParafiscale).add(accessoire).add(cnpac);
     }
 
+    private int ordre(CategorieQuittance categorie) {
+        return switch (categorie) {
+            case AUTOMOBILE -> 10;
+            case CORPOREL -> 20;
+            case EVCAT -> 30;
+            case ASSISTANCE -> 40;
+            case TOTAL -> 99;
+        };
+    }
+
+    private List<RegleFiscaleQuittanceEngine.Application> applicationsSansNature(
+            List<RegleFiscaleQuittanceEngine.Application> applications,
+            NatureRegleFiscale nature
+    ) {
+        if (applications == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(applications.stream()
+                .filter(application -> application.regle().getNature() != nature)
+                .toList());
+    }
+
+    private List<RegleFiscaleQuittanceEngine.Application> applicationsPourLignes(
+            List<Ligne> lignes,
+            List<RegleFiscaleQuittanceEngine.Application> applications
+    ) {
+        Map<CategorieQuittance, Ligne> parCategorie = new EnumMap<>(CategorieQuittance.class);
+        lignes.stream()
+                .filter(ligne -> ligne.categorie() != CategorieQuittance.TOTAL)
+                .forEach(ligne -> parCategorie.put(ligne.categorie(), ligne));
+        return applications.stream().filter(application -> {
+            Ligne ligne = parCategorie.get(application.regle().getCategorieResultat());
+            if (ligne == null) {
+                return false;
+            }
+            return switch (application.regle().getNature()) {
+                case EVCAT -> ligne.primeNette().signum() != 0;
+                case TAXE_ASSURANCE -> ligne.taxe().signum() != 0;
+                case TPF -> ligne.taxeParafiscale().signum() != 0;
+                case CNPAC -> ligne.cnpac().signum() != 0;
+            };
+        }).toList();
+    }
+
     private BigDecimal param(Long agenceId, String code) {
         return parametreApplicationService.getDecimal(agenceId, code, BigDecimal.ZERO);
     }
@@ -338,6 +505,7 @@ public class QuittanceCalculService {
 
     public record Resultat(
             List<Ligne> lignes,
+            List<RegleFiscaleQuittanceEngine.Application> applications,
             BigDecimal primeNette,
             BigDecimal taxe,
             BigDecimal taxeParafiscale,
@@ -345,6 +513,11 @@ public class QuittanceCalculService {
             BigDecimal cnpac,
             BigDecimal primeTotale
     ) {
+        public Resultat(List<Ligne> lignes, BigDecimal primeNette, BigDecimal taxe,
+                        BigDecimal taxeParafiscale, BigDecimal accessoire,
+                        BigDecimal cnpac, BigDecimal primeTotale) {
+            this(lignes, List.of(), primeNette, taxe, taxeParafiscale, accessoire, cnpac, primeTotale);
+        }
     }
 
     public record Ligne(

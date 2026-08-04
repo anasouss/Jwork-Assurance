@@ -43,7 +43,8 @@ public class DataSeeder implements CommandLineRunner {
             "attestation-stock:manage",
             "attestation-stock:cancel",
             "agence:manage-self",
-            "regle-fiscale:view"
+            "regle-fiscale:view",
+            "regle-fiscale:manage"
     );
 
     private final PermissionRepository permissionRepository;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,10 +40,7 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
   }, [open, rule]);
 
   const percentage = form.modeCalcul === "TAUX";
-  const displayedValue = useMemo(
-    () => percentage ? form.valeur * 100 : form.valeur,
-    [form.valeur, percentage],
-  );
+  const displayedValue = percentage ? percentageForInput(form.valeur) : form.valeur;
 
   const changeNature = (nature: FiscalRuleNature) => {
     const defaults = defaultsForNature(nature);
@@ -232,6 +229,11 @@ function toDateOnly(date?: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function percentageForInput(decimalValue: number) {
+  if (!Number.isFinite(decimalValue)) return 0;
+  return Number((decimalValue * 100).toFixed(8));
 }
 
 const natureOptions: [string, string][] = [["TAXE_ASSURANCE", "Taxe d’assurance"], ["TPF", "Taxe parafiscale"], ["EVCAT", "EVCAT"], ["CNPAC", "CNPAC"]];

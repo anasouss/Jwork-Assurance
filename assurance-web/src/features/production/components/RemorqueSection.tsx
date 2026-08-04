@@ -126,6 +126,7 @@ export function RemorqueSection({
                 <AttestationNumberInput
                   value={remorque.numeroAttestation ?? ""}
                   onChange={(value) => update(index, { numeroAttestation: value })}
+                  numeroCourant={remorque.numeroAttestationInitiale}
                   compagnieAssuranceId={compagnieAssuranceId}
                   usageId={remorque.usageId}
                   compagnies={compagnies}

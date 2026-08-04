@@ -205,6 +205,7 @@ export function VehicleForm({
             <AttestationNumberInput
               value={vehicule.numeroAttestation ?? ""}
               onChange={(value) => update({ numeroAttestation: value })}
+              numeroCourant={vehicule.numeroAttestationInitiale}
               compagnieAssuranceId={compagnieAssuranceId}
               usageId={vehicule.usageId}
               compagnies={compagnies}
@@ -341,6 +342,7 @@ export function RemorqueForm({
             <AttestationNumberInput
               value={remorque.numeroAttestation ?? ""}
               onChange={(value) => update({ numeroAttestation: value })}
+              numeroCourant={remorque.numeroAttestationInitiale}
               compagnieAssuranceId={compagnieAssuranceId}
               usageId={remorque.usageId}
               compagnies={compagnies}

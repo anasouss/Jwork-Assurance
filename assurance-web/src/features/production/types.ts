@@ -529,6 +529,7 @@ export type VehiculeInput = {
   dateEcheance?: string;
   crm?: string;
   numeroAttestation?: string;
+  numeroAttestationInitiale?: string;
   coefficientProrata?: number;
   remorque?: boolean;
   valeurVenale?: number;
@@ -564,6 +565,7 @@ export type RemorqueInput = {
   dateEcheance?: string;
   crm?: string;
   numeroAttestation?: string;
+  numeroAttestationInitiale?: string;
   coefficientProrata?: number;
   valeurAssuree?: number;
 };

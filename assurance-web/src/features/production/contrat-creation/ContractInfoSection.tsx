@@ -293,6 +293,7 @@ export function ContractInfoSection({
                 <AttestationNumberInput
                   value={form.numeroAttestation}
                   onChange={form.setNumeroAttestation}
+                  numeroCourant={form.numeroAttestationInitiale}
                   compagnieAssuranceId={form.compagnieAssuranceId}
                   usageId={form.usageId}
                   compagnies={form.refs.compagnies.data ?? []}

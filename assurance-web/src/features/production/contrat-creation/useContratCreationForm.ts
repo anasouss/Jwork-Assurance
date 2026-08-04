@@ -44,6 +44,7 @@ export function useContratCreationForm(
   const initialCategorieClientId = options?.initialCategorieClientId;
   const [numeroPolice, setNumeroPolice] = useState("");
   const [numeroAttestation, setNumeroAttestation] = useState("");
+  const [numeroAttestationInitiale, setNumeroAttestationInitiale] = useState("");
   const [compagnieAssuranceId, setCompagnieAssuranceId] = useState("");
   const [conventionId, setConventionId] = useState("");
   const [usageId, setUsageId] = useState("");
@@ -232,6 +233,7 @@ export function useContratCreationForm(
     const hydrated = hydrateDraft(draft);
     setNumeroPolice(hydrated.numeroPolice);
     setNumeroAttestation(hydrated.numeroAttestation);
+    setNumeroAttestationInitiale(hydrated.numeroAttestation);
     setCompagnieAssuranceId(hydrated.compagnieAssuranceId);
     setConventionId(hydrated.conventionId);
     setUsageId(hydrated.usageId);
@@ -354,21 +356,29 @@ export function useContratCreationForm(
         },
       };
     }),
-    vehicules: vehicules.map((vehicule) => ({
-      ...vehicule,
-      coefficientProrata: undefined,
-      usageId: vehicule.usageId || contractUsageFallback || undefined,
-      dateEffet: vehicule.dateEffet || dateEffet,
-      dateEcheance: vehicule.dateEcheance || dateEcheance,
-      crm: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : vehicule.crm,
-    })),
+    vehicules: vehicules.map((source) => {
+      const vehicule = { ...source };
+      delete vehicule.numeroAttestationInitiale;
+      return {
+        ...vehicule,
+        coefficientProrata: undefined,
+        usageId: vehicule.usageId || contractUsageFallback || undefined,
+        dateEffet: vehicule.dateEffet || dateEffet,
+        dateEcheance: vehicule.dateEcheance || dateEcheance,
+        crm: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : vehicule.crm,
+      };
+    }),
     remorques: typeContrat === "PARTICULIER"
       ? []
-      : remorques.map((remorque) => ({
-          ...remorque,
-          coefficientProrata: undefined,
-          usageId: remorque.usageId || contractUsageFallback || undefined,
-        })),
+      : remorques.map((source) => {
+          const remorque = { ...source };
+          delete remorque.numeroAttestationInitiale;
+          return {
+            ...remorque,
+            coefficientProrata: undefined,
+            usageId: remorque.usageId || contractUsageFallback || undefined,
+          };
+        }),
     garanties: typeContrat === "PARTICULIER"
       ? garanties.filter((garantie) => garantie.remorqueIndex == null)
       : garanties,
@@ -1110,6 +1120,7 @@ export function useContratCreationForm(
     setNumeroPolice,
     numeroAttestation,
     setNumeroAttestation,
+    numeroAttestationInitiale,
     compagnieAssuranceId,
     setCompagnieAssuranceId: setCompagnieForContrat,
     conventionId,
@@ -1496,6 +1507,7 @@ function hydrateDraft(draft: ContratSummary) {
         dateEcheance: nullToUndefined(vehicule.dateEcheance),
         crm: nullToUndefined(vehicule.crm),
         numeroAttestation: nullToUndefined(vehicule.numeroAttestation),
+        numeroAttestationInitiale: nullToUndefined(vehicule.numeroAttestation),
         coefficientProrata: nullToUndefined(vehicule.coefficientProrata),
         remorque: Boolean(vehicule.remorque),
         valeurVenale: nullToUndefined(vehicule.valeurVenale),
@@ -1520,6 +1532,7 @@ function hydrateDraft(draft: ContratSummary) {
     dateEcheance: nullToUndefined(remorque.dateEcheance),
     crm: nullToUndefined(remorque.crm),
     numeroAttestation: nullToUndefined(remorque.numeroAttestation),
+    numeroAttestationInitiale: nullToUndefined(remorque.numeroAttestation),
     coefficientProrata: nullToUndefined(remorque.coefficientProrata),
     valeurAssuree: nullToUndefined(remorque.valeurAssuree),
   } satisfies RemorqueInput));

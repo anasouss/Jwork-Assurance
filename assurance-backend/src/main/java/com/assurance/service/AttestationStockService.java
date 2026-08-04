@@ -148,7 +148,7 @@ public class AttestationStockService {
                     .numeroNormalise(numeroNormalise)
                     .prefixe(prefixe)
                     .codeUsageStock(codeUsageStock)
-                    .message("Numero d'attestation obligatoire")
+                    .message("Numéro d'attestation obligatoire")
                     .suggestions(List.of())
                     .build();
         }
@@ -162,7 +162,7 @@ public class AttestationStockService {
                     .numeroNormalise(numeroNormalise)
                     .prefixe(prefixe)
                     .codeUsageStock(codeUsageStock)
-                    .message("Numero deja associe a cette cible")
+                    .message("Numéro déjà associé à cette cible")
                     .suggestions(List.of())
                     .build();
         }
@@ -177,8 +177,8 @@ public class AttestationStockService {
         AttestationStock stock = candidates.stream().findFirst().orElse(null);
         boolean disponible = stock != null && stock.getStatut() == StatutAttestationStock.DISPONIBLE;
         String message = stock == null
-                ? "Ce numero d'attestation n'existe pas en stock"
-                : disponible ? "Numero disponible en stock" : messageStatut(stock.getStatut());
+                ? "Ce numéro d'attestation n'existe pas en stock"
+                : disponible ? "Numéro disponible en stock" : messageStatut(stock.getStatut());
         return AttestationNumeroValidationResponse.builder()
                 .controleStockActif(true)
                 .validationRequise(true)
@@ -377,7 +377,7 @@ public class AttestationStockService {
         }
         String numeroNormalise = normaliserNumero(numero, contrat, usage);
         if (!hasText(numeroNormalise)) {
-            throw new BadRequestException("Numero d'attestation obligatoire pour ce mouvement");
+            throw new BadRequestException("Numéro d'attestation obligatoire pour ce mouvement");
         }
         AttestationStock attestation = trouverDisponiblePourUpdate(contrat, usage, numeroNormalise);
         attestation.setStatut(StatutAttestationStock.UTILISEE);
@@ -457,7 +457,7 @@ public class AttestationStockService {
         return candidates.stream()
                 .filter(attestation -> attestation.getStatut() == StatutAttestationStock.DISPONIBLE)
                 .findFirst()
-                .orElseThrow(() -> new BadRequestException("Ce numero d'attestation n'est pas disponible en stock"));
+                .orElseThrow(() -> new BadRequestException("Ce numéro d'attestation n'est pas disponible en stock"));
     }
 
     private GroupeUsageAttestation groupeStock(Usage usage) {
@@ -616,18 +616,18 @@ public class AttestationStockService {
 
     private String messageStatut(StatutAttestationStock statut) {
         if (statut == StatutAttestationStock.UTILISEE) {
-            return "Ce numero d'attestation est deja utilise";
+            return "Ce numéro d'attestation est déjà utilisé";
         }
         if (statut == StatutAttestationStock.RESERVEE) {
-            return "Ce numero d'attestation est reserve";
+            return "Ce numéro d'attestation est réservé";
         }
         if (statut == StatutAttestationStock.ANNULEE) {
-            return "Ce numero d'attestation est annule";
+            return "Ce numéro d'attestation est annulé";
         }
         if (statut == StatutAttestationStock.DESACTIVEE) {
-            return "Ce numero d'attestation est desactive";
+            return "Ce numéro d'attestation est désactivé";
         }
-        return "Ce numero d'attestation n'est pas disponible en stock";
+        return "Ce numéro d'attestation n'est pas disponible en stock";
     }
 
     private long toLong(Object value) {

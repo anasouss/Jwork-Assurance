@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -274,6 +275,10 @@ public class QuittanceCalculService {
 
     private BigDecimal moins(BigDecimal apres, BigDecimal avant) {
         return scale(zeroIfNull(apres).subtract(zeroIfNull(avant)));
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private Resultat withTotal(List<Ligne> source, BigDecimal signe) {

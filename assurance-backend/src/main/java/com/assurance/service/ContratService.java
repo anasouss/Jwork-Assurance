@@ -4962,6 +4962,9 @@ public class ContratService {
                     .sorted(Comparator.comparing(MouvementGarantie::getId))
                     .map(this::toGarantieView)
                     .toList();
+            if (garanties.isEmpty()) {
+                garanties = inheritedGuaranteesAtMovement(contrat, selectedMouvement, vehicules, remorques);
+            }
         }
 
         List<ContratResponse.MouvementView> mouvements = new ArrayList<>();
@@ -5083,6 +5086,91 @@ public class ContratService {
                 .targetSummaries(targetSummaries)
                 .quittanceGenerale(quittanceGenerale)
                 .build();
+    }
+
+    private List<ContratResponse.GarantieView> inheritedGuaranteesAtMovement(
+            Contrat contrat,
+            MouvementContrat selectedMouvement,
+            List<ContratResponse.VehiculeView> vehicules,
+            List<ContratResponse.RemorqueView> remorques
+    ) {
+        Set<Long> vehiculeIds = vehicules.stream()
+                .map(ContratResponse.VehiculeView::getVehiculeId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Long> remorqueIds = remorques.stream()
+                .map(ContratResponse.RemorqueView::getRemorqueId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<MouvementContrat> chronology = contrat.getMouvements().stream()
+                .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
+                .sorted(Comparator
+                        .comparing(MouvementContrat::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(MouvementContrat::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        int selectedIndex = chronology.indexOf(selectedMouvement);
+        for (int index = selectedIndex; index >= 0; index--) {
+            List<MouvementGarantie> effectiveSnapshots = effectiveGuaranteeSnapshots(
+                    mouvementGarantieRepository.findByMouvementContratId(chronology.get(index).getId())
+            );
+            if (!effectiveSnapshots.isEmpty()) {
+                return effectiveSnapshots.stream()
+                        .filter(snapshot -> guaranteeTargets(snapshot, vehiculeIds, remorqueIds))
+                        .sorted(Comparator.comparing(MouvementGarantie::getId))
+                        .map(this::toGarantieView)
+                        .toList();
+            }
+        }
+
+        return activeGarantiesForView(contrat).stream()
+                .filter(garantie -> guaranteeTargets(garantie, vehiculeIds, remorqueIds))
+                .map(this::toGarantieView)
+                .toList();
+    }
+
+    private List<MouvementGarantie> effectiveGuaranteeSnapshots(List<MouvementGarantie> snapshots) {
+        for (NatureSnapshotMouvement nature : List.of(
+                NatureSnapshotMouvement.APRES,
+                NatureSnapshotMouvement.AJOUT,
+                NatureSnapshotMouvement.COURANT
+        )) {
+            List<MouvementGarantie> matching = snapshots.stream()
+                    .filter(snapshot -> snapshot.getNature() == nature)
+                    .toList();
+            if (!matching.isEmpty()) {
+                return matching;
+            }
+        }
+        return List.of();
+    }
+
+    private boolean guaranteeTargets(
+            MouvementGarantie snapshot,
+            Set<Long> vehiculeIds,
+            Set<Long> remorqueIds
+    ) {
+        if (snapshot.getVehicule() != null) {
+            return vehiculeIds.contains(snapshot.getVehicule().getId());
+        }
+        if (snapshot.getRemorque() != null) {
+            return remorqueIds.contains(snapshot.getRemorque().getId());
+        }
+        return true;
+    }
+
+    private boolean guaranteeTargets(
+            ContratGarantie garantie,
+            Set<Long> vehiculeIds,
+            Set<Long> remorqueIds
+    ) {
+        if (garantie.getVehicule() != null) {
+            return vehiculeIds.contains(garantie.getVehicule().getId());
+        }
+        if (garantie.getRemorque() != null) {
+            return remorqueIds.contains(garantie.getRemorque().getId());
+        }
+        return true;
     }
 
     private String numeroActeAffiche(MouvementContrat mouvement, int positionChronologique) {

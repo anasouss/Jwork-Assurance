@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.dto.response.ClientResponse;
 import com.assurance.dto.response.ContratResponse;
+import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
@@ -77,7 +78,7 @@ public class FlottePolicePdfService {
             if (writeFranchises(document, contrat, section)) {
                 section++;
             }
-            writeQuittance(document, contrat.getQuittanceGenerale(), section);
+            writeQuittance(document, contrat.getQuittanceGenerale(), contrat.getAssistances(), section);
 
             document.close();
             return output.toByteArray();
@@ -155,7 +156,7 @@ public class FlottePolicePdfService {
         boolean hasDcCapital = codes.contains("DC");
         boolean showAssistance = !list(contrat.getAssistances()).isEmpty();
         int valueColumns = hasDcCapital ? 4 : 3;
-        int guaranteeColumns = Math.max(1, codes.size() + (showAssistance ? 1 : 0));
+        int guaranteeColumns = Math.max(1, codes.size() + (showAssistance ? 2 : 0));
         int columnCount = 8 + valueColumns + guaranteeColumns;
         float[] widths = tariffWidths(codes.size(), hasDcCapital, showAssistance);
         Table table = new Table(widths).setWidth(UnitValue.createPercentValue(100));
@@ -183,13 +184,15 @@ public class FlottePolicePdfService {
         }
         if (showAssistance) {
             addHeader(table, "ASSISTANCE", 1, 1, ASSISTANCE_BG);
+            addHeader(table, "PRIME\nTTC", 1, 1, ASSISTANCE_BG);
         }
 
         BigDecimal rowsTotal = BigDecimal.ZERO;
         for (Target target : targets) {
             List<ContratResponse.GarantieView> rowGuarantees = guaranteesFor(guarantees, target);
             QuittanceResponse.TargetSummary summary = summaryFor(contrat, target);
-            BigDecimal rowTotal = summary == null ? BigDecimal.ZERO : zero(summary.getPrimeTotale());
+            BigDecimal assistancePrime = assistancePrimeFor(contrat, target);
+            BigDecimal rowTotal = (summary == null ? BigDecimal.ZERO : zero(summary.getPrimeTotale())).add(assistancePrime);
             rowsTotal = rowsTotal.add(rowTotal);
 
             table.addCell(valueCell(target.usageLabel(), TextAlignment.LEFT));
@@ -212,19 +215,18 @@ public class FlottePolicePdfService {
             }
             if (showAssistance) {
                 table.addCell(assistanceCell(assistanceFor(contrat, target)));
+                table.addCell(valueCell(formatMoneyOrEmpty(assistancePrime), TextAlignment.RIGHT)
+                        .setBackgroundColor(ASSISTANCE_BG));
             }
             table.addCell(valueCell(formatMoney(rowTotal), TextAlignment.RIGHT).setBold());
         }
 
-        BigDecimal documentTotal = contrat.getQuittanceGenerale() == null
-                ? rowsTotal
-                : zero(contrat.getQuittanceGenerale().getPrimeTotale());
         table.addCell(new Cell(1, columnCount - 1)
                 .add(new Paragraph("TOTAL").setBold())
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBorder(new SolidBorder(BORDER, 0.8f))
                 .setPadding(2));
-        table.addCell(valueCell(formatMoney(documentTotal), TextAlignment.RIGHT).setBold());
+        table.addCell(valueCell(formatMoney(rowsTotal), TextAlignment.RIGHT).setBold());
         document.add(table);
     }
 
@@ -285,7 +287,8 @@ public class FlottePolicePdfService {
         return true;
     }
 
-    private void writeQuittance(Document document, QuittanceResponse quittance, int section) {
+    private void writeQuittance(Document document, QuittanceResponse quittance,
+                                List<AssistanceContratResponse> assistances, int section) {
         if (quittance == null || list(quittance.getLignes()).isEmpty()) {
             return;
         }
@@ -301,15 +304,42 @@ public class FlottePolicePdfService {
         for (String header : List.of("Catégorie", "Prime nette", "Taxes", "TPF", "ACC", "CNPAC", "Total")) {
             table.addHeaderCell(headerCell(header, HEADER_BG));
         }
-        for (QuittanceResponse.Ligne line : lines) {
-            boolean total = Boolean.TRUE.equals(line.getGlobale());
-            table.addCell(withBold(valueCell(total ? "TOTAL" : value(line.getCategorie(), "-"), TextAlignment.LEFT), total));
-            table.addCell(withBold(valueCell(formatMoney(line.getPrimeNette()), TextAlignment.RIGHT), total));
-            table.addCell(withBold(valueCell(formatMoney(line.getTaxe()), TextAlignment.RIGHT), total));
-            table.addCell(withBold(valueCell(formatMoney(line.getTaxeParafiscale()), TextAlignment.RIGHT), total));
-            table.addCell(withBold(valueCell(formatMoney(line.getAccessoire()), TextAlignment.RIGHT), total));
-            table.addCell(withBold(valueCell(formatMoney(line.getCnpac()), TextAlignment.RIGHT), total));
-            table.addCell(withBold(valueCell(formatMoney(line.getPrimeTotale()), TextAlignment.RIGHT), total));
+        BigDecimal assistanceNet = list(assistances).stream()
+                .map(AssistanceContratResponse::getPrimeNette)
+                .map(FlottePolicePdfService::zero)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal assistanceTtc = list(assistances).stream()
+                .map(AssistanceContratResponse::getPrimeTotale)
+                .map(FlottePolicePdfService::zero)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal assistanceTax = assistanceTtc.subtract(assistanceNet).max(BigDecimal.ZERO);
+        for (QuittanceResponse.Ligne line : lines.stream().filter(item -> !Boolean.TRUE.equals(item.getGlobale())).toList()) {
+            table.addCell(valueCell(value(line.getCategorie(), "-"), TextAlignment.LEFT));
+            table.addCell(valueCell(formatMoney(line.getPrimeNette()), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(line.getTaxe()), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(line.getTaxeParafiscale()), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(line.getAccessoire()), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(line.getCnpac()), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(line.getPrimeTotale()), TextAlignment.RIGHT));
+        }
+        if (assistanceTtc.compareTo(BigDecimal.ZERO) != 0) {
+            table.addCell(valueCell("ASSISTANCE", TextAlignment.LEFT));
+            table.addCell(valueCell(formatMoney(assistanceNet), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(assistanceTax), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(BigDecimal.ZERO), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(BigDecimal.ZERO), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(BigDecimal.ZERO), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoney(assistanceTtc), TextAlignment.RIGHT));
+        }
+        QuittanceResponse.Ligne total = lines.stream().filter(item -> Boolean.TRUE.equals(item.getGlobale())).findFirst().orElse(null);
+        if (total != null) {
+            table.addCell(valueCell("TOTAL", TextAlignment.LEFT).setBold());
+            table.addCell(valueCell(formatMoney(zero(total.getPrimeNette()).add(assistanceNet)), TextAlignment.RIGHT).setBold());
+            table.addCell(valueCell(formatMoney(zero(total.getTaxe()).add(assistanceTax)), TextAlignment.RIGHT).setBold());
+            table.addCell(valueCell(formatMoney(total.getTaxeParafiscale()), TextAlignment.RIGHT).setBold());
+            table.addCell(valueCell(formatMoney(total.getAccessoire()), TextAlignment.RIGHT).setBold());
+            table.addCell(valueCell(formatMoney(total.getCnpac()), TextAlignment.RIGHT).setBold());
+            table.addCell(valueCell(formatMoney(zero(total.getPrimeTotale()).add(assistanceTtc)), TextAlignment.RIGHT).setBold());
         }
         document.add(table);
     }
@@ -359,6 +389,17 @@ public class FlottePolicePdfService {
                 .distinct()
                 .reduce((left, right) -> left + " / " + right)
                 .orElse("");
+    }
+
+    private BigDecimal assistancePrimeFor(ContratResponse contrat, Target target) {
+        if (!"VEHICULE".equals(target.kind())) {
+            return BigDecimal.ZERO;
+        }
+        return list(contrat.getAssistances()).stream()
+                .filter(item -> target.id().equals(item.getVehiculeId()))
+                .map(AssistanceContratResponse::getPrimeTotale)
+                .map(FlottePolicePdfService::zero)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private List<ContratResponse.GarantieView> vehicleGuarantees(List<ContratResponse.GarantieView> guarantees) {
@@ -513,12 +554,13 @@ public class FlottePolicePdfService {
         if (hasDcCapital) {
             widths.add(1.25f);
         }
-        int renderedGuarantees = Math.max(1, codeCount);
+        int renderedGuarantees = codeCount == 0 && !showAssistance ? 1 : codeCount;
         for (int index = 0; index < renderedGuarantees; index++) {
             widths.add(0.58f);
         }
         if (showAssistance) {
             widths.add(1.4f);
+            widths.add(1.25f);
         }
         widths.add(1.55f);
         float[] result = new float[widths.size()];

@@ -227,7 +227,9 @@ function FlottePolicySheet({
   const assistances = contrat.assistances ?? [];
   const showAssistance = assistances.length > 0;
   const totals = contrat.quittanceGenerale;
-  const totalAmount = totals?.primeTotale ?? totals?.lignes?.find((ligne) => ligne.globale)?.primeTotale;
+  const insuranceTotal = totals?.primeTotale ?? totals?.lignes?.find((ligne) => ligne.globale)?.primeTotale;
+  const assistanceTotal = assistances.reduce((sum, item) => sum + Number(item.primeTotale ?? 0), 0);
+  const totalAmount = Number(insuranceTotal ?? 0) + assistanceTotal;
   const targetSummaries = contrat.targetSummaries ?? contrat.quittanceGenerale?.targetSummaries ?? [];
   const actLabel = mouvement?.libelle ?? latestEvent(contrat);
   const actNumber = mouvement?.numeroMouvement ?? "1";
@@ -273,7 +275,7 @@ function FlottePolicySheet({
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>PF/PTC</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>ENERGIE</th>
               <th className="border border-slate-700 px-1 py-1" colSpan={hasDcCapital ? 4 : 3}>VALEURS</th>
-              <th className="border border-slate-700 px-1 py-1" colSpan={guaranteeCodes.length + (showAssistance ? 1 : 0)}>GARANTIES A ASSURER</th>
+              <th className="border border-slate-700 px-1 py-1" colSpan={guaranteeCodes.length + (showAssistance ? 2 : 0)}>GARANTIES A ASSURER</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Montant total</th>
             </tr>
             <tr className="bg-slate-100 text-center font-bold text-blue-950">
@@ -283,6 +285,7 @@ function FlottePolicySheet({
               {hasDcCapital ? <th className="border border-slate-700 px-1 py-1">Capital<br />DC</th> : null}
               {guaranteeCodes.map((code) => <th key={code} className="border border-slate-700 px-1 py-1">{code}</th>)}
               {showAssistance ? <th className="border border-slate-700 bg-amber-50 px-1 py-1">ASSISTANCE</th> : null}
+              {showAssistance ? <th className="border border-slate-700 bg-amber-50 px-1 py-1">PRIME<br />TTC</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -301,6 +304,8 @@ function FlottePolicySheet({
               const valeurNeuf = isVehicle ? target.item.valeurNeuf : null;
               const valeurVenale = isVehicle ? target.item.valeurVenale : target.item.valeurAssuree;
               const valeurGlace = isVehicle ? target.item.valeurGlace : null;
+              const targetAssistancePrime = isVehicle ? assistancePrime(assistances, target.item.vehiculeId) : 0;
+              const targetTotal = Number(summary?.primeTotale ?? summary?.primeNette ?? 0) + targetAssistancePrime;
               return (
                 <tr key={`${target.kind}-${targetId ?? target.index}`} className="align-middle">
                   <td className="border border-slate-700 px-1 py-1">{text(target.item.usageCode)}</td>
@@ -320,12 +325,13 @@ function FlottePolicySheet({
                     </td>
                   ))}
                   {showAssistance ? <td className="border border-slate-700 bg-amber-50 px-1 py-1 text-center">{isVehicle ? assistanceCell(assistances, target.item.vehiculeId) : ""}</td> : null}
-                  <td className="border border-slate-700 px-1 py-1 text-right font-semibold">{moneyAmount(summary?.primeTotale ?? summary?.primeNette)}</td>
+                  {showAssistance ? <td className="border border-slate-700 bg-amber-50 px-1 py-1 text-right">{targetAssistancePrime ? moneyAmount(targetAssistancePrime) : ""}</td> : null}
+                  <td className="border border-slate-700 px-1 py-1 text-right font-semibold">{moneyAmount(targetTotal)}</td>
                 </tr>
               );
             })}
             <tr className="font-bold">
-              <td className="border border-slate-700 px-1 py-1 text-center" colSpan={7 + 3 + (hasDcCapital ? 1 : 0) + guaranteeCodes.length + (showAssistance ? 1 : 0)}>TOTAL</td>
+              <td className="border border-slate-700 px-1 py-1 text-center" colSpan={7 + 3 + (hasDcCapital ? 1 : 0) + guaranteeCodes.length + (showAssistance ? 2 : 0)}>TOTAL</td>
               <td className="border border-slate-700 px-1 py-1 text-right">{moneyAmount(totalAmount)}</td>
             </tr>
           </tbody>
@@ -336,7 +342,7 @@ function FlottePolicySheet({
         </div>
 
         <FlotteFranchiseTable vehicles={vehicles} garanties={vehicleGuarantees} />
-        <FlotteQuittanceTable contrat={contrat} />
+        <FlotteQuittanceTable contrat={contrat} assistances={assistances} />
       </div>
     </div>
   );
@@ -650,9 +656,14 @@ function FlotteFranchiseTable({ vehicles, garanties }: { vehicles: Vehicule[]; g
   );
 }
 
-function FlotteQuittanceTable({ contrat }: { contrat: ContratSummary }) {
+function FlotteQuittanceTable({ contrat, assistances }: { contrat: ContratSummary; assistances: AssistanceContrat[] }) {
   const lignes = contrat.quittanceGenerale?.lignes?.filter((ligne) => ligne.globale || moneyAmount(ligne.primeTotale) !== "0,00") ?? [];
   if (!lignes.length) return null;
+  const assistanceNet = assistances.reduce((sum, item) => sum + Number(item.primeNette ?? 0), 0);
+  const assistanceTtc = assistances.reduce((sum, item) => sum + Number(item.primeTotale ?? 0), 0);
+  const assistanceTax = Math.max(0, assistanceTtc - assistanceNet);
+  const detailLines = lignes.filter((ligne) => !ligne.globale);
+  const total = lignes.find((ligne) => ligne.globale);
   return (
     <>
       <h2 className="mt-2 text-sm font-bold">III. Quittance</h2>
@@ -669,9 +680,9 @@ function FlotteQuittanceTable({ contrat }: { contrat: ContratSummary }) {
           </tr>
         </thead>
         <tbody>
-          {lignes.map((ligne) => (
-            <tr key={`${ligne.categorie}-${ligne.ordre}`} className={ligne.globale ? "font-bold" : ""}>
-              <td className="border border-slate-700 px-2 py-1">{ligne.globale ? "TOTAL" : ligne.categorie}</td>
+          {detailLines.map((ligne) => (
+            <tr key={`${ligne.categorie}-${ligne.ordre}`}>
+              <td className="border border-slate-700 px-2 py-1">{ligne.categorie}</td>
               <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.primeNette)}</td>
               <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.taxe)}</td>
               <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.taxeParafiscale)}</td>
@@ -680,6 +691,28 @@ function FlotteQuittanceTable({ contrat }: { contrat: ContratSummary }) {
               <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(ligne.primeTotale)}</td>
             </tr>
           ))}
+          {assistanceTtc ? (
+            <tr>
+              <td className="border border-slate-700 px-2 py-1">ASSISTANCE</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(assistanceNet)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(assistanceTax)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">0,00</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">0,00</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">0,00</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(assistanceTtc)}</td>
+            </tr>
+          ) : null}
+          {total ? (
+            <tr className="font-bold">
+              <td className="border border-slate-700 px-2 py-1">TOTAL</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(Number(total.primeNette ?? 0) + assistanceNet)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(Number(total.taxe ?? 0) + assistanceTax)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(total.taxeParafiscale)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(total.accessoire)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(total.cnpac)}</td>
+              <td className="border border-slate-700 px-2 py-1 text-right">{moneyAmount(Number(total.primeTotale ?? 0) + assistanceTtc)}</td>
+            </tr>
+          ) : null}
         </tbody>
       </table>
     </>
@@ -713,6 +746,12 @@ function capitalForCode(garanties: Garantie[], code: string) {
 function assistanceCell(assistances: AssistanceContrat[], vehiculeId?: string | null) {
   const assistance = assistances.find((item) => String(item.vehiculeId ?? "") === String(vehiculeId ?? ""));
   return assistance?.produit ?? "";
+}
+
+function assistancePrime(assistances: AssistanceContrat[], vehiculeId?: string | null) {
+  return assistances
+    .filter((item) => String(item.vehiculeId ?? "") === String(vehiculeId ?? ""))
+    .reduce((sum, item) => sum + Number(item.primeTotale ?? 0), 0);
 }
 
 function flotteFranchiseRows(vehicles: Vehicule[], garanties: Garantie[], usages: string[]) {

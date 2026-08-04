@@ -305,13 +305,13 @@ function FlottePolicySheet({
                     </td>
                   ))}
                   {showAssistance ? <td className="border border-slate-700 bg-amber-50 px-1 py-1 text-center">{isVehicle ? assistanceCell(assistances, target.item.vehiculeId) : ""}</td> : null}
-                  <td className="border border-slate-700 px-1 py-1 text-right font-semibold">{formatMoney(summary?.primeTotale ?? summary?.primeNette)}</td>
+                  <td className="border border-slate-700 px-1 py-1 text-right font-semibold">{moneyAmount(summary?.primeTotale ?? summary?.primeNette)}</td>
                 </tr>
               );
             })}
             <tr className="font-bold">
               <td className="border border-slate-700 px-1 py-1 text-center" colSpan={6 + 3 + (hasDcCapital ? 1 : 0) + guaranteeCodes.length + (showAssistance ? 1 : 0)}>TOTAL</td>
-              <td className="border border-slate-700 px-1 py-1 text-right">{formatMoney(totalAmount)}</td>
+              <td className="border border-slate-700 px-1 py-1 text-right">{moneyAmount(totalAmount)}</td>
             </tr>
           </tbody>
         </table>
@@ -682,7 +682,7 @@ function flotteGuaranteeCodes(garanties: Garantie[]) {
 function flotteGuaranteeCell(garanties: Garantie[], code: string) {
   const garantie = garanties.find((item) => String(item.code ?? "").toUpperCase() === code);
   if (!garantie) return "";
-  if (code === "DV" && garantie.tauxFranchise != null) return `FR${moneyAmount(garantie.tauxFranchise)}%`;
+  if (code === "DV" && Number(garantie.tauxFranchise) > 0) return `FR${compactNumber(Number(garantie.tauxFranchise))}%`;
   return "X";
 }
 
@@ -703,13 +703,15 @@ function assistanceCell(assistances: AssistanceContrat[], vehiculeId?: string | 
 function flotteFranchiseRows(vehicles: Vehicule[], garanties: Garantie[], usages: string[]) {
   const rows = new Map<string, { code: string; byUsage: Record<string, string> }>();
   for (const code of flotteGuaranteeCodes(garanties)) {
-    const garantiesForCode = garanties.filter((garantie) => String(garantie.code ?? "").toUpperCase() === code && (garantie.tauxFranchise != null || garantie.franchiseMinimale != null));
+    const garantiesForCode = garanties.filter((garantie) =>
+      String(garantie.code ?? "").toUpperCase() === code && hasPositiveFranchise(garantie)
+    );
     if (!garantiesForCode.length) continue;
     const row = { code, byUsage: {} as Record<string, string> };
     for (const usage of usages) {
       const vehicleIds = new Set(vehicles.filter((vehicule) => (vehicule.usageCode ?? vehicule.usageLibelle ?? "-") === usage).map((vehicule) => String(vehicule.vehiculeId)));
       const garantie = garantiesForCode.find((item) => vehicleIds.has(String(item.vehiculeId ?? "")));
-      row.byUsage[usage] = franchiseLabel(garantie ?? garantiesForCode[0]);
+      row.byUsage[usage] = garantie ? franchiseLabel(garantie) : "-";
     }
     rows.set(code, row);
   }
@@ -828,9 +830,17 @@ function garantieLabel(garantie: Garantie) {
 }
 
 function franchiseLabel(garantie: Garantie) {
-  const taux = garantie.tauxFranchise == null ? null : `${moneyAmount(garantie.tauxFranchise)} %`;
-  const min = garantie.franchiseMinimale == null ? null : `min ${moneyAmount(garantie.franchiseMinimale)} DH`;
+  const taux = Number(garantie.tauxFranchise) > 0 ? `${moneyAmount(garantie.tauxFranchise)} %` : null;
+  const min = Number(garantie.franchiseMinimale) > 0 ? `min ${moneyAmount(garantie.franchiseMinimale)} DH` : null;
   return [taux, min].filter(Boolean).join(" avec ") || "-";
+}
+
+function hasPositiveFranchise(garantie: Garantie) {
+  return Number(garantie.tauxFranchise) > 0 || Number(garantie.franchiseMinimale) > 0;
+}
+
+function compactNumber(value: number) {
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format(value);
 }
 
 function formatOptionalAmount(value?: number | null) {

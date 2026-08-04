@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { attestationStockApi } from "../api/attestation-stock";
 import { referenceApi } from "../api/references";
 import { AttestationCancelDialog } from "../components/AttestationCancelDialog";
+import { AttestationStockControlConfirmDialog } from "../components/AttestationStockControlConfirmDialog";
 import {
   AttestationDeliveryCreateDialog,
   type CreateLivraisonForm,
@@ -106,6 +107,7 @@ function AttestationStockDashboardPage() {
   const [search, setSearch] = useState<AttestationStockFilters>(() => appliedSearch);
   const [attestationToCancel, setAttestationToCancel] = useState<AttestationStockItem | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [pendingStockControl, setPendingStockControl] = useState<boolean | null>(null);
   const [seuilForm, setSeuilForm] = useState<AttestationThresholdForm>({
     id: "",
     compagnieAssuranceId: "",
@@ -145,6 +147,7 @@ function AttestationStockDashboardPage() {
   const updateSettings = useMutation({
     mutationFn: attestationStockApi.updateAttestationsStockSettings,
     onSuccess: async () => {
+      setPendingStockControl(null);
       toast.success("Paramètre stock mis à jour");
       await queryClient.invalidateQueries({ queryKey: attestationStockKeys.dashboard() });
     },
@@ -255,7 +258,7 @@ function AttestationStockDashboardPage() {
               <Switch
                 checked={Boolean(dashboard.data?.controleStockActif)}
                 disabled={updateSettings.isPending || dashboard.isLoading}
-                onCheckedChange={(checked) => updateSettings.mutate({ controleStockActif: checked })}
+                onCheckedChange={setPendingStockControl}
               />
             </div>
           </div>
@@ -315,6 +318,17 @@ function AttestationStockDashboardPage() {
           setCancelReason("");
         }}
         onConfirm={() => cancelAttestation.mutate()}
+      />
+
+      <AttestationStockControlConfirmDialog
+        nextValue={pendingStockControl}
+        pending={updateSettings.isPending}
+        onClose={() => setPendingStockControl(null)}
+        onConfirm={() => {
+          if (pendingStockControl !== null) {
+            updateSettings.mutate({ controleStockActif: pendingStockControl });
+          }
+        }}
       />
     </div>
   );

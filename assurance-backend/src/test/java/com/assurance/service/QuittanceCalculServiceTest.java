@@ -9,7 +9,6 @@ import com.assurance.enums.ModeCalculRegleFiscale;
 import com.assurance.enums.NatureRegleFiscale;
 import com.assurance.enums.TypeImpactMouvement;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,13 +24,12 @@ import static org.mockito.Mockito.when;
 
 class QuittanceCalculServiceTest {
 
-    private final QuittanceCalculService service = new QuittanceCalculService(null, null);
+    private final QuittanceCalculService service = new QuittanceCalculService(null);
 
     @Test
-    void enabledFiscalRulesUseTheExplicitMovementEffectiveDate() {
+    void fiscalRulesUseTheExplicitMovementEffectiveDate() {
         RegleFiscaleQuittanceEngine engine = mock(RegleFiscaleQuittanceEngine.class);
-        QuittanceCalculService fiscalService = new QuittanceCalculService(null, engine);
-        ReflectionTestUtils.setField(fiscalService, "fiscalRulesEnabled", true);
+        QuittanceCalculService fiscalService = new QuittanceCalculService(engine);
         Contrat contrat = new Contrat();
         LocalDate movementDate = LocalDate.of(2027, 1, 15);
         RegleFiscaleQuittanceEngine.Ligne line = new RegleFiscaleQuittanceEngine.Ligne(
@@ -50,8 +48,7 @@ class QuittanceCalculServiceTest {
     @Test
     void returnPremiumSnapshotsOnlyTheEvcatAmountActuallyReturned() {
         RegleFiscaleQuittanceEngine engine = mock(RegleFiscaleQuittanceEngine.class);
-        QuittanceCalculService fiscalService = new QuittanceCalculService(null, engine);
-        ReflectionTestUtils.setField(fiscalService, "fiscalRulesEnabled", true);
+        QuittanceCalculService fiscalService = new QuittanceCalculService(engine);
         Contrat contrat = new Contrat();
         LocalDate movementDate = LocalDate.of(2027, 2, 1);
         RegleFiscale taxRule = rule("TAX", NatureRegleFiscale.TAXE_ASSURANCE, CategorieQuittance.AUTOMOBILE);

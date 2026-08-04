@@ -13,10 +13,10 @@ import java.util.Optional;
 public interface RegleFiscaleRepository extends JpaRepository<RegleFiscale, Long> {
 
     @Override
-    @EntityGraph(attributePaths = {"compagnieAssurance", "garantie", "usage", "groupeUsageAttestation"})
+    @EntityGraph(attributePaths = {"compagnieAssurance", "categorieClient", "garantie", "usage", "groupeUsageAttestation"})
     List<RegleFiscale> findAll();
 
-    @EntityGraph(attributePaths = {"compagnieAssurance", "garantie", "usage", "groupeUsageAttestation"})
+    @EntityGraph(attributePaths = {"compagnieAssurance", "categorieClient", "garantie", "usage", "groupeUsageAttestation"})
     @Query("""
             select r from RegleFiscale r
             where r.actif = true

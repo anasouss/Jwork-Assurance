@@ -513,6 +513,7 @@ public class ContratService {
         contrat = contratRepository.save(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), Map.of(), true);
+        synchronizeCategorieClient(contrat, true);
         validateUsageForClientCategory(contrat, usageContrat);
         applyContractBilling(contrat, request, true);
 
@@ -766,6 +767,7 @@ public class ContratService {
         contratClientRepository.flush();
         contrat.getClients().clear();
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, true);
+        synchronizeCategorieClient(contrat, true);
         validateUsageForClientCategory(contrat, contrat.getUsage());
     }
 
@@ -977,6 +979,7 @@ public class ContratService {
         clearDraftChildren(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
+        synchronizeCategorieClient(contrat, true);
         validateUsageForClientCategory(contrat, contrat.getUsage());
         applyContractBilling(contrat, request, finalMode);
 
@@ -4513,6 +4516,7 @@ public class ContratService {
                 .build();
 
         buildPreviewClientLinks(contrat, request.getClients(), request.getAgenceId());
+        synchronizeCategorieClient(contrat, false);
         validateUsageForClientCategory(contrat, usageContrat);
 
         List<Vehicule> vehicules = buildVehiculesPreview(request, contrat, usageContrat);
@@ -5049,6 +5053,9 @@ public class ContratService {
                 .agenceId(contrat.getAgence() != null ? contrat.getAgence().getId() : null)
                 .compagnieAssuranceId(contrat.getCompagnieAssurance() != null ? contrat.getCompagnieAssurance().getId() : null)
                 .conventionId(contrat.getConvention() != null ? contrat.getConvention().getId() : null)
+                .categorieClientId(contrat.getCategorieClient() != null ? contrat.getCategorieClient().getId() : null)
+                .categorieClientCode(contrat.getCategorieClient() != null ? contrat.getCategorieClient().getCode() : null)
+                .categorieClientLibelle(contrat.getCategorieClient() != null ? contrat.getCategorieClient().getLibelle() : null)
                 .contratOrigineId(contrat.getContratOrigine() != null ? contrat.getContratOrigine().getId() : null)
                 .renouvele(contrat.getRenouvele())
                 .modeTermeRenouvellement(contrat.getModeTermeRenouvellement())
@@ -5897,6 +5904,18 @@ public class ContratService {
     }
 
     private CategorieClient resolveUsageCategorieClient(Contrat contrat) {
+        return contrat.getCategorieClient();
+    }
+
+    private void synchronizeCategorieClient(Contrat contrat, boolean persist) {
+        CategorieClient categorie = deriveCategorieClient(contrat);
+        contrat.setCategorieClient(categorie);
+        if (persist) {
+            contratRepository.save(contrat);
+        }
+    }
+
+    private CategorieClient deriveCategorieClient(Contrat contrat) {
         if (contrat.getConvention() != null && contrat.getConvention().getCategorieClient() != null) {
             return contrat.getConvention().getCategorieClient();
         }

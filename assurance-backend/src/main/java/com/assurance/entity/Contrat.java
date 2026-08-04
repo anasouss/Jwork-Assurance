@@ -63,6 +63,10 @@ public class Contrat extends BaseEntity {
     private Convention convention;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categorie_client_id")
+    private CategorieClient categorieClient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usage_id")
     private Usage usage;
 

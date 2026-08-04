@@ -1,5 +1,6 @@
 package com.assurance.seeder;
 
+import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Garantie;
 import com.assurance.entity.RegleFiscale;
 import com.assurance.entity.Usage;
@@ -8,9 +9,9 @@ import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeCalculRegleFiscale;
 import com.assurance.enums.NatureRegleFiscale;
 import com.assurance.enums.TypeGarantie;
+import com.assurance.repository.CategorieClientRepository;
 import com.assurance.repository.GarantieRepository;
 import com.assurance.repository.RegleFiscaleRepository;
-import com.assurance.repository.UsageRepository;
 import com.assurance.service.ParametreApplicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
@@ -30,7 +31,7 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
 
     private final RegleFiscaleRepository repository;
     private final GarantieRepository garantieRepository;
-    private final UsageRepository usageRepository;
+    private final CategorieClientRepository categorieClientRepository;
     private final ParametreApplicationService parametreApplicationService;
 
     @Override
@@ -72,20 +73,47 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
         seed("EVCAT_VEHICULE", "EVCAT - autres garanties véhicule", NatureRegleFiscale.EVCAT,
                 BaseCalculRegleFiscale.PRIME_GARANTIE, evcatAutres, CategorieQuittance.EVCAT,
                 null, TypeGarantie.VEHICULE, null, 0);
-        seedTpv(rc, "B1", evcatTpvRc);
-        seedTpv(rc, "B2", evcatTpvRc);
+        seedTpv(rc, evcatTpvRc);
 
         seed("CNPAC_UNITAIRE", "CNPAC par unité assurée", NatureRegleFiscale.CNPAC,
                 BaseCalculRegleFiscale.UNITE_ASSUREE, cnpac, CategorieQuittance.AUTOMOBILE,
                 null, null, null, 0, ModeCalculRegleFiscale.MONTANT_FIXE);
     }
 
-    private void seedTpv(Garantie rc, String usageCode, String value) {
-        Usage usage = usageRepository.findByCodeIgnoreCase(usageCode).orElse(null);
-        if (usage == null) return;
-        seed("EVCAT_RC_" + usageCode, "EVCAT RC - usage " + usageCode, NatureRegleFiscale.EVCAT,
-                BaseCalculRegleFiscale.PRIME_GARANTIE, value, CategorieQuittance.EVCAT,
-                rc, null, usage, 200);
+    private void seedTpv(Garantie rc, String value) {
+        CategorieClient tpv = categorieClientRepository.findByCodeIgnoreCase("TPV").orElse(null);
+        if (tpv == null) return;
+
+        RegleFiscale tpvRule = repository.findByCodeIgnoreCaseAndDateDebut("EVCAT_RC_TPV", INITIAL_DATE)
+                .orElse(null);
+        RegleFiscale legacyB1 = repository.findByCodeIgnoreCaseAndDateDebut("EVCAT_RC_B1", INITIAL_DATE)
+                .orElse(null);
+        if (tpvRule == null && legacyB1 != null) {
+            legacyB1.setCode("EVCAT_RC_TPV");
+            legacyB1.setLibelle("EVCAT RC - catégorie TPV");
+            legacyB1.setCategorieClient(tpv);
+            legacyB1.setUsage(null);
+            legacyB1.setPriorite(200);
+            legacyB1.setActif(true);
+            tpvRule = repository.save(legacyB1);
+        }
+        if (tpvRule == null) {
+            repository.save(RegleFiscale.builder()
+                    .code("EVCAT_RC_TPV").libelle("EVCAT RC - catégorie TPV")
+                    .nature(NatureRegleFiscale.EVCAT).modeCalcul(ModeCalculRegleFiscale.TAUX)
+                    .valeur(new BigDecimal(value)).baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
+                    .categorieResultat(CategorieQuittance.EVCAT).garantie(rc).categorieClient(tpv)
+                    .dateDebut(INITIAL_DATE).applicable(true).priorite(200).actif(true).build());
+        }
+
+        repository.findByCodeIgnoreCaseAndDateDebut("EVCAT_RC_B1", INITIAL_DATE).ifPresent(legacyB1Remaining -> {
+            legacyB1Remaining.setActif(false);
+            repository.save(legacyB1Remaining);
+        });
+        repository.findByCodeIgnoreCaseAndDateDebut("EVCAT_RC_B2", INITIAL_DATE).ifPresent(legacyB2 -> {
+            legacyB2.setActif(false);
+            repository.save(legacyB2);
+        });
     }
 
     private String globalParam(String code, String fallback) {

@@ -35,6 +35,7 @@ public class UpsertRegleFiscaleRequest {
     @NotNull
     private CategorieQuittance categorieResultat;
     private Long compagnieAssuranceId;
+    private Long categorieClientId;
     private Long garantieId;
     private TypeGarantie typeGarantie;
     private Long usageId;

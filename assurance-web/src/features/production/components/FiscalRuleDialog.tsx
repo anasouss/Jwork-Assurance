@@ -26,6 +26,7 @@ const categories: QuittanceCategory[] = ["AUTOMOBILE", "CORPOREL", "EVCAT"];
 export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }: Props) {
   const [form, setForm] = useState<UpsertFiscalRule>(() => emptyRule());
   const compagnies = useReference("compagnies-assurance", open);
+  const categoriesClient = useReference("categories-client", open);
   const garanties = useQuery({
     queryKey: ["referentiel", "garanties", "parametrage"],
     queryFn: () => referenceApi.configuredGuarantees(),
@@ -89,6 +90,9 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
           </Field>
           <Field label="Compagnie">
             <ReferenceSelect value={form.compagnieAssuranceId} items={compagnies.data ?? []} onChange={(compagnieAssuranceId) => setForm({ ...form, compagnieAssuranceId })} />
+          </Field>
+          <Field label="Catégorie client">
+            <ReferenceSelect value={form.categorieClientId} items={categoriesClient.data ?? []} onChange={(categorieClientId) => setForm({ ...form, categorieClientId })} />
           </Field>
           <Field label="Type de contrat">
             <EnumSelect nullable value={form.typeContrat ?? NONE} onChange={(value) => setForm({ ...form, typeContrat: value === NONE ? null : value as UpsertFiscalRule["typeContrat"] })} options={contractOptions} />
@@ -170,7 +174,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 function emptyRule(): UpsertFiscalRule {
   return { code: "", libelle: "", nature: "TAXE_ASSURANCE", modeCalcul: "TAUX", valeur: 0,
     baseCalcul: "PRIME_GARANTIE", categorieBase: null, categorieResultat: "AUTOMOBILE",
-    compagnieAssuranceId: null, garantieId: null, typeGarantie: null, usageId: null,
+    compagnieAssuranceId: null, categorieClientId: null, garantieId: null, typeGarantie: null, usageId: null,
     groupeUsageAttestationId: null, typeContrat: null, dateDebut: toDateOnly(new Date()), dateFin: null,
     applicable: true, priorite: 0, actif: true, description: null, referenceReglementaire: null };
 }
@@ -186,6 +190,7 @@ function fromRule(rule: FiscalRule): UpsertFiscalRule {
     categorieBase: rule.categorieBase,
     categorieResultat: rule.categorieResultat,
     compagnieAssuranceId: rule.compagnieAssuranceId,
+    categorieClientId: rule.categorieClientId,
     garantieId: rule.garantieId,
     typeGarantie: rule.typeGarantie,
     usageId: rule.usageId,

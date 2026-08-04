@@ -35,6 +35,7 @@ import java.time.LocalDate;
                 @Index(name = "idx_regle_fiscale_validite", columnList = "actif,date_debut,date_fin"),
                 @Index(name = "idx_regle_fiscale_nature", columnList = "nature"),
                 @Index(name = "idx_regle_fiscale_compagnie", columnList = "compagnie_assurance_id"),
+                @Index(name = "idx_regle_fiscale_categorie_client", columnList = "categorie_client_id"),
                 @Index(name = "idx_regle_fiscale_garantie", columnList = "garantie_id")
         })
 @Getter
@@ -76,6 +77,10 @@ public class RegleFiscale extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "compagnie_assurance_id")
     private CompagnieAssurance compagnieAssurance;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categorie_client_id")
+    private CategorieClient categorieClient;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "garantie_id")

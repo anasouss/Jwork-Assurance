@@ -29,6 +29,9 @@ public class ContratResponse {
     private Long agenceId;
     private Long compagnieAssuranceId;
     private Long conventionId;
+    private Long categorieClientId;
+    private String categorieClientCode;
+    private String categorieClientLibelle;
     private Long contratOrigineId;
     private Boolean renouvele;
     private ModeTermeRenouvellement modeTermeRenouvellement;

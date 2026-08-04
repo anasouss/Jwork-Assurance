@@ -1126,6 +1126,9 @@ export type ContratSummary = {
   agenceId?: string;
   compagnieAssuranceId?: string;
   conventionId?: string | null;
+  categorieClientId?: string | null;
+  categorieClientCode?: string | null;
+  categorieClientLibelle?: string | null;
   contratOrigineId?: string | null;
   renouvele?: boolean;
   modeTermeRenouvellement?: "CABINET" | "COMPAGNIE" | null;

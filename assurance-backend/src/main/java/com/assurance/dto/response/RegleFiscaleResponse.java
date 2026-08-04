@@ -27,6 +27,9 @@ public class RegleFiscaleResponse {
     private CategorieQuittance categorieResultat;
     private Long compagnieAssuranceId;
     private String compagnieAssuranceLibelle;
+    private Long categorieClientId;
+    private String categorieClientCode;
+    private String categorieClientLibelle;
     private Long garantieId;
     private String garantieCode;
     private String garantieLibelle;
@@ -53,6 +56,9 @@ public class RegleFiscaleResponse {
                 .categorieResultat(rule.getCategorieResultat())
                 .compagnieAssuranceId(rule.getCompagnieAssurance() == null ? null : rule.getCompagnieAssurance().getId())
                 .compagnieAssuranceLibelle(rule.getCompagnieAssurance() == null ? null : rule.getCompagnieAssurance().getNom())
+                .categorieClientId(rule.getCategorieClient() == null ? null : rule.getCategorieClient().getId())
+                .categorieClientCode(rule.getCategorieClient() == null ? null : rule.getCategorieClient().getCode())
+                .categorieClientLibelle(rule.getCategorieClient() == null ? null : rule.getCategorieClient().getLibelle())
                 .garantieId(rule.getGarantie() == null ? null : rule.getGarantie().getId())
                 .garantieCode(rule.getGarantie() == null ? null : rule.getGarantie().getCode())
                 .garantieLibelle(rule.getGarantie() == null ? null : rule.getGarantie().getLibelle())

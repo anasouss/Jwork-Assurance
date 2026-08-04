@@ -10,6 +10,7 @@ import com.assurance.enums.NatureRegleFiscale;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ApplicationRegleFiscaleQuittanceRepository;
+import com.assurance.repository.CategorieClientRepository;
 import com.assurance.repository.CompagnieAssuranceRepository;
 import com.assurance.repository.GarantieRepository;
 import com.assurance.repository.GroupeUsageAttestationRepository;
@@ -32,6 +33,7 @@ public class RegleFiscaleService {
     private final RegleFiscaleRepository regleFiscaleRepository;
     private final ApplicationRegleFiscaleQuittanceRepository applicationRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
+    private final CategorieClientRepository categorieClientRepository;
     private final GarantieRepository garantieRepository;
     private final UsageRepository usageRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
@@ -97,6 +99,9 @@ public class RegleFiscaleService {
         rule.setCompagnieAssurance(request.getCompagnieAssuranceId() == null ? null
                 : compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId())));
+        rule.setCategorieClient(request.getCategorieClientId() == null ? null
+                : categorieClientRepository.findById(request.getCategorieClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId())));
         rule.setGarantie(request.getGarantieId() == null ? null
                 : garantieRepository.findById(request.getGarantieId())
                 .orElseThrow(() -> new ResourceNotFoundException("Garantie", request.getGarantieId())));
@@ -210,6 +215,7 @@ public class RegleFiscaleService {
                 && left.getBaseCalcul() == right.getBaseCalcul()
                 && left.getCategorieBase() == right.getCategorieBase()
                 && Objects.equals(id(left.getCompagnieAssurance()), id(right.getCompagnieAssurance()))
+                && Objects.equals(id(left.getCategorieClient()), id(right.getCategorieClient()))
                 && Objects.equals(id(left.getGarantie()), id(right.getGarantie()))
                 && left.getTypeGarantie() == right.getTypeGarantie()
                 && Objects.equals(id(left.getUsage()), id(right.getUsage()))
@@ -232,6 +238,7 @@ public class RegleFiscaleService {
                 || rule.getCategorieBase() != request.getCategorieBase()
                 || rule.getCategorieResultat() != request.getCategorieResultat()
                 || !Objects.equals(id(rule.getCompagnieAssurance()), request.getCompagnieAssuranceId())
+                || !Objects.equals(id(rule.getCategorieClient()), request.getCategorieClientId())
                 || !Objects.equals(id(rule.getGarantie()), request.getGarantieId())
                 || rule.getTypeGarantie() != request.getTypeGarantie()
                 || !Objects.equals(id(rule.getUsage()), request.getUsageId())

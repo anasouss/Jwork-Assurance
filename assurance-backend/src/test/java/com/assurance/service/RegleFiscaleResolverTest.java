@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.entity.CompagnieAssurance;
+import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratGarantie;
 import com.assurance.entity.Garantie;
@@ -69,6 +70,26 @@ class RegleFiscaleResolverTest {
 
         assertThat(resolved.getCode()).isEqualTo("EXEMPT_PERSON");
         assertThat(resolved.getApplicable()).isFalse();
+    }
+
+    @Test
+    void clientCategoryRuleAppliesOnlyToContractSnapshot() {
+        LocalDate effectDate = LocalDate.of(2026, 8, 4);
+        Garantie guarantee = guarantee(1L, "RC", TypeGarantie.VEHICULE);
+        CategorieClient tpv = CategorieClient.builder().code("TPV").libelle("TPV").build();
+        tpv.setId(3L);
+        Contrat contract = Contrat.builder().typeContrat(TypeContrat.FLOTTE).categorieClient(tpv).build();
+        ContratGarantie contractGuarantee = ContratGarantie.builder().garantie(guarantee).build();
+        RegleFiscale general = guaranteeRule(1L, "EVCAT_RC", null, guarantee, null, "0.035", true, 0);
+        RegleFiscale categoryRule = guaranteeRule(2L, "EVCAT_RC_TPV", null, guarantee, null, "0.02", true, 0);
+        categoryRule.setCategorieClient(tpv);
+        when(repository.findActiveAt(effectDate)).thenReturn(List.of(general, categoryRule));
+
+        RegleFiscale resolved = resolver.catalogue(effectDate)
+                .forGuarantee(NatureRegleFiscale.TAXE_ASSURANCE, contract, contractGuarantee)
+                .orElseThrow();
+
+        assertThat(resolved.getCode()).isEqualTo("EVCAT_RC_TPV");
     }
 
     @Test

@@ -47,6 +47,8 @@ type MovementLine = {
   statut?: string | null;
   dateEffet?: string | null;
   dateEcheance?: string | null;
+  autoriseAssistance?: boolean | null;
+  autoriseCarteVerte?: boolean | null;
   isSynthetic?: boolean;
 };
 
@@ -388,7 +390,15 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && !isInitialContractMovement(movement)
     && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";
   const canDownload = canViewContrat && !isTerminalMovementCode(movement.code);
-  const hasPrimaryActions = canEditDirectly || canCreateMovement;
+  const canOpenAssistance = canManageAssistance
+    && !terminal
+    && !movement.isSynthetic
+    && movement.autoriseAssistance === true;
+  const canOpenCarteVerte = canManageCarteVerte
+    && !terminal
+    && !movement.isSynthetic
+    && movement.autoriseCarteVerte === true;
+  const hasPrimaryActions = canEditDirectly || canCreateMovement || canOpenAssistance || canOpenCarteVerte;
   const resolvedDeleteMode = resolveDeleteMode(contrat, movement, child);
   const deleteMode = resolvedDeleteMode === "CONTRAT" && canDeleteContrat
     ? resolvedDeleteMode
@@ -539,22 +549,22 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
               )}
-              {canManageAssistance ? (
-                <DropdownMenuItem asChild>
-                  <Link to={assistancePath}>Contrat assistance</Link>
-                </DropdownMenuItem>
-              ) : null}
-              {canManageCarteVerte ? (
-                <DropdownMenuItem asChild>
-                  <Link to={carteVertePath}>{isFlotte ? "Ajout carte verte" : "Ajouter une carte verte"}</Link>
-                </DropdownMenuItem>
-              ) : null}
               {canRenew ? (
                 <DropdownMenuItem disabled={renewalMutation.isPending} onSelect={startRenewal}>
                   Renouvellement
                 </DropdownMenuItem>
               ) : null}
             </>
+          ) : null}
+          {canOpenAssistance ? (
+            <DropdownMenuItem asChild>
+              <Link to={assistancePath}>Contrat assistance</Link>
+            </DropdownMenuItem>
+          ) : null}
+          {canOpenCarteVerte ? (
+            <DropdownMenuItem asChild>
+              <Link to={carteVertePath}>Carte verte</Link>
+            </DropdownMenuItem>
           ) : null}
           {hasPrimaryActions ? <DropdownMenuSeparator /> : null}
           {canDownload ? <DropdownMenuItem>Télécharger</DropdownMenuItem> : null}
@@ -719,6 +729,8 @@ function movementLines(contrat: ContratListItem): MovementLine[] {
       statut: movement.statut,
       dateEffet: movement.dateEffet,
       dateEcheance: movement.dateEcheance,
+      autoriseAssistance: movement.autoriseAssistance,
+      autoriseCarteVerte: movement.autoriseCarteVerte,
     }));
   }
   return [{

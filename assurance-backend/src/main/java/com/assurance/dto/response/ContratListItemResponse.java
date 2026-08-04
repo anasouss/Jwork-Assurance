@@ -63,6 +63,8 @@ public class ContratListItemResponse {
         private String numeroMouvement;
         private LocalDate dateEffet;
         private LocalDate dateEcheance;
+        private Boolean autoriseAssistance;
+        private Boolean autoriseCarteVerte;
         private BigDecimal primeNette;
         private BigDecimal taxe;
         private BigDecimal taxeParafiscale;

@@ -265,6 +265,10 @@ public class ContratSearchService {
                 .numeroMouvement(displayedNumber)
                 .dateEffet(movement.getDateEffet())
                 .dateEcheance(movement.getDateEcheance())
+                .autoriseAssistance(movement.getTypeMouvement() != null
+                        && Boolean.TRUE.equals(movement.getTypeMouvement().getAutoriseAssistance()))
+                .autoriseCarteVerte(movement.getTypeMouvement() != null
+                        && Boolean.TRUE.equals(movement.getTypeMouvement().getAutoriseCarteVerte()))
                 .primeNette(movement.getPrimeNette())
                 .taxe(movement.getTaxe())
                 .taxeParafiscale(movement.getTaxeParafiscale())

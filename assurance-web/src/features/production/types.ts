@@ -1262,6 +1262,8 @@ export type ContratSummary = {
     numeroMouvement?: string | null;
     dateEffet?: string | null;
     dateEcheance?: string | null;
+    autoriseAssistance?: boolean | null;
+    autoriseCarteVerte?: boolean | null;
     primeTotale?: number | null;
   }[];
   avenantDrafts?: AvenantDraftSummary[];

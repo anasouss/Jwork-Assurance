@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.NiveauEcartAffectation;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,4 +16,8 @@ public class LotAffectationQuittanceResponse {
     private BigDecimal montantTtcAffecte;
     private BigDecimal ecart;
     private boolean equilibre;
+    private BigDecimal seuilAvertissementEcart;
+    private BigDecimal seuilBlocageEcart;
+    private NiveauEcartAffectation niveauEcart;
+    private boolean validationAutorisee;
 }

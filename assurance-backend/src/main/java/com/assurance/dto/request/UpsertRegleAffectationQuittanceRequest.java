@@ -41,6 +41,12 @@ public class UpsertRegleAffectationQuittanceRequest {
     @DecimalMin("0")
     private BigDecimal tauxRetenue;
     @NotNull
+    @DecimalMin("0")
+    private BigDecimal seuilAvertissementEcart;
+    @NotNull
+    @DecimalMin("0")
+    private BigDecimal seuilBlocageEcart;
+    @NotNull
     private LocalDate dateDebut;
     private LocalDate dateFin;
     private String excelFeuille;

@@ -13,6 +13,7 @@ export type SourceAffectation = "AUTOMATIQUE" | "MANUEL" | "IMPORT";
 export type ModeAffectation = "AUTOMATIQUE" | "MANUEL_OU_IMPORT";
 export type ModeVentilationQuittance = "GLOBALE" | "PAR_CATEGORIE";
 export type ModeCalculCommission = "TAUX_NET" | "TAUX_BRUT_TVA_INCLUSE";
+export type NiveauEcartAffectation = "EQUILIBRE" | "AVERTISSEMENT" | "BLOQUANT";
 
 export type Rule = {
   id: string;
@@ -28,6 +29,8 @@ export type Rule = {
   tauxTvaIncluseCommission: number;
   retenueParDefaut: boolean;
   tauxRetenue: number;
+  seuilAvertissementEcart: number;
+  seuilBlocageEcart: number;
   dateDebut: string;
   dateFin?: string | null;
   excelFeuille?: string | null;
@@ -168,6 +171,10 @@ export type BatchAllocationResponse = {
   montantTtcAffecte: number;
   ecart: number;
   equilibre: boolean;
+  seuilAvertissementEcart: number;
+  seuilBlocageEcart: number;
+  niveauEcart: NiveauEcartAffectation;
+  validationAutorisee: boolean;
 };
 
 export type AllocationRequest = {
@@ -191,6 +198,10 @@ export type ImportPreview = {
   netCompagnie: number;
   ecart: number;
   equilibre: boolean;
+  seuilAvertissementEcart: number;
+  seuilBlocageEcart: number;
+  niveauEcart: NiveauEcartAffectation;
+  validationAutorisee: boolean;
 };
 
 export type ReferenceOption = {

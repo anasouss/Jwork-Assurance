@@ -79,6 +79,14 @@ public class RegleAffectationQuittance extends BaseEntity {
     @Column(name = "taux_retenue", nullable = false, precision = 9, scale = 4)
     private BigDecimal tauxRetenue;
 
+    @Builder.Default
+    @Column(name = "seuil_avertissement_ecart", nullable = false, precision = 15, scale = 2)
+    private BigDecimal seuilAvertissementEcart = new BigDecimal("0.01");
+
+    @Builder.Default
+    @Column(name = "seuil_blocage_ecart", nullable = false, precision = 15, scale = 2)
+    private BigDecimal seuilBlocageEcart = new BigDecimal("50.00");
+
     @Column(name = "date_debut", nullable = false)
     private LocalDate dateDebut;
 

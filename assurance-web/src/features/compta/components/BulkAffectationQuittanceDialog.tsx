@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
+import { classifyAllocationDifference } from "../allocation-tolerance";
 import type { AllocationLine, ImportPreview, QuittanceAllocation } from "../types";
 
 type BatchLine = {
@@ -54,10 +55,15 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
   const expected = useMemo(() => rows.reduce((sum, row) => sum + row.montantTtc, 0), [rows]);
   const entered = useMemo(() => lines.reduce((sum, line) => sum + (line.montantTtc ?? 0), 0), [lines]);
   const difference = entered - expected;
-  const balance = expected - entered;
-  const balanced = Math.abs(difference) < 0.005;
-  const balanceLabel = balanced ? "Équilibré" : balance > 0 ? "Reste à affecter" : "Dépassement";
-  const balanceValue = balanced ? 0 : Math.abs(balance);
+  const calculatedTolerance = classifyAllocationDifference(difference, rows[0]?.regle);
+  const tolerance = preview
+    ? {
+        level: preview.niveauEcart,
+        allowed: preview.validationAutorisee,
+        warningThreshold: preview.seuilAvertissementEcart,
+        blockingThreshold: preview.seuilBlocageEcart,
+      }
+    : calculatedTolerance;
   const targets = rows.map((row) => ({
     id: row.quittanceId,
     label: `${row.mouvement} · ${dateLabel(row.dateEffet)} · ${money(row.montantTtc)}`,
@@ -113,7 +119,7 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
       && line.primeNette != null && line.montantTaxes != null && line.accessoires != null
       && line.montantTtc != null && line.commissionNette != null)
     && rows.every((row) => lines.some((line) => line.quittanceId === row.quittanceId))
-    && Math.abs(difference) < 0.005
+    && tolerance.allowed
     && (mode !== "IMPORT" || Boolean(preview && !preview.erreurs.length));
 
   function close(value: boolean) {
@@ -142,7 +148,14 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
             <Metric label="Mouvements sélectionnés" value={String(rows.length)} />
             <Metric label="TTC attendu" value={money(expected)} />
             <Metric label="TTC affecté" value={money(entered)} />
-            <Metric label={balanceLabel} value={money(balanceValue)} error={!balanced} />
+            <Metric
+              label="Écart"
+              value={money(difference)}
+              detail={`Blocage au-delà de ${money(tolerance.blockingThreshold)}`}
+              error={tolerance.level === "BLOQUANT"}
+              warning={tolerance.level === "AVERTISSEMENT"}
+              success={tolerance.level === "EQUILIBRE"}
+            />
           </div>
 
           <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
@@ -270,13 +283,21 @@ function MoneyCell({ value, readOnly, onChange }: { value?: number; readOnly: bo
 
 function ImportSummary({ preview }: { preview: ImportPreview }) {
   return <div className="grid gap-2">
-    <div className="flex flex-wrap items-center gap-2"><FileSpreadsheet className="size-4" /><span className="font-medium">{preview.fichier}</span><Badge variant="secondary">{preview.lignesLues} ligne(s)</Badge><Badge variant={preview.equilibre ? "default" : "destructive"}>Écart {money(preview.ecart)}</Badge></div>
+    <div className="flex flex-wrap items-center gap-2"><FileSpreadsheet className="size-4" /><span className="font-medium">{preview.fichier}</span><Badge variant="secondary">{preview.lignesLues} ligne(s)</Badge><ToleranceBadge preview={preview} /></div>
+    {!preview.validationAutorisee ? <Alert variant="destructive"><AlertTitle>Écart supérieur au seuil autorisé</AlertTitle><AlertDescription>L’écart absolu dépasse {money(preview.seuilBlocageEcart)}. Corrigez le fichier ou la sélection avant d’enregistrer.</AlertDescription></Alert> : null}
     {preview.erreurs.length ? <Alert variant="destructive"><AlertTitle>Anomalies d’import</AlertTitle><AlertDescription>{preview.erreurs.join(" · ")}</AlertDescription></Alert> : null}
   </div>;
 }
 
-function Metric({ label, value, error = false }: { label: string; value: string; error?: boolean }) {
-  return <div className="bg-background px-4 py-3"><div className="text-xs uppercase text-muted-foreground">{label}</div><div className={error ? "mt-1 font-semibold text-destructive" : "mt-1 font-semibold"}>{value}</div></div>;
+function ToleranceBadge({ preview }: { preview: ImportPreview }) {
+  if (preview.niveauEcart === "BLOQUANT") return <Badge variant="destructive">Écart {money(preview.ecart)}</Badge>;
+  if (preview.niveauEcart === "AVERTISSEMENT") return <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">Écart {money(preview.ecart)}</Badge>;
+  return <Badge className="bg-emerald-600 text-white">Écart {money(preview.ecart)}</Badge>;
+}
+
+function Metric({ label, value, detail, error = false, warning = false, success = false }: { label: string; value: string; detail?: string; error?: boolean; warning?: boolean; success?: boolean }) {
+  const valueClass = error ? "text-destructive" : warning ? "text-amber-600 dark:text-amber-400" : success ? "text-emerald-600 dark:text-emerald-400" : "";
+  return <div className="bg-background px-4 py-3"><div className="text-xs uppercase text-muted-foreground">{label}</div><div className={`mt-1 font-semibold ${valueClass}`}>{value}</div>{detail ? <div className="mt-1 text-xs text-muted-foreground">{detail}</div> : null}</div>;
 }
 
 function emptyLine(row?: QuittanceAllocation): BatchLine {

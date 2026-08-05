@@ -58,6 +58,8 @@ type RuleForm = {
   tauxTvaIncluseCommission?: number;
   retenueParDefaut: boolean;
   tauxRetenue?: number;
+  seuilAvertissementEcart?: number;
+  seuilBlocageEcart?: number;
   dateDebut: string;
   dateFin: string;
   excelFeuille: string;
@@ -104,6 +106,8 @@ const EMPTY_FORM: RuleForm = {
   modeVentilation: "GLOBALE",
   modeCalculCommission: "TAUX_NET",
   retenueParDefaut: false,
+  seuilAvertissementEcart: 0.01,
+  seuilBlocageEcart: 50,
   dateDebut: "",
   dateFin: "",
   ...DEFAULT_EXCEL_MAPPING,
@@ -387,6 +391,28 @@ export function QuittanceRulesDialog({
               {form.typeContrat === "FLOTTE" ? (
                 <div className="grid gap-4 border-t pt-4">
                   <div>
+                    <h3 className="text-sm font-semibold">Tolérance d’écart d’affectation</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Un écart inférieur au seuil d’avertissement est accepté sans alerte. Au-delà du seuil de blocage, l’enregistrement est refusé.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 xl:max-w-2xl">
+                    <AmountField
+                      label="Seuil d’avertissement (MAD)"
+                      value={form.seuilAvertissementEcart}
+                      onChange={(value) => setForm((current) => ({ ...current, seuilAvertissementEcart: value }))}
+                    />
+                    <AmountField
+                      label="Seuil de blocage (MAD)"
+                      value={form.seuilBlocageEcart}
+                      onChange={(value) => setForm((current) => ({ ...current, seuilBlocageEcart: value }))}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              {form.typeContrat === "FLOTTE" ? (
+                <div className="grid gap-4 border-t pt-4">
+                  <div>
                     <h3 className="text-sm font-semibold">Colonnes de l’import Excel</h3>
                     <p className="text-sm text-muted-foreground">
                       La casse, les accents, les espaces et la ponctuation sont ignorés.
@@ -538,6 +564,7 @@ export function QuittanceRulesDialog({
                   <th className="px-3 py-2 text-right">Auto</th>
                   <th className="px-3 py-2 text-right">EVCAT</th>
                   <th className="px-3 py-2 text-right">Corporel</th>
+                  <th className="px-3 py-2 text-right">Avert. / blocage</th>
                   <th className="px-3 py-2">Période</th>
                   <th className="px-3 py-2">Statut</th>
                   <th className="px-3 py-2 text-right">Actions</th>
@@ -547,7 +574,7 @@ export function QuittanceRulesDialog({
                 {rules.isLoading ? (
                   Array.from({ length: 3 }).map((_, index) => (
                     <tr key={index} className="border-t">
-                      <td colSpan={10} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
+                      <td colSpan={11} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
                     </tr>
                   ))
                 ) : sortedRules.length ? (
@@ -568,6 +595,11 @@ export function QuittanceRulesDialog({
                       <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionAutomobile)}</td>
                       <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionEvcat)}</td>
                       <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionCorporel)}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-right">
+                        {rule.typeContrat === "FLOTTE"
+                          ? `${moneyLabel(rule.seuilAvertissementEcart)} / ${moneyLabel(rule.seuilBlocageEcart)}`
+                          : "—"}
+                      </td>
                       <td className="px-3 py-3">{rule.dateDebut} → {rule.dateFin ?? "sans fin"}</td>
                       <td className="px-3 py-3">
                         <Badge variant={rule.actif ? "default" : "secondary"}>{rule.actif ? "Active" : "Inactive"}</Badge>
@@ -585,7 +617,7 @@ export function QuittanceRulesDialog({
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
+                  <tr><td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
                 )}
               </tbody>
             </table>
@@ -690,6 +722,28 @@ function RateField({
   );
 }
 
+function AmountField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value?: number;
+  onChange: (value: number | undefined) => void;
+}) {
+  return (
+    <Field label={label} required>
+      <Input
+        type="number"
+        min="0"
+        step="0.01"
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value === "" ? undefined : Number(event.target.value))}
+      />
+    </Field>
+  );
+}
+
 function ExcelTitleField({
   label,
   value,
@@ -764,6 +818,9 @@ function isComplete(form: RuleForm) {
       commissionComplete &&
       excelComplete &&
       form.tauxRetenue != null &&
+      form.seuilAvertissementEcart != null &&
+      form.seuilBlocageEcart != null &&
+      form.seuilAvertissementEcart <= form.seuilBlocageEcart &&
       (!form.dateFin || form.dateFin >= form.dateDebut)
   );
 }
@@ -780,6 +837,8 @@ function ruleToForm(rule: Rule): RuleForm {
     tauxTvaIncluseCommission: rule.tauxTvaIncluseCommission,
     retenueParDefaut: rule.retenueParDefaut,
     tauxRetenue: rule.tauxRetenue,
+    seuilAvertissementEcart: rule.seuilAvertissementEcart,
+    seuilBlocageEcart: rule.seuilBlocageEcart,
     dateDebut: rule.dateDebut,
     dateFin: rule.dateFin ?? "",
     excelFeuille: rule.excelFeuille ?? "",
@@ -821,6 +880,8 @@ function toRequest(form: RuleForm): RuleRequest {
         : form.tauxTvaIncluseCommission!,
     retenueParDefaut: form.retenueParDefaut,
     tauxRetenue: form.tauxRetenue!,
+    seuilAvertissementEcart: form.seuilAvertissementEcart!,
+    seuilBlocageEcart: form.seuilBlocageEcart!,
     dateDebut: form.dateDebut,
     dateFin: form.dateFin || null,
     excelFeuille: isFleet ? form.excelFeuille.trim() || null : null,
@@ -850,4 +911,8 @@ function contractLabel(type: TypeContrat) {
 
 function rateLabel(value: number) {
   return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format(value)} %`;
+}
+
+function moneyLabel(value: number) {
+  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value);
 }

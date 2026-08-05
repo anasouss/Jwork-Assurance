@@ -23,6 +23,7 @@ import com.assurance.enums.ModeCalculCommission;
 import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.NatureAffectationQuittance;
 import com.assurance.enums.NatureElementFacturable;
+import com.assurance.enums.NiveauEcartAffectation;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.SourceAffectationQuittance;
 import com.assurance.enums.StatutAffectationQuittance;
@@ -435,6 +436,11 @@ public class AffectationQuittanceService {
                 : buildAutomaticAffectations(agenceId, userId, quittance, regle, request);
 
         validateRequestNumbers(agenceId, quittance, entities);
+        BigDecimal expected = requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance");
+        BigDecimal affected = entities.stream()
+                .map(AffectationQuittanceCompagnie::getMontantTtc)
+                .reduce(ZERO, BigDecimal::add);
+        requireAllowedDifference(regle, affected.subtract(expected));
         affectationRepository.deleteByQuittanceId(quittanceId);
         affectationRepository.flush();
         affectationRepository.saveAll(entities);
@@ -487,14 +493,12 @@ public class AffectationQuittanceService {
         BigDecimal affected = entities.stream()
                 .map(AffectationQuittanceCompagnie::getMontantTtc)
                 .reduce(ZERO, BigDecimal::add);
-        if (money(affected).compareTo(money(expected)) != 0) {
-            throw new BadRequestException("Le total TTC des lignes compagnie ne correspond pas au total des quittances sélectionnées");
-        }
-
+        RegleAffectationQuittance batchRule = requireEffectiveRule(agenceId, quittances.get(0));
+        requireAllowedDifference(batchRule, affected.subtract(expected));
         byId.keySet().forEach(affectationRepository::deleteByQuittanceId);
         affectationRepository.flush();
         affectationRepository.saveAll(entities);
-        return buildBatchResponse(quittances, entities, expected);
+        return buildBatchResponse(quittances, entities, expected, batchRule);
     }
 
     @Transactional
@@ -524,12 +528,7 @@ public class AffectationQuittanceService {
         BigDecimal montantTtc = sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getMontantTtc);
         BigDecimal expected = requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance");
         BigDecimal ecart = money(montantTtc.subtract(expected));
-        boolean equilibre = ecart.signum() == 0;
-        if (!equilibre) {
-            parsed.errors().add(
-                    "Le total TTC importé ne correspond pas au montant de la quittance de production"
-            );
-        }
+        EcartPolicy policy = evaluateDifference(regle, ecart);
 
         return ImportAffectationQuittancePreviewResponse.builder()
                 .fichier(cleanFileName(file.getOriginalFilename()))
@@ -543,7 +542,11 @@ public class AffectationQuittanceService {
                 .commissionNette(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getCommissionNette))
                 .netCompagnie(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getNetCompagnie))
                 .ecart(ecart)
-                .equilibre(equilibre)
+                .equilibre(policy.level() == NiveauEcartAffectation.EQUILIBRE)
+                .seuilAvertissementEcart(policy.warningThreshold())
+                .seuilBlocageEcart(policy.blockingThreshold())
+                .niveauEcart(policy.level())
+                .validationAutorisee(policy.allowed())
                 .build();
     }
 
@@ -568,9 +571,7 @@ public class AffectationQuittanceService {
                 .map(quittance -> requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance"))
                 .reduce(ZERO, BigDecimal::add);
         BigDecimal ecart = money(montantTtc.subtract(expected));
-        if (ecart.signum() != 0) {
-            parsed.errors().add("Le total TTC importé ne correspond pas au total des quittances sélectionnées");
-        }
+        EcartPolicy policy = evaluateDifference(regle, ecart);
         return ImportAffectationQuittancePreviewResponse.builder()
                 .fichier(cleanFileName(file.getOriginalFilename()))
                 .lignesLues(parsed.lines().size())
@@ -583,7 +584,11 @@ public class AffectationQuittanceService {
                 .commissionNette(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getCommissionNette))
                 .netCompagnie(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getNetCompagnie))
                 .ecart(ecart)
-                .equilibre(ecart.signum() == 0)
+                .equilibre(policy.level() == NiveauEcartAffectation.EQUILIBRE)
+                .seuilAvertissementEcart(policy.warningThreshold())
+                .seuilBlocageEcart(policy.blockingThreshold())
+                .niveauEcart(policy.level())
+                .validationAutorisee(policy.allowed())
                 .build();
     }
 
@@ -952,7 +957,8 @@ public class AffectationQuittanceService {
     private LotAffectationQuittanceResponse buildBatchResponse(
             List<Quittance> quittances,
             List<AffectationQuittanceCompagnie> entities,
-            BigDecimal expected
+            BigDecimal expected,
+            RegleAffectationQuittance regle
     ) {
         Map<Long, List<AffectationQuittanceCompagnie>> byQuittance = entities.stream()
                 .collect(Collectors.groupingBy(item -> item.getQuittance().getId()));
@@ -970,13 +976,18 @@ public class AffectationQuittanceService {
                 .toList();
         BigDecimal affected = entities.stream().map(AffectationQuittanceCompagnie::getMontantTtc).reduce(ZERO, BigDecimal::add);
         BigDecimal difference = money(affected.subtract(expected));
+        EcartPolicy policy = evaluateDifference(regle, difference);
         return LotAffectationQuittanceResponse.builder()
                 .quittances(responses)
                 .lignes(entities.stream().map(this::toLineResponse).toList())
                 .montantTtcAttendu(money(expected))
                 .montantTtcAffecte(money(affected))
                 .ecart(difference)
-                .equilibre(difference.signum() == 0)
+                .equilibre(policy.level() == NiveauEcartAffectation.EQUILIBRE)
+                .seuilAvertissementEcart(policy.warningThreshold())
+                .seuilBlocageEcart(policy.blockingThreshold())
+                .niveauEcart(policy.level())
+                .validationAutorisee(policy.allowed())
                 .build();
     }
 
@@ -1492,6 +1503,20 @@ public class AffectationQuittanceService {
         validatePercentage(request.getTauxCommissionCorporel(), "Taux commission corporel");
         validatePercentage(request.getTauxTvaIncluseCommission(), "Taux TVA incluse");
         validatePercentage(request.getTauxRetenue(), "Taux retenue");
+        BigDecimal warningThreshold = requiredAmount(
+                request.getSeuilAvertissementEcart(),
+                "Seuil d'avertissement d'écart"
+        );
+        BigDecimal blockingThreshold = requiredAmount(
+                request.getSeuilBlocageEcart(),
+                "Seuil de blocage d'écart"
+        );
+        if (warningThreshold.signum() < 0 || blockingThreshold.signum() < 0) {
+            throw new BadRequestException("Les seuils d'écart doivent être positifs ou nuls");
+        }
+        if (warningThreshold.compareTo(blockingThreshold) > 0) {
+            throw new BadRequestException("Le seuil d'avertissement doit être inférieur ou égal au seuil de blocage");
+        }
         if (request.getTypeContrat() == TypeContrat.FLOTTE
                 && request.getModeAffectation() != ModeAffectationQuittance.MANUEL_OU_IMPORT) {
             throw new BadRequestException("Une règle flotte doit utiliser le mode manuel/import");
@@ -1636,6 +1661,8 @@ public class AffectationQuittanceService {
         entity.setTauxTvaIncluseCommission(request.getTauxTvaIncluseCommission());
         entity.setRetenueParDefaut(request.getRetenueParDefaut());
         entity.setTauxRetenue(request.getTauxRetenue());
+        entity.setSeuilAvertissementEcart(money(request.getSeuilAvertissementEcart()));
+        entity.setSeuilBlocageEcart(money(request.getSeuilBlocageEcart()));
         entity.setDateDebut(request.getDateDebut());
         entity.setDateFin(request.getDateFin());
         entity.setExcelFeuille(trimToNull(request.getExcelFeuille()));
@@ -1671,6 +1698,8 @@ public class AffectationQuittanceService {
                 .tauxTvaIncluseCommission(entity.getTauxTvaIncluseCommission())
                 .retenueParDefaut(entity.getRetenueParDefaut())
                 .tauxRetenue(entity.getTauxRetenue())
+                .seuilAvertissementEcart(entity.getSeuilAvertissementEcart())
+                .seuilBlocageEcart(entity.getSeuilBlocageEcart())
                 .dateDebut(entity.getDateDebut())
                 .dateFin(entity.getDateFin())
                 .excelFeuille(entity.getExcelFeuille())
@@ -1815,6 +1844,40 @@ public class AffectationQuittanceService {
         return StatutAffectationQuittance.AVEC_ECART;
     }
 
+    private EcartPolicy evaluateDifference(RegleAffectationQuittance regle, BigDecimal difference) {
+        BigDecimal warningThreshold = money(regle.getSeuilAvertissementEcart() != null
+                ? regle.getSeuilAvertissementEcart()
+                : new BigDecimal("0.01"));
+        BigDecimal blockingThreshold = money(regle.getSeuilBlocageEcart() != null
+                ? regle.getSeuilBlocageEcart()
+                : new BigDecimal("50.00"));
+        if (warningThreshold.signum() < 0 || blockingThreshold.compareTo(warningThreshold) < 0) {
+            throw new BadRequestException("Les seuils d'écart de la règle d'affectation sont invalides");
+        }
+
+        BigDecimal absoluteDifference = money(difference).abs();
+        NiveauEcartAffectation level;
+        if (absoluteDifference.signum() == 0 || absoluteDifference.compareTo(warningThreshold) < 0) {
+            level = NiveauEcartAffectation.EQUILIBRE;
+        } else if (absoluteDifference.compareTo(blockingThreshold) <= 0) {
+            level = NiveauEcartAffectation.AVERTISSEMENT;
+        } else {
+            level = NiveauEcartAffectation.BLOQUANT;
+        }
+        return new EcartPolicy(warningThreshold, blockingThreshold, level);
+    }
+
+    private void requireAllowedDifference(RegleAffectationQuittance regle, BigDecimal difference) {
+        EcartPolicy policy = evaluateDifference(regle, difference);
+        if (!policy.allowed()) {
+            throw new BadRequestException(
+                    "L'écart absolu de " + money(difference).abs().toPlainString()
+                            + " MAD dépasse le seuil de blocage de "
+                            + policy.blockingThreshold().toPlainString() + " MAD"
+            );
+        }
+    }
+
     private String movementLabel(Quittance quittance) {
         if (quittance.getMouvementContrat() != null
                 && quittance.getMouvementContrat().getTypeMouvement() != null) {
@@ -1948,6 +2011,16 @@ public class AffectationQuittanceService {
     }
 
     private record Retention(BigDecimal rate, BigDecimal amount) {
+    }
+
+    private record EcartPolicy(
+            BigDecimal warningThreshold,
+            BigDecimal blockingThreshold,
+            NiveauEcartAffectation level
+    ) {
+        private boolean allowed() {
+            return level != NiveauEcartAffectation.BLOQUANT;
+        }
     }
 
     private record ParsedImport(

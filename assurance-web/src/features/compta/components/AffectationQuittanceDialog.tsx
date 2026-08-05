@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
+import { classifyAllocationDifference } from "../allocation-tolerance";
 import type {
   AllocationLine,
   AllocationRequest,
@@ -106,6 +107,19 @@ export function AffectationQuittanceDialog({
   });
 
   const detailData = retentionPreview.data ?? savedDetail.data;
+  const enteredTtc = fleetLines.reduce((sum, line) => sum + (line.montantTtc ?? 0), 0);
+  const calculatedTolerance = classifyAllocationDifference(
+    enteredTtc - (detailData?.montantTtc ?? 0),
+    detailData?.regle
+  );
+  const tolerance = importPreview
+    ? {
+        level: importPreview.niveauEcart,
+        allowed: importPreview.validationAutorisee,
+        warningThreshold: importPreview.seuilAvertissementEcart,
+        blockingThreshold: importPreview.seuilBlocageEcart,
+      }
+    : calculatedTolerance;
 
   useEffect(() => {
     if (!open) {
@@ -199,6 +213,7 @@ export function AffectationQuittanceDialog({
     return (
       fleetLines.length > 0 &&
       fleetLines.every(isCompleteFleetLine) &&
+      tolerance.allowed &&
       (
         fleetMode !== "IMPORT" ||
         (
@@ -207,7 +222,7 @@ export function AffectationQuittanceDialog({
         )
       )
     );
-  }, [avecRetenue, detailData, fleetLines, fleetMode, importPreview, numero]);
+  }, [avecRetenue, detailData, fleetLines, fleetMode, importPreview, numero, tolerance.allowed]);
 
   return (
     <>
@@ -248,7 +263,13 @@ export function AffectationQuittanceDialog({
               </label>
 
               {detailData.typeContrat === "FLOTTE" ? (
-                <Tabs value={fleetMode} onValueChange={(value) => setFleetMode(value as FleetMode)}>
+                <div className="grid gap-4">
+                  <AllocationDifference
+                    difference={enteredTtc - detailData.montantTtc}
+                    blockingThreshold={tolerance.blockingThreshold}
+                    level={tolerance.level}
+                  />
+                  <Tabs value={fleetMode} onValueChange={(value) => setFleetMode(value as FleetMode)}>
                   <TabsList>
                     <TabsTrigger value="MANUEL">Saisie manuelle</TabsTrigger>
                     <TabsTrigger value="IMPORT">Import Excel</TabsTrigger>
@@ -330,7 +351,8 @@ export function AffectationQuittanceDialog({
                       <FleetLinesEditor lines={fleetLines} onChange={setFleetLines} imported readOnly={readOnly} />
                     ) : null}
                   </TabsContent>
-                </Tabs>
+                  </Tabs>
+                </div>
               ) : detailData.regle?.modeVentilation === "PAR_CATEGORIE" ? (
                 <AutomaticCategoryAllocation lines={fleetLines} onChange={setFleetLines} readOnly={readOnly} />
               ) : (
@@ -613,10 +635,14 @@ function ImportResult({ preview }: { preview: ImportPreview }) {
         <FileSpreadsheet className="size-4" />
         <span className="font-medium">{preview.fichier}</span>
         <Badge variant="secondary">{preview.lignesLues} ligne(s)</Badge>
-        <Badge variant={preview.equilibre ? "default" : "destructive"}>
-          Écart {money(preview.ecart)}
-        </Badge>
+        <ToleranceBadge preview={preview} />
       </div>
+      {!preview.validationAutorisee ? (
+        <Alert variant="destructive">
+          <AlertTitle>Écart supérieur au seuil autorisé</AlertTitle>
+          <AlertDescription>L’écart absolu dépasse {money(preview.seuilBlocageEcart)}. Corrigez le fichier avant d’enregistrer.</AlertDescription>
+        </Alert>
+      ) : null}
       {preview.erreurs.length ? (
         <Alert variant="destructive">
           <AlertTitle>Le fichier contient des anomalies</AlertTitle>
@@ -629,6 +655,30 @@ function ImportResult({ preview }: { preview: ImportPreview }) {
       ) : null}
     </div>
   );
+}
+
+function AllocationDifference({ difference, blockingThreshold, level }: {
+  difference: number;
+  blockingThreshold: number;
+  level: ImportPreview["niveauEcart"];
+}) {
+  const tone = level === "BLOQUANT"
+    ? "text-destructive"
+    : level === "AVERTISSEMENT"
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-emerald-600 dark:text-emerald-400";
+  return (
+    <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2">
+      <Metric label="Écart" value={money(difference)} valueClassName={tone} />
+      <Metric label="Seuil de blocage" value={money(blockingThreshold)} />
+    </div>
+  );
+}
+
+function ToleranceBadge({ preview }: { preview: ImportPreview }) {
+  if (preview.niveauEcart === "BLOQUANT") return <Badge variant="destructive">Écart {money(preview.ecart)}</Badge>;
+  if (preview.niveauEcart === "AVERTISSEMENT") return <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">Écart {money(preview.ecart)}</Badge>;
+  return <Badge className="bg-emerald-600 text-white">Écart {money(preview.ecart)}</Badge>;
 }
 
 function MoneyValue({ value, strong = false }: { value?: number | null; strong?: boolean }) {
@@ -660,11 +710,11 @@ function MoneyCell({
   );
 }
 
-function Metric({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Metric({ label, value, strong, valueClassName = "" }: { label: string; value: string; strong?: boolean; valueClassName?: string }) {
   return (
     <div className="min-w-0 bg-background px-4 py-3">
       <div className="text-xs uppercase text-muted-foreground">{label}</div>
-      <div className={strong ? "mt-1 truncate font-semibold" : "mt-1 truncate font-medium"}>{value}</div>
+      <div className={`${strong ? "mt-1 truncate font-semibold" : "mt-1 truncate font-medium"} ${valueClassName}`}>{value}</div>
     </div>
   );
 }

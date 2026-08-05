@@ -124,7 +124,16 @@ export function GarantieSection({
   const personneGaranties = garanties
     .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE")
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
+  const personneGarantieIds = new Set(personneGaranties.map((garantie) => garantie.id));
+  const hasSelectedPersonneGuarantee = selected.some((item) => personneGarantieIds.has(item.garantieId));
   const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || linePrimeNette(preview, "ASSISTANCE") != null;
+
+  useEffect(() => {
+    if (allowPrimeColumn && !automaticPricing && hasSelectedPersonneGuarantee && !primeColumnEnabled) {
+      setPrimeColumnEnabled?.(true);
+    }
+  }, [allowPrimeColumn, automaticPricing, hasSelectedPersonneGuarantee, primeColumnEnabled, setPrimeColumnEnabled]);
+
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
   };
@@ -143,6 +152,10 @@ export function GarantieSection({
       return;
     }
     if (checked) {
+      if (type === "PERSONNE" && !automaticPricing && !primeColumnEnabled) {
+        setPrimeColumnEnabled?.(true);
+        toast.info("La saisie des primes nettes a été activée pour la garantie personne");
+      }
       const formules = type === "PERSONNE" ? formulesForGuarantee(formulesPersonne, garantie) : [];
       const formule = formules[0];
       const line = type === "VEHICULE" ? linesForGuarantee(lignes, garantie)[0] : undefined;
@@ -186,7 +199,16 @@ export function GarantieSection({
     >
       {allowPrimeColumn ? (
         <div className="mb-4 flex items-center gap-2 text-sm">
-          <Switch checked={primeColumnEnabled} onCheckedChange={(value) => setPrimeColumnEnabled?.(value)} />
+          <Switch
+            checked={primeColumnEnabled}
+            onCheckedChange={(value) => {
+              if (!value && hasSelectedPersonneGuarantee) {
+                toast.error("La saisie des primes nettes est obligatoire pour les garanties personne");
+                return;
+              }
+              setPrimeColumnEnabled?.(value);
+            }}
+          />
           <span>Saisie avec primes</span>
         </div>
       ) : null}

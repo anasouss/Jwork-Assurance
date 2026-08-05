@@ -660,6 +660,15 @@ export function useContratCreationForm(
         nextErrors[`vehicules.${index}.valeurVenale`] = valeurVenaleError;
       }
     });
+    if (typeContrat === "PARTICULIER" && request.saisiePrimeNette) {
+      request.garanties.forEach((garantie, index) => {
+        if (garantie.prime == null) {
+          const reference = refs.garanties.data?.find((item) => item.id === garantie.garantieId);
+          const label = reference?.code || reference?.libelle || `n° ${index + 1}`;
+          nextErrors[`garanties.${index}.prime`] = `Prime nette obligatoire pour la garantie ${label}.`;
+        }
+      });
+    }
     setValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       toast.error(Object.values(nextErrors)[0] ?? "Corrigez les champs indiqués");
@@ -839,6 +848,15 @@ export function useContratCreationForm(
     }
     if (section === "garanties" && request.garanties.length === 0) {
       nextErrors.garanties = "Au moins une garantie est obligatoire.";
+    }
+    if (section === "garanties" && typeContrat === "PARTICULIER" && request.saisiePrimeNette) {
+      request.garanties.forEach((garantie, index) => {
+        if (garantie.prime == null) {
+          const reference = refs.garanties.data?.find((item) => item.id === garantie.garantieId);
+          const label = reference?.code || reference?.libelle || `n° ${index + 1}`;
+          nextErrors[`garanties.${index}.prime`] = `Prime nette obligatoire pour la garantie ${label}.`;
+        }
+      });
     }
     setValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {

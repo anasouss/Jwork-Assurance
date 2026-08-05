@@ -331,7 +331,7 @@ export default function QuittanceAffectationPage() {
         </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[1650px] table-fixed border-collapse text-sm">
+            <table className="w-full min-w-[1635px] table-fixed border-collapse text-sm">
               <colgroup>
                 <col className="w-11" />
                 <col className="w-[185px]" />
@@ -339,7 +339,7 @@ export default function QuittanceAffectationPage() {
                 <col className="w-[155px]" />
                 <col className="w-[110px]" />
                 <col className="w-[110px]" />
-                <col className="w-[105px]" />
+                <col className="w-[90px]" />
                 <col className="w-[105px]" />
                 <col className="w-[105px]" />
                 <col className="w-[110px]" />
@@ -550,11 +550,11 @@ function Metric({ label, value, warning }: { label: string; value: string; warni
 }
 
 function Header({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <th className={`whitespace-nowrap px-3 py-3 text-left font-semibold ${className}`}>{children}</th>;
+  return <th className={`whitespace-nowrap px-2 py-3 text-left font-semibold ${className}`}>{children}</th>;
 }
 
 function Cell({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <td className={`px-3 py-3 align-middle ${className}`}>{children}</td>;
+  return <td className={`px-2 py-3 align-middle ${className}`}>{children}</td>;
 }
 
 function isBulkCompatible(row: QuittanceAllocation, reference?: QuittanceAllocation) {

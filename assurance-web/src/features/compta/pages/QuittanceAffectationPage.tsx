@@ -49,6 +49,10 @@ const DEFAULT_FILTERS: Filters = {
   search: "",
 };
 const PAGE_SIZE = 25;
+const AMOUNT_FORMATTER = new Intl.NumberFormat("fr-MA", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 export default function QuittanceAffectationPage() {
   const [urlParams, setUrlParams] = useSearchParams();
@@ -325,7 +329,25 @@ export default function QuittanceAffectationPage() {
         </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[2080px] border-collapse text-sm">
+            <table className="w-full min-w-[1900px] table-fixed border-collapse text-sm">
+              <colgroup>
+                <col className="w-11" />
+                <col className="w-[210px]" />
+                <col className="w-[180px]" />
+                <col className="w-[190px]" />
+                <col className="w-[110px]" />
+                <col className="w-[110px]" />
+                <col className="w-[105px]" />
+                <col className="w-[105px]" />
+                <col className="w-[105px]" />
+                <col className="w-[110px]" />
+                <col className="w-[115px]" />
+                <col className="w-[100px]" />
+                <col className="w-[115px]" />
+                <col className="w-[170px]" />
+                <col className="w-[155px]" />
+                <col className="w-[150px]" />
+              </colgroup>
               <thead className="bg-amber-600 text-xs uppercase text-white dark:bg-amber-700">
                 <tr>
                   <Header>
@@ -336,19 +358,18 @@ export default function QuittanceAffectationPage() {
                       onCheckedChange={(checked) => setSelectedIds(checked === true ? selectableRows.map((row) => row.quittanceId) : [])}
                     />
                   </Header>
-                  <Header>Produit</Header>
+                  <Header>Produit / dossier</Header>
                   <Header>Mouvement</Header>
-                  <Header>Souscripteur</Header>
-                  <Header>Police</Header>
+                  <Header>Souscripteur / police</Header>
                   <Header>Date effet</Header>
                   <Header>Date échéance</Header>
-                  <Header className="text-right">Prime nette</Header>
-                  <Header className="text-right">Taxes</Header>
-                  <Header className="text-right">Accessoires</Header>
-                  <Header className="text-right">Montant TTC</Header>
-                  <Header className="text-right">Commission nette</Header>
-                  <Header className="text-right">Retenue</Header>
-                  <Header className="text-right">Net compagnie</Header>
+                  <Header className="text-right">Prime nette (MAD)</Header>
+                  <Header className="text-right">Taxes (MAD)</Header>
+                  <Header className="text-right">Accessoires (MAD)</Header>
+                  <Header className="text-right">TTC (MAD)</Header>
+                  <Header className="text-right">Commission (MAD)</Header>
+                  <Header className="text-right">Retenue (MAD)</Header>
+                  <Header className="text-right">Net compagnie (MAD)</Header>
                   <Header>N° quittance compagnie</Header>
                   <Header>Statut</Header>
                   <Header className="text-right">Action</Header>
@@ -357,12 +378,12 @@ export default function QuittanceAffectationPage() {
               <tbody>
                 {!searched ? (
                   <tr>
-                    <td colSpan={17} className="px-3 py-12 text-center text-muted-foreground">
+                    <td colSpan={16} className="px-3 py-12 text-center text-muted-foreground">
                       Renseignez au moins un critère puis lancez la recherche.
                     </td>
                   </tr>
                 ) : quittances.isLoading ? (
-                  <TableRowsSkeleton colSpan={17} />
+                  <TableRowsSkeleton colSpan={16} />
                 ) : displayRows.length ? (
                   displayRows.map(({ key, row, line }) => (
                     <tr key={key} className="border-b transition-colors hover:bg-muted/40">
@@ -379,8 +400,8 @@ export default function QuittanceAffectationPage() {
                         )}
                       </Cell>
                       <Cell>
-                        <div className="font-medium">{productLabel(row)}</div>
-                        <div className="text-xs text-muted-foreground">{row.dossier}</div>
+                        <div className="truncate font-medium" title={row.dossier}>{row.dossier}</div>
+                        <div className="truncate text-xs text-muted-foreground">{productLabel(row)}</div>
                       </Cell>
                       <Cell>
                         <div className="font-medium">{row.mouvement}</div>
@@ -388,22 +409,36 @@ export default function QuittanceAffectationPage() {
                           {line?.categorieSource || line?.acteSource || natureLabel(row.nature)}
                         </div>
                       </Cell>
-                      <Cell>{row.souscripteur || "—"}</Cell>
-                      <Cell>{row.police || "—"}</Cell>
+                      <Cell>
+                        <div className="truncate font-medium" title={row.souscripteur || undefined}>
+                          {row.souscripteur || "—"}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground" title={row.police || undefined}>
+                          {row.police || "—"}
+                        </div>
+                      </Cell>
                       <Cell>{dateLabel(line?.dateEffet ?? row.dateEffet)}</Cell>
                       <Cell>{dateLabel(line?.dateEcheance ?? row.dateEcheance)}</Cell>
-                      <Cell className="text-right">{money(line?.primeNette ?? row.primeNette)}</Cell>
-                      <Cell className="text-right">{money(line?.montantTaxes ?? row.montantTaxes)}</Cell>
-                      <Cell className="text-right">{money(line?.accessoires ?? row.accessoires)}</Cell>
-                      <Cell className="text-right font-medium">{money(line?.montantTtc ?? row.montantTtc)}</Cell>
-                      <Cell className="text-right">
-                        {money(line?.commissionNette ?? row.commissionCalculee ?? 0)}
+                      <Cell className="whitespace-nowrap text-right tabular-nums">
+                        {amount(line?.primeNette ?? row.primeNette)}
                       </Cell>
-                      <Cell className="text-right">
-                        {money(line?.montantRetenue ?? row.retenueCalculee ?? 0)}
+                      <Cell className="whitespace-nowrap text-right tabular-nums">
+                        {amount(line?.montantTaxes ?? row.montantTaxes)}
                       </Cell>
-                      <Cell className="text-right font-medium">
-                        {money(line?.netCompagnie ?? row.netCompagnieCalcule ?? 0)}
+                      <Cell className="whitespace-nowrap text-right tabular-nums">
+                        {amount(line?.accessoires ?? row.accessoires)}
+                      </Cell>
+                      <Cell className="whitespace-nowrap text-right font-medium tabular-nums">
+                        {amount(line?.montantTtc ?? row.montantTtc)}
+                      </Cell>
+                      <Cell className="whitespace-nowrap text-right tabular-nums">
+                        {amount(line?.commissionNette ?? row.commissionCalculee ?? 0)}
+                      </Cell>
+                      <Cell className="whitespace-nowrap text-right tabular-nums">
+                        {amount(line?.montantRetenue ?? row.retenueCalculee ?? 0)}
+                      </Cell>
+                      <Cell className="whitespace-nowrap text-right font-medium tabular-nums">
+                        {amount(line?.netCompagnie ?? row.netCompagnieCalcule ?? 0)}
                       </Cell>
                       <Cell>
                         {line ? (
@@ -448,7 +483,7 @@ export default function QuittanceAffectationPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={17} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
+                  <tr><td colSpan={16} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
                 )}
               </tbody>
             </table>
@@ -590,10 +625,11 @@ function dateLabel(value?: string | null) {
 }
 
 function money(value: number) {
-  return `${new Intl.NumberFormat("fr-MA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)} MAD`;
+  return `${amount(value)} MAD`;
+}
+
+function amount(value: number) {
+  return AMOUNT_FORMATTER.format(value);
 }
 
 function hasMeaningfulFilter(filters: Filters) {

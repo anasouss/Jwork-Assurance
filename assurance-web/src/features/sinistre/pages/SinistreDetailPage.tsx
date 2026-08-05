@@ -66,6 +66,7 @@ import {
   documentTypeLabels,
 } from "../components/SinistreDocumentDialog";
 import { SinistreMissionDialog } from "../components/SinistreMissionDialog";
+import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import type {
   DecisionCouverture,
   SinistreDetail,
@@ -931,25 +932,12 @@ function GeneralSection({
             />
           </Field>
           <Field label="Ville">
-            <Select
+            <SinistreVilleSelect
+              cities={cities}
               disabled={!editable}
-              value={form.villeId || "NONE"}
-              onValueChange={(value) =>
-                update("villeId", value === "NONE" ? "" : value)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">Non renseignée</SelectItem>
-                {cities.map((city) => (
-                  <SelectItem key={city.id} value={city.id}>
-                    {city.libelle}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              value={form.villeId}
+              onValueChange={(value) => update("villeId", value)}
+            />
           </Field>
           <Field label="Responsabilité (%)">
             <Input

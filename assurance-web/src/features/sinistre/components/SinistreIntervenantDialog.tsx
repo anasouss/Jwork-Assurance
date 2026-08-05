@@ -10,16 +10,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { ReferenceOption } from "@/features/production/types";
 import type { Intervenant } from "../types";
+import {
+  SinistreVilleSelect,
+  type CityOption,
+} from "./SinistreVilleSelect";
 
 export type IntervenantKind = "EXPERT" | "GARAGE";
 
@@ -35,7 +31,7 @@ export function SinistreIntervenantDialog({
   open: boolean;
   kind: IntervenantKind;
   intervenant: Intervenant | null;
-  cities: ReferenceOption[];
+  cities: CityOption[];
   saving: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (request: object) => void;
@@ -125,24 +121,11 @@ export function SinistreIntervenantDialog({
             />
           </Field>
           <Field label="Ville">
-            <Select
-              value={form.villeId || "NONE"}
-              onValueChange={(value) =>
-                update("villeId", value === "NONE" ? "" : value)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">Non renseignée</SelectItem>
-                {cities.map((city) => (
-                  <SelectItem key={city.id} value={city.id}>
-                    {city.libelle}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SinistreVilleSelect
+              cities={cities}
+              value={form.villeId}
+              onValueChange={(value) => update("villeId", value)}
+            />
           </Field>
           <div className="flex items-end">
             <label className="flex h-9 w-full items-center justify-between rounded-md border px-3 text-sm">

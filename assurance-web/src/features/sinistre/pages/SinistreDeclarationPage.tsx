@@ -21,6 +21,7 @@ import { contractApi } from "@/features/production/api/contracts";
 import { referenceApi } from "@/features/production/api/references";
 import type { ContratListItem } from "@/features/production/types";
 import { sinistreApi, sinistreKeys } from "../api";
+import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import { natureLabels } from "../format";
 import type { NatureSinistre } from "../types";
 
@@ -268,24 +269,11 @@ export default function SinistreDeclarationPage() {
             </Select>
           </Field>
           <Field label="Ville">
-            <Select
-              value={villeId || "NONE"}
-              onValueChange={(value) =>
-                setVilleId(value === "NONE" ? "" : value)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Ville" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">Non renseignée</SelectItem>
-                {(cities.data ?? []).map((city) => (
-                  <SelectItem key={city.id} value={city.id}>
-                    {city.libelle}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SinistreVilleSelect
+              cities={cities.data ?? []}
+              value={villeId}
+              onValueChange={setVilleId}
+            />
           </Field>
           <div className="md:col-span-2 lg:col-span-3">
             <Field label="Lieu">

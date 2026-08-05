@@ -235,6 +235,9 @@ public class HistoriqueFinancierRecalculService {
         List<ContratGarantie> after = guarantees(contrat, snapshots, AFTER_NATURES, afterTargets);
         List<ContratGarantie> differential = guarantees(
                 contrat, snapshots, EnumSet.of(NatureSnapshotMouvement.DIFFERENTIEL), afterTargets);
+        SnapshotTargets withdrawnTargets = targets(mouvement, EnumSet.of(NatureSnapshotMouvement.RETRAIT));
+        List<ContratGarantie> withdrawn = guarantees(
+                contrat, snapshots, EnumSet.of(NatureSnapshotMouvement.RETRAIT), withdrawnTargets);
         TypeMouvementContrat type = mouvement.getTypeMouvement();
         TypeImpactMouvement impact = type.getTypeImpact() == null ? TypeImpactMouvement.NORMAL : type.getTypeImpact();
 
@@ -244,10 +247,11 @@ public class HistoriqueFinancierRecalculService {
         SnapshotTargets outputTargets;
 
         if (!before.isEmpty() && !after.isEmpty()) {
-            if ("CHV_M".equalsIgnoreCase(type.getCode())) {
-                before.forEach(garantie -> garantie.setPrime(
-                        calculGarantieService.calculerPrimePeriodeRestante(
-                                contrat, garantie, mouvement.getDateEffet())));
+            if (impact == TypeImpactMouvement.DIFFERENTIEL) {
+                appliquerPeriodeRestante(contrat, before, mouvement);
+                if (!"CHV_M".equalsIgnoreCase(type.getCode())) {
+                    appliquerPeriodeRestante(contrat, after, mouvement);
+                }
             }
             QuittanceCalculService.Resultat avant = calculate(contrat, null, before, beforeTargets, mouvement);
             QuittanceCalculService.Resultat apres = calculate(contrat, null, after, afterTargets, mouvement);
@@ -259,9 +263,22 @@ public class HistoriqueFinancierRecalculService {
             summaries = elementFacturableCibleService.calculerDifference(
                     contrat, before, after, outputTargets.vehicules(), outputTargets.remorques(), mouvement.getDateEffet());
         } else {
-            garantiesPourCibles = !after.isEmpty() ? after : differential;
-            outputTargets = afterTargets.hasTargets() ? afterTargets : targets(
-                    mouvement, EnumSet.of(NatureSnapshotMouvement.DIFFERENTIEL, NatureSnapshotMouvement.RETRAIT));
+            if (impact == TypeImpactMouvement.RETOUR_PRIME) {
+                garantiesPourCibles = withdrawn;
+                outputTargets = withdrawnTargets;
+                appliquerPeriodeRestante(contrat, garantiesPourCibles, mouvement);
+            } else if (impact == TypeImpactMouvement.CNPAC_SEUL) {
+                garantiesPourCibles = List.of();
+                outputTargets = beforeTargets;
+            } else if (impact == TypeImpactMouvement.DIFFERENTIEL && !differential.isEmpty()) {
+                garantiesPourCibles = differential;
+                outputTargets = afterTargets.hasTargets() ? afterTargets : targets(
+                        mouvement, EnumSet.of(NatureSnapshotMouvement.DIFFERENTIEL));
+            } else {
+                garantiesPourCibles = !after.isEmpty() ? after : differential;
+                outputTargets = afterTargets.hasTargets() ? afterTargets : targets(
+                        mouvement, EnumSet.of(NatureSnapshotMouvement.DIFFERENTIEL, NatureSnapshotMouvement.RETRAIT));
+            }
             if (garantiesPourCibles.isEmpty()
                     && impact != TypeImpactMouvement.ZERO
                     && impact != TypeImpactMouvement.CNPAC_SEUL) {
@@ -271,7 +288,7 @@ public class HistoriqueFinancierRecalculService {
             if (impact == TypeImpactMouvement.ZERO) {
                 summaries = List.of();
             } else if (impact == TypeImpactMouvement.CNPAC_SEUL) {
-                summaries = singleTargetSummary(calcul, outputTargets);
+                summaries = cnpacTargetSummaries(calcul, outputTargets);
             } else if (impact == TypeImpactMouvement.RETOUR_PRIME) {
                 summaries = elementFacturableCibleService.calculerDifference(
                         contrat, garantiesPourCibles, List.of(), outputTargets.vehicules(),
@@ -286,6 +303,16 @@ public class HistoriqueFinancierRecalculService {
         return new CalculationPlan(
                 mouvement, quittance, calcul, garantiesPourCibles,
                 outputTargets.persistedVehicules(), outputTargets.persistedRemorques(), summaries);
+    }
+
+    private void appliquerPeriodeRestante(
+            Contrat contrat,
+            List<ContratGarantie> garanties,
+            MouvementContrat mouvement
+    ) {
+        garanties.forEach(garantie -> garantie.setPrime(
+                calculGarantieService.calculerPrimePeriodeRestante(
+                        contrat, garantie, mouvement.getDateEffet())));
     }
 
     private QuittanceCalculService.Resultat calculate(
@@ -442,27 +469,45 @@ public class HistoriqueFinancierRecalculService {
         return new SnapshotTargets(vehicules, remorques, persistedVehicules, persistedRemorques);
     }
 
-    private List<QuittanceResponse.TargetSummary> singleTargetSummary(
+    private List<QuittanceResponse.TargetSummary> cnpacTargetSummaries(
             QuittanceCalculService.Resultat result,
             SnapshotTargets targets
     ) {
         if (!targets.hasTargets()) return List.of();
-        boolean vehicle = !targets.vehicules().isEmpty();
-        return List.of(QuittanceResponse.TargetSummary.builder()
-                .kind(vehicle ? "VEHICULE" : "REMORQUE")
-                .vehiculeIndex(vehicle ? 0 : null)
-                .remorqueIndex(vehicle ? null : 0)
-                .primeNette(result.primeNette())
-                .primeNetteHorsEvcat(result.primeNette())
-                .automobilePrimeNette(result.primeNette())
+        int targetCount = targets.vehicules().size() + targets.remorques().size();
+        BigDecimal cnpacPerTarget = result.cnpac()
+                .divide(BigDecimal.valueOf(targetCount), 2, RoundingMode.HALF_UP);
+        List<QuittanceResponse.TargetSummary> summaries = new ArrayList<>();
+        for (int index = 0; index < targets.vehicules().size(); index++) {
+            summaries.add(cnpacTargetSummary("VEHICULE", index, null, cnpacPerTarget));
+        }
+        for (int index = 0; index < targets.remorques().size(); index++) {
+            summaries.add(cnpacTargetSummary("REMORQUE", null, index, cnpacPerTarget));
+        }
+        return summaries;
+    }
+
+    private QuittanceResponse.TargetSummary cnpacTargetSummary(
+            String kind,
+            Integer vehiculeIndex,
+            Integer remorqueIndex,
+            BigDecimal cnpac
+    ) {
+        return QuittanceResponse.TargetSummary.builder()
+                .kind(kind)
+                .vehiculeIndex(vehiculeIndex)
+                .remorqueIndex(remorqueIndex)
+                .primeNette(BigDecimal.ZERO)
+                .primeNetteHorsEvcat(BigDecimal.ZERO)
+                .automobilePrimeNette(BigDecimal.ZERO)
                 .corporelPrimeNette(BigDecimal.ZERO)
                 .evcatPrimeNette(BigDecimal.ZERO)
-                .taxe(result.taxe())
-                .taxeParafiscale(result.taxeParafiscale())
-                .accessoire(result.accessoire())
-                .cnpac(result.cnpac())
-                .primeTotale(result.primeTotale())
-                .build());
+                .taxe(BigDecimal.ZERO)
+                .taxeParafiscale(BigDecimal.ZERO)
+                .accessoire(BigDecimal.ZERO)
+                .cnpac(cnpac)
+                .primeTotale(cnpac)
+                .build();
     }
 
     private List<QuittanceResponse.TargetSummary> reconcile(

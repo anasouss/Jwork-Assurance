@@ -586,13 +586,12 @@ export function useContratCreationForm(
   });
 
   const validateRequiredGuaranteePrimes = (errors: Record<string, string>) => {
-    if (typeContrat !== "PARTICULIER") {
+    if (typeContrat !== "PARTICULIER" || !request.saisiePrimeNette) {
       return;
     }
     request.garanties.forEach((garantie, index) => {
       const reference = refs.garanties.data?.find((item) => item.id === garantie.garantieId);
-      const requiresPrime = request.saisiePrimeNette || reference?.typeGarantie === "PERSONNE";
-      if (requiresPrime && garantie.prime == null) {
+      if (garantie.prime == null) {
         const label = reference?.code || reference?.libelle || `n° ${index + 1}`;
         errors[`garanties.${index}.prime`] = `Prime nette obligatoire pour la garantie ${label}.`;
       }

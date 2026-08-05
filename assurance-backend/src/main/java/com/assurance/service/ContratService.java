@@ -6343,9 +6343,6 @@ public class ContratService {
             if (modeSelectionne != ModeTarificationGarantie.PROTECTION) {
                 throw new BadRequestException("La garantie personne " + garantie.getCode() + " doit utiliser le mode PROTECTION");
             }
-            if (contratManuel && montants.prime() == null) {
-                throw new BadRequestException("La prime nette est obligatoire pour la garantie personne " + garantie.getCode());
-            }
             return;
         }
 

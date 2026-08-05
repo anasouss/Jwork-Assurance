@@ -45,7 +45,10 @@ public class UpsertRegleAffectationQuittanceRequest {
     private BigDecimal seuilAvertissementEcart;
     @NotNull
     @DecimalMin("0")
-    private BigDecimal seuilBlocageEcart;
+    private BigDecimal margeManquanteMaximale;
+    @NotNull
+    @DecimalMin("0")
+    private BigDecimal margeDepassementMaximale;
     @NotNull
     private LocalDate dateDebut;
     private LocalDate dateFin;

@@ -84,8 +84,23 @@ public class RegleAffectationQuittance extends BaseEntity {
     private BigDecimal seuilAvertissementEcart = new BigDecimal("0.01");
 
     @Builder.Default
-    @Column(name = "seuil_blocage_ecart", nullable = false, precision = 15, scale = 2)
-    private BigDecimal seuilBlocageEcart = new BigDecimal("50.00");
+    @Column(
+            name = "marge_manquante_maximale",
+            nullable = false,
+            precision = 15,
+            scale = 2,
+            columnDefinition = "DECIMAL(15,2) DEFAULT 20.00"
+    )
+    private BigDecimal margeManquanteMaximale = new BigDecimal("20.00");
+
+    @Builder.Default
+    @Column(
+            name = "seuil_blocage_ecart",
+            nullable = false,
+            precision = 15,
+            scale = 2
+    )
+    private BigDecimal margeDepassementMaximale = new BigDecimal("50.00");
 
     @Column(name = "date_debut", nullable = false)
     private LocalDate dateDebut;

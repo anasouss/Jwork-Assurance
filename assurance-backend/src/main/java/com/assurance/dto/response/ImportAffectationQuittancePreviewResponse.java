@@ -23,7 +23,8 @@ public class ImportAffectationQuittancePreviewResponse {
     private BigDecimal ecart;
     private boolean equilibre;
     private BigDecimal seuilAvertissementEcart;
-    private BigDecimal seuilBlocageEcart;
+    private BigDecimal margeManquanteMaximale;
+    private BigDecimal margeDepassementMaximale;
     private NiveauEcartAffectation niveauEcart;
     private boolean validationAutorisee;
 }

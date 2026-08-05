@@ -59,7 +59,8 @@ type RuleForm = {
   retenueParDefaut: boolean;
   tauxRetenue?: number;
   seuilAvertissementEcart?: number;
-  seuilBlocageEcart?: number;
+  margeManquanteMaximale?: number;
+  margeDepassementMaximale?: number;
   dateDebut: string;
   dateFin: string;
   excelFeuille: string;
@@ -107,7 +108,8 @@ const EMPTY_FORM: RuleForm = {
   modeCalculCommission: "TAUX_NET",
   retenueParDefaut: false,
   seuilAvertissementEcart: 0.01,
-  seuilBlocageEcart: 50,
+  margeManquanteMaximale: 20,
+  margeDepassementMaximale: 50,
   dateDebut: "",
   dateFin: "",
   ...DEFAULT_EXCEL_MAPPING,
@@ -393,19 +395,24 @@ export function QuittanceRulesDialog({
                   <div>
                     <h3 className="text-sm font-semibold">Tolérance d’écart d’affectation</h3>
                     <p className="text-sm text-muted-foreground">
-                      Un écart inférieur au seuil d’avertissement est accepté sans alerte. Au-delà du seuil de blocage, l’enregistrement est refusé.
+                      La marge sans alerte s’applique dans les deux sens. Les montants manquants et les dépassements ont chacun leur propre limite de blocage.
                     </p>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2 xl:max-w-2xl">
+                  <div className="grid gap-4 md:grid-cols-3 xl:max-w-4xl">
                     <AmountField
-                      label="Seuil d’avertissement (MAD)"
+                      label="Marge sans alerte (MAD)"
                       value={form.seuilAvertissementEcart}
                       onChange={(value) => setForm((current) => ({ ...current, seuilAvertissementEcart: value }))}
                     />
                     <AmountField
-                      label="Seuil de blocage (MAD)"
-                      value={form.seuilBlocageEcart}
-                      onChange={(value) => setForm((current) => ({ ...current, seuilBlocageEcart: value }))}
+                      label="Manquant maximal (MAD)"
+                      value={form.margeManquanteMaximale}
+                      onChange={(value) => setForm((current) => ({ ...current, margeManquanteMaximale: value }))}
+                    />
+                    <AmountField
+                      label="Dépassement maximal (MAD)"
+                      value={form.margeDepassementMaximale}
+                      onChange={(value) => setForm((current) => ({ ...current, margeDepassementMaximale: value }))}
                     />
                   </div>
                 </div>
@@ -564,7 +571,7 @@ export function QuittanceRulesDialog({
                   <th className="px-3 py-2 text-right">Auto</th>
                   <th className="px-3 py-2 text-right">EVCAT</th>
                   <th className="px-3 py-2 text-right">Corporel</th>
-                  <th className="px-3 py-2 text-right">Avert. / blocage</th>
+                  <th className="px-3 py-2 text-right">Sans alerte / manque / dépassement</th>
                   <th className="px-3 py-2">Période</th>
                   <th className="px-3 py-2">Statut</th>
                   <th className="px-3 py-2 text-right">Actions</th>
@@ -597,7 +604,7 @@ export function QuittanceRulesDialog({
                       <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionCorporel)}</td>
                       <td className="px-3 py-3 whitespace-nowrap text-right">
                         {rule.typeContrat === "FLOTTE"
-                          ? `${moneyLabel(rule.seuilAvertissementEcart)} / ${moneyLabel(rule.seuilBlocageEcart)}`
+                          ? `${moneyLabel(rule.seuilAvertissementEcart)} / ${moneyLabel(rule.margeManquanteMaximale)} / ${moneyLabel(rule.margeDepassementMaximale)}`
                           : "—"}
                       </td>
                       <td className="px-3 py-3">{rule.dateDebut} → {rule.dateFin ?? "sans fin"}</td>
@@ -819,8 +826,13 @@ function isComplete(form: RuleForm) {
       excelComplete &&
       form.tauxRetenue != null &&
       form.seuilAvertissementEcart != null &&
-      form.seuilBlocageEcart != null &&
-      form.seuilAvertissementEcart <= form.seuilBlocageEcart &&
+      form.margeManquanteMaximale != null &&
+      form.margeDepassementMaximale != null &&
+      form.seuilAvertissementEcart >= 0 &&
+      form.margeManquanteMaximale >= 0 &&
+      form.margeDepassementMaximale >= 0 &&
+      form.seuilAvertissementEcart <= form.margeManquanteMaximale &&
+      form.seuilAvertissementEcart <= form.margeDepassementMaximale &&
       (!form.dateFin || form.dateFin >= form.dateDebut)
   );
 }
@@ -838,7 +850,8 @@ function ruleToForm(rule: Rule): RuleForm {
     retenueParDefaut: rule.retenueParDefaut,
     tauxRetenue: rule.tauxRetenue,
     seuilAvertissementEcart: rule.seuilAvertissementEcart,
-    seuilBlocageEcart: rule.seuilBlocageEcart,
+    margeManquanteMaximale: rule.margeManquanteMaximale,
+    margeDepassementMaximale: rule.margeDepassementMaximale,
     dateDebut: rule.dateDebut,
     dateFin: rule.dateFin ?? "",
     excelFeuille: rule.excelFeuille ?? "",
@@ -881,7 +894,8 @@ function toRequest(form: RuleForm): RuleRequest {
     retenueParDefaut: form.retenueParDefaut,
     tauxRetenue: form.tauxRetenue!,
     seuilAvertissementEcart: form.seuilAvertissementEcart!,
-    seuilBlocageEcart: form.seuilBlocageEcart!,
+    margeManquanteMaximale: form.margeManquanteMaximale!,
+    margeDepassementMaximale: form.margeDepassementMaximale!,
     dateDebut: form.dateDebut,
     dateFin: form.dateFin || null,
     excelFeuille: isFleet ? form.excelFeuille.trim() || null : null,

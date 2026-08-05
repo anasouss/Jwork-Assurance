@@ -61,7 +61,9 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
         level: preview.niveauEcart,
         allowed: preview.validationAutorisee,
         warningThreshold: preview.seuilAvertissementEcart,
-        blockingThreshold: preview.seuilBlocageEcart,
+        blockingThreshold: applicableBlockingLimit(preview),
+        shortageLimit: preview.margeManquanteMaximale,
+        excessLimit: preview.margeDepassementMaximale,
       }
     : calculatedTolerance;
   const targets = rows.map((row) => ({
@@ -151,7 +153,7 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
             <Metric
               label="Écart"
               value={money(difference)}
-              detail={`Blocage au-delà de ${money(tolerance.blockingThreshold)}`}
+              detail={`${difference < 0 ? "Manquant" : "Dépassement"} maximal : ${money(tolerance.blockingThreshold)}`}
               error={tolerance.level === "BLOQUANT"}
               warning={tolerance.level === "AVERTISSEMENT"}
               success={tolerance.level === "EQUILIBRE"}
@@ -284,7 +286,7 @@ function MoneyCell({ value, readOnly, onChange }: { value?: number; readOnly: bo
 function ImportSummary({ preview }: { preview: ImportPreview }) {
   return <div className="grid gap-2">
     <div className="flex flex-wrap items-center gap-2"><FileSpreadsheet className="size-4" /><span className="font-medium">{preview.fichier}</span><Badge variant="secondary">{preview.lignesLues} ligne(s)</Badge><ToleranceBadge preview={preview} /></div>
-    {!preview.validationAutorisee ? <Alert variant="destructive"><AlertTitle>Écart supérieur au seuil autorisé</AlertTitle><AlertDescription>L’écart absolu dépasse {money(preview.seuilBlocageEcart)}. Corrigez le fichier ou la sélection avant d’enregistrer.</AlertDescription></Alert> : null}
+    {!preview.validationAutorisee ? <Alert variant="destructive"><AlertTitle>Écart supérieur au seuil autorisé</AlertTitle><AlertDescription>{preview.ecart < 0 ? "Le montant manquant" : "Le dépassement"} excède la marge autorisée de {money(applicableBlockingLimit(preview))}. Corrigez le fichier ou la sélection avant d’enregistrer.</AlertDescription></Alert> : null}
     {preview.erreurs.length ? <Alert variant="destructive"><AlertTitle>Anomalies d’import</AlertTitle><AlertDescription>{preview.erreurs.join(" · ")}</AlertDescription></Alert> : null}
   </div>;
 }
@@ -293,6 +295,12 @@ function ToleranceBadge({ preview }: { preview: ImportPreview }) {
   if (preview.niveauEcart === "BLOQUANT") return <Badge variant="destructive">Écart {money(preview.ecart)}</Badge>;
   if (preview.niveauEcart === "AVERTISSEMENT") return <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">Écart {money(preview.ecart)}</Badge>;
   return <Badge className="bg-emerald-600 text-white">Écart {money(preview.ecart)}</Badge>;
+}
+
+function applicableBlockingLimit(preview: ImportPreview) {
+  return preview.ecart < 0
+    ? preview.margeManquanteMaximale
+    : preview.margeDepassementMaximale;
 }
 
 function Metric({ label, value, detail, error = false, warning = false, success = false }: { label: string; value: string; detail?: string; error?: boolean; warning?: boolean; success?: boolean }) {

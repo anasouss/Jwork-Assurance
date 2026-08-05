@@ -544,7 +544,8 @@ public class AffectationQuittanceService {
                 .ecart(ecart)
                 .equilibre(policy.level() == NiveauEcartAffectation.EQUILIBRE)
                 .seuilAvertissementEcart(policy.warningThreshold())
-                .seuilBlocageEcart(policy.blockingThreshold())
+                .margeManquanteMaximale(policy.shortageLimit())
+                .margeDepassementMaximale(policy.excessLimit())
                 .niveauEcart(policy.level())
                 .validationAutorisee(policy.allowed())
                 .build();
@@ -586,7 +587,8 @@ public class AffectationQuittanceService {
                 .ecart(ecart)
                 .equilibre(policy.level() == NiveauEcartAffectation.EQUILIBRE)
                 .seuilAvertissementEcart(policy.warningThreshold())
-                .seuilBlocageEcart(policy.blockingThreshold())
+                .margeManquanteMaximale(policy.shortageLimit())
+                .margeDepassementMaximale(policy.excessLimit())
                 .niveauEcart(policy.level())
                 .validationAutorisee(policy.allowed())
                 .build();
@@ -985,7 +987,8 @@ public class AffectationQuittanceService {
                 .ecart(difference)
                 .equilibre(policy.level() == NiveauEcartAffectation.EQUILIBRE)
                 .seuilAvertissementEcart(policy.warningThreshold())
-                .seuilBlocageEcart(policy.blockingThreshold())
+                .margeManquanteMaximale(policy.shortageLimit())
+                .margeDepassementMaximale(policy.excessLimit())
                 .niveauEcart(policy.level())
                 .validationAutorisee(policy.allowed())
                 .build();
@@ -1574,15 +1577,22 @@ public class AffectationQuittanceService {
                 request.getSeuilAvertissementEcart(),
                 "Seuil d'avertissement d'écart"
         );
-        BigDecimal blockingThreshold = requiredAmount(
-                request.getSeuilBlocageEcart(),
-                "Seuil de blocage d'écart"
+        BigDecimal shortageLimit = requiredAmount(
+                request.getMargeManquanteMaximale(),
+                "Marge manquante maximale"
         );
-        if (warningThreshold.signum() < 0 || blockingThreshold.signum() < 0) {
-            throw new BadRequestException("Les seuils d'écart doivent être positifs ou nuls");
+        BigDecimal excessLimit = requiredAmount(
+                request.getMargeDepassementMaximale(),
+                "Marge de dépassement maximale"
+        );
+        if (warningThreshold.signum() < 0 || shortageLimit.signum() < 0 || excessLimit.signum() < 0) {
+            throw new BadRequestException("Les marges d'écart doivent être positives ou nulles");
         }
-        if (warningThreshold.compareTo(blockingThreshold) > 0) {
-            throw new BadRequestException("Le seuil d'avertissement doit être inférieur ou égal au seuil de blocage");
+        if (warningThreshold.compareTo(shortageLimit) > 0
+                || warningThreshold.compareTo(excessLimit) > 0) {
+            throw new BadRequestException(
+                    "La marge sans alerte doit être inférieure ou égale aux marges maximales"
+            );
         }
         if (request.getTypeContrat() == TypeContrat.FLOTTE
                 && request.getModeAffectation() != ModeAffectationQuittance.MANUEL_OU_IMPORT) {
@@ -1729,7 +1739,8 @@ public class AffectationQuittanceService {
         entity.setRetenueParDefaut(request.getRetenueParDefaut());
         entity.setTauxRetenue(request.getTauxRetenue());
         entity.setSeuilAvertissementEcart(money(request.getSeuilAvertissementEcart()));
-        entity.setSeuilBlocageEcart(money(request.getSeuilBlocageEcart()));
+        entity.setMargeManquanteMaximale(money(request.getMargeManquanteMaximale()));
+        entity.setMargeDepassementMaximale(money(request.getMargeDepassementMaximale()));
         entity.setDateDebut(request.getDateDebut());
         entity.setDateFin(request.getDateFin());
         entity.setExcelFeuille(trimToNull(request.getExcelFeuille()));
@@ -1766,7 +1777,8 @@ public class AffectationQuittanceService {
                 .retenueParDefaut(entity.getRetenueParDefaut())
                 .tauxRetenue(entity.getTauxRetenue())
                 .seuilAvertissementEcart(entity.getSeuilAvertissementEcart())
-                .seuilBlocageEcart(entity.getSeuilBlocageEcart())
+                .margeManquanteMaximale(entity.getMargeManquanteMaximale())
+                .margeDepassementMaximale(entity.getMargeDepassementMaximale())
                 .dateDebut(entity.getDateDebut())
                 .dateFin(entity.getDateFin())
                 .excelFeuille(entity.getExcelFeuille())
@@ -1915,32 +1927,42 @@ public class AffectationQuittanceService {
         BigDecimal warningThreshold = money(regle.getSeuilAvertissementEcart() != null
                 ? regle.getSeuilAvertissementEcart()
                 : new BigDecimal("0.01"));
-        BigDecimal blockingThreshold = money(regle.getSeuilBlocageEcart() != null
-                ? regle.getSeuilBlocageEcart()
+        BigDecimal shortageLimit = money(regle.getMargeManquanteMaximale() != null
+                ? regle.getMargeManquanteMaximale()
+                : new BigDecimal("20.00"));
+        BigDecimal excessLimit = money(regle.getMargeDepassementMaximale() != null
+                ? regle.getMargeDepassementMaximale()
                 : new BigDecimal("50.00"));
-        if (warningThreshold.signum() < 0 || blockingThreshold.compareTo(warningThreshold) < 0) {
-            throw new BadRequestException("Les seuils d'écart de la règle d'affectation sont invalides");
+        if (warningThreshold.signum() < 0
+                || shortageLimit.compareTo(warningThreshold) < 0
+                || excessLimit.compareTo(warningThreshold) < 0) {
+            throw new BadRequestException("Les marges d'écart de la règle d'affectation sont invalides");
         }
 
-        BigDecimal absoluteDifference = money(difference).abs();
+        BigDecimal roundedDifference = money(difference);
+        BigDecimal absoluteDifference = roundedDifference.abs();
+        BigDecimal applicableLimit = roundedDifference.signum() < 0 ? shortageLimit : excessLimit;
         NiveauEcartAffectation level;
-        if (absoluteDifference.signum() == 0 || absoluteDifference.compareTo(warningThreshold) < 0) {
+        if (absoluteDifference.compareTo(warningThreshold) <= 0) {
             level = NiveauEcartAffectation.EQUILIBRE;
-        } else if (absoluteDifference.compareTo(blockingThreshold) <= 0) {
+        } else if (absoluteDifference.compareTo(applicableLimit) <= 0) {
             level = NiveauEcartAffectation.AVERTISSEMENT;
         } else {
             level = NiveauEcartAffectation.BLOQUANT;
         }
-        return new EcartPolicy(warningThreshold, blockingThreshold, level);
+        return new EcartPolicy(warningThreshold, shortageLimit, excessLimit, level);
     }
 
     private void requireAllowedDifference(RegleAffectationQuittance regle, BigDecimal difference) {
         EcartPolicy policy = evaluateDifference(regle, difference);
         if (!policy.allowed()) {
+            boolean shortage = difference.signum() < 0;
+            BigDecimal applicableLimit = shortage ? policy.shortageLimit() : policy.excessLimit();
             throw new BadRequestException(
-                    "L'écart absolu de " + money(difference).abs().toPlainString()
-                            + " MAD dépasse le seuil de blocage de "
-                            + policy.blockingThreshold().toPlainString() + " MAD"
+                    (shortage ? "Le montant manquant de " : "Le dépassement de ")
+                            + money(difference).abs().toPlainString()
+                            + " MAD dépasse la marge autorisée de "
+                            + applicableLimit.toPlainString() + " MAD"
             );
         }
     }
@@ -2082,7 +2104,8 @@ public class AffectationQuittanceService {
 
     private record EcartPolicy(
             BigDecimal warningThreshold,
-            BigDecimal blockingThreshold,
+            BigDecimal shortageLimit,
+            BigDecimal excessLimit,
             NiveauEcartAffectation level
     ) {
         private boolean allowed() {

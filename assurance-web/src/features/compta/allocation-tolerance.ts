@@ -5,23 +5,52 @@ export type AllocationTolerance = {
   allowed: boolean;
   warningThreshold: number;
   blockingThreshold: number;
+  shortageLimit: number;
+  excessLimit: number;
 };
 
 export function classifyAllocationDifference(
   difference: number,
-  rule?: Pick<Rule, "seuilAvertissementEcart" | "seuilBlocageEcart"> | null
+  rule?: Pick<
+    Rule,
+    "seuilAvertissementEcart" | "margeManquanteMaximale" | "margeDepassementMaximale"
+  > | null
 ): AllocationTolerance {
   const warningThreshold = Math.max(0, rule?.seuilAvertissementEcart ?? 0.01);
-  const blockingThreshold = Math.max(warningThreshold, rule?.seuilBlocageEcart ?? 50);
-  const absoluteDifference = Math.abs(roundMoney(difference));
+  const shortageLimit = Math.max(warningThreshold, rule?.margeManquanteMaximale ?? 20);
+  const excessLimit = Math.max(warningThreshold, rule?.margeDepassementMaximale ?? 50);
+  const roundedDifference = roundMoney(difference);
+  const absoluteDifference = Math.abs(roundedDifference);
+  const blockingThreshold = roundedDifference < 0 ? shortageLimit : excessLimit;
 
-  if (absoluteDifference === 0 || absoluteDifference < warningThreshold) {
-    return { level: "EQUILIBRE", allowed: true, warningThreshold, blockingThreshold };
+  if (absoluteDifference <= warningThreshold) {
+    return {
+      level: "EQUILIBRE",
+      allowed: true,
+      warningThreshold,
+      blockingThreshold,
+      shortageLimit,
+      excessLimit,
+    };
   }
   if (absoluteDifference <= blockingThreshold) {
-    return { level: "AVERTISSEMENT", allowed: true, warningThreshold, blockingThreshold };
+    return {
+      level: "AVERTISSEMENT",
+      allowed: true,
+      warningThreshold,
+      blockingThreshold,
+      shortageLimit,
+      excessLimit,
+    };
   }
-  return { level: "BLOQUANT", allowed: false, warningThreshold, blockingThreshold };
+  return {
+    level: "BLOQUANT",
+    allowed: false,
+    warningThreshold,
+    blockingThreshold,
+    shortageLimit,
+    excessLimit,
+  };
 }
 
 function roundMoney(value: number) {

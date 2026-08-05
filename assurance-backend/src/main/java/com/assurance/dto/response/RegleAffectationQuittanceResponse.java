@@ -27,7 +27,8 @@ public class RegleAffectationQuittanceResponse {
     private Boolean retenueParDefaut;
     private BigDecimal tauxRetenue;
     private BigDecimal seuilAvertissementEcart;
-    private BigDecimal seuilBlocageEcart;
+    private BigDecimal margeManquanteMaximale;
+    private BigDecimal margeDepassementMaximale;
     private LocalDate dateDebut;
     private LocalDate dateFin;
     private String excelFeuille;

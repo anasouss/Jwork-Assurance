@@ -117,7 +117,9 @@ export function AffectationQuittanceDialog({
         level: importPreview.niveauEcart,
         allowed: importPreview.validationAutorisee,
         warningThreshold: importPreview.seuilAvertissementEcart,
-        blockingThreshold: importPreview.seuilBlocageEcart,
+        blockingThreshold: applicableBlockingLimit(importPreview),
+        shortageLimit: importPreview.margeManquanteMaximale,
+        excessLimit: importPreview.margeDepassementMaximale,
       }
     : calculatedTolerance;
 
@@ -640,7 +642,9 @@ function ImportResult({ preview }: { preview: ImportPreview }) {
       {!preview.validationAutorisee ? (
         <Alert variant="destructive">
           <AlertTitle>Écart supérieur au seuil autorisé</AlertTitle>
-          <AlertDescription>L’écart absolu dépasse {money(preview.seuilBlocageEcart)}. Corrigez le fichier avant d’enregistrer.</AlertDescription>
+          <AlertDescription>
+            {preview.ecart < 0 ? "Le montant manquant" : "Le dépassement"} excède la marge autorisée de {money(applicableBlockingLimit(preview))}. Corrigez le fichier avant d’enregistrer.
+          </AlertDescription>
         </Alert>
       ) : null}
       {preview.erreurs.length ? (
@@ -670,7 +674,10 @@ function AllocationDifference({ difference, blockingThreshold, level }: {
   return (
     <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2">
       <Metric label="Écart" value={money(difference)} valueClassName={tone} />
-      <Metric label="Seuil de blocage" value={money(blockingThreshold)} />
+      <Metric
+        label={difference < 0 ? "Manquant maximal" : "Dépassement maximal"}
+        value={money(blockingThreshold)}
+      />
     </div>
   );
 }
@@ -679,6 +686,12 @@ function ToleranceBadge({ preview }: { preview: ImportPreview }) {
   if (preview.niveauEcart === "BLOQUANT") return <Badge variant="destructive">Écart {money(preview.ecart)}</Badge>;
   if (preview.niveauEcart === "AVERTISSEMENT") return <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">Écart {money(preview.ecart)}</Badge>;
   return <Badge className="bg-emerald-600 text-white">Écart {money(preview.ecart)}</Badge>;
+}
+
+function applicableBlockingLimit(preview: ImportPreview) {
+  return preview.ecart < 0
+    ? preview.margeManquanteMaximale
+    : preview.margeDepassementMaximale;
 }
 
 function MoneyValue({ value, strong = false }: { value?: number | null; strong?: boolean }) {

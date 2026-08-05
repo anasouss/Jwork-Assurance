@@ -30,7 +30,8 @@ export type Rule = {
   retenueParDefaut: boolean;
   tauxRetenue: number;
   seuilAvertissementEcart: number;
-  seuilBlocageEcart: number;
+  margeManquanteMaximale: number;
+  margeDepassementMaximale: number;
   dateDebut: string;
   dateFin?: string | null;
   excelFeuille?: string | null;
@@ -172,7 +173,8 @@ export type BatchAllocationResponse = {
   ecart: number;
   equilibre: boolean;
   seuilAvertissementEcart: number;
-  seuilBlocageEcart: number;
+  margeManquanteMaximale: number;
+  margeDepassementMaximale: number;
   niveauEcart: NiveauEcartAffectation;
   validationAutorisee: boolean;
 };
@@ -199,7 +201,8 @@ export type ImportPreview = {
   ecart: number;
   equilibre: boolean;
   seuilAvertissementEcart: number;
-  seuilBlocageEcart: number;
+  margeManquanteMaximale: number;
+  margeDepassementMaximale: number;
   niveauEcart: NiveauEcartAffectation;
   validationAutorisee: boolean;
 };

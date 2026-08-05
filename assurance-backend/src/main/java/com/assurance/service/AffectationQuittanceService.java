@@ -1304,6 +1304,7 @@ public class AffectationQuittanceService {
         if (lines.isEmpty() && errors.isEmpty()) {
             errors.add("Le fichier ne contient aucune ligne exploitable");
         }
+        propagateImportTargetsByQuittanceFamily(lines, quittances);
         return new ParsedImport(lines, errors);
     }
 
@@ -1337,6 +1338,72 @@ public class AffectationQuittanceService {
                 .filter(candidate -> resolveDateEffet(candidate).equals(dateEffet))
                 .toList();
         return exactDateMatches.size() == 1 ? exactDateMatches.get(0) : null;
+    }
+
+    private void propagateImportTargetsByQuittanceFamily(
+            List<AffectationQuittanceResponse.Ligne> lines,
+            List<Quittance> candidates
+    ) {
+        if (candidates.size() < 2) {
+            return;
+        }
+
+        Map<String, Set<Long>> matchedTargetsByFamily = new HashMap<>();
+        for (AffectationQuittanceResponse.Ligne line : lines) {
+            String family = quittanceNumberFamily(line.getNumeroQuittanceCompagnie());
+            if (family != null && line.getQuittanceId() != null) {
+                matchedTargetsByFamily
+                        .computeIfAbsent(family, ignored -> new HashSet<>())
+                        .add(line.getQuittanceId());
+            }
+        }
+
+        Map<Long, Quittance> candidatesById = candidates.stream()
+                .collect(Collectors.toMap(Quittance::getId, Function.identity()));
+        for (AffectationQuittanceResponse.Ligne line : lines) {
+            if (line.getQuittanceId() != null) {
+                continue;
+            }
+            String family = quittanceNumberFamily(line.getNumeroQuittanceCompagnie());
+            Set<Long> matchedTargets = family == null ? null : matchedTargetsByFamily.get(family);
+            if (matchedTargets == null || matchedTargets.size() != 1) {
+                continue;
+            }
+            Quittance target = candidatesById.get(matchedTargets.iterator().next());
+            if (target != null && isWithinAllocationPeriod(line, target)) {
+                line.setQuittanceId(target.getId());
+            }
+        }
+    }
+
+    private String quittanceNumberFamily(String number) {
+        String normalized = trimToNull(number);
+        if (normalized == null) {
+            return null;
+        }
+        String family = normalized.toUpperCase(Locale.ROOT)
+                .replaceFirst("[\\s._/-]+\\d+$", "")
+                .trim();
+        return family.equals(normalized.toUpperCase(Locale.ROOT).trim()) || family.isBlank()
+                ? null
+                : family;
+    }
+
+    private boolean isWithinAllocationPeriod(
+            AffectationQuittanceResponse.Ligne line,
+            Quittance target
+    ) {
+        LocalDate dateEffet = line.getDateEffet();
+        LocalDate dateEcheance = line.getDateEcheance();
+        LocalDate periodStart = resolveDateEffet(target);
+        LocalDate periodEnd = resolveDateEcheance(target);
+        return dateEffet != null
+                && periodStart != null
+                && periodEnd != null
+                && !dateEffet.isBefore(periodStart)
+                && !dateEffet.isAfter(periodEnd)
+                && (dateEcheance == null
+                || (!dateEcheance.isBefore(dateEffet) && !dateEcheance.isAfter(periodEnd)));
     }
 
     private Sheet resolveImportSheet(Workbook workbook, RegleAffectationQuittance regle) {

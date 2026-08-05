@@ -90,36 +90,47 @@ export function FinancialHistoryRecalculationDialog({ contratId, open, onOpenCha
             </div>
 
             <div className="overflow-x-auto rounded-md border">
-              <table className="w-full min-w-[850px] text-sm">
+              <table className="w-full min-w-[1050px] text-sm">
                 <thead className="bg-muted/60 text-left">
                   <tr>
                     <th className="px-3 py-2">Mouvement</th>
                     <th className="px-3 py-2">Date d’effet</th>
-                    <th className="px-3 py-2 text-right">Prime nette actuelle</th>
-                    <th className="px-3 py-2 text-right">Prime nette recalculée</th>
-                    <th className="px-3 py-2 text-right">Taxes actuelles</th>
-                    <th className="px-3 py-2 text-right">Taxes recalculées</th>
-                    <th className="px-3 py-2 text-right">TTC actuel</th>
-                    <th className="px-3 py-2 text-right">TTC recalculé</th>
+                    <th className="px-3 py-2">Version</th>
+                    <th className="px-3 py-2 text-right">Prime nette</th>
+                    <th className="px-3 py-2 text-right">Taxe d’assurance</th>
+                    <th className="px-3 py-2 text-right">TPF</th>
+                    <th className="px-3 py-2 text-right">Accessoires</th>
+                    <th className="px-3 py-2 text-right">CNPAC</th>
+                    <th className="px-3 py-2 text-right">TTC</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {data.mouvements.map((movement) => (
-                    <tr key={movement.mouvementId} className="border-t">
-                      <td className="px-3 py-2">
+                {data.mouvements.map((movement) => (
+                  <tbody key={movement.mouvementId}>
+                    <tr className="border-t">
+                      <td rowSpan={2} className="px-3 py-2 align-top">
                         <div className="font-medium">{movement.numeroMouvement} · {movement.libelle}</div>
                         <div className="text-xs text-muted-foreground">{movement.code}</div>
                       </td>
-                      <td className="px-3 py-2">{formatDate(movement.dateEffet)}</td>
+                      <td rowSpan={2} className="px-3 py-2 align-top">{formatDate(movement.dateEffet)}</td>
+                      <td className="px-3 py-2 text-muted-foreground">Actuel</td>
                       <Amount value={movement.anciensMontants.primeNette} />
-                      <Amount value={movement.nouveauxMontants.primeNette} changed={movement.modifie} />
-                      <Amount value={movement.anciensMontants.taxe + movement.anciensMontants.taxeParafiscale} />
-                      <Amount value={movement.nouveauxMontants.taxe + movement.nouveauxMontants.taxeParafiscale} changed={movement.modifie} />
+                      <Amount value={movement.anciensMontants.taxe} />
+                      <Amount value={movement.anciensMontants.taxeParafiscale} />
+                      <Amount value={movement.anciensMontants.accessoire} />
+                      <Amount value={movement.anciensMontants.cnpac} />
                       <Amount value={movement.anciensMontants.primeTotale} />
-                      <Amount value={movement.nouveauxMontants.primeTotale} changed={movement.modifie} strong />
                     </tr>
-                  ))}
-                </tbody>
+                    <tr className="bg-muted/20">
+                      <td className="px-3 py-2 font-medium">Recalculé</td>
+                      <ComparedAmount current={movement.anciensMontants.primeNette} recalculated={movement.nouveauxMontants.primeNette} />
+                      <ComparedAmount current={movement.anciensMontants.taxe} recalculated={movement.nouveauxMontants.taxe} />
+                      <ComparedAmount current={movement.anciensMontants.taxeParafiscale} recalculated={movement.nouveauxMontants.taxeParafiscale} />
+                      <ComparedAmount current={movement.anciensMontants.accessoire} recalculated={movement.nouveauxMontants.accessoire} />
+                      <ComparedAmount current={movement.anciensMontants.cnpac} recalculated={movement.nouveauxMontants.cnpac} />
+                      <ComparedAmount current={movement.anciensMontants.primeTotale} recalculated={movement.nouveauxMontants.primeTotale} strong />
+                    </tr>
+                  </tbody>
+                ))}
               </table>
             </div>
           </div>
@@ -158,6 +169,10 @@ function Amount({ value, changed, strong }: { value: number; changed?: boolean; 
       {money.format(value)}
     </td>
   );
+}
+
+function ComparedAmount({ current, recalculated, strong }: { current: number; recalculated: number; strong?: boolean }) {
+  return <Amount value={recalculated} changed={Math.abs(recalculated - current) >= 0.005} strong={strong} />;
 }
 
 function formatDate(value: string) {

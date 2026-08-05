@@ -209,20 +209,29 @@ function BatchLinesTable({ lines, targets, imported = false, onChange }: {
   onChange: (lines: BatchLine[]) => void;
 }) {
   const update = (key: string, patch: Partial<BatchLine>) => onChange(lines.map((line) => line.key === key ? { ...line, ...patch } : line));
+  const targetById = new Map(targets.map((target) => [target.id, target.label]));
+  const importedGroups = imported ? consecutiveTargetGroups(lines) : new Map<string, number>();
   return (
     <div className="overflow-x-auto border">
       <table className="w-full min-w-[1580px] text-sm">
         <thead className="bg-muted/60 text-left text-xs uppercase"><tr>
-          <th className="px-2 py-2">Mouvement cible</th><th className="px-2 py-2">N° quittance</th>
+          <th className="px-2 py-2">{imported ? "Mouvement rattaché" : "Mouvement cible"}</th><th className="px-2 py-2">N° quittance</th>
           <th className="px-2 py-2">Date effet</th><th className="px-2 py-2">Date échéance</th>
           <th className="px-2 py-2 text-right">Prime nette</th><th className="px-2 py-2 text-right">Taxes</th>
           <th className="px-2 py-2 text-right">Accessoires</th><th className="px-2 py-2 text-right">TTC</th>
           <th className="px-2 py-2 text-right">Commission nette</th><th className="px-2 py-2 text-right">Net compagnie</th><th />
         </tr></thead>
         <tbody>{lines.length ? lines.map((line) => <tr key={line.key} className="border-t align-top">
-          <td className="min-w-64 px-2 py-2"><Select value={line.quittanceId} onValueChange={(value) => update(line.key, { quittanceId: value })}>
-            <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{targets.map((target) => <SelectItem key={target.id} value={target.id}>{target.label}</SelectItem>)}</SelectContent>
-          </Select></td>
+          {imported && line.quittanceId ? (
+            importedGroups.has(line.key) ? <td rowSpan={importedGroups.get(line.key)} className="min-w-64 border-r bg-muted/20 px-3 py-3 align-top">
+              <div className="font-medium">{targetById.get(line.quittanceId) ?? "Mouvement introuvable"}</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {importedGroups.get(line.key)} ligne(s) Excel rattachée(s)
+              </div>
+            </td> : null
+          ) : <td className="min-w-64 px-2 py-2"><Select value={line.quittanceId} onValueChange={(value) => update(line.key, { quittanceId: value })}>
+            <SelectTrigger><SelectValue placeholder={imported ? "Mouvement non identifié" : "Sélectionner"} /></SelectTrigger><SelectContent>{targets.map((target) => <SelectItem key={target.id} value={target.id}>{target.label}</SelectItem>)}</SelectContent>
+          </Select>{imported ? <p className="mt-1 text-xs text-amber-600">Rattachement manuel requis</p> : null}</td>}
           <td className="min-w-44 px-2 py-2"><Input readOnly={imported} value={line.numeroQuittanceCompagnie} onChange={(event) => update(line.key, { numeroQuittanceCompagnie: event.target.value })} /></td>
           <td className="min-w-40 px-2 py-2"><DatePicker disabled={imported} date={line.dateEffet} onSelect={(date) => update(line.key, { dateEffet: toDateOnly(date) ?? "" })} /></td>
           <td className="min-w-40 px-2 py-2"><DatePicker disabled={imported} date={line.dateEcheance} onSelect={(date) => update(line.key, { dateEcheance: toDateOnly(date) ?? "" })} /></td>
@@ -237,6 +246,22 @@ function BatchLinesTable({ lines, targets, imported = false, onChange }: {
       </table>
     </div>
   );
+}
+
+function consecutiveTargetGroups(lines: BatchLine[]) {
+  const groups = new Map<string, number>();
+  for (let index = 0; index < lines.length;) {
+    const targetId = lines[index].quittanceId;
+    if (!targetId) {
+      index += 1;
+      continue;
+    }
+    let end = index + 1;
+    while (end < lines.length && lines[end].quittanceId === targetId) end += 1;
+    groups.set(lines[index].key, end - index);
+    index = end;
+  }
+  return groups;
 }
 
 function MoneyCell({ value, readOnly, onChange }: { value?: number; readOnly: boolean; onChange: (value?: number) => void }) {

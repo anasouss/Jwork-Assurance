@@ -329,7 +329,7 @@ export default function QuittanceAffectationPage() {
         </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[1900px] table-fixed border-collapse text-sm">
+            <table className="w-full min-w-[1710px] table-fixed border-collapse text-sm">
               <colgroup>
                 <col className="w-11" />
                 <col className="w-[210px]" />
@@ -342,10 +342,9 @@ export default function QuittanceAffectationPage() {
                 <col className="w-[105px]" />
                 <col className="w-[110px]" />
                 <col className="w-[115px]" />
-                <col className="w-[100px]" />
                 <col className="w-[115px]" />
-                <col className="w-[170px]" />
-                <col className="w-[155px]" />
+                <col className="w-[150px]" />
+                <col className="w-[105px]" />
                 <col className="w-[150px]" />
               </colgroup>
               <thead className="bg-amber-600 text-xs uppercase text-white dark:bg-amber-700">
@@ -368,7 +367,6 @@ export default function QuittanceAffectationPage() {
                   <Header className="text-right">Accessoires</Header>
                   <Header className="text-right">TTC</Header>
                   <Header className="text-right">Commission</Header>
-                  <Header className="text-right">Retenue</Header>
                   <Header className="text-right">Net compagnie</Header>
                   <Header>N° quittance</Header>
                   <Header>Statut</Header>
@@ -378,12 +376,12 @@ export default function QuittanceAffectationPage() {
               <tbody>
                 {!searched ? (
                   <tr>
-                    <td colSpan={16} className="px-3 py-12 text-center text-muted-foreground">
+                    <td colSpan={15} className="px-3 py-12 text-center text-muted-foreground">
                       Renseignez au moins un critère puis lancez la recherche.
                     </td>
                   </tr>
                 ) : quittances.isLoading ? (
-                  <TableRowsSkeleton colSpan={16} />
+                  <TableRowsSkeleton colSpan={15} />
                 ) : displayRows.length ? (
                   displayRows.map(({ key, row, line }) => (
                     <tr key={key} className="border-b transition-colors hover:bg-muted/40">
@@ -436,9 +434,6 @@ export default function QuittanceAffectationPage() {
                       <Cell className="whitespace-nowrap text-right tabular-nums">
                         {amount(line?.commissionNette ?? row.commissionCalculee ?? 0)}
                       </Cell>
-                      <Cell className="whitespace-nowrap text-right tabular-nums">
-                        {amount(line?.montantRetenue ?? row.retenueCalculee ?? 0)}
-                      </Cell>
                       <Cell className="whitespace-nowrap text-right font-medium tabular-nums">
                         {amount(line?.netCompagnie ?? row.netCompagnieCalcule ?? 0)}
                       </Cell>
@@ -485,7 +480,7 @@ export default function QuittanceAffectationPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={16} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
+                  <tr><td colSpan={15} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
                 )}
               </tbody>
             </table>

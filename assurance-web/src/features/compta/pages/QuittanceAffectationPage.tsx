@@ -325,7 +325,7 @@ export default function QuittanceAffectationPage() {
         </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[1480px] border-collapse text-sm">
+            <table className="w-full min-w-[2080px] border-collapse text-sm">
               <thead className="bg-amber-600 text-xs uppercase text-white dark:bg-amber-700">
                 <tr>
                   <Header>
@@ -344,7 +344,11 @@ export default function QuittanceAffectationPage() {
                   <Header>Date échéance</Header>
                   <Header className="text-right">Prime nette</Header>
                   <Header className="text-right">Taxes</Header>
+                  <Header className="text-right">Accessoires</Header>
                   <Header className="text-right">Montant TTC</Header>
+                  <Header className="text-right">Commission nette</Header>
+                  <Header className="text-right">Retenue</Header>
+                  <Header className="text-right">Net compagnie</Header>
                   <Header>N° quittance compagnie</Header>
                   <Header>Statut</Header>
                   <Header className="text-right">Action</Header>
@@ -353,12 +357,12 @@ export default function QuittanceAffectationPage() {
               <tbody>
                 {!searched ? (
                   <tr>
-                    <td colSpan={13} className="px-3 py-12 text-center text-muted-foreground">
+                    <td colSpan={17} className="px-3 py-12 text-center text-muted-foreground">
                       Renseignez au moins un critère puis lancez la recherche.
                     </td>
                   </tr>
                 ) : quittances.isLoading ? (
-                  <TableRowsSkeleton colSpan={13} />
+                  <TableRowsSkeleton colSpan={17} />
                 ) : displayRows.length ? (
                   displayRows.map(({ key, row, line }) => (
                     <tr key={key} className="border-b transition-colors hover:bg-muted/40">
@@ -380,7 +384,9 @@ export default function QuittanceAffectationPage() {
                       </Cell>
                       <Cell>
                         <div className="font-medium">{row.mouvement}</div>
-                        <div className="text-xs text-muted-foreground">{natureLabel(row.nature)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {line?.categorieSource || line?.acteSource || natureLabel(row.nature)}
+                        </div>
                       </Cell>
                       <Cell>{row.souscripteur || "—"}</Cell>
                       <Cell>{row.police || "—"}</Cell>
@@ -388,7 +394,17 @@ export default function QuittanceAffectationPage() {
                       <Cell>{dateLabel(line?.dateEcheance ?? row.dateEcheance)}</Cell>
                       <Cell className="text-right">{money(line?.primeNette ?? row.primeNette)}</Cell>
                       <Cell className="text-right">{money(line?.montantTaxes ?? row.montantTaxes)}</Cell>
+                      <Cell className="text-right">{money(line?.accessoires ?? row.accessoires)}</Cell>
                       <Cell className="text-right font-medium">{money(line?.montantTtc ?? row.montantTtc)}</Cell>
+                      <Cell className="text-right">
+                        {money(line?.commissionNette ?? row.commissionCalculee ?? 0)}
+                      </Cell>
+                      <Cell className="text-right">
+                        {money(line?.montantRetenue ?? row.retenueCalculee ?? 0)}
+                      </Cell>
+                      <Cell className="text-right font-medium">
+                        {money(line?.netCompagnie ?? row.netCompagnieCalcule ?? 0)}
+                      </Cell>
                       <Cell>
                         {line ? (
                           <span className="whitespace-nowrap font-semibold tabular-nums">
@@ -402,7 +418,7 @@ export default function QuittanceAffectationPage() {
                         ) : null}
                       </Cell>
                       <Cell>
-                        <StatusBadge status={row.statutAffectation} />
+                        {line ? <WritingStatus row={row} /> : <StatusBadge status={row.statutAffectation} />}
                       </Cell>
                       <Cell className="text-right">
                         <div className="flex items-center justify-end gap-2 whitespace-nowrap">
@@ -423,7 +439,7 @@ export default function QuittanceAffectationPage() {
                           >
                             {row.regle
                               ? canAffect
-                                ? row.statutAffectation === "NON_AFFECTEE" ? "Affecter" : "Modifier"
+                                ? row.statutAffectation === "NON_AFFECTEE" ? "Affecter" : "Modifier l’affectation"
                                 : "Consulter"
                               : canConfigure ? "Configurer" : "Configuration requise"}
                           </Button>
@@ -432,7 +448,7 @@ export default function QuittanceAffectationPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={13} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
+                  <tr><td colSpan={17} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
                 )}
               </tbody>
             </table>
@@ -533,6 +549,24 @@ function StatusBadge({ status }: { status: StatutAffectation }) {
     AVEC_ECART: "Avec écart",
   };
   return <Badge variant={variants[status]}>{labels[status]}</Badge>;
+}
+
+function WritingStatus({ row }: { row: QuittanceAllocation }) {
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <Badge variant="success">Affectée</Badge>
+      {row.statutAffectation === "PARTIELLEMENT_AFFECTEE" ? (
+        <span className="whitespace-nowrap text-xs font-medium text-amber-700 dark:text-amber-400">
+          Affectation partielle
+        </span>
+      ) : null}
+      {row.statutAffectation === "AVEC_ECART" ? (
+        <span className="whitespace-nowrap text-xs font-medium text-destructive">
+          Écart {money(row.ecart)}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function productLabel(row: QuittanceAllocation) {

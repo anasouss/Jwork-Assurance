@@ -228,7 +228,8 @@ public class AffectationQuittanceService {
     private byte[] createExportWorkbook(List<AffectationQuittanceResponse> rows) {
         String[] headers = {
                 "Produit", "Mouvement", "Souscripteur", "Police", "Date effet", "Date échéance",
-                "Prime nette", "Taxes", "Montant TTC", "N° quittance compagnie", "Statut"
+                "Prime nette", "Taxes", "Accessoires", "Montant TTC", "Commission nette", "Retenue",
+                "Net compagnie", "N° quittance compagnie", "Statut"
         };
 
         try (Workbook workbook = new XSSFWorkbook();
@@ -257,7 +258,7 @@ public class AffectationQuittanceService {
                 }
             }
 
-            int[] widths = {28, 28, 26, 18, 16, 16, 17, 17, 17, 28, 24};
+            int[] widths = {28, 28, 26, 18, 16, 16, 17, 17, 17, 17, 18, 17, 18, 28, 28};
             for (int column = 0; column < widths.length; column++) {
                 sheet.setColumnWidth(column, widths[column] * 256);
             }
@@ -293,9 +294,27 @@ public class AffectationQuittanceService {
         setExportText(row, column++, formatExportDate(line != null ? line.getDateEcheance() : item.getDateEcheance()), textStyle);
         setExportMoney(row, column++, line != null ? line.getPrimeNette() : item.getPrimeNette(), moneyStyle);
         setExportMoney(row, column++, line != null ? line.getMontantTaxes() : item.getMontantTaxes(), moneyStyle);
+        setExportMoney(row, column++, line != null ? line.getAccessoires() : item.getAccessoires(), moneyStyle);
         setExportMoney(row, column++, line != null ? line.getMontantTtc() : item.getMontantTtc(), moneyStyle);
+        setExportMoney(row, column++, line != null ? line.getCommissionNette() : item.getCommissionCalculee(), moneyStyle);
+        setExportMoney(row, column++, line != null ? line.getMontantRetenue() : item.getRetenueCalculee(), moneyStyle);
+        setExportMoney(row, column++, line != null ? line.getNetCompagnie() : item.getNetCompagnieCalcule(), moneyStyle);
         setExportText(row, column++, line != null ? line.getNumeroQuittanceCompagnie() : null, textStyle);
-        setExportText(row, column, statusLabel(item.getStatutAffectation()), textStyle);
+        setExportText(row, column, exportStatusLabel(item, line), textStyle);
+    }
+
+    private String exportStatusLabel(
+            AffectationQuittanceResponse item,
+            AffectationQuittanceResponse.Ligne line
+    ) {
+        if (line == null) {
+            return statusLabel(item.getStatutAffectation());
+        }
+        return switch (item.getStatutAffectation()) {
+            case PARTIELLEMENT_AFFECTEE -> "Affectée - Affectation partielle";
+            case AVEC_ECART -> "Affectée - Écart " + money(item.getEcart()) + " MAD";
+            default -> "Affectée";
+        };
     }
 
     private CellStyle createExportHeaderStyle(Workbook workbook) {

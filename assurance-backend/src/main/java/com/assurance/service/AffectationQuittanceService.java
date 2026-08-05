@@ -247,20 +247,14 @@ public class AffectationQuittanceService {
 
             int rowIndex = 1;
             for (AffectationQuittanceResponse item : rows) {
-                Row row = sheet.createRow(rowIndex++);
-                row.setHeightInPoints(30);
-                int column = 0;
-                setExportText(row, column++, joinExportLines(productLabel(item), item.getDossier()), textStyle);
-                setExportText(row, column++, joinExportLines(item.getMouvement(), natureLabel(item.getNature())), textStyle);
-                setExportText(row, column++, item.getSouscripteur(), textStyle);
-                setExportText(row, column++, item.getPolice(), textStyle);
-                setExportText(row, column++, formatExportDate(item.getDateEffet()), textStyle);
-                setExportText(row, column++, formatExportDate(item.getDateEcheance()), textStyle);
-                setExportMoney(row, column++, item.getPrimeNette(), moneyStyle);
-                setExportMoney(row, column++, item.getMontantTaxes(), moneyStyle);
-                setExportMoney(row, column++, item.getMontantTtc(), moneyStyle);
-                setExportText(row, column++, item.getNumerosQuittanceCompagnie(), textStyle);
-                setExportText(row, column, statusLabel(item.getStatutAffectation()), textStyle);
+                List<AffectationQuittanceResponse.Ligne> lines = item.getLignes();
+                if (lines == null || lines.isEmpty()) {
+                    writeExportRow(sheet.createRow(rowIndex++), item, null, textStyle, moneyStyle);
+                    continue;
+                }
+                for (AffectationQuittanceResponse.Ligne line : lines) {
+                    writeExportRow(sheet.createRow(rowIndex++), item, line, textStyle, moneyStyle);
+                }
             }
 
             int[] widths = {28, 28, 26, 18, 16, 16, 17, 17, 17, 28, 24};
@@ -280,6 +274,28 @@ public class AffectationQuittanceService {
         } catch (IOException exception) {
             throw new BadRequestException("Génération du fichier Excel impossible");
         }
+    }
+
+    private void writeExportRow(
+            Row row,
+            AffectationQuittanceResponse item,
+            AffectationQuittanceResponse.Ligne line,
+            CellStyle textStyle,
+            CellStyle moneyStyle
+    ) {
+        row.setHeightInPoints(30);
+        int column = 0;
+        setExportText(row, column++, joinExportLines(productLabel(item), item.getDossier()), textStyle);
+        setExportText(row, column++, joinExportLines(item.getMouvement(), natureLabel(item.getNature())), textStyle);
+        setExportText(row, column++, item.getSouscripteur(), textStyle);
+        setExportText(row, column++, item.getPolice(), textStyle);
+        setExportText(row, column++, formatExportDate(line != null ? line.getDateEffet() : item.getDateEffet()), textStyle);
+        setExportText(row, column++, formatExportDate(line != null ? line.getDateEcheance() : item.getDateEcheance()), textStyle);
+        setExportMoney(row, column++, line != null ? line.getPrimeNette() : item.getPrimeNette(), moneyStyle);
+        setExportMoney(row, column++, line != null ? line.getMontantTaxes() : item.getMontantTaxes(), moneyStyle);
+        setExportMoney(row, column++, line != null ? line.getMontantTtc() : item.getMontantTtc(), moneyStyle);
+        setExportText(row, column++, line != null ? line.getNumeroQuittanceCompagnie() : null, textStyle);
+        setExportText(row, column, statusLabel(item.getStatutAffectation()), textStyle);
     }
 
     private CellStyle createExportHeaderStyle(Workbook workbook) {

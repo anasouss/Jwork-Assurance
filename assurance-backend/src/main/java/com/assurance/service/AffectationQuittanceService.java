@@ -310,11 +310,7 @@ public class AffectationQuittanceService {
         if (line == null) {
             return statusLabel(item.getStatutAffectation());
         }
-        return switch (item.getStatutAffectation()) {
-            case PARTIELLEMENT_AFFECTEE -> "Affectée - Affectation partielle";
-            case AVEC_ECART -> "Affectée - Écart " + money(item.getEcart()) + " MAD";
-            default -> "Affectée";
-        };
+        return "Affectée";
     }
 
     private CellStyle createExportHeaderStyle(Workbook workbook) {

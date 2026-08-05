@@ -370,7 +370,7 @@ export default function QuittanceAffectationPage() {
                   <Header className="text-right">Commission</Header>
                   <Header className="text-right">Retenue</Header>
                   <Header className="text-right">Net compagnie</Header>
-                  <Header>N° quittance compagnie</Header>
+                  <Header>N° quittance</Header>
                   <Header>Statut</Header>
                   <Header className="text-right">Action</Header>
                 </tr>
@@ -400,8 +400,10 @@ export default function QuittanceAffectationPage() {
                         )}
                       </Cell>
                       <Cell>
-                        <div className="truncate font-medium" title={row.dossier}>{row.dossier}</div>
-                        <div className="truncate text-xs text-muted-foreground">{productLabel(row)}</div>
+                        <div className="truncate font-medium">{productLabel(row)}</div>
+                        <div className="truncate text-xs text-muted-foreground" title={row.dossier}>
+                          {row.dossier}
+                        </div>
                       </Cell>
                       <Cell>
                         <div className="font-medium">{row.mouvement}</div>
@@ -453,7 +455,7 @@ export default function QuittanceAffectationPage() {
                         ) : null}
                       </Cell>
                       <Cell>
-                        {line ? <WritingStatus row={row} /> : <StatusBadge status={row.statutAffectation} />}
+                        <StatusBadge status={line ? "AFFECTEE" : row.statutAffectation} />
                       </Cell>
                       <Cell className="text-right">
                         <div className="flex items-center justify-end gap-2 whitespace-nowrap">
@@ -584,24 +586,6 @@ function StatusBadge({ status }: { status: StatutAffectation }) {
     AVEC_ECART: "Avec écart",
   };
   return <Badge variant={variants[status]}>{labels[status]}</Badge>;
-}
-
-function WritingStatus({ row }: { row: QuittanceAllocation }) {
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <Badge variant="success">Affectée</Badge>
-      {row.statutAffectation === "PARTIELLEMENT_AFFECTEE" ? (
-        <span className="whitespace-nowrap text-xs font-medium text-amber-700 dark:text-amber-400">
-          Affectation partielle
-        </span>
-      ) : null}
-      {row.statutAffectation === "AVEC_ECART" ? (
-        <span className="whitespace-nowrap text-xs font-medium text-destructive">
-          Écart {money(row.ecart)}
-        </span>
-      ) : null}
-    </div>
-  );
 }
 
 function productLabel(row: QuittanceAllocation) {

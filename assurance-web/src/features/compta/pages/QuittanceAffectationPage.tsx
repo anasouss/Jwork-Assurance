@@ -34,7 +34,7 @@ type QuittancePresence = "AVEC_QUITTANCE" | "SANS_QUITTANCE";
 type Filters = {
   compagnieId: "ALL" | string;
   typeContrat: "ALL" | TypeContrat;
-  nature: "ALL" | QuittancePresence;
+  nature: QuittancePresence;
   dateDu: string;
   dateAu: string;
   search: string;
@@ -43,7 +43,7 @@ type Filters = {
 const DEFAULT_FILTERS: Filters = {
   compagnieId: "ALL",
   typeContrat: "ALL",
-  nature: "ALL",
+  nature: "SANS_QUITTANCE",
   dateDu: "",
   dateAu: "",
   search: "",
@@ -84,9 +84,7 @@ export default function QuittanceAffectationPage() {
     () => !searched ? null : ({
       compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
       typeContrat: appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
-      avecQuittance: appliedFilters.nature === "ALL"
-        ? undefined
-        : appliedFilters.nature === "AVEC_QUITTANCE",
+      avecQuittance: appliedFilters.nature === "AVEC_QUITTANCE",
       dateDu: appliedFilters.dateDu || undefined,
       dateAu: appliedFilters.dateAu || undefined,
       search: appliedFilters.search.trim() || undefined,
@@ -107,8 +105,8 @@ export default function QuittanceAffectationPage() {
   const rows = quittances.data?.rows ?? [];
   const isAffectedView = appliedFilters.nature === "AVEC_QUITTANCE";
   const isPendingView = appliedFilters.nature === "SANS_QUITTANCE";
-  const showSelectionColumn = !isAffectedView;
-  const showCompanyColumns = !isPendingView;
+  const showSelectionColumn = isPendingView;
+  const showCompanyColumns = isAffectedView;
   type DisplayRow = {
     key: string;
     row: QuittanceAllocation;
@@ -141,7 +139,7 @@ export default function QuittanceAffectationPage() {
     : isAffectedView
       ? "min-w-[1510px]"
       : "min-w-[1555px]";
-  const canSearch = hasMeaningfulFilter(filters);
+  const canSearch = Boolean(filters.nature);
   const hasDateError = Boolean(filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu);
 
   function applyFilters() {
@@ -272,7 +270,6 @@ export default function QuittanceAffectationPage() {
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">Toutes</SelectItem>
                   <SelectItem value="AVEC_QUITTANCE">Primes avec quittances</SelectItem>
                   <SelectItem value="SANS_QUITTANCE">Primes sans quittances</SelectItem>
                 </SelectContent>
@@ -643,15 +640,6 @@ function amount(value: number) {
   return AMOUNT_FORMATTER.format(value).replace(/[\u00a0\u202f]/g, " ");
 }
 
-function hasMeaningfulFilter(filters: Filters) {
-  return filters.compagnieId !== "ALL"
-    || filters.typeContrat !== "ALL"
-    || filters.nature !== "ALL"
-    || Boolean(filters.dateDu)
-    || Boolean(filters.dateAu)
-    || Boolean(filters.search.trim());
-}
-
 function searchStateFromUrl(params: URLSearchParams) {
   const typeContrat = params.get("typeContrat");
   const nature = params.get("nature");
@@ -660,13 +648,14 @@ function searchStateFromUrl(params: URLSearchParams) {
     typeContrat: typeContrat === "PARTICULIER" || typeContrat === "CONVENTION" || typeContrat === "FLOTTE"
       ? typeContrat
       : "ALL",
-    nature: nature === "AVEC_QUITTANCE" || nature === "SANS_QUITTANCE" ? nature : "ALL",
+    nature: nature === "AVEC_QUITTANCE" ? nature : "SANS_QUITTANCE",
     dateDu: validDateParam(params.get("dateDu")),
     dateAu: validDateParam(params.get("dateAu")),
     search: params.get("search")?.trim() || "",
   };
   const requestedPage = Number.parseInt(params.get("page") || "1", 10);
-  const searched = hasMeaningfulFilter(filters);
+  const searched = ["compagnieId", "typeContrat", "nature", "dateDu", "dateAu", "search"]
+    .some((key) => params.has(key));
   return {
     filters,
     searched,
@@ -678,7 +667,7 @@ function toUrlParams(filters: Filters, page: number) {
   const params = new URLSearchParams();
   if (filters.compagnieId !== "ALL") params.set("compagnieId", filters.compagnieId);
   if (filters.typeContrat !== "ALL") params.set("typeContrat", filters.typeContrat);
-  if (filters.nature !== "ALL") params.set("nature", filters.nature);
+  params.set("nature", filters.nature);
   if (filters.dateDu) params.set("dateDu", filters.dateDu);
   if (filters.dateAu) params.set("dateAu", filters.dateAu);
   if (filters.search.trim()) params.set("search", filters.search.trim());
@@ -694,7 +683,7 @@ function toApiFilters(filters: Filters) {
   return {
     compagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
     typeContrat: filters.typeContrat === "ALL" ? undefined : filters.typeContrat,
-    avecQuittance: filters.nature === "ALL" ? undefined : filters.nature === "AVEC_QUITTANCE",
+    avecQuittance: filters.nature === "AVEC_QUITTANCE",
     dateDu: filters.dateDu || undefined,
     dateAu: filters.dateAu || undefined,
     search: filters.search.trim() || undefined,

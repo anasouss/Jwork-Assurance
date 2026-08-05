@@ -21,6 +21,7 @@ import { AffectationQuittanceDialog } from "../components/AffectationQuittanceDi
 import { BulkAffectationQuittanceDialog } from "../components/BulkAffectationQuittanceDialog";
 import { QuittanceRulesDialog } from "../components/QuittanceRulesDialog";
 import type {
+  AllocationLine,
   CategorieMouvement,
   QuittanceAllocation,
   Rule,
@@ -100,6 +101,17 @@ export default function QuittanceAffectationPage() {
   });
 
   const rows = quittances.data?.rows ?? [];
+  const displayRows: Array<{
+    key: string;
+    row: QuittanceAllocation;
+    line: AllocationLine | null;
+  }> = rows.flatMap((row) => row.lignes.length > 0
+    ? row.lignes.map((line, index) => ({
+        key: line.id ?? `${row.quittanceId}-${index}`,
+        row,
+        line,
+      }))
+    : [{ key: row.quittanceId, row, line: null }]);
   const selectedRows = rows.filter((row) => selectedIds.includes(row.quittanceId));
   const selectionReference = selectedRows[0];
   const selectableRows = rows.filter((row) => isBulkCompatible(row, selectionReference));
@@ -346,18 +358,20 @@ export default function QuittanceAffectationPage() {
                   </tr>
                 ) : quittances.isLoading ? (
                   <TableRowsSkeleton colSpan={13} />
-                ) : rows.length ? (
-                  rows.map((row) => (
-                    <tr key={row.quittanceId} className="border-b transition-colors hover:bg-muted/40">
+                ) : displayRows.length ? (
+                  displayRows.map(({ key, row, line }) => (
+                    <tr key={key} className="border-b transition-colors hover:bg-muted/40">
                       <Cell>
-                        <Checkbox
-                          aria-label={`Sélectionner ${row.mouvement}`}
-                          disabled={!canAffect || !isBulkCompatible(row, selectionReference)}
-                          checked={selectedIds.includes(row.quittanceId)}
-                          onCheckedChange={(checked) => setSelectedIds((current) => checked === true
-                            ? [...current, row.quittanceId]
-                            : current.filter((id) => id !== row.quittanceId))}
-                        />
+                        {line ? null : (
+                          <Checkbox
+                            aria-label={`Sélectionner ${row.mouvement}`}
+                            disabled={!canAffect || !isBulkCompatible(row, selectionReference)}
+                            checked={selectedIds.includes(row.quittanceId)}
+                            onCheckedChange={(checked) => setSelectedIds((current) => checked === true
+                              ? [...current, row.quittanceId]
+                              : current.filter((id) => id !== row.quittanceId))}
+                          />
+                        )}
                       </Cell>
                       <Cell>
                         <div className="font-medium">{productLabel(row)}</div>
@@ -369,15 +383,15 @@ export default function QuittanceAffectationPage() {
                       </Cell>
                       <Cell>{row.souscripteur || "—"}</Cell>
                       <Cell>{row.police || "—"}</Cell>
-                      <Cell>{dateLabel(row.dateEffet)}</Cell>
-                      <Cell>{dateLabel(row.dateEcheance)}</Cell>
-                      <Cell className="text-right">{money(row.primeNette)}</Cell>
-                      <Cell className="text-right">{money(row.montantTaxes)}</Cell>
-                      <Cell className="text-right font-medium">{money(row.montantTtc)}</Cell>
+                      <Cell>{dateLabel(line?.dateEffet ?? row.dateEffet)}</Cell>
+                      <Cell>{dateLabel(line?.dateEcheance ?? row.dateEcheance)}</Cell>
+                      <Cell className="text-right">{money(line?.primeNette ?? row.primeNette)}</Cell>
+                      <Cell className="text-right">{money(line?.montantTaxes ?? row.montantTaxes)}</Cell>
+                      <Cell className="text-right font-medium">{money(line?.montantTtc ?? row.montantTtc)}</Cell>
                       <Cell>
-                        {row.numerosQuittanceCompagnie ? (
-                          <span className="whitespace-nowrap font-semibold tabular-nums text-foreground">
-                            {row.numerosQuittanceCompagnie}
+                        {line ? (
+                          <span className="whitespace-nowrap font-semibold tabular-nums">
+                            {line.numeroQuittanceCompagnie}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -386,7 +400,9 @@ export default function QuittanceAffectationPage() {
                           <div className="mt-1 text-xs font-medium text-destructive">Configuration manquante</div>
                         ) : null}
                       </Cell>
-                      <Cell><StatusBadge status={row.statutAffectation} /></Cell>
+                      <Cell>
+                        <StatusBadge status={row.statutAffectation} />
+                      </Cell>
                       <Cell className="text-right">
                         <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                           <Button asChild type="button" size="icon" variant="ghost" title="Voir le détail">

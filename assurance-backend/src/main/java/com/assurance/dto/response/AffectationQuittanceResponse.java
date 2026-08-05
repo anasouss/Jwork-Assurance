@@ -35,7 +35,6 @@ public class AffectationQuittanceResponse {
     private BigDecimal montantTtc;
     private BigDecimal montantAffecte;
     private BigDecimal ecart;
-    private String numerosQuittanceCompagnie;
     private BigDecimal commissionCalculee;
     private BigDecimal retenueCalculee;
     private BigDecimal netCompagnieCalcule;

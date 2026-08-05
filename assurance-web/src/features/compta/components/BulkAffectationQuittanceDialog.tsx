@@ -225,7 +225,8 @@ function BatchLinesTable({ lines, targets, imported = false, onChange }: {
 }) {
   const update = (key: string, patch: Partial<BatchLine>) => onChange(lines.map((line) => line.key === key ? { ...line, ...patch } : line));
   const targetById = new Map(targets.map((target) => [target.id, target.label]));
-  const importedGroups = imported ? consecutiveTargetGroups(lines) : new Map<string, number>();
+  const displayedLines = imported ? groupImportedLinesByTarget(lines) : lines;
+  const importedGroups = imported ? consecutiveTargetGroups(displayedLines) : new Map<string, number>();
   return (
     <div className="overflow-x-auto border">
       <table className="w-full min-w-[1580px] text-sm">
@@ -236,13 +237,10 @@ function BatchLinesTable({ lines, targets, imported = false, onChange }: {
           <th className="px-2 py-2 text-right">Accessoires</th><th className="px-2 py-2 text-right">TTC</th>
           <th className="px-2 py-2 text-right">Commission nette</th><th className="px-2 py-2 text-right">Net compagnie</th><th />
         </tr></thead>
-        <tbody>{lines.length ? lines.map((line) => <tr key={line.key} className="border-t align-top">
+        <tbody>{displayedLines.length ? displayedLines.map((line) => <tr key={line.key} className="border-t align-top">
           {imported && line.quittanceId ? (
             importedGroups.has(line.key) ? <td rowSpan={importedGroups.get(line.key)} className="min-w-64 border-r bg-muted/20 px-3 py-3 align-top">
               <div className="font-medium">{targetById.get(line.quittanceId) ?? "Mouvement introuvable"}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {importedGroups.get(line.key)} ligne(s) Excel rattachée(s)
-              </div>
             </td> : null
           ) : <td className="min-w-64 px-2 py-2"><Select value={line.quittanceId} onValueChange={(value) => update(line.key, { quittanceId: value })}>
             <SelectTrigger><SelectValue placeholder={imported ? "Mouvement non identifié" : "Sélectionner"} /></SelectTrigger><SelectContent>{targets.map((target) => <SelectItem key={target.id} value={target.id}>{target.label}</SelectItem>)}</SelectContent>
@@ -261,6 +259,22 @@ function BatchLinesTable({ lines, targets, imported = false, onChange }: {
       </table>
     </div>
   );
+}
+
+function groupImportedLinesByTarget(lines: BatchLine[]) {
+  const groups = new Map<string, BatchLine[]>();
+
+  lines.forEach((line) => {
+    const groupKey = line.quittanceId || `unmatched:${line.key}`;
+    const group = groups.get(groupKey);
+    if (group) {
+      group.push(line);
+    } else {
+      groups.set(groupKey, [line]);
+    }
+  });
+
+  return Array.from(groups.values()).flat();
 }
 
 function consecutiveTargetGroups(lines: BatchLine[]) {

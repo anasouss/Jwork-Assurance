@@ -146,7 +146,7 @@ public class AffectationQuittanceService {
                             affectations.getOrDefault(quittance.getId(), List.of()),
                             souscripteurs.get(quittance.getContrat().getId()),
                             regle,
-                            false
+                            true
                     );
                 })
                 .toList();
@@ -1156,13 +1156,23 @@ public class AffectationQuittanceService {
                 .montantTtc(expected)
                 .montantAffecte(money(allocated))
                 .ecart(money(allocated.subtract(expected)))
-                .numerosQuittanceCompagnie(affectations.stream()
-                        .map(AffectationQuittanceCompagnie::getNumeroQuittanceCompagnie)
-                        .collect(Collectors.joining(", ")))
                 .avecRetenue(avecRetenue)
                 .statutAffectation(statut)
                 .regle(regle != null ? toRuleResponse(regle) : null)
-                .lignes(includeLines ? affectations.stream().map(this::toLineResponse).toList() : List.of())
+                .lignes(includeLines
+                        ? affectations.stream()
+                                .sorted(Comparator
+                                        .comparing(
+                                                AffectationQuittanceCompagnie::getDateEffet,
+                                                Comparator.nullsLast(Comparator.naturalOrder())
+                                        )
+                                        .thenComparing(
+                                                AffectationQuittanceCompagnie::getNumeroQuittanceCompagnie,
+                                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
+                                        ))
+                                .map(this::toLineResponse)
+                                .toList()
+                        : List.of())
                 .build();
     }
 

@@ -110,7 +110,6 @@ export type QuittanceAllocation = {
   montantTtc: number;
   montantAffecte: number;
   ecart: number;
-  numerosQuittanceCompagnie: string;
   commissionCalculee?: number | null;
   retenueCalculee?: number | null;
   netCompagnieCalcule?: number | null;

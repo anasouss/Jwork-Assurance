@@ -47,8 +47,11 @@ export function ContratFormLayout({
   showFractionnement = true,
   order = "mono",
 }: Props) {
+  const loadError = form.draftQuery.error;
   const submissionError = form.createMutation.error;
-  const correctionConflict = form.correctionBlocked
+  const loadCorrectionConflict = loadError instanceof ApiError
+    && loadError.code === "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED";
+  const correctionConflict = form.correctionBlocked || loadCorrectionConflict
     || (submissionError instanceof ApiError
       && submissionError.code === "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED");
   const souscripteurCategorieClientId = form.clients.find((client) => client.role === "SOUSCRIPTEUR")?.client.categorieClientId ?? "";
@@ -305,6 +308,35 @@ export function ContratFormLayout({
     return (
       <div className="mx-auto w-full max-w-[1440px]">
         <ProductionFormSkeleton variant="contract" />
+      </div>
+    );
+  }
+
+  if (form.draftQuery.isError) {
+    return (
+      <div className="mx-auto grid w-full max-w-[1440px] gap-4">
+        <div>
+          <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</div>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">Modification du contrat</h1>
+          <p className="text-sm text-muted-foreground">Le contrat ne peut pas être ouvert en modification.</p>
+        </div>
+
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>
+            {loadCorrectionConflict ? "Modification directe impossible" : "Chargement impossible"}
+          </AlertTitle>
+          <AlertDescription>
+            <p>
+              {loadError instanceof Error
+                ? loadError.message
+                : "Une erreur est survenue pendant le chargement du contrat."}
+            </p>
+            <Button asChild variant="outline" size="sm" className="mt-2">
+              <Link to="/app/production/contrats">Retour à la liste des contrats</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }

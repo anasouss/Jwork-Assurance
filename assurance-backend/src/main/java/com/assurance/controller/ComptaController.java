@@ -3,6 +3,7 @@ package com.assurance.controller;
 import com.assurance.dto.request.CreerDocumentClientRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
 import com.assurance.dto.request.EnregistrerAffectationQuittanceRequest;
+import com.assurance.dto.request.EnregistrerLotAffectationQuittanceRequest;
 import com.assurance.dto.request.UpsertRegleAffectationQuittanceRequest;
 import com.assurance.dto.response.AffectationQuittancePageResponse;
 import com.assurance.dto.response.AffectationQuittanceResponse;
@@ -11,6 +12,7 @@ import com.assurance.dto.response.DocumentClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.ElementFacturableResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
+import com.assurance.dto.response.LotAffectationQuittanceResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
@@ -144,6 +146,21 @@ public class ComptaController {
         ));
     }
 
+    @PutMapping("/quittances/affectations/lot")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<LotAffectationQuittanceResponse>> enregistrerLotAffectation(
+            @Valid @RequestBody EnregistrerLotAffectationQuittanceRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                affectationQuittanceService.saveBatch(
+                        TenantContext.getCurrentAgence(),
+                        TenantContext.getCurrentUser(),
+                        request
+                ),
+                "Affectation groupée des quittances enregistrée"
+        ));
+    }
+
     @DeleteMapping("/quittances/{quittanceId}/affectation")
     @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
     public ResponseEntity<ApiResponse<Void>> supprimerAffectation(@PathVariable Long quittanceId) {
@@ -161,6 +178,21 @@ public class ComptaController {
         return ResponseEntity.ok(ApiResponse.success(affectationQuittanceService.previewImport(
                 TenantContext.getCurrentAgence(),
                 quittanceId,
+                avecRetenue,
+                file
+        )));
+    }
+
+    @PostMapping("/quittances/affectations/lot/imports/previsualisation")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<ImportAffectationQuittancePreviewResponse>> previsualiserImportLot(
+            @RequestParam List<Long> quittanceIds,
+            @RequestParam boolean avecRetenue,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(affectationQuittanceService.previewBatchImport(
+                TenantContext.getCurrentAgence(),
+                quittanceIds,
                 avecRetenue,
                 file
         )));

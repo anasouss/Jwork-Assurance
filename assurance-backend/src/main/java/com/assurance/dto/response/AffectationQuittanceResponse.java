@@ -48,6 +48,7 @@ public class AffectationQuittanceResponse {
     @Builder
     public static class Ligne {
         private Long id;
+        private Long quittanceId;
         private String numeroQuittanceCompagnie;
         private SourceAffectationQuittance source;
         private LocalDate dateEffet;

@@ -23,4 +23,11 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
             String numeroQuittanceCompagnie,
             Long quittanceId
     );
+
+    boolean existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
+            Long agenceId,
+            Long compagnieId,
+            String numeroQuittanceCompagnie,
+            Collection<Long> quittanceIds
+    );
 }

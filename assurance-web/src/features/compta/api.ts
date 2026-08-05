@@ -2,6 +2,8 @@ import { apiFetch, apiFetchBlob, apiUpload, buildQueryString } from "@/lib/api/b
 import type { ApiResponse } from "@/lib/types";
 import type {
   AllocationRequest,
+  BatchAllocationRequest,
+  BatchAllocationResponse,
   ClientDocument,
   ClientDocumentPage,
   ClientDocumentSourcePage,
@@ -87,6 +89,20 @@ export const comptaApi = {
     );
   },
 
+  async saveBatchAllocation(request: BatchAllocationRequest) {
+    const response = unwrap(
+      await apiFetch<ApiResponse<BatchAllocationResponse>>(
+        "/api/v1/compta/quittances/affectations/lot",
+        { method: "PUT", body: JSON.stringify(request) }
+      )
+    );
+    return {
+      ...response,
+      quittances: response.quittances.map(normalizeAllocation),
+      lignes: response.lignes.map(normalizeAllocationLine),
+    };
+  },
+
   async previewImport(quittanceId: string, file: File, avecRetenue: boolean) {
     const data = new FormData();
     data.append("file", file);
@@ -105,6 +121,21 @@ export const comptaApi = {
         id: line.id == null ? undefined : String(line.id),
       })),
     };
+  },
+
+  async previewBatchImport(quittanceIds: string[], file: File, avecRetenue: boolean) {
+    const data = new FormData();
+    data.append("file", file);
+    const preview = unwrap(
+      await apiUpload<ApiResponse<ImportPreview>>(
+        `/api/v1/compta/quittances/affectations/lot/imports/previsualisation${buildQueryString({
+          quittanceIds,
+          avecRetenue,
+        })}`,
+        data
+      )
+    );
+    return { ...preview, lignes: preview.lignes.map(normalizeAllocationLine) };
   },
 
   async rules(params: { page: number; size: number }) {
@@ -258,10 +289,15 @@ function normalizeAllocation(allocation: QuittanceAllocation): QuittanceAllocati
     mouvementId: allocation.mouvementId == null ? null : String(allocation.mouvementId),
     compagnieId: allocation.compagnieId == null ? null : String(allocation.compagnieId),
     regle: allocation.regle ? normalizeRule(allocation.regle) : null,
-    lignes: allocation.lignes.map((line) => ({
-      ...line,
-      id: line.id == null ? undefined : String(line.id),
-    })),
+    lignes: allocation.lignes.map(normalizeAllocationLine),
+  };
+}
+
+function normalizeAllocationLine(line: QuittanceAllocation["lignes"][number]) {
+  return {
+    ...line,
+    id: line.id == null ? undefined : String(line.id),
+    quittanceId: line.quittanceId == null ? null : String(line.quittanceId),
   };
 }
 

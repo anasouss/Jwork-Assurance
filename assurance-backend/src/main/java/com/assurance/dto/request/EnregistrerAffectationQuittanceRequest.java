@@ -25,6 +25,7 @@ public class EnregistrerAffectationQuittanceRequest {
 
     @Data
     public static class Ligne {
+        private Long quittanceId;
         @NotBlank
         private String numeroQuittanceCompagnie;
         @NotNull

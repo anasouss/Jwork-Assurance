@@ -1,10 +1,12 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.EnregistrerAffectationQuittanceRequest;
+import com.assurance.dto.request.EnregistrerLotAffectationQuittanceRequest;
 import com.assurance.dto.request.UpsertRegleAffectationQuittanceRequest;
 import com.assurance.dto.response.AffectationQuittancePageResponse;
 import com.assurance.dto.response.AffectationQuittanceResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
+import com.assurance.dto.response.LotAffectationQuittanceResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
 import com.assurance.entity.AffectationQuittanceCompagnie;
@@ -443,6 +445,59 @@ public class AffectationQuittanceService {
     }
 
     @Transactional
+    public LotAffectationQuittanceResponse saveBatch(
+            Long agenceId,
+            Long userId,
+            EnregistrerLotAffectationQuittanceRequest request
+    ) {
+        List<Quittance> quittances = requireCompatibleFleetBatch(agenceId, request.getQuittanceIds());
+        Map<Long, Quittance> byId = quittances.stream()
+                .collect(Collectors.toMap(Quittance::getId, Function.identity()));
+        Map<Long, List<EnregistrerAffectationQuittanceRequest.Ligne>> linesByQuittance = request.getLignes().stream()
+                .peek(line -> {
+                    if (line.getQuittanceId() == null || !byId.containsKey(line.getQuittanceId())) {
+                        throw new BadRequestException("Chaque ligne compagnie doit être rattachée à un mouvement sélectionné");
+                    }
+                })
+                .collect(Collectors.groupingBy(
+                        EnregistrerAffectationQuittanceRequest.Ligne::getQuittanceId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+        if (!linesByQuittance.keySet().containsAll(byId.keySet())) {
+            throw new BadRequestException("Chaque quittance sélectionnée doit recevoir au moins une ligne compagnie");
+        }
+
+        List<AffectationQuittanceCompagnie> entities = new ArrayList<>();
+        for (Quittance quittance : quittances) {
+            RegleAffectationQuittance regle = requireEffectiveRule(agenceId, quittance);
+            validateMode(TypeContrat.FLOTTE, regle, request.getSource());
+            EnregistrerAffectationQuittanceRequest itemRequest = new EnregistrerAffectationQuittanceRequest();
+            itemRequest.setSource(request.getSource());
+            itemRequest.setAvecRetenue(request.getAvecRetenue());
+            itemRequest.setFichierSource(request.getFichierSource());
+            itemRequest.setLignes(linesByQuittance.get(quittance.getId()));
+            entities.addAll(buildFleetAffectations(agenceId, userId, quittance, regle, itemRequest));
+        }
+
+        validateBatchRequestNumbers(agenceId, byId.keySet(), entities);
+        BigDecimal expected = quittances.stream()
+                .map(quittance -> requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance"))
+                .reduce(ZERO, BigDecimal::add);
+        BigDecimal affected = entities.stream()
+                .map(AffectationQuittanceCompagnie::getMontantTtc)
+                .reduce(ZERO, BigDecimal::add);
+        if (money(affected).compareTo(money(expected)) != 0) {
+            throw new BadRequestException("Le total TTC des lignes compagnie ne correspond pas au total des quittances sélectionnées");
+        }
+
+        byId.keySet().forEach(affectationRepository::deleteByQuittanceId);
+        affectationRepository.flush();
+        affectationRepository.saveAll(entities);
+        return buildBatchResponse(quittances, entities, expected);
+    }
+
+    @Transactional
     public void clear(Long agenceId, Long quittanceId) {
         requireQuittance(agenceId, quittanceId);
         affectationRepository.deleteByQuittanceId(quittanceId);
@@ -465,7 +520,7 @@ public class AffectationQuittanceService {
             throw new BadRequestException("Sélectionnez un fichier Excel");
         }
 
-        ParsedImport parsed = parseImport(file, quittance, regle, avecRetenue);
+        ParsedImport parsed = parseImport(file, List.of(quittance), regle, avecRetenue);
         BigDecimal montantTtc = sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getMontantTtc);
         BigDecimal expected = requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance");
         BigDecimal ecart = money(montantTtc.subtract(expected));
@@ -489,6 +544,46 @@ public class AffectationQuittanceService {
                 .netCompagnie(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getNetCompagnie))
                 .ecart(ecart)
                 .equilibre(equilibre)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ImportAffectationQuittancePreviewResponse previewBatchImport(
+            Long agenceId,
+            List<Long> quittanceIds,
+            boolean avecRetenue,
+            MultipartFile file
+    ) {
+        List<Quittance> quittances = requireCompatibleFleetBatch(agenceId, quittanceIds);
+        RegleAffectationQuittance regle = requireEffectiveRule(agenceId, quittances.get(0));
+        if (regle.getModeAffectation() != ModeAffectationQuittance.MANUEL_OU_IMPORT) {
+            throw new BadRequestException("L'import groupé requiert une règle flotte en mode manuel/import");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Sélectionnez un fichier Excel");
+        }
+        ParsedImport parsed = parseBatchImport(file, quittances, regle, avecRetenue);
+        BigDecimal montantTtc = sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getMontantTtc);
+        BigDecimal expected = quittances.stream()
+                .map(quittance -> requiredAmount(quittance.getPrimeTotale(), "Montant TTC de la quittance"))
+                .reduce(ZERO, BigDecimal::add);
+        BigDecimal ecart = money(montantTtc.subtract(expected));
+        if (ecart.signum() != 0) {
+            parsed.errors().add("Le total TTC importé ne correspond pas au total des quittances sélectionnées");
+        }
+        return ImportAffectationQuittancePreviewResponse.builder()
+                .fichier(cleanFileName(file.getOriginalFilename()))
+                .lignesLues(parsed.lines().size())
+                .lignes(parsed.lines())
+                .erreurs(parsed.errors())
+                .primeNette(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getPrimeNette))
+                .montantTaxes(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getMontantTaxes))
+                .accessoires(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getAccessoires))
+                .montantTtc(money(montantTtc))
+                .commissionNette(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getCommissionNette))
+                .netCompagnie(sum(parsed.lines(), AffectationQuittanceResponse.Ligne::getNetCompagnie))
+                .ecart(ecart)
+                .equilibre(ecart.signum() == 0)
                 .build();
     }
 
@@ -806,6 +901,85 @@ public class AffectationQuittanceService {
         }
     }
 
+    private void validateBatchRequestNumbers(
+            Long agenceId,
+            Collection<Long> quittanceIds,
+            List<AffectationQuittanceCompagnie> entities
+    ) {
+        Set<String> requestNumbers = new HashSet<>();
+        for (AffectationQuittanceCompagnie entity : entities) {
+            String normalized = entity.getNumeroQuittanceCompagnie().trim().toUpperCase(Locale.ROOT);
+            if (!requestNumbers.add(normalized)) {
+                throw new BadRequestException("Le numéro de quittance " + entity.getNumeroQuittanceCompagnie() + " est dupliqué");
+            }
+            if (affectationRepository
+                    .existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
+                            agenceId,
+                            entity.getCompagnieAssurance().getId(),
+                            entity.getNumeroQuittanceCompagnie(),
+                            quittanceIds
+                    )) {
+                throw new BadRequestException("Le numéro de quittance " + entity.getNumeroQuittanceCompagnie() + " est déjà affecté");
+            }
+        }
+    }
+
+    private List<Quittance> requireCompatibleFleetBatch(Long agenceId, Collection<Long> requestedIds) {
+        if (requestedIds == null || requestedIds.size() < 2) {
+            throw new BadRequestException("Sélectionnez au moins deux quittances pour une affectation groupée");
+        }
+        List<Long> ids = requestedIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (ids.size() != requestedIds.size()) {
+            throw new BadRequestException("La sélection contient des quittances dupliquées ou invalides");
+        }
+        List<Quittance> quittances = ids.stream().map(id -> requireQuittance(agenceId, id)).toList();
+        Quittance reference = quittances.get(0);
+        Long contractId = reference.getContrat().getId();
+        Long companyId = requireQuittanceCompagnie(reference).getId();
+        if (reference.getContrat().getTypeContrat() != TypeContrat.FLOTTE
+                || quittances.stream().anyMatch(item -> item.getContrat().getTypeContrat() != TypeContrat.FLOTTE)
+                || quittances.stream().anyMatch(item -> !item.getContrat().getId().equals(contractId))
+                || quittances.stream().anyMatch(item -> !requireQuittanceCompagnie(item).getId().equals(companyId))) {
+            throw new BadRequestException("Les quittances groupées doivent appartenir à la même flotte, police et compagnie");
+        }
+        Long ruleId = requireEffectiveRule(agenceId, reference).getId();
+        if (quittances.stream().anyMatch(item -> !requireEffectiveRule(agenceId, item).getId().equals(ruleId))) {
+            throw new BadRequestException("Les quittances sélectionnées n'utilisent pas la même règle d'affectation");
+        }
+        return quittances.stream().sorted(Comparator.comparing(this::resolveDateEffet)).toList();
+    }
+
+    private LotAffectationQuittanceResponse buildBatchResponse(
+            List<Quittance> quittances,
+            List<AffectationQuittanceCompagnie> entities,
+            BigDecimal expected
+    ) {
+        Map<Long, List<AffectationQuittanceCompagnie>> byQuittance = entities.stream()
+                .collect(Collectors.groupingBy(item -> item.getQuittance().getId()));
+        Map<Long, String> subscribers = resolveSouscripteurs(
+                quittances.stream().map(item -> item.getContrat().getId()).collect(Collectors.toSet())
+        );
+        List<AffectationQuittanceResponse> responses = quittances.stream()
+                .map(item -> toResponse(
+                        item,
+                        byQuittance.getOrDefault(item.getId(), List.of()),
+                        subscribers.get(item.getContrat().getId()),
+                        requireEffectiveRule(item.getContrat().getAgence().getId(), item),
+                        true
+                ))
+                .toList();
+        BigDecimal affected = entities.stream().map(AffectationQuittanceCompagnie::getMontantTtc).reduce(ZERO, BigDecimal::add);
+        BigDecimal difference = money(affected.subtract(expected));
+        return LotAffectationQuittanceResponse.builder()
+                .quittances(responses)
+                .lignes(entities.stream().map(this::toLineResponse).toList())
+                .montantTtcAttendu(money(expected))
+                .montantTtcAffecte(money(affected))
+                .ecart(difference)
+                .equilibre(difference.signum() == 0)
+                .build();
+    }
+
     private BigDecimal calculateCommission(Quittance quittance, RegleAffectationQuittance regle) {
         List<LigneQuittance> categoryLines = accountingCategoryLines(quittance);
         if (categoryLines.isEmpty()) {
@@ -998,6 +1172,7 @@ public class AffectationQuittanceService {
     private AffectationQuittanceResponse.Ligne toLineResponse(AffectationQuittanceCompagnie entity) {
         return AffectationQuittanceResponse.Ligne.builder()
                 .id(entity.getId())
+                .quittanceId(entity.getQuittance().getId())
                 .numeroQuittanceCompagnie(entity.getNumeroQuittanceCompagnie())
                 .source(entity.getSource())
                 .dateEffet(entity.getDateEffet())
@@ -1021,10 +1196,12 @@ public class AffectationQuittanceService {
 
     private ParsedImport parseImport(
             MultipartFile file,
-            Quittance quittance,
+            List<Quittance> quittances,
             RegleAffectationQuittance regle,
             boolean avecRetenue
     ) {
+        Quittance referenceQuittance = quittances.get(0);
+        Set<Long> selectedIds = quittances.stream().map(Quittance::getId).collect(Collectors.toSet());
         List<AffectationQuittanceResponse.Ligne> lines = new ArrayList<>();
         List<String> errors = new ArrayList<>();
         Set<String> numbers = new HashSet<>();
@@ -1041,7 +1218,7 @@ public class AffectationQuittanceService {
                 );
             }
             Map<String, Integer> columns = resolveImportColumns(readHeaders(headerRow), regle);
-            String expectedPolicy = normalizeIdentifier(quittance.getContrat().getNumeroPolice());
+            String expectedPolicy = normalizeIdentifier(referenceQuittance.getContrat().getNumeroPolice());
 
             for (int rowIndex = headerRow.getRowNum() + 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
@@ -1054,17 +1231,17 @@ public class AffectationQuittanceService {
                     if (columns.containsKey("nopolice")
                             && expectedPolicy != null
                             && !expectedPolicy.equals(normalizeIdentifier(policy))) {
-                        throw new BadRequestException("la police " + policy + " ne correspond pas à " + quittance.getContrat().getNumeroPolice());
+                        throw new BadRequestException("la police " + policy + " ne correspond pas à " + referenceQuittance.getContrat().getNumeroPolice());
                     }
                     if (!numbers.add(number.trim().toUpperCase(Locale.ROOT))) {
                         throw new BadRequestException("le numéro " + number + " est dupliqué dans le fichier");
                     }
                     if (affectationRepository
-                            .existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNot(
-                                    quittance.getContrat().getAgence().getId(),
-                                    requireQuittanceCompagnie(quittance).getId(),
+                            .existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
+                                    referenceQuittance.getContrat().getAgence().getId(),
+                                    requireQuittanceCompagnie(referenceQuittance).getId(),
                                     number,
-                                    quittance.getId()
+                                    selectedIds
                             )) {
                         throw new BadRequestException("le numéro " + number + " est déjà affecté");
                     }
@@ -1076,18 +1253,23 @@ public class AffectationQuittanceService {
                     BigDecimal netCompagnie = decimal(row, columns, "netcompagnie");
                     LocalDate lineEffectDate = date(row, columns, "dateeffet");
                     LocalDate lineEndDate = optionalDate(row, columns, "datefin");
-                    validateAllocationPeriod(lineEffectDate, lineEndDate, quittance, number);
+                    String act = text(row, columns, "acte");
+                    Quittance target = matchImportTarget(quittances, act, lineEffectDate);
+                    if (target != null) {
+                        validateAllocationPeriod(lineEffectDate, lineEndDate, target, number);
+                    }
                     BigDecimal calculatedTtc = primeNette.add(taxes).add(accessoires);
                     if (money(calculatedTtc).compareTo(money(montantTtc)) != 0) {
                         throw new BadRequestException("le montant TTC ne correspond pas à prime nette + taxes + accessoires");
                     }
                     Retention retention = calculateRetention(commission, avecRetenue, regle);
                     lines.add(AffectationQuittanceResponse.Ligne.builder()
+                            .quittanceId(target == null ? null : target.getId())
                             .numeroQuittanceCompagnie(number)
                             .source(SourceAffectationQuittance.IMPORT)
                             .dateEffet(lineEffectDate)
                             .dateEcheance(lineEndDate)
-                            .acteSource(text(row, columns, "acte"))
+                            .acteSource(act)
                             .categorieSource(text(row, columns, "categorie"))
                             .statutSource(text(row, columns, "statut"))
                             .fichierSource(cleanFileName(file.getOriginalFilename()))
@@ -1112,6 +1294,38 @@ public class AffectationQuittanceService {
             errors.add("Le fichier ne contient aucune ligne exploitable");
         }
         return new ParsedImport(lines, errors);
+    }
+
+    private ParsedImport parseBatchImport(
+            MultipartFile file,
+            List<Quittance> quittances,
+            RegleAffectationQuittance regle,
+            boolean avecRetenue
+    ) {
+        return parseImport(file, quittances, regle, avecRetenue);
+    }
+
+    private Quittance matchImportTarget(
+            List<Quittance> candidates,
+            String act,
+            LocalDate dateEffet
+    ) {
+        if (candidates.size() == 1) return candidates.get(0);
+        String normalizedAct = normalizeHeader(act == null ? "" : act);
+        List<Quittance> actMatches = normalizedAct.isBlank() ? List.of() : candidates.stream()
+                .filter(candidate -> {
+                    String movement = candidate.getMouvementContrat() == null
+                            ? "affaire nouvelle"
+                            : candidate.getMouvementContrat().getTypeMouvement().getLibelle();
+                    String normalizedMovement = normalizeHeader(movement);
+                    return normalizedAct.contains(normalizedMovement) || normalizedMovement.contains(normalizedAct);
+                })
+                .toList();
+        if (actMatches.size() == 1) return actMatches.get(0);
+        List<Quittance> exactDateMatches = candidates.stream()
+                .filter(candidate -> resolveDateEffet(candidate).equals(dateEffet))
+                .toList();
+        return exactDateMatches.size() == 1 ? exactDateMatches.get(0) : null;
     }
 
     private Sheet resolveImportSheet(Workbook workbook, RegleAffectationQuittance regle) {

@@ -5286,6 +5286,9 @@ public class ContratService {
         if (saved != null) {
             return saved;
         }
+        if (contrat.getDateEffet() == null) {
+            return null;
+        }
         List<Vehicule> vehiculesActifs = activeVehiculesForView(contrat);
         List<Remorque> remorquesActives = activeRemorquesForView(contrat);
         List<ContratGarantie> garantiesActives = activeGarantiesForView(contrat);

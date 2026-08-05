@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import { accountingKeys, referenceKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { AffectationQuittanceDialog } from "../components/AffectationQuittanceDialog";
+import { BulkAffectationQuittanceDialog } from "../components/BulkAffectationQuittanceDialog";
 import { QuittanceRulesDialog } from "../components/QuittanceRulesDialog";
 import type {
   CategorieMouvement,
@@ -60,6 +62,8 @@ export default function QuittanceAffectationPage() {
   const [page, setPage] = useState(initialState.page);
   const [selectedQuittanceId, setSelectedQuittanceId] = useState<string>();
   const [allocationOpen, setAllocationOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [ruleTarget, setRuleTarget] = useState<{
     compagnieId?: string | null;
@@ -96,6 +100,9 @@ export default function QuittanceAffectationPage() {
   });
 
   const rows = quittances.data?.rows ?? [];
+  const selectedRows = rows.filter((row) => selectedIds.includes(row.quittanceId));
+  const selectionReference = selectedRows[0];
+  const selectableRows = rows.filter((row) => isBulkCompatible(row, selectionReference));
   const pageInfo = quittances.data?.page;
   const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
   const currentPage = Math.min(pageInfo?.number ?? page, totalPages - 1);
@@ -106,6 +113,7 @@ export default function QuittanceAffectationPage() {
   function applyFilters() {
     if (!canSearch || hasDateError) return;
     setPage(0);
+    setSelectedIds([]);
     setAppliedFilters(filters);
     setSearched(true);
     setUrlParams(toUrlParams(filters, 0), { replace: true });
@@ -116,10 +124,12 @@ export default function QuittanceAffectationPage() {
     setAppliedFilters(DEFAULT_FILTERS);
     setPage(0);
     setSearched(false);
+    setSelectedIds([]);
     setUrlParams(new URLSearchParams(), { replace: true });
   }
 
   function goToPage(nextPage: number) {
+    setSelectedIds([]);
     setPage(nextPage);
     setUrlParams(toUrlParams(appliedFilters, nextPage), { replace: true });
   }
@@ -282,6 +292,12 @@ export default function QuittanceAffectationPage() {
       <Card className="min-w-0 border-border/70 shadow-none">
         <CardHeader className="flex flex-row items-center justify-between gap-3 border-b py-3">
           <CardTitle className="text-base">Quittances</CardTitle>
+          <div className="flex items-center gap-2">
+          {canAffect && selectedRows.length > 1 ? (
+            <Button type="button" size="sm" onClick={() => setBulkOpen(true)}>
+              Affecter la sélection ({selectedRows.length})
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -292,12 +308,21 @@ export default function QuittanceAffectationPage() {
             <Download className="size-4" />
             {exporting ? "Export..." : "Exporter Excel"}
           </Button>
+          </div>
         </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
             <table className="w-full min-w-[1480px] border-collapse text-sm">
               <thead className="bg-amber-600 text-xs uppercase text-white dark:bg-amber-700">
                 <tr>
+                  <Header>
+                    <Checkbox
+                      aria-label="Sélectionner toutes les quittances compatibles"
+                      disabled={!selectionReference}
+                      checked={Boolean(selectionReference) && selectableRows.length > 0 && selectableRows.every((row) => selectedIds.includes(row.quittanceId))}
+                      onCheckedChange={(checked) => setSelectedIds(checked === true ? selectableRows.map((row) => row.quittanceId) : [])}
+                    />
+                  </Header>
                   <Header>Produit</Header>
                   <Header>Mouvement</Header>
                   <Header>Souscripteur</Header>
@@ -315,15 +340,25 @@ export default function QuittanceAffectationPage() {
               <tbody>
                 {!searched ? (
                   <tr>
-                    <td colSpan={12} className="px-3 py-12 text-center text-muted-foreground">
+                    <td colSpan={13} className="px-3 py-12 text-center text-muted-foreground">
                       Renseignez au moins un critère puis lancez la recherche.
                     </td>
                   </tr>
                 ) : quittances.isLoading ? (
-                  <TableRowsSkeleton colSpan={12} />
+                  <TableRowsSkeleton colSpan={13} />
                 ) : rows.length ? (
                   rows.map((row) => (
                     <tr key={row.quittanceId} className="border-b transition-colors hover:bg-muted/40">
+                      <Cell>
+                        <Checkbox
+                          aria-label={`Sélectionner ${row.mouvement}`}
+                          disabled={!canAffect || !isBulkCompatible(row, selectionReference)}
+                          checked={selectedIds.includes(row.quittanceId)}
+                          onCheckedChange={(checked) => setSelectedIds((current) => checked === true
+                            ? [...current, row.quittanceId]
+                            : current.filter((id) => id !== row.quittanceId))}
+                        />
+                      </Cell>
                       <Cell>
                         <div className="font-medium">{productLabel(row)}</div>
                         <div className="text-xs text-muted-foreground">{row.dossier}</div>
@@ -380,7 +415,7 @@ export default function QuittanceAffectationPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={12} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
+                  <tr><td colSpan={13} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
                 )}
               </tbody>
             </table>
@@ -418,6 +453,12 @@ export default function QuittanceAffectationPage() {
           if (!value) setSelectedQuittanceId(undefined);
         }}
       />
+      <BulkAffectationQuittanceDialog
+        rows={selectedRows}
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        onSaved={() => setSelectedIds([])}
+      />
       <QuittanceRulesDialog
         open={rulesOpen}
         onOpenChange={(value) => {
@@ -447,6 +488,18 @@ function Header({ children, className = "" }: { children: ReactNode; className?:
 
 function Cell({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <td className={`px-3 py-3 align-middle ${className}`}>{children}</td>;
+}
+
+function isBulkCompatible(row: QuittanceAllocation, reference?: QuittanceAllocation) {
+  if (row.typeContrat !== "FLOTTE"
+      || row.statutAffectation !== "NON_AFFECTEE"
+      || row.regle?.modeAffectation !== "MANUEL_OU_IMPORT") {
+    return false;
+  }
+  if (!reference) return true;
+  return row.contratId === reference.contratId
+    && row.compagnieId === reference.compagnieId
+    && row.regle?.id === reference.regle?.id;
 }
 
 function StatusBadge({ status }: { status: StatutAffectation }) {

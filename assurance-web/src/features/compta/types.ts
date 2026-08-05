@@ -64,6 +64,7 @@ export type RulePage = {
 
 export type AllocationLine = {
   id?: string;
+  quittanceId?: string | null;
   numeroQuittanceCompagnie: string;
   source: SourceAffectation;
   dateEffet: string;
@@ -151,6 +152,23 @@ export type AllocationRequestLine = Pick<
   | "montantTtc"
   | "commissionNette"
 >;
+
+export type BatchAllocationRequest = {
+  quittanceIds: string[];
+  source: SourceAffectation;
+  avecRetenue: boolean;
+  fichierSource?: string;
+  lignes: Array<AllocationRequestLine & { quittanceId: string }>;
+};
+
+export type BatchAllocationResponse = {
+  quittances: QuittanceAllocation[];
+  lignes: AllocationLine[];
+  montantTtcAttendu: number;
+  montantTtcAffecte: number;
+  ecart: number;
+  equilibre: boolean;
+};
 
 export type AllocationRequest = {
   source: SourceAffectation;

@@ -49,7 +49,7 @@ const DEFAULT_FILTERS: Filters = {
   search: "",
 };
 const PAGE_SIZE = 25;
-const AMOUNT_FORMATTER = new Intl.NumberFormat("fr-MA", {
+const AMOUNT_FORMATTER = new Intl.NumberFormat("fr-FR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
@@ -363,13 +363,13 @@ export default function QuittanceAffectationPage() {
                   <Header>Souscripteur / police</Header>
                   <Header>Date effet</Header>
                   <Header>Date échéance</Header>
-                  <Header className="text-right">Prime nette (MAD)</Header>
-                  <Header className="text-right">Taxes (MAD)</Header>
-                  <Header className="text-right">Accessoires (MAD)</Header>
-                  <Header className="text-right">TTC (MAD)</Header>
-                  <Header className="text-right">Commission (MAD)</Header>
-                  <Header className="text-right">Retenue (MAD)</Header>
-                  <Header className="text-right">Net compagnie (MAD)</Header>
+                  <Header className="text-right">Prime nette</Header>
+                  <Header className="text-right">Taxes</Header>
+                  <Header className="text-right">Accessoires</Header>
+                  <Header className="text-right">TTC</Header>
+                  <Header className="text-right">Commission</Header>
+                  <Header className="text-right">Retenue</Header>
+                  <Header className="text-right">Net compagnie</Header>
                   <Header>N° quittance compagnie</Header>
                   <Header>Statut</Header>
                   <Header className="text-right">Action</Header>
@@ -629,7 +629,7 @@ function money(value: number) {
 }
 
 function amount(value: number) {
-  return AMOUNT_FORMATTER.format(value);
+  return AMOUNT_FORMATTER.format(value).replace(/[\u00a0\u202f]/g, " ");
 }
 
 function hasMeaningfulFilter(filters: Filters) {

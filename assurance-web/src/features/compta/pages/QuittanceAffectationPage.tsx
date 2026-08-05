@@ -125,6 +125,16 @@ export default function QuittanceAffectationPage() {
   const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
   const currentPage = Math.min(pageInfo?.number ?? page, totalPages - 1);
   const missingRules = rows.filter((row) => !row.regle).length;
+  const isAffectedView = appliedFilters.nature === "AVEC_QUITTANCE";
+  const isPendingView = appliedFilters.nature === "SANS_QUITTANCE";
+  const showSelectionColumn = !isAffectedView;
+  const showCompanyColumns = !isPendingView;
+  const tableColumnCount = 10 + (showSelectionColumn ? 1 : 0) + (showCompanyColumns ? 4 : 0);
+  const tableMinWidth = isPendingView
+    ? "min-w-[1200px]"
+    : isAffectedView
+      ? "min-w-[1510px]"
+      : "min-w-[1555px]";
   const canSearch = hasMeaningfulFilter(filters);
   const hasDateError = Boolean(filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu);
 
@@ -299,9 +309,11 @@ export default function QuittanceAffectationPage() {
       ) : null}
 
       {searched ? (
-        <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 xl:grid-cols-5">
+        <div className={`grid gap-px overflow-hidden border bg-border sm:grid-cols-2 ${isPendingView ? "xl:grid-cols-4" : "xl:grid-cols-5"}`}>
           <Metric label="Mouvements trouvés" value={String(pageInfo?.totalElements ?? 0)} />
-          <Metric label="Écritures compagnie affichées" value={String(companyWritingCount)} />
+          {!isPendingView ? (
+            <Metric label="Écritures compagnie affichées" value={String(companyWritingCount)} />
+          ) : null}
           <Metric label="TTC de la page" value={money(quittances.data?.summary.montantTtc ?? 0)} />
           <Metric label="Montant affecté de la page" value={money(quittances.data?.summary.montantAffecte ?? 0)} />
           <Metric label="Configuration manquante sur la page" value={String(missingRules)} warning={missingRules > 0} />
@@ -331,9 +343,9 @@ export default function QuittanceAffectationPage() {
         </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[1635px] table-fixed border-collapse text-sm">
+            <table className={`w-full table-fixed border-collapse text-sm ${tableMinWidth}`}>
               <colgroup>
-                <col className="w-11" />
+                {showSelectionColumn ? <col className="w-11" /> : null}
                 <col className="w-[185px]" />
                 <col className="w-[180px]" />
                 <col className="w-[155px]" />
@@ -341,24 +353,26 @@ export default function QuittanceAffectationPage() {
                 <col className="w-[110px]" />
                 <col className="w-[90px]" />
                 <col className="w-[105px]" />
-                <col className="w-[105px]" />
+                {showCompanyColumns ? <col className="w-[105px]" /> : null}
                 <col className="w-[110px]" />
-                <col className="w-[115px]" />
-                <col className="w-[115px]" />
-                <col className="w-[150px]" />
-                <col className="w-[105px]" />
+                {showCompanyColumns ? <col className="w-[115px]" /> : null}
+                {showCompanyColumns ? <col className="w-[115px]" /> : null}
+                {showCompanyColumns ? <col className="w-[145px]" /> : null}
+                <col className="w-[85px]" />
                 <col className="w-[150px]" />
               </colgroup>
               <thead className="bg-amber-600 text-xs uppercase text-white dark:bg-amber-700">
                 <tr>
-                  <Header>
-                    <Checkbox
-                      aria-label="Sélectionner toutes les quittances compatibles"
-                      disabled={!selectionReference}
-                      checked={Boolean(selectionReference) && selectableRows.length > 0 && selectableRows.every((row) => selectedIds.includes(row.quittanceId))}
-                      onCheckedChange={(checked) => setSelectedIds(checked === true ? selectableRows.map((row) => row.quittanceId) : [])}
-                    />
-                  </Header>
+                  {showSelectionColumn ? (
+                    <Header>
+                      <Checkbox
+                        aria-label="Sélectionner toutes les quittances compatibles"
+                        disabled={!selectionReference}
+                        checked={Boolean(selectionReference) && selectableRows.length > 0 && selectableRows.every((row) => selectedIds.includes(row.quittanceId))}
+                        onCheckedChange={(checked) => setSelectedIds(checked === true ? selectableRows.map((row) => row.quittanceId) : [])}
+                      />
+                    </Header>
+                  ) : null}
                   <Header>Produit / dossier</Header>
                   <Header>Mouvement</Header>
                   <Header>Client / police</Header>
@@ -366,11 +380,11 @@ export default function QuittanceAffectationPage() {
                   <Header>Date échéance</Header>
                   <Header className="text-right">Prime nette</Header>
                   <Header className="text-right">Taxes</Header>
-                  <Header className="text-right">Accessoires</Header>
+                  {showCompanyColumns ? <Header className="text-right">Accessoires</Header> : null}
                   <Header className="text-right">TTC</Header>
-                  <Header className="text-right">Commission</Header>
-                  <Header className="text-right">Net compagnie</Header>
-                  <Header>N° quittance</Header>
+                  {showCompanyColumns ? <Header className="text-right">Commission</Header> : null}
+                  {showCompanyColumns ? <Header className="text-right">Net compagnie</Header> : null}
+                  {showCompanyColumns ? <Header>N° quittance</Header> : null}
                   <Header>Statut</Header>
                   <Header className="text-right">Action</Header>
                 </tr>
@@ -378,27 +392,29 @@ export default function QuittanceAffectationPage() {
               <tbody>
                 {!searched ? (
                   <tr>
-                    <td colSpan={15} className="px-3 py-12 text-center text-muted-foreground">
+                    <td colSpan={tableColumnCount} className="px-3 py-12 text-center text-muted-foreground">
                       Renseignez au moins un critère puis lancez la recherche.
                     </td>
                   </tr>
                 ) : quittances.isLoading ? (
-                  <TableRowsSkeleton colSpan={15} />
+                  <TableRowsSkeleton colSpan={tableColumnCount} />
                 ) : displayRows.length ? (
                   displayRows.map(({ key, row, line }) => (
                     <tr key={key} className="border-b transition-colors hover:bg-muted/40">
-                      <Cell>
-                        {line ? null : (
-                          <Checkbox
-                            aria-label={`Sélectionner ${row.mouvement}`}
-                            disabled={!canAffect || !isBulkCompatible(row, selectionReference)}
-                            checked={selectedIds.includes(row.quittanceId)}
-                            onCheckedChange={(checked) => setSelectedIds((current) => checked === true
-                              ? [...current, row.quittanceId]
-                              : current.filter((id) => id !== row.quittanceId))}
-                          />
-                        )}
-                      </Cell>
+                      {showSelectionColumn ? (
+                        <Cell>
+                          {line ? null : (
+                            <Checkbox
+                              aria-label={`Sélectionner ${row.mouvement}`}
+                              disabled={!canAffect || !isBulkCompatible(row, selectionReference)}
+                              checked={selectedIds.includes(row.quittanceId)}
+                              onCheckedChange={(checked) => setSelectedIds((current) => checked === true
+                                ? [...current, row.quittanceId]
+                                : current.filter((id) => id !== row.quittanceId))}
+                            />
+                          )}
+                        </Cell>
+                      ) : null}
                       <Cell>
                         <div className="truncate font-medium">{productLabel(row)}</div>
                         <div className="truncate text-xs text-muted-foreground" title={row.dossier}>
@@ -427,32 +443,40 @@ export default function QuittanceAffectationPage() {
                       <Cell className="whitespace-nowrap text-right tabular-nums">
                         {amount(line?.montantTaxes ?? row.montantTaxes)}
                       </Cell>
-                      <Cell className="whitespace-nowrap text-right tabular-nums">
-                        {amount(line?.accessoires ?? row.accessoires)}
-                      </Cell>
+                      {showCompanyColumns ? (
+                        <Cell className="whitespace-nowrap text-right tabular-nums">
+                          {amount(line?.accessoires ?? row.accessoires)}
+                        </Cell>
+                      ) : null}
                       <Cell className="whitespace-nowrap text-right font-medium tabular-nums">
                         {amount(line?.montantTtc ?? row.montantTtc)}
                       </Cell>
-                      <Cell className="whitespace-nowrap text-right tabular-nums">
-                        {amount(line?.commissionNette ?? row.commissionCalculee ?? 0)}
-                      </Cell>
-                      <Cell className="whitespace-nowrap text-right font-medium tabular-nums">
-                        {amount(line?.netCompagnie ?? row.netCompagnieCalcule ?? 0)}
-                      </Cell>
+                      {showCompanyColumns ? (
+                        <Cell className="whitespace-nowrap text-right tabular-nums">
+                          {amount(line?.commissionNette ?? row.commissionCalculee ?? 0)}
+                        </Cell>
+                      ) : null}
+                      {showCompanyColumns ? (
+                        <Cell className="whitespace-nowrap text-right font-medium tabular-nums">
+                          {amount(line?.netCompagnie ?? row.netCompagnieCalcule ?? 0)}
+                        </Cell>
+                      ) : null}
+                      {showCompanyColumns ? (
+                        <Cell>
+                          {line ? (
+                            <span className="whitespace-nowrap font-semibold tabular-nums">
+                              {line.numeroQuittanceCompagnie}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </Cell>
+                      ) : null}
                       <Cell>
-                        {line ? (
-                          <span className="whitespace-nowrap font-semibold tabular-nums">
-                            {line.numeroQuittanceCompagnie}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        <StatusBadge status={line ? "AFFECTEE" : row.statutAffectation} />
                         {!row.regle ? (
                           <div className="mt-1 text-xs font-medium text-destructive">Configuration manquante</div>
                         ) : null}
-                      </Cell>
-                      <Cell>
-                        <StatusBadge status={line ? "AFFECTEE" : row.statutAffectation} />
                       </Cell>
                       <Cell className="text-right">
                         <div className="flex items-center justify-end gap-2 whitespace-nowrap">
@@ -482,7 +506,7 @@ export default function QuittanceAffectationPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={15} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
+                  <tr><td colSpan={tableColumnCount} className="px-3 py-12 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
                 )}
               </tbody>
             </table>

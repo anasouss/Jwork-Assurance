@@ -101,11 +101,12 @@ export default function QuittanceAffectationPage() {
   });
 
   const rows = quittances.data?.rows ?? [];
-  const displayRows: Array<{
+  type DisplayRow = {
     key: string;
     row: QuittanceAllocation;
     line: AllocationLine | null;
-  }> = rows.flatMap((row) => row.lignes.length > 0
+  };
+  const displayRows = rows.flatMap<DisplayRow>((row) => row.lignes.length > 0
     ? row.lignes.map((line, index) => ({
         key: line.id ?? `${row.quittanceId}-${index}`,
         row,

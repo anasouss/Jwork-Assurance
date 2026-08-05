@@ -47,7 +47,12 @@ public class DataSeeder implements CommandLineRunner {
             "regle-fiscale:manage",
             "contrat:recalculate-financial-history",
             "contact-compagnie:view",
-            "contact-compagnie:manage"
+            "contact-compagnie:manage",
+            "sinistre:view",
+            "sinistre:create",
+            "sinistre:manage",
+            "sinistre:finance",
+            "sinistre:referentiel"
     );
 
     private final PermissionRepository permissionRepository;

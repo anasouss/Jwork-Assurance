@@ -26,6 +26,26 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/ProductionDashboardPage")),
       },
       {
+        path: "sinistre",
+        lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreDashboardPage")),
+      },
+      {
+        path: "sinistre/dossiers",
+        lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreListPage")),
+      },
+      {
+        path: "sinistre/declarer",
+        lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreDeclarationPage")),
+      },
+      {
+        path: "sinistre/dossiers/:sinistreId",
+        lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreDetailPage")),
+      },
+      {
+        path: "sinistre/referentiels",
+        lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreReferentielsPage")),
+      },
+      {
         path: "production/ajouter-dossier",
         lazy: lazyRoute(() => import("@/features/production/pages/ContratCreationPage")),
       },

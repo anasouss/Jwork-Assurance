@@ -69,7 +69,13 @@ public class PermissionSeeder implements CommandLineRunner {
             permission("referentiel:view", "Consulter les referentiels", "referentiel"),
             permission("referentiel:manage", "Gerer les referentiels", "referentiel"),
             permission("contact-compagnie:view", "Consulter les contacts compagnie", "contact-compagnie"),
-            permission("contact-compagnie:manage", "Gérer les contacts compagnie", "contact-compagnie")
+            permission("contact-compagnie:manage", "Gérer les contacts compagnie", "contact-compagnie"),
+
+            permission("sinistre:view", "Consulter les sinistres", "sinistre"),
+            permission("sinistre:create", "Déclarer un sinistre", "sinistre"),
+            permission("sinistre:manage", "Gérer les dossiers sinistre", "sinistre"),
+            permission("sinistre:finance", "Gérer les opérations financières des sinistres", "sinistre"),
+            permission("sinistre:referentiel", "Gérer les experts et garages", "sinistre")
     );
 
     private final PermissionRepository permissionRepository;

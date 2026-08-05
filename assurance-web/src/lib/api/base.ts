@@ -11,13 +11,14 @@ const AUTH_REQUEST_HEADERS = { "X-Auth-Request": "1" } as const;
 type NetworkErrorMapper = (error: unknown) => Error;
 
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code?: string
-  ) {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
+    this.status = status;
+    this.code = code;
   }
 }
 

@@ -124,15 +124,7 @@ export function GarantieSection({
   const personneGaranties = garanties
     .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE")
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
-  const personneGarantieIds = new Set(personneGaranties.map((garantie) => garantie.id));
-  const hasSelectedPersonneGuarantee = selected.some((item) => personneGarantieIds.has(item.garantieId));
   const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || linePrimeNette(preview, "ASSISTANCE") != null;
-
-  useEffect(() => {
-    if (allowPrimeColumn && !automaticPricing && hasSelectedPersonneGuarantee && !primeColumnEnabled) {
-      setPrimeColumnEnabled?.(true);
-    }
-  }, [allowPrimeColumn, automaticPricing, hasSelectedPersonneGuarantee, primeColumnEnabled, setPrimeColumnEnabled]);
 
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
@@ -152,10 +144,6 @@ export function GarantieSection({
       return;
     }
     if (checked) {
-      if (type === "PERSONNE" && !automaticPricing && !primeColumnEnabled) {
-        setPrimeColumnEnabled?.(true);
-        toast.info("La saisie des primes nettes a été activée pour la garantie personne");
-      }
       const formules = type === "PERSONNE" ? formulesForGuarantee(formulesPersonne, garantie) : [];
       const formule = formules[0];
       const line = type === "VEHICULE" ? linesForGuarantee(lignes, garantie)[0] : undefined;
@@ -201,13 +189,7 @@ export function GarantieSection({
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Switch
             checked={primeColumnEnabled}
-            onCheckedChange={(value) => {
-              if (!value && hasSelectedPersonneGuarantee) {
-                toast.error("La saisie des primes nettes est obligatoire pour les garanties personne");
-                return;
-              }
-              setPrimeColumnEnabled?.(value);
-            }}
+            onCheckedChange={(value) => setPrimeColumnEnabled?.(value)}
           />
           <span>Saisie avec primes</span>
         </div>
@@ -572,7 +554,7 @@ export function GarantieSection({
                   <th className="w-48 px-3 py-3 text-right">Hospitalisation</th>
                   <th className="w-44 px-3 py-3 text-right">Frais funéraires</th>
                   <th className="w-56 px-3 py-3 text-right">Chirurgie réparatrice</th>
-                  {automaticPricing || primeColumnEnabled ? <th className="w-40 px-3 py-3 text-left">Prime nette</th> : null}
+                  <th className="w-40 px-3 py-3 text-left">Prime nette</th>
                 </tr>
               </thead>
               <tbody className="block xl:table-row-group">
@@ -626,11 +608,11 @@ export function GarantieSection({
                       <ResponsiveRecordCell label="Chirurgie réparatrice" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</ResponsiveRecordCell>
                       {automaticPricing ? (
                         <ResponsiveRecordCell label="Prime nette" valueClassName="text-right text-muted-foreground">{checked ? money(selectedFormule?.primeNette) : "-"}</ResponsiveRecordCell>
-                      ) : primeColumnEnabled ? (
+                      ) : (
                         <ResponsiveRecordCell label="Prime nette">
                           <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
                         </ResponsiveRecordCell>
-                      ) : null}
+                      )}
                     </tr>
                   );
                 })}

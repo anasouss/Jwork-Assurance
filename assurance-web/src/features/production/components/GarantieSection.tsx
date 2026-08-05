@@ -554,7 +554,9 @@ export function GarantieSection({
                   <th className="w-48 px-3 py-3 text-right">Hospitalisation</th>
                   <th className="w-44 px-3 py-3 text-right">Frais funéraires</th>
                   <th className="w-56 px-3 py-3 text-right">Chirurgie réparatrice</th>
-                  <th className="w-40 px-3 py-3 text-left">Prime nette</th>
+                  {automaticPricing || primeColumnEnabled ? (
+                    <th className="w-40 px-3 py-3 text-left">Prime nette</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="block xl:table-row-group">
@@ -608,11 +610,11 @@ export function GarantieSection({
                       <ResponsiveRecordCell label="Chirurgie réparatrice" valueClassName="text-right">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</ResponsiveRecordCell>
                       {automaticPricing ? (
                         <ResponsiveRecordCell label="Prime nette" valueClassName="text-right text-muted-foreground">{checked ? money(selectedFormule?.primeNette) : "-"}</ResponsiveRecordCell>
-                      ) : (
+                      ) : primeColumnEnabled ? (
                         <ResponsiveRecordCell label="Prime nette">
                           <MoneyInput disabled={rowDisabled} className={controlClass(checked)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
                         </ResponsiveRecordCell>
-                      )}
+                      ) : null}
                     </tr>
                   );
                 })}

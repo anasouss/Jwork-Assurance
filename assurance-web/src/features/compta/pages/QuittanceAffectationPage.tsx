@@ -474,7 +474,7 @@ export default function QuittanceAffectationPage() {
                           >
                             {row.regle
                               ? canAffect
-                                ? row.statutAffectation === "NON_AFFECTEE" ? "Affecter" : "Modifier l’affectation"
+                                ? row.statutAffectation === "NON_AFFECTEE" ? "Affecter" : "Modifier"
                                 : "Consulter"
                               : canConfigure ? "Configurer" : "Configuration requise"}
                           </Button>

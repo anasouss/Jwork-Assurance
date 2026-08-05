@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Edit, Handshake, Plus, Search } from "lucide-react";
+import { Building2, Edit, Handshake, Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,13 @@ import { referenceAdminApi } from "../api/reference-admin";
 import { Field } from "../components/Field";
 import { compagnieAssuranceSchema } from "../schemas";
 import type { ReferenceOption, UpsertCompagnieAssuranceRequest } from "../types";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function CompaniesPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const canViewContacts = permissions.includes("contact-compagnie:view") || permissions.includes("contact-compagnie:manage");
   const compagnies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
     queryFn: () => referenceApi.list("compagnies-assurance"),
@@ -154,6 +157,11 @@ export default function CompaniesPage() {
                           icon: Handshake,
                           onSelect: () => navigate(`/app/companies/conventions?compagnieId=${compagnie.id}`),
                         },
+                        ...(canViewContacts ? [{
+                          label: "Contacts",
+                          icon: Users,
+                          onSelect: () => navigate(`/app/companies/contacts?compagnieId=${compagnie.id}`),
+                        }] : []),
                         {
                           label: "Modifier",
                           icon: Edit,

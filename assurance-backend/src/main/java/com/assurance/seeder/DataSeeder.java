@@ -45,7 +45,9 @@ public class DataSeeder implements CommandLineRunner {
             "agence:manage-self",
             "regle-fiscale:view",
             "regle-fiscale:manage",
-            "contrat:recalculate-financial-history"
+            "contrat:recalculate-financial-history",
+            "contact-compagnie:view",
+            "contact-compagnie:manage"
     );
 
     private final PermissionRepository permissionRepository;

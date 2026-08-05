@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { appNavigation, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
+import { appNavigation, canSeeNavigationItem, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
 import skayMark from "@/assets/skay-mark.webp";
 import {
   Sidebar,
@@ -20,7 +20,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const activeModule = moduleForPath(pathname);
   const visibleNavigation = appNavigation.filter(
-    (item) => item.module === activeModule && (!item.permission || permissions.includes(item.permission))
+    (item) => item.module === activeModule && canSeeNavigationItem(item, permissions)
   );
 
   return (

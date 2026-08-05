@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { appModules, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
+import { appModules, canSeeNavigationItem, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +59,7 @@ export function AppHeader() {
 
         <nav className="hidden min-w-0 items-center justify-center gap-1 overflow-x-auto lg:flex">
           {appModules
-            .filter((item) => !item.permission || permissions.includes(item.permission))
+            .filter((item) => canSeeNavigationItem(item, permissions))
             .map((item) => {
               if (item.disabled) {
                 return (

@@ -87,8 +87,8 @@ export default function ProductionDashboardPage() {
               </>
             );
             const className = item.primary
-              ? "flex h-12 items-center gap-3 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
-              : "flex h-12 items-center gap-3 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-200";
+              ? "flex h-12 cursor-pointer items-center gap-3 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+              : "flex h-12 cursor-pointer items-center gap-3 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-200";
 
             if (item.disabled) {
               return (
@@ -96,7 +96,7 @@ export default function ProductionDashboardPage() {
                   key={item.title}
                   type="button"
                   disabled
-                  className="flex h-12 items-center gap-3 rounded-md border border-dashed bg-muted/30 px-4 text-sm font-semibold text-muted-foreground"
+                  className="flex h-12 cursor-not-allowed items-center gap-3 rounded-md border border-dashed bg-muted/30 px-4 text-sm font-semibold text-muted-foreground"
                 >
                   <item.icon className="size-4" />
                   <span>{item.title}</span>

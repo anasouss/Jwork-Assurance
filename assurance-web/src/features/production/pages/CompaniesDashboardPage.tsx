@@ -1,11 +1,23 @@
 import { Link } from "react-router-dom";
 import { Ambulance, Building2, Handshake, Package, Users } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+
+type CompanyAction = {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  href: string;
+  permission?: string;
+  permissions?: readonly string[];
+  primary?: boolean;
+  disabled?: boolean;
+};
 
 export default function CompaniesDashboardPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
 
-  const actions = [
+  const actions: CompanyAction[] = [
     {
       title: "Liste des compagnies",
       description: "Assureurs, ordre d'affichage, RC, ICE et préfixes.",
@@ -39,11 +51,11 @@ export default function CompaniesDashboardPage() {
       title: "Contacts",
       description: "Interlocuteurs compagnie.",
       icon: Users,
-      href: "/app/companies",
-      permission: "referentiel:view",
-      disabled: true,
+      href: "/app/companies/contacts",
+      permissions: ["contact-compagnie:view", "contact-compagnie:manage"],
     },
-  ].filter((item) => !item.permission || permissions.includes(item.permission));
+  ].filter((item) => item.permissions?.some((permission) => permissions.includes(permission))
+    ?? (!item.permission || permissions.includes(item.permission)));
 
   return (
     <div className="grid gap-6">

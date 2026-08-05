@@ -10,6 +10,10 @@ const startsWith = (prefix: string) => (pathname: string) => pathname.startsWith
 
 const routePermissionRules: readonly RoutePermissionRule[] = [
   {
+    matches: startsWith("/app/companies/contacts"),
+    anyOf: ["contact-compagnie:view", "contact-compagnie:manage"],
+  },
+  {
     matches: startsWith("/app/production/renouvellements/"),
     anyOf: ["contrat:renew", "contrat:update"],
   },
@@ -57,7 +61,7 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
   },
   {
     matches: startsWith("/app/companies"),
-    anyOf: ["referentiel:view", "referentiel:manage"],
+    anyOf: ["referentiel:view", "referentiel:manage", "contact-compagnie:view", "contact-compagnie:manage"],
   },
   {
     matches: startsWith("/app/admin"),

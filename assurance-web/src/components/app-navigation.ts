@@ -24,6 +24,7 @@ export type AppModule = {
   exact?: boolean;
   disabled?: boolean;
   permission?: string;
+  permissions?: readonly string[];
 };
 
 export type AppNavigationItem = AppModule & {
@@ -34,7 +35,7 @@ export const appModules: AppModule[] = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true },
   { title: "Production", url: "/app/production", icon: BadgeCheck, permission: "contrat:view" },
   { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, disabled: true },
-  { title: "Compagnies", url: "/app/companies", icon: Building2, permission: "referentiel:view" },
+  { title: "Compagnies", url: "/app/companies", icon: Building2, permissions: ["referentiel:view", "referentiel:manage", "contact-compagnie:view", "contact-compagnie:manage"] },
   { title: "CRM", url: "/app/crm", icon: Users, permission: "client:view" },
   { title: "Compta", url: "/app/compta", icon: Calculator, permission: "quittance:view" },
   { title: "Administration", url: "/app/admin", icon: Settings, permission: "user:view" },
@@ -52,12 +53,20 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permission: "referentiel:view" },
   { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "referentiel:view" },
   { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "referentiel:view" },
+  { module: "companies", title: "Contacts", url: "/app/companies/contacts", icon: Users, permissions: ["contact-compagnie:view", "contact-compagnie:manage"] },
   { module: "crm", title: "Portefeuille client", url: "/app/crm", icon: Users, exact: true, permission: "client:view" },
   { module: "compta", title: "Tableau de bord", url: "/app/compta", icon: LayoutDashboard, exact: true, permission: "quittance:view" },
   { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
   { module: "compta", title: "Relevés et factures", url: "/app/compta/releves-factures", icon: FileText, permission: "quittance:view" },
   { module: "admin", title: "Utilisateurs & rôles", url: "/app/admin", icon: UserCog, exact: true, permission: "user:view" },
 ];
+
+export function canSeeNavigationItem(item: AppModule, userPermissions: readonly string[]) {
+  if (item.permissions?.length) {
+    return item.permissions.some((permission) => userPermissions.includes(permission));
+  }
+  return !item.permission || userPermissions.includes(item.permission);
+}
 
 export function moduleForPath(pathname: string): AppNavigationItem["module"] {
   if (pathname.startsWith("/app/compta")) {

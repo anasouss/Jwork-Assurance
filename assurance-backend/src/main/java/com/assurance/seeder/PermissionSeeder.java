@@ -67,7 +67,9 @@ public class PermissionSeeder implements CommandLineRunner {
             restricted("config:view", "Consulter la configuration", "config"),
             restricted("config:manage", "Gerer la configuration", "config"),
             permission("referentiel:view", "Consulter les referentiels", "referentiel"),
-            permission("referentiel:manage", "Gerer les referentiels", "referentiel")
+            permission("referentiel:manage", "Gerer les referentiels", "referentiel"),
+            permission("contact-compagnie:view", "Consulter les contacts compagnie", "contact-compagnie"),
+            permission("contact-compagnie:manage", "Gérer les contacts compagnie", "contact-compagnie")
     );
 
     private final PermissionRepository permissionRepository;

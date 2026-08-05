@@ -17,6 +17,8 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
 
     void deleteByQuittanceId(Long quittanceId);
 
+    boolean existsByQuittanceId(Long quittanceId);
+
     boolean existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNot(
             Long agenceId,
             Long compagnieId,

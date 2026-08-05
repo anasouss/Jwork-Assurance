@@ -10,6 +10,7 @@ import com.assurance.entity.Quittance;
 import com.assurance.entity.Remorque;
 import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.Vehicule;
+import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutElementFacturable;
@@ -142,6 +143,20 @@ public class QuittanceProductionService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
+        return remplacerPourMouvement(
+                contrat, mouvement, typeMouvement, calcul, garanties, vehicules, remorques, null);
+    }
+
+    public Quittance remplacerPourMouvement(
+            Contrat contrat,
+            MouvementContrat mouvement,
+            TypeMouvementContrat typeMouvement,
+            QuittanceCalculService.Resultat calcul,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<QuittanceResponse.TargetSummary> targetSummaries
+    ) {
         Quittance quittance = quittanceRepository.findFirstByMouvementContratIdOrderByCreatedAtAsc(mouvement.getId())
                 .orElse(null);
         if (quittance == null || quittance.getElementFacturable() == null) {
@@ -164,7 +179,7 @@ public class QuittanceProductionService {
         elementFacturableRepository.save(element);
 
         quittance.setCompagnieAssurance(contrat.getCompagnieAssurance());
-        quittance.setNumeroQuittance(genererNumeroQuittance(contrat, mouvement, typeMouvement));
+        // A recalculation updates amounts in place; the accounting reference is immutable.
         quittance.setType(typeMouvement.getCode());
         quittance.setCategorie(CategorieQuittance.TOTAL.name());
         quittance.setDateDebut(mouvement.getDateEffet());
@@ -200,7 +215,12 @@ public class QuittanceProductionService {
 
         elementFacturableCibleRepository.deleteByElementFacturableId(element.getId());
         elementFacturableCibleRepository.flush();
-        elementFacturableCibleService.generer(element, contrat, garanties, vehicules, remorques);
+        if (targetSummaries == null) {
+            elementFacturableCibleService.generer(element, contrat, garanties, vehicules, remorques);
+        } else {
+            elementFacturableCibleService.genererDepuisResumes(
+                    element, contrat, targetSummaries, vehicules, remorques);
+        }
         return quittance;
     }
 

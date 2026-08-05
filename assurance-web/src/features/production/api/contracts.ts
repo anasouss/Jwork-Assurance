@@ -5,6 +5,7 @@ import type {
   ContratListItem,
   ContratSummary,
   EcheanceAutomobileResponse,
+  FinancialHistoryRecalculation,
   PagedResponse,
   TypeContrat,
 } from "../types";
@@ -110,6 +111,23 @@ export const contractApi = {
       await apiFetch<ApiResponse<void>>(
         `/api/v1/contrats/${contratId}/mouvements/${mouvementId}`,
         { method: "DELETE" }
+      )
+    );
+  },
+
+  async previewFinancialHistoryRecalculation(contratId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<FinancialHistoryRecalculation>>(
+        `/api/v1/contrats/${contratId}/recalcul-financier/preview`
+      )
+    );
+  },
+
+  async applyFinancialHistoryRecalculation(contratId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<FinancialHistoryRecalculation>>(
+        `/api/v1/contrats/${contratId}/recalcul-financier`,
+        { method: "POST" }
       )
     );
   },

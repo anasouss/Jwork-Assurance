@@ -20,6 +20,7 @@ import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.EcheanceAutomobileResponse;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.QuittanceResponse;
+import com.assurance.dto.response.RecalculHistoriqueFinancierResponse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
@@ -32,6 +33,7 @@ import com.assurance.service.FlottePolicePdfService;
 import com.assurance.service.PreTermeFlottePdfService;
 import com.assurance.service.EcheanceProductionService;
 import com.assurance.service.MouvementContratService;
+import com.assurance.service.HistoriqueFinancierRecalculService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -66,6 +68,7 @@ public class ContratController {
     private final PreTermeFlottePdfService preTermeFlottePdfService;
     private final MouvementContratService mouvementContratService;
     private final EcheanceProductionService echeanceProductionService;
+    private final HistoriqueFinancierRecalculService historiqueFinancierRecalculService;
 
     @PostMapping
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
@@ -288,6 +291,25 @@ public class ContratController {
             @RequestParam(required = false) Long mouvementId
     ) {
         return ResponseEntity.ok(ApiResponse.success(contratService.get(TenantContext.getCurrentAgence(), id, mouvementId)));
+    }
+
+    @GetMapping("/{id}/recalcul-financier/preview")
+    @PreAuthorize("hasAuthority('PERM_contrat:recalculate-financial-history')")
+    public ResponseEntity<ApiResponse<RecalculHistoriqueFinancierResponse>> previewRecalculFinancier(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(historiqueFinancierRecalculService.preview(id)));
+    }
+
+    @PostMapping("/{id}/recalcul-financier")
+    @PreAuthorize("hasAuthority('PERM_contrat:recalculate-financial-history')")
+    public ResponseEntity<ApiResponse<RecalculHistoriqueFinancierResponse>> appliquerRecalculFinancier(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                historiqueFinancierRecalculService.appliquer(id),
+                "Historique financier recalculé"
+        ));
     }
 
     @DeleteMapping("/{id}")

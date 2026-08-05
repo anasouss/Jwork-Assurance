@@ -27,6 +27,7 @@ import { avenantApi } from "../api/avenants";
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { ContractWorkflowDialogs } from "../components/contracts/ContractWorkflowDialogs";
+import { FinancialHistoryRecalculationDialog } from "../components/contracts/FinancialHistoryRecalculationDialog";
 import {
   DEFAULT_CONTRACT_FILTERS,
   contractPageFromSearchParams,
@@ -347,6 +348,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [draftChoiceCode, setDraftChoiceCode] = useState<string | null>(null);
   const [renewalDialogOpen, setRenewalDialogOpen] = useState(false);
+  const [financialRecalculationOpen, setFinancialRecalculationOpen] = useState(false);
   const [renewalTerm, setRenewalTerm] = useState<"CABINET" | "COMPAGNIE">("CABINET");
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -365,6 +367,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const canManageCarteVerte = permissions.includes("carte-verte:manage") || canUpdateContrat;
   const canViewContrat = permissions.includes("contrat:view");
   const canViewPieces = permissions.includes("piece-jointe:view") || permissions.includes("contrat:view");
+  const canRecalculateFinancialHistory = permissions.includes("contrat:recalculate-financial-history")
+    && !child
+    && isActiveContrat(contrat);
   const hasActiveAvenants = (contrat.mouvements ?? []).some((item) => {
     const statut = String(item.statut ?? "").trim().toUpperCase();
     return !isInitialContractMovement(item) && statut !== "ANNULE";
@@ -398,7 +403,8 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && !terminal
     && !movement.isSynthetic
     && movement.autoriseCarteVerte === true;
-  const hasPrimaryActions = canEditDirectly || canCreateMovement || canOpenAssistance || canOpenCarteVerte;
+  const hasPrimaryActions = canEditDirectly || canCreateMovement || canOpenAssistance || canOpenCarteVerte
+    || canRecalculateFinancialHistory;
   const resolvedDeleteMode = resolveDeleteMode(contrat, movement, child);
   const deleteMode = resolvedDeleteMode === "CONTRAT" && canDeleteContrat
     ? resolvedDeleteMode
@@ -566,6 +572,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
               <Link to={carteVertePath}>Carte verte</Link>
             </DropdownMenuItem>
           ) : null}
+          {canRecalculateFinancialHistory ? (
+            <DropdownMenuItem onSelect={() => setFinancialRecalculationOpen(true)}>
+              Recalculer l’historique financier
+            </DropdownMenuItem>
+          ) : null}
           {hasPrimaryActions ? <DropdownMenuSeparator /> : null}
           {canDownload ? <DropdownMenuItem>Télécharger</DropdownMenuItem> : null}
           {canViewPieces ? (
@@ -624,6 +635,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
             navigate(avenantPath(contrat, code));
           },
         }}
+      />
+      <FinancialHistoryRecalculationDialog
+        contratId={contrat.id}
+        open={financialRecalculationOpen}
+        onOpenChange={setFinancialRecalculationOpen}
       />
     </>
   );

@@ -9,15 +9,19 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Collection;
-import jakarta.persistence.LockModeType;
 
 public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select q from Quittance q where q.contrat.id = :contratId")
+    List<Quittance> findByContratIdForUpdate(@Param("contratId") Long contratId);
     @Query("""
             select coalesce(sum(q.primeNette), 0) as primeNette,
                    coalesce(sum(q.taxe), 0) as taxe,

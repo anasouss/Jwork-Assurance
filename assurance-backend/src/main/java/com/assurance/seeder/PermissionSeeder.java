@@ -22,6 +22,7 @@ public class PermissionSeeder implements CommandLineRunner {
             permission("contrat:update", "Modifier un contrat", "contrat"),
             permission("contrat:delete", "Supprimer un contrat brouillon", "contrat"),
             permission("contrat:renew", "Renouveler un contrat", "contrat"),
+            permission("contrat:recalculate-financial-history", "Recalculer l'historique financier", "contrat"),
 
             permission("avenant:view", "Consulter les avenants", "avenant"),
             permission("avenant:create", "Creer un avenant", "avenant"),

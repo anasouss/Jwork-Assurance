@@ -1316,3 +1316,33 @@ export type ContratListGroup = {
   key: string;
   contrats: ContratListItem[];
 };
+
+export type FinancialHistoryAmounts = {
+  primeNette: number;
+  taxe: number;
+  taxeParafiscale: number;
+  accessoire: number;
+  cnpac: number;
+  primeTotale: number;
+};
+
+export type FinancialHistoryRecalculation = {
+  contratId: string;
+  numeroDossier?: string | null;
+  applicable: boolean;
+  applique: boolean;
+  blocages: string[];
+  mouvements: Array<{
+    mouvementId: string;
+    numeroMouvement?: string | null;
+    code: string;
+    libelle: string;
+    dateEffet: string;
+    anciensMontants: FinancialHistoryAmounts;
+    nouveauxMontants: FinancialHistoryAmounts;
+    modifie: boolean;
+  }>;
+  ancienTotal: number;
+  nouveauTotal: number;
+  ecartTotal: number;
+};

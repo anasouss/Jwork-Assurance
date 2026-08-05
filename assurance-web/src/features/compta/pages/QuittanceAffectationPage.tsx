@@ -105,18 +105,28 @@ export default function QuittanceAffectationPage() {
   });
 
   const rows = quittances.data?.rows ?? [];
+  const isAffectedView = appliedFilters.nature === "AVEC_QUITTANCE";
+  const isPendingView = appliedFilters.nature === "SANS_QUITTANCE";
+  const showSelectionColumn = !isAffectedView;
+  const showCompanyColumns = !isPendingView;
   type DisplayRow = {
     key: string;
     row: QuittanceAllocation;
     line: AllocationLine | null;
   };
-  const displayRows = rows.flatMap<DisplayRow>((row) => row.lignes.length > 0
-    ? row.lignes.map((line, index) => ({
+  const displayRows = rows.flatMap<DisplayRow>((row) => {
+    if (isPendingView) {
+      return [{ key: row.quittanceId, row, line: null }];
+    }
+    if (row.lignes.length > 0) {
+      return row.lignes.map((line, index) => ({
         key: line.id ?? `${row.quittanceId}-${index}`,
         row,
         line,
-      }))
-    : [{ key: row.quittanceId, row, line: null }]);
+      }));
+    }
+    return isAffectedView ? [] : [{ key: row.quittanceId, row, line: null }];
+  });
   const selectedRows = rows.filter((row) => selectedIds.includes(row.quittanceId));
   const selectionReference = selectedRows[0];
   const selectableRows = rows.filter((row) => isBulkCompatible(row, selectionReference));
@@ -125,10 +135,6 @@ export default function QuittanceAffectationPage() {
   const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
   const currentPage = Math.min(pageInfo?.number ?? page, totalPages - 1);
   const missingRules = rows.filter((row) => !row.regle).length;
-  const isAffectedView = appliedFilters.nature === "AVEC_QUITTANCE";
-  const isPendingView = appliedFilters.nature === "SANS_QUITTANCE";
-  const showSelectionColumn = !isAffectedView;
-  const showCompanyColumns = !isPendingView;
   const tableColumnCount = 10 + (showSelectionColumn ? 1 : 0) + (showCompanyColumns ? 4 : 0);
   const tableMinWidth = isPendingView
     ? "min-w-[1200px]"

@@ -54,6 +54,10 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
   const expected = useMemo(() => rows.reduce((sum, row) => sum + row.montantTtc, 0), [rows]);
   const entered = useMemo(() => lines.reduce((sum, line) => sum + (line.montantTtc ?? 0), 0), [lines]);
   const difference = entered - expected;
+  const balance = expected - entered;
+  const balanced = Math.abs(difference) < 0.005;
+  const balanceLabel = balanced ? "Équilibré" : balance > 0 ? "Reste à affecter" : "Dépassement";
+  const balanceValue = balanced ? 0 : Math.abs(balance);
   const targets = rows.map((row) => ({
     id: row.quittanceId,
     label: `${row.mouvement} · ${dateLabel(row.dateEffet)} · ${money(row.montantTtc)}`,
@@ -134,10 +138,11 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
         </DialogHeader>
 
         <div className="grid gap-4">
-          <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-3">
+          <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 lg:grid-cols-4">
             <Metric label="Mouvements sélectionnés" value={String(rows.length)} />
             <Metric label="TTC attendu" value={money(expected)} />
-            <Metric label="Écart" value={money(difference)} error={Math.abs(difference) >= 0.005} />
+            <Metric label="TTC affecté" value={money(entered)} />
+            <Metric label={balanceLabel} value={money(balanceValue)} error={!balanced} />
           </div>
 
           <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">

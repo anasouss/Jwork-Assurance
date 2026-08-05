@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearAuth, getAccessToken, saveAuth } from "@/lib/auth";
 import type { AuthResponse } from "@/lib/types";
-import { apiFetch, refreshAuthSession } from "./base";
+import { ApiError, apiFetch, refreshAuthSession } from "./base";
 
 const session = (accessToken: string): AuthResponse => ({
   accessToken,
@@ -42,6 +42,24 @@ describe("authenticated API requests", () => {
 
     await expect(apiFetch("/api/v1/secure")).rejects.toThrow("Forbidden");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the HTTP status and business error code", async () => {
+    saveAuth(session("access-1"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      success: false,
+      message: "Correction impossible",
+      code: "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED",
+    }, 409)));
+
+    const request = apiFetch("/api/v1/contrats/12");
+
+    await expect(request).rejects.toMatchObject({
+      name: "ApiError",
+      message: "Correction impossible",
+      status: 409,
+      code: "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED",
+    } satisfies Partial<ApiError>);
   });
 
   it("refreshes once after a 401 and retries with the new access token", async () => {

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Link } from "react-router-dom";
+import { CircleAlert, Loader2, Save } from "lucide-react";
+import { ApiError } from "@/lib/api/base";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -44,6 +47,10 @@ export function ContratFormLayout({
   showFractionnement = true,
   order = "mono",
 }: Props) {
+  const submissionError = form.createMutation.error;
+  const correctionConflict = form.correctionBlocked
+    || (submissionError instanceof ApiError
+      && submissionError.code === "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED");
   const souscripteurCategorieClientId = form.clients.find((client) => client.role === "SOUSCRIPTEUR")?.client.categorieClientId ?? "";
   const proprietaireCategorieClientId = form.clients.find((client) => client.role === "PROPRIETAIRE")?.client.categorieClientId ?? "";
   const assistanceCategorieClientId = order === "flotte"
@@ -321,6 +328,29 @@ export function ContratFormLayout({
         </div>
       </div>
 
+      {correctionConflict ? (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Modification directe impossible</AlertTitle>
+          <AlertDescription>
+            <p>
+              Ce contrat contient déjà des avenants ou mouvements validés. L'affaire nouvelle ne peut plus être modifiée directement.
+            </p>
+            <Button asChild variant="outline" size="sm" className="mt-2">
+              <Link to="/app/production/contrats">Retour à la liste des contrats</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : form.createMutation.isError ? (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Enregistrement impossible</AlertTitle>
+          <AlertDescription>
+            {submissionError instanceof Error ? submissionError.message : "Une erreur est survenue pendant l'enregistrement."}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {clientSections}
       {contractSection}
       {order === "flotte" ? (
@@ -375,7 +405,7 @@ export function ContratFormLayout({
       ) : null}
 
       <div className="flex justify-end gap-2 border-t pt-4">
-        <Button onClick={form.handleCreate} disabled={form.createMutation.isPending}>
+        <Button onClick={form.handleCreate} disabled={form.createMutation.isPending || correctionConflict}>
           {form.createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
           {form.createMutation.isPending
             ? form.correctionMode ? "Enregistrement..." : form.renewalMode ? "Enregistrement..." : "Création..."

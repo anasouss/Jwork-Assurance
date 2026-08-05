@@ -24,6 +24,7 @@ import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeImpactMouvement;
 import com.assurance.exception.BadRequestException;
+import com.assurance.exception.ConflictException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.LigneQuittanceRepository;
@@ -609,7 +610,10 @@ public class MouvementContratService {
                     ? ""
                     : mouvement.getTypeMouvement().getCode().trim().toUpperCase(Locale.ROOT);
             if (!CODE_AFFAIRE_NOUVELLE.equals(code) && !CODE_RENOUVELLEMENT.equals(code)) {
-                throw new BadRequestException("Ce contrat a deja des mouvements. Supprimez ou annulez les avenants/mouvements avant de corriger l'affaire nouvelle.");
+                throw new ConflictException(
+                        "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED",
+                        "Ce contrat contient déjà des avenants ou mouvements validés. L'affaire nouvelle ne peut plus être modifiée directement. Rectifiez le dernier mouvement concerné depuis la liste des contrats."
+                );
             }
         }
         if (mouvementsValides.size() > 1) {

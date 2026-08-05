@@ -8,6 +8,7 @@ import lombok.Data;
 public class ApiResponse<T> {
     private boolean success;
     private String message;
+    private String code;
     private T data;
 
     public static <T> ApiResponse<T> success(T data) {
@@ -20,5 +21,9 @@ public class ApiResponse<T> {
 
     public static <T> ApiResponse<T> error(String message) {
         return ApiResponse.<T>builder().success(false).message(message).build();
+    }
+
+    public static <T> ApiResponse<T> error(String message, String code) {
+        return ApiResponse.<T>builder().success(false).message(message).code(code).build();
     }
 }

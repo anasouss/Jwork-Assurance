@@ -10,6 +10,17 @@ const AUTH_REQUEST_HEADERS = { "X-Auth-Request": "1" } as const;
 
 type NetworkErrorMapper = (error: unknown) => Error;
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function clearRefreshCookie(): Promise<void> {
   await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
     method: "DELETE",
@@ -64,7 +75,7 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const response = await authenticatedRequest(path, options);
   if (!response.ok) {
-    throw new Error(await responseErrorMessage(response));
+    throw await responseError(response);
   }
   if (response.status === 204) return undefined as T;
   return normalizeApiIds(await response.json()) as T;
@@ -76,19 +87,19 @@ export async function apiFetchBlob(
 ): Promise<Blob> {
   const response = await authenticatedRequest(path, options);
   if (!response.ok) {
-    throw new Error(await responseErrorMessage(response));
+    throw await responseError(response);
   }
   return await response.blob();
 }
 
-async function responseErrorMessage(response: Response): Promise<string> {
+async function responseError(response: Response): Promise<ApiError> {
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    const errorData = await response.json().catch(() => ({}));
-    return errorData.message || `HTTP ${response.status}`;
+    const errorData = await response.json().catch(() => ({})) as { message?: string; code?: string };
+    return new ApiError(errorData.message || `HTTP ${response.status}`, response.status, errorData.code);
   }
   const text = await response.text().catch(() => "");
-  return text || `HTTP ${response.status}`;
+  return new ApiError(text || `HTTP ${response.status}`, response.status);
 }
 
 export async function apiUpload<T>(
@@ -104,7 +115,7 @@ export async function apiUpload<T>(
     toUploadNetworkError
   );
   if (!response.ok) {
-    throw new Error(await responseErrorMessage(response));
+    throw await responseError(response);
   }
   if (response.status === 204) return undefined as T;
   return normalizeApiIds(await response.json()) as T;

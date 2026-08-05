@@ -2,6 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useState, type Dispatc
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { ApiError } from "@/lib/api/base";
 import { attestationStockKeys, contractKeys } from "@/lib/query-keys";
 import { clientApi } from "../api/clients";
 import { contractCreationApi } from "../api/contract-creation";
@@ -224,6 +225,11 @@ export function useContratCreationForm(
   const correctionMode = String(draftQuery.data?.statut ?? "").toUpperCase() === "ACTIVE"
     && !draftQuery.data?.prospection
     && !draftQuery.data?.brouillon;
+  const correctionBlocked = correctionMode && (draftQuery.data?.mouvements ?? []).some((movement) => {
+    const code = String(movement.code ?? "").trim().toUpperCase();
+    const status = String(movement.statut ?? "").trim().toUpperCase();
+    return status === "VALIDE" && code !== "AN" && code !== "REN";
+  });
 
   useEffect(() => {
     const draft = draftQuery.data;
@@ -501,13 +507,18 @@ export function useContratCreationForm(
       toast.success("Contrat créé");
       navigate(`/app/production/contrats/${contrat.id}/pieces-jointes`);
     },
-    onError: (error) => toast.error(error instanceof Error
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED") {
+        return;
+      }
+      toast.error(error instanceof Error
       ? error.message
       : options?.renewalMode
         ? "Enregistrement du pré-terme impossible"
         : correctionMode
           ? "Modification impossible"
-          : "Création impossible"),
+          : "Création impossible");
+    },
   });
 
   const saveDraftMutation = useMutation({
@@ -1205,6 +1216,7 @@ export function useContratCreationForm(
     prospectionMode: Boolean(options?.prospectionMode),
     renewalMode: Boolean(options?.renewalMode),
     correctionMode,
+    correctionBlocked,
   };
 }
 

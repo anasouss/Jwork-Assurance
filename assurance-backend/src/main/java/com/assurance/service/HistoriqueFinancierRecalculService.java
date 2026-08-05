@@ -65,6 +65,7 @@ public class HistoriqueFinancierRecalculService {
     private final AffectationQuittanceCompagnieRepository affectationRepository;
     private final LigneDocumentClientRepository ligneDocumentClientRepository;
     private final QuittanceCalculService quittanceCalculService;
+    private final CalculGarantieService calculGarantieService;
     private final ElementFacturableCibleService elementFacturableCibleService;
     private final QuittanceProductionService quittanceProductionService;
 
@@ -243,6 +244,11 @@ public class HistoriqueFinancierRecalculService {
         SnapshotTargets outputTargets;
 
         if (!before.isEmpty() && !after.isEmpty()) {
+            if ("CHV_M".equalsIgnoreCase(type.getCode())) {
+                before.forEach(garantie -> garantie.setPrime(
+                        calculGarantieService.calculerPrimePeriodeRestante(
+                                contrat, garantie, mouvement.getDateEffet())));
+            }
             QuittanceCalculService.Resultat avant = calculate(contrat, null, before, beforeTargets, mouvement);
             QuittanceCalculService.Resultat apres = calculate(contrat, null, after, afterTargets, mouvement);
             calcul = "CHV_M".equalsIgnoreCase(type.getCode())

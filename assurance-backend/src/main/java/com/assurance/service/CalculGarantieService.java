@@ -6,6 +6,7 @@ import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
+import com.assurance.entity.ContratGarantie;
 import com.assurance.entity.Garantie;
 import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.entity.Remorque;
@@ -91,6 +92,62 @@ public class CalculGarantieService {
             return null;
         }
         return montant.multiply(prorata == null ? BigDecimal.ONE : prorata).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal calculerPrimePeriodeRestante(
+            Contrat contrat,
+            ContratGarantie garantie,
+            LocalDate dateEffetMouvement
+    ) {
+        if (contrat == null || garantie == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal primeContrat = garantie.getPrime() == null ? BigDecimal.ZERO : garantie.getPrime();
+        BigDecimal prorataOrigine = resolveProrataOrigine(contrat, garantie);
+        BigDecimal primeAnnuelle = prorataOrigine.compareTo(BigDecimal.ZERO) > 0
+                ? primeContrat.divide(prorataOrigine, 8, RoundingMode.HALF_UP)
+                : primeContrat;
+        BigDecimal prorataRestant = resolveProrataRestant(contrat, garantie, dateEffetMouvement);
+        return primeAnnuelle.multiply(prorataRestant).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal resolveProrataOrigine(Contrat contrat, ContratGarantie garantie) {
+        if (!isProrataApplicable(contrat, garantie.getGarantie())) {
+            return BigDecimal.ONE;
+        }
+        BigDecimal coefficient = garantie.getVehicule() != null ? garantie.getVehicule().getCoefficientProrata()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getCoefficientProrata() : null;
+        if (coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0) {
+            return coefficient;
+        }
+        LocalDate dateEffet = garantie.getVehicule() != null ? garantie.getVehicule().getDateEffet()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEffet()
+                : contrat.getDateEffet();
+        LocalDate dateEcheance = garantie.getVehicule() != null ? garantie.getVehicule().getDateEcheance()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEcheance()
+                : contrat.getDateEcheance();
+        return calculerProrata(dateEffet, dateEcheance);
+    }
+
+    private BigDecimal resolveProrataRestant(
+            Contrat contrat,
+            ContratGarantie garantie,
+            LocalDate dateEffetMouvement
+    ) {
+        LocalDate dateDebutCible = garantie.getVehicule() != null ? garantie.getVehicule().getDateEffet()
+                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEffet()
+                : contrat.getDateEffet();
+        LocalDate dateDebutRetour = dateEffetMouvement == null ? dateDebutCible
+                : dateDebutCible != null && dateDebutCible.isAfter(dateEffetMouvement)
+                        ? dateDebutCible : dateEffetMouvement;
+        LocalDate dateEcheance = contrat.getDateEcheance();
+        if (dateEcheance == null || dateDebutRetour == null || dateDebutRetour.isAfter(dateEcheance)) {
+            return BigDecimal.ZERO;
+        }
+        if (!isProrataApplicable(contrat, garantie.getGarantie())) {
+            return BigDecimal.ONE;
+        }
+        return calculerProrata(dateDebutRetour, dateEcheance);
     }
 
     public BigDecimal calculerPrimeLigne(

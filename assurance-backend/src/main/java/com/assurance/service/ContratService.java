@@ -3978,47 +3978,11 @@ public class ContratService {
     }
 
     private BigDecimal primeRetourPrime(Contrat contrat, AvenantRequest request, ContratGarantie garantie) {
-        BigDecimal primeContrat = zeroIfNull(garantie.getPrime());
-        BigDecimal prorataOrigine = resolveProrataOrigine(contrat, garantie);
-        BigDecimal primeAnnuelle = prorataOrigine.compareTo(BigDecimal.ZERO) > 0
-                ? primeContrat.divide(prorataOrigine, 8, RoundingMode.HALF_UP)
-                : primeContrat;
-        BigDecimal prorataRestant = resolveProrataRestant(contrat, request, garantie);
-        return scale(primeAnnuelle.multiply(prorataRestant));
-    }
-
-    private BigDecimal resolveProrataOrigine(Contrat contrat, ContratGarantie garantie) {
-        if (!calculGarantieService.isProrataApplicable(contrat, garantie.getGarantie())) {
-            return BigDecimal.ONE;
-        }
-        BigDecimal coefficient = garantie.getVehicule() != null ? garantie.getVehicule().getCoefficientProrata()
-                : garantie.getRemorque() != null ? garantie.getRemorque().getCoefficientProrata() : null;
-        if (coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0) {
-            return coefficient;
-        }
-        LocalDate dateEffet = garantie.getVehicule() != null ? garantie.getVehicule().getDateEffet()
-                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEffet()
-                : contrat.getDateEffet();
-        LocalDate dateEcheance = garantie.getVehicule() != null ? garantie.getVehicule().getDateEcheance()
-                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEcheance()
-                : contrat.getDateEcheance();
-        return calculGarantieService.calculerProrata(dateEffet, dateEcheance);
-    }
-
-    private BigDecimal resolveProrataRestant(Contrat contrat, AvenantRequest request, ContratGarantie garantie) {
-        LocalDate dateDebutCible = garantie.getVehicule() != null ? garantie.getVehicule().getDateEffet()
-                : garantie.getRemorque() != null ? garantie.getRemorque().getDateEffet()
-                : contrat.getDateEffet();
-        LocalDate dateEffetAvenant = firstNonNull(request.getDateEffet(), dateDebutCible, contrat.getDateEffet());
-        LocalDate dateDebutRetour = dateDebutCible != null && dateDebutCible.isAfter(dateEffetAvenant) ? dateDebutCible : dateEffetAvenant;
-        LocalDate dateEcheance = contrat.getDateEcheance();
-        if (dateEcheance == null || dateDebutRetour == null || dateDebutRetour.isAfter(dateEcheance)) {
-            return BigDecimal.ZERO;
-        }
-        if (!calculGarantieService.isProrataApplicable(contrat, garantie.getGarantie())) {
-            return BigDecimal.ONE;
-        }
-        return calculGarantieService.calculerProrata(dateDebutRetour, dateEcheance);
+        return calculGarantieService.calculerPrimePeriodeRestante(
+                contrat,
+                garantie,
+                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
+        );
     }
 
     private MouvementContratRequest toMouvementRequest(AvenantRequest request, Contrat contrat) {

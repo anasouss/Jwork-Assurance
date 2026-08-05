@@ -120,6 +120,7 @@ export default function QuittanceAffectationPage() {
   const selectedRows = rows.filter((row) => selectedIds.includes(row.quittanceId));
   const selectionReference = selectedRows[0];
   const selectableRows = rows.filter((row) => isBulkCompatible(row, selectionReference));
+  const companyWritingCount = rows.reduce((total, row) => total + row.lignes.length, 0);
   const pageInfo = quittances.data?.page;
   const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
   const currentPage = Math.min(pageInfo?.number ?? page, totalPages - 1);
@@ -298,8 +299,9 @@ export default function QuittanceAffectationPage() {
       ) : null}
 
       {searched ? (
-        <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Quittances trouvées" value={String(pageInfo?.totalElements ?? 0)} />
+        <div className="grid gap-px overflow-hidden border bg-border sm:grid-cols-2 xl:grid-cols-5">
+          <Metric label="Mouvements trouvés" value={String(pageInfo?.totalElements ?? 0)} />
+          <Metric label="Écritures compagnie affichées" value={String(companyWritingCount)} />
           <Metric label="TTC de la page" value={money(quittances.data?.summary.montantTtc ?? 0)} />
           <Metric label="Montant affecté de la page" value={money(quittances.data?.summary.montantAffecte ?? 0)} />
           <Metric label="Configuration manquante sur la page" value={String(missingRules)} warning={missingRules > 0} />
@@ -329,12 +331,12 @@ export default function QuittanceAffectationPage() {
         </CardHeader>
         <CardContent className="min-w-0 p-0">
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[1710px] table-fixed border-collapse text-sm">
+            <table className="w-full min-w-[1650px] table-fixed border-collapse text-sm">
               <colgroup>
                 <col className="w-11" />
-                <col className="w-[210px]" />
+                <col className="w-[185px]" />
                 <col className="w-[180px]" />
-                <col className="w-[190px]" />
+                <col className="w-[155px]" />
                 <col className="w-[110px]" />
                 <col className="w-[110px]" />
                 <col className="w-[105px]" />
@@ -359,7 +361,7 @@ export default function QuittanceAffectationPage() {
                   </Header>
                   <Header>Produit / dossier</Header>
                   <Header>Mouvement</Header>
-                  <Header>Souscripteur / police</Header>
+                  <Header>Client / police</Header>
                   <Header>Date effet</Header>
                   <Header>Date échéance</Header>
                   <Header className="text-right">Prime nette</Header>

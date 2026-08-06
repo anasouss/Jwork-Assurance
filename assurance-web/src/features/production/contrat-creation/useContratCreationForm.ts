@@ -103,6 +103,12 @@ export function useContratCreationForm(
     categoriesClient: useReference("categories-client"),
   };
 
+  const draftQuery = useQuery({
+    queryKey: ["contrat-draft", draftId],
+    queryFn: () => contractCreationApi.getContratDraft(draftId ?? ""),
+    enabled: Boolean(draftId),
+  });
+
   const selectedConvention = useMemo(
     () => refs.conventions.data?.find((item) => item.id === conventionId) ?? null,
     [conventionId, refs.conventions.data]
@@ -115,8 +121,11 @@ export function useContratCreationForm(
   const categorieClientId = useMemo(() => {
     const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE")?.client.categorieClientId;
     const souscripteur = clients.find((client) => client.role === "SOUSCRIPTEUR")?.client.categorieClientId;
-    return typeContrat === "FLOTTE" ? proprietaire || souscripteur || "" : souscripteur || "";
-  }, [clients, typeContrat]);
+    const persistedCategory = idString(draftQuery.data?.categorieClientId) || initialCategorieClientId || "";
+    return typeContrat === "FLOTTE"
+      ? proprietaire || souscripteur || persistedCategory
+      : souscripteur || persistedCategory;
+  }, [clients, draftQuery.data?.categorieClientId, initialCategorieClientId, typeContrat]);
   const selectedCategorieClient = useMemo(
     () => refs.categoriesClient.data?.find((item) => item.id === categorieClientId) ?? null,
     [categorieClientId, refs.categoriesClient.data]
@@ -217,11 +226,6 @@ export function useContratCreationForm(
     enabled: Boolean(grilleTarifaireId),
   });
 
-  const draftQuery = useQuery({
-    queryKey: ["contrat-draft", draftId],
-    queryFn: () => contractCreationApi.getContratDraft(draftId ?? ""),
-    enabled: Boolean(draftId),
-  });
   const correctionMode = String(draftQuery.data?.statut ?? "").toUpperCase() === "ACTIVE"
     && !draftQuery.data?.prospection
     && !draftQuery.data?.brouillon;

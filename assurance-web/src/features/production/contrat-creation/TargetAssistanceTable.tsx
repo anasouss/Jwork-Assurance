@@ -126,18 +126,25 @@ export function TargetAssistanceTable({
               </Select>
             </ResponsiveRecordCell>
             <ResponsiveRecordCell label="Produit">
-              <Select
-                disabled={!assistance.enabled || selectableProducts.length === 0}
-                value={selectedProductId}
-                onValueChange={(value) => onChange({ produitAssistanceId: value })}
-              >
-                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                <SelectContent>
-                  {selectableProducts.map((produit) => (
-                    <SelectItem key={produit.id} value={produit.id}>{produit.libelle}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid gap-1">
+                <Select
+                  disabled={!assistance.enabled || selectableProducts.length === 0}
+                  value={selectedProductId}
+                  onValueChange={(value) => onChange({ produitAssistanceId: value })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                  <SelectContent>
+                    {selectableProducts.map((produit) => (
+                      <SelectItem key={produit.id} value={produit.id}>{produit.libelle}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {assistance.enabled && assistance.compagnieAssistanceId && selectableProducts.length === 0 ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Aucun produit compatible pour cette compagnie.
+                  </p>
+                ) : null}
+              </div>
             </ResponsiveRecordCell>
             <ResponsiveRecordCell label="Prime" valueClassName="text-right font-medium">
               {assistance.enabled && prime != null ? formatMoney(prime) : "-"}

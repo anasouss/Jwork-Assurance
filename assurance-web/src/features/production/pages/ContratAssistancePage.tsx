@@ -171,14 +171,21 @@ export default function ContratAssistancePage() {
                   </Select>
                 </Field>
                 <Field label="Produit d'assistance" required>
-                  <Select value={form.produitAssistanceId} disabled={!form.compagnieAssistanceId || filteredProducts.length === 0} onValueChange={(value) => setForm((current) => ({ ...current, produitAssistanceId: value }))}>
-                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                    <SelectContent>
-                      {filteredProducts.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>{product.libelle}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="grid gap-1">
+                    <Select value={form.produitAssistanceId} disabled={!form.compagnieAssistanceId || filteredProducts.length === 0} onValueChange={(value) => setForm((current) => ({ ...current, produitAssistanceId: value }))}>
+                      <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                      <SelectContent>
+                        {filteredProducts.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>{product.libelle}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.compagnieAssistanceId && filteredProducts.length === 0 ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Aucun produit compatible pour cette compagnie.
+                      </p>
+                    ) : null}
+                  </div>
                 </Field>
                 <Field label="N° contrat/quittance" required>
                   <Input value={form.numeroContratOuQuittance ?? ""} onChange={(event) => setForm((current) => ({ ...current, numeroContratOuQuittance: event.target.value }))} />

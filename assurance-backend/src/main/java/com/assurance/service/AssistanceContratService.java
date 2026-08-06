@@ -98,11 +98,6 @@ public class AssistanceContratService {
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
                 ))
                 .toList();
-        Set<Long> compagnieIds = produits.stream()
-                .map(AssistanceContratContextResponse.ProduitAssistanceOption::getCompagnieAssistanceId)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toSet());
-
         return AssistanceContratContextResponse.builder()
                 .contratId(contrat.getId())
                 .numeroDossier(contrat.getNumeroDossier())
@@ -119,7 +114,6 @@ public class AssistanceContratService {
                 .assistances(activeAssistances.stream().map(this::toResponse).toList())
                 .compagnies(compagnieAssistanceRepository.findAll().stream()
                         .filter(compagnie -> Boolean.TRUE.equals(compagnie.getActif()))
-                        .filter(compagnie -> compagnieIds.contains(compagnie.getId()))
                         .sorted(Comparator.comparing(CompagnieAssistance::getNom, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                         .map(compagnie -> AssistanceContratContextResponse.CompagnieAssistanceOption.builder()
                                 .id(compagnie.getId())

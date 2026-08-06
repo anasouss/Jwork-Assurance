@@ -40,8 +40,7 @@ app:
   security:
     refresh-cookie-secure: ${APP_REFRESH_COOKIE_SECURE:true}
   storage:
-    pieces-jointes-dir: ${APP_STORAGE_PIECES_JOINTES_DIR:/data/assurance/pieces-jointes}
-    agency-logos-dir: ${APP_STORAGE_AGENCY_LOGOS_DIR:/data/assurance/agency-logos}
+    root-dir: ${APP_STORAGE_ROOT_DIR:/data/assurance}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175}
   seed:

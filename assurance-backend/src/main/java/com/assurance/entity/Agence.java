@@ -77,6 +77,15 @@ public class Agence extends BaseEntity {
     @Column(name = "logo_nom_fichier", length = 255)
     private String logoNomFichier;
 
+    @Column(name = "signature_chemin_stockage", length = 500)
+    private String signatureCheminStockage;
+
+    @Column(name = "signature_type_mime", length = 50)
+    private String signatureTypeMime;
+
+    @Column(name = "signature_nom_fichier", length = 255)
+    private String signatureNomFichier;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default

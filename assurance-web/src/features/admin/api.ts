@@ -164,4 +164,23 @@ export const adminApi = {
       method: "DELETE",
     }));
   },
+
+  async agencySignature(id: string) {
+    return apiFetchBlob(`/api/v1/admin/agencies/${id}/signature`);
+  },
+
+  async uploadAgencySignature(id: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return unwrap(await apiUpload<ApiResponse<AdminAgency>>(
+      `/api/v1/admin/agencies/${id}/signature`,
+      formData
+    ));
+  },
+
+  async deleteAgencySignature(id: string) {
+    return unwrap(await apiFetch<ApiResponse<AdminAgency>>(`/api/v1/admin/agencies/${id}/signature`, {
+      method: "DELETE",
+    }));
+  },
 };

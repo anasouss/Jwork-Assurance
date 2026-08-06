@@ -15,7 +15,7 @@ WORKDIR /app
 RUN apk add --no-cache su-exec \
     && addgroup -S app \
     && adduser -S app -G app \
-    && mkdir -p /data/assurance/pieces-jointes /data/assurance/agency-logos \
+    && mkdir -p /data/assurance \
     && chown -R app:app /data/assurance
 
 COPY --from=build /app/target/*.jar /app/app.jar
@@ -24,8 +24,7 @@ RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 
 ENV JAVA_OPTS=""
 ENV PORT=8080
-ENV APP_STORAGE_PIECES_JOINTES_DIR=/data/assurance/pieces-jointes
-ENV APP_STORAGE_AGENCY_LOGOS_DIR=/data/assurance/agency-logos
+ENV APP_STORAGE_ROOT_DIR=/data/assurance
 EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

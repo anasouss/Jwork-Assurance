@@ -54,6 +54,7 @@ import { toDateOnly } from "@/features/production/date";
 import type { ClientResponse, GroupeClient } from "@/features/production/types";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { RelevePdfOptionsDialog } from "../components/RelevePdfOptionsDialog";
 import {
   DOCUMENT_DEFAULTS,
   SOURCE_DEFAULTS,
@@ -1040,7 +1041,9 @@ function DeleteDocumentDialog(props: { target?: ClientDocument; onClose: () => v
 
 function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
   const [loading, setLoading] = useState(false);
-  async function preview() {
+  const [optionsOpen, setOptionsOpen] = useState(false);
+
+  async function preview(withSignature: boolean) {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
       toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
@@ -1049,9 +1052,10 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
     previewWindow.opener = null;
     setLoading(true);
     try {
-      const blob = await comptaApi.clientDocumentPdf(props.document.id);
+      const blob = await comptaApi.clientDocumentPdf(props.document.id, withSignature);
       const url = URL.createObjectURL(blob);
       previewWindow.location.href = url;
+      setOptionsOpen(false);
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       previewWindow.close();
@@ -1060,17 +1064,37 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
       setLoading(false);
     }
   }
+
+  function handleClick() {
+    if (props.document.typeDocument === "RELEVE") {
+      setOptionsOpen(true);
+      return;
+    }
+    void preview(false);
+  }
+
   return (
-    <Button
-      variant="ghost"
-      size={props.withLabel ? "default" : "icon"}
-      onClick={preview}
-      disabled={loading}
-      title="Prévisualiser le PDF"
-    >
-      <FileDown className="size-4" />
-      {props.withLabel ? (loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size={props.withLabel ? "default" : "icon"}
+        onClick={handleClick}
+        disabled={loading}
+        title="Prévisualiser le PDF"
+      >
+        <FileDown className="size-4" />
+        {props.withLabel ? (loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
+      </Button>
+      {props.document.typeDocument === "RELEVE" ? (
+        <RelevePdfOptionsDialog
+          open={optionsOpen}
+          loading={loading}
+          signatureAvailable={props.document.signatureDisponible}
+          onOpenChange={setOptionsOpen}
+          onOpenPdf={(withSignature) => void preview(withSignature)}
+        />
+      ) : null}
+    </>
   );
 }
 

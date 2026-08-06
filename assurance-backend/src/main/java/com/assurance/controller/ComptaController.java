@@ -333,9 +333,16 @@ public class ComptaController {
 
     @GetMapping("/documents-clients/{documentId}/pdf")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
-    public ResponseEntity<byte[]> documentClientPdf(@PathVariable Long documentId) {
+    public ResponseEntity<byte[]> documentClientPdf(
+            @PathVariable Long documentId,
+            @RequestParam(defaultValue = "false") boolean avecSignature
+    ) {
         DocumentClientResponse detail = documentClientService.detail(TenantContext.getCurrentAgence(), documentId);
-        byte[] pdf = documentClientPdfService.generate(TenantContext.getCurrentAgence(), documentId);
+        byte[] pdf = documentClientPdfService.generate(
+                TenantContext.getCurrentAgence(),
+                documentId,
+                avecSignature
+        );
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=" + detail.getNumero() + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)

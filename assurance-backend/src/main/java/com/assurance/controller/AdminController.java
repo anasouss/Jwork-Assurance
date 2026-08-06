@@ -215,4 +215,35 @@ public class AdminController {
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> deleteAgencyLogo(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(adminService.deleteAgencyLogo(id), "Logo agence supprimé"));
     }
+
+    @PostMapping(value = "/agencies/{id}/signature", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgencySignature(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                adminService.updateAgencySignature(id, file),
+                "Signature agence modifiée"
+        ));
+    }
+
+    @GetMapping("/agencies/{id}/signature")
+    public ResponseEntity<Resource> agencySignature(@PathVariable Long id) {
+        AdminService.AgencySignature signature = adminService.getAgencySignature(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(signature.contentType()))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename(signature.filename()).build().toString()
+                )
+                .body(signature.resource());
+    }
+
+    @DeleteMapping("/agencies/{id}/signature")
+    public ResponseEntity<ApiResponse<AdminAgenceResponse>> deleteAgencySignature(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                adminService.deleteAgencySignature(id),
+                "Signature agence supprimée"
+        ));
+    }
 }

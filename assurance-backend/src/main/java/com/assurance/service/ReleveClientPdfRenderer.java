@@ -4,6 +4,7 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.LigneDocumentClient;
 import com.assurance.enums.StatutDocumentClient;
+import com.assurance.exception.BadRequestException;
 import com.itextpdf.barcodes.BarcodeQRCode;
 import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.io.image.ImageDataFactory;
@@ -53,8 +54,9 @@ public class ReleveClientPdfRenderer {
     private static final float PAGE_MARGIN = 10f;
 
     private final AgencyLogoStorageService agencyLogoStorageService;
+    private final AgencySignatureStorageService agencySignatureStorageService;
 
-    public byte[] render(DocumentClient source) throws Exception {
+    public byte[] render(DocumentClient source, boolean avecSignature) throws Exception {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(output));
             Document document = new Document(pdf, PageSize.A4);
@@ -71,6 +73,9 @@ public class ReleveClientPdfRenderer {
             writeStatementLines(document, source, bold, tableHeader);
             writeTotal(document, source, bold);
             writePaymentText(document, source);
+            if (avecSignature) {
+                writeSignature(document, source.getAgence());
+            }
             if (source.getStatut() == StatutDocumentClient.ANNULE) {
                 writeCancellation(document, source, bold);
             }
@@ -273,6 +278,23 @@ public class ReleveClientPdfRenderer {
                 .setFontSize(9.5f)
                 .setMarginLeft(7)
                 .setMarginTop(0));
+    }
+
+    private void writeSignature(Document document, Agence agence) {
+        byte[] content = agencySignatureStorageService.loadBytesIfPresent(agence.getSignatureCheminStockage());
+        if (content == null || content.length == 0) {
+            throw new BadRequestException("Aucune signature n’est configurée pour cette agence");
+        }
+        Image signature = new Image(ImageDataFactory.create(content));
+        signature.scaleToFit(150, 75);
+        signature.setHorizontalAlignment(HorizontalAlignment.RIGHT);
+        Table container = new Table(new float[]{1})
+                .setWidth(UnitValue.createPercentValue(32))
+                .setHorizontalAlignment(HorizontalAlignment.RIGHT)
+                .setMarginRight(30)
+                .setMarginTop(8);
+        container.addCell(borderless(new Cell()).add(signature).setTextAlignment(TextAlignment.RIGHT));
+        document.add(container);
     }
 
     private void writeCancellation(Document document, DocumentClient source, PdfFont bold) {

@@ -32,6 +32,7 @@ public class DocumentClientResponse {
     private String notes;
     private LocalDateTime dateAnnulation;
     private String motifAnnulation;
+    private boolean signatureDisponible;
     private List<Ligne> lignes;
 
     @Getter

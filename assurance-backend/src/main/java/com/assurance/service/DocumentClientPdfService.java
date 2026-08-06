@@ -58,11 +58,13 @@ public class DocumentClientPdfService {
     private final AgencyLogoStorageService agencyLogoStorageService;
 
     @Transactional(readOnly = true)
-    public byte[] generate(Long agenceId, Long documentId) {
+    public byte[] generate(Long agenceId, Long documentId, boolean avecSignature) {
         DocumentClient source = documentClientService.findDocument(agenceId, documentId);
         if (source.getTypeDocument() == TypeDocumentClient.RELEVE) {
             try {
-                return releveClientPdfRenderer.render(source);
+                return releveClientPdfRenderer.render(source, avecSignature);
+            } catch (BadRequestException exception) {
+                throw exception;
             } catch (Exception exception) {
                 throw new BadRequestException("La génération du PDF a échoué");
             }

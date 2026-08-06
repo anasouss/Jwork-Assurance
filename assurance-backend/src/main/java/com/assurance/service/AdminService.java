@@ -50,6 +50,7 @@ public class AdminService {
     private final AgenceRepository agenceRepository;
     private final PasswordEncoder passwordEncoder;
     private final AgencyLogoStorageService agencyLogoStorageService;
+    private final AgencySignatureStorageService agencySignatureStorageService;
 
     @Transactional(readOnly = true)
     public List<AdminUtilisateurResponse> listPlatformAdmins() {
@@ -479,6 +480,51 @@ public class AdminService {
         );
     }
 
+    @Transactional
+    public AdminAgenceResponse updateAgencySignature(Long id, MultipartFile file) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        Agence agence = managedAgency(actor, id);
+        String previousStorageKey = agence.getSignatureCheminStockage();
+        AgencySignatureStorageService.StoredSignature stored = agencySignatureStorageService.store(
+                agence.getId(),
+                agence.getCode(),
+                file
+        );
+        agence.setSignatureCheminStockage(stored.storageKey());
+        agence.setSignatureTypeMime(stored.contentType());
+        agence.setSignatureNomFichier(stored.fileName());
+        agencySignatureStorageService.deleteAfterCommit(previousStorageKey);
+        return AdminAgenceResponse.from(agenceRepository.save(agence));
+    }
+
+    @Transactional
+    public AdminAgenceResponse deleteAgencySignature(Long id) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        Agence agence = managedAgency(actor, id);
+        agencySignatureStorageService.deleteAfterCommit(agence.getSignatureCheminStockage());
+        agence.setSignatureCheminStockage(null);
+        agence.setSignatureTypeMime(null);
+        agence.setSignatureNomFichier(null);
+        return AdminAgenceResponse.from(agenceRepository.save(agence));
+    }
+
+    @Transactional(readOnly = true)
+    public AgencySignature getAgencySignature(Long id) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        Agence agence = managedAgency(actor, id);
+        if (agence.getSignatureCheminStockage() == null || agence.getSignatureCheminStockage().isBlank()) {
+            throw new ResourceNotFoundException("Signature agence introuvable");
+        }
+        return new AgencySignature(
+                agencySignatureStorageService.load(agence.getSignatureCheminStockage()),
+                agence.getSignatureTypeMime(),
+                agence.getSignatureNomFichier()
+        );
+    }
+
     private Agence managedAgency(Utilisateur actor, Long id) {
         Agence agence = agenceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", id));
@@ -487,6 +533,9 @@ public class AdminService {
     }
 
     public record AgencyLogo(Resource resource, String contentType, String filename) {
+    }
+
+    public record AgencySignature(Resource resource, String contentType, String filename) {
     }
 
     private Utilisateur currentUser() {

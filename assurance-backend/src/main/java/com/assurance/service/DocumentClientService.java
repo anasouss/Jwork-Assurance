@@ -532,6 +532,8 @@ public class DocumentClientService {
                 .notes(document.getNotes())
                 .dateAnnulation(document.getDateAnnulation())
                 .motifAnnulation(document.getMotifAnnulation())
+                .signatureDisponible(document.getAgence().getSignatureCheminStockage() != null
+                        && !document.getAgence().getSignatureCheminStockage().isBlank())
                 .lignes(lines)
                 .build();
     }

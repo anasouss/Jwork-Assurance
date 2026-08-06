@@ -63,6 +63,7 @@ export type AdminAgency = {
   banque?: string | null;
   rib?: string | null;
   logoDisponible: boolean;
+  signatureDisponible: boolean;
   statut: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 };
 

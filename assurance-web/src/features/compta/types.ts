@@ -298,6 +298,7 @@ export type ClientDocument = {
   notes?: string | null;
   dateAnnulation?: string | null;
   motifAnnulation?: string | null;
+  signatureDisponible: boolean;
   lignes: ClientDocumentLine[];
 };
 

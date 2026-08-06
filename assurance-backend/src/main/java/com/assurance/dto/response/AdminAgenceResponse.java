@@ -26,6 +26,7 @@ public class AdminAgenceResponse {
     private String banque;
     private String rib;
     private boolean logoDisponible;
+    private boolean signatureDisponible;
     private StatutAgence statut;
 
     public static AdminAgenceResponse from(Agence agence) {
@@ -46,6 +47,8 @@ public class AdminAgenceResponse {
                 .banque(agence.getBanque())
                 .rib(agence.getRib())
                 .logoDisponible(agence.getLogoCheminStockage() != null && !agence.getLogoCheminStockage().isBlank())
+                .signatureDisponible(agence.getSignatureCheminStockage() != null
+                        && !agence.getSignatureCheminStockage().isBlank())
                 .statut(agence.getStatut())
                 .build();
     }

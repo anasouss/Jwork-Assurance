@@ -261,8 +261,10 @@ export const comptaApi = {
     });
   },
 
-  async clientDocumentPdf(id: string) {
-    return apiFetchBlob(`/api/v1/compta/documents-clients/${id}/pdf`);
+  async clientDocumentPdf(id: string, avecSignature = false) {
+    return apiFetchBlob(
+      `/api/v1/compta/documents-clients/${id}/pdf${buildQueryString({ avecSignature })}`
+    );
   },
 };
 

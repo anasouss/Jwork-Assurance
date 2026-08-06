@@ -483,14 +483,14 @@ export function QuittanceRulesDialog({
                     />
                     <ExcelTitleField
                       label="Accessoires"
-                      required
                       value={form.excelColonneAccessoires}
+                      placeholder="Optionnel - 0 par défaut"
                       onChange={(value) => setForm((current) => ({ ...current, excelColonneAccessoires: value }))}
                     />
                     <ExcelTitleField
                       label="Montant TTC"
-                      required
                       value={form.excelColonneMontantTtc}
+                      placeholder="Optionnel - calculé automatiquement"
                       onChange={(value) => setForm((current) => ({ ...current, excelColonneMontantTtc: value }))}
                     />
                     <ExcelTitleField
@@ -501,8 +501,8 @@ export function QuittanceRulesDialog({
                     />
                     <ExcelTitleField
                       label="Net compagnie"
-                      required
                       value={form.excelColonneNetCompagnie}
+                      placeholder="Optionnel - calculé automatiquement"
                       onChange={(value) => setForm((current) => ({ ...current, excelColonneNetCompagnie: value }))}
                     />
                     <ExcelTitleField
@@ -813,10 +813,7 @@ function isComplete(form: RuleForm) {
         form.excelColonneDateEffet.trim() &&
         form.excelColonnePrimeNette.trim() &&
         form.excelColonneTaxes.trim() &&
-        form.excelColonneAccessoires.trim() &&
-        form.excelColonneMontantTtc.trim() &&
-        form.excelColonneCommissionNette.trim() &&
-        form.excelColonneNetCompagnie.trim()
+        form.excelColonneCommissionNette.trim()
       )
     );
   return Boolean(

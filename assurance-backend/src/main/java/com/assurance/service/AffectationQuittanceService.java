@@ -1302,10 +1302,20 @@ public class AffectationQuittanceService {
                     }
                     BigDecimal primeNette = decimal(row, columns, "primenette");
                     BigDecimal taxes = decimal(row, columns, "taxe");
-                    BigDecimal accessoires = decimal(row, columns, "accessoires");
-                    BigDecimal montantTtc = decimal(row, columns, "montantttc");
+                    BigDecimal accessoires = optionalDecimal(row, columns, "accessoires", ZERO);
+                    BigDecimal calculatedTtc = money(primeNette.add(taxes).add(accessoires));
+                    BigDecimal montantTtc = optionalDecimal(row, columns, "montantttc", calculatedTtc);
                     BigDecimal commission = decimal(row, columns, "commissionnette");
-                    BigDecimal netCompagnie = decimal(row, columns, "netcompagnie");
+                    Retention retention = calculateRetention(commission, avecRetenue, regle);
+                    BigDecimal calculatedNetCompagnie = money(
+                            montantTtc.subtract(commission).add(retention.amount())
+                    );
+                    BigDecimal netCompagnie = optionalDecimal(
+                            row,
+                            columns,
+                            "netcompagnie",
+                            calculatedNetCompagnie
+                    );
                     LocalDate lineEffectDate = date(row, columns, "dateeffet");
                     LocalDate lineEndDate = optionalDate(row, columns, "datefin");
                     String act = text(row, columns, "acte");
@@ -1313,11 +1323,9 @@ public class AffectationQuittanceService {
                     if (target != null) {
                         validateAllocationPeriod(lineEffectDate, lineEndDate, target, number);
                     }
-                    BigDecimal calculatedTtc = primeNette.add(taxes).add(accessoires);
                     if (money(calculatedTtc).compareTo(money(montantTtc)) != 0) {
                         throw new BadRequestException("le montant TTC ne correspond pas à prime nette + taxes + accessoires");
                     }
-                    Retention retention = calculateRetention(commission, avecRetenue, regle);
                     lines.add(AffectationQuittanceResponse.Ligne.builder()
                             .quittanceId(target == null ? null : target.getId())
                             .numeroQuittanceCompagnie(number)
@@ -1486,10 +1494,10 @@ public class AffectationQuittanceService {
         resolveImportColumn(sourceColumns, columns, missing, "datefin", regle.getExcelColonneDateEcheance(), false);
         resolveImportColumn(sourceColumns, columns, missing, "primenette", regle.getExcelColonnePrimeNette(), true);
         resolveImportColumn(sourceColumns, columns, missing, "taxe", regle.getExcelColonneTaxes(), true);
-        resolveImportColumn(sourceColumns, columns, missing, "accessoires", regle.getExcelColonneAccessoires(), true);
-        resolveImportColumn(sourceColumns, columns, missing, "montantttc", regle.getExcelColonneMontantTtc(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "accessoires", regle.getExcelColonneAccessoires(), false);
+        resolveImportColumn(sourceColumns, columns, missing, "montantttc", regle.getExcelColonneMontantTtc(), false);
         resolveImportColumn(sourceColumns, columns, missing, "commissionnette", regle.getExcelColonneCommissionNette(), true);
-        resolveImportColumn(sourceColumns, columns, missing, "netcompagnie", regle.getExcelColonneNetCompagnie(), true);
+        resolveImportColumn(sourceColumns, columns, missing, "netcompagnie", regle.getExcelColonneNetCompagnie(), false);
         resolveImportColumn(sourceColumns, columns, missing, "acte", regle.getExcelColonneActe(), false);
         resolveImportColumn(sourceColumns, columns, missing, "categorie", regle.getExcelColonneCategorie(), false);
         resolveImportColumn(sourceColumns, columns, missing, "statut", regle.getExcelColonneStatut(), false);
@@ -1532,6 +1540,23 @@ public class AffectationQuittanceService {
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             throw new BadRequestException("montant manquant pour " + key);
         }
+        return decimal(cell, key);
+    }
+
+    private BigDecimal optionalDecimal(
+            Row row,
+            Map<String, Integer> columns,
+            String key,
+            BigDecimal defaultValue
+    ) {
+        Cell cell = cell(row, columns, key);
+        if (cell == null || cell.getCellType() == CellType.BLANK) {
+            return money(defaultValue);
+        }
+        return decimal(cell, key);
+    }
+
+    private BigDecimal decimal(Cell cell, String key) {
         if (cell.getCellType() == CellType.NUMERIC) {
             return money(BigDecimal.valueOf(cell.getNumericCellValue()));
         }
@@ -1689,10 +1714,7 @@ public class AffectationQuittanceService {
         required.put("Date effet", request.getExcelColonneDateEffet());
         required.put("Prime nette", request.getExcelColonnePrimeNette());
         required.put("Taxes", request.getExcelColonneTaxes());
-        required.put("Accessoires", request.getExcelColonneAccessoires());
-        required.put("Montant TTC", request.getExcelColonneMontantTtc());
         required.put("Commission nette", request.getExcelColonneCommissionNette());
-        required.put("Net compagnie", request.getExcelColonneNetCompagnie());
         List<String> missing = required.entrySet().stream()
                 .filter(entry -> trimToNull(entry.getValue()) == null)
                 .map(Map.Entry::getKey)

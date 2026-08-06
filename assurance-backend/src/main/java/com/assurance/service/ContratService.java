@@ -560,8 +560,8 @@ public class ContratService {
                     .ptc(input.getPtc())
                     .datePremiereCirculation(input.getDatePremiereCirculation())
                     .dateExpirationCarteGrise(input.getDateExpirationCarteGrise())
-                    .dateEffet(firstNonNull(input.getDateEffet(), contractDates.dateEffet()))
-                    .dateEcheance(firstNonNull(input.getDateEcheance(), contractDates.dateEcheance()))
+                    .dateEffet(contractDates.dateEffet())
+                    .dateEcheance(contractDates.dateEcheance())
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .remorque(input.getRemorque() == null ? false : input.getRemorque())
@@ -591,8 +591,8 @@ public class ContratService {
                     .immatriculation(input.getImmatriculation())
                     .ptc(input.getPtc())
                     .dateMiseEnCirculation(input.getDateMiseEnCirculation())
-                    .dateEffet(firstNonNull(input.getDateEffet(), contractDates.dateEffet()))
-                    .dateEcheance(firstNonNull(input.getDateEcheance(), contractDates.dateEcheance()))
+                    .dateEffet(contractDates.dateEffet())
+                    .dateEcheance(contractDates.dateEcheance())
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .coefficientProrata(input.getCoefficientProrata())
@@ -1035,8 +1035,8 @@ public class ContratService {
                     .ptc(input.getPtc())
                     .datePremiereCirculation(input.getDatePremiereCirculation())
                     .dateExpirationCarteGrise(input.getDateExpirationCarteGrise())
-                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
-                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
+                    .dateEffet(contrat.getDateEffet())
+                    .dateEcheance(contrat.getDateEcheance())
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .remorque(input.getRemorque() == null ? false : input.getRemorque())
@@ -1066,8 +1066,8 @@ public class ContratService {
                     .immatriculation(input.getImmatriculation())
                     .ptc(input.getPtc())
                     .dateMiseEnCirculation(input.getDateMiseEnCirculation())
-                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
-                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
+                    .dateEffet(contrat.getDateEffet())
+                    .dateEcheance(contrat.getDateEcheance())
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .coefficientProrata(input.getCoefficientProrata())
@@ -1328,8 +1328,8 @@ public class ContratService {
         vehicule.setPtc(input.getPtc());
         vehicule.setDatePremiereCirculation(input.getDatePremiereCirculation());
         vehicule.setDateExpirationCarteGrise(input.getDateExpirationCarteGrise());
-        vehicule.setDateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()));
-        vehicule.setDateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()));
+        vehicule.setDateEffet(contrat.getDateEffet());
+        vehicule.setDateEcheance(contrat.getDateEcheance());
         vehicule.setCrm(input.getCrm());
         vehicule.setNumeroAttestation(input.getNumeroAttestation());
         vehicule.setRemorque(input.getRemorque() == null ? false : input.getRemorque());
@@ -1362,8 +1362,8 @@ public class ContratService {
         remorque.setImmatriculation(input.getImmatriculation());
         remorque.setPtc(input.getPtc());
         remorque.setDateMiseEnCirculation(input.getDateMiseEnCirculation());
-        remorque.setDateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()));
-        remorque.setDateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()));
+        remorque.setDateEffet(contrat.getDateEffet());
+        remorque.setDateEcheance(contrat.getDateEcheance());
         remorque.setCrm(input.getCrm());
         remorque.setNumeroAttestation(input.getNumeroAttestation());
         remorque.setCoefficientProrata(input.getCoefficientProrata());
@@ -3997,8 +3997,21 @@ public class ContratService {
 
     private AvenantTargets buildAvenantTargetsPreview(Contrat contrat, AvenantRequest request) {
         CreateContratRequest previewRequest = avenantCreateRequest(contrat, request);
-        List<Vehicule> vehicules = buildVehiculesPreview(previewRequest, contrat, contrat.getUsage());
-        List<Remorque> remorques = buildRemorquesPreview(previewRequest, contrat, contrat.getUsage());
+        LocalDate dateEffetCible = firstNonNull(request.getDateEffet(), contrat.getDateEffet());
+        List<Vehicule> vehicules = buildVehiculesPreview(
+                previewRequest,
+                contrat,
+                contrat.getUsage(),
+                dateEffetCible,
+                contrat.getDateEcheance()
+        );
+        List<Remorque> remorques = buildRemorquesPreview(
+                previewRequest,
+                contrat,
+                contrat.getUsage(),
+                dateEffetCible,
+                contrat.getDateEcheance()
+        );
         List<ContratGarantie> garanties = buildGarantiesPreview(previewRequest, contrat, vehicules, remorques);
         return new AvenantTargets(vehicules, remorques, garanties);
     }
@@ -4010,7 +4023,7 @@ public class ContratService {
             Vehicule vehicule = new Vehicule();
             vehicule.setContrat(contrat);
             applyVehiculeInput(contrat, vehicule, input);
-            vehicule.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+            vehicule.setDateEffet(firstNonNull(request.getDateEffet(), contrat.getDateEffet()));
             vehicule.setDateEcheance(contrat.getDateEcheance());
             vehicule.setActif(true);
             vehicule = vehiculeRepository.save(vehicule);
@@ -4024,7 +4037,7 @@ public class ContratService {
             Remorque remorque = new Remorque();
             remorque.setContrat(contrat);
             applyRemorqueInput(contrat, remorque, input);
-            remorque.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+            remorque.setDateEffet(firstNonNull(request.getDateEffet(), contrat.getDateEffet()));
             remorque.setDateEcheance(contrat.getDateEcheance());
             remorque.setActif(true);
             remorque = remorqueRepository.save(remorque);
@@ -4501,9 +4514,21 @@ public class ContratService {
         synchronizeCategorieClient(contrat, false);
         validateUsageForClientCategory(contrat, usageContrat);
 
-        List<Vehicule> vehicules = buildVehiculesPreview(request, contrat, usageContrat);
+        List<Vehicule> vehicules = buildVehiculesPreview(
+                request,
+                contrat,
+                usageContrat,
+                contrat.getDateEffet(),
+                contrat.getDateEcheance()
+        );
         contrat.getVehicules().addAll(vehicules);
-        List<Remorque> remorques = buildRemorquesPreview(request, contrat, usageContrat);
+        List<Remorque> remorques = buildRemorquesPreview(
+                request,
+                contrat,
+                usageContrat,
+                contrat.getDateEffet(),
+                contrat.getDateEcheance()
+        );
         contrat.getRemorques().addAll(remorques);
         List<ContratGarantie> garanties = buildGarantiesPreview(request, contrat, vehicules, remorques);
         contrat.getGaranties().addAll(garanties);
@@ -4568,7 +4593,13 @@ public class ContratService {
                 .build();
     }
 
-    private List<Vehicule> buildVehiculesPreview(CreateContratRequest request, Contrat contrat, Usage usageContrat) {
+    private List<Vehicule> buildVehiculesPreview(
+            CreateContratRequest request,
+            Contrat contrat,
+            Usage usageContrat,
+            LocalDate dateEffetCible,
+            LocalDate dateEcheanceCible
+    ) {
         List<Vehicule> vehicules = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
@@ -4594,8 +4625,8 @@ public class ContratService {
                     .ptc(input.getPtc())
                     .datePremiereCirculation(input.getDatePremiereCirculation())
                     .dateExpirationCarteGrise(input.getDateExpirationCarteGrise())
-                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
-                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
+                    .dateEffet(dateEffetCible)
+                    .dateEcheance(dateEcheanceCible)
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .coefficientProrata(input.getCoefficientProrata())
@@ -4611,7 +4642,13 @@ public class ContratService {
         return vehicules;
     }
 
-    private List<Remorque> buildRemorquesPreview(CreateContratRequest request, Contrat contrat, Usage usageContrat) {
+    private List<Remorque> buildRemorquesPreview(
+            CreateContratRequest request,
+            Contrat contrat,
+            Usage usageContrat,
+            LocalDate dateEffetCible,
+            LocalDate dateEcheanceCible
+    ) {
         List<Remorque> remorques = new ArrayList<>();
         for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
@@ -4625,8 +4662,8 @@ public class ContratService {
                     .immatriculation(input.getImmatriculation())
                     .ptc(input.getPtc())
                     .dateMiseEnCirculation(input.getDateMiseEnCirculation())
-                    .dateEffet(firstNonNull(input.getDateEffet(), contrat.getDateEffet()))
-                    .dateEcheance(firstNonNull(input.getDateEcheance(), contrat.getDateEcheance()))
+                    .dateEffet(dateEffetCible)
+                    .dateEcheance(dateEcheanceCible)
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .coefficientProrata(input.getCoefficientProrata())

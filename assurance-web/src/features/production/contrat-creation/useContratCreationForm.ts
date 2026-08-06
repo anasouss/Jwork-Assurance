@@ -369,8 +369,8 @@ export function useContratCreationForm(
         ...vehicule,
         coefficientProrata: undefined,
         usageId: vehicule.usageId || contractUsageFallback || undefined,
-        dateEffet: vehicule.dateEffet || dateEffet,
-        dateEcheance: vehicule.dateEcheance || dateEcheance,
+        dateEffet,
+        dateEcheance,
         crm: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : vehicule.crm,
       };
     }),
@@ -383,6 +383,8 @@ export function useContratCreationForm(
             ...remorque,
             coefficientProrata: undefined,
             usageId: remorque.usageId || contractUsageFallback || undefined,
+            dateEffet,
+            dateEcheance,
           };
         }),
     garanties: typeContrat === "PARTICULIER"

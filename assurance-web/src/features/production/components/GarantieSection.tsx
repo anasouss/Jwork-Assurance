@@ -753,8 +753,11 @@ function AssistanceTable({
     const usageIds = Array.isArray(produit.usageIds) ? produit.usageIds.map(String) : [];
     return usageIds.length === 0 || !usageId || usageIds.includes(usageId);
   });
-  const selectedProduct = filteredProducts.find((produit) => produit.id === assistance.produitAssistanceId);
-  const selectedProductId = selectedProduct?.id ?? "";
+  const selectedProduct = produitsAssistance.find((produit) => produit.id === assistance.produitAssistanceId);
+  const selectedProductId = assistance.produitAssistanceId ?? "";
+  const selectableProducts = selectedProduct && !filteredProducts.some((produit) => produit.id === selectedProduct.id)
+    ? [selectedProduct, ...filteredProducts]
+    : filteredProducts;
   const tarifsQuery = useQuery({
     queryKey: ["referentiel", "produits-assistance", selectedProductId, "tarifs"],
     queryFn: () => assistanceProductApi.listProductRates(selectedProductId),
@@ -775,12 +778,6 @@ function AssistanceTable({
       dateEcheance: computeDateEcheanceFromCode(assistance.dateEffet, echeanceCode, assistance.dateEcheance),
     });
   };
-
-  useEffect(() => {
-    if (assistance.produitAssistanceId && !selectedProductId) {
-      onChange({ produitAssistanceId: undefined });
-    }
-  }, [assistance.produitAssistanceId, onChange, selectedProductId]);
 
   return (
     <div className="overflow-hidden rounded-md border xl:overflow-x-auto">
@@ -853,13 +850,13 @@ function AssistanceTable({
             </ResponsiveRecordCell>
             <ResponsiveRecordCell label="Produit">
               <Select
-                disabled={!assistance.enabled || filteredProducts.length === 0}
+                disabled={!assistance.enabled || selectableProducts.length === 0}
                 value={selectedProductId}
                 onValueChange={(value) => onChange({ produitAssistanceId: value })}
               >
               <SelectTrigger className="w-full"><SelectValue placeholder="Choisir" /></SelectTrigger>
                 <SelectContent>
-                  {filteredProducts.map((produit) => (
+                  {selectableProducts.map((produit) => (
                     <SelectItem key={produit.id} value={produit.id}>{produit.libelle}</SelectItem>
                   ))}
                 </SelectContent>

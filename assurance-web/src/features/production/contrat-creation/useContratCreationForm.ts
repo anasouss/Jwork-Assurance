@@ -1122,6 +1122,7 @@ export function useContratCreationForm(
 
   return {
     typeContrat,
+    categorieClientId,
     refs,
     groupesClients,
     lignesGrille,

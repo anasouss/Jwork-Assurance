@@ -54,11 +54,7 @@ export function ContratFormLayout({
   const correctionConflict = form.correctionBlocked || loadCorrectionConflict
     || (submissionError instanceof ApiError
       && submissionError.code === "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED");
-  const souscripteurCategorieClientId = form.clients.find((client) => client.role === "SOUSCRIPTEUR")?.client.categorieClientId ?? "";
-  const proprietaireCategorieClientId = form.clients.find((client) => client.role === "PROPRIETAIRE")?.client.categorieClientId ?? "";
-  const assistanceCategorieClientId = order === "flotte"
-    ? proprietaireCategorieClientId || souscripteurCategorieClientId
-    : souscripteurCategorieClientId;
+  const assistanceCategorieClientId = form.categorieClientId;
   const flotteTargetUsages = useMemo(() => {
     if (order !== "flotte") {
       return form.availableUsages;

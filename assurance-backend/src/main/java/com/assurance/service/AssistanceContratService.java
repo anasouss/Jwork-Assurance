@@ -243,6 +243,11 @@ public class AssistanceContratService {
                 && produit.getUsages().stream().noneMatch(usage -> usage.getId().equals(vehicule.getUsage().getId()))) {
             throw new BadRequestException("Produit d'assistance incompatible avec l'usage du vehicule");
         }
+        Long categorieClientId = resolveAssistanceCategorieClientId(contrat);
+        if (produit.getCategorieClient() != null
+                && !produit.getCategorieClient().getId().equals(categorieClientId)) {
+            throw new BadRequestException("Produit d'assistance incompatible avec la categorie client du contrat");
+        }
 
         LocalDate dateSouscription = firstNonNull(
                 request.getDateSouscription(),
@@ -407,7 +412,14 @@ public class AssistanceContratService {
         if (preferred != null) {
             return preferred;
         }
-        return resolveCategorieClientId(contrat, RoleClientContrat.SOUSCRIPTEUR);
+        RoleClientContrat secondaryRole = preferredRole == RoleClientContrat.PROPRIETAIRE
+                ? RoleClientContrat.SOUSCRIPTEUR
+                : RoleClientContrat.PROPRIETAIRE;
+        Long secondary = resolveCategorieClientId(contrat, secondaryRole);
+        if (secondary != null) {
+            return secondary;
+        }
+        return contrat.getCategorieClient() != null ? contrat.getCategorieClient().getId() : null;
     }
 
     private Long resolveCategorieClientId(Contrat contrat, RoleClientContrat role) {

@@ -22,7 +22,6 @@ import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.PieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
 import com.assurance.repository.TypePieceJointeRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -30,7 +29,6 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -63,22 +61,7 @@ public class PieceJointeService {
     private final TypeMouvementContratRepository typeMouvementContratRepository;
     private final TypePieceJointeRepository typePieceJointeRepository;
     private final PieceJointeRepository pieceJointeRepository;
-
-    @Value("${app.storage.pieces-jointes-dir:/data/assurance/pieces-jointes}")
-    private String piecesJointesDir;
-
-    @PostConstruct
-    void initializeStorage() {
-        Path root = storageRoot();
-        try {
-            Files.createDirectories(root);
-        } catch (IOException error) {
-            throw new IllegalStateException("Impossible d'initialiser le stockage des pieces jointes: " + root, error);
-        }
-        if (!Files.isWritable(root)) {
-            throw new IllegalStateException("Le stockage des pieces jointes n'est pas accessible en ecriture: " + root);
-        }
-    }
+    private final StorageLayoutService storageLayoutService;
 
     @Transactional(readOnly = true)
     public List<TypePieceJointeResponse> listTypes(Long agenceId, boolean includeInactive) {
@@ -349,20 +332,8 @@ public class PieceJointeService {
         }
     }
 
-    private Path storageRoot() {
-        return Path.of(piecesJointesDir).toAbsolutePath().normalize();
-    }
-
     private Path resolveStorageKey(Path storageKey) {
-        if (storageKey.isAbsolute()) {
-            throw new IllegalStateException("Une cle de stockage relative est obligatoire");
-        }
-        Path root = storageRoot();
-        Path resolved = root.resolve(storageKey).normalize();
-        if (!resolved.startsWith(root)) {
-            throw new IllegalStateException("La cle de stockage sort du repertoire autorise");
-        }
-        return resolved;
+        return storageLayoutService.resolveContractAttachment(storageKey);
     }
 
     private Path resolveStoredPath(PieceJointe piece) {

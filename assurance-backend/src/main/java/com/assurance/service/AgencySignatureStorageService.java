@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class AgencySignatureStorageService {
 
     private static final long MAX_FILE_SIZE = 4L * 1024L * 1024L;

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-storage_dir="${APP_STORAGE_PIECES_JOINTES_DIR:-/data/assurance/pieces-jointes}"
+storage_dir="${APP_STORAGE_ROOT_DIR:-/data/assurance}"
 
 mkdir -p "$storage_dir"
 chown -R app:app "$storage_dir"

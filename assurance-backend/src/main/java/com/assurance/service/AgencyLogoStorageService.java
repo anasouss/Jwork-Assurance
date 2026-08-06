@@ -2,8 +2,7 @@ package com.assurance.service;
 
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
-import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -22,27 +21,14 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class AgencyLogoStorageService {
 
     private static final long MAX_LOGO_SIZE = 4L * 1024L * 1024L;
     private static final int MAX_LOGO_WIDTH = 1600;
     private static final int MAX_LOGO_HEIGHT = 800;
 
-    @Value("${app.storage.agency-logos-dir:/data/assurance/agency-logos}")
-    private String agencyLogosDir;
-
-    @PostConstruct
-    void initializeStorage() {
-        Path root = storageRoot();
-        try {
-            Files.createDirectories(root);
-        } catch (IOException error) {
-            throw new IllegalStateException("Impossible d'initialiser le stockage des logos d'agence: " + root, error);
-        }
-        if (!Files.isWritable(root)) {
-            throw new IllegalStateException("Le stockage des logos d'agence n'est pas accessible en ecriture: " + root);
-        }
-    }
+    private final StorageLayoutService storageLayoutService;
 
     public StoredLogo store(Long agencyId, String agencyCode, MultipartFile file) {
         byte[] content = normalize(file);
@@ -148,20 +134,8 @@ public class AgencyLogoStorageService {
         }
     }
 
-    private Path storageRoot() {
-        return Path.of(agencyLogosDir).toAbsolutePath().normalize();
-    }
-
     private Path resolveStorageKey(Path storageKey) {
-        if (storageKey.isAbsolute()) {
-            throw new IllegalStateException("Une cle de stockage relative est obligatoire");
-        }
-        Path root = storageRoot();
-        Path resolved = root.resolve(storageKey).normalize();
-        if (!resolved.startsWith(root)) {
-            throw new IllegalStateException("La cle de stockage sort du repertoire autorise");
-        }
-        return resolved;
+        return storageLayoutService.resolveAgencyLogo(storageKey);
     }
 
     private void deleteOnRollback(Path path) {

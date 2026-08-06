@@ -10,9 +10,7 @@ import com.assurance.enums.TypeEvenementSinistre;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.SinistreDocumentRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -49,21 +47,7 @@ public class SinistreDocumentService {
     private final SinistreWorkflowService workflowService;
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
-
-    @Value("${app.storage.sinistres-dir:/data/assurance/sinistres}")
-    private String sinistresDir;
-
-    @PostConstruct
-    void initializeStorage() {
-        try {
-            Files.createDirectories(storageRoot());
-        } catch (IOException error) {
-            throw new IllegalStateException("Impossible d'initialiser le stockage des sinistres", error);
-        }
-        if (!Files.isWritable(storageRoot())) {
-            throw new IllegalStateException("Le stockage des sinistres n'est pas accessible en écriture");
-        }
-    }
+    private final StorageLayoutService storageLayoutService;
 
     @Transactional
     public SinistreDetailResponse upload(
@@ -202,16 +186,17 @@ public class SinistreDocumentService {
     private StoredDocument store(Long agenceId, Long sinistreId, MultipartFile file) {
         String originalName = file.getOriginalFilename() == null ? "document" : file.getOriginalFilename();
         String extension = safeExtension(originalName);
-        Path directory = storageRoot().resolve(agenceId.toString()).resolve(sinistreId.toString()).normalize();
-        Path path = directory.resolve(UUID.randomUUID() + extension).normalize();
-        if (!path.startsWith(storageRoot())) {
-            throw new BadRequestException("Chemin de stockage invalide");
-        }
+        String storageKey = Path.of(agenceId.toString())
+                .resolve(sinistreId.toString())
+                .resolve(UUID.randomUUID() + extension)
+                .toString();
+        Path path = resolveStorageKey(storageKey);
+        Path directory = path.getParent();
         try {
             Files.createDirectories(directory);
             Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
             return new StoredDocument(
-                    storageRoot().relativize(path).toString(),
+                    storageKey,
                     originalName,
                     normalizeContentType(file.getContentType()),
                     file.getSize(),
@@ -237,16 +222,12 @@ public class SinistreDocumentService {
                 : contentType.toLowerCase(Locale.ROOT);
     }
 
-    private Path storageRoot() {
-        return Path.of(sinistresDir).toAbsolutePath().normalize();
-    }
-
     private Path resolveStorageKey(String storageKey) {
-        Path path = storageRoot().resolve(storageKey).normalize();
-        if (!path.startsWith(storageRoot())) {
+        try {
+            return storageLayoutService.resolveClaimDocument(storageKey);
+        } catch (IllegalArgumentException | IllegalStateException error) {
             throw new BadRequestException("Chemin de stockage invalide");
         }
-        return path;
     }
 
     private void deleteOnRollback(Path path) {

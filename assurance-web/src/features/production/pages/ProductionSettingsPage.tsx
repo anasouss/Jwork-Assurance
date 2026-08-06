@@ -68,7 +68,7 @@ const settings = [
   },
   {
     title: "Sous-classes",
-    description: "Référentiel SC1, SC2, SC3, SC4 pour les usages concernés.",
+    description: "Référentiel SC1, SC2, SC3, SC5 et SC6 pour les usages concernés.",
     href: "/app/production/parametres/sous-classes",
     icon: Layers3,
   },

@@ -107,6 +107,7 @@ public class CreateContratRequest {
         private String immatriculationProvisoire;
         private String carburant;
         private String puissanceFiscale;
+        private String cylindree;
         @NotBlank
         private String nombrePlaces;
         private String sousClasse;

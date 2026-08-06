@@ -93,6 +93,7 @@ export function useContratCreationForm(
     carrosseries: useReference("carrosseries"),
     categoriesTransport: useReference("categories-transport"),
     sousClasses: useReference("sous-classes"),
+    tarifsUsage: useReference("tarifs-usage"),
     garanties: useReference("garanties"),
     compagnies: useReference("compagnies-assurance"),
     conventions: useReference("conventions"),
@@ -159,6 +160,20 @@ export function useContratCreationForm(
     const allowedIds = new Set(conventionUsageIds);
     return usages.filter((usage) => allowedIds.has(usage.id));
   }, [categorieClientId, categorieUsageIds, conventionId, conventionUsageIds, refs.usages.data, selectedConvention, typeContrat]);
+
+  const selectedUsage = useMemo(
+    () => availableUsages.find((usage) => usage.id === usageId),
+    [availableUsages, usageId]
+  );
+  const selectedSousClasse = useMemo(() => {
+    const code = vehicules[0]?.sousClasse;
+    return refs.sousClasses.data?.find((item) => (item.code ?? item.libelle) === code);
+  }, [refs.sousClasses.data, vehicules]);
+  const requireDriverDetails = !(
+    typeContrat === "CONVENTION"
+    && selectedUsage?.bySousClasse
+    && !selectedSousClasse?.conducteurPermisRequis
+  );
 
   useEffect(() => {
     if (typeContrat !== "CONVENTION" || !usageId || !selectedConvention) {
@@ -666,7 +681,7 @@ export function useContratCreationForm(
         nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
       }
       if (
-        (
+        requireDriverDetails && (
           item.role === "CONDUCTEUR"
           || (item.role === "PROPRIETAIRE" && (typeContrat === "FLOTTE" || (item.client.typeClient !== "PERSONNE_MORALE" && item.client.conducteurHabituel !== false)))
         )
@@ -677,7 +692,7 @@ export function useContratCreationForm(
       if (isBeforeToday(item.client.cinValidite, today)) {
         nextErrors[`clients.${index}.client.cinValidite`] = "La validité CIN ne doit pas être expirée.";
       }
-      if (isBeforeToday(item.client.dateValiditePermis, today)) {
+      if (requireDriverDetails && isBeforeToday(item.client.dateValiditePermis, today)) {
         nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
       }
     });
@@ -762,12 +777,14 @@ export function useContratCreationForm(
           nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
         }
         if (
+          requireDriverDetails
+          &&
           role === "PROPRIETAIRE"
           && (typeContrat === "FLOTTE" || (client.typeClient !== "PERSONNE_MORALE" && client.conducteurHabituel !== false))
         ) {
           requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
         }
-        if (isBeforeToday(client.dateValiditePermis, today)) {
+        if (requireDriverDetails && isBeforeToday(client.dateValiditePermis, today)) {
           nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
         }
       });
@@ -778,20 +795,22 @@ export function useContratCreationForm(
     }
     if (section === "proprietaire") {
       validateClient("PROPRIETAIRE");
-      request.clients
-        .map((item, index) => ({ item, index }))
-        .filter(({ item }) => item.role === "CONDUCTEUR")
-        .forEach(({ item, index }) => {
-          const client = item.client;
-          requireField(`clients.${index}.client.genre`, client.genre, "Genre du conducteur obligatoire.");
-          requireField(`clients.${index}.client.cin`, client.cin, "CIN conducteur obligatoire.");
-          requireField(`clients.${index}.client.nom`, client.nom, "Nom conducteur obligatoire.");
-          requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom conducteur obligatoire.");
-          requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
-          if (isBeforeToday(client.dateValiditePermis, today)) {
-            nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
-          }
-        });
+      if (requireDriverDetails) {
+        request.clients
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.role === "CONDUCTEUR")
+          .forEach(({ item, index }) => {
+            const client = item.client;
+            requireField(`clients.${index}.client.genre`, client.genre, "Genre du conducteur obligatoire.");
+            requireField(`clients.${index}.client.cin`, client.cin, "CIN conducteur obligatoire.");
+            requireField(`clients.${index}.client.nom`, client.nom, "Nom conducteur obligatoire.");
+            requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom conducteur obligatoire.");
+            requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
+            if (isBeforeToday(client.dateValiditePermis, today)) {
+              nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
+            }
+          });
+      }
     }
     if (section === "contrat") {
       if (typeContrat === "PARTICULIER") {
@@ -851,6 +870,15 @@ export function useContratCreationForm(
         }
         if (vehiculeUsage?.bySousClasse) {
           requireField(`vehicules.${index}.sousClasse`, vehicule.sousClasse, "Sous-classe obligatoire.");
+          const sousClasse = refs.sousClasses.data?.find(
+            (item) => (item.code ?? item.libelle) === vehicule.sousClasse
+          );
+          const cylindree = sousClasse?.champMoteur === "CYLINDREE";
+          requireField(
+            `vehicules.${index}.${cylindree ? "cylindree" : "puissanceFiscale"}`,
+            cylindree ? vehicule.cylindree : vehicule.puissanceFiscale,
+            cylindree ? "Cylindrée obligatoire." : "Puissance fiscale obligatoire."
+          );
         }
         if (vehiculeUsage?.byPtc) {
           requireField(`vehicules.${index}.ptc`, vehicule.ptc, "PTC obligatoire.");
@@ -928,6 +956,15 @@ export function useContratCreationForm(
         }
         if (vehiculeUsage?.bySousClasse) {
           requireField(`vehicules.${target.index}.sousClasse`, vehicule.sousClasse, "Sous-classe obligatoire.");
+          const sousClasse = refs.sousClasses.data?.find(
+            (item) => (item.code ?? item.libelle) === vehicule.sousClasse
+          );
+          const cylindree = sousClasse?.champMoteur === "CYLINDREE";
+          requireField(
+            `vehicules.${target.index}.${cylindree ? "cylindree" : "puissanceFiscale"}`,
+            cylindree ? vehicule.cylindree : vehicule.puissanceFiscale,
+            cylindree ? "Cylindrée obligatoire." : "Puissance fiscale obligatoire."
+          );
         }
         if (vehiculeUsage?.byPtc) {
           requireField(`vehicules.${target.index}.ptc`, vehicule.ptc, "PTC obligatoire.");
@@ -1093,7 +1130,16 @@ export function useContratCreationForm(
 
   const setUsageForContrat = (value: string) => {
     setUsageId(value);
-    setVehicules((current) => current.map((vehicule) => ({ ...vehicule, usageId: value })));
+    setVehicules((current) => current.map((vehicule) => ({
+      ...vehicule,
+      usageId: value,
+      categorieTransportId: undefined,
+      carburant: undefined,
+      puissanceFiscale: undefined,
+      cylindree: undefined,
+      sousClasse: undefined,
+      ptc: undefined,
+    })));
   };
 
   useEffect(() => {
@@ -1541,6 +1587,7 @@ function hydrateDraft(draft: ContratSummary) {
         immatriculation: nullToUndefined(vehicule.immatriculation),
         carburant: nullToUndefined(vehicule.carburant),
         puissanceFiscale: nullToUndefined(vehicule.puissanceFiscale),
+        cylindree: nullToUndefined(vehicule.cylindree),
         nombrePlaces: nullToUndefined(vehicule.nombrePlaces),
         sousClasse: nullToUndefined(vehicule.sousClasse),
         ptc: nullToUndefined(vehicule.ptc),

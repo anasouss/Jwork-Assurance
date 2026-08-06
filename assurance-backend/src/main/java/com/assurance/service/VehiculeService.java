@@ -45,6 +45,7 @@ public class VehiculeService {
                 .categorieTransportLibelle(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getLibelle() : null)
                 .carburant(vehicule.getCarburant())
                 .puissanceFiscale(vehicule.getPuissanceFiscale())
+                .cylindree(vehicule.getCylindree())
                 .nombrePlaces(vehicule.getNombrePlaces())
                 .sousClasse(vehicule.getSousClasse())
                 .ptc(vehicule.getPtc())

@@ -24,6 +24,7 @@ type VehicleFormProps = {
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
   sousClasses: ReferenceOption[];
+  tarifsUsage?: ReferenceOption[];
   crmPartage: boolean;
   crmPartageValeur: string;
   showCrm: boolean;
@@ -43,6 +44,7 @@ export function VehicleForm({
   carrosseries,
   categoriesTransport,
   sousClasses,
+  tarifsUsage = [],
   crmPartage,
   crmPartageValeur,
   showCrm,
@@ -53,6 +55,10 @@ export function VehicleForm({
   const usage = usages.find((item) => item.id === vehicule.usageId);
   const needsCarburantAndPf = Boolean(usage?.byCarburantAndPf);
   const needsSousClasse = Boolean(usage?.bySousClasse);
+  const availableSousClasses = tariffedSousClasses(sousClasses, tarifsUsage, vehicule.usageId);
+  const selectedSousClasse = sousClasses.find((item) => item.code === vehicule.sousClasse);
+  const usesCylindree = needsSousClasse && selectedSousClasse?.champMoteur === "CYLINDREE";
+  const needsMotorField = needsCarburantAndPf || (needsSousClasse && Boolean(selectedSousClasse));
   const needsPtc = Boolean(usage?.byPtc);
   const needsCategorieTransport = Boolean(usage?.byCategorieTransport);
   const update = (patch: Partial<VehiculeInput>) => {
@@ -74,6 +80,7 @@ export function VehicleForm({
       categorieTransportId: categorieTransportId || undefined,
       carburant: found.carburant ?? undefined,
       puissanceFiscale: found.puissanceFiscale ?? undefined,
+      cylindree: found.cylindree ?? undefined,
       nombrePlaces: found.nombrePlaces ?? undefined,
       sousClasse: found.sousClasse ?? undefined,
       ptc: found.ptc ?? undefined,
@@ -105,6 +112,7 @@ export function VehicleForm({
               categorieTransportId: undefined,
               carburant: undefined,
               puissanceFiscale: undefined,
+              cylindree: undefined,
               sousClasse: undefined,
               ptc: undefined,
             })}
@@ -138,9 +146,19 @@ export function VehicleForm({
         <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
           <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
-        {needsCarburantAndPf ? (
-          <Field label="Puissance fiscale" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
-            <Input className="text-right" value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update({ puissanceFiscale: event.target.value })} />
+        {needsMotorField ? (
+          <Field
+            label={usesCylindree ? "Cylindrée" : "Puissance fiscale"}
+            required
+            error={errors[`vehicules.${index}.${usesCylindree ? "cylindree" : "puissanceFiscale"}`]}
+          >
+            <Input
+              className="text-right"
+              value={usesCylindree ? vehicule.cylindree ?? "" : vehicule.puissanceFiscale ?? ""}
+              onChange={(event) => update(usesCylindree
+                ? { cylindree: event.target.value }
+                : { puissanceFiscale: event.target.value })}
+            />
           </Field>
         ) : null}
         {needsCarburantAndPf ? (
@@ -176,12 +194,16 @@ export function VehicleForm({
               placeholder="Sous-classe"
               emptyText="Aucune sous-classe trouvée"
               invalidText="Sous-classe invalide : choisissez une option existante."
-              options={sousClasses.filter(isActiveReference).map((sousClasse) => ({
+              options={availableSousClasses.map((sousClasse) => ({
                 value: sousClasse.code ?? sousClasse.libelle,
                 label: sousClasse.code ? `${sousClasse.code} - ${sousClasse.libelle}` : sousClasse.libelle,
                 keywords: sousClasse.libelle,
               }))}
-              onValueChange={(value) => update({ sousClasse: value || undefined })}
+              onValueChange={(value) => update({
+                sousClasse: value || undefined,
+                puissanceFiscale: undefined,
+                cylindree: undefined,
+              })}
             />
           </Field>
         ) : null}
@@ -366,6 +388,24 @@ function stringValue(value: unknown) {
 
 function isActiveReference(option: ReferenceOption) {
   return option.actif !== false;
+}
+
+function tariffedSousClasses(
+  sousClasses: ReferenceOption[],
+  tarifsUsage: ReferenceOption[],
+  usageId?: string,
+) {
+  const activeSousClasses = sousClasses.filter(isActiveReference);
+  if (!usageId || tarifsUsage.length === 0) {
+    return activeSousClasses;
+  }
+  const configuredIds = new Set(
+    tarifsUsage
+      .filter((tarif) => String(tarif.usageId ?? "") === usageId && tarif.actif !== false)
+      .map((tarif) => String(tarif.sousClasseId ?? ""))
+      .filter(Boolean),
+  );
+  return activeSousClasses.filter((sousClasse) => configuredIds.has(sousClasse.id));
 }
 
 function toOptionalNumber(value: unknown) {

@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.ChampMoteurSousClasse;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,4 +14,6 @@ public class ReferenceOptionResponse {
     private Boolean actif;
     private Long compagnieAssuranceId;
     private String compagnieAssuranceLibelle;
+    private ChampMoteurSousClasse champMoteur;
+    private Boolean conducteurPermisRequis;
 }

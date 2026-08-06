@@ -26,7 +26,7 @@ import { referenceAdminApi } from "../api/reference-admin";
 import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeExclusionGarantieSchema, groupeUsageAttestationSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { numberValue, toNumber } from "../utils/format";
-import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertGroupeExclusionGarantieRequest, UpsertGroupeUsageAttestationRequest, UpsertReferenceRequest, UpsertUsageRequest } from "../types";
+import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertGroupeExclusionGarantieRequest, UpsertGroupeUsageAttestationRequest, UpsertReferenceRequest, UpsertSousClasseRequest, UpsertUsageRequest } from "../types";
 
 export function MarquesSettingsPage() {
   return (
@@ -66,16 +66,138 @@ export function CarburantsSettingsPage() {
 }
 
 export function SousClassesSettingsPage() {
+  const queryClient = useQueryClient();
+  const query = useReference("sous-classes");
+  const [editing, setEditing] = useState<ReferenceOption | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [payload, setPayload] = useState<UpsertSousClasseRequest>(emptySubclassPayload);
+
+  useEffect(() => {
+    setPayload(editing ? {
+      code: editing.code ?? "",
+      libelle: editing.libelle,
+      champMoteur: editing.champMoteur ?? "PUISSANCE_FISCALE",
+      conducteurPermisRequis: Boolean(editing.conducteurPermisRequis),
+      actif: editing.actif !== false,
+    } : emptySubclassPayload);
+  }, [editing]);
+
+  const save = useMutation({
+    mutationFn: ({ id, value }: { id?: string; value: UpsertSousClasseRequest }) =>
+      id ? referenceAdminApi.updateSubclass(id, value) : referenceAdminApi.createSubclass(value),
+    onSuccess: async () => {
+      setEditing(null);
+      setDialogOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "sous-classes"] });
+      toast.success("Sous-classe enregistrée");
+    },
+    onError: showError,
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setPayload(emptySubclassPayload);
+    setDialogOpen(true);
+  };
+
   return (
-    <CodeReferencePage
+    <ReferenceShell
       title="Sous-classes"
-      description="Référentiel des sous-classes Skay, utilisé par les usages qui tarifent sur sous-classe."
-      path="sous-classes"
-      create={referenceAdminApi.createSubclass}
-      update={referenceAdminApi.updateSubclass}
-    />
+      description="Sous-classes tarifaires et règles de saisie associées aux véhicules."
+    >
+      <div className="flex justify-end">
+        <Button onClick={openCreate}><Plus className="size-4" />Ajouter</Button>
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier la sous-classe" : "Ajouter une sous-classe"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Field label="Code" required>
+              <Input value={payload.code} onChange={(event) => setPayload((current) => ({ ...current, code: event.target.value }))} />
+            </Field>
+            <Field label="Libellé" required>
+              <Input value={payload.libelle} onChange={(event) => setPayload((current) => ({ ...current, libelle: event.target.value }))} />
+            </Field>
+            <Field label="Caractéristique moteur" required>
+              <Select
+                value={payload.champMoteur}
+                onValueChange={(value) => setPayload((current) => ({
+                  ...current,
+                  champMoteur: value as UpsertSousClasseRequest["champMoteur"],
+                }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CYLINDREE">Cylindrée</SelectItem>
+                  <SelectItem value="PUISSANCE_FISCALE">Puissance fiscale</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Flag
+              label="Informations conducteur et permis requises"
+              checked={Boolean(payload.conducteurPermisRequis)}
+              onChange={(value) => setPayload((current) => ({ ...current, conducteurPermisRequis: value }))}
+            />
+            <Flag label="Active" checked={payload.actif !== false} onChange={(value) => setPayload((current) => ({ ...current, actif: value }))} />
+            <div className="flex gap-2">
+              <Button
+                disabled={save.isPending || !payload.code.trim() || !payload.libelle.trim()}
+                onClick={() => save.mutate({ id: editing?.id, value: cleanTextPayload(payload) as UpsertSousClasseRequest })}
+              >
+                {editing ? "Modifier" : "Ajouter"}
+              </Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Card className="border-border/70 shadow-none">
+        <CardContent className="pt-6">
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader className="bg-emerald-700 [&_th]:text-white">
+                <TableRow className="hover:bg-emerald-700">
+                  <TableHead>Code</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead>Caractéristique moteur</TableHead>
+                  <TableHead>Conducteur / permis</TableHead>
+                  <TableHead>Active</TableHead>
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(query.data ?? []).map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.code}</TableCell>
+                    <TableCell>{item.libelle}</TableCell>
+                    <TableCell>{item.champMoteur === "CYLINDREE" ? "Cylindrée" : "Puissance fiscale"}</TableCell>
+                    <TableCell>{item.conducteurPermisRequis ? "Requis" : "Non requis"}</TableCell>
+                    <TableCell>{item.actif === false ? "Non" : "Oui"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" aria-label={`Modifier ${item.libelle}`} onClick={() => { setEditing(item); setDialogOpen(true); }}>
+                        <Edit className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </ReferenceShell>
   );
 }
+
+const emptySubclassPayload: UpsertSousClasseRequest = {
+  code: "",
+  libelle: "",
+  champMoteur: "PUISSANCE_FISCALE",
+  conducteurPermisRequis: false,
+  actif: true,
+};
 
 export function CategoriesTransportSettingsPage() {
   const queryClient = useQueryClient();

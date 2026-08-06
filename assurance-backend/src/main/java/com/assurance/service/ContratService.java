@@ -16,12 +16,14 @@ import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.*;
 import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.CategorieQuittance;
+import com.assurance.enums.ChampMoteurSousClasse;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.ModeTermeRenouvellement;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.StatutElementFacturable;
@@ -31,6 +33,7 @@ import com.assurance.enums.TypeGarantie;
 import com.assurance.enums.TypeImpactMouvement;
 import com.assurance.enums.TypeMouvementStockAttestation;
 import com.assurance.enums.TypePayeurPrime;
+import com.assurance.enums.TypeClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.*;
@@ -68,6 +71,8 @@ public class ContratService {
     private final MarqueRepository marqueRepository;
     private final CarrosserieRepository carrosserieRepository;
     private final CategorieTransportRepository categorieTransportRepository;
+    private final SousClasseRepository sousClasseRepository;
+    private final TarifUsageRepository tarifUsageRepository;
     private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
     private final AssistanceContratRepository assistanceContratRepository;
     private final AssistanceContratService assistanceContratService;
@@ -133,6 +138,7 @@ public class ContratService {
     @Transactional
     public ContratResponse create(Long agenceId, CreateContratRequest request) {
         bindAgence(request, agenceId);
+        validateSubclassDriverRequirements(request);
         return createContrat(request);
     }
 
@@ -407,6 +413,7 @@ public class ContratService {
     public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
         bindAgence(request, agenceId);
+        validateSubclassDriverRequirements(request);
         Contrat contratOrigine = contrat.getContratOrigine();
         boolean correctionContratActif = isCorrectionAffaireNouvelle(contrat);
         if (contratOrigine != null) {
@@ -555,6 +562,7 @@ public class ContratService {
                     .immatriculationProvisoire(input.getImmatriculationProvisoire())
                     .carburant(input.getCarburant())
                     .puissanceFiscale(input.getPuissanceFiscale())
+                    .cylindree(input.getCylindree())
                     .nombrePlaces(input.getNombrePlaces())
                     .sousClasse(input.getSousClasse())
                     .ptc(input.getPtc())
@@ -704,6 +712,7 @@ public class ContratService {
     }
 
     private ContratResponse appliquerCorrectionAffaireNouvelle(Contrat contrat, CreateContratRequest request) {
+        validateSubclassDriverRequirements(request);
         request.setProspection(false);
         if (hasText(request.getNumeroContrat())
                 && contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(request.getAgenceId(), request.getNumeroContrat(), contrat.getId())) {
@@ -1030,6 +1039,7 @@ public class ContratService {
                     .immatriculationProvisoire(input.getImmatriculationProvisoire())
                     .carburant(input.getCarburant())
                     .puissanceFiscale(input.getPuissanceFiscale())
+                    .cylindree(input.getCylindree())
                     .nombrePlaces(input.getNombrePlaces())
                     .sousClasse(input.getSousClasse())
                     .ptc(input.getPtc())
@@ -1295,8 +1305,28 @@ public class ContratService {
                 && (!hasText(input.getCarburant()) || !hasText(input.getPuissanceFiscale()))) {
             throw new BadRequestException("Carburant et puissance fiscale obligatoires pour cet usage");
         }
-        if (Boolean.TRUE.equals(usage.getBySousClasse()) && !hasText(input.getSousClasse())) {
-            throw new BadRequestException("Sous-classe obligatoire pour cet usage");
+        if (Boolean.TRUE.equals(usage.getBySousClasse())) {
+            if (!hasText(input.getSousClasse())) {
+                throw new BadRequestException("Sous-classe obligatoire pour cet usage");
+            }
+            SousClasse sousClasse = sousClasseRepository.findByCodeIgnoreCase(input.getSousClasse())
+                    .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                    .orElseThrow(() -> new BadRequestException("Sous-classe inactive ou inconnue"));
+            boolean cylindreeRequise = sousClasse.getChampMoteur() == ChampMoteurSousClasse.CYLINDREE;
+            if (cylindreeRequise && !hasText(input.getCylindree())) {
+                throw new BadRequestException("Cylindree obligatoire pour cette sous-classe");
+            }
+            if (!cylindreeRequise && !hasText(input.getPuissanceFiscale())) {
+                throw new BadRequestException("Puissance fiscale obligatoire pour cette sous-classe");
+            }
+            boolean sousClasseTarifee = tarifUsageRepository
+                        .findByUsage_IdAndActifTrue(usage.getId())
+                        .stream()
+                        .anyMatch(tarif -> tarif.getSousClasse() != null
+                                && input.getSousClasse().equalsIgnoreCase(tarif.getSousClasse().getCode()));
+            if (!sousClasseTarifee) {
+                throw new BadRequestException("Sous-classe non tarifee pour cet usage");
+            }
         }
         if (Boolean.TRUE.equals(usage.getByPtc()) && !hasText(input.getPtc())) {
             throw new BadRequestException("PTC obligatoire pour cet usage");
@@ -1304,6 +1334,89 @@ public class ContratService {
         if (Boolean.TRUE.equals(usage.getByCategorieTransport()) && input.getCategorieTransportId() == null) {
             throw new BadRequestException("Categorie transport obligatoire pour cet usage");
         }
+    }
+
+    private void validateSubclassDriverRequirements(CreateContratRequest request) {
+        boolean permisRequis = (request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules())
+                .stream()
+                .map(CreateContratRequest.VehiculeInput::getSousClasse)
+                .filter(this::hasText)
+                .map(code -> sousClasseRepository.findByCodeIgnoreCase(code)
+                        .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                        .orElseThrow(() -> new BadRequestException("Sous-classe inactive ou inconnue")))
+                .anyMatch(item -> Boolean.TRUE.equals(item.getConducteurPermisRequis()));
+        if (!permisRequis) {
+            return;
+        }
+
+        List<CreateContratRequest.ClientInput> clients = request.getClients() == null ? List.of() : request.getClients();
+        CreateContratRequest.ClientInput proprietaire = clients.stream()
+                .filter(item -> item.getRole() == RoleClientContrat.PROPRIETAIRE)
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Le proprietaire est obligatoire pour cette sous-classe"));
+        DriverDetails proprietaireDetails = driverDetails(request.getAgenceId(), proprietaire, clients, new HashSet<>());
+        if (proprietaireDetails.typeClient() == TypeClient.PERSONNE_PHYSIQUE
+                && !Boolean.FALSE.equals(proprietaireDetails.conducteurHabituel())) {
+            validateDriverPermit(proprietaireDetails, request.getDateEffet());
+            return;
+        }
+
+        CreateContratRequest.ClientInput conducteur = clients.stream()
+                .filter(item -> item.getRole() == RoleClientContrat.CONDUCTEUR)
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Le conducteur est obligatoire pour cette sous-classe"));
+        validateDriverPermit(
+                driverDetails(request.getAgenceId(), conducteur, clients, new HashSet<>()),
+                request.getDateEffet()
+        );
+    }
+
+    private DriverDetails driverDetails(
+            Long agenceId,
+            CreateContratRequest.ClientInput input,
+            List<CreateContratRequest.ClientInput> clients,
+            Set<RoleClientContrat> visitedRoles
+    ) {
+        if (input.getRole() == null || !visitedRoles.add(input.getRole())) {
+            throw new BadRequestException("La reference entre clients est invalide");
+        }
+        if (input.getClient() != null) {
+            CreateClientRequest client = input.getClient();
+            return new DriverDetails(client.getTypeClient(), client.getConducteurHabituel(), client.getDateValiditePermis());
+        }
+        if (input.getSameAsRole() != null) {
+            CreateContratRequest.ClientInput referenced = clients.stream()
+                    .filter(item -> item.getRole() == input.getSameAsRole())
+                    .findFirst()
+                    .orElseThrow(() -> new BadRequestException("Le client reference est introuvable"));
+            return driverDetails(agenceId, referenced, clients, visitedRoles);
+        }
+        if (input.getClientId() == null) {
+            throw new BadRequestException("Les informations du conducteur sont obligatoires");
+        }
+        Client client = clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
+        return new DriverDetails(client.getTypeClient(), client.getConducteurHabituel(), client.getDateValiditePermis());
+    }
+
+    private void validateDriverPermit(DriverDetails driver, LocalDate dateEffet) {
+        if (driver.typeClient() != TypeClient.PERSONNE_PHYSIQUE) {
+            throw new BadRequestException("Le conducteur doit etre une personne physique");
+        }
+        if (driver.dateValiditePermis() == null) {
+            throw new BadRequestException("La validite du permis est obligatoire pour cette sous-classe");
+        }
+        LocalDate referenceDate = dateEffet == null ? LocalDate.now() : dateEffet;
+        if (driver.dateValiditePermis().isBefore(referenceDate)) {
+            throw new BadRequestException("Le permis doit etre valide a la date d'effet du contrat");
+        }
+    }
+
+    private record DriverDetails(
+            TypeClient typeClient,
+            Boolean conducteurHabituel,
+            LocalDate dateValiditePermis
+    ) {
     }
 
     private void applyVehiculeInput(Contrat contrat, Vehicule vehicule, CreateContratRequest.VehiculeInput input) {
@@ -1323,6 +1436,7 @@ public class ContratService {
         vehicule.setImmatriculationProvisoire(input.getImmatriculationProvisoire());
         vehicule.setCarburant(input.getCarburant());
         vehicule.setPuissanceFiscale(input.getPuissanceFiscale());
+        vehicule.setCylindree(input.getCylindree());
         vehicule.setNombrePlaces(input.getNombrePlaces());
         vehicule.setSousClasse(input.getSousClasse());
         vehicule.setPtc(input.getPtc());
@@ -2169,6 +2283,7 @@ public class ContratService {
         input.setImmatriculationProvisoire(snapshot.getImmatriculationProvisoire());
         input.setCarburant(snapshot.getCarburant());
         input.setPuissanceFiscale(snapshot.getPuissanceFiscale());
+        input.setCylindree(snapshot.getCylindree());
         input.setNombrePlaces(snapshot.getNombrePlaces());
         input.setSousClasse(snapshot.getSousClasse());
         input.setPtc(snapshot.getPtc());
@@ -2601,6 +2716,7 @@ public class ContratService {
         vehicule.setImmatriculationProvisoire(snapshot.getImmatriculationProvisoire());
         vehicule.setCarburant(snapshot.getCarburant());
         vehicule.setPuissanceFiscale(snapshot.getPuissanceFiscale());
+        vehicule.setCylindree(snapshot.getCylindree());
         vehicule.setNombrePlaces(snapshot.getNombrePlaces());
         vehicule.setSousClasse(snapshot.getSousClasse());
         vehicule.setPtc(snapshot.getPtc());
@@ -4346,6 +4462,7 @@ public class ContratService {
         input.setImmatriculationProvisoire(source.getImmatriculationProvisoire());
         input.setCarburant(source.getCarburant());
         input.setPuissanceFiscale(source.getPuissanceFiscale());
+        input.setCylindree(source.getCylindree());
         input.setNombrePlaces(source.getNombrePlaces());
         input.setSousClasse(source.getSousClasse());
         input.setPtc(source.getPtc());
@@ -4620,6 +4737,7 @@ public class ContratService {
                     .immatriculationProvisoire(input.getImmatriculationProvisoire())
                     .carburant(input.getCarburant())
                     .puissanceFiscale(input.getPuissanceFiscale())
+                    .cylindree(input.getCylindree())
                     .nombrePlaces(input.getNombrePlaces())
                     .sousClasse(input.getSousClasse())
                     .ptc(input.getPtc())
@@ -4766,6 +4884,7 @@ public class ContratService {
                 .categorieTransportLibelle(vehicule.getCategorieTransport() != null ? vehicule.getCategorieTransport().getLibelle() : null)
                 .carburant(vehicule.getCarburant())
                 .puissanceFiscale(vehicule.getPuissanceFiscale())
+                .cylindree(vehicule.getCylindree())
                 .nombrePlaces(vehicule.getNombrePlaces())
                 .sousClasse(vehicule.getSousClasse())
                 .ptc(vehicule.getPtc())
@@ -4807,6 +4926,7 @@ public class ContratService {
                 .categorieTransportLibelle(snapshot.getCategorieTransport() != null ? snapshot.getCategorieTransport().getLibelle() : null)
                 .carburant(snapshot.getCarburant())
                 .puissanceFiscale(snapshot.getPuissanceFiscale())
+                .cylindree(snapshot.getCylindree())
                 .nombrePlaces(snapshot.getNombrePlaces())
                 .sousClasse(snapshot.getSousClasse())
                 .ptc(snapshot.getPtc())
@@ -6478,7 +6598,7 @@ public class ContratService {
         if (ligne.getModeTarification() != null) {
             score += 1;
         }
-        if (matchesText(ligne.getSousClasse(), vehicule != null ? vehicule.getSousClasse() : null)) {
+        if (matchesSousClasse(ligne, vehicule)) {
             score += 1;
         }
         if (matchesText(ligne.getCarburant(), vehicule != null ? vehicule.getCarburant() : null)) {
@@ -6492,7 +6612,7 @@ public class ContratService {
             return inRange(parseDecimal(vehicule.getPuissanceFiscale()), ligne.getPuissanceFiscaleMin(), ligne.getPuissanceFiscaleMax())
                     && inRange(parseDecimal(vehicule.getNombrePlaces()), ligne.getNombrePlacesMin(), ligne.getNombrePlacesMax())
                     && inRange(parseDecimal(vehicule.getPtc()), ligne.getPtcMin(), ligne.getPtcMax())
-                    && matchesText(ligne.getSousClasse(), vehicule.getSousClasse())
+                    && matchesSousClasse(ligne, vehicule)
                     && matchesText(ligne.getCarburant(), vehicule.getCarburant());
         }
         if (remorque != null) {
@@ -6501,7 +6621,7 @@ public class ContratService {
                     && ligne.getPuissanceFiscaleMax() == null
                     && ligne.getNombrePlacesMin() == null
                     && ligne.getNombrePlacesMax() == null
-                    && !hasText(ligne.getSousClasse())
+                    && ligne.getSousClasse() == null
                     && !hasText(ligne.getCarburant());
         }
         return ligne.getPuissanceFiscaleMin() == null
@@ -6510,7 +6630,7 @@ public class ContratService {
                 && ligne.getNombrePlacesMax() == null
                 && ligne.getPtcMin() == null
                 && ligne.getPtcMax() == null
-                && !hasText(ligne.getSousClasse())
+                && ligne.getSousClasse() == null
                 && !hasText(ligne.getCarburant());
     }
 
@@ -6526,6 +6646,11 @@ public class ContratService {
 
     private boolean matchesText(String expected, String actual) {
         return !hasText(expected) || (hasText(actual) && expected.trim().equalsIgnoreCase(actual.trim()));
+    }
+
+    private boolean matchesSousClasse(LigneGrilleTarifaire ligne, Vehicule vehicule) {
+        return ligne.getSousClasse() == null
+                || (vehicule != null && matchesText(ligne.getSousClasse().getCode(), vehicule.getSousClasse()));
     }
 
     private BigDecimal parseDecimal(String value) {

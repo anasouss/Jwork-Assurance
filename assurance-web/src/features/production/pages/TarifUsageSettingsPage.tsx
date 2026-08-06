@@ -144,7 +144,7 @@ export default function TarifUsageSettingsPage() {
                     nombrePlacesMax: undefined,
                     ptcMin: undefined,
                     ptcMax: undefined,
-                    sousClasse: undefined,
+                    sousClasseId: undefined,
                   });
                 }}
               >
@@ -173,7 +173,7 @@ export default function TarifUsageSettingsPage() {
                 </Select>
               </Field>
             ) : null}
-            {selectedUsage?.byCarburantAndPf || selectedUsage?.bySousClasse ? (
+            {selectedUsage?.byCarburantAndPf ? (
               <Field label="Carburant">
                 <Select
                   value={payload.carburant || "__none"}
@@ -208,16 +208,18 @@ export default function TarifUsageSettingsPage() {
               </>
             ) : null}
             {selectedUsage?.bySousClasse ? (
-              <Field label="Sous-classe">
+              <Field label="Sous-classe" required>
                 <Select
-                  value={payload.sousClasse || "__none"}
-                  onValueChange={(value) => update({ sousClasse: value === "__none" ? undefined : value })}
+                  value={payload.sousClasseId || "__none"}
+                  onValueChange={(value) => update({ sousClasseId: value === "__none" ? undefined : value })}
                 >
                   <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                   <SelectContent>
                   <SelectItem value="__none">Choisir</SelectItem>
-                  {(sousClasses.data ?? []).map((sousClasse) => (
-                    <SelectItem key={sousClasse.id} value={sousClasse.code ?? sousClasse.libelle}>{sousClasse.libelle}</SelectItem>
+                  {(sousClasses.data ?? []).filter((sousClasse) => sousClasse.actif !== false).map((sousClasse) => (
+                    <SelectItem key={sousClasse.id} value={sousClasse.id}>
+                      {sousClasse.code ? `${sousClasse.code} - ` : ""}{sousClasse.libelle}
+                    </SelectItem>
                   ))}
                   </SelectContent>
                 </Select>
@@ -227,7 +229,10 @@ export default function TarifUsageSettingsPage() {
             <MoneyField label="Prime par place" value={payload.primeParPlace} onChange={(value) => update({ primeParPlace: value })} />
             <Flag label="Actif" checked={payload.actif} onChange={(value) => update({ actif: value })} />
             <div className="flex items-end gap-2">
-              <Button disabled={save.isPending} onClick={() => saveTarif(editing, payload, save.mutate)}>
+              <Button
+                disabled={save.isPending}
+                onClick={() => saveTarif(editing, payload, Boolean(selectedUsage?.bySousClasse), save.mutate)}
+              >
                 <Plus className="size-4" />
                 {editing ? "Modifier" : "Ajouter"}
               </Button>
@@ -355,7 +360,7 @@ export default function TarifUsageSettingsPage() {
                     <TableCell>{range(tarif.puissanceFiscaleMin, tarif.puissanceFiscaleMax)}</TableCell>
                     <TableCell>{range(tarif.nombrePlacesMin, tarif.nombrePlacesMax)}</TableCell>
                     <TableCell>{range(tarif.ptcMin, tarif.ptcMax)}</TableCell>
-                    <TableCell>{text(tarif.sousClasse)}</TableCell>
+                    <TableCell>{text(tarif.sousClasseCode ?? tarif.sousClasseLibelle)}</TableCell>
                     <TableCell>{money(tarif.primeParPlace)}</TableCell>
                     <TableCell>{money(tarif.primeNette)}</TableCell>
                     <TableCell className="text-right">
@@ -423,8 +428,13 @@ function useReference(path: string) {
 function saveTarif(
   editing: ReferenceOption | null,
   payload: UpsertTarifUsageRequest,
+  sousClasseRequired: boolean,
   mutate: (variables: { id?: string; value: UpsertTarifUsageRequest }) => void
 ) {
+  if (sousClasseRequired && !payload.sousClasseId) {
+    toast.error("La sous-classe est obligatoire pour cet usage");
+    return;
+  }
   const parsed = tarifUsageSchema.safeParse(cleanPayload(payload));
   if (!parsed.success) {
     toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
@@ -447,7 +457,7 @@ function tarifPayload(tarif: ReferenceOption): UpsertTarifUsageRequest {
     nombrePlacesMax: toNumber(tarif.nombrePlacesMax),
     ptcMin: toNumber(tarif.ptcMin),
     ptcMax: toNumber(tarif.ptcMax),
-    sousClasse: String(tarif.sousClasse ?? ""),
+    sousClasseId: String(tarif.sousClasseId ?? ""),
     carburant: String(tarif.carburant ?? ""),
     primeNette: toNumber(tarif.primeNette),
     primeParPlace: toNumber(tarif.primeParPlace),
@@ -460,7 +470,7 @@ function cleanPayload(payload: UpsertTarifUsageRequest): UpsertTarifUsageRequest
     ...payload,
     categorieTransportId: payload.categorieTransportId || undefined,
     carburant: payload.carburant || undefined,
-    sousClasse: payload.sousClasse || undefined,
+    sousClasseId: payload.sousClasseId || undefined,
   };
 }
 

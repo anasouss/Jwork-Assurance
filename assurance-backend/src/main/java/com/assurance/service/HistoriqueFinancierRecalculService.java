@@ -347,6 +347,7 @@ public class HistoriqueFinancierRecalculService {
                     .immatriculationProvisoire(snapshot.getImmatriculationProvisoire())
                     .carburant(snapshot.getCarburant())
                     .puissanceFiscale(snapshot.getPuissanceFiscale())
+                    .cylindree(snapshot.getCylindree())
                     .nombrePlaces(snapshot.getNombrePlaces())
                     .sousClasse(snapshot.getSousClasse())
                     .ptc(snapshot.getPtc())

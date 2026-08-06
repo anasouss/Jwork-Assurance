@@ -115,6 +115,7 @@ public class ContratResponse {
         private String categorieTransportLibelle;
         private String carburant;
         private String puissanceFiscale;
+        private String cylindree;
         private String nombrePlaces;
         private String sousClasse;
         private String ptc;

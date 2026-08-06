@@ -41,6 +41,7 @@ export const DEFAULT_VEHICLE: VehiculeInput = {
   typeVehicule: "AUTOMOBILE",
   carburant: "Diesel",
   puissanceFiscale: "",
+  cylindree: "",
   nombrePlaces: "",
   immatriculation: "",
   datePremiereCirculation: "",

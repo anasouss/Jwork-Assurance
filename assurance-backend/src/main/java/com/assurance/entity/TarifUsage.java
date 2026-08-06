@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "tarifs_usage", indexes = {
         @Index(name = "idx_tarif_usage", columnList = "usage_id"),
+        @Index(name = "idx_tarif_usage_sous_classe", columnList = "sous_classe_id"),
         @Index(name = "idx_tarif_usage_categorie_transport", columnList = "categorie_transport_id"),
         @Index(name = "idx_tarif_usage_carburant", columnList = "carburant_id")
 })
@@ -50,8 +51,9 @@ public class TarifUsage extends BaseEntity {
     @Column(name = "ptc_max", precision = 10, scale = 2)
     private BigDecimal ptcMax;
 
-    @Column(name = "sous_classe", length = 80)
-    private String sousClasse;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sous_classe_id")
+    private SousClasse sousClasse;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categorie_transport_id")

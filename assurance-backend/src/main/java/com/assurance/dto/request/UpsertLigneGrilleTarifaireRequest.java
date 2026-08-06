@@ -21,7 +21,7 @@ public class UpsertLigneGrilleTarifaireRequest {
     private BigDecimal nombrePlacesMax;
     private BigDecimal ptcMin;
     private BigDecimal ptcMax;
-    private String sousClasse;
+    private Long sousClasseId;
     private String carburant;
     private BigDecimal taux;
     private BigDecimal tauxFranchise;

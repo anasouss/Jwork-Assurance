@@ -1,6 +1,7 @@
 package com.assurance.seeder;
 
 import com.assurance.entity.*;
+import com.assurance.enums.ChampMoteurSousClasse;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
 import com.assurance.enums.CritereSelectionTarif;
@@ -156,10 +157,15 @@ public class DataSeeder implements CommandLineRunner {
         seedCarburant("HYBRIDE_E", "Hybride essence");
         seedCarburant("HYBRIDE_D", "Hybride diesel");
 
-        seedSousClasse("SC1", "SC1");
-        seedSousClasse("SC2", "SC2");
-        seedSousClasse("SC3", "SC3");
-        seedSousClasse("SC4", "SC4");
+        seedSousClasse("SC1", "SC1", ChampMoteurSousClasse.CYLINDREE, false);
+        seedSousClasse("SC2", "SC2", ChampMoteurSousClasse.CYLINDREE, false);
+        seedSousClasse("SC3", "SC3", ChampMoteurSousClasse.PUISSANCE_FISCALE, false);
+        seedSousClasse("SC5", "SC5", ChampMoteurSousClasse.PUISSANCE_FISCALE, true);
+        seedSousClasse("SC6", "SC6", ChampMoteurSousClasse.PUISSANCE_FISCALE, true);
+        sousClasseRepository.findByCodeIgnoreCase("SC4").ifPresent(sousClasse -> {
+            sousClasse.setActif(false);
+            sousClasseRepository.save(sousClasse);
+        });
 
         seedCategorieTransport("PETIT_TAXIS", "Petit taxi", "Taxi urbain");
         seedCategorieTransport("GRAND_TAXIS", "Grand taxi", "Taxi interurbain");
@@ -178,7 +184,7 @@ public class DataSeeder implements CommandLineRunner {
         Usage usageA = seedUsage("A", "TOURISME", "Tourisme", groupeA, true, true, false, false, false, berline);
         Usage usageC1 = seedUsage("C1", "C1", "Commerce C1", groupeC, true, true, false, false, false, utilitaire);
         seedUsage("C2", "C2", "Commerce C2", groupeC, true, true, false, false, false, utilitaire);
-        Usage usageCyclos = seedUsage("CYCLOS", "CYCLOS", "Cyclos et motocycles", groupeE, true, true, false, false, false, moto);
+        Usage usageCyclos = seedUsage("CYCLOS", "CYCLOS", "Cyclos et motocycles", groupeE, true, false, true, false, false, moto);
         seedUsage("D1", "TRANSPORT DE MATIERE INFLAMMABLE <= 3,5T", "Divers", groupeD, true, true, false, true, false, utilitaire);
         seedUsage("D2", "TRANSPORT DE MATIERE INFLAMMABLE > 3,5T", "Divers", groupeD, true, false, false, true, false, camion);
         seedUsage("D3", "AMBULANCE", "Divers", groupeD, true, true, false, false, false, utilitaire);
@@ -770,15 +776,25 @@ public class DataSeeder implements CommandLineRunner {
         return carburantRepository.save(carburant);
     }
 
-    private SousClasse seedSousClasse(String code, String libelle) {
+    private SousClasse seedSousClasse(
+            String code,
+            String libelle,
+            ChampMoteurSousClasse champMoteur,
+            boolean conducteurPermisRequis
+    ) {
         SousClasse sousClasse = sousClasseRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 sousClasseRepository.save(SousClasse.builder()
                         .code(code)
                         .libelle(libelle)
+                        .champMoteur(champMoteur)
+                        .conducteurPermisRequis(conducteurPermisRequis)
                         .actif(true)
                         .build())
         );
         sousClasse.setLibelle(libelle);
+        sousClasse.setChampMoteur(champMoteur);
+        sousClasse.setConducteurPermisRequis(conducteurPermisRequis);
+        sousClasse.setActif(true);
         return sousClasseRepository.save(sousClasse);
     }
 

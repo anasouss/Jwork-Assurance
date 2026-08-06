@@ -69,6 +69,9 @@ public class Vehicule extends BaseEntity {
     private String puissanceFiscale;
 
     @Column(length = 40)
+    private String cylindree;
+
+    @Column(length = 40)
     private String nombrePlaces;
 
     @Column(name = "sous_classe", length = 80)

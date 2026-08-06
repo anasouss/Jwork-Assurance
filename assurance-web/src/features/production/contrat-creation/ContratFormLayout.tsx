@@ -57,6 +57,16 @@ export function ContratFormLayout({
   const assistanceCategorieClientId = form.categorieClientId;
   const compagniesAssistance = form.assistanceContext.data?.compagnies ?? [];
   const produitsAssistance = form.assistanceContext.data?.produits ?? [];
+  const selectedUsage = form.availableUsages.find((usage) => usage.id === form.usageId);
+  const selectedSousClasseCode = form.vehicules[0]?.sousClasse;
+  const selectedSousClasse = (form.refs.sousClasses.data ?? []).find(
+    (item) => (item.code ?? item.libelle) === selectedSousClasseCode
+  );
+  const requireDriverDetails = !(
+    showConvention
+    && selectedUsage?.bySousClasse
+    && !selectedSousClasse?.conducteurPermisRequis
+  );
   const flotteTargetUsages = useMemo(() => {
     if (order !== "flotte") {
       return form.availableUsages;
@@ -156,6 +166,7 @@ export function ContratFormLayout({
       }}
       showOptionalRoles={false}
       showProprietaireCategorie={order === "flotte"}
+      requireDriverDetails={requireDriverDetails}
       errors={form.validationErrors}
       onSaveSection={saveSectionAndAdvance}
       savedSections={form.savedSections}
@@ -189,6 +200,7 @@ export function ContratFormLayout({
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
       sousClasses={form.refs.sousClasses.data ?? []}
+      tarifsUsage={form.refs.tarifsUsage.data ?? []}
       allowMultipleVehicules={allowMultipleVehicules}
       showUsage={form.typeContrat !== "PARTICULIER" && !showConvention}
       showAttestation={form.typeContrat !== "PARTICULIER" && !showConvention}
@@ -257,6 +269,7 @@ export function ContratFormLayout({
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
       sousClasses={form.refs.sousClasses.data ?? []}
+      tarifsUsage={form.refs.tarifsUsage.data ?? []}
       compagniesAssistance={compagniesAssistance}
       produitsAssistance={produitsAssistance}
       grilleSelected={Boolean(form.grilleTarifaireId)}

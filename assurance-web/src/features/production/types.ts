@@ -13,6 +13,8 @@ export type ReferenceOption = {
   compagnieAssuranceId?: string | null;
   compagnieAssuranceLibelle?: string | null;
   critereSelectionTarif?: "TAUX_PRIME" | "TAUX_FRANCHISE" | null;
+  champMoteur?: "CYLINDREE" | "PUISSANCE_FISCALE" | null;
+  conducteurPermisRequis?: boolean | null;
   [key: string]: unknown;
 };
 
@@ -521,6 +523,7 @@ export type VehiculeInput = {
   immatriculationProvisoire?: string;
   carburant?: string;
   puissanceFiscale?: string;
+  cylindree?: string;
   nombrePlaces?: string;
   sousClasse?: string;
   ptc?: string;
@@ -904,7 +907,7 @@ export type UpsertLigneGrilleTarifaireRequest = {
   nombrePlacesMax?: number;
   ptcMin?: number;
   ptcMax?: number;
-  sousClasse?: string;
+  sousClasseId?: string;
   carburant?: string;
   modeTarification?: string;
   libelleOption?: string;
@@ -979,7 +982,7 @@ export type UpsertTarifUsageRequest = {
   nombrePlacesMax?: number;
   ptcMin?: number;
   ptcMax?: number;
-  sousClasse?: string;
+  sousClasseId?: string;
   carburant?: string;
   primeNette?: number;
   primeParPlace?: number;
@@ -1063,6 +1066,11 @@ export type UpsertCodeReferenceRequest = {
   code: string;
   libelle: string;
   actif?: boolean;
+};
+
+export type UpsertSousClasseRequest = UpsertCodeReferenceRequest & {
+  champMoteur: "CYLINDREE" | "PUISSANCE_FISCALE";
+  conducteurPermisRequis?: boolean;
 };
 
 export type TypePieceJointe = {
@@ -1189,6 +1197,7 @@ export type ContratSummary = {
     categorieTransportLibelle?: string | null;
     carburant?: string | null;
     puissanceFiscale?: string | null;
+    cylindree?: string | null;
     nombrePlaces?: string | null;
     sousClasse?: string | null;
     ptc?: string | null;

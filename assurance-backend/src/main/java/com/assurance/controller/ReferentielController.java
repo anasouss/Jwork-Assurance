@@ -5,6 +5,7 @@ import com.assurance.dto.request.UpsertCategorieClientRequest;
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
 import com.assurance.dto.request.UpsertCompagnieAssistanceRequest;
 import com.assurance.dto.request.UpsertCodeReferenceRequest;
+import com.assurance.dto.request.UpsertSousClasseRequest;
 import com.assurance.dto.request.UpsertCompagnieAssuranceRequest;
 import com.assurance.dto.request.UpsertConventionRequest;
 import com.assurance.dto.request.UpsertFormuleGarantiePersonneRequest;
@@ -280,13 +281,15 @@ public class ReferentielController {
     }
 
     @PostMapping("/sous-classes")
-    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createSousClasse(@Valid @RequestBody UpsertCodeReferenceRequest request) {
+    public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createSousClasse(@Valid @RequestBody UpsertSousClasseRequest request) {
         sousClasseRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code sous-classe deja utilise");
         });
         SousClasse sousClasse = sousClasseRepository.save(SousClasse.builder()
                 .code(request.getCode())
                 .libelle(request.getLibelle())
+                .champMoteur(request.getChampMoteur())
+                .conducteurPermisRequis(Boolean.TRUE.equals(request.getConducteurPermisRequis()))
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
         return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasse), "Sous-classe creee"));
@@ -295,7 +298,7 @@ public class ReferentielController {
     @PutMapping("/sous-classes/{id}")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateSousClasse(
             @PathVariable Long id,
-            @Valid @RequestBody UpsertCodeReferenceRequest request
+            @Valid @RequestBody UpsertSousClasseRequest request
     ) {
         SousClasse sousClasse = sousClasseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("SousClasse", id));
@@ -306,6 +309,8 @@ public class ReferentielController {
                 });
         sousClasse.setCode(request.getCode());
         sousClasse.setLibelle(request.getLibelle());
+        sousClasse.setChampMoteur(request.getChampMoteur());
+        sousClasse.setConducteurPermisRequis(Boolean.TRUE.equals(request.getConducteurPermisRequis()));
         sousClasse.setActif(request.getActif() == null ? true : request.getActif());
         return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasseRepository.save(sousClasse)), "Sous-classe modifiee"));
     }
@@ -554,8 +559,13 @@ public class ReferentielController {
 
     @GetMapping("/tarifs-usage")
     @Transactional(readOnly = true)
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> tarifsUsage() {
-        return ResponseEntity.ok(ApiResponse.success(tarifUsageRepository.findAll().stream()
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> tarifsUsage(
+            @RequestParam(required = false) Long usageId
+    ) {
+        List<TarifUsage> tarifs = usageId == null
+                ? tarifUsageRepository.findAll()
+                : tarifUsageRepository.findByUsage_IdAndActifTrue(usageId);
+        return ResponseEntity.ok(ApiResponse.success(tarifs.stream()
                 .filter(tarif -> Boolean.TRUE.equals(tarif.getActif()))
                 .sorted(Comparator
                         .comparing((TarifUsage tarif) -> tarif.getUsage() != null ? tarif.getUsage().getCode() : "")
@@ -1114,6 +1124,8 @@ public class ReferentielController {
                 .id(sousClasse.getId())
                 .code(sousClasse.getCode())
                 .libelle(sousClasse.getLibelle())
+                .champMoteur(sousClasse.getChampMoteur())
+                .conducteurPermisRequis(sousClasse.getConducteurPermisRequis())
                 .actif(sousClasse.getActif())
                 .build();
     }
@@ -1519,6 +1531,13 @@ public class ReferentielController {
         CategorieTransport categorieTransport = request.getCategorieTransportId() == null ? null :
                 categorieTransportRepository.findById(request.getCategorieTransportId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieTransport", request.getCategorieTransportId()));
+        SousClasse sousClasse = resolveSousClasse(request.getSousClasseId());
+        if (Boolean.TRUE.equals(usage.getBySousClasse()) && sousClasse == null) {
+            throw new BadRequestException("Sous-classe obligatoire pour cet usage");
+        }
+        if (!Boolean.TRUE.equals(usage.getBySousClasse())) {
+            sousClasse = null;
+        }
         tarif.setUsage(usage);
         tarif.setCategorieTransport(categorieTransport);
         tarif.setPuissanceFiscaleMin(request.getPuissanceFiscaleMin());
@@ -1527,7 +1546,7 @@ public class ReferentielController {
         tarif.setNombrePlacesMax(request.getNombrePlacesMax());
         tarif.setPtcMin(request.getPtcMin());
         tarif.setPtcMax(request.getPtcMax());
-        tarif.setSousClasse(blankToNull(request.getSousClasse()));
+        tarif.setSousClasse(sousClasse);
         tarif.setCarburant(resolveTarifUsageCarburant(request));
         tarif.setPrimeNette(request.getPrimeNette());
         tarif.setPrimeParPlace(request.getPrimeParPlace());
@@ -1538,6 +1557,7 @@ public class ReferentielController {
         Usage usage = tarif.getUsage();
         CategorieTransport categorieTransport = tarif.getCategorieTransport();
         Carburant carburant = tarif.getCarburant();
+        SousClasse sousClasse = tarif.getSousClasse();
         return option(tarif.getId(), usage != null ? usage.getCode() : null, usage != null ? usage.getLibelle() : "Tarif usage")
                 .putValue("usageId", usage != null ? usage.getId() : null)
                 .putValue("usageCode", usage != null ? usage.getCode() : null)
@@ -1555,7 +1575,9 @@ public class ReferentielController {
                 .putValue("nombrePlacesMax", tarif.getNombrePlacesMax())
                 .putValue("ptcMin", tarif.getPtcMin())
                 .putValue("ptcMax", tarif.getPtcMax())
-                .putValue("sousClasse", tarif.getSousClasse())
+                .putValue("sousClasseId", sousClasse != null ? sousClasse.getId() : null)
+                .putValue("sousClasseCode", sousClasse != null ? sousClasse.getCode() : null)
+                .putValue("sousClasseLibelle", sousClasse != null ? sousClasse.getLibelle() : null)
                 .putValue("carburantId", carburant != null ? carburant.getId() : null)
                 .putValue("carburantCode", carburant != null ? carburant.getCode() : null)
                 .putValue("carburantLibelle", carburant != null ? carburant.getLibelle() : null)
@@ -1622,6 +1644,10 @@ public class ReferentielController {
         CategorieTransport categorieTransport = request.getCategorieTransportId() == null ? null :
                 categorieTransportRepository.findById(request.getCategorieTransportId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieTransport", request.getCategorieTransportId()));
+        SousClasse sousClasse = resolveSousClasse(request.getSousClasseId());
+        if (usage != null && !Boolean.TRUE.equals(usage.getBySousClasse())) {
+            sousClasse = null;
+        }
         ligne.setGarantie(garantie);
         ligne.setUsage(usage);
         ligne.setCategorieTransport(categorieTransport);
@@ -1631,7 +1657,7 @@ public class ReferentielController {
         ligne.setNombrePlacesMax(request.getNombrePlacesMax());
         ligne.setPtcMin(request.getPtcMin());
         ligne.setPtcMax(request.getPtcMax());
-        ligne.setSousClasse(request.getSousClasse());
+        ligne.setSousClasse(sousClasse);
         ligne.setCarburant(request.getCarburant());
         ligne.setTaux(request.getTaux());
         ligne.setTauxFranchise(request.getTauxFranchise());
@@ -1758,6 +1784,7 @@ public class ReferentielController {
     }
 
     private Map<String, Object> toLigneResponse(LigneGrilleTarifaire ligne) {
+        SousClasse sousClasse = ligne.getSousClasse();
         return option(ligne.getId(), null, ligne.getLibelleOption() != null ? ligne.getLibelleOption() : ligne.getGarantie().getLibelle())
                 .putValue("grilleId", ligne.getGrilleTarifaire() != null ? ligne.getGrilleTarifaire().getId() : null)
                 .putValue("garantieId", ligne.getGarantie() != null ? ligne.getGarantie().getId() : null)
@@ -1773,7 +1800,9 @@ public class ReferentielController {
                 .putValue("nombrePlacesMax", ligne.getNombrePlacesMax())
                 .putValue("ptcMin", ligne.getPtcMin())
                 .putValue("ptcMax", ligne.getPtcMax())
-                .putValue("sousClasse", ligne.getSousClasse())
+                .putValue("sousClasseId", sousClasse != null ? sousClasse.getId() : null)
+                .putValue("sousClasseCode", sousClasse != null ? sousClasse.getCode() : null)
+                .putValue("sousClasseLibelle", sousClasse != null ? sousClasse.getLibelle() : null)
                 .putValue("carburant", ligne.getCarburant())
                 .putValue("prime", ligne.getPrime())
                 .putValue("capital", ligne.getCapital())
@@ -1783,6 +1812,15 @@ public class ReferentielController {
                 .putValue("ordreAffichage", ligne.getOrdreAffichage())
                 .putValue("actif", ligne.getActif())
                 .map();
+    }
+
+    private SousClasse resolveSousClasse(Long sousClasseId) {
+        if (sousClasseId == null) {
+            return null;
+        }
+        return sousClasseRepository.findById(sousClasseId)
+                .filter(sousClasse -> Boolean.TRUE.equals(sousClasse.getActif()))
+                .orElseThrow(() -> new BadRequestException("Sous-classe inactive ou inconnue"));
     }
 
     private CritereSelectionTarif effectiveCritereSelectionTarif(Garantie garantie) {

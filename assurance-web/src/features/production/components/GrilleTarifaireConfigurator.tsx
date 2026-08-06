@@ -66,6 +66,12 @@ export function GrilleTarifaireConfigurator({
     enabled: Boolean(grille.id),
   });
 
+  const sousClasses = useQuery({
+    queryKey: ["referentiel", "sous-classes"],
+    queryFn: () => referenceApi.list("sous-classes"),
+    staleTime: 60_000,
+  });
+
   const allowedUsageSet = useMemo(
     () => (allowedUsageIds?.length ? new Set(allowedUsageIds) : null),
     [allowedUsageIds]
@@ -299,6 +305,7 @@ export function GrilleTarifaireConfigurator({
               <TableHead className="w-10">#</TableHead>
               <TableHead>Garantie</TableHead>
               <TableHead className="min-w-32">Mode</TableHead>
+              {activeUsage?.bySousClasse ? <TableHead className="min-w-44">Sous-classe</TableHead> : null}
               <TableHead className="min-w-32 text-right">Taux de valeur</TableHead>
               <TableHead className="min-w-32 text-right">Taux franchise</TableHead>
               <TableHead className="min-w-32 text-right">Franchise minimale</TableHead>
@@ -344,6 +351,29 @@ export function GrilleTarifaireConfigurator({
                         }}
                       />
                     </TableCell>
+                    {activeUsage?.bySousClasse ? (
+                      <TableCell>
+                        <Select
+                          value={draft.sousClasseId || "__all"}
+                          disabled={!enabled}
+                          onValueChange={(value) => updateDraft(draft.localKey, {
+                            sousClasseId: value === "__all" ? undefined : value,
+                          })}
+                        >
+                          <SelectTrigger className="h-9"><SelectValue placeholder="Toutes" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all">Toutes</SelectItem>
+                            {(sousClasses.data ?? [])
+                              .filter((sousClasse) => sousClasse.actif !== false)
+                              .map((sousClasse) => (
+                                <SelectItem key={sousClasse.id} value={sousClasse.id}>
+                                  {sousClasse.code ? `${sousClasse.code} - ` : ""}{sousClasse.libelle}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       <NumberCell
                         disabled={!enabled || rowMode !== "TAUX"}
@@ -732,7 +762,7 @@ function buildDrafts(garanties: ReferenceOption[], lignes: ReferenceOption[]): M
         nombrePlacesMax: toNumber(ligne.nombrePlacesMax),
         ptcMin: toNumber(ligne.ptcMin),
         ptcMax: toNumber(ligne.ptcMax),
-        sousClasse: stringValue(ligne.sousClasse),
+        sousClasseId: stringValue(ligne.sousClasseId),
         carburant: stringValue(ligne.carburant),
         modeTarification: stringValue(ligne.modeTarification) || defaultMode(garantie),
         libelleOption: stringValue(ligne.libelleOption),
@@ -774,7 +804,7 @@ function cleanDraft(draft: MatrixLine, usageId: string, garantie?: ReferenceOpti
     nombrePlacesMax: draft.nombrePlacesMax,
     ptcMin: draft.ptcMin,
     ptcMax: draft.ptcMax,
-    sousClasse: draft.sousClasse || undefined,
+    sousClasseId: draft.sousClasseId || undefined,
     carburant: draft.carburant || undefined,
     modeTarification: mode,
     libelleOption: draft.libelleOption || undefined,

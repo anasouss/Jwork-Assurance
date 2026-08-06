@@ -1,7 +1,10 @@
 package com.assurance.entity;
 
+import com.assurance.enums.ChampMoteurSousClasse;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,4 +30,18 @@ public class SousClasse extends BaseEntity {
     @Builder.Default
     @Column(nullable = false)
     private Boolean actif = true;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "champ_moteur",
+            nullable = false,
+            length = 30,
+            columnDefinition = "varchar(30) default 'PUISSANCE_FISCALE'"
+    )
+    private ChampMoteurSousClasse champMoteur = ChampMoteurSousClasse.PUISSANCE_FISCALE;
+
+    @Builder.Default
+    @Column(name = "conducteur_permis_requis", nullable = false, columnDefinition = "boolean default false")
+    private Boolean conducteurPermisRequis = false;
 }

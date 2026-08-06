@@ -271,6 +271,7 @@ export default function AvenantContratPage() {
       immatriculation: item.immatriculation ?? undefined,
       carburant: item.carburant ?? undefined,
       puissanceFiscale: item.puissanceFiscale ?? undefined,
+      cylindree: item.cylindree ?? undefined,
       nombrePlaces: item.nombrePlaces ?? undefined,
       sousClasse: item.sousClasse ?? undefined,
       ptc: item.ptc ?? undefined,

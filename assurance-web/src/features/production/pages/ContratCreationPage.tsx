@@ -32,6 +32,17 @@ export default function ContratCreationPage() {
     () => filteredConventions.find((convention) => convention.id === form.conventionId) ?? null,
     [filteredConventions, form.conventionId]
   );
+  const selectedUsage = useMemo(
+    () => form.availableUsages.find((usage) => usage.id === form.usageId) ?? null,
+    [form.availableUsages, form.usageId]
+  );
+  const selectedSousClasse = form.vehicules[0]?.sousClasse ?? "";
+  const usageTarifs = useQuery({
+    queryKey: ["entry-usage-tarifs", form.usageId],
+    queryFn: () => referenceApi.list("tarifs-usage", { usageId: form.usageId }),
+    enabled: Boolean(form.usageId && selectedUsage?.bySousClasse),
+    staleTime: 60_000,
+  });
   const assignedGrilleId = typeof selectedConvention?.grilleTarifaireId === "string" ? selectedConvention.grilleTarifaireId : "";
   const shouldCheckConventionGrille = typeContrat === "CONVENTION" && Boolean(assignedGrilleId && form.usageId);
   const conventionGrilleLines = useQuery({
@@ -50,6 +61,19 @@ export default function ContratCreationPage() {
   const conventionGrilleConfigured = shouldCheckConventionGrille
     && !conventionGrilleChecking
     && ((conventionGrilleLines.data?.length ?? 0) > 0 || (conventionPersonneFormules.data?.length ?? 0) > 0);
+  const availableSousClasses = useMemo(() => {
+    if (!selectedUsage?.bySousClasse) {
+      return [];
+    }
+    const configuredIds = new Set(
+      (usageTarifs.data ?? [])
+        .map((tarif) => String(tarif.sousClasseId ?? ""))
+        .filter(Boolean),
+    );
+    return (form.refs.sousClasses.data ?? []).filter(
+      (item) => item.actif !== false && configuredIds.has(item.id),
+    );
+  }, [form.refs.sousClasses.data, selectedUsage?.bySousClasse, usageTarifs.data]);
   const conventionStartBlockedReason = conventionStartBlockReason({
     typeContrat,
     conventionSelected: Boolean(form.conventionId),
@@ -63,7 +87,13 @@ export default function ContratCreationPage() {
     assurance === "automobile" &&
     Boolean(typeContrat) &&
     (typeContrat !== "PARTICULIER" || Boolean(categorieClientId)) &&
-    (typeContrat !== "CONVENTION" || Boolean(form.compagnieAssuranceId && form.conventionId && form.usageId && !conventionStartBlockedReason));
+    (typeContrat !== "CONVENTION" || Boolean(
+      form.compagnieAssuranceId
+      && form.conventionId
+      && form.usageId
+      && (!selectedUsage?.bySousClasse || selectedSousClasse)
+      && !conventionStartBlockedReason
+    ));
 
   const createDraftMutation = useMutation({
     mutationFn: contractCreationApi.createContratDraft,
@@ -222,7 +252,18 @@ export default function ContratCreationPage() {
                 </Select>
               </Field>
               <Field label="Usage">
-                <Select value={form.usageId} onValueChange={form.setUsageId} disabled={!form.conventionId || form.availableUsages.length === 0}>
+                <Select
+                  value={form.usageId}
+                  onValueChange={(value) => {
+                    form.setUsageId(value);
+                    form.setVehicules(form.vehicules.map((vehicule, index) => (
+                      index === 0
+                        ? { ...vehicule, usageId: value, sousClasse: undefined, cylindree: undefined }
+                        : vehicule
+                    )));
+                  }}
+                  disabled={!form.conventionId || form.availableUsages.length === 0}
+                >
                   <SelectTrigger><SelectValue placeholder="Choisir une option" /></SelectTrigger>
                   <SelectContent>
                     {form.availableUsages.map((usage) => (
@@ -234,6 +275,29 @@ export default function ContratCreationPage() {
                   <p className="mt-1 text-xs text-red-600">{conventionStartBlockedReason}</p>
                 ) : null}
               </Field>
+              {selectedUsage?.bySousClasse ? (
+                <Field label="Sous-classe" required>
+                  <Select
+                    value={selectedSousClasse}
+                    onValueChange={(value) => form.setVehicules(form.vehicules.map((vehicule, index) => (
+                      index === 0 ? { ...vehicule, usageId: form.usageId, sousClasse: value } : vehicule
+                    )))}
+                    disabled={usageTarifs.isLoading || availableSousClasses.length === 0}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choisir une sous-classe" /></SelectTrigger>
+                    <SelectContent>
+                      {availableSousClasses.map((sousClasse) => (
+                        <SelectItem key={sousClasse.id} value={sousClasse.code ?? sousClasse.libelle}>
+                          {sousClasse.code ? `${sousClasse.code} - ` : ""}{sousClasse.libelle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!usageTarifs.isLoading && availableSousClasses.length === 0 ? (
+                    <p className="mt-1 text-xs text-red-600">Aucune sous-classe active n’est tarifée pour cet usage.</p>
+                  ) : null}
+                </Field>
+              ) : null}
             </div>
           ) : null}
 

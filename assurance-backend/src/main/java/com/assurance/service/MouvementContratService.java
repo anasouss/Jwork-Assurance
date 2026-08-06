@@ -694,6 +694,7 @@ public class MouvementContratService {
                     .immatriculationProvisoire(vehicule.getImmatriculationProvisoire())
                     .carburant(vehicule.getCarburant())
                     .puissanceFiscale(vehicule.getPuissanceFiscale())
+                    .cylindree(vehicule.getCylindree())
                     .nombrePlaces(vehicule.getNombrePlaces())
                     .sousClasse(vehicule.getSousClasse())
                     .ptc(vehicule.getPtc())

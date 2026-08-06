@@ -358,7 +358,8 @@ public class CalculGarantieService {
             return false;
         }
         if (Boolean.TRUE.equals(usage.getBySousClasse())) {
-            return equalsIgnoreCase(tarif.getSousClasse(), vehicule.getSousClasse())
+            return tarif.getSousClasse() != null
+                    && equalsIgnoreCase(tarif.getSousClasse().getCode(), vehicule.getSousClasse())
                     && matchesCarburant(tarif.getCarburant(), vehicule.getCarburant());
         }
         if (Boolean.TRUE.equals(usage.getByPtc())) {

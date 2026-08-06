@@ -34,6 +34,7 @@ export function VehiculeSection({
   carrosseries,
   categoriesTransport,
   sousClasses,
+  tarifsUsage = [],
   allowMultipleVehicules = true,
   showUsage = true,
   showAttestation = true,
@@ -56,6 +57,7 @@ export function VehiculeSection({
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
   sousClasses: ReferenceOption[];
+  tarifsUsage?: ReferenceOption[];
   allowMultipleVehicules?: boolean;
   showUsage?: boolean;
   showAttestation?: boolean;
@@ -92,6 +94,7 @@ export function VehiculeSection({
       categorieTransportId: categorieTransportId || undefined,
       carburant: found.carburant ?? undefined,
       puissanceFiscale: found.puissanceFiscale ?? undefined,
+      cylindree: found.cylindree ?? undefined,
       nombrePlaces: found.nombrePlaces ?? undefined,
       sousClasse: found.sousClasse ?? undefined,
       ptc: found.ptc ?? undefined,
@@ -136,6 +139,17 @@ export function VehiculeSection({
           const usage = usages.find((item) => item.id === vehicule.usageId);
           const needsCarburantAndPf = Boolean(usage?.byCarburantAndPf);
           const needsSousClasse = Boolean(usage?.bySousClasse);
+          const availableSousClasses = tariffedSousClasses(sousClasses, tarifsUsage, vehicule.usageId);
+          const selectedSousClasse = sousClasses.find(
+            (item) => (item.code ?? item.libelle) === vehicule.sousClasse
+          );
+          const needsMotorField = needsCarburantAndPf || Boolean(needsSousClasse && selectedSousClasse);
+          const motorFieldLabel = selectedSousClasse?.champMoteur === "CYLINDREE"
+            ? "Cylindrée"
+            : "Puissance fiscale";
+          const motorFieldError = selectedSousClasse?.champMoteur === "CYLINDREE"
+            ? errors[`vehicules.${index}.cylindree`]
+            : errors[`vehicules.${index}.puissanceFiscale`];
           const needsPtc = Boolean(usage?.byPtc);
           const needsCategorieTransport = Boolean(usage?.byCategorieTransport);
           return (
@@ -167,6 +181,7 @@ export function VehiculeSection({
                           categorieTransportId: undefined,
                           carburant: undefined,
                           puissanceFiscale: undefined,
+                          cylindree: undefined,
                           sousClasse: undefined,
                           ptc: undefined,
                         })
@@ -219,9 +234,14 @@ export function VehiculeSection({
                     </Select>
                   </Field>
                 ) : null}
-                {needsCarburantAndPf ? (
-                  <Field label="Puissance fiscale" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
-                    <Input value={vehicule.puissanceFiscale ?? ""} onChange={(event) => update(index, { puissanceFiscale: event.target.value })} />
+                {needsMotorField ? (
+                  <Field label={motorFieldLabel} required error={motorFieldError}>
+                    <Input
+                      value={selectedSousClasse?.champMoteur === "CYLINDREE" ? vehicule.cylindree ?? "" : vehicule.puissanceFiscale ?? ""}
+                      onChange={(event) => update(index, selectedSousClasse?.champMoteur === "CYLINDREE"
+                        ? { cylindree: event.target.value }
+                        : { puissanceFiscale: event.target.value })}
+                    />
                   </Field>
                 ) : null}
                 {needsSousClasse ? (
@@ -231,12 +251,16 @@ export function VehiculeSection({
                       placeholder="Sous-classe"
                       emptyText="Aucune sous-classe trouvée"
                       invalidText="Sous-classe invalide : choisissez une option existante."
-                      options={sousClasses.filter(isActiveReference).map((sousClasse) => ({
+                      options={availableSousClasses.map((sousClasse) => ({
                         value: sousClasse.code ?? sousClasse.libelle,
                         label: sousClasse.code ? `${sousClasse.code} - ${sousClasse.libelle}` : sousClasse.libelle,
                         keywords: sousClasse.libelle,
                       }))}
-                      onValueChange={(value) => update(index, { sousClasse: value || undefined })}
+                      onValueChange={(value) => update(index, {
+                        sousClasse: value || undefined,
+                        puissanceFiscale: undefined,
+                        cylindree: undefined,
+                      })}
                     />
                   </Field>
                 ) : null}
@@ -356,4 +380,22 @@ function toOptionalNumber(value: unknown) {
 
 function isActiveReference(option: ReferenceOption) {
   return option.actif !== false;
+}
+
+function tariffedSousClasses(
+  sousClasses: ReferenceOption[],
+  tarifsUsage: ReferenceOption[],
+  usageId?: string,
+) {
+  const activeSousClasses = sousClasses.filter(isActiveReference);
+  if (!usageId || tarifsUsage.length === 0) {
+    return activeSousClasses;
+  }
+  const configuredIds = new Set(
+    tarifsUsage
+      .filter((tarif) => String(tarif.usageId ?? "") === usageId && tarif.actif !== false)
+      .map((tarif) => String(tarif.sousClasseId ?? ""))
+      .filter(Boolean),
+  );
+  return activeSousClasses.filter((sousClasse) => configuredIds.has(sousClasse.id));
 }

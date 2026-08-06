@@ -59,6 +59,7 @@ export type ContractTargetsSectionProps = {
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
   sousClasses: ReferenceOption[];
+  tarifsUsage?: ReferenceOption[];
   compagniesAssistance: ReferenceOption[];
   produitsAssistance: ReferenceOption[];
   grilleSelected: boolean;
@@ -121,6 +122,7 @@ export function ContractTargetsSection({
   carrosseries,
   categoriesTransport,
   sousClasses,
+  tarifsUsage = [],
   compagniesAssistance,
   produitsAssistance,
   grilleSelected,
@@ -474,6 +476,7 @@ export function ContractTargetsSection({
                     carrosseries={carrosseries}
                     categoriesTransport={categoriesTransport}
                     sousClasses={sousClasses}
+                    tarifsUsage={tarifsUsage}
                     crmPartage={crmPartage}
                     crmPartageValeur={crmPartageValeur}
                     showCrm={showVehicleCrm}

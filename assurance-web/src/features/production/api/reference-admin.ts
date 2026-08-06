@@ -10,6 +10,7 @@ import type {
   UpsertGroupeExclusionGarantieRequest,
   UpsertGroupeUsageAttestationRequest,
   UpsertReferenceRequest,
+  UpsertSousClasseRequest,
   UpsertUsageRequest,
 } from "../types";
 
@@ -83,8 +84,8 @@ export const referenceAdminApi = {
     createReference("carburants", payload),
   updateFuel: (id: string, payload: UpsertCodeReferenceRequest) =>
     updateReference("carburants", id, payload),
-  createSubclass: (payload: UpsertCodeReferenceRequest) =>
+  createSubclass: (payload: UpsertSousClasseRequest) =>
     createReference("sous-classes", payload),
-  updateSubclass: (id: string, payload: UpsertCodeReferenceRequest) =>
+  updateSubclass: (id: string, payload: UpsertSousClasseRequest) =>
     updateReference("sous-classes", id, payload),
 };

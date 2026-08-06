@@ -18,7 +18,7 @@ INSERT INTO tarifs_usage (
     nombre_places_max,
     ptc_min,
     ptc_max,
-    sous_classe,
+    sous_classe_id,
     prime_nette,
     prime_par_place,
     actif
@@ -34,7 +34,7 @@ SELECT
     src.nombre_places_max,
     src.ptc_min,
     src.ptc_max,
-    src.sous_classe,
+    sous_classe_ref.id,
     src.prime_nette,
     src.prime_par_place,
     src.actif
@@ -181,9 +181,7 @@ FROM (
     UNION ALL
     SELECT 71 AS skay_id, 'D6_SC3' AS usage_code, 'Diesel' AS carburant_libelle, 8 AS puissance_fiscale_min, NULL AS puissance_fiscale_max, NULL AS nombre_places_min, NULL AS nombre_places_max, NULL AS ptc_min, NULL AS ptc_max, NULL AS sous_classe, 5006.4 AS prime_nette, 0 AS prime_par_place, true AS actif
     UNION ALL
-    SELECT 72 AS skay_id, 'D6_SC4' AS usage_code, NULL AS carburant_libelle, NULL AS puissance_fiscale_min, NULL AS puissance_fiscale_max, NULL AS nombre_places_min, NULL AS nombre_places_max, NULL AS ptc_min, NULL AS ptc_max, 'AUTOCAR' AS sous_classe, 7359.6 AS prime_nette, 0 AS prime_par_place, true AS actif
-    UNION ALL
-    SELECT 73 AS skay_id, 'D6_SC4' AS usage_code, NULL AS carburant_libelle, NULL AS puissance_fiscale_min, NULL AS puissance_fiscale_max, NULL AS nombre_places_min, NULL AS nombre_places_max, NULL AS ptc_min, NULL AS ptc_max, 'UTILITAIRE>3.5T' AS sous_classe, 7359.6 AS prime_nette, 0 AS prime_par_place, true AS actif
+    SELECT 72 AS skay_id, 'D6_SC4' AS usage_code, NULL AS carburant_libelle, NULL AS puissance_fiscale_min, NULL AS puissance_fiscale_max, NULL AS nombre_places_min, NULL AS nombre_places_max, NULL AS ptc_min, NULL AS ptc_max, NULL AS sous_classe, 7359.6 AS prime_nette, 0 AS prime_par_place, true AS actif
     UNION ALL
     SELECT 74 AS skay_id, 'D8' AS usage_code, NULL AS carburant_libelle, NULL AS puissance_fiscale_min, NULL AS puissance_fiscale_max, NULL AS nombre_places_min, NULL AS nombre_places_max, NULL AS ptc_min, NULL AS ptc_max, NULL AS sous_classe, 1412 AS prime_nette, 0 AS prime_par_place, true AS actif
     UNION ALL
@@ -270,4 +268,8 @@ LEFT JOIN carburants carburant_ref
     ON src.carburant_libelle IS NOT NULL
     AND (UPPER(carburant_ref.libelle) = UPPER(src.carburant_libelle)
         OR UPPER(carburant_ref.code) = UPPER(src.carburant_libelle))
-WHERE src.carburant_libelle IS NULL OR carburant_ref.id IS NOT NULL;
+LEFT JOIN sous_classes sous_classe_ref
+    ON src.sous_classe IS NOT NULL
+    AND UPPER(sous_classe_ref.code) = UPPER(src.sous_classe)
+WHERE (src.carburant_libelle IS NULL OR carburant_ref.id IS NOT NULL)
+  AND (src.sous_classe IS NULL OR sous_classe_ref.id IS NOT NULL);

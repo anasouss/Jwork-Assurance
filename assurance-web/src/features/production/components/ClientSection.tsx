@@ -42,6 +42,7 @@ export function ClientSection({
   onSouscripteurGroupChange,
   showOptionalRoles = false,
   showProprietaireCategorie = false,
+  requireDriverDetails = true,
   errors = {},
   onSaveSection,
   savedSections = {},
@@ -57,6 +58,7 @@ export function ClientSection({
   onSouscripteurGroupChange?: (groupe?: GroupeClient) => void;
   showOptionalRoles?: boolean;
   showProprietaireCategorie?: boolean;
+  requireDriverDetails?: boolean;
   errors?: Record<string, string>;
   onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
   savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
@@ -72,7 +74,7 @@ export function ClientSection({
     const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
     const needsConducteur = Boolean(
       proprietaire && (proprietaire.client.typeClient === "PERSONNE_MORALE" || proprietaire.client.conducteurHabituel === false)
-    ) && !showProprietaireCategorie;
+    ) && !showProprietaireCategorie && requireDriverDetails;
     const hasConducteur = clients.some((client) => client.role === "CONDUCTEUR");
     if (needsConducteur && !hasConducteur) {
       setClients([...clients, emptyClient("CONDUCTEUR")]);
@@ -81,7 +83,7 @@ export function ClientSection({
     if (!needsConducteur && hasConducteur && !showOptionalRoles) {
       setClients(clients.filter((client) => client.role !== "CONDUCTEUR"));
     }
-  }, [clients, setClients, showOptionalRoles, showProprietaireCategorie]);
+  }, [clients, requireDriverDetails, setClients, showOptionalRoles, showProprietaireCategorie]);
 
   useEffect(() => () => {
     Object.values(lookupTimers.current).forEach(clearTimeout);
@@ -333,9 +335,11 @@ export function ClientSection({
           const selectedVille = villes.find((ville) => ville.id === item.client.villeId);
           const saharaAllowed = Boolean(selectedVille?.saharienne);
           const disabledByCopy = isProprietaire && sameAsSouscripteur;
-          const showProprietaireConducteur = isProprietaire && !showProprietaireCategorie;
+          const showProprietaireConducteur = isProprietaire && !showProprietaireCategorie && requireDriverDetails;
           const proprietorIsDriver = showProprietaireConducteur && !morale && item.client.conducteurHabituel !== false;
-          const showProprietairePermisFields = isProprietaire && (showProprietaireCategorie || (!morale && proprietorIsDriver));
+          const showProprietairePermisFields = requireDriverDetails
+            && isProprietaire
+            && (showProprietaireCategorie || (!morale && proprietorIsDriver));
           const conducteur = clients
             .map((client, clientIndex) => ({ client, clientIndex }))
             .find(({ client }) => client.role === "CONDUCTEUR");
@@ -548,7 +552,7 @@ export function ClientSection({
                       </Field>
                     </div>
                   ) : null}
-                  {!proprietorIsDriver && conducteur ? (
+                  {requireDriverDetails && !proprietorIsDriver && conducteur ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                       <Field label="Genre" required error={errors[`clients.${conducteur.clientIndex}.client.genre`]}>
                         <Select value={conducteur.client.client.genre ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { genre: value as GenreClient })}>
@@ -592,7 +596,7 @@ export function ClientSection({
                   ) : null}
                 </>
               ) : null}
-              {item.role === "CONDUCTEUR" && !morale ? (
+              {requireDriverDetails && item.role === "CONDUCTEUR" && !morale ? (
                 <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-2 lg:grid-cols-4">
                   <Field label="Date de naissance">
                     <DatePicker date={item.client.dateNaissance} onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })} />

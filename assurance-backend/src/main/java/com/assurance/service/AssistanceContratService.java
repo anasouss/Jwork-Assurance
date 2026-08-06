@@ -72,12 +72,36 @@ public class AssistanceContratService {
                 .filter(assistance -> assistance.getVehicule() != null)
                 .map(assistance -> assistance.getVehicule().getId())
                 .collect(Collectors.toSet());
-        List<AssistanceContratContextResponse.VehiculeAssistanceOption> vehicules = resolveVehiculesCibles(contrat, mouvement).stream()
+        List<Vehicule> vehiculesContexte = resolveVehiculesCibles(contrat, mouvement).stream()
                 .filter(vehicule -> Boolean.TRUE.equals(vehicule.getActif()))
+                .toList();
+        List<Vehicule> vehiculesEligibles = vehiculesContexte.stream()
                 .filter(vehicule -> !vehiculesAvecAssistance.contains(vehicule.getId()))
-                .map(this::toVehiculeOption)
                 .toList();
         Long categorieClientId = resolveAssistanceCategorieClientId(contrat);
+        Set<Long> usageIds = vehiculesContexte.stream()
+                .map(Vehicule::getUsage)
+                .filter(java.util.Objects::nonNull)
+                .map(Usage::getId)
+                .collect(Collectors.toSet());
+        List<AssistanceContratContextResponse.ProduitAssistanceOption> produits = produitAssistanceRepository.findAll().stream()
+                .filter(produit -> Boolean.TRUE.equals(produit.getActif()))
+                .filter(produit -> produit.getCategorieClient() == null
+                        || produit.getCategorieClient().getId().equals(categorieClientId))
+                .filter(produit -> produit.getUsages() == null
+                        || produit.getUsages().isEmpty()
+                        || produit.getUsages().stream().anyMatch(usage -> usageIds.contains(usage.getId())))
+                .map(produit -> toProduitOption(produit, referenceDate))
+                .filter(produit -> produit.getTarifProduitAssistanceId() != null)
+                .sorted(Comparator.comparing(
+                        AssistanceContratContextResponse.ProduitAssistanceOption::getLibelle,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
+                ))
+                .toList();
+        Set<Long> compagnieIds = produits.stream()
+                .map(AssistanceContratContextResponse.ProduitAssistanceOption::getCompagnieAssistanceId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
 
         return AssistanceContratContextResponse.builder()
                 .contratId(contrat.getId())
@@ -91,10 +115,11 @@ public class AssistanceContratService {
                 .mouvementCode(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getCode() : null)
                 .mouvementLibelle(mouvement != null && mouvement.getTypeMouvement() != null ? mouvement.getTypeMouvement().getLibelle() : "Contrat")
                 .categorieClientId(categorieClientId)
-                .vehiculesEligibles(vehicules)
+                .vehiculesEligibles(vehiculesEligibles.stream().map(this::toVehiculeOption).toList())
                 .assistances(activeAssistances.stream().map(this::toResponse).toList())
                 .compagnies(compagnieAssistanceRepository.findAll().stream()
                         .filter(compagnie -> Boolean.TRUE.equals(compagnie.getActif()))
+                        .filter(compagnie -> compagnieIds.contains(compagnie.getId()))
                         .sorted(Comparator.comparing(CompagnieAssistance::getNom, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                         .map(compagnie -> AssistanceContratContextResponse.CompagnieAssistanceOption.builder()
                                 .id(compagnie.getId())
@@ -102,11 +127,7 @@ public class AssistanceContratService {
                                 .libelle(compagnie.getNom())
                                 .build())
                         .toList())
-                .produits(produitAssistanceRepository.findAll().stream()
-                        .filter(produit -> Boolean.TRUE.equals(produit.getActif()))
-                        .sorted(Comparator.comparing(ProduitAssistance::getLibelle, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
-                        .map(produit -> toProduitOption(produit, referenceDate))
-                        .toList())
+                .produits(produits)
                 .build();
     }
 
@@ -234,13 +255,16 @@ public class AssistanceContratService {
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", request.getCompagnieAssistanceId()));
         ProduitAssistance produit = produitAssistanceRepository.findById(request.getProduitAssistanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", request.getProduitAssistanceId()));
+        if (!Boolean.TRUE.equals(compagnie.getActif()) || !Boolean.TRUE.equals(produit.getActif())) {
+            throw new BadRequestException("La compagnie ou le produit d'assistance est inactif");
+        }
         if (produit.getCompagnieAssistance() == null
                 || !produit.getCompagnieAssistance().getId().equals(compagnie.getId())) {
             throw new BadRequestException("Le produit d'assistance ne correspond pas a la compagnie selectionnee");
         }
         if (produit.getUsages() != null && !produit.getUsages().isEmpty()
-                && vehicule.getUsage() != null
-                && produit.getUsages().stream().noneMatch(usage -> usage.getId().equals(vehicule.getUsage().getId()))) {
+                && (vehicule.getUsage() == null
+                || produit.getUsages().stream().noneMatch(usage -> usage.getId().equals(vehicule.getUsage().getId())))) {
             throw new BadRequestException("Produit d'assistance incompatible avec l'usage du vehicule");
         }
         Long categorieClientId = resolveAssistanceCategorieClientId(contrat);
@@ -262,8 +286,11 @@ public class AssistanceContratService {
         int trimestres = resolveAssistanceQuarterCount(dateEffet, dateEcheance);
         BigDecimal prorata = BigDecimal.valueOf(trimestres).divide(BigDecimal.valueOf(4), 8, RoundingMode.HALF_UP);
         TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveTarifForDate(produit, dateSouscription);
-        BigDecimal montantHt = tarif == null ? BigDecimal.ZERO : tarif.getMontantHt();
-        BigDecimal montantTtc = tarif == null ? BigDecimal.ZERO : tarif.getMontantTtc();
+        if (tarif == null) {
+            throw new BadRequestException("Aucun tarif d'assistance applicable a la date de souscription");
+        }
+        BigDecimal montantHt = tarif.getMontantHt();
+        BigDecimal montantTtc = tarif.getMontantTtc();
         BigDecimal primeNette = montantHt.multiply(prorata).setScale(2, RoundingMode.HALF_UP);
         BigDecimal primeTotale = montantTtc.multiply(prorata).setScale(2, RoundingMode.HALF_UP);
         return new AssistancePricing(

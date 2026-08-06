@@ -55,6 +55,8 @@ export function ContratFormLayout({
     || (submissionError instanceof ApiError
       && submissionError.code === "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED");
   const assistanceCategorieClientId = form.categorieClientId;
+  const compagniesAssistance = form.assistanceContext.data?.compagnies ?? [];
+  const produitsAssistance = form.assistanceContext.data?.produits ?? [];
   const flotteTargetUsages = useMemo(() => {
     if (order !== "flotte") {
       return form.availableUsages;
@@ -225,8 +227,8 @@ export function ContratFormLayout({
       showAssistanceRow={showConvention}
       assistanceDraft={form.assistanceDraft}
       setAssistanceDraft={form.setAssistanceDraft}
-      compagniesAssistance={form.refs.compagniesAssistance.data ?? []}
-      produitsAssistance={form.refs.produitsAssistance.data ?? []}
+      compagniesAssistance={compagniesAssistance}
+      produitsAssistance={produitsAssistance}
       assistanceUsageId={form.usageId}
       assistanceCategorieClientId={assistanceCategorieClientId}
       onSaveSection={saveSectionAndAdvance}
@@ -255,8 +257,8 @@ export function ContratFormLayout({
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
       sousClasses={form.refs.sousClasses.data ?? []}
-      compagniesAssistance={form.refs.compagniesAssistance.data ?? []}
-      produitsAssistance={form.refs.produitsAssistance.data ?? []}
+      compagniesAssistance={compagniesAssistance}
+      produitsAssistance={produitsAssistance}
       grilleSelected={Boolean(form.grilleTarifaireId)}
       preview={form.preview}
       targetPreview={form.targetPreview}

@@ -95,8 +95,6 @@ export function useContratCreationForm(
     sousClasses: useReference("sous-classes"),
     garanties: useReference("garanties"),
     compagnies: useReference("compagnies-assurance"),
-    compagniesAssistance: useReference("compagnies-assistance"),
-    produitsAssistance: useReference("produits-assistance"),
     conventions: useReference("conventions"),
     grilles: useReference("grilles-tarifaires"),
     villes: useReference("villes"),
@@ -106,6 +104,14 @@ export function useContratCreationForm(
   const draftQuery = useQuery({
     queryKey: ["contrat-draft", draftId],
     queryFn: () => contractCreationApi.getContratDraft(draftId ?? ""),
+    enabled: Boolean(draftId),
+  });
+
+  const assistanceContext = useQuery({
+    queryKey: ["contrat-draft", draftId, "assistance-context", dateEffet],
+    queryFn: () => contractServiceApi.getAssistanceContext(draftId ?? "", {
+      dateSouscription: dateEffet,
+    }),
     enabled: Boolean(draftId),
   });
 
@@ -1130,6 +1136,7 @@ export function useContratCreationForm(
     request,
     draftId,
     draftQuery,
+    assistanceContext,
     initialLoading,
     preview,
     targetPreview,

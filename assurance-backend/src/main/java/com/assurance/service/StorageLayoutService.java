@@ -137,7 +137,11 @@ public class StorageLayoutService {
                 }
             }
         }
-        removeEmptyDirectories(legacyRoot);
+        try {
+            removeEmptyDirectories(legacyRoot);
+        } catch (IOException error) {
+            log.warn("Nettoyage du repertoire de stockage historique ignore: {}", legacyRoot, error);
+        }
     }
 
     private void move(Path source, Path destination) throws IOException {

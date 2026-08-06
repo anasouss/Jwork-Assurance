@@ -151,11 +151,16 @@ public class StorageLayoutService {
     private void removeEmptyDirectories(Path legacyRoot) throws IOException {
         try (Stream<Path> paths = Files.walk(legacyRoot)) {
             for (Path directory : paths.filter(Files::isDirectory)
+                    .filter(directory -> !directory.equals(legacyRoot))
                     .sorted(Comparator.reverseOrder())
                     .toList()) {
                 try (Stream<Path> children = Files.list(directory)) {
                     if (children.findAny().isEmpty()) {
-                        Files.deleteIfExists(directory);
+                        try {
+                            Files.deleteIfExists(directory);
+                        } catch (IOException error) {
+                            log.warn("Repertoire de stockage historique vide conserve: {}", directory, error);
+                        }
                     }
                 }
             }

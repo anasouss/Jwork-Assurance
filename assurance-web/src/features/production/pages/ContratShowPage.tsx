@@ -575,7 +575,7 @@ function financialSummaryRows(contrat: ContratSummary) {
   const hasAssistance = assistance.primeTotale !== 0;
   const rows = lignes.map((ligne) => ({
     key: `${ligne.categorie}-${ligne.ordre}`,
-    label: ligne.globale ? (hasAssistance ? "Total assurance" : "Total général") : text(ligne.categorie),
+    label: ligne.globale ? "Total général" : text(ligne.categorie),
     primeNette: numberOrZero(ligne.primeNette),
     taxe: numberOrZero(ligne.taxe),
     taxeParafiscale: numberOrZero(ligne.taxeParafiscale),
@@ -586,7 +586,6 @@ function financialSummaryRows(contrat: ContratSummary) {
   }));
   if (!hasAssistance) return rows;
 
-  const insurance = lignes.find((ligne) => ligne.globale) ?? contrat.quittanceGenerale;
   const assistanceTax = roundMoney(assistance.primeTotale - assistance.primeNette);
   rows.push({
     key: "assistance",
@@ -598,17 +597,6 @@ function financialSummaryRows(contrat: ContratSummary) {
     cnpac: 0,
     primeTotale: assistance.primeTotale,
     emphasized: false,
-  });
-  rows.push({
-    key: "total-payable",
-    label: "Total à payer",
-    primeNette: roundMoney(numberOrZero(insurance?.primeNette) + assistance.primeNette),
-    taxe: roundMoney(numberOrZero(insurance?.taxe) + assistanceTax),
-    taxeParafiscale: numberOrZero(insurance?.taxeParafiscale),
-    accessoire: numberOrZero(insurance?.accessoire),
-    cnpac: numberOrZero(insurance?.cnpac),
-    primeTotale: roundMoney(numberOrZero(insurance?.primeTotale) + assistance.primeTotale),
-    emphasized: true,
   });
   return rows;
 }

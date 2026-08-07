@@ -293,6 +293,7 @@ export function useContratCreationForm(
     setVehicules(hydrated.vehicules);
     setRemorques(hydrated.remorques);
     setGaranties(hydrated.garanties);
+    setQuittances(hydrated.quittances);
     setPreview(hydrated.preview);
     setTargetPreview(hydrated.targetPreview);
     setHydratedDraftId(draftId);
@@ -486,7 +487,11 @@ export function useContratCreationForm(
   const previewMutation = useMutation({
     mutationFn: contractCreationApi.previewQuittance,
     onSuccess: (data) => {
-      setPreview(data);
+      setPreview((current) => preservePreviewAssistances(
+        data,
+        current,
+        assistanceEnabled || assistanceDraft.enabled
+      ));
       setTargetPreview(null);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Prévisualisation impossible"),
@@ -501,7 +506,11 @@ export function useContratCreationForm(
   const autoPreviewMutation = useMutation({
     mutationFn: contractCreationApi.previewQuittance,
     onSuccess: (data) => {
-      setPreview(data);
+      setPreview((current) => preservePreviewAssistances(
+        data,
+        current,
+        assistanceEnabled || assistanceDraft.enabled
+      ));
       setTargetPreview(null);
     },
     onError: () => setPreview(null),
@@ -1758,6 +1767,7 @@ function hydrateDraft(draft: ContratSummary) {
     vehicules,
     remorques,
     garanties,
+    quittances: quittanceLinesFromDraft(draft),
     targetAssistances,
     preview: quittanceGeneraleFromDraft(draft),
     targetPreview: targetQuittanceGeneraleFromDraft(draft),
@@ -1792,6 +1802,33 @@ function quittanceGeneraleFromDraft(draft: ContratSummary): QuittancePreview | n
     };
   }
   return null;
+}
+
+function quittanceLinesFromDraft(draft: ContratSummary): QuittanceInput[] {
+  const persisted = new Map(
+    (draft.quittanceGenerale?.lignes ?? [])
+      .filter((line) => line.categorie === "AUTOMOBILE" || line.categorie === "CORPOREL" || line.categorie === "EVCAT")
+      .map((line) => [line.categorie, line])
+  );
+
+  return defaultQuittanceLines().map((fallback) => ({
+    ...fallback,
+    ...persisted.get(fallback.categorie),
+    categorie: fallback.categorie,
+    ordre: fallback.ordre,
+    globale: false,
+  }));
+}
+
+function preservePreviewAssistances(
+  next: QuittancePreview,
+  current: QuittancePreview | null,
+  assistanceEnabled: boolean
+): QuittancePreview {
+  if (!assistanceEnabled || next.assistances?.length || !current?.assistances?.length) {
+    return next;
+  }
+  return { ...next, assistances: current.assistances };
 }
 
 function targetQuittanceGeneraleFromDraft(draft: ContratSummary): QuittancePreview | null {

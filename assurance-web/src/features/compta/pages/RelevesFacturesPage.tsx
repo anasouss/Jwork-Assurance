@@ -818,8 +818,6 @@ function IssueDialog(props: {
   onIssued: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const invoiceEligible = props.rows.every((row) => row.facturable);
@@ -828,10 +826,6 @@ function IssueDialog(props: {
 
   useEffect(() => {
     if (!props.open || !props.rows.length) return;
-    const startDates = props.rows.map((row) => row.dateEffet).filter(Boolean).sort();
-    const endDates = props.rows.map((row) => row.dateEcheance || row.dateEffet).filter(Boolean).sort();
-    setPeriodStart(startDates[0] ?? "");
-    setPeriodEnd(endDates[endDates.length - 1] ?? "");
     setDueDate("");
     setNotes("");
   }, [props.open, props.rows, invoiceEligible]);
@@ -840,8 +834,6 @@ function IssueDialog(props: {
     mutationFn: () => comptaApi.createClientDocument({
       typeDocument: props.type,
       elementFacturableIds: props.rows.map((row) => row.elementFacturableId),
-      periodeDebut: periodStart,
-      periodeFin: periodEnd,
       dateEcheance: props.type === "FACTURE" ? dueDate : undefined,
       notes: notes.trim() || undefined,
     }),
@@ -855,9 +847,7 @@ function IssueDialog(props: {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Émission impossible"),
   });
-  const invalid = !periodStart
-    || !periodEnd
-    || (props.type === "FACTURE" && (!dueDate || !invoiceEligible));
+  const invalid = props.type === "FACTURE" && (!dueDate || !invoiceEligible);
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -871,22 +861,17 @@ function IssueDialog(props: {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            <FilterField label="Période du">
-              <DatePicker date={periodStart} onSelect={(date) => setPeriodStart(toDateOnly(date) ?? "")} />
-            </FilterField>
-            <FilterField label="Période au">
-              <DatePicker date={periodEnd} onSelect={(date) => setPeriodEnd(toDateOnly(date) ?? "")} />
-            </FilterField>
-            <FilterField label={props.type === "FACTURE" ? "Échéance de paiement *" : "Échéance de paiement"}>
-              <DatePicker
-                date={dueDate}
-                onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
-                disabled={props.type !== "FACTURE"}
-                minDate={new Date()}
-              />
-            </FilterField>
-          </div>
+          {props.type === "FACTURE" ? (
+            <div className="max-w-sm">
+              <FilterField label="Échéance de paiement *">
+                <DatePicker
+                  date={dueDate}
+                  onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
+                  minDate={new Date()}
+                />
+              </FilterField>
+            </div>
+          ) : null}
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-muted">

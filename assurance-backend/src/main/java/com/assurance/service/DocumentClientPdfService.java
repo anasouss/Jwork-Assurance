@@ -29,6 +29,7 @@ import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
 import com.itextpdf.layout.property.VerticalAlignment;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentClientPdfService {
 
     private static final DeviceRgb ACCENT = new DeviceRgb(0, 154, 112);
@@ -72,6 +74,7 @@ public class DocumentClientPdfService {
             } catch (BadRequestException exception) {
                 throw exception;
             } catch (Exception exception) {
+                log.error("Failed to generate statement PDF for client document {}", documentId, exception);
                 throw new BadRequestException("La génération du PDF a échoué");
             }
         }
@@ -95,6 +98,7 @@ public class DocumentClientPdfService {
             document.close();
             return output.toByteArray();
         } catch (Exception exception) {
+            log.error("Failed to generate invoice PDF for client document {}", documentId, exception);
             throw new BadRequestException("La génération du PDF a échoué");
         }
     }
@@ -300,13 +304,36 @@ public class DocumentClientPdfService {
             DocumentClient source,
             Map<LigneDocumentClient, Integer> fleetAnnexes
     ) {
-        fleetAnnexes.forEach((line, annexNumber) -> flottePolicePdfService.appendClientDocumentAnnex(
-                document,
-                source.getAgence().getId(),
-                line.getElementFacturable().getContrat().getId(),
-                movementId(line),
-                annexNumber
-        ));
+        fleetAnnexes.forEach((line, annexNumber) -> {
+            Long contractId = line.getElementFacturable().getContrat().getId();
+            Long movementId = movementId(line);
+            try {
+                flottePolicePdfService.appendClientDocumentAnnex(
+                        document,
+                        source.getAgence().getId(),
+                        contractId,
+                        movementId,
+                        annexNumber
+                );
+            } catch (Exception exception) {
+                log.error(
+                        "Failed to render fleet annex {} for client document {}, contract {}, movement {}",
+                        annexNumber,
+                        source.getId(),
+                        contractId,
+                        movementId,
+                        exception
+                );
+                throw new BadRequestException(annexError(line, annexNumber, movementId));
+            }
+        });
+    }
+
+    private String annexError(LigneDocumentClient line, int annexNumber, Long movementId) {
+        String police = value(line.getNumeroPolice());
+        String movement = movementId == null ? "non rattaché" : String.valueOf(movementId);
+        return "La génération de l'annexe " + annexNumber + " (police " + police
+                + ", mouvement " + movement + ") a échoué";
     }
 
     private Long movementId(LigneDocumentClient line) {

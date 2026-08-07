@@ -40,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -96,6 +97,9 @@ public class FlottePolicePdfService {
             Long mouvementId,
             int annexNumber
     ) {
+        if (mouvementId == null) {
+            throw new BadRequestException("Le mouvement de l'annexe flotte " + annexNumber + " est introuvable");
+        }
         ContratResponse contrat = contratService.get(agenceId, contratId, mouvementId);
         if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
             throw new BadRequestException("L'annexe flotte est réservée aux contrats flotte");
@@ -404,8 +408,8 @@ public class FlottePolicePdfService {
 
     private List<ContratResponse.GarantieView> guaranteesFor(List<ContratResponse.GarantieView> guarantees, Target target) {
         return guarantees.stream().filter(item -> "VEHICULE".equals(target.kind())
-                ? target.id().equals(item.getVehiculeId())
-                : target.id().equals(item.getRemorqueId())).toList();
+                ? Objects.equals(target.id(), item.getVehiculeId())
+                : Objects.equals(target.id(), item.getRemorqueId())).toList();
     }
 
     private QuittanceResponse.TargetSummary summaryFor(ContratResponse contrat, Target target) {
@@ -421,7 +425,7 @@ public class FlottePolicePdfService {
             return "";
         }
         return list(contrat.getAssistances()).stream()
-                .filter(item -> target.id().equals(item.getVehiculeId()))
+                .filter(item -> Objects.equals(target.id(), item.getVehiculeId()))
                 .map(item -> value(item.getProduit(), ""))
                 .filter(item -> !item.isBlank())
                 .distinct()
@@ -434,7 +438,7 @@ public class FlottePolicePdfService {
             return BigDecimal.ZERO;
         }
         return list(contrat.getAssistances()).stream()
-                .filter(item -> target.id().equals(item.getVehiculeId()))
+                .filter(item -> Objects.equals(target.id(), item.getVehiculeId()))
                 .map(AssistanceContratResponse::getPrimeTotale)
                 .map(FlottePolicePdfService::zero)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

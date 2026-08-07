@@ -16,6 +16,7 @@ import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.geom.Rectangle;
+import com.itextpdf.kernel.events.PdfDocumentEvent;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfPage;
 import com.itextpdf.kernel.pdf.PdfWriter;
@@ -34,6 +35,7 @@ import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
 import com.itextpdf.layout.property.VerticalAlignment;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
@@ -49,6 +51,7 @@ import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class ReleveClientPdfRenderer {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yy");
@@ -71,6 +74,10 @@ public class ReleveClientPdfRenderer {
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             PdfFont tableHeader = PdfFontFactory.createFont(StandardFonts.TIMES_BOLD);
+            pdf.addEventHandler(
+                    PdfDocumentEvent.END_PAGE,
+                    event -> writeFooter((PdfDocumentEvent) event, source, regular, bold)
+            );
             document.setFont(regular).setFontSize(9.5f).setFontColor(ColorConstants.BLACK);
             Map<LigneDocumentClient, Integer> fleetAnnexes = fleetAnnexes(source);
 
@@ -87,7 +94,6 @@ public class ReleveClientPdfRenderer {
                 writeCancellation(document, source, bold);
             }
             writeFleetAnnexes(document, source, fleetAnnexes);
-            writeFooters(pdf, source, regular, bold);
 
             document.close();
             return output.toByteArray();
@@ -262,13 +268,36 @@ public class ReleveClientPdfRenderer {
             DocumentClient source,
             Map<LigneDocumentClient, Integer> fleetAnnexes
     ) {
-        fleetAnnexes.forEach((line, annexNumber) -> flottePolicePdfService.appendClientDocumentAnnex(
-                document,
-                source.getAgence().getId(),
-                line.getElementFacturable().getContrat().getId(),
-                movementId(line),
-                annexNumber
-        ));
+        fleetAnnexes.forEach((line, annexNumber) -> {
+            Long contractId = line.getElementFacturable().getContrat().getId();
+            Long movementId = movementId(line);
+            try {
+                flottePolicePdfService.appendClientDocumentAnnex(
+                        document,
+                        source.getAgence().getId(),
+                        contractId,
+                        movementId,
+                        annexNumber
+                );
+            } catch (Exception exception) {
+                log.error(
+                        "Failed to render fleet annex {} for client document {}, contract {}, movement {}",
+                        annexNumber,
+                        source.getId(),
+                        contractId,
+                        movementId,
+                        exception
+                );
+                throw new BadRequestException(annexError(line, annexNumber, movementId));
+            }
+        });
+    }
+
+    private String annexError(LigneDocumentClient line, int annexNumber, Long movementId) {
+        String police = value(line.getNumeroPolice());
+        String movement = movementId == null ? "non rattaché" : String.valueOf(movementId);
+        return "La génération de l'annexe " + annexNumber + " (police " + police
+                + ", mouvement " + movement + ") a échoué";
     }
 
     private Long movementId(LigneDocumentClient line) {
@@ -370,41 +399,45 @@ public class ReleveClientPdfRenderer {
                 .setMarginTop(12));
     }
 
-    private void writeFooters(PdfDocument pdf, DocumentClient source, PdfFont regular, PdfFont bold) {
+    private void writeFooter(
+            PdfDocumentEvent event,
+            DocumentClient source,
+            PdfFont regular,
+            PdfFont bold
+    ) {
         Agence agency = source.getAgence();
-        for (int index = 1; index <= pdf.getNumberOfPages(); index++) {
-            PdfPage page = pdf.getPage(index);
-            Rectangle pageSize = page.getPageSize();
-            PdfCanvas pdfCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdf);
-            pdfCanvas.setStrokeColor(ColorConstants.DARK_GRAY)
-                    .setLineWidth(0.35f)
-                    .moveTo(PAGE_MARGIN, 57)
-                    .lineTo(pageSize.getWidth() - PAGE_MARGIN, 57)
-                    .stroke();
-            Canvas canvas = new Canvas(pdfCanvas, pdf, new Rectangle(
-                    PAGE_MARGIN,
-                    9,
-                    pageSize.getWidth() - (PAGE_MARGIN * 2),
-                    44
-            ));
-            String contacts = contactLine(agency);
-            String location = addressLine(agency);
-            String legal = legalLine(agency);
-            String bank = bankLine(agency);
-            if (!contacts.isBlank()) {
-                canvas.add(footerParagraph(contacts, regular));
-            }
-            if (!location.isBlank()) {
-                canvas.add(footerParagraph(location, regular));
-            }
-            if (!legal.isBlank()) {
-                canvas.add(footerParagraph(legal, regular));
-            }
-            if (!bank.isBlank()) {
-                canvas.add(footerParagraph(bank, bold));
-            }
-            canvas.close();
+        PdfDocument pdf = event.getDocument();
+        PdfPage page = event.getPage();
+        Rectangle pageSize = page.getPageSize();
+        PdfCanvas pdfCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdf);
+        pdfCanvas.setStrokeColor(ColorConstants.DARK_GRAY)
+                .setLineWidth(0.35f)
+                .moveTo(PAGE_MARGIN, 57)
+                .lineTo(pageSize.getWidth() - PAGE_MARGIN, 57)
+                .stroke();
+        Canvas canvas = new Canvas(pdfCanvas, pdf, new Rectangle(
+                PAGE_MARGIN,
+                9,
+                pageSize.getWidth() - (PAGE_MARGIN * 2),
+                44
+        ));
+        String contacts = contactLine(agency);
+        String location = addressLine(agency);
+        String legal = legalLine(agency);
+        String bank = bankLine(agency);
+        if (!contacts.isBlank()) {
+            canvas.add(footerParagraph(contacts, regular));
         }
+        if (!location.isBlank()) {
+            canvas.add(footerParagraph(location, regular));
+        }
+        if (!legal.isBlank()) {
+            canvas.add(footerParagraph(legal, regular));
+        }
+        if (!bank.isBlank()) {
+            canvas.add(footerParagraph(bank, bold));
+        }
+        canvas.close();
     }
 
     private Paragraph footerParagraph(String text, PdfFont regular) {

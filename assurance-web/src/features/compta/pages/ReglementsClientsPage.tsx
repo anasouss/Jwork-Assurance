@@ -315,7 +315,15 @@ export default function ReglementsClientsPage() {
                 </tbody>
               </table>
             </div>
-            {receivables.data && <ServerPagination page={receivables.data.page} onPageChange={setPage} />}
+            {receivables.data && (
+              <ServerPagination
+                page={receivables.data.page.number}
+                totalPages={receivables.data.page.totalPages}
+                totalElements={receivables.data.page.totalElements}
+                loading={receivables.isFetching}
+                onPageChange={setPage}
+              />
+            )}
           </section>
         </TabsContent>
 

@@ -395,7 +395,13 @@ export default function TresoreriePage() {
             </table>
           </section>
           {movements.data && (
-            <ServerPagination page={movements.data.page} onPageChange={setMovementPage} />
+            <ServerPagination
+              page={movements.data.page.number}
+              totalPages={movements.data.page.totalPages}
+              totalElements={movements.data.page.totalElements}
+              loading={movements.isFetching}
+              onPageChange={setMovementPage}
+            />
           )}
         </TabsContent>
       </Tabs>

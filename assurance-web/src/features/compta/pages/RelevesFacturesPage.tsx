@@ -228,6 +228,11 @@ export default function RelevesFacturesPage() {
     : undefined;
 
   function toggleSource(row: ClientDocumentSource, checked: boolean) {
+    const elementFacturableId = row.elementFacturableId;
+    if (!elementFacturableId) {
+      toast.error("Cette écriture ne peut pas être ajoutée à un document client.");
+      return;
+    }
     if (checked && urlState.operationType === "FACTURE" && !row.facturable) {
       toast.error(row.dejaFacturee ? "Cette écriture est déjà facturée." : "Cette écriture ne peut pas être facturée.");
       return;
@@ -239,8 +244,8 @@ export default function RelevesFacturesPage() {
     }
     setSelected((current) => {
       const next = { ...current };
-      if (checked) next[row.elementFacturableId] = row;
-      else delete next[row.elementFacturableId];
+      if (checked) next[elementFacturableId] = row;
+      else delete next[elementFacturableId];
       return next;
     });
   }
@@ -833,7 +838,9 @@ function IssueDialog(props: {
   const issue = useMutation({
     mutationFn: () => comptaApi.createClientDocument({
       typeDocument: props.type,
-      elementFacturableIds: props.rows.map((row) => row.elementFacturableId),
+      elementFacturableIds: props.rows
+        .map((row) => row.elementFacturableId)
+        .filter((id): id is string => Boolean(id)),
       dateEcheance: props.type === "FACTURE" ? dueDate : undefined,
       notes: notes.trim() || undefined,
     }),

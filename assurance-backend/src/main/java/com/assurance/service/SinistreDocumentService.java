@@ -33,7 +33,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SinistreDocumentService {
 
-    private static final long MAX_FILE_SIZE = 20L * 1024L * 1024L;
+    private static final long MAX_FILE_SIZE = 30L * 1024L * 1024L;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             MediaType.APPLICATION_PDF_VALUE,
             MediaType.IMAGE_JPEG_VALUE,
@@ -175,7 +175,7 @@ public class SinistreDocumentService {
             throw new BadRequestException("Aucun fichier sélectionné");
         }
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new BadRequestException("Le fichier dépasse la taille maximale de 20 Mo");
+            throw new BadRequestException("Le fichier dépasse la taille maximale de 30 Mo");
         }
         String contentType = normalizeContentType(file.getContentType());
         if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {

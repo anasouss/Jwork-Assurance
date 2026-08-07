@@ -24,8 +24,8 @@ spring:
     default-property-inclusion: non_null
   servlet:
     multipart:
-      max-file-size: 4MB
-      max-request-size: 5MB
+      max-file-size: ${APP_UPLOAD_MAX_FILE_SIZE:30MB}
+      max-request-size: ${APP_UPLOAD_MAX_REQUEST_SIZE:32MB}
 
 server:
   port: ${PORT:8099}

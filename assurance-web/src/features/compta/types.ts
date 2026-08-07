@@ -280,7 +280,6 @@ export type ClientDocumentSource = {
   taxes: number;
   accessoires: number;
   montantTtc: number;
-  affectee: boolean;
   dejaFacturee: boolean;
   facturable: boolean;
 };

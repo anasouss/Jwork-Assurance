@@ -3,6 +3,7 @@ import type { ClientDocumentStatus, ClientDocumentType, TypeContrat } from "./ty
 export type ReleveTab = "sources" | "documents";
 
 export type SourceFilters = {
+  brancheId: string;
   typeContrat: "ALL" | TypeContrat;
   dateDu: string;
   dateAu: string;
@@ -10,7 +11,6 @@ export type SourceFilters = {
 };
 
 export type DocumentFilters = {
-  type: "ALL" | ClientDocumentType;
   statut: "ALL" | ClientDocumentStatus;
   dateDu: string;
   dateAu: string;
@@ -18,6 +18,7 @@ export type DocumentFilters = {
 };
 
 export type ReleveSearchState = {
+  operationType: ClientDocumentType;
   payerType: "CLIENT" | "GROUPE";
   payerId: string;
   tab: ReleveTab;
@@ -28,6 +29,7 @@ export type ReleveSearchState = {
 };
 
 export const SOURCE_DEFAULTS: SourceFilters = {
+  brancheId: "ALL",
   typeContrat: "ALL",
   dateDu: "",
   dateAu: "",
@@ -35,7 +37,6 @@ export const SOURCE_DEFAULTS: SourceFilters = {
 };
 
 export const DOCUMENT_DEFAULTS: DocumentFilters = {
-  type: "ALL",
   statut: "ALL",
   dateDu: "",
   dateAu: "",
@@ -44,13 +45,14 @@ export const DOCUMENT_DEFAULTS: DocumentFilters = {
 
 export function releveSearchStateFromParams(params: URLSearchParams): ReleveSearchState {
   const sourceType = params.get("sourceTypeContrat");
-  const documentType = params.get("documentType");
   const documentStatus = params.get("documentStatut");
   return {
+    operationType: params.get("operationType") === "FACTURE" ? "FACTURE" : "RELEVE",
     payerType: params.get("payeurType") === "GROUPE" ? "GROUPE" : "CLIENT",
     payerId: params.get("payeurId") ?? "",
     tab: params.get("tab") === "documents" ? "documents" : "sources",
     sourceFilters: {
+      brancheId: params.get("sourceBrancheId") ?? "ALL",
       typeContrat: isContractType(sourceType) ? sourceType : "ALL",
       dateDu: validDate(params.get("sourceDateDu")),
       dateAu: validDate(params.get("sourceDateAu")),
@@ -58,7 +60,6 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
     },
     sourcePage: pageFromParam(params.get("sourcePage")),
     documentFilters: {
-      type: documentType === "RELEVE" || documentType === "FACTURE" ? documentType : "ALL",
       statut: documentStatus === "EMIS" || documentStatus === "ANNULE" ? documentStatus : "ALL",
       dateDu: validDate(params.get("documentDateDu")),
       dateAu: validDate(params.get("documentDateAu")),
@@ -70,6 +71,7 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
 
 export function releveSearchParams(state: ReleveSearchState) {
   const params = new URLSearchParams();
+  if (state.operationType === "FACTURE") params.set("operationType", "FACTURE");
   if (state.payerType === "GROUPE") params.set("payeurType", "GROUPE");
   if (state.payerId) params.set("payeurId", state.payerId);
   if (state.tab === "documents") params.set("tab", "documents");
@@ -77,12 +79,14 @@ export function releveSearchParams(state: ReleveSearchState) {
   if (state.sourceFilters.typeContrat !== "ALL") {
     params.set("sourceTypeContrat", state.sourceFilters.typeContrat);
   }
+  if (state.sourceFilters.brancheId !== "ALL") {
+    params.set("sourceBrancheId", state.sourceFilters.brancheId);
+  }
   if (state.sourceFilters.dateDu) params.set("sourceDateDu", state.sourceFilters.dateDu);
   if (state.sourceFilters.dateAu) params.set("sourceDateAu", state.sourceFilters.dateAu);
   if (state.sourceFilters.search.trim()) params.set("sourceSearch", state.sourceFilters.search.trim());
   if (state.sourcePage > 0) params.set("sourcePage", String(state.sourcePage + 1));
 
-  if (state.documentFilters.type !== "ALL") params.set("documentType", state.documentFilters.type);
   if (state.documentFilters.statut !== "ALL") params.set("documentStatut", state.documentFilters.statut);
   if (state.documentFilters.dateDu) params.set("documentDateDu", state.documentFilters.dateDu);
   if (state.documentFilters.dateAu) params.set("documentDateAu", state.documentFilters.dateAu);

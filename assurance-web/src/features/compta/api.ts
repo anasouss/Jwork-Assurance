@@ -32,6 +32,12 @@ export const comptaApi = {
     ).map(normalizeReference);
   },
 
+  async insuranceBranches() {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/branches-assurance")
+    ).map(normalizeReference);
+  },
+
   async conventionBillingInstallments(params: {
     statut?: ConventionBillingStatus;
     dateDu?: string;
@@ -218,6 +224,7 @@ export const comptaApi = {
   async searchClientDocumentSources(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
+    brancheId?: string;
     typeContrat?: TypeContrat;
     dateDu?: string;
     dateAu?: string;

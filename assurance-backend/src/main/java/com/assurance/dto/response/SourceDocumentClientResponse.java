@@ -29,7 +29,6 @@ public class SourceDocumentClientResponse {
     private BigDecimal taxes;
     private BigDecimal accessoires;
     private BigDecimal montantTtc;
-    private boolean affectee;
     private boolean dejaFacturee;
     private boolean facturable;
 }

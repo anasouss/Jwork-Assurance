@@ -249,6 +249,7 @@ public class ComptaController {
     public ResponseEntity<ApiResponse<SourceDocumentClientPageResponse>> sourcesDocumentsClients(
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
@@ -260,6 +261,7 @@ public class ComptaController {
                 TenantContext.getCurrentAgence(),
                 payeurType,
                 payeurId,
+                brancheId,
                 typeContrat,
                 dateDu,
                 dateAu,

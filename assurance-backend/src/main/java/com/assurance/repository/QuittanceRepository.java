@@ -336,6 +336,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
               )
+              and q.payee = false
+              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
                     q.elementFacturable is null
@@ -420,6 +422,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
               )
+              and q.payee = false
+              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
                     q.elementFacturable is null
@@ -491,6 +495,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             """)
     Page<Quittance> searchForClientDocuments(
             @Param("agenceId") Long agenceId,
+            @Param("brancheId") Long brancheId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,

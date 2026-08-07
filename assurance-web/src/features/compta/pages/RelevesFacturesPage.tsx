@@ -68,6 +68,7 @@ import type {
   ClientDocument,
   ClientDocumentSource,
   ClientDocumentType,
+  ReferenceOption,
 } from "../types";
 
 type SelectedPayer = {
@@ -79,6 +80,8 @@ type SelectedPayer = {
   treasuryName?: string;
   memberCount?: number;
 };
+
+type PayerScope = "ALL" | SelectedPayer["type"];
 
 const PAGE_SIZE = 25;
 
@@ -97,7 +100,7 @@ export default function RelevesFacturesPage() {
   const [detailId, setDetailId] = useState<string>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
   const [deleteTarget, setDeleteTarget] = useState<ClientDocument>();
-  const [payerMode, setPayerMode] = useState<SelectedPayer["type"]>(requestedPayerType);
+  const [payerScope, setPayerScope] = useState<PayerScope>(requestedPayerId ? requestedPayerType : "ALL");
   const [payerSearch, setPayerSearch] = useState("");
   const deferredPayerSearch = useDeferredValue(payerSearch.trim());
   const [selectedPayer, setSelectedPayer] = useState<SelectedPayer>();
@@ -105,7 +108,7 @@ export default function RelevesFacturesPage() {
   useEffect(() => {
     setSourceFilters(urlState.sourceFilters);
     setDocumentFilters(urlState.documentFilters);
-    setPayerMode(urlState.payerType);
+    setPayerScope(urlState.payerId ? urlState.payerType : "ALL");
   }, [urlState]);
 
   const clients = useQuery({
@@ -115,13 +118,13 @@ export default function RelevesFacturesPage() {
       page: 0,
       size: 30,
     }),
-    enabled: payerMode === "CLIENT",
+    enabled: payerScope === "CLIENT",
     staleTime: 30_000,
   });
   const groups = useQuery({
     queryKey: ["groupes-clients"],
     queryFn: clientApi.listGroupesClients,
-    enabled: payerMode === "GROUPE",
+    enabled: payerScope === "GROUPE",
     staleTime: 60_000,
   });
   const requestedClient = useQuery({
@@ -130,10 +133,16 @@ export default function RelevesFacturesPage() {
     enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
     staleTime: 30_000,
   });
+  const branches = useQuery({
+    queryKey: ["compta", "insurance-branches"],
+    queryFn: comptaApi.insuranceBranches,
+    staleTime: 60_000,
+  });
 
   const sourceParams = useMemo(() => ({
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
+    brancheId: urlState.sourceFilters.brancheId === "ALL" ? undefined : urlState.sourceFilters.brancheId,
     typeContrat: urlState.sourceFilters.typeContrat === "ALL" ? undefined : urlState.sourceFilters.typeContrat,
     dateDu: urlState.sourceFilters.dateDu || undefined,
     dateAu: urlState.sourceFilters.dateAu || undefined,
@@ -144,14 +153,14 @@ export default function RelevesFacturesPage() {
   const documentParams = useMemo(() => ({
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
-    type: urlState.documentFilters.type === "ALL" ? undefined : urlState.documentFilters.type,
+    type: urlState.operationType,
     statut: urlState.documentFilters.statut === "ALL" ? undefined : urlState.documentFilters.statut,
     dateDu: urlState.documentFilters.dateDu || undefined,
     dateAu: urlState.documentFilters.dateAu || undefined,
     search: urlState.documentFilters.search.trim() || undefined,
     page: urlState.documentPage,
     size: PAGE_SIZE,
-  }), [selectedPayer, urlState.documentFilters, urlState.documentPage]);
+  }), [selectedPayer, urlState.documentFilters, urlState.documentPage, urlState.operationType]);
 
   const sources = useQuery({
     queryKey: ["compta", "client-document-sources", sourceParams],
@@ -171,12 +180,12 @@ export default function RelevesFacturesPage() {
     setSearchParams(releveSearchParams({ ...urlState, ...patch }), { replace: true });
   }
 
-  function changePayer(payer?: SelectedPayer, mode = payer?.type ?? payerMode) {
-    setPayerMode(mode);
+  function changePayer(payer?: SelectedPayer, scope: PayerScope = payer?.type ?? payerScope) {
+    setPayerScope(scope);
     setSelectedPayer(payer);
     setSelected({});
     updateUrl({
-      payerType: mode,
+      payerType: scope === "GROUPE" ? "GROUPE" : "CLIENT",
       payerId: payer?.id ?? "",
       sourcePage: 0,
       documentPage: 0,
@@ -186,12 +195,13 @@ export default function RelevesFacturesPage() {
   useEffect(() => {
     if (!requestedPayerId) {
       if (selectedPayer) setSelectedPayer(undefined);
+      setPayerScope("ALL");
       return;
     }
     if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
     if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
       const client = requestedClient.data.client;
-      setPayerMode("CLIENT");
+      setPayerScope("CLIENT");
       setSelectedPayer({
         type: "CLIENT",
         id: client.id,
@@ -204,7 +214,7 @@ export default function RelevesFacturesPage() {
     if (requestedPayerType === "GROUPE") {
       const group = groups.data?.find((item) => item.id === requestedPayerId);
       if (!group) return;
-      setPayerMode("GROUPE");
+      setPayerScope("GROUPE");
       setSelectedPayer({
         type: "GROUPE",
         id: group.id,
@@ -222,6 +232,10 @@ export default function RelevesFacturesPage() {
     : undefined;
 
   function toggleSource(row: ClientDocumentSource, checked: boolean) {
+    if (checked && urlState.operationType === "FACTURE" && !row.facturable) {
+      toast.error(row.dejaFacturee ? "Cette quittance est déjà facturée." : "Cette écriture ne peut pas être facturée.");
+      return;
+    }
     const payerKey = `${row.payeurType}:${row.payeurId}`;
     if (checked && selectedPayerKey && selectedPayerKey !== payerKey) {
       toast.error("Sélectionnez uniquement des quittances du même payeur.");
@@ -268,8 +282,16 @@ export default function RelevesFacturesPage() {
         </Button>
       </div>
 
+      <OperationSelector
+        value={urlState.operationType}
+        onChange={(operationType) => {
+          setSelected({});
+          updateUrl({ operationType, sourcePage: 0, documentPage: 0 });
+        }}
+      />
+
       <PayerAccountSelector
-        mode={payerMode}
+        mode={payerScope}
         selected={selectedPayer}
         clients={clients.data?.items ?? []}
         groups={groups.data ?? []}
@@ -289,7 +311,7 @@ export default function RelevesFacturesPage() {
         <TabsList>
           <TabsTrigger value="sources">
             <ReceiptText className="size-4" />
-            Quittances à documenter
+            {urlState.operationType === "RELEVE" ? "Préparer le relevé" : "Quittances à facturer"}
           </TabsTrigger>
           <TabsTrigger value="documents">
             <FileText className="size-4" />
@@ -300,6 +322,7 @@ export default function RelevesFacturesPage() {
         <TabsContent value="sources" className="grid gap-4">
           <SourceSearch
             filters={sourceFilters}
+            branches={branches.data ?? []}
             onChange={setSourceFilters}
             onApply={applySourceFilters}
             onReset={resetSourceFilters}
@@ -311,13 +334,17 @@ export default function RelevesFacturesPage() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {selectedRows.length
                     ? `${selectedRows.length} quittance(s) sélectionnée(s).`
-                    : "Sélectionnez les quittances à regrouper dans le document."}
+                    : urlState.operationType === "RELEVE"
+                      ? "Sélectionnez les écritures du même payeur à présenter sur le relevé."
+                      : "Sélectionnez les quittances facturables du même payeur."}
                 </p>
               </div>
               {canIssue ? (
                 <Button disabled={!selectedRows.length} onClick={() => setIssueOpen(true)}>
                   <FilePlus2 className="size-4" />
-                  Émettre un document
+                  {urlState.operationType === "RELEVE"
+                    ? `Créer le relevé${selectedRows.length ? ` (${selectedRows.length})` : ""}`
+                    : `Émettre la facture${selectedRows.length ? ` (${selectedRows.length})` : ""}`}
                 </Button>
               ) : null}
             </CardHeader>
@@ -335,7 +362,7 @@ export default function RelevesFacturesPage() {
                       <Header align="right">Prime nette</Header>
                       <Header align="right">Taxes</Header>
                       <Header align="right">TTC</Header>
-                      <Header>Facture</Header>
+                      <Header>Éligibilité</Header>
                       <Header align="center">Détail</Header>
                     </tr>
                   </thead>
@@ -349,8 +376,8 @@ export default function RelevesFacturesPage() {
                         <td className="px-4 py-3">
                           <Checkbox
                             checked={Boolean(selected[row.quittanceId])}
+                            disabled={urlState.operationType === "FACTURE" && !row.facturable}
                             onCheckedChange={(checked) => toggleSource(row, checked === true)}
-                            disabled={!row.affectee}
                             aria-label={`Sélectionner ${row.dossier}`}
                           />
                         </td>
@@ -371,10 +398,13 @@ export default function RelevesFacturesPage() {
                         <MoneyCell value={row.taxes} />
                         <MoneyCell value={row.montantTtc} strong />
                         <td className="px-3 py-3">
-                          {!row.affectee ? <Badge variant="secondary">Non affectée</Badge>
-                            : row.dejaFacturee ? <Badge className="bg-emerald-100 text-emerald-800">Émise</Badge>
-                            : row.facturable ? <Badge variant="outline">Disponible</Badge>
-                              : <Badge variant="secondary">Crédit</Badge>}
+                          {urlState.operationType === "RELEVE"
+                            ? <Badge variant="outline">Disponible</Badge>
+                            : row.dejaFacturee
+                              ? <Badge className="bg-emerald-100 text-emerald-800">Déjà facturée</Badge>
+                              : row.facturable
+                                ? <Badge variant="outline">Facturable</Badge>
+                                : <Badge variant="secondary">Crédit</Badge>}
                         </td>
                         <td className="px-3 py-3 text-center">
                           <Button asChild variant="ghost" size="icon" title="Voir le contrat">
@@ -405,6 +435,7 @@ export default function RelevesFacturesPage() {
             onReset={resetDocumentFilters}
           />
           <DocumentTable
+            operationType={urlState.operationType}
             loading={documents.isLoading}
             rows={documents.data?.rows ?? []}
             page={documents.data?.page}
@@ -418,6 +449,7 @@ export default function RelevesFacturesPage() {
       </Tabs>
 
       <IssueDialog
+        type={urlState.operationType}
         open={issueOpen}
         onOpenChange={setIssueOpen}
         rows={selectedRows}
@@ -434,13 +466,49 @@ export default function RelevesFacturesPage() {
   );
 }
 
+function OperationSelector(props: {
+  value: ClientDocumentType;
+  onChange: (value: ClientDocumentType) => void;
+}) {
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-3">
+        <div className="font-semibold">Document à préparer</div>
+        <p className="text-sm text-muted-foreground">
+          Le relevé présente les écritures du client. La facture engage uniquement des quittances facturables.
+        </p>
+      </div>
+      <div className="grid max-w-xl grid-cols-2 rounded-md border bg-muted p-1">
+        {([
+          { value: "RELEVE" as const, label: "Relevé client", Icon: FileText },
+          { value: "FACTURE" as const, label: "Facture client", Icon: ReceiptText },
+        ]).map(({ value, label, Icon }) => (
+          <button
+            key={value}
+            type="button"
+            className={`flex h-10 items-center justify-center gap-2 rounded-sm px-3 text-sm font-medium ${
+              props.value === value
+                ? "bg-amber-100 text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-700"
+                : "text-muted-foreground hover:bg-background hover:text-foreground"
+            }`}
+            onClick={() => props.onChange(value)}
+          >
+            <Icon className="size-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function PayerAccountSelector(props: {
-  mode: SelectedPayer["type"];
+  mode: PayerScope;
   selected?: SelectedPayer;
   clients: ClientResponse[];
   groups: GroupeClient[];
   loading: boolean;
-  onModeChange: (mode: SelectedPayer["type"]) => void;
+  onModeChange: (mode: PayerScope) => void;
   onQueryChange: (query: string) => void;
   onSelect: (payer?: SelectedPayer) => void;
 }) {
@@ -486,6 +554,7 @@ function PayerAccountSelector(props: {
       props.onSelect();
       return;
     }
+    if (props.mode === "ALL") return;
     if (props.mode === "CLIENT") {
       const client = props.clients.find((item) => item.id === value);
       if (!client) return;
@@ -513,10 +582,10 @@ function PayerAccountSelector(props: {
   const Icon = props.mode === "GROUPE" ? Building2 : Users;
   return (
     <section className="overflow-visible rounded-md border bg-card">
-      <div className="grid gap-4 p-4 lg:grid-cols-[220px_minmax(320px,620px)_1fr] lg:items-end">
-        <FilterField label="Compte payeur">
-          <div className="grid grid-cols-2 rounded-md border border-slate-300 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
-            {(["CLIENT", "GROUPE"] as const).map((mode) => (
+      <div className="grid gap-4 p-4 lg:grid-cols-[300px_minmax(320px,620px)_1fr] lg:items-end">
+        <FilterField label="Cible">
+          <div className="grid grid-cols-3 rounded-md border border-slate-300 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
+            {(["ALL", "CLIENT", "GROUPE"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -527,21 +596,27 @@ function PayerAccountSelector(props: {
                 }`}
                 onClick={() => props.onModeChange(mode)}
               >
-                {mode === "CLIENT" ? "Client" : "Groupe"}
+                {mode === "ALL" ? "Toutes" : mode === "CLIENT" ? "Client" : "Groupe"}
               </button>
             ))}
           </div>
         </FilterField>
-        <FilterField label={props.mode === "CLIENT" ? "Rechercher un client" : "Rechercher un groupe"}>
-          <AutocompleteSelect
-            options={props.mode === "CLIENT" ? clientOptions : groupOptions}
-            value={props.selected?.type === props.mode ? props.selected.id : ""}
-            onValueChange={select}
-            onQueryChange={props.mode === "CLIENT" ? props.onQueryChange : undefined}
-            placeholder={props.mode === "CLIENT" ? "Nom, RC, CIN, ICE ou code" : "Code, groupe ou membre"}
-            emptyText={props.loading ? "Chargement..." : "Aucun résultat"}
-          />
-        </FilterField>
+        {props.mode === "ALL" ? (
+          <div className="pb-2 text-sm text-muted-foreground">
+            Toutes les cibles sont affichées. La sélection finale reste limitée à un même payeur.
+          </div>
+        ) : (
+          <FilterField label={props.mode === "CLIENT" ? "Rechercher un client" : "Rechercher un groupe"}>
+            <AutocompleteSelect
+              options={props.mode === "CLIENT" ? clientOptions : groupOptions}
+              value={props.selected?.type === props.mode ? props.selected.id : ""}
+              onValueChange={select}
+              onQueryChange={props.mode === "CLIENT" ? props.onQueryChange : undefined}
+              placeholder={props.mode === "CLIENT" ? "Nom, RC, CIN, ICE ou code" : "Code, groupe ou membre"}
+              emptyText={props.loading ? "Chargement..." : "Aucun résultat"}
+            />
+          </FilterField>
+        )}
         {props.selected ? (
           <div className="flex min-w-0 items-center gap-3 rounded-md border-l-4 border-l-amber-500 bg-amber-50/60 px-4 py-2.5">
             <Icon className="size-5 shrink-0 text-amber-700" />
@@ -558,11 +633,11 @@ function PayerAccountSelector(props: {
               </div>
             </div>
           </div>
-        ) : (
+        ) : props.mode !== "ALL" ? (
           <p className="pb-2 text-sm text-muted-foreground">
-            Toutes les cibles sont affichées. Sélectionnez un payeur pour limiter les résultats.
+            Sélectionnez un payeur pour limiter les résultats.
           </p>
-        )}
+        ) : <div />}
       </div>
     </section>
   );
@@ -570,6 +645,7 @@ function PayerAccountSelector(props: {
 
 function SourceSearch(props: {
   filters: SourceFilters;
+  branches: ReferenceOption[];
   onChange: (value: SourceFilters) => void;
   onApply: () => void;
   onReset: () => void;
@@ -578,7 +654,18 @@ function SourceSearch(props: {
   return (
     <Card className="shadow-none">
       <CardHeader className="pb-3"><CardTitle className="text-base">Recherche</CardTitle></CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.5fr_auto]">
+      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_1.5fr_auto]">
+        <FilterField label="Branche">
+          <Select value={filters.brancheId} onValueChange={(value) => onChange({ ...filters, brancheId: value })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Toutes</SelectItem>
+              {props.branches.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
         <FilterField label="Type de contrat">
           <Select value={filters.typeContrat} onValueChange={(value) => onChange({ ...filters, typeContrat: value as SourceFilters["typeContrat"] })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -615,17 +702,7 @@ function DocumentSearch(props: {
   return (
     <Card className="shadow-none">
       <CardHeader className="pb-3"><CardTitle className="text-base">Recherche des documents</CardTitle></CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_1.5fr_auto]">
-        <FilterField label="Document">
-          <Select value={filters.type} onValueChange={(value) => onChange({ ...filters, type: value as DocumentFilters["type"] })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tous</SelectItem>
-              <SelectItem value="RELEVE">Relevé</SelectItem>
-              <SelectItem value="FACTURE">Facture</SelectItem>
-            </SelectContent>
-          </Select>
-        </FilterField>
+      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.5fr_auto]">
         <FilterField label="Statut">
           <Select value={filters.statut} onValueChange={(value) => onChange({ ...filters, statut: value as DocumentFilters["statut"] })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -652,6 +729,7 @@ function DocumentSearch(props: {
 }
 
 function DocumentTable(props: {
+  operationType: ClientDocumentType;
   loading: boolean;
   rows: ClientDocument[];
   page?: { number: number; totalElements: number; totalPages: number; first: boolean; last: boolean };
@@ -663,14 +741,17 @@ function DocumentTable(props: {
 }) {
   return (
     <Card className="min-w-0 shadow-none">
-      <CardHeader className="pb-3"><CardTitle className="text-base">Historique émis</CardTitle></CardHeader>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">
+          {props.operationType === "RELEVE" ? "Relevés émis" : "Factures émises"}
+        </CardTitle>
+      </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="border-y bg-amber-600 text-white">
               <tr>
                 <Header>N° document</Header>
-                <Header>Type</Header>
                 <Header>Émission</Header>
                 <Header>Période</Header>
                 <Header align="right">Montant</Header>
@@ -679,14 +760,13 @@ function DocumentTable(props: {
               </tr>
             </thead>
             <tbody>
-              {props.loading ? <LoadingRows columns={7} /> : null}
+              {props.loading ? <LoadingRows columns={6} /> : null}
               {!props.loading && !props.rows.length ? (
-                <tr><td colSpan={7} className="h-32 text-center text-muted-foreground">Aucun document émis.</td></tr>
+                <tr><td colSpan={6} className="h-32 text-center text-muted-foreground">Aucun document émis.</td></tr>
               ) : null}
               {props.rows.map((document) => (
                 <tr key={document.id} className="border-b hover:bg-muted/30">
                   <td className="px-4 py-3 font-semibold">{document.numero}</td>
-                  <td className="px-3 py-3">{document.typeDocument === "RELEVE" ? "Relevé" : "Facture"}</td>
                   <td className="px-3 py-3">{formatDate(document.dateEmission)}</td>
                   <td className="whitespace-nowrap px-3 py-3">
                     {formatDate(document.periodeDebut)} au {formatDate(document.periodeFin)}
@@ -727,13 +807,13 @@ function DocumentTable(props: {
 }
 
 function IssueDialog(props: {
+  type: ClientDocumentType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rows: ClientDocumentSource[];
   onIssued: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [type, setType] = useState<ClientDocumentType>("RELEVE");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -750,16 +830,15 @@ function IssueDialog(props: {
     setPeriodEnd(endDates[endDates.length - 1] ?? "");
     setDueDate("");
     setNotes("");
-    setType(invoiceEligible ? "FACTURE" : "RELEVE");
   }, [props.open, props.rows, invoiceEligible]);
 
   const issue = useMutation({
     mutationFn: () => comptaApi.createClientDocument({
-      typeDocument: type,
+      typeDocument: props.type,
       quittanceIds: props.rows.map((row) => row.quittanceId),
       periodeDebut: periodStart,
       periodeFin: periodEnd,
-      dateEcheance: type === "FACTURE" ? dueDate : undefined,
+      dateEcheance: props.type === "FACTURE" ? dueDate : undefined,
       notes: notes.trim() || undefined,
     }),
     onSuccess: async (document) => {
@@ -772,39 +851,34 @@ function IssueDialog(props: {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Émission impossible"),
   });
-  const invalid = !periodStart || !periodEnd || (type === "FACTURE" && !dueDate);
+  const invalid = !periodStart
+    || !periodEnd
+    || (props.type === "FACTURE" && (!dueDate || !invoiceEligible));
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Émettre un document client</DialogTitle>
+          <DialogTitle>
+            {props.type === "RELEVE" ? "Créer le relevé client" : "Émettre la facture client"}
+          </DialogTitle>
           <DialogDescription>
             {props.rows.length} quittance(s) pour {props.rows[0]?.payeurNom ?? "-"}.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-4">
-            <FilterField label="Type de document">
-              <Select value={type} onValueChange={(value) => setType(value as ClientDocumentType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="RELEVE">Relevé</SelectItem>
-                  <SelectItem value="FACTURE" disabled={!invoiceEligible}>Facture</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
+          <div className="grid gap-3 md:grid-cols-3">
             <FilterField label="Période du">
               <DatePicker date={periodStart} onSelect={(date) => setPeriodStart(toDateOnly(date) ?? "")} />
             </FilterField>
             <FilterField label="Période au">
               <DatePicker date={periodEnd} onSelect={(date) => setPeriodEnd(toDateOnly(date) ?? "")} />
             </FilterField>
-            <FilterField label={type === "FACTURE" ? "Échéance de paiement *" : "Échéance de paiement"}>
+            <FilterField label={props.type === "FACTURE" ? "Échéance de paiement *" : "Échéance de paiement"}>
               <DatePicker
                 date={dueDate}
                 onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
-                disabled={type !== "FACTURE"}
+                disabled={props.type !== "FACTURE"}
                 minDate={new Date()}
               />
             </FilterField>
@@ -841,8 +915,8 @@ function IssueDialog(props: {
             </FilterField>
             <div className="rounded-md border">
               <SummaryLine label="Total débit" value={debit} />
-              {type === "RELEVE" ? <SummaryLine label="Total crédit" value={credit} /> : null}
-              <SummaryLine label={type === "RELEVE" ? "Solde" : "Total à payer"} value={debit - credit} strong />
+              {props.type === "RELEVE" ? <SummaryLine label="Total crédit" value={credit} /> : null}
+              <SummaryLine label={props.type === "RELEVE" ? "Solde" : "Total à payer"} value={debit - credit} strong />
             </div>
           </div>
         </div>
@@ -850,7 +924,11 @@ function IssueDialog(props: {
           <Button variant="outline" onClick={() => props.onOpenChange(false)}>Annuler</Button>
           <Button disabled={invalid || issue.isPending} onClick={() => issue.mutate()}>
             <FilePlus2 className="size-4" />
-            {issue.isPending ? "Émission..." : "Émettre"}
+            {issue.isPending
+              ? "Traitement..."
+              : props.type === "RELEVE"
+                ? "Créer le relevé"
+                : "Émettre la facture"}
           </Button>
         </DialogFooter>
       </DialogContent>

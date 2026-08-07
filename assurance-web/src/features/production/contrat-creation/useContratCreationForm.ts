@@ -372,18 +372,16 @@ export function useContratCreationForm(
     nombreVehicules: vehicules.length,
     nombreRemorques: typeContrat === "PARTICULIER" ? 0 : remorques.length,
     prospection: Boolean(options?.prospectionMode),
-    assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled || assistanceDraft.enabled : false,
-    assistances: typeContrat === "PARTICULIER"
-      ? undefined
-      : typeContrat === "FLOTTE"
-        ? Object.entries(targetAssistances).flatMap(([key, assistance]) => {
-            const [kind, indexText] = key.split(":");
-            const vehiculeIndex = Number(indexText);
-            return kind === "vehicule" && Number.isInteger(vehiculeIndex)
-              ? assistanceRequestInput(assistance, vehiculeIndex)
-              : [];
-          })
-        : assistanceRequestInput(assistanceDraft, 0),
+    assistance: assistanceEnabled || assistanceDraft.enabled,
+    assistances: typeContrat === "FLOTTE"
+      ? Object.entries(targetAssistances).flatMap(([key, assistance]) => {
+          const [kind, indexText] = key.split(":");
+          const vehiculeIndex = Number(indexText);
+          return kind === "vehicule" && Number.isInteger(vehiculeIndex)
+            ? assistanceRequestInput(assistance, vehiculeIndex)
+            : [];
+        })
+      : assistanceRequestInput(assistanceDraft, 0),
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
@@ -567,7 +565,7 @@ export function useContratCreationForm(
         throw new Error("Brouillon introuvable pour enregistrer cette section");
       }
       const draft = await contractCreationApi.updateContratDraft(draftId, payload);
-      if (typeContrat !== "CONVENTION") {
+      if (typeContrat === "FLOTTE") {
         return draft;
       }
       if (assistanceDraft.enabled
@@ -933,7 +931,7 @@ export function useContratCreationForm(
     }
     if (section === "garanties") {
       validateRequiredGuaranteePrimes(nextErrors);
-      if (typeContrat === "CONVENTION" && assistanceDraft.enabled) {
+      if (typeContrat !== "FLOTTE" && assistanceDraft.enabled) {
         if (!assistanceDraft.compagnieAssistanceId) {
           nextErrors.garanties = "Compagnie assistance obligatoire.";
         } else if (!assistanceDraft.produitAssistanceId) {

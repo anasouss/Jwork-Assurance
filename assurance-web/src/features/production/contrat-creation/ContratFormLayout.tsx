@@ -236,7 +236,7 @@ export function ContratFormLayout({
       showTotalsSummary={showConvention}
       assistanceEnabled={form.assistanceEnabled}
       setAssistanceEnabled={form.setAssistanceEnabled}
-      showAssistanceRow={showConvention}
+      showAssistanceRow={showConvention || form.typeContrat === "PARTICULIER"}
       assistanceDraft={form.assistanceDraft}
       setAssistanceDraft={form.setAssistanceDraft}
       compagniesAssistance={compagniesAssistance}

@@ -1312,7 +1312,7 @@ function drawPdfTable(
   const headerHeight = 5;
   ensurePdfSpace(ctx, headerHeight * 2);
   ctx.pdf.setFillColor(255, 255, 255);
-  ctx.pdf.setDrawColor(0, 0, 0);
+  ctx.pdf.setDrawColor(203, 213, 225);
   ctx.pdf.rect(tableX, ctx.y, tableWidth, headerHeight, "FD");
   let cursorX = tableX + 1.5;
   ctx.pdf.setFont("helvetica", "bold");
@@ -1331,7 +1331,7 @@ function drawPdfTable(
     const rowHeight = Math.max(4.8, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
     ensurePdfSpace(ctx, rowHeight + 1);
     cursorX = tableX + 1.5;
-    ctx.pdf.setDrawColor(0, 0, 0);
+    ctx.pdf.setDrawColor(226, 232, 240);
     ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
     row.forEach((_cell, index) => {
       const isLast = index === row.length - 1;

@@ -286,6 +286,7 @@ export function useContratCreationForm(
     setCrmPartageValeur(hydrated.crmPartageValeur);
     setTauxRc(hydrated.tauxRc);
     setAssistanceEnabled(hydrated.assistanceEnabled);
+    setAssistanceDraft(hydrated.assistanceDraft);
     setTargetAssistances(hydrated.targetAssistances);
     setSaisiePrimeNette(hydrated.saisiePrimeNette);
     setClients(withInitialCategorieClient(hydrated.clients, initialCategorieClientId));
@@ -1727,6 +1728,7 @@ function hydrateDraft(draft: ContratSummary) {
       numeroContratOuQuittance: nullToUndefined(assistance.numeroContratOuQuittance),
     };
   }
+  const assistanceDraft = targetAssistances["vehicule:0"] ?? { enabled: false };
 
   return {
     numeroPolice: draft.numeroPolice ?? "",
@@ -1752,6 +1754,7 @@ function hydrateDraft(draft: ContratSummary) {
     crmPartageValeur: draft.crmPartageValeur ?? "",
     tauxRc: draft.tauxRc == null ? "" : String(draft.tauxRc),
     assistanceEnabled: Boolean(draft.assistance) || Object.values(targetAssistances).some((assistance) => assistance.enabled),
+    assistanceDraft,
     saisiePrimeNette: Boolean(draft.saisiePrimeNette),
     clients,
     vehicules,

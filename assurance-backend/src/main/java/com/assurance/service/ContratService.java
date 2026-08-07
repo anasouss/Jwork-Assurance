@@ -444,8 +444,9 @@ public class ContratService {
         contratRepository.save(contrat);
         refreshDraftAssistanceReferences(contrat, graph.assistances());
         if (!prospection) {
+            MouvementContrat mouvementInitial;
             if (contratOrigine == null) {
-                mouvementContratService.creerAffaireNouvelle(
+                mouvementInitial = mouvementContratService.creerAffaireNouvelle(
                         contrat,
                         graph.vehicules(),
                         graph.remorques(),
@@ -453,7 +454,7 @@ public class ContratService {
                         graph.quittanceManuelle()
                 );
             } else {
-                mouvementContratService.creerRenouvellement(
+                mouvementInitial = mouvementContratService.creerRenouvellement(
                         contrat,
                         contratOrigine,
                         graph.vehicules(),
@@ -464,6 +465,7 @@ public class ContratService {
                 contratOrigine.setStatut(StatutContrat.RENEWED);
                 contratRepository.save(contratOrigine);
             }
+            bindAssistancesToMovement(graph.assistances(), mouvementInitial);
         }
         return toResponse(contrat);
     }
@@ -1266,6 +1268,33 @@ public class ContratService {
         assistanceContratRepository.saveAll(assistances);
         contrat.setAssistance(true);
         contratRepository.save(contrat);
+    }
+
+    private void bindAssistancesToMovement(List<AssistanceContrat> assistances, MouvementContrat mouvement) {
+        if (assistances == null || assistances.isEmpty() || mouvement == null) {
+            return;
+        }
+        for (AssistanceContrat assistance : assistances) {
+            assistance.setMouvementContrat(mouvement);
+            ElementFacturable element = assistance.getElementFacturable();
+            if (element != null) {
+                element.setMouvementContrat(mouvement);
+                elementFacturableRepository.save(element);
+            }
+        }
+        assistanceContratRepository.saveAll(assistances);
+    }
+
+    private boolean belongsToSelectedMovement(AssistanceContrat assistance, MouvementContrat selectedMouvement) {
+        if (assistance.getMouvementContrat() != null) {
+            return selectedMouvement.getId().equals(assistance.getMouvementContrat().getId());
+        }
+        CategorieMouvementContrat categorie = selectedMouvement.getTypeMouvement() != null
+                ? selectedMouvement.getTypeMouvement().getCategorie()
+                : null;
+        boolean initialMovement = categorie == CategorieMouvementContrat.AFFAIRE_NOUVELLE
+                || categorie == CategorieMouvementContrat.RENOUVELLEMENT;
+        return initialMovement && Boolean.TRUE.equals(assistance.getActif());
     }
 
     private void validateDraftVehiculeInput(Contrat contrat, CreateContratRequest.VehiculeInput input) {
@@ -5201,8 +5230,7 @@ public class ContratService {
         List<AssistanceContratResponse> assistances = (selectedMouvement == null
                 ? assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
                 : assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(contrat.getId()).stream()
-                        .filter(assistance -> assistance.getMouvementContrat() != null
-                                && selectedMouvement.getId().equals(assistance.getMouvementContrat().getId()))
+                        .filter(assistance -> belongsToSelectedMovement(assistance, selectedMouvement))
                         .toList())
                 .stream()
                 .map(this::toAssistanceResponse)

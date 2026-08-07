@@ -5,6 +5,7 @@ import com.assurance.entity.DocumentClient;
 import com.assurance.entity.LigneDocumentClient;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutDocumentClient;
+import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
 import com.itextpdf.barcodes.BarcodeQRCode;
 import com.itextpdf.io.font.constants.StandardFonts;
@@ -42,7 +43,9 @@ import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -56,6 +59,8 @@ public class ReleveClientPdfRenderer {
 
     private final AgencyLogoStorageService agencyLogoStorageService;
     private final AgencySignatureStorageService agencySignatureStorageService;
+    private final FlottePolicePdfService flottePolicePdfService;
+    private final DocumentClientLineLabelService lineLabelService;
 
     public byte[] render(DocumentClient source, boolean avecSignature) throws Exception {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
@@ -67,11 +72,12 @@ public class ReleveClientPdfRenderer {
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             PdfFont tableHeader = PdfFontFactory.createFont(StandardFonts.TIMES_BOLD);
             document.setFont(regular).setFontSize(9.5f).setFontColor(ColorConstants.BLACK);
+            Map<LigneDocumentClient, Integer> fleetAnnexes = fleetAnnexes(source);
 
             writeLetterHead(document, pdf, source, bold);
             writeLetterIntroduction(document, source, regular, bold);
             writeClientReference(document, source, bold);
-            writeStatementLines(document, source, bold, tableHeader);
+            writeStatementLines(document, source, bold, tableHeader, fleetAnnexes);
             writeTotal(document, source, bold);
             writePaymentText(document, source);
             if (avecSignature) {
@@ -80,6 +86,7 @@ public class ReleveClientPdfRenderer {
             if (source.getStatut() == StatutDocumentClient.ANNULE) {
                 writeCancellation(document, source, bold);
             }
+            writeFleetAnnexes(document, source, fleetAnnexes);
             writeFooters(pdf, source, regular, bold);
 
             document.close();
@@ -164,25 +171,24 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeClientReference(Document document, DocumentClient source, PdfFont bold) {
-        Table reference = new Table(new float[]{1.5f, 1.2f, 0.6f, 1.8f})
+        Table reference = new Table(new float[]{2.7f, 2.4f})
                 .setWidth(UnitValue.createPercentValue(46))
                 .setMarginLeft(11)
                 .setMarginBottom(12);
-        reference.addCell(referenceCell("L’ID Client :", bold, TextAlignment.LEFT));
-        reference.addCell(referenceCell(value(source.getPayeurIdentifiant()), null, TextAlignment.LEFT));
-        reference.addCell(referenceCell("Réf :", null, TextAlignment.LEFT));
-        reference.addCell(referenceCell(value(source.getNumero()), null, TextAlignment.LEFT));
+        reference.addCell(referenceCell("L’ID Client :", value(source.getPayeurIdentifiant()), bold));
+        reference.addCell(referenceCell("Réf :", value(source.getNumero()), bold));
         document.add(reference);
     }
 
-    private Cell referenceCell(String text, PdfFont font, TextAlignment alignment) {
-        Paragraph paragraph = new Paragraph(text).setFontSize(9f).setMargin(0);
-        if (font != null) {
-            paragraph.setFont(font);
-        }
+    private Cell referenceCell(String label, String value, PdfFont bold) {
+        Paragraph paragraph = new Paragraph()
+                .add(new com.itextpdf.layout.element.Text(label + " ").setFont(bold))
+                .add(value)
+                .setFontSize(9f)
+                .setMargin(0);
         return new Cell()
                 .add(paragraph)
-                .setTextAlignment(alignment)
+                .setTextAlignment(TextAlignment.LEFT)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(TABLE_BORDER)
                 .setPadding(3);
@@ -192,7 +198,8 @@ public class ReleveClientPdfRenderer {
             Document document,
             DocumentClient source,
             PdfFont bold,
-            PdfFont tableHeader
+            PdfFont tableHeader,
+            Map<LigneDocumentClient, Integer> fleetAnnexes
     ) {
         Table table = new Table(new float[]{17, 9.5f, 6.2f, 6.2f, 8, 6.5f, 7.5f, 7, 9, 23})
                 .setWidth(UnitValue.createPercentValue(100))
@@ -210,11 +217,17 @@ public class ReleveClientPdfRenderer {
 
         source.getLignes().stream()
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
-                .forEach(line -> addStatementLine(table, source, line, bold));
+                .forEach(line -> addStatementLine(table, source, line, bold, fleetAnnexes.get(line)));
         document.add(table);
     }
 
-    private void addStatementLine(Table table, DocumentClient source, LigneDocumentClient line, PdfFont bold) {
+    private void addStatementLine(
+            Table table,
+            DocumentClient source,
+            LigneDocumentClient line,
+            PdfFont bold,
+            Integer fleetAnnexNumber
+    ) {
         BigDecimal balance = money(line.getDebit()).subtract(money(line.getCredit()));
         addValue(table, source.getPayeurNom(), TextAlignment.LEFT, null);
         addValue(table, statementReference(line), TextAlignment.CENTER, null);
@@ -225,7 +238,48 @@ public class ReleveClientPdfRenderer {
         addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, null);
         addValue(table, positiveAmount(line.getCredit()), TextAlignment.CENTER, null);
         addValue(table, amount(balance), TextAlignment.CENTER, bold);
-        addValue(table, value(line.getMouvement()), TextAlignment.LEFT, null);
+        addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null);
+    }
+
+    private Map<LigneDocumentClient, Integer> fleetAnnexes(DocumentClient source) {
+        Map<LigneDocumentClient, Integer> annexes = new LinkedHashMap<>();
+        source.getLignes().stream()
+                .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
+                .filter(this::isFleetInsuranceLine)
+                .forEach(line -> annexes.put(line, annexes.size() + 1));
+        return annexes;
+    }
+
+    private boolean isFleetInsuranceLine(LigneDocumentClient line) {
+        return line.getElementFacturable() != null
+                && line.getElementFacturable().getNature() != NatureElementFacturable.ASSISTANCE
+                && line.getElementFacturable().getContrat() != null
+                && line.getElementFacturable().getContrat().getTypeContrat() == TypeContrat.FLOTTE;
+    }
+
+    private void writeFleetAnnexes(
+            Document document,
+            DocumentClient source,
+            Map<LigneDocumentClient, Integer> fleetAnnexes
+    ) {
+        fleetAnnexes.forEach((line, annexNumber) -> flottePolicePdfService.appendClientDocumentAnnex(
+                document,
+                source.getAgence().getId(),
+                line.getElementFacturable().getContrat().getId(),
+                movementId(line),
+                annexNumber
+        ));
+    }
+
+    private Long movementId(LigneDocumentClient line) {
+        if (line.getQuittance() != null && line.getQuittance().getMouvementContrat() != null) {
+            return line.getQuittance().getMouvementContrat().getId();
+        }
+        if (line.getElementFacturable() != null
+                && line.getElementFacturable().getMouvementContrat() != null) {
+            return line.getElementFacturable().getMouvementContrat().getId();
+        }
+        return null;
     }
 
     private String statementReference(LigneDocumentClient line) {

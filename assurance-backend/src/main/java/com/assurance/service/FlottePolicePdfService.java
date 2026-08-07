@@ -15,8 +15,10 @@ import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.AreaBreak;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.property.AreaBreakType;
 import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
@@ -85,6 +87,37 @@ public class FlottePolicePdfService {
         } catch (Exception exception) {
             throw new BadRequestException("Génération du PDF de la police flotte impossible");
         }
+    }
+
+    public void appendClientDocumentAnnex(
+            Document document,
+            Long agenceId,
+            Long contratId,
+            Long mouvementId,
+            int annexNumber
+    ) {
+        ContratResponse contrat = contratService.get(agenceId, contratId, mouvementId);
+        if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
+            throw new BadRequestException("L'annexe flotte est réservée aux contrats flotte");
+        }
+
+        document.getPdfDocument().setDefaultPageSize(PageSize.A4.rotate());
+        document.add(new AreaBreak(AreaBreakType.NEXT_PAGE));
+        document.add(new Paragraph("ANNEXE " + annexNumber + " - POLICE FLOTTE")
+                .setBold()
+                .setFontSize(12)
+                .setFontColor(INK)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setMarginBottom(2));
+        document.add(new Paragraph("Police N° " + safe(value(contrat.getNumeroPolice(), "-")))
+                .setBold()
+                .setFontSize(8)
+                .setFontColor(ACCENT)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setMarginTop(0)
+                .setMarginBottom(7));
+        writeTariff(document, contrat);
+        writeLegend(document, contrat.getGaranties());
     }
 
     private ContratResponse.MouvementView resolveMouvement(ContratResponse contrat, Long mouvementId) {

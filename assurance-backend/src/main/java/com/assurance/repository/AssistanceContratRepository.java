@@ -25,7 +25,16 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
 
     Optional<AssistanceContrat> findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(Long contratId, Long vehiculeId);
 
-    @EntityGraph(attributePaths = {"compagnieAssistance", "produitAssistance", "elementFacturable"})
+    @EntityGraph(attributePaths = {"vehicule", "vehicule.marque"})
+    Optional<AssistanceContrat> findByElementFacturableId(Long elementFacturableId);
+
+    @EntityGraph(attributePaths = {
+            "compagnieAssistance",
+            "produitAssistance",
+            "elementFacturable",
+            "vehicule",
+            "vehicule.marque"
+    })
     @Query("""
             select a
             from AssistanceContrat a

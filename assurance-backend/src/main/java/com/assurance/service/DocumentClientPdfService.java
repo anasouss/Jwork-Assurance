@@ -3,7 +3,9 @@ package com.assurance.service;
 import com.assurance.entity.Agence;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.LigneDocumentClient;
+import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutDocumentClient;
+import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeDocumentClient;
 import com.assurance.exception.BadRequestException;
 import com.itextpdf.io.font.constants.StandardFonts;
@@ -37,7 +39,9 @@ import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -56,6 +60,8 @@ public class DocumentClientPdfService {
     private final DocumentClientService documentClientService;
     private final ReleveClientPdfRenderer releveClientPdfRenderer;
     private final AgencyLogoStorageService agencyLogoStorageService;
+    private final FlottePolicePdfService flottePolicePdfService;
+    private final DocumentClientLineLabelService lineLabelService;
 
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long documentId, boolean avecSignature) {
@@ -76,14 +82,16 @@ public class DocumentClientPdfService {
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             document.setFont(regular).setFontColor(TEXT);
+            Map<LigneDocumentClient, Integer> fleetAnnexes = fleetAnnexes(source);
 
             writeHeader(document, source, bold);
             writeDocumentMetadata(document, source, bold);
             writePayer(document, source, bold);
-            writeLines(document, source, bold);
+            writeLines(document, source, bold, fleetAnnexes);
             writeTotals(document, source, bold);
             writeNotesAndLegalText(document, source, bold);
             writeAgencyFooter(document, source.getAgence());
+            writeFleetAnnexes(document, source, fleetAnnexes);
             document.close();
             return output.toByteArray();
         } catch (Exception exception) {
@@ -210,7 +218,12 @@ public class DocumentClientPdfService {
         document.add(payer);
     }
 
-    private void writeLines(Document document, DocumentClient source, PdfFont bold) {
+    private void writeLines(
+            Document document,
+            DocumentClient source,
+            PdfFont bold,
+            Map<LigneDocumentClient, Integer> fleetAnnexes
+    ) {
         boolean statement = source.getTypeDocument() == TypeDocumentClient.RELEVE;
         document.add(new Paragraph(statement ? "MOUVEMENTS DE LA PÉRIODE" : "DÉTAIL DES PRIMES")
                 .setFont(bold)
@@ -228,7 +241,7 @@ public class DocumentClientPdfService {
         addHeader(table, "DATE", bold);
         addHeader(table, "DOSSIER / POLICE", bold);
         addHeader(table, "QUITTANCE", bold);
-        addHeader(table, "MOUVEMENT", bold);
+        addHeader(table, "LIBELLÉ", bold);
         if (statement) {
             addHeader(table, "DÉBIT", bold);
             addHeader(table, "CRÉDIT", bold);
@@ -241,15 +254,20 @@ public class DocumentClientPdfService {
 
         source.getLignes().stream()
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
-                .forEach(line -> addLine(table, line, statement));
+                .forEach(line -> addLine(table, line, statement, fleetAnnexes.get(line)));
         document.add(table);
     }
 
-    private void addLine(Table table, LigneDocumentClient line, boolean statement) {
+    private void addLine(
+            Table table,
+            LigneDocumentClient line,
+            boolean statement,
+            Integer fleetAnnexNumber
+    ) {
         addValue(table, date(line.getDateOperation()), TextAlignment.LEFT);
         addValue(table, join(line.getNumeroDossier(), line.getNumeroPolice()), TextAlignment.LEFT);
         addValue(table, value(line.getNumeroQuittance()), TextAlignment.LEFT);
-        addValue(table, value(line.getMouvement()), TextAlignment.LEFT);
+        addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT);
         if (statement) {
             addValue(table, amount(line.getDebit()), TextAlignment.RIGHT);
             addValue(table, amount(line.getCredit()), TextAlignment.RIGHT);
@@ -259,6 +277,47 @@ public class DocumentClientPdfService {
             addValue(table, amount(line.getAccessoires()), TextAlignment.RIGHT);
             addValue(table, amount(line.getMontantTtc()), TextAlignment.RIGHT);
         }
+    }
+
+    private Map<LigneDocumentClient, Integer> fleetAnnexes(DocumentClient source) {
+        Map<LigneDocumentClient, Integer> annexes = new LinkedHashMap<>();
+        source.getLignes().stream()
+                .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
+                .filter(this::isFleetInsuranceLine)
+                .forEach(line -> annexes.put(line, annexes.size() + 1));
+        return annexes;
+    }
+
+    private boolean isFleetInsuranceLine(LigneDocumentClient line) {
+        return line.getElementFacturable() != null
+                && line.getElementFacturable().getNature() != NatureElementFacturable.ASSISTANCE
+                && line.getElementFacturable().getContrat() != null
+                && line.getElementFacturable().getContrat().getTypeContrat() == TypeContrat.FLOTTE;
+    }
+
+    private void writeFleetAnnexes(
+            Document document,
+            DocumentClient source,
+            Map<LigneDocumentClient, Integer> fleetAnnexes
+    ) {
+        fleetAnnexes.forEach((line, annexNumber) -> flottePolicePdfService.appendClientDocumentAnnex(
+                document,
+                source.getAgence().getId(),
+                line.getElementFacturable().getContrat().getId(),
+                movementId(line),
+                annexNumber
+        ));
+    }
+
+    private Long movementId(LigneDocumentClient line) {
+        if (line.getQuittance() != null && line.getQuittance().getMouvementContrat() != null) {
+            return line.getQuittance().getMouvementContrat().getId();
+        }
+        if (line.getElementFacturable() != null
+                && line.getElementFacturable().getMouvementContrat() != null) {
+            return line.getElementFacturable().getMouvementContrat().getId();
+        }
+        return null;
     }
 
     private void writeTotals(Document document, DocumentClient source, PdfFont bold) {

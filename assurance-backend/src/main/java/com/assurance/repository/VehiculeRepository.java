@@ -1,6 +1,7 @@
 package com.assurance.repository;
 
 import com.assurance.entity.Vehicule;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,6 +24,7 @@ public interface VehiculeRepository extends JpaRepository<Vehicule, Long> {
               and (v.actif is null or v.actif = true)
             order by v.createdAt asc
             """)
+    @EntityGraph(attributePaths = "marque")
     List<Vehicule> findActiveByContratIdOrderByCreatedAtAsc(@Param("contratId") Long contratId);
 
     List<Vehicule> findByContratIdAndIdIn(Long contratId, List<Long> ids);

@@ -14,6 +14,7 @@ import com.assurance.enums.TypePayeurPrime;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -76,6 +77,9 @@ public class CreateContratRequest {
 
     @Valid
     private List<GarantieInput> garanties;
+
+    @Valid
+    private List<AssistanceInput> assistances;
 
     @Valid
     private List<QuittanceInput> quittances;
@@ -173,6 +177,24 @@ public class CreateContratRequest {
         private BigDecimal prime;
         private BigDecimal tauxFranchise;
         private BigDecimal franchiseMinimale;
+    }
+
+    @Data
+    public static class AssistanceInput {
+        private Long assistanceId;
+
+        @NotNull
+        @PositiveOrZero
+        private Integer vehiculeIndex;
+
+        private Boolean enabled = true;
+        private Long compagnieAssistanceId;
+        private Long produitAssistanceId;
+        private LocalDate dateSouscription;
+        private LocalDate dateEffet;
+        private String echeanceCode;
+        private String numeroContratOuQuittance;
+        private String typeQuittance;
     }
 
     @Data

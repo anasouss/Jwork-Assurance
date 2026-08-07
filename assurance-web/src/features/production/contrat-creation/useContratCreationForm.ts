@@ -372,6 +372,17 @@ export function useContratCreationForm(
     nombreRemorques: typeContrat === "PARTICULIER" ? 0 : remorques.length,
     prospection: Boolean(options?.prospectionMode),
     assistance: typeContrat !== "PARTICULIER" ? assistanceEnabled || assistanceDraft.enabled : false,
+    assistances: typeContrat === "PARTICULIER"
+      ? undefined
+      : typeContrat === "FLOTTE"
+        ? Object.entries(targetAssistances).flatMap(([key, assistance]) => {
+            const [kind, indexText] = key.split(":");
+            const vehiculeIndex = Number(indexText);
+            return kind === "vehicule" && Number.isInteger(vehiculeIndex)
+              ? assistanceRequestInput(assistance, vehiculeIndex)
+              : [];
+          })
+        : assistanceRequestInput(assistanceDraft, 0),
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
@@ -450,7 +461,8 @@ export function useContratCreationForm(
     isFlotteLocationCategory,
     tauxRc,
     assistanceEnabled,
-    assistanceDraft.enabled,
+    assistanceDraft,
+    targetAssistances,
     modeSaisieGaranties,
     saisiePrimeNette,
     vehicules,
@@ -549,11 +561,24 @@ export function useContratCreationForm(
   });
 
   const saveDraftMutation = useMutation({
-    mutationFn: (payload: CreateContratRequest) => {
+    mutationFn: async (payload: CreateContratRequest) => {
       if (!draftId) {
         throw new Error("Brouillon introuvable pour enregistrer cette section");
       }
-      return contractCreationApi.updateContratDraft(draftId, payload);
+      const draft = await contractCreationApi.updateContratDraft(draftId, payload);
+      if (typeContrat !== "CONVENTION") {
+        return draft;
+      }
+      if (assistanceDraft.enabled
+          && (!assistanceDraft.compagnieAssistanceId || !assistanceDraft.produitAssistanceId)) {
+        return draft;
+      }
+      return syncDraftVehiculeAssistance(
+        draftId,
+        draft,
+        { kind: "vehicule", index: 0 },
+        assistanceDraft
+      );
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] });
@@ -907,6 +932,13 @@ export function useContratCreationForm(
     }
     if (section === "garanties") {
       validateRequiredGuaranteePrimes(nextErrors);
+      if (typeContrat === "CONVENTION" && assistanceDraft.enabled) {
+        if (!assistanceDraft.compagnieAssistanceId) {
+          nextErrors.garanties = "Compagnie assistance obligatoire.";
+        } else if (!assistanceDraft.produitAssistanceId) {
+          nextErrors.garanties = "Produit assistance obligatoire.";
+        }
+      }
     }
     setValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -1452,7 +1484,29 @@ function scopedTargetRequest(request: CreateContratRequest, target: ContratTarge
   return {
     ...request,
     garanties: targetGaranties(request.garanties, target),
+    assistances: request.assistances?.filter((assistance) => (
+      target.kind === "vehicule" && assistance.vehiculeIndex === target.index
+    )),
   };
+}
+
+function assistanceRequestInput(assistance: AssistanceDraft | undefined, vehiculeIndex: number) {
+  if (!assistance?.enabled
+      || !assistance.compagnieAssistanceId
+      || !assistance.produitAssistanceId) {
+    return [];
+  }
+  return [{
+    vehiculeIndex,
+    enabled: true,
+    compagnieAssistanceId: assistance.compagnieAssistanceId,
+    produitAssistanceId: assistance.produitAssistanceId,
+    dateSouscription: emptyToUndefined(assistance.dateSouscription ?? ""),
+    dateEffet: emptyToUndefined(assistance.dateEffet ?? ""),
+    echeanceCode: emptyToUndefined(assistance.echeanceCode ?? ""),
+    numeroContratOuQuittance: emptyToUndefined(assistance.numeroContratOuQuittance ?? ""),
+    typeQuittance: "AN",
+  }];
 }
 
 function targetKey(target: ContratTargetKey) {

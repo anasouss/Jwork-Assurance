@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Calculator, Check, ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +7,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn } from "@/lib/utils";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
-import { assistanceProductApi } from "../api/assistance-products";
-import { resolveAssistanceTariffAmount } from "../assistance-pricing";
 import { moneyAmount } from "../utils/format";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "./useContratCreationForm";
@@ -215,24 +212,8 @@ export function ContractTargetsSection({
     remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
   const activeVehiculePreview = previewForTarget(preview, targetPreview, activeVehiculeTarget);
   const activeRemorquePreview = previewForTarget(preview, targetPreview, activeRemorqueTarget);
-  const activeVehiculeAssistance = activeVehiculeTarget ? assistances[targetKey(activeVehiculeTarget)] : undefined;
-  const activeRemorqueAssistance = activeRemorqueTarget ? assistances[targetKey(activeRemorqueTarget)] : undefined;
-  const activeVehiculeAssistanceProductId = activeVehiculeAssistance?.enabled ? activeVehiculeAssistance.produitAssistanceId ?? "" : "";
-  const activeRemorqueAssistanceProductId = activeRemorqueAssistance?.enabled ? activeRemorqueAssistance.produitAssistanceId ?? "" : "";
-  const activeVehiculeAssistanceTarifs = useQuery({
-    queryKey: ["referentiel", "produits-assistance", activeVehiculeAssistanceProductId, "tarifs"],
-    queryFn: () => assistanceProductApi.listProductRates(activeVehiculeAssistanceProductId),
-    enabled: Boolean(activeVehiculeAssistanceProductId),
-    staleTime: 60_000,
-  });
-  const activeRemorqueAssistanceTarifs = useQuery({
-    queryKey: ["referentiel", "produits-assistance", activeRemorqueAssistanceProductId, "tarifs"],
-    queryFn: () => assistanceProductApi.listProductRates(activeRemorqueAssistanceProductId),
-    enabled: Boolean(activeRemorqueAssistanceProductId),
-    staleTime: 60_000,
-  });
-  const activeVehiculeAssistanceNet = targetAssistanceNet(activeVehiculeAssistance, produitsAssistance, activeVehiculeAssistanceTarifs.data);
-  const activeRemorqueAssistanceNet = targetAssistanceNet(activeRemorqueAssistance, produitsAssistance, activeRemorqueAssistanceTarifs.data);
+  const activeVehiculeAssistanceNet = activeVehiculePreview?.assistances?.[0]?.primeTotale ?? undefined;
+  const activeRemorqueAssistanceNet = activeRemorquePreview?.assistances?.[0]?.primeTotale ?? undefined;
   const targetActionText = targetActionMode === "calculate"
     ? {
         info: "Enregistrer informations",
@@ -865,14 +846,6 @@ function CalculationValue({ value, loading, fallback = "-" }: { value?: number; 
     );
   }
   return value == null ? fallback : moneyAmount(value);
-}
-
-function targetAssistanceNet(assistance: AssistanceDraft | undefined, produitsAssistance: ReferenceOption[], tarifs?: ReferenceOption[]) {
-  if (!assistance?.enabled || !assistance.produitAssistanceId) {
-    return undefined;
-  }
-  const product = produitsAssistance.find((item) => item.id === assistance.produitAssistanceId);
-  return resolveAssistanceTariffAmount(product, tarifs, assistance.dateSouscription, "montantTtc");
 }
 
 function hasTargetPersonneGaranties(selected: GarantieInput[], personneGaranties: ReferenceOption[], target?: Target) {

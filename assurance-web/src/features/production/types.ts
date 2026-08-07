@@ -627,6 +627,11 @@ export type AssistanceDraft = {
   numeroContratOuQuittance?: string;
 };
 
+export type AssistanceInput = Omit<AssistanceDraft, "assistanceId" | "modified" | "dateEcheance"> & {
+  vehiculeIndex: number;
+  typeQuittance?: string;
+};
+
 export type AssistanceContrat = {
   id: string;
   contratId: string;
@@ -787,6 +792,7 @@ export type CreateContratRequest = {
   vehicules: VehiculeInput[];
   remorques: RemorqueInput[];
   garanties: GarantieInput[];
+  assistances?: AssistanceInput[];
   quittances?: QuittanceInput[];
 };
 

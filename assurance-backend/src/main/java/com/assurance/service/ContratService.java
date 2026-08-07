@@ -4649,6 +4649,7 @@ public class ContratService {
         contrat.getRemorques().addAll(remorques);
         List<ContratGarantie> garanties = buildGarantiesPreview(request, contrat, vehicules, remorques);
         contrat.getGaranties().addAll(garanties);
+        List<AssistanceContratResponse> assistances = previewCreationAssistances(contrat, vehicules, request);
 
         int unitesCnpac = countCnpacUnits(garanties, vehicules, remorques);
         QuittanceCalculService.Resultat calcul = buildManualQuittanceResult(request);
@@ -4672,9 +4673,45 @@ public class ContratService {
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
                 .garanties(garanties.stream().map(garantie -> toQuittanceGarantieResponse(garantie, vehicules, remorques)).toList())
+                .assistances(assistances)
                 .targetSummaries(quittanceManuelle ? List.of() : elementFacturableCibleService.calculer(
                         contrat, garanties, vehicules, remorques, contrat.getDateEffet()))
                 .build();
+    }
+
+    private List<AssistanceContratResponse> previewCreationAssistances(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            CreateContratRequest request
+    ) {
+        List<AssistanceContratResponse> responses = new ArrayList<>();
+        for (CreateContratRequest.AssistanceInput input : request.getAssistances() == null
+                ? List.<CreateContratRequest.AssistanceInput>of()
+                : request.getAssistances()) {
+            if (Boolean.FALSE.equals(input.getEnabled())) {
+                continue;
+            }
+            if (input.getVehiculeIndex() == null
+                    || input.getVehiculeIndex() < 0
+                    || input.getVehiculeIndex() >= vehicules.size()) {
+                throw new BadRequestException("L'assistance cible un vehicule invalide");
+            }
+            if (input.getCompagnieAssistanceId() == null || input.getProduitAssistanceId() == null) {
+                throw new BadRequestException("La compagnie et le produit d'assistance sont obligatoires");
+            }
+            Vehicule vehicule = vehicules.get(input.getVehiculeIndex());
+            UpsertAssistanceContratRequest assistanceRequest = new UpsertAssistanceContratRequest();
+            assistanceRequest.setVehiculeId(vehicule.getId());
+            assistanceRequest.setCompagnieAssistanceId(input.getCompagnieAssistanceId());
+            assistanceRequest.setProduitAssistanceId(input.getProduitAssistanceId());
+            assistanceRequest.setDateSouscription(input.getDateSouscription());
+            assistanceRequest.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+            assistanceRequest.setEcheanceCode(firstNonNull(input.getEcheanceCode(), request.getEcheance()));
+            assistanceRequest.setNumeroContratOuQuittance(input.getNumeroContratOuQuittance());
+            assistanceRequest.setTypeQuittance(hasText(input.getTypeQuittance()) ? input.getTypeQuittance() : "AN");
+            responses.add(assistanceContratService.preview(contrat, vehicule, assistanceRequest));
+        }
+        return responses;
     }
 
     private Client resolveClientForCreation(Long agenceId, CreateContratRequest.ClientInput input) {

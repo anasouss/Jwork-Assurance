@@ -1,15 +1,12 @@
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { EcheanceInput } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { assistanceProductApi } from "../api/assistance-products";
-import { resolveAssistanceTariffAmount } from "../assistance-pricing";
-import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
-import type { AssistanceDraft, ReferenceOption } from "../types";
+import { computeDateEcheanceFromCode, toDateOnly } from "../date";
+import type { AssistanceContrat, AssistanceDraft, ReferenceOption } from "../types";
 import { formatMoney } from "../utils/format";
 import type { ContractTarget } from "./ContractTargetsSection";
 
@@ -20,6 +17,7 @@ type TargetAssistanceTableProps = {
   compagniesAssistance: ReferenceOption[];
   produitsAssistance: ReferenceOption[];
   categorieClientId?: string;
+  preview?: AssistanceContrat;
 };
 
 export function TargetAssistanceTable({
@@ -29,6 +27,7 @@ export function TargetAssistanceTable({
   compagniesAssistance,
   produitsAssistance,
   categorieClientId,
+  preview,
 }: TargetAssistanceTableProps) {
   const filteredProducts = produitsAssistance.filter((produit) => {
     if (assistance.compagnieAssistanceId && produit.compagnieAssistanceId !== assistance.compagnieAssistanceId) {
@@ -45,16 +44,8 @@ export function TargetAssistanceTable({
   const selectableProducts = selectedProduct && !filteredProducts.some((produit) => produit.id === selectedProduct.id)
     ? [selectedProduct, ...filteredProducts]
     : filteredProducts;
-  const tarifsQuery = useQuery({
-    queryKey: ["referentiel", "produits-assistance", selectedProductId, "tarifs"],
-    queryFn: () => assistanceProductApi.listProductRates(selectedProductId),
-    enabled: assistance.enabled && Boolean(selectedProductId),
-    staleTime: 60_000,
-  });
-  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription, "montantTtc");
-  const trimestres = assistance.enabled
-    ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance)
-    : undefined;
+  const prime = preview?.primeTotale;
+  const trimestres = preview?.trimestres;
 
   const updateDateEffet = (dateEffet?: string) => {
     onChange({

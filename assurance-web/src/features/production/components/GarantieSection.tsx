@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -13,12 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
-import { assistanceProductApi } from "../api/assistance-products";
-import { resolveAssistanceTariffAmount } from "../assistance-pricing";
-import { computeAssistanceQuarterCount, computeDateEcheanceFromCode, toDateOnly } from "../date";
+import { computeDateEcheanceFromCode, toDateOnly } from "../date";
 import { formatMoney, money, moneyAmount, numberValue, roundMoney } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
-import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
+import type { AssistanceContrat, AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 import { tariffSelectionLabel } from "../contrat-creation/tariff-selection-label";
 
@@ -123,7 +120,7 @@ export function GarantieSection({
   const personneGaranties = garanties
     .filter((garantie) => String(garantie.typeGarantie ?? "VEHICULE") === "PERSONNE")
     .filter((garantie) => !automaticPricing || formulesForGuarantee(formulesPersonne, garantie).length > 0);
-  const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || linePrimeNette(preview, "ASSISTANCE") != null;
+  const showAssistanceTotal = assistanceEnabled || Boolean(assistanceDraft?.enabled) || assistanceTotal(preview) != null;
 
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     setSelected(selected.map((item) => (item.garantieId === garantieId ? { ...item, ...patch } : item)));
@@ -638,6 +635,7 @@ export function GarantieSection({
               produitsAssistance={produitsAssistance}
               usageId={assistanceUsageId}
               categorieClientId={assistanceCategorieClientId}
+              preview={preview?.assistances?.[0]}
             />
           </div>
         ) : (
@@ -693,7 +691,7 @@ function GuaranteeTotalsSummary({
     rows.splice(2, 0, ["PTA (Prime Personne)", summary.pta], ["ACCESSOIRE", summary.accessoire]);
   }
   if (showAssistanceTotal) {
-    rows.push(["ASSISTANCE", linePrimeNette(preview, "ASSISTANCE")]);
+    rows.push(["ASSISTANCE", assistanceTotal(preview)]);
   }
 
   return (
@@ -734,6 +732,7 @@ function AssistanceTable({
   produitsAssistance,
   usageId,
   categorieClientId,
+  preview,
 }: {
   assistance: AssistanceDraft;
   onChange: (patch: Partial<AssistanceDraft>) => void;
@@ -741,6 +740,7 @@ function AssistanceTable({
   produitsAssistance: ReferenceOption[];
   usageId?: string;
   categorieClientId?: string;
+  preview?: AssistanceContrat;
 }) {
   const filteredProducts = produitsAssistance.filter((produit) => {
     if (assistance.compagnieAssistanceId && produit.compagnieAssistanceId !== assistance.compagnieAssistanceId) {
@@ -757,14 +757,8 @@ function AssistanceTable({
   const selectableProducts = selectedProduct && !filteredProducts.some((produit) => produit.id === selectedProduct.id)
     ? [selectedProduct, ...filteredProducts]
     : filteredProducts;
-  const tarifsQuery = useQuery({
-    queryKey: ["referentiel", "produits-assistance", selectedProductId, "tarifs"],
-    queryFn: () => assistanceProductApi.listProductRates(selectedProductId),
-    enabled: assistance.enabled && Boolean(selectedProductId),
-    staleTime: 60_000,
-  });
-  const prime = resolveAssistanceTariffAmount(selectedProduct, tarifsQuery.data, assistance.dateSouscription, "montantTtc");
-  const trimestres = assistance.enabled ? computeAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance) : undefined;
+  const prime = preview?.primeTotale;
+  const trimestres = preview?.trimestres;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({
       dateEffet,
@@ -883,8 +877,11 @@ function AssistanceTable({
   );
 }
 
-function linePrimeNette(preview: QuittancePreview | null | undefined, categorie: string) {
-  return preview?.lignes.find((ligne) => ligne.categorie === categorie)?.primeNette;
+function assistanceTotal(preview: QuittancePreview | null | undefined) {
+  const values = preview?.assistances
+    ?.map((assistance) => assistance.primeTotale)
+    .filter((value): value is number => value != null);
+  return values?.length ? roundMoney(values.reduce((sum, value) => sum + value, 0)) : undefined;
 }
 
 function addNumbers(left?: number, right?: number) {

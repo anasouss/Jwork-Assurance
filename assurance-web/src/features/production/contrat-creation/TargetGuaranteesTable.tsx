@@ -507,6 +507,7 @@ export function TargetGuaranteesTable({
           compagniesAssistance={compagniesAssistance}
           produitsAssistance={produitsAssistance}
           categorieClientId={assistanceCategorieClientId}
+          preview={preview?.assistances?.[0]}
         />
       ) : null}
     </div>

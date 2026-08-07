@@ -1788,7 +1788,10 @@ function withInitialCategorieClient(clients: ClientInput[], categorieClientId?: 
 
 function quittanceGeneraleFromDraft(draft: ContratSummary): QuittancePreview | null {
   if (draft.quittanceGenerale) {
-    return draft.quittanceGenerale;
+    return {
+      ...draft.quittanceGenerale,
+      assistances: draft.assistances ?? draft.quittanceGenerale.assistances,
+    };
   }
   return null;
 }

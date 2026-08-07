@@ -1,12 +1,13 @@
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
 import { moneyAmount, numberOrZero, roundMoney } from "../utils/format";
-import type { QuittanceInput } from "../types";
+import type { AssistanceContrat, QuittanceInput } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
 type Props = {
   lignes: QuittanceInput[];
   setLignes: (value: QuittanceInput[]) => void;
+  assistances?: AssistanceContrat[];
   openSection?: ContratSectionKey;
   onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 };
@@ -29,8 +30,14 @@ const COLUMNS: { key: MoneyColumnKey; label: string }[] = [
   { key: "cnpac", label: "CNPAC" },
 ];
 
-export function ManualQuittanceSection({ lignes, setLignes, openSection, onSectionOpenChange }: Props) {
-  const totals = lignes.reduce(
+export function ManualQuittanceSection({
+  lignes,
+  setLignes,
+  assistances = [],
+  openSection,
+  onSectionOpenChange,
+}: Props) {
+  const insuranceTotals = lignes.reduce(
     (acc, ligne) => ({
       primeNette: acc.primeNette + numberOrZero(ligne.primeNette),
       taxe: acc.taxe + numberOrZero(ligne.taxe),
@@ -41,6 +48,26 @@ export function ManualQuittanceSection({ lignes, setLignes, openSection, onSecti
     }),
     { primeNette: 0, taxe: 0, taxeParafiscale: 0, accessoire: 0, cnpac: 0, primeTotale: 0 }
   );
+  const assistanceTotals = assistances.reduce(
+    (totals, assistance) => ({
+      primeNette: totals.primeNette + numberOrZero(assistance.primeNette),
+      taxe: totals.taxe + Math.max(
+        0,
+        numberOrZero(assistance.primeTotale) - numberOrZero(assistance.primeNette)
+      ),
+      primeTotale: totals.primeTotale + numberOrZero(assistance.primeTotale),
+    }),
+    { primeNette: 0, taxe: 0, primeTotale: 0 }
+  );
+  const hasAssistance = assistances.length > 0;
+  const totals = {
+    primeNette: insuranceTotals.primeNette + assistanceTotals.primeNette,
+    taxe: insuranceTotals.taxe + assistanceTotals.taxe,
+    taxeParafiscale: insuranceTotals.taxeParafiscale,
+    accessoire: insuranceTotals.accessoire,
+    cnpac: insuranceTotals.cnpac,
+    primeTotale: insuranceTotals.primeTotale + assistanceTotals.primeTotale,
+  };
 
   const update = (categorie: QuittanceInput["categorie"], key: MoneyColumnKey, value: number | undefined) => {
     setLignes(lignes.map((ligne) => (ligne.categorie === categorie ? { ...ligne, [key]: value } : ligne)));
@@ -82,19 +109,54 @@ export function ManualQuittanceSection({ lignes, setLignes, openSection, onSecti
                 <td className="px-3 py-2 text-right font-semibold">{moneyAmount(totalLine(ligne))}</td>
               </tr>
             ))}
-            <tr className="border-t bg-muted/50 font-semibold">
-              <td className="px-3 py-3">Total</td>
-              <td className="px-3 py-3 text-right">{moneyAmount(totals.primeNette)}</td>
-              <td className="px-3 py-3 text-right">{moneyAmount(totals.taxe)}</td>
-              <td className="px-3 py-3 text-right">{moneyAmount(totals.taxeParafiscale)}</td>
-              <td className="px-3 py-3 text-right">{moneyAmount(totals.accessoire)}</td>
-              <td className="px-3 py-3 text-right">{moneyAmount(totals.cnpac)}</td>
-              <td className="px-3 py-3 text-right">{moneyAmount(totals.primeTotale)}</td>
-            </tr>
+            {hasAssistance ? (
+              <>
+                <SummaryRow label="Total assurance" totals={insuranceTotals} />
+                <tr className="border-t">
+                  <td className="px-3 py-3 font-medium">Assistance</td>
+                  <td className="px-3 py-3 text-right">{moneyAmount(assistanceTotals.primeNette)}</td>
+                  <td className="px-3 py-3 text-right">{moneyAmount(assistanceTotals.taxe)}</td>
+                  <td className="px-3 py-3 text-right">{moneyAmount(0)}</td>
+                  <td className="px-3 py-3 text-right">{moneyAmount(0)}</td>
+                  <td className="px-3 py-3 text-right">{moneyAmount(0)}</td>
+                  <td className="px-3 py-3 text-right font-semibold">{moneyAmount(assistanceTotals.primeTotale)}</td>
+                </tr>
+                <SummaryRow label="Total général" totals={totals} />
+              </>
+            ) : (
+              <SummaryRow label="Total" totals={insuranceTotals} />
+            )}
           </tbody>
         </table>
       </div>
     </SectionCard>
+  );
+}
+
+function SummaryRow({
+  label,
+  totals,
+}: {
+  label: string;
+  totals: {
+    primeNette: number;
+    taxe: number;
+    taxeParafiscale: number;
+    accessoire: number;
+    cnpac: number;
+    primeTotale: number;
+  };
+}) {
+  return (
+    <tr className="border-t bg-muted/50 font-semibold">
+      <td className="px-3 py-3">{label}</td>
+      <td className="px-3 py-3 text-right">{moneyAmount(totals.primeNette)}</td>
+      <td className="px-3 py-3 text-right">{moneyAmount(totals.taxe)}</td>
+      <td className="px-3 py-3 text-right">{moneyAmount(totals.taxeParafiscale)}</td>
+      <td className="px-3 py-3 text-right">{moneyAmount(totals.accessoire)}</td>
+      <td className="px-3 py-3 text-right">{moneyAmount(totals.cnpac)}</td>
+      <td className="px-3 py-3 text-right">{moneyAmount(totals.primeTotale)}</td>
+    </tr>
   );
 }
 

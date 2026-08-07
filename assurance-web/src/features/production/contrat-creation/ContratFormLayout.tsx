@@ -417,6 +417,7 @@ export function ContratFormLayout({
       <ManualQuittanceSection
         lignes={form.quittances}
         setLignes={form.setQuittances}
+        assistances={form.preview?.assistances}
         openSection={activeSection}
         onSectionOpenChange={handleSectionOpenChange}
       />

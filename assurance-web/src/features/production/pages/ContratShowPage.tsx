@@ -1254,7 +1254,9 @@ function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[], primeLabel = "
     formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
     franchiseLabel(garantie),
     moneyAmount(garantie.prime),
-  ]), [68, 36, 48, 28]);
+  ]), [68, 36, 48, 28], {
+    alignments: ["left", "center", "center", "right"],
+  });
 }
 
 function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
@@ -1297,7 +1299,10 @@ function drawPdfTable(
   headers: string[],
   rows: string[][],
   widths: number[],
-  options: { emphasizedRows?: Set<number> } = {},
+  options: {
+    emphasizedRows?: Set<number>;
+    alignments?: Array<"left" | "center" | "right">;
+  } = {},
 ) {
   if (!rows.length) return;
   const tableX = ctx.x + 3;
@@ -1307,15 +1312,15 @@ function drawPdfTable(
   const headerHeight = 5;
   ensurePdfSpace(ctx, headerHeight * 2);
   ctx.pdf.setFillColor(255, 255, 255);
-  ctx.pdf.setDrawColor(203, 213, 225);
+  ctx.pdf.setDrawColor(0, 0, 0);
   ctx.pdf.rect(tableX, ctx.y, tableWidth, headerHeight, "FD");
   let cursorX = tableX + 1.5;
   ctx.pdf.setFont("helvetica", "bold");
   ctx.pdf.setFontSize(6);
   ctx.pdf.setTextColor(51, 65, 85);
   headers.forEach((header, index) => {
-    const align = index === 0 ? "left" : "right";
-    const textX = align === "right" ? cursorX + actualWidths[index] - 2 : cursorX;
+    const align = options.alignments?.[index] ?? (index === 0 ? "left" : "right");
+    const textX = pdfCellTextX(cursorX, actualWidths[index], align);
     ctx.pdf.text(pdfSafe(header), textX, ctx.y + 3.4, { align, maxWidth: actualWidths[index] - 3 });
     cursorX += actualWidths[index];
   });
@@ -1326,7 +1331,7 @@ function drawPdfTable(
     const rowHeight = Math.max(4.8, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
     ensurePdfSpace(ctx, rowHeight + 1);
     cursorX = tableX + 1.5;
-    ctx.pdf.setDrawColor(226, 232, 240);
+    ctx.pdf.setDrawColor(0, 0, 0);
     ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
     row.forEach((_cell, index) => {
       const isLast = index === row.length - 1;
@@ -1334,8 +1339,8 @@ function drawPdfTable(
       ctx.pdf.setFont("helvetica", emphasized || isLast ? "bold" : "normal");
       ctx.pdf.setFontSize(6.3);
       ctx.pdf.setTextColor(2, 6, 23);
-      const align = index === 0 ? "left" : "right";
-      const textX = align === "right" ? cursorX + actualWidths[index] - 2 : cursorX;
+      const align = options.alignments?.[index] ?? (index === 0 ? "left" : "right");
+      const textX = pdfCellTextX(cursorX, actualWidths[index], align);
       ctx.pdf.text(wrapped[index], textX, ctx.y + 3.2, { align, maxWidth: actualWidths[index] - 3 });
       cursorX += actualWidths[index];
     });
@@ -1343,6 +1348,16 @@ function drawPdfTable(
   }
   ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
   ctx.y += 1;
+}
+
+function pdfCellTextX(
+  cursorX: number,
+  width: number,
+  align: "left" | "center" | "right",
+) {
+  if (align === "center") return cursorX + width / 2 - 0.75;
+  if (align === "right") return cursorX + width - 2;
+  return cursorX;
 }
 
 function ensurePdfSpace(ctx: PdfContext, needed: number) {

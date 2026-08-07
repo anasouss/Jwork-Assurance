@@ -64,8 +64,25 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     anyOf: ["contrat:view", "contrat:create", "contrat:update"],
   },
   {
+    matches: startsWith("/app/compta/reglements"),
+    anyOf: ["reglement-client:view", "reglement-client:create", "reglement-client:manage"],
+  },
+  {
+    matches: startsWith("/app/compta/tresorerie"),
+    anyOf: ["tresorerie:view", "tresorerie:manage"],
+  },
+  {
     matches: startsWith("/app/compta"),
-    anyOf: ["quittance:view", "quittance:create", "quittance:manage"],
+    anyOf: [
+      "quittance:view",
+      "quittance:create",
+      "quittance:manage",
+      "reglement-client:view",
+      "reglement-client:create",
+      "reglement-client:manage",
+      "tresorerie:view",
+      "tresorerie:manage",
+    ],
   },
   {
     matches: startsWith("/app/crm"),

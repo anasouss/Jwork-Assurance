@@ -13,6 +13,10 @@ import type {
   ConventionBillingStatus,
   CreateConventionInvoiceRequest,
   CreateClientDocumentRequest,
+  ClientPayment,
+  ClientPaymentPage,
+  ClientReceivablePage,
+  CreateClientPaymentRequest,
   ImportPreview,
   QuittanceAllocation,
   QuittancePage,
@@ -21,6 +25,12 @@ import type {
   RulePage,
   RuleRequest,
   TypeContrat,
+  PaymentInstrument,
+  ReplacePaymentInstrumentRequest,
+  TreasuryAccount,
+  TreasuryMovement,
+  TreasuryMovementPage,
+  UpsertTreasuryAccountRequest,
 } from "./types";
 
 const unwrap = <T,>(response: ApiResponse<T>) => response.data;
@@ -316,6 +326,136 @@ export const comptaApi = {
       `/api/v1/compta/documents-clients/${id}/pdf${buildQueryString({ avecSignature })}`
     );
   },
+
+  async clientReceivables(params: {
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
+    brancheId?: string;
+    typeContrat?: TypeContrat;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    return normalizeClientReceivablePage(unwrap(await apiFetch<ApiResponse<ClientReceivablePage>>(
+      `/api/v1/compta/reglements-clients/creances${buildQueryString(params)}`
+    )));
+  },
+
+  async clientInvoiceReceivables(params: {
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    return normalizeClientReceivablePage(unwrap(await apiFetch<ApiResponse<ClientReceivablePage>>(
+      `/api/v1/compta/reglements-clients/creances/factures${buildQueryString(params)}`
+    )));
+  },
+
+  async clientPayments(params: {
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    return normalizeClientPaymentPage(unwrap(await apiFetch<ApiResponse<ClientPaymentPage>>(
+      `/api/v1/compta/reglements-clients${buildQueryString(params)}`
+    )));
+  },
+
+  async createClientPayment(request: CreateClientPaymentRequest) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      "/api/v1/compta/reglements-clients",
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async cancelClientPayment(id: string, motif: string) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/${id}/annulation`,
+      { method: "POST", body: JSON.stringify({ motif }) }
+    )));
+  },
+
+  async pendingPaymentInstruments() {
+    return unwrap(await apiFetch<ApiResponse<PaymentInstrument[]>>(
+      "/api/v1/compta/reglements-clients/instruments/en-attente"
+    )).map(normalizePaymentInstrument);
+  },
+
+  async changePaymentInstrumentStatus(
+    id: string,
+    request: {
+      statut: "CONFIRME" | "REJETE";
+      compteTresorerieId?: string;
+      dateOperation?: string;
+      motif?: string;
+    }
+  ) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/instruments/${id}/statut`,
+      { method: "PUT", body: JSON.stringify(request) }
+    )));
+  },
+
+  async replacePaymentInstrument(
+    id: string,
+    request: ReplacePaymentInstrumentRequest
+  ) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/instruments/${id}/remplacement`,
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async treasuryAccounts() {
+    return unwrap(await apiFetch<ApiResponse<TreasuryAccount[]>>(
+      "/api/v1/compta/tresorerie/comptes"
+    )).map(normalizeTreasuryAccount);
+  },
+
+  async createTreasuryAccount(request: UpsertTreasuryAccountRequest) {
+    return normalizeTreasuryAccount(unwrap(await apiFetch<ApiResponse<TreasuryAccount>>(
+      "/api/v1/compta/tresorerie/comptes",
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async updateTreasuryAccount(id: string, request: UpsertTreasuryAccountRequest) {
+    return normalizeTreasuryAccount(unwrap(await apiFetch<ApiResponse<TreasuryAccount>>(
+      `/api/v1/compta/tresorerie/comptes/${id}`,
+      { method: "PUT", body: JSON.stringify(request) }
+    )));
+  },
+
+  async treasuryMovements() {
+    return unwrap(await apiFetch<ApiResponse<TreasuryMovement[]>>(
+      "/api/v1/compta/tresorerie/mouvements"
+    )).map(normalizeTreasuryMovement);
+  },
+
+  async treasuryJournal(params: {
+    compteId?: string;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<TreasuryMovementPage>>(
+      `/api/v1/compta/tresorerie/journal${buildQueryString(params)}`
+    ));
+    return {
+      ...result,
+      rows: result.rows.map(normalizeTreasuryMovement),
+    };
+  },
 };
 
 function normalizeReference(option: ReferenceOption): ReferenceOption {
@@ -370,5 +510,86 @@ function normalizeClientDocument(document: ClientDocument): ClientDocument {
       contratId: line.contratId == null ? "" : String(line.contratId),
       mouvementId: line.mouvementId == null ? null : String(line.mouvementId),
     })),
+  };
+}
+
+function normalizeClientReceivablePage(page: ClientReceivablePage): ClientReceivablePage {
+  return {
+    ...page,
+    rows: page.rows.map((row) => ({
+      ...row,
+      source: {
+        ...row.source,
+        elementFacturableId: row.source.elementFacturableId == null
+          ? null
+          : String(row.source.elementFacturableId),
+        documentClientId: row.source.documentClientId == null
+          ? null
+          : String(row.source.documentClientId),
+        quittanceId: row.source.quittanceId == null ? null : String(row.source.quittanceId),
+        contratId: row.source.contratId == null ? "" : String(row.source.contratId),
+        mouvementId: row.source.mouvementId == null ? null : String(row.source.mouvementId),
+        payeurId: String(row.source.payeurId),
+        souscripteurId: row.source.souscripteurId == null
+          ? null
+          : String(row.source.souscripteurId),
+      },
+    })),
+  };
+}
+
+function normalizeClientPaymentPage(page: ClientPaymentPage): ClientPaymentPage {
+  return {
+    ...page,
+    rows: page.rows.map(normalizeClientPayment),
+  };
+}
+
+function normalizeClientPayment(payment: ClientPayment): ClientPayment {
+  return {
+    ...payment,
+    id: String(payment.id),
+    clientPayeurId: payment.clientPayeurId == null ? null : String(payment.clientPayeurId),
+    groupePayeurId: payment.groupePayeurId == null ? null : String(payment.groupePayeurId),
+    instruments: payment.instruments.map(normalizePaymentInstrument),
+  };
+}
+
+function normalizePaymentInstrument(instrument: PaymentInstrument): PaymentInstrument {
+  return {
+    ...instrument,
+    id: String(instrument.id),
+    reglementId: String(instrument.reglementId),
+    compteTresorerieId: instrument.compteTresorerieId == null
+      ? null
+      : String(instrument.compteTresorerieId),
+    affectations: instrument.affectations.map((allocation) => ({
+      ...allocation,
+      id: String(allocation.id),
+      elementFacturableId: allocation.elementFacturableId == null
+        ? null
+        : String(allocation.elementFacturableId),
+      documentClientId: allocation.documentClientId == null
+        ? null
+        : String(allocation.documentClientId),
+    })),
+  };
+}
+
+function normalizeTreasuryAccount(account: TreasuryAccount): TreasuryAccount {
+  return {
+    ...account,
+    id: String(account.id),
+  };
+}
+
+function normalizeTreasuryMovement(movement: TreasuryMovement): TreasuryMovement {
+  return {
+    ...movement,
+    id: String(movement.id),
+    compteTresorerieId: String(movement.compteTresorerieId),
+    instrumentReglementId: movement.instrumentReglementId == null
+      ? null
+      : String(movement.instrumentReglementId),
   };
 }

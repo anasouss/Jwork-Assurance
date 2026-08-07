@@ -49,6 +49,13 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               and e.actif = true
               and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
               and c.prospection = false
+              and not exists (
+                    select 1
+                    from LigneDocumentClient invoiceLine
+                    where invoiceLine.elementFacturable = e
+                      and invoiceLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+                      and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              )
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
@@ -167,6 +174,13 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               and e.actif = true
               and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
               and c.prospection = false
+              and not exists (
+                    select 1
+                    from LigneDocumentClient invoiceLine
+                    where invoiceLine.elementFacturable = e
+                      and invoiceLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+                      and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              )
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'

@@ -267,8 +267,9 @@ export type CreateConventionInvoiceRequest = {
 };
 
 export type ClientDocumentSource = {
-  elementFacturableId: string;
-  nature: BillableElementNature;
+  elementFacturableId?: string | null;
+  documentClientId?: string | null;
+  nature?: BillableElementNature | null;
   quittanceId?: string | null;
   contratId: string;
   mouvementId?: string | null;
@@ -371,4 +372,156 @@ export type CreateClientDocumentRequest = {
   elementFacturableIds: string[];
   dateEcheance?: string;
   notes?: string;
+};
+
+export type ClientPaymentMode =
+  | "ESPECES"
+  | "CHEQUE"
+  | "EFFET"
+  | "VIREMENT"
+  | "VERSEMENT_BANCAIRE"
+  | "CARTE"
+  | "PRELEVEMENT";
+
+export type ClientPaymentStatus = "VALIDE" | "ANNULE";
+export type PaymentInstrumentStatus = "EN_ATTENTE" | "CONFIRME" | "REJETE" | "REMPLACE";
+export type PaymentAllocationStatus = "EN_ATTENTE" | "CONFIRMEE" | "ANNULEE";
+export type TreasuryAccountType = "CAISSE" | "BANQUE";
+
+export type ClientReceivable = {
+  source: ClientDocumentSource;
+  montantConfirme: number;
+  montantEnAttente: number;
+  soldeOuvert: number;
+  statut: "IMPAYEE" | "PARTIELLEMENT_REGLEE" | "COUVERTE_EN_ATTENTE" | "PAYEE";
+};
+
+export type ClientReceivablePage = {
+  summary: {
+    total: number;
+    montantInitial: number;
+    montantConfirme: number;
+    montantEnAttente: number;
+    soldeOuvert: number;
+  };
+  page: PageInfo;
+  rows: ClientReceivable[];
+};
+
+export type PaymentAllocation = {
+  id: string;
+  elementFacturableId?: string | null;
+  documentClientId?: string | null;
+  montant: number;
+  statut: PaymentAllocationStatus;
+};
+
+export type PaymentInstrument = {
+  id: string;
+  reglementId: string;
+  numeroReglement: string;
+  payeurNom: string;
+  mode: ClientPaymentMode;
+  statut: PaymentInstrumentStatus;
+  montant: number;
+  dateInstrument: string;
+  dateEcheance?: string | null;
+  referenceInstrument?: string | null;
+  banqueEmettrice?: string | null;
+  compteTresorerieId?: string | null;
+  compteTresorerie?: string | null;
+  affectations: PaymentAllocation[];
+};
+
+export type ClientPayment = {
+  id: string;
+  numero: string;
+  dateReglement: string;
+  clientPayeurId?: string | null;
+  groupePayeurId?: string | null;
+  payeurNom: string;
+  statut: ClientPaymentStatus;
+  montantTotal: number;
+  montantNonAffecte: number;
+  notes?: string | null;
+  creePar: string;
+  instruments: PaymentInstrument[];
+};
+
+export type ClientPaymentPage = {
+  page: PageInfo;
+  rows: ClientPayment[];
+};
+
+export type CreateClientPaymentRequest = {
+  dateReglement: string;
+  clientPayeurId?: string;
+  groupePayeurId?: string;
+  notes?: string;
+  instruments: Array<{
+    mode: ClientPaymentMode;
+    montant: number;
+    dateInstrument?: string;
+    dateEcheance?: string;
+    referenceInstrument?: string;
+    banqueEmettrice?: string;
+    compteTresorerieId?: string;
+    affectations: Array<{
+      elementFacturableId?: string;
+      documentClientId?: string;
+      montant: number;
+    }>;
+  }>;
+};
+
+export type ReplacePaymentInstrumentRequest = {
+  mode: ClientPaymentMode;
+  montant: number;
+  dateInstrument?: string;
+  dateEcheance?: string;
+  referenceInstrument?: string;
+  banqueEmettrice?: string;
+  compteTresorerieId?: string;
+};
+
+export type TreasuryAccount = {
+  id: string;
+  code: string;
+  libelle: string;
+  typeCompte: TreasuryAccountType;
+  nomBanque?: string | null;
+  rib?: string | null;
+  devise: string;
+  soldeInitial: number;
+  soldeCourant: number;
+  actif: boolean;
+};
+
+export type UpsertTreasuryAccountRequest = {
+  code: string;
+  libelle: string;
+  typeCompte: TreasuryAccountType;
+  nomBanque?: string;
+  rib?: string;
+  soldeInitial: number;
+  actif: boolean;
+};
+
+export type TreasuryMovement = {
+  id: string;
+  compteTresorerieId: string;
+  compteTresorerie: string;
+  instrumentReglementId?: string | null;
+  nature: "REGLEMENT_CLIENT" | "REJET_INSTRUMENT" | "REMISE_BANQUE" | "TRANSFERT" | "AJUSTEMENT";
+  sens: "ENTREE" | "SORTIE";
+  dateOperation: string;
+  dateValeur?: string | null;
+  montant: number;
+  reference?: string | null;
+  libelle: string;
+};
+
+export type TreasuryMovementPage = {
+  page: PageInfo;
+  rows: TreasuryMovement[];
 };

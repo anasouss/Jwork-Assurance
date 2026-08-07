@@ -7,17 +7,23 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface DocumentClientRepository extends JpaRepository<DocumentClient, Long> {
 
-    @EntityGraph(attributePaths = {"clientPayeur", "groupePayeur"})
+    @EntityGraph(attributePaths = {
+            "clientPayeur",
+            "groupePayeur"
+    })
     @Query("""
-            select d
+            select distinct d
             from DocumentClient d
             where d.agence.id = :agenceId
               and (:type is null or d.typeDocument = :type)
@@ -60,4 +66,24 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             "lignes.echeanceFacturationConvention"
     })
     Optional<DocumentClient> findByAgenceIdAndId(Long agenceId, Long id);
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "clientPayeur",
+            "groupePayeur",
+            "lignes",
+            "lignes.elementFacturable"
+    })
+    @Query("""
+            select distinct d
+            from DocumentClient d
+            where d.agence.id = :agenceId
+              and d.id in :documentIds
+              and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+              and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
+            """)
+    List<DocumentClient> findIssuedInvoicesForUpdate(
+            @Param("agenceId") Long agenceId,
+            @Param("documentIds") Collection<Long> documentIds
+    );
 }

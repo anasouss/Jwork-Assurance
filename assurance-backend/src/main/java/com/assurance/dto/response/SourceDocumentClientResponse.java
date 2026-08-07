@@ -12,6 +12,7 @@ import java.time.LocalDate;
 @Builder
 public class SourceDocumentClientResponse {
     private Long elementFacturableId;
+    private Long documentClientId;
     private NatureElementFacturable nature;
     private Long quittanceId;
     private Long contratId;

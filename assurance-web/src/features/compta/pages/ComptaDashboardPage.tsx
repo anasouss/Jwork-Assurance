@@ -51,16 +51,35 @@ const groups: ComptaGroup[] = [
         href: "/app/compta/facturation-conventions",
         permission: "quittance:view",
       },
-      { title: "Règlements clients", icon: WalletCards, disabled: true },
+      {
+        title: "Règlements clients",
+        icon: WalletCards,
+        href: "/app/compta/reglements",
+        permission: "reglement-client:view",
+      },
     ],
   },
   {
     title: "Trésorerie",
     actions: [
-      { title: "Comptes de caisse", icon: Banknote, disabled: true },
-      { title: "Écritures de caisse", icon: ScrollText, disabled: true },
-      { title: "Comptes bancaires", icon: Landmark, disabled: true },
-      { title: "Écritures bancaires", icon: Scale, disabled: true },
+      {
+        title: "Caisses et banques",
+        icon: Banknote,
+        href: "/app/compta/tresorerie",
+        permission: "tresorerie:view",
+      },
+      {
+        title: "Chèques et effets",
+        icon: ScrollText,
+        href: "/app/compta/tresorerie",
+        permission: "tresorerie:view",
+      },
+      {
+        title: "Journal de trésorerie",
+        icon: Landmark,
+        href: "/app/compta/tresorerie",
+        permission: "tresorerie:view",
+      },
     ],
   },
   {

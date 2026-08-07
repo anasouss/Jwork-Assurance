@@ -20,6 +20,7 @@ import com.assurance.entity.SequenceDocumentClient;
 import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.RoleClientContrat;
+import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutEcheanceFacturationConvention;
@@ -30,6 +31,7 @@ import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
+import com.assurance.repository.AffectationReglementClientRepository;
 import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.DocumentClientRepository;
@@ -75,6 +77,7 @@ public class DocumentClientService {
     private final SequenceDocumentClientRepository sequenceDocumentClientRepository;
     private final AgenceRepository agenceRepository;
     private final EcheanceFacturationConventionRepository echeanceFacturationConventionRepository;
+    private final AffectationReglementClientRepository affectationReglementClientRepository;
 
     @Transactional(readOnly = true)
     public SourceDocumentClientPageResponse searchSources(
@@ -287,6 +290,18 @@ public class DocumentClientService {
         DocumentClient document = findDocument(agenceId, documentId);
         if (document.getStatut() == StatutDocumentClient.ANNULE) {
             throw new BadRequestException("Ce document est déjà annulé");
+        }
+        if (document.getTypeDocument() == TypeDocumentClient.FACTURE
+                && affectationReglementClientRepository.existsByDocumentClientIdAndStatutIn(
+                        documentId,
+                        Set.of(
+                                StatutAffectationReglement.EN_ATTENTE,
+                                StatutAffectationReglement.CONFIRMEE
+                        )
+                )) {
+            throw new BadRequestException(
+                    "Cette facture contient des règlements actifs. Annulez d'abord les règlements concernés"
+            );
         }
         document.setStatut(StatutDocumentClient.ANNULE);
         document.setDateAnnulation(LocalDateTime.now());

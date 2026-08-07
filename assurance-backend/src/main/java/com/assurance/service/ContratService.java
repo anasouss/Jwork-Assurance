@@ -1285,18 +1285,6 @@ public class ContratService {
         assistanceContratRepository.saveAll(assistances);
     }
 
-    private boolean belongsToSelectedMovement(AssistanceContrat assistance, MouvementContrat selectedMouvement) {
-        if (assistance.getMouvementContrat() != null) {
-            return selectedMouvement.getId().equals(assistance.getMouvementContrat().getId());
-        }
-        CategorieMouvementContrat categorie = selectedMouvement.getTypeMouvement() != null
-                ? selectedMouvement.getTypeMouvement().getCategorie()
-                : null;
-        boolean initialMovement = categorie == CategorieMouvementContrat.AFFAIRE_NOUVELLE
-                || categorie == CategorieMouvementContrat.RENOUVELLEMENT;
-        return initialMovement && Boolean.TRUE.equals(assistance.getActif());
-    }
-
     private void validateDraftVehiculeInput(Contrat contrat, CreateContratRequest.VehiculeInput input) {
         if (input == null) {
             throw new BadRequestException("Vehicule obligatoire");
@@ -5230,7 +5218,8 @@ public class ContratService {
         List<AssistanceContratResponse> assistances = (selectedMouvement == null
                 ? assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
                 : assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(contrat.getId()).stream()
-                        .filter(assistance -> belongsToSelectedMovement(assistance, selectedMouvement))
+                        .filter(assistance -> assistance.getMouvementContrat() != null
+                                && selectedMouvement.getId().equals(assistance.getMouvementContrat().getId()))
                         .toList())
                 .stream()
                 .map(this::toAssistanceResponse)

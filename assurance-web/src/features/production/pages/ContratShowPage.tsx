@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
-import { formatMoney, moneyAmount, text } from "../utils/format";
+import { formatMoney, moneyAmount, numberOrZero, roundMoney, text } from "../utils/format";
 import type { AssistanceContrat, ClientResponse, ContratSummary, ReferenceOption } from "../types";
 import type { jsPDF as JsPDF } from "jspdf";
 
@@ -524,11 +524,8 @@ function QuittanceSection({
   movementLabel?: string | null;
   differential?: boolean;
 }) {
-  const lignes = (contrat.quittanceGenerale?.lignes ?? []).filter((ligne) => {
-    const categorie = String(ligne.categorie ?? "").toUpperCase();
-    return categorie !== "CORPOREL" || personneGaranties(contrat).length > 0;
-  });
-  if (!lignes.length) return null;
+  const rows = financialSummaryRows(contrat);
+  if (!rows.length) return null;
   return (
     <Section title={movementLabel
       ? `${differential ? "Quittance différentielle" : "Quittance"} - ${movementLabel}`
@@ -546,21 +543,74 @@ function QuittanceSection({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {lignes.map((ligne) => (
-            <TableRow key={`${ligne.categorie}-${ligne.ordre}`} className={ligne.globale ? "font-bold" : ""}>
-              <TableCell>{ligne.globale ? "Total général" : ligne.categorie}</TableCell>
-              <TableCell className="text-right">{moneyAmount(ligne.primeNette)}</TableCell>
-              <TableCell className="text-right">{moneyAmount(ligne.taxe)}</TableCell>
-              <TableCell className="text-right">{moneyAmount(ligne.taxeParafiscale)}</TableCell>
-              <TableCell className="text-right">{moneyAmount(ligne.accessoire)}</TableCell>
-              <TableCell className="text-right">{moneyAmount(ligne.cnpac)}</TableCell>
-              <TableCell className="text-right">{moneyAmount(ligne.primeTotale)}</TableCell>
+          {rows.map((row) => (
+            <TableRow key={row.key} className={row.emphasized ? "font-bold" : ""}>
+              <TableCell>{row.label}</TableCell>
+              <TableCell className="text-right">{moneyAmount(row.primeNette)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(row.taxe)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(row.taxeParafiscale)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(row.accessoire)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(row.cnpac)}</TableCell>
+              <TableCell className="text-right">{moneyAmount(row.primeTotale)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </Section>
   );
+}
+
+function financialSummaryRows(contrat: ContratSummary) {
+  const lignes = (contrat.quittanceGenerale?.lignes ?? []).filter((ligne) => {
+    const categorie = String(ligne.categorie ?? "").toUpperCase();
+    return categorie !== "CORPOREL" || personneGaranties(contrat).length > 0;
+  });
+  const assistance = (contrat.assistances ?? []).reduce(
+    (total, item) => ({
+      primeNette: roundMoney(total.primeNette + numberOrZero(item.primeNette)),
+      primeTotale: roundMoney(total.primeTotale + numberOrZero(item.primeTotale)),
+    }),
+    { primeNette: 0, primeTotale: 0 },
+  );
+  const hasAssistance = assistance.primeTotale !== 0;
+  const rows = lignes.map((ligne) => ({
+    key: `${ligne.categorie}-${ligne.ordre}`,
+    label: ligne.globale ? (hasAssistance ? "Total assurance" : "Total général") : text(ligne.categorie),
+    primeNette: numberOrZero(ligne.primeNette),
+    taxe: numberOrZero(ligne.taxe),
+    taxeParafiscale: numberOrZero(ligne.taxeParafiscale),
+    accessoire: numberOrZero(ligne.accessoire),
+    cnpac: numberOrZero(ligne.cnpac),
+    primeTotale: numberOrZero(ligne.primeTotale),
+    emphasized: Boolean(ligne.globale),
+  }));
+  if (!hasAssistance) return rows;
+
+  const insurance = lignes.find((ligne) => ligne.globale) ?? contrat.quittanceGenerale;
+  const assistanceTax = roundMoney(assistance.primeTotale - assistance.primeNette);
+  rows.push({
+    key: "assistance",
+    label: "ASSISTANCE",
+    primeNette: assistance.primeNette,
+    taxe: assistanceTax,
+    taxeParafiscale: 0,
+    accessoire: 0,
+    cnpac: 0,
+    primeTotale: assistance.primeTotale,
+    emphasized: false,
+  });
+  rows.push({
+    key: "total-payable",
+    label: "Total à payer",
+    primeNette: roundMoney(numberOrZero(insurance?.primeNette) + assistance.primeNette),
+    taxe: roundMoney(numberOrZero(insurance?.taxe) + assistanceTax),
+    taxeParafiscale: numberOrZero(insurance?.taxeParafiscale),
+    accessoire: numberOrZero(insurance?.accessoire),
+    cnpac: numberOrZero(insurance?.cnpac),
+    primeTotale: roundMoney(numberOrZero(insurance?.primeTotale) + assistance.primeTotale),
+    emphasized: true,
+  });
+  return rows;
 }
 
 function Section({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
@@ -1233,18 +1283,15 @@ function drawPdfAssistances(ctx: PdfContext, assistances: AssistanceContrat[]) {
 }
 
 function drawPdfQuittance(ctx: PdfContext, contrat: ContratSummary) {
-  const lignes = (contrat.quittanceGenerale?.lignes ?? []).filter((ligne) => {
-    const categorie = String(ligne.categorie ?? "").toUpperCase();
-    return categorie !== "CORPOREL" || personneGaranties(contrat).length > 0;
-  });
-  drawPdfTable(ctx, ["Catégorie", "P. nette", "Taxes", "TPF", "Accessoires", "CNPAC", "Total"], lignes.map((ligne) => [
-    ligne.globale ? "Total général" : text(ligne.categorie),
-    moneyAmount(ligne.primeNette),
-    moneyAmount(ligne.taxe),
-    moneyAmount(ligne.taxeParafiscale),
-    moneyAmount(ligne.accessoire),
-    moneyAmount(ligne.cnpac),
-    moneyAmount(ligne.primeTotale),
+  const rows = financialSummaryRows(contrat);
+  drawPdfTable(ctx, ["Catégorie", "P. nette", "Taxes", "TPF", "Accessoires", "CNPAC", "Total"], rows.map((row) => [
+    row.label,
+    moneyAmount(row.primeNette),
+    moneyAmount(row.taxe),
+    moneyAmount(row.taxeParafiscale),
+    moneyAmount(row.accessoire),
+    moneyAmount(row.cnpac),
+    moneyAmount(row.primeTotale),
   ]), [28, 27, 27, 22, 30, 24, 22]);
 }
 

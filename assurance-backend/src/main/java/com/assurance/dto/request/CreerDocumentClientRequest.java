@@ -20,12 +20,6 @@ public class CreerDocumentClientRequest {
     @NotEmpty
     private List<Long> elementFacturableIds;
 
-    @NotNull
-    private LocalDate periodeDebut;
-
-    @NotNull
-    private LocalDate periodeFin;
-
     private LocalDate dateEcheance;
 
     @Size(max = 1000)

@@ -369,8 +369,6 @@ export type ClientDocumentPage = {
 export type CreateClientDocumentRequest = {
   typeDocument: ClientDocumentType;
   elementFacturableIds: string[];
-  periodeDebut: string;
-  periodeFin: string;
   dateEcheance?: string;
   notes?: string;
 };

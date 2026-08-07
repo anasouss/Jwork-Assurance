@@ -197,11 +197,7 @@ public class DocumentClientService {
                 .map(element -> resolveSource(element, quittances, assistances))
                 .toList();
         sources.forEach(this::validateSource);
-        sources.forEach(source -> validateSourcePeriod(
-                source,
-                request.getPeriodeDebut(),
-                request.getPeriodeFin()
-        ));
+        DocumentPeriod documentPeriod = deriveDocumentPeriod(sources);
 
         Map<Long, Client> subscribers = loadSubscribersFromContracts(sources.stream()
                 .map(source -> source.element().getContrat())
@@ -227,8 +223,8 @@ public class DocumentClientService {
                 .statut(StatutDocumentClient.EMIS)
                 .numero(nextNumber(agence, request.getTypeDocument(), emissionDate.getYear()))
                 .dateEmission(emissionDate)
-                .periodeDebut(request.getPeriodeDebut())
-                .periodeFin(request.getPeriodeFin())
+                .periodeDebut(documentPeriod.start())
+                .periodeFin(documentPeriod.end())
                 .dateEcheance(request.getDateEcheance())
                 .clientPayeur(payer.client())
                 .groupePayeur(payer.group())
@@ -313,7 +309,6 @@ public class DocumentClientService {
     }
 
     private void validateRequest(CreerDocumentClientRequest request) {
-        validatePeriod(request.getPeriodeDebut(), request.getPeriodeFin());
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
             if (request.getDateEcheance() == null) {
                 throw new BadRequestException("La date d'échéance est obligatoire pour une facture");
@@ -385,15 +380,22 @@ public class DocumentClientService {
         }
     }
 
-    private void validateSourcePeriod(BillableSource source, LocalDate periodStart, LocalDate periodEnd) {
-        LocalDate effectiveDate = source.element().getDateDebut();
-        if (effectiveDate == null
-                || effectiveDate.isBefore(periodStart)
-                || effectiveDate.isAfter(periodEnd)) {
-            throw new BadRequestException(
-                    "La période du document doit inclure la date d'effet de chaque écriture"
-            );
-        }
+    private DocumentPeriod deriveDocumentPeriod(List<BillableSource> sources) {
+        LocalDate start = sources.stream()
+                .map(BillableSource::element)
+                .map(ElementFacturable::getDateDebut)
+                .filter(Objects::nonNull)
+                .min(LocalDate::compareTo)
+                .orElseThrow(() -> new BadRequestException(
+                        "Les écritures sélectionnées n'ont pas de date d'effet"
+                ));
+        LocalDate end = sources.stream()
+                .map(BillableSource::element)
+                .map(element -> element.getDateFin() == null ? element.getDateDebut() : element.getDateFin())
+                .filter(Objects::nonNull)
+                .max(LocalDate::compareTo)
+                .orElse(start);
+        return new DocumentPeriod(start, end);
     }
 
     private String nextNumber(Agence agence, TypeDocumentClient type, int year) {
@@ -769,5 +771,8 @@ public class DocumentClientService {
             Quittance quittance,
             AssistanceContrat assistance
     ) {
+    }
+
+    private record DocumentPeriod(LocalDate start, LocalDate end) {
     }
 }

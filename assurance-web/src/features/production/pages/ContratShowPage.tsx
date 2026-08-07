@@ -136,7 +136,6 @@ export default function ContratShowPage() {
                 ["Produit", productLabel(contrat)],
                 ["Compagnie", compagnie],
                 ...(contrat.typeContrat === "CONVENTION" ? [["Convention", convention] as [string, ReactNode]] : []),
-                ["N° police", text(contrat.numeroPolice)],
                 ["N° attestation", firstAttestation(contrat)],
                 ["Date d'effet", formatDate(selectedMouvement?.dateEffet ?? contrat.dateEffet)],
                 ["Date d'échéance", formatDate(selectedMouvement?.dateEcheance ?? contrat.dateEcheance)],
@@ -432,7 +431,6 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
         <TableHeader>
           <TableRow className="bg-slate-100">
             <TableHead>Garantie</TableHead>
-            <TableHead>Formule</TableHead>
             <TableHead className="text-right">Décès</TableHead>
             <TableHead className="text-right">Invalidité</TableHead>
             <TableHead className="text-right">Frais médicaux</TableHead>
@@ -442,8 +440,7 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
         <TableBody>
           {garanties.map((garantie) => (
             <TableRow key={garantie.contratGarantieId}>
-              <TableCell className="font-medium">{garantieLabel(garantie)}</TableCell>
-              <TableCell>{text(garantie.formule)}</TableCell>
+              <TableCell className="font-medium">{garantieName(garantie)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantDeces)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantInvalidite)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantFraisMedicaux)}</TableCell>
@@ -503,7 +500,7 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
         <TableBody>
           {vehiculeGaranties.map((garantie) => (
             <TableRow key={garantie.contratGarantieId}>
-              <TableCell className="px-2 py-0.5 font-medium">{garantieLabel(garantie)}</TableCell>
+              <TableCell className="px-2 py-0.5 font-medium">{garantieName(garantie)}</TableCell>
               <TableCell className="px-2 py-0.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
               <TableCell className="px-2 py-0.5">{franchiseLabel(garantie)}</TableCell>
               <TableCell className="px-2 py-0.5 text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
@@ -575,7 +572,7 @@ function financialSummaryRows(contrat: ContratSummary) {
   const hasAssistance = assistance.primeTotale !== 0;
   const rows = lignes.map((ligne) => ({
     key: `${ligne.categorie}-${ligne.ordre}`,
-    label: ligne.globale ? "Total général" : text(ligne.categorie),
+    label: ligne.globale ? (hasAssistance ? "Total automobile" : "Total général") : text(ligne.categorie),
     primeNette: numberOrZero(ligne.primeNette),
     taxe: numberOrZero(ligne.taxe),
     taxeParafiscale: numberOrZero(ligne.taxeParafiscale),
@@ -597,6 +594,18 @@ function financialSummaryRows(contrat: ContratSummary) {
     cnpac: 0,
     primeTotale: assistance.primeTotale,
     emphasized: false,
+  });
+  const insurance = lignes.find((ligne) => ligne.globale) ?? contrat.quittanceGenerale;
+  rows.push({
+    key: "total-general",
+    label: "Total général",
+    primeNette: roundMoney(numberOrZero(insurance?.primeNette) + assistance.primeNette),
+    taxe: roundMoney(numberOrZero(insurance?.taxe) + assistanceTax),
+    taxeParafiscale: numberOrZero(insurance?.taxeParafiscale),
+    accessoire: numberOrZero(insurance?.accessoire),
+    cnpac: numberOrZero(insurance?.cnpac),
+    primeTotale: roundMoney(numberOrZero(insurance?.primeTotale) + assistance.primeTotale),
+    emphasized: true,
   });
   return rows;
 }
@@ -922,8 +931,8 @@ function personneGaranties(contrat: ContratSummary) {
   return (contrat.garanties ?? []).filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() === "PERSONNE");
 }
 
-function garantieLabel(garantie: Garantie) {
-  return [garantie.code, garantie.libelle].filter(Boolean).join(" - ");
+function garantieName(garantie: Garantie) {
+  return text(garantie.libelle ?? garantie.code);
 }
 
 function franchiseLabel(garantie: Garantie) {
@@ -992,7 +1001,6 @@ async function openContratPdf(params: {
       ["Produit", productLabel(params.contrat)],
       ["Compagnie", params.compagnie],
       ...(params.contrat.typeContrat === "CONVENTION" ? [["Convention", params.convention] as [string, string]] : []),
-      ["N° police", text(params.contrat.numeroPolice)],
       ["N° attestation", firstAttestation(params.contrat)],
       ["Date d'effet", formatDate(params.mouvement?.dateEffet ?? params.contrat.dateEffet)],
       ["Date d'échéance", formatDate(params.mouvement?.dateEcheance ?? params.contrat.dateEcheance)],
@@ -1242,7 +1250,7 @@ function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[], primeLabel = "
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return;
   drawPdfTable(ctx, ["Garantie assurée", "Valeur assurée", "Franchise", primeLabel], vehiculeGaranties.map((garantie) => [
-    garantieLabel(garantie),
+    garantieName(garantie),
     formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
     franchiseLabel(garantie),
     formatMoney(garantie.prime),
@@ -1250,14 +1258,13 @@ function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[], primeLabel = "
 }
 
 function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
-  drawPdfTable(ctx, ["Garantie", "Formule", "Décès", "Invalidité", "Frais médicaux", "Prime nette"], garanties.map((garantie) => [
-    garantieLabel(garantie),
-    text(garantie.formule),
+  drawPdfTable(ctx, ["Garantie", "Décès", "Invalidité", "Frais médicaux", "Prime nette"], garanties.map((garantie) => [
+    garantieName(garantie),
     amountOrDash(garantie.montantDeces),
     amountOrDash(garantie.montantInvalidite),
     amountOrDash(garantie.montantFraisMedicaux),
     formatMoney(garantie.prime),
-  ]), [45, 28, 24, 24, 31, 28]);
+  ]), [60, 30, 30, 34, 26]);
 }
 
 function drawPdfAssistances(ctx: PdfContext, assistances: AssistanceContrat[]) {
@@ -1299,7 +1306,9 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
   ctx.pdf.setFontSize(6);
   ctx.pdf.setTextColor(51, 65, 85);
   headers.forEach((header, index) => {
-    ctx.pdf.text(pdfSafe(header), cursorX, ctx.y + 3.4);
+    const align = index === 0 ? "left" : "right";
+    const textX = align === "right" ? cursorX + actualWidths[index] - 2 : cursorX;
+    ctx.pdf.text(pdfSafe(header), textX, ctx.y + 3.4, { align, maxWidth: actualWidths[index] - 3 });
     cursorX += actualWidths[index];
   });
   ctx.y += headerHeight;

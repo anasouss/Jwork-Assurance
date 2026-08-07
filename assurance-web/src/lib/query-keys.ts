@@ -18,7 +18,9 @@ export const contractKeys = {
 
 export const accountingKeys = {
   all: ["compta"] as const,
-  quittanceAllocations: (params?: QueryParams) => [...accountingKeys.all, "quittance-allocations", params ?? {}] as const,
+  quittanceAllocationLists: () => [...accountingKeys.all, "quittance-allocations"] as const,
+  quittanceAllocations: (params?: QueryParams) => [...accountingKeys.quittanceAllocationLists(), params ?? {}] as const,
+  quittanceAllocationDetail: (id?: string) => [...accountingKeys.all, "affectation-quittance", id] as const,
 };
 
 export const amendmentKeys = {

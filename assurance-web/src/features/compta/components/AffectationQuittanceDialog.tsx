@@ -32,6 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
+import { accountingKeys } from "@/lib/query-keys";
 import { comptaApi } from "../api";
 import { classifyAllocationDifference } from "../allocation-tolerance";
 import type {
@@ -90,7 +91,7 @@ export function AffectationQuittanceDialog({
   const [initializedId, setInitializedId] = useState<string | null>(null);
 
   const savedDetail = useQuery({
-    queryKey: ["compta", "affectation-quittance", quittanceId],
+    queryKey: accountingKeys.quittanceAllocationDetail(quittanceId),
     queryFn: () => comptaApi.allocation(quittanceId!),
     enabled: open && Boolean(quittanceId),
   });
@@ -164,8 +165,8 @@ export function AffectationQuittanceDialog({
     onSuccess: async () => {
       toast.success("Affectation enregistrée");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittances"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittance", quittanceId] }),
+        queryClient.invalidateQueries({ queryKey: accountingKeys.quittanceAllocationLists() }),
+        queryClient.invalidateQueries({ queryKey: accountingKeys.quittanceAllocationDetail(quittanceId) }),
       ]);
       onOpenChange(false);
     },
@@ -178,8 +179,8 @@ export function AffectationQuittanceDialog({
       toast.success("Affectation supprimée");
       setConfirmClear(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittances"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittance", quittanceId] }),
+        queryClient.invalidateQueries({ queryKey: accountingKeys.quittanceAllocationLists() }),
+        queryClient.invalidateQueries({ queryKey: accountingKeys.quittanceAllocationDetail(quittanceId) }),
       ]);
       onOpenChange(false);
     },

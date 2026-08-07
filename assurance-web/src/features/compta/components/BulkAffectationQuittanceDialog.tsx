@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
+import { accountingKeys } from "@/lib/query-keys";
 import { comptaApi } from "../api";
 import { classifyAllocationDifference } from "../allocation-tolerance";
 import type { AllocationLine, ImportPreview, QuittanceAllocation } from "../types";
@@ -109,7 +110,7 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
     }),
     onSuccess: async () => {
       toast.success("Affectation groupée enregistrée");
-      await queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittances"] });
+      await queryClient.invalidateQueries({ queryKey: accountingKeys.quittanceAllocationLists() });
       onSaved();
       onOpenChange(false);
     },

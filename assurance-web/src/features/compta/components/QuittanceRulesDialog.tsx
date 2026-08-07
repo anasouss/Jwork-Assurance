@@ -36,6 +36,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toDateOnly } from "@/features/production/date";
+import { accountingKeys } from "@/lib/query-keys";
 import { comptaApi } from "../api";
 import type { ModeCalculCommission, ModeVentilationQuittance, Rule, RuleRequest, TypeContrat } from "../types";
 
@@ -196,7 +197,7 @@ export function QuittanceRulesDialog({
       toast.success(editing ? "Règle modifiée" : "Règle créée");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "regles-quittances"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittances"] }),
+        queryClient.invalidateQueries({ queryKey: accountingKeys.quittanceAllocationLists() }),
       ]);
       setEditing(null);
       setForm(EMPTY_FORM);
@@ -215,7 +216,7 @@ export function QuittanceRulesDialog({
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "regles-quittances"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "affectation-quittances"] }),
+        queryClient.invalidateQueries({ queryKey: accountingKeys.quittanceAllocationLists() }),
       ]);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Suppression impossible"),

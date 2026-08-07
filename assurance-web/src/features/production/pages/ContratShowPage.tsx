@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
-import { formatMoney, moneyAmount, numberOrZero, roundMoney, text } from "../utils/format";
+import { moneyAmount, numberOrZero, roundMoney, text } from "../utils/format";
 import type { AssistanceContrat, ClientResponse, ContratSummary, ReferenceOption } from "../types";
 import type { jsPDF as JsPDF } from "jspdf";
 
@@ -156,7 +156,7 @@ export default function ContratShowPage() {
                   ? [["N° bon de commande", contrat.numeroBonCommande] as [string, ReactNode]]
                   : []),
                 ...(contrat.montantBulletin != null
-                  ? [["Montant du bulletin", formatMoney(contrat.montantBulletin)] as [string, ReactNode]]
+                  ? [["Montant du bulletin", moneyAmount(contrat.montantBulletin)] as [string, ReactNode]]
                   : []),
               ]}
             />
@@ -444,7 +444,7 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
               <TableCell className="text-right">{amountOrDash(garantie.montantDeces)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantInvalidite)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantFraisMedicaux)}</TableCell>
-              <TableCell className="text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
+              <TableCell className="text-right font-semibold">{moneyAmount(garantie.prime)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -474,7 +474,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
               <TableCell>{text(assistance.compagnieAssistanceLibelle)}</TableCell>
               <TableCell>{text(assistance.produit)}</TableCell>
               <TableCell>{formatDate(assistance.dateEffet)} au {formatDate(assistance.dateEcheance)}</TableCell>
-              <TableCell className="text-right font-semibold">{formatMoney(assistance.primeTotale)}</TableCell>
+              <TableCell className="text-right font-semibold">{moneyAmount(assistance.primeTotale)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -503,7 +503,7 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
               <TableCell className="px-2 py-0.5 font-medium">{garantieName(garantie)}</TableCell>
               <TableCell className="px-2 py-0.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
               <TableCell className="px-2 py-0.5">{franchiseLabel(garantie)}</TableCell>
-              <TableCell className="px-2 py-0.5 text-right font-semibold">{formatMoney(garantie.prime)}</TableCell>
+              <TableCell className="px-2 py-0.5 text-right font-semibold">{moneyAmount(garantie.prime)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -1121,8 +1121,8 @@ function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossi
 function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
   ensurePdfSpace(ctx, 12);
   const { pdf } = ctx;
-  pdf.setFillColor(241, 245, 249);
-  pdf.setDrawColor(226, 232, 240);
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(203, 213, 225);
   pdf.rect(ctx.x, ctx.y, ctx.width, 5, "FD");
   pdf.setFillColor(5, 150, 105);
   pdf.rect(ctx.x, ctx.y, 0.8, 5, "F");
@@ -1253,7 +1253,7 @@ function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[], primeLabel = "
     garantieName(garantie),
     formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
     franchiseLabel(garantie),
-    formatMoney(garantie.prime),
+    moneyAmount(garantie.prime),
   ]), [68, 36, 48, 28]);
 }
 
@@ -1263,7 +1263,7 @@ function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
     amountOrDash(garantie.montantDeces),
     amountOrDash(garantie.montantInvalidite),
     amountOrDash(garantie.montantFraisMedicaux),
-    formatMoney(garantie.prime),
+    moneyAmount(garantie.prime),
   ]), [60, 30, 30, 34, 26]);
 }
 
@@ -1273,7 +1273,7 @@ function drawPdfAssistances(ctx: PdfContext, assistances: AssistanceContrat[]) {
     text(assistance.compagnieAssistanceLibelle),
     text(assistance.produit),
     `${formatDate(assistance.dateEffet)} au ${formatDate(assistance.dateEcheance)}`,
-    formatMoney(assistance.primeTotale),
+    moneyAmount(assistance.primeTotale),
   ]), [28, 43, 43, 42, 24]);
 }
 
@@ -1287,10 +1287,18 @@ function drawPdfQuittance(ctx: PdfContext, contrat: ContratSummary) {
     moneyAmount(row.accessoire),
     moneyAmount(row.cnpac),
     moneyAmount(row.primeTotale),
-  ]), [28, 27, 27, 22, 30, 24, 22]);
+  ]), [28, 27, 27, 22, 30, 24, 22], {
+    emphasizedRows: new Set(rows.flatMap((row, index) => row.emphasized ? [index] : [])),
+  });
 }
 
-function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widths: number[]) {
+function drawPdfTable(
+  ctx: PdfContext,
+  headers: string[],
+  rows: string[][],
+  widths: number[],
+  options: { emphasizedRows?: Set<number> } = {},
+) {
   if (!rows.length) return;
   const tableX = ctx.x + 3;
   const tableWidth = ctx.width - 6;
@@ -1298,8 +1306,8 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
   const actualWidths = widths.map((width) => (width / totalWidth) * tableWidth);
   const headerHeight = 5;
   ensurePdfSpace(ctx, headerHeight * 2);
-  ctx.pdf.setFillColor(241, 245, 249);
-  ctx.pdf.setDrawColor(226, 232, 240);
+  ctx.pdf.setFillColor(255, 255, 255);
+  ctx.pdf.setDrawColor(203, 213, 225);
   ctx.pdf.rect(tableX, ctx.y, tableWidth, headerHeight, "FD");
   let cursorX = tableX + 1.5;
   ctx.pdf.setFont("helvetica", "bold");
@@ -1313,7 +1321,7 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
   });
   ctx.y += headerHeight;
 
-  for (const row of rows) {
+  for (const [rowIndex, row] of rows.entries()) {
     const wrapped = row.map((cell, index) => wrapPdfText(ctx, cell, actualWidths[index] - 3));
     const rowHeight = Math.max(4.8, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
     ensurePdfSpace(ctx, rowHeight + 1);
@@ -1322,7 +1330,8 @@ function drawPdfTable(ctx: PdfContext, headers: string[], rows: string[][], widt
     ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
     row.forEach((_cell, index) => {
       const isLast = index === row.length - 1;
-      ctx.pdf.setFont("helvetica", isLast ? "bold" : "normal");
+      const emphasized = options.emphasizedRows?.has(rowIndex) ?? false;
+      ctx.pdf.setFont("helvetica", emphasized || isLast ? "bold" : "normal");
       ctx.pdf.setFontSize(6.3);
       ctx.pdf.setTextColor(2, 6, 23);
       const align = index === 0 ? "left" : "right";

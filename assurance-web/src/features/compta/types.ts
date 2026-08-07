@@ -214,6 +214,51 @@ export type ReferenceOption = {
 
 export type ClientDocumentType = "RELEVE" | "FACTURE";
 export type ClientDocumentStatus = "EMIS" | "ANNULE";
+export type ConventionBillingStatus = "A_FACTURER" | "FACTUREE" | "ANNULEE";
+export type Fractionnement = "MENSUEL" | "TRIMESTRIEL" | "SEMESTRIEL" | "ANNUEL";
+
+export type ConventionBillingInstallment = {
+  id: string;
+  contratId: string;
+  documentId?: string | null;
+  payeurId: string;
+  payeurType: "CLIENT" | "GROUPE";
+  payeurNom: string;
+  numeroDossier?: string | null;
+  numeroPolice?: string | null;
+  compagnieId?: string | null;
+  compagnie?: string | null;
+  conventionId?: string | null;
+  convention?: string | null;
+  fractionnement: Fractionnement;
+  numeroPeriode: number;
+  nombrePeriodes: number;
+  periodeDebut: string;
+  periodeFin: string;
+  dateEcheance: string;
+  statut: ConventionBillingStatus;
+  primeNette: number;
+  taxes: number;
+  accessoires: number;
+  montantTtc: number;
+};
+
+export type ConventionBillingPage = {
+  summary: {
+    total: number;
+    aFacturer: number;
+    facturees: number;
+    montantAFacturer: number;
+  };
+  page: PageInfo;
+  rows: ConventionBillingInstallment[];
+};
+
+export type CreateConventionInvoiceRequest = {
+  echeanceIds: string[];
+  dateEcheance?: string;
+  notes?: string;
+};
 
 export type ClientDocumentSource = {
   quittanceId: string;
@@ -259,7 +304,9 @@ export type ClientDocumentSourcePage = {
 
 export type ClientDocumentLine = {
   id: string;
-  quittanceId: string;
+  quittanceId?: string | null;
+  elementFacturableId?: string | null;
+  echeanceFacturationConventionId?: string | null;
   contratId: string;
   mouvementId?: string | null;
   ordre: number;

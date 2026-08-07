@@ -24,10 +24,10 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
               and (:statut is null or d.statut = :statut)
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
-              and (
+              and (:payeurId is null or (
                     (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
                     or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
-              )
+              ))
               and (
                     :search is null
                     or lower(d.numero) like concat('%', :search, '%')
@@ -54,7 +54,10 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             "clientPayeur.ville",
             "groupePayeur",
             "lignes",
-            "lignes.quittance"
+            "lignes.quittance",
+            "lignes.elementFacturable",
+            "lignes.elementFacturable.contrat",
+            "lignes.echeanceFacturationConvention"
     })
     Optional<DocumentClient> findByAgenceIdAndId(Long agenceId, Long id);
 }

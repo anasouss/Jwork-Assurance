@@ -332,6 +332,10 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.globale = true
               and q.alternative = false
               and c.prospection = false
+              and not (
+                    c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
+                    and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+              )
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
                     q.elementFacturable is null
@@ -340,7 +344,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (:dateDu is null or q.dateDebut >= :dateDu)
               and (:dateAu is null or q.dateDebut <= :dateAu)
-              and (
+              and (:payeurId is null or (
                     (
                         :payeurType = 'GROUPE'
                         and gf.id = :payeurId
@@ -372,7 +376,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                             )
                         )
                     )
-              )
+              ))
               and (
                     :search is null
                     or lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%')
@@ -412,6 +416,10 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.globale = true
               and q.alternative = false
               and c.prospection = false
+              and not (
+                    c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
+                    and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+              )
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
                     q.elementFacturable is null
@@ -420,7 +428,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (:dateDu is null or q.dateDebut >= :dateDu)
               and (:dateAu is null or q.dateDebut <= :dateAu)
-              and (
+              and (:payeurId is null or (
                     (
                         :payeurType = 'GROUPE'
                         and gf.id = :payeurId
@@ -452,7 +460,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                             )
                         )
                     )
-              )
+              ))
               and (
                     :search is null
                     or lower(coalesce(c.numeroDossier, '')) like concat('%', :search, '%')

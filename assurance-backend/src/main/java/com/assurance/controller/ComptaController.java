@@ -1,6 +1,7 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.CreerDocumentClientRequest;
+import com.assurance.dto.request.CreerFactureConventionRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
 import com.assurance.dto.request.EnregistrerAffectationQuittanceRequest;
 import com.assurance.dto.request.EnregistrerLotAffectationQuittanceRequest;
@@ -10,6 +11,7 @@ import com.assurance.dto.response.AffectationQuittanceResponse;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.DocumentClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
+import com.assurance.dto.response.EcheanceFacturationConventionPageResponse;
 import com.assurance.dto.response.ElementFacturableResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
 import com.assurance.dto.response.LotAffectationQuittanceResponse;
@@ -19,10 +21,12 @@ import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeDocumentClient;
+import com.assurance.enums.StatutEcheanceFacturationConvention;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AffectationQuittanceService;
 import com.assurance.service.DocumentClientPdfService;
 import com.assurance.service.DocumentClientService;
+import com.assurance.service.FacturationConventionService;
 import com.assurance.service.ElementFacturableService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +57,7 @@ public class ComptaController {
     private final ElementFacturableService elementFacturableService;
     private final AffectationQuittanceService affectationQuittanceService;
     private final DocumentClientService documentClientService;
+    private final FacturationConventionService facturationConventionService;
     private final DocumentClientPdfService documentClientPdfService;
 
     @GetMapping("/elements-facturables")
@@ -242,8 +247,8 @@ public class ComptaController {
     @GetMapping("/documents-clients/sources")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<SourceDocumentClientPageResponse>> sourcesDocumentsClients(
-            @RequestParam String payeurType,
-            @RequestParam Long payeurId,
+            @RequestParam(required = false) String payeurType,
+            @RequestParam(required = false) Long payeurId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
@@ -264,11 +269,41 @@ public class ComptaController {
         )));
     }
 
+    @GetMapping("/facturation-conventions/echeances")
+    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    public ResponseEntity<ApiResponse<EcheanceFacturationConventionPageResponse>> echeancesConvention(
+            @RequestParam(required = false) StatutEcheanceFacturationConvention statut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long conventionId,
+            @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(facturationConventionService.search(
+                TenantContext.getCurrentAgence(), statut, dateDu, dateAu,
+                compagnieId, conventionId, payeurId, search, page, size
+        )));
+    }
+
+    @PostMapping("/facturation-conventions/factures")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<DocumentClientResponse>> creerFactureConvention(
+            @Valid @RequestBody CreerFactureConventionRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                facturationConventionService.createInvoice(TenantContext.getCurrentAgence(), request),
+                "Facture convention émise"
+        ));
+    }
+
     @GetMapping("/documents-clients")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<DocumentClientPageResponse>> documentsClients(
-            @RequestParam String payeurType,
-            @RequestParam Long payeurId,
+            @RequestParam(required = false) String payeurType,
+            @RequestParam(required = false) Long payeurId,
             @RequestParam(required = false) TypeDocumentClient type,
             @RequestParam(required = false) StatutDocumentClient statut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,

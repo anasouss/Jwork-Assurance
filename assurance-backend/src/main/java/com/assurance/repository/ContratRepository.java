@@ -19,6 +19,24 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public interface ContratRepository extends JpaRepository<Contrat, Long> {
+
+    @EntityGraph(attributePaths = {
+            "agence", "compagnieAssurance", "convention", "payeurPrime",
+            "payeurPrime.ville", "groupeFacturation", "groupeFacturation.clientTresorerie"
+    })
+    @Query("""
+            select c from Contrat c
+            where c.agence.id = :agenceId
+              and c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and c.prospection = false
+              and c.brouillon = false
+              and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+              and c.dateEffet is not null
+              and c.dateEcheance is not null
+            order by c.dateEffet, c.id
+            """)
+    List<Contrat> findConventionInvoiceContracts(@Param("agenceId") Long agenceId);
     long countByAgenceIdAndProspectionFalseAndBrouillonFalseAndStatut(Long agenceId, StatutContrat statut);
 
     long countByAgenceIdAndProspectionFalseAndBrouillonTrue(Long agenceId);

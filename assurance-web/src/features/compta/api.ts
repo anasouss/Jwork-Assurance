@@ -9,6 +9,9 @@ import type {
   ClientDocumentSourcePage,
   ClientDocumentStatus,
   ClientDocumentType,
+  ConventionBillingPage,
+  ConventionBillingStatus,
+  CreateConventionInvoiceRequest,
   CreateClientDocumentRequest,
   ImportPreview,
   QuittanceAllocation,
@@ -27,6 +30,45 @@ export const comptaApi = {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/compagnies-assurance")
     ).map(normalizeReference);
+  },
+
+  async conventionBillingInstallments(params: {
+    statut?: ConventionBillingStatus;
+    dateDu?: string;
+    dateAu?: string;
+    compagnieId?: string;
+    conventionId?: string;
+    payeurId?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(
+      await apiFetch<ApiResponse<ConventionBillingPage>>(
+        `/api/v1/compta/facturation-conventions/echeances${buildQueryString(params)}`
+      )
+    );
+    return {
+      ...result,
+      rows: result.rows.map((row) => ({
+        ...row,
+        id: String(row.id),
+        contratId: String(row.contratId),
+        documentId: row.documentId == null ? null : String(row.documentId),
+        payeurId: String(row.payeurId),
+        compagnieId: row.compagnieId == null ? null : String(row.compagnieId),
+        conventionId: row.conventionId == null ? null : String(row.conventionId),
+      })),
+    };
+  },
+
+  async createConventionInvoice(request: CreateConventionInvoiceRequest) {
+    return normalizeClientDocument(
+      unwrap(await apiFetch<ApiResponse<ClientDocument>>(
+        "/api/v1/compta/facturation-conventions/factures",
+        { method: "POST", body: JSON.stringify(request) }
+      ))
+    );
   },
 
   async searchQuittances(params: {
@@ -174,8 +216,8 @@ export const comptaApi = {
   },
 
   async searchClientDocumentSources(params: {
-    payeurType: "CLIENT" | "GROUPE";
-    payeurId: string;
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
     typeContrat?: TypeContrat;
     dateDu?: string;
     dateAu?: string;
@@ -202,8 +244,8 @@ export const comptaApi = {
   },
 
   async searchClientDocuments(params: {
-    payeurType: "CLIENT" | "GROUPE";
-    payeurId: string;
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
     type?: ClientDocumentType;
     statut?: ClientDocumentStatus;
     dateDu?: string;
@@ -312,8 +354,12 @@ function normalizeClientDocument(document: ClientDocument): ClientDocument {
     lignes: (document.lignes ?? []).map((line) => ({
       ...line,
       id: String(line.id),
-      quittanceId: String(line.quittanceId),
-      contratId: String(line.contratId),
+      quittanceId: line.quittanceId == null ? null : String(line.quittanceId),
+      elementFacturableId: line.elementFacturableId == null ? null : String(line.elementFacturableId),
+      echeanceFacturationConventionId: line.echeanceFacturationConventionId == null
+        ? null
+        : String(line.echeanceFacturationConventionId),
+      contratId: line.contratId == null ? "" : String(line.contratId),
       mouvementId: line.mouvementId == null ? null : String(line.mouvementId),
     })),
   };

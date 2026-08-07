@@ -45,6 +45,12 @@ const groups: ComptaGroup[] = [
         href: "/app/compta/releves-factures",
         permission: "quittance:view",
       },
+      {
+        title: "Facturation conventions",
+        icon: ReceiptText,
+        href: "/app/compta/facturation-conventions",
+        permission: "quittance:view",
+      },
       { title: "Règlements clients", icon: WalletCards, disabled: true },
     ],
   },

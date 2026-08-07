@@ -40,12 +40,20 @@ public class LigneDocumentClient extends BaseEntity {
     private DocumentClient document;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quittance_id", nullable = false)
+    @JoinColumn(name = "quittance_id")
     private Quittance quittance;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "affectation_quittance_compagnie_id", nullable = false)
+    @JoinColumn(name = "affectation_quittance_compagnie_id")
     private AffectationQuittanceCompagnie affectationQuittanceCompagnie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "element_facturable_id")
+    private ElementFacturable elementFacturable;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "echeance_facturation_convention_id")
+    private EcheanceFacturationConvention echeanceFacturationConvention;
 
     @Column(nullable = false)
     private Integer ordre;

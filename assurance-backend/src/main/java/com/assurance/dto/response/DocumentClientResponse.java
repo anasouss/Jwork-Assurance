@@ -40,6 +40,8 @@ public class DocumentClientResponse {
     public static class Ligne {
         private Long id;
         private Long quittanceId;
+        private Long elementFacturableId;
+        private Long echeanceFacturationConventionId;
         private Long contratId;
         private Long mouvementId;
         private Integer ordre;

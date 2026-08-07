@@ -132,18 +132,18 @@ export default function RelevesFacturesPage() {
   });
 
   const sourceParams = useMemo(() => ({
-    payeurType: selectedPayer?.type ?? payerMode,
-    payeurId: selectedPayer?.id ?? "",
+    payeurType: selectedPayer?.type,
+    payeurId: selectedPayer?.id,
     typeContrat: urlState.sourceFilters.typeContrat === "ALL" ? undefined : urlState.sourceFilters.typeContrat,
     dateDu: urlState.sourceFilters.dateDu || undefined,
     dateAu: urlState.sourceFilters.dateAu || undefined,
     search: urlState.sourceFilters.search.trim() || undefined,
     page: urlState.sourcePage,
     size: PAGE_SIZE,
-  }), [payerMode, selectedPayer, urlState.sourceFilters, urlState.sourcePage]);
+  }), [selectedPayer, urlState.sourceFilters, urlState.sourcePage]);
   const documentParams = useMemo(() => ({
-    payeurType: selectedPayer?.type ?? payerMode,
-    payeurId: selectedPayer?.id ?? "",
+    payeurType: selectedPayer?.type,
+    payeurId: selectedPayer?.id,
     type: urlState.documentFilters.type === "ALL" ? undefined : urlState.documentFilters.type,
     statut: urlState.documentFilters.statut === "ALL" ? undefined : urlState.documentFilters.statut,
     dateDu: urlState.documentFilters.dateDu || undefined,
@@ -151,17 +151,16 @@ export default function RelevesFacturesPage() {
     search: urlState.documentFilters.search.trim() || undefined,
     page: urlState.documentPage,
     size: PAGE_SIZE,
-  }), [payerMode, selectedPayer, urlState.documentFilters, urlState.documentPage]);
+  }), [selectedPayer, urlState.documentFilters, urlState.documentPage]);
 
   const sources = useQuery({
     queryKey: ["compta", "client-document-sources", sourceParams],
     queryFn: () => comptaApi.searchClientDocumentSources(sourceParams),
-    enabled: Boolean(selectedPayer),
   });
   const documents = useQuery({
     queryKey: ["compta", "client-documents", documentParams],
     queryFn: () => comptaApi.searchClientDocuments(documentParams),
-    enabled: Boolean(selectedPayer) && urlState.tab === "documents",
+    enabled: urlState.tab === "documents",
   });
 
   useEffect(() => {
@@ -283,8 +282,7 @@ export default function RelevesFacturesPage() {
         onSelect={changePayer}
       />
 
-      {selectedPayer ? (
-        <Tabs
+      <Tabs
           value={urlState.tab}
           onValueChange={(value) => updateUrl({ tab: value === "documents" ? "documents" : "sources" })}
         >
@@ -329,7 +327,7 @@ export default function RelevesFacturesPage() {
                   <thead className="border-y bg-amber-600 text-white">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left" aria-label="Sélection" />
-                      <Header>{selectedPayer.type === "GROUPE" ? "Entité / souscripteur" : "Souscripteur"}</Header>
+                      <Header>Cible / souscripteur</Header>
                       <Header>Dossier / police</Header>
                       <Header>Mouvement</Header>
                       <Header>Compagnie</Header>
@@ -358,9 +356,9 @@ export default function RelevesFacturesPage() {
                         </td>
                         <td className="px-3 py-3">
                           <div className="font-medium">{row.souscripteurNom || row.payeurNom}</div>
-                          {selectedPayer.type === "GROUPE" ? (
-                            <div className="text-xs text-muted-foreground">{selectedPayer.name}</div>
-                          ) : null}
+                          <div className="text-xs text-muted-foreground">
+                            {row.payeurType === "GROUPE" ? `Groupe : ${row.payeurNom}` : row.payeurNom}
+                          </div>
                         </td>
                         <td className="px-3 py-3">
                           <div className="font-medium">{row.dossier || "-"}</div>
@@ -417,18 +415,7 @@ export default function RelevesFacturesPage() {
             onDelete={canDelete ? setDeleteTarget : undefined}
           />
         </TabsContent>
-        </Tabs>
-      ) : (
-        <div className="grid min-h-64 place-items-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
-          <div className="max-w-md">
-            <Users className="mx-auto mb-3 size-9 text-muted-foreground" />
-            <h2 className="font-semibold">Sélectionnez le payeur</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Les quittances et les documents seront chargés dans un compte client ou groupe unique.
-            </p>
-          </div>
-        </div>
-      )}
+      </Tabs>
 
       <IssueDialog
         open={issueOpen}
@@ -573,7 +560,7 @@ function PayerAccountSelector(props: {
           </div>
         ) : (
           <p className="pb-2 text-sm text-muted-foreground">
-            Choisissez un payeur pour ouvrir son compte documentaire.
+            Toutes les cibles sont affichées. Sélectionnez un payeur pour limiter les résultats.
           </p>
         )}
       </div>

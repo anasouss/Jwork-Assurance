@@ -20,6 +20,7 @@ import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.StatutElementFacturable;
+import com.assurance.enums.StatutEcheanceFacturationConvention;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeDocumentClient;
@@ -33,6 +34,7 @@ import com.assurance.repository.DocumentClientRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.SequenceDocumentClientRepository;
+import com.assurance.repository.EcheanceFacturationConventionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -68,6 +70,7 @@ public class DocumentClientService {
     private final SequenceDocumentClientRepository sequenceDocumentClientRepository;
     private final AgenceRepository agenceRepository;
     private final AffectationQuittanceCompagnieRepository affectationQuittanceCompagnieRepository;
+    private final EcheanceFacturationConventionRepository echeanceFacturationConventionRepository;
 
     @Transactional(readOnly = true)
     public SourceDocumentClientPageResponse searchSources(
@@ -81,7 +84,7 @@ public class DocumentClientService {
             int page,
             int size
     ) {
-        validatePayer(payeurType, payeurId);
+        validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size));
         Page<Quittance> result = quittanceRepository.searchForClientDocuments(
@@ -142,7 +145,7 @@ public class DocumentClientService {
             int page,
             int size
     ) {
-        validatePayer(payeurType, payeurId);
+        validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         Page<DocumentClient> result = documentClientRepository.search(
                 agenceId,
@@ -296,12 +299,15 @@ public class DocumentClientService {
         document.setStatut(StatutDocumentClient.ANNULE);
         document.setDateAnnulation(LocalDateTime.now());
         document.setMotifAnnulation(request.getMotif().trim());
+        releaseConventionSchedules(document);
         return toResponse(documentClientRepository.save(document), true);
     }
 
     @Transactional
     public void delete(Long agenceId, Long documentId) {
-        documentClientRepository.delete(findDocument(agenceId, documentId));
+        DocumentClient document = findDocument(agenceId, documentId);
+        releaseConventionSchedules(document);
+        documentClientRepository.delete(document);
     }
 
     @Transactional(readOnly = true)
@@ -325,6 +331,12 @@ public class DocumentClientService {
     private void validatePayer(String payeurType, Long payeurId) {
         if (payeurId == null || (!"CLIENT".equals(payeurType) && !"GROUPE".equals(payeurType))) {
             throw new BadRequestException("Sélectionnez un payeur valide");
+        }
+    }
+
+    private void validateOptionalPayer(String payeurType, Long payeurId) {
+        if (payeurId != null) {
+            validatePayer(payeurType, payeurId);
         }
     }
 
@@ -490,11 +502,23 @@ public class DocumentClientService {
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
                 .map(line -> DocumentClientResponse.Ligne.builder()
                         .id(line.getId())
-                        .quittanceId(line.getQuittance().getId())
-                        .contratId(line.getQuittance().getContrat().getId())
-                        .mouvementId(line.getQuittance().getMouvementContrat() == null
+                        .quittanceId(line.getQuittance() == null ? null : line.getQuittance().getId())
+                        .elementFacturableId(line.getElementFacturable() == null
+                                ? null : line.getElementFacturable().getId())
+                        .echeanceFacturationConventionId(line.getEcheanceFacturationConvention() == null
+                                ? null : line.getEcheanceFacturationConvention().getId())
+                        .contratId(line.getQuittance() != null
+                                ? line.getQuittance().getContrat().getId()
+                                : line.getElementFacturable() == null
                                 ? null
-                                : line.getQuittance().getMouvementContrat().getId())
+                                : line.getElementFacturable().getContrat().getId())
+                        .mouvementId(line.getQuittance() != null
+                                && line.getQuittance().getMouvementContrat() != null
+                                ? line.getQuittance().getMouvementContrat().getId()
+                                : line.getElementFacturable() != null
+                                && line.getElementFacturable().getMouvementContrat() != null
+                                ? line.getElementFacturable().getMouvementContrat().getId()
+                                : null)
                         .ordre(line.getOrdre())
                         .dateOperation(line.getDateOperation())
                         .dateEcheance(line.getDateEcheance())
@@ -536,6 +560,16 @@ public class DocumentClientService {
                         && !document.getAgence().getSignatureCheminStockage().isBlank())
                 .lignes(lines)
                 .build();
+    }
+
+    private void releaseConventionSchedules(DocumentClient document) {
+        List<com.assurance.entity.EcheanceFacturationConvention> schedules =
+                echeanceFacturationConventionRepository.findByDocumentClientId(document.getId());
+        schedules.forEach(schedule -> {
+            schedule.setDocumentClient(null);
+            schedule.setStatut(StatutEcheanceFacturationConvention.A_FACTURER);
+        });
+        echeanceFacturationConventionRepository.saveAll(schedules);
     }
 
     private SourceDocumentClientPageResponse.PageInfo pageInfo(Page<Quittance> page) {

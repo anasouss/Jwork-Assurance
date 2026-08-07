@@ -31,4 +31,6 @@ public interface LigneDocumentClientRepository extends JpaRepository<LigneDocume
             @Param("type") TypeDocumentClient type,
             @Param("statut") StatutDocumentClient statut
     );
+
+    List<LigneDocumentClient> findByEcheanceFacturationConventionIdIn(Collection<Long> echeanceIds);
 }

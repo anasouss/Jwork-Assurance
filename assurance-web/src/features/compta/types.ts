@@ -214,6 +214,12 @@ export type ReferenceOption = {
 
 export type ClientDocumentType = "RELEVE" | "FACTURE";
 export type ClientDocumentStatus = "EMIS" | "ANNULE";
+export type BillableElementNature =
+  | "CONTRAT"
+  | "MOUVEMENT_CONTRAT"
+  | "CARTE_VERTE"
+  | "ASSISTANCE"
+  | "FRAIS_DOCUMENT";
 export type ConventionBillingStatus = "A_FACTURER" | "FACTUREE" | "ANNULEE";
 export type Fractionnement = "MENSUEL" | "TRIMESTRIEL" | "SEMESTRIEL" | "ANNUEL";
 
@@ -261,13 +267,16 @@ export type CreateConventionInvoiceRequest = {
 };
 
 export type ClientDocumentSource = {
-  quittanceId: string;
+  elementFacturableId: string;
+  nature: BillableElementNature;
+  quittanceId?: string | null;
   contratId: string;
   mouvementId?: string | null;
   dossier: string;
   police: string;
   typeContrat: TypeContrat;
   mouvement: string;
+  reference?: string | null;
   compagnie: string;
   dateEffet: string;
   dateEcheance?: string | null;
@@ -305,6 +314,7 @@ export type ClientDocumentLine = {
   id: string;
   quittanceId?: string | null;
   elementFacturableId?: string | null;
+  nature?: BillableElementNature | null;
   echeanceFacturationConventionId?: string | null;
   contratId: string;
   mouvementId?: string | null;
@@ -358,7 +368,7 @@ export type ClientDocumentPage = {
 
 export type CreateClientDocumentRequest = {
   typeDocument: ClientDocumentType;
-  quittanceIds: string[];
+  elementFacturableIds: string[];
   periodeDebut: string;
   periodeFin: string;
   dateEcheance?: string;

@@ -100,7 +100,7 @@ export default function RelevesFacturesPage() {
   const [detailId, setDetailId] = useState<string>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
   const [deleteTarget, setDeleteTarget] = useState<ClientDocument>();
-  const [payerScope, setPayerScope] = useState<PayerScope>(requestedPayerId ? requestedPayerType : "ALL");
+  const payerScope = urlState.payerScope;
   const [payerSearch, setPayerSearch] = useState("");
   const deferredPayerSearch = useDeferredValue(payerSearch.trim());
   const [selectedPayer, setSelectedPayer] = useState<SelectedPayer>();
@@ -108,7 +108,6 @@ export default function RelevesFacturesPage() {
   useEffect(() => {
     setSourceFilters(urlState.sourceFilters);
     setDocumentFilters(urlState.documentFilters);
-    setPayerScope(urlState.payerId ? urlState.payerType : "ALL");
   }, [urlState]);
 
   const clients = useQuery({
@@ -181,10 +180,10 @@ export default function RelevesFacturesPage() {
   }
 
   function changePayer(payer?: SelectedPayer, scope: PayerScope = payer?.type ?? payerScope) {
-    setPayerScope(scope);
     setSelectedPayer(payer);
     setSelected({});
     updateUrl({
+      payerScope: scope,
       payerType: scope === "GROUPE" ? "GROUPE" : "CLIENT",
       payerId: payer?.id ?? "",
       sourcePage: 0,
@@ -195,13 +194,11 @@ export default function RelevesFacturesPage() {
   useEffect(() => {
     if (!requestedPayerId) {
       if (selectedPayer) setSelectedPayer(undefined);
-      setPayerScope("ALL");
       return;
     }
     if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
     if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
       const client = requestedClient.data.client;
-      setPayerScope("CLIENT");
       setSelectedPayer({
         type: "CLIENT",
         id: client.id,
@@ -214,7 +211,6 @@ export default function RelevesFacturesPage() {
     if (requestedPayerType === "GROUPE") {
       const group = groups.data?.find((item) => item.id === requestedPayerId);
       if (!group) return;
-      setPayerScope("GROUPE");
       setSelectedPayer({
         type: "GROUPE",
         id: group.id,
@@ -224,7 +220,7 @@ export default function RelevesFacturesPage() {
         memberCount: group.membres.length,
       });
     }
-  }, [groups.data, requestedClient.data, requestedPayerId, requestedPayerType, selectedPayer?.id]);
+  }, [groups.data, requestedClient.data, requestedPayerId, requestedPayerType, selectedPayer?.id, urlState.payerScope]);
 
   const selectedRows = useMemo(() => Object.values(selected), [selected]);
   const selectedPayerKey = selectedRows.length
@@ -233,18 +229,18 @@ export default function RelevesFacturesPage() {
 
   function toggleSource(row: ClientDocumentSource, checked: boolean) {
     if (checked && urlState.operationType === "FACTURE" && !row.facturable) {
-      toast.error(row.dejaFacturee ? "Cette quittance est déjà facturée." : "Cette écriture ne peut pas être facturée.");
+      toast.error(row.dejaFacturee ? "Cette écriture est déjà facturée." : "Cette écriture ne peut pas être facturée.");
       return;
     }
     const payerKey = `${row.payeurType}:${row.payeurId}`;
     if (checked && selectedPayerKey && selectedPayerKey !== payerKey) {
-      toast.error("Sélectionnez uniquement des quittances du même payeur.");
+      toast.error("Sélectionnez uniquement des écritures du même payeur.");
       return;
     }
     setSelected((current) => {
       const next = { ...current };
-      if (checked) next[row.quittanceId] = row;
-      else delete next[row.quittanceId];
+      if (checked) next[row.elementFacturableId] = row;
+      else delete next[row.elementFacturableId];
       return next;
     });
   }
@@ -274,7 +270,7 @@ export default function RelevesFacturesPage() {
           <div className="text-xs font-semibold uppercase text-amber-700">Comptabilité client</div>
           <h1 className="text-2xl font-semibold">Relevés et factures</h1>
           <p className="text-sm text-muted-foreground">
-            Émission de documents client à partir des quittances validées, avec historique PDF immuable.
+            Relevés et factures à partir des écritures d'assurance et d'assistance validées.
           </p>
         </div>
         <Button asChild variant="outline">
@@ -311,7 +307,7 @@ export default function RelevesFacturesPage() {
         <TabsList>
           <TabsTrigger value="sources">
             <ReceiptText className="size-4" />
-            {urlState.operationType === "RELEVE" ? "Préparer le relevé" : "Quittances à facturer"}
+            {urlState.operationType === "RELEVE" ? "Préparer le relevé" : "Écritures à facturer"}
           </TabsTrigger>
           <TabsTrigger value="documents">
             <FileText className="size-4" />
@@ -330,13 +326,13 @@ export default function RelevesFacturesPage() {
           <Card className="min-w-0 shadow-none">
             <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
               <div>
-                <CardTitle className="text-base">Quittances validées</CardTitle>
+                <CardTitle className="text-base">Écritures disponibles</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {selectedRows.length
-                    ? `${selectedRows.length} quittance(s) sélectionnée(s).`
+                    ? `${selectedRows.length} écriture(s) sélectionnée(s).`
                     : urlState.operationType === "RELEVE"
                       ? "Sélectionnez les écritures du même payeur à présenter sur le relevé."
-                      : "Sélectionnez les quittances facturables du même payeur."}
+                      : "Sélectionnez les écritures facturables du même payeur."}
                 </p>
               </div>
               {canIssue ? (
@@ -355,7 +351,7 @@ export default function RelevesFacturesPage() {
                     <tr>
                       <th className="w-12 px-4 py-3 text-left" aria-label="Sélection" />
                       <Header>Cible / souscripteur</Header>
-                      <Header>Dossier / police</Header>
+                      <Header>Police / référence</Header>
                       <Header>Mouvement</Header>
                       <Header>Compagnie</Header>
                       <Header>Date d'effet</Header>
@@ -369,16 +365,16 @@ export default function RelevesFacturesPage() {
                   <tbody>
                     {sources.isLoading ? <LoadingRows columns={11} /> : null}
                     {!sources.isLoading && !(sources.data?.rows.length) ? (
-                      <tr><td colSpan={11} className="h-32 text-center text-muted-foreground">Aucune quittance trouvée.</td></tr>
+                      <tr><td colSpan={11} className="h-32 text-center text-muted-foreground">Aucune écriture trouvée.</td></tr>
                     ) : null}
                     {(sources.data?.rows ?? []).map((row) => (
-                      <tr key={row.quittanceId} className="border-b hover:bg-muted/30">
+                      <tr key={row.elementFacturableId} className="border-b hover:bg-muted/30">
                         <td className="px-4 py-3">
                           <Checkbox
-                            checked={Boolean(selected[row.quittanceId])}
+                            checked={Boolean(selected[row.elementFacturableId])}
                             disabled={urlState.operationType === "FACTURE" && !row.facturable}
                             onCheckedChange={(checked) => toggleSource(row, checked === true)}
-                            aria-label={`Sélectionner ${row.dossier}`}
+                            aria-label={`Sélectionner ${row.police || row.reference || row.dossier}`}
                           />
                         </td>
                         <td className="px-3 py-3">
@@ -388,8 +384,12 @@ export default function RelevesFacturesPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <div className="font-medium">{row.dossier || "-"}</div>
-                          <div className="text-xs text-muted-foreground">{row.police || "-"}</div>
+                          <div className="font-medium">
+                            {row.nature === "ASSISTANCE" ? row.reference || "-" : row.police || row.reference || "-"}
+                          </div>
+                          {row.nature === "ASSISTANCE" ? (
+                            <div className="text-xs text-muted-foreground">Contrat d'assistance</div>
+                          ) : null}
                         </td>
                         <td className="px-3 py-3">{row.mouvement}</td>
                         <td className="px-3 py-3">{row.compagnie}</td>
@@ -460,7 +460,11 @@ export default function RelevesFacturesPage() {
         }}
       />
       <DocumentDetailDialog id={detailId} onOpenChange={(open) => !open && setDetailId(undefined)} />
-      <CancelDocumentDialog target={cancelTarget} onClose={() => setCancelTarget(undefined)} />
+      <CancelDocumentDialog
+        target={cancelTarget}
+        onClose={() => setCancelTarget(undefined)}
+        onCancelled={() => updateUrl({ tab: "sources", sourcePage: 0, documentPage: 0 })}
+      />
       <DeleteDocumentDialog target={deleteTarget} onClose={() => setDeleteTarget(undefined)} />
     </div>
   );
@@ -475,7 +479,7 @@ function OperationSelector(props: {
       <div className="mb-3">
         <div className="font-semibold">Document à préparer</div>
         <p className="text-sm text-muted-foreground">
-          Le relevé présente les écritures du client. La facture engage uniquement des quittances facturables.
+          Le relevé présente les écritures du client. La facture engage uniquement les écritures facturables.
         </p>
       </div>
       <div className="grid max-w-xl grid-cols-2 rounded-md border bg-muted p-1">
@@ -683,7 +687,7 @@ function SourceSearch(props: {
         <FilterField label="Date d'effet au">
           <DatePicker date={filters.dateAu} onSelect={(date) => onChange({ ...filters, dateAu: toDateOnly(date) ?? "" })} />
         </FilterField>
-        <FilterField label="Dossier, police ou quittance">
+        <FilterField label="Dossier, police, quittance ou assistance">
           <Input value={filters.search} onChange={(event) => onChange({ ...filters, search: event.target.value })} />
         </FilterField>
         <SearchActions onApply={props.onApply} onReset={props.onReset} />
@@ -784,7 +788,7 @@ function DocumentTable(props: {
                       </Button>
                       <PdfButton document={document} />
                       {props.onCancel && document.statut === "EMIS" ? (
-                        <Button variant="ghost" size="icon" title="Annuler le document" onClick={() => props.onCancel?.(document)}>
+                        <Button variant="ghost" size="icon" title="Rectifier le document" onClick={() => props.onCancel?.(document)}>
                           <Ban className="size-4 text-destructive" />
                         </Button>
                       ) : null}
@@ -835,7 +839,7 @@ function IssueDialog(props: {
   const issue = useMutation({
     mutationFn: () => comptaApi.createClientDocument({
       typeDocument: props.type,
-      quittanceIds: props.rows.map((row) => row.quittanceId),
+      elementFacturableIds: props.rows.map((row) => row.elementFacturableId),
       periodeDebut: periodStart,
       periodeFin: periodEnd,
       dateEcheance: props.type === "FACTURE" ? dueDate : undefined,
@@ -863,7 +867,7 @@ function IssueDialog(props: {
             {props.type === "RELEVE" ? "Créer le relevé client" : "Émettre la facture client"}
           </DialogTitle>
           <DialogDescription>
-            {props.rows.length} quittance(s) pour {props.rows[0]?.payeurNom ?? "-"}.
+            {props.rows.length} écriture(s) pour {props.rows[0]?.payeurNom ?? "-"}.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -887,7 +891,7 @@ function IssueDialog(props: {
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-muted">
                 <tr>
-                  <Header>Dossier</Header>
+                  <Header>Police / référence</Header>
                   <Header>Mouvement</Header>
                   <Header>Date</Header>
                   <Header align="right">Prime nette</Header>
@@ -897,8 +901,13 @@ function IssueDialog(props: {
               </thead>
               <tbody>
                 {props.rows.map((row) => (
-                  <tr key={row.quittanceId} className="border-t">
-                    <td className="px-3 py-2">{row.dossier}</td>
+                  <tr key={row.elementFacturableId} className="border-t">
+                    <td className="px-3 py-2">
+                      <div>{row.nature === "ASSISTANCE" ? row.reference || "-" : row.police || row.reference || "-"}</div>
+                      {row.nature === "ASSISTANCE" ? (
+                        <div className="text-xs text-muted-foreground">Contrat d'assistance</div>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2">{row.mouvement}</td>
                     <td className="px-3 py-2">{formatDate(row.dateEffet)}</td>
                     <MoneyCell value={row.primeNette} />
@@ -972,7 +981,7 @@ function DocumentDetailDialog(props: { id?: string; onOpenChange: (open: boolean
                 <thead className="bg-muted">
                   <tr>
                     <Header>Date</Header>
-                    <Header>Dossier / police</Header>
+                    <Header>Police / référence</Header>
                     <Header>Mouvement</Header>
                     <Header align="right">Prime nette</Header>
                     <Header align="right">Taxes</Header>
@@ -984,7 +993,16 @@ function DocumentDetailDialog(props: { id?: string; onOpenChange: (open: boolean
                   {document.lignes.map((line) => (
                     <tr key={line.id} className="border-t">
                       <td className="px-3 py-2">{formatDate(line.dateOperation)}</td>
-                      <td className="px-3 py-2">{line.numeroDossier}<div className="text-xs text-muted-foreground">{line.numeroPolice}</div></td>
+                      <td className="px-3 py-2">
+                        <div>
+                          {line.nature === "ASSISTANCE"
+                            ? line.numeroQuittance || "-"
+                            : line.numeroPolice || line.numeroQuittance || "-"}
+                        </div>
+                        {line.nature !== "ASSISTANCE" && line.numeroQuittance && line.numeroQuittance !== line.numeroPolice ? (
+                          <div className="text-xs text-muted-foreground">{line.numeroQuittance}</div>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-2">{line.mouvement}</td>
                       <MoneyCell value={line.primeNette} />
                       <MoneyCell value={line.taxes} />
@@ -1006,7 +1024,11 @@ function DocumentDetailDialog(props: { id?: string; onOpenChange: (open: boolean
   );
 }
 
-function CancelDocumentDialog(props: { target?: ClientDocument; onClose: () => void }) {
+function CancelDocumentDialog(props: {
+  target?: ClientDocument;
+  onClose: () => void;
+  onCancelled: () => void;
+}) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
 
@@ -1023,6 +1045,7 @@ function CancelDocumentDialog(props: { target?: ClientDocument; onClose: () => v
         queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
       ]);
       props.onClose();
+      props.onCancelled();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Annulation impossible"),
   });
@@ -1030,9 +1053,10 @@ function CancelDocumentDialog(props: { target?: ClientDocument; onClose: () => v
     <AlertDialog open={Boolean(props.target)} onOpenChange={(open) => !open && props.onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Annuler {props.target?.numero} ?</AlertDialogTitle>
+          <AlertDialogTitle>Rectifier {props.target?.numero} ?</AlertDialogTitle>
           <AlertDialogDescription>
-            Le document restera dans l'historique avec le statut annulé. Les quittances d'une facture annulée pourront être refacturées.
+            Le document émis restera inchangé dans l'historique avec le statut annulé. Ses écritures
+            redeviendront disponibles pour composer et émettre un nouveau document.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <FilterField label="Motif d'annulation *">
@@ -1053,7 +1077,7 @@ function CancelDocumentDialog(props: { target?: ClientDocument; onClose: () => v
               cancel.mutate();
             }}
           >
-            Annuler le document
+            {cancel.isPending ? "Annulation..." : "Annuler et recomposer"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -1082,7 +1106,7 @@ function DeleteDocumentDialog(props: { target?: ClientDocument; onClose: () => v
         <AlertDialogHeader>
           <AlertDialogTitle>Supprimer {props.target?.numero} ?</AlertDialogTitle>
           <AlertDialogDescription>
-            Cette suppression est définitive. Les quittances liées redeviendront disponibles pour un nouveau document.
+            Cette suppression est définitive. Les écritures liées redeviendront disponibles pour un nouveau document.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -1230,7 +1254,11 @@ function PageFooter(props: {
 }
 
 function formatMoney(value: number) {
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value || 0);
+  const amount = new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value || 0).replace(/[\u00a0\u202f]/g, " ");
+  return `${amount} MAD`;
 }
 
 function formatDate(value?: string | null) {

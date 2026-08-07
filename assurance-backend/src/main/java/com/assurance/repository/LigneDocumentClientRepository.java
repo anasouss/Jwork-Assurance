@@ -15,19 +15,20 @@ public interface LigneDocumentClientRepository extends JpaRepository<LigneDocume
     @Query("""
             select count(l)
             from LigneDocumentClient l
-            where l.quittance.mouvementContrat.id = :mouvementId
+            where l.elementFacturable.mouvementContrat.id = :mouvementId
             """)
     long countByMouvementContratId(@Param("mouvementId") Long mouvementId);
 
     @Query("""
-            select l.quittance.id
+            select directElement.id
             from LigneDocumentClient l
-            where l.quittance.id in :quittanceIds
+            join l.elementFacturable directElement
+            where directElement.id in :elementIds
               and l.document.typeDocument = :type
               and l.document.statut = :statut
             """)
-    List<Long> findQuittanceIdsAlreadyIssued(
-            @Param("quittanceIds") Collection<Long> quittanceIds,
+    List<Long> findElementFacturableIdsAlreadyIssued(
+            @Param("elementIds") Collection<Long> elementIds,
             @Param("type") TypeDocumentClient type,
             @Param("statut") StatutDocumentClient statut
     );

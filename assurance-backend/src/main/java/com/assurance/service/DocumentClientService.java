@@ -7,15 +7,18 @@ import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.dto.response.SourceDocumentClientResponse;
 import com.assurance.entity.Agence;
+import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.DocumentClient;
+import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.GroupeClient;
 import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.Quittance;
 import com.assurance.entity.SequenceDocumentClient;
 import com.assurance.enums.ModeFacturationContrat;
+import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.StatutElementFacturable;
@@ -27,8 +30,10 @@ import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
+import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.DocumentClientRepository;
+import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.SequenceDocumentClientRepository;
@@ -62,6 +67,8 @@ public class DocumentClientService {
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
     private final QuittanceRepository quittanceRepository;
+    private final ElementFacturableRepository elementFacturableRepository;
+    private final AssistanceContratRepository assistanceContratRepository;
     private final ContratClientRepository contratClientRepository;
     private final DocumentClientRepository documentClientRepository;
     private final LigneDocumentClientRepository ligneDocumentClientRepository;
@@ -85,7 +92,7 @@ public class DocumentClientService {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size));
-        Page<Quittance> result = quittanceRepository.searchForClientDocuments(
+        Page<ElementFacturable> result = elementFacturableRepository.searchForClientDocuments(
                 agenceId,
                 brancheId,
                 typeContrat,
@@ -97,20 +104,25 @@ public class DocumentClientService {
                 pageable
         );
 
-        Map<Long, Client> subscribers = loadSubscribers(result.getContent());
-        List<Long> pageIds = result.getContent().stream().map(Quittance::getId).toList();
+        List<Long> pageIds = result.getContent().stream().map(ElementFacturable::getId).toList();
+        Map<Long, Quittance> quittances = loadQuittancesByElement(pageIds);
+        Map<Long, AssistanceContrat> assistances = loadAssistancesByElement(pageIds);
+        Map<Long, Client> subscribers = loadSubscribersFromContracts(result.getContent().stream()
+                .map(ElementFacturable::getContrat)
+                .toList());
         Set<Long> alreadyInvoiced = pageIds.isEmpty()
                 ? Set.of()
-                : new HashSet<>(ligneDocumentClientRepository.findQuittanceIdsAlreadyIssued(
+                : new HashSet<>(ligneDocumentClientRepository.findElementFacturableIdsAlreadyIssued(
                         pageIds,
                         TypeDocumentClient.FACTURE,
                         StatutDocumentClient.EMIS
                 ));
         List<SourceDocumentClientResponse> rows = result.getContent().stream()
-                .map(q -> toSourceResponse(
-                        q,
-                        resolvePayer(q.getContrat(), subscribers),
-                        subscribers.get(q.getContrat().getId()),
+                .map(element -> resolveSource(element, quittances, assistances))
+                .map(source -> toSourceResponse(
+                        source,
+                        resolvePayer(source.element().getContrat(), subscribers),
+                        subscribers.get(source.element().getContrat().getId()),
                         alreadyInvoiced
                 ))
                 .toList();
@@ -167,17 +179,23 @@ public class DocumentClientService {
     @Transactional
     public DocumentClientResponse create(Long agenceId, CreerDocumentClientRequest request) {
         validateRequest(request);
-        List<Long> requestedIds = request.getQuittanceIds().stream()
+        List<Long> requestedIds = request.getElementFacturableIds().stream()
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         if (requestedIds.isEmpty()) {
-            throw new BadRequestException("Sélectionnez au moins une quittance");
+            throw new BadRequestException("Sélectionnez au moins une écriture");
         }
-        List<Quittance> sources = quittanceRepository.findClientDocumentSources(agenceId, requestedIds);
-        if (sources.size() != requestedIds.size()) {
-            throw new BadRequestException("Une ou plusieurs quittances sélectionnées sont introuvables");
+        List<ElementFacturable> elements = elementFacturableRepository
+                .findClientDocumentSourcesForUpdate(agenceId, requestedIds);
+        if (elements.size() != requestedIds.size()) {
+            throw new BadRequestException("Une ou plusieurs écritures sélectionnées sont introuvables");
         }
+        Map<Long, Quittance> quittances = loadQuittancesByElement(requestedIds);
+        Map<Long, AssistanceContrat> assistances = loadAssistancesByElement(requestedIds);
+        List<BillableSource> sources = elements.stream()
+                .map(element -> resolveSource(element, quittances, assistances))
+                .toList();
         sources.forEach(this::validateSource);
         sources.forEach(source -> validateSourcePeriod(
                 source,
@@ -185,13 +203,15 @@ public class DocumentClientService {
                 request.getPeriodeFin()
         ));
 
-        Map<Long, Client> subscribers = loadSubscribers(sources);
+        Map<Long, Client> subscribers = loadSubscribersFromContracts(sources.stream()
+                .map(source -> source.element().getContrat())
+                .toList());
         List<Payer> payers = sources.stream()
-                .map(source -> resolvePayer(source.getContrat(), subscribers))
+                .map(source -> resolvePayer(source.element().getContrat(), subscribers))
                 .toList();
         String payerKey = payers.get(0).key();
         if (payers.stream().anyMatch(payer -> !payer.key().equals(payerKey))) {
-            throw new BadRequestException("Les quittances sélectionnées doivent appartenir au même payeur");
+            throw new BadRequestException("Les écritures sélectionnées doivent appartenir au même payeur");
         }
 
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
@@ -221,32 +241,35 @@ public class DocumentClientService {
                 .notes(trimToNull(request.getNotes()))
                 .build();
 
-        List<Quittance> orderedSources = sources.stream()
-                .sorted(Comparator.comparing(Quittance::getDateDebut).thenComparing(Quittance::getId))
+        List<BillableSource> orderedSources = sources.stream()
+                .sorted(Comparator.comparing((BillableSource source) -> source.element().getDateDebut())
+                        .thenComparing(source -> source.element().getId()))
                 .toList();
         int order = 1;
         BigDecimal debit = ZERO;
         BigDecimal credit = ZERO;
-        for (Quittance source : orderedSources) {
-            BigDecimal ttc = money(source.getPrimeTotale());
+        for (BillableSource source : orderedSources) {
+            ElementFacturable element = source.element();
+            BigDecimal ttc = money(element.getPrimeTotale());
             BigDecimal lineDebit = ttc.signum() > 0 ? ttc : ZERO;
             BigDecimal lineCredit = ttc.signum() < 0 ? ttc.abs() : ZERO;
             LigneDocumentClient line = LigneDocumentClient.builder()
                     .document(document)
-                    .quittance(source)
+                    .quittance(source.quittance())
+                    .elementFacturable(element)
                     .ordre(order++)
-                    .dateOperation(source.getDateDebut())
-                    .dateEcheance(source.getDateFin())
-                    .numeroDossier(source.getContrat().getNumeroDossier())
-                    .numeroPolice(source.getContrat().getNumeroPolice())
-                    .numeroQuittance(source.getNumeroQuittance())
-                    .mouvement(movementLabel(source))
-                    .compagnie(source.getCompagnieAssurance().getNom())
+                    .dateOperation(element.getDateDebut())
+                    .dateEcheance(element.getDateFin())
+                    .numeroDossier(element.getContrat().getNumeroDossier())
+                    .numeroPolice(element.getContrat().getNumeroPolice())
+                    .numeroQuittance(sourceReference(source))
+                    .mouvement(sourceLabel(source))
+                    .compagnie(sourceCompany(source))
                     .debit(lineDebit)
                     .credit(lineCredit)
-                    .primeNette(money(source.getPrimeNette()))
-                    .taxes(taxes(source))
-                    .accessoires(accessories(source))
+                    .primeNette(money(element.getPrimeNette()))
+                    .taxes(taxes(element))
+                    .accessoires(accessories(element))
                     .montantTtc(ttc)
                     .build();
             document.getLignes().add(line);
@@ -313,40 +336,62 @@ public class DocumentClientService {
         }
     }
 
-    private void validateInvoiceSources(List<Quittance> sources) {
-        if (sources.stream().anyMatch(source -> money(source.getPrimeTotale()).signum() <= 0)) {
-            throw new BadRequestException("Une facture ne peut contenir que des quittances débitrices");
+    private void validateInvoiceSources(List<BillableSource> sources) {
+        if (sources.stream().anyMatch(source -> money(source.element().getPrimeTotale()).signum() <= 0)) {
+            throw new BadRequestException("Une facture ne peut contenir que des écritures débitrices");
         }
-        Set<Long> alreadyInvoiced = new HashSet<>(ligneDocumentClientRepository.findQuittanceIdsAlreadyIssued(
-                sources.stream().map(Quittance::getId).toList(),
+        Set<Long> alreadyInvoiced = new HashSet<>(ligneDocumentClientRepository
+                .findElementFacturableIdsAlreadyIssued(
+                sources.stream().map(source -> source.element().getId()).toList(),
                 TypeDocumentClient.FACTURE,
                 StatutDocumentClient.EMIS
         ));
         if (!alreadyInvoiced.isEmpty()) {
-            throw new BadRequestException("Une ou plusieurs quittances figurent déjà sur une facture émise");
+            throw new BadRequestException("Une ou plusieurs écritures figurent déjà sur une facture émise");
         }
     }
 
-    private void validateSource(Quittance source) {
-        if (!Boolean.TRUE.equals(source.getGlobale()) || Boolean.TRUE.equals(source.getAlternative())) {
-            throw new BadRequestException("La quittance sélectionnée n'est pas une quittance globale valide");
+    private void validateSource(BillableSource source) {
+        ElementFacturable element = source.element();
+        Contrat contract = element.getContrat();
+        if (!Boolean.TRUE.equals(element.getActif()) || element.getStatut() == StatutElementFacturable.ANNULE) {
+            throw new BadRequestException("L'écriture sélectionnée est annulée");
         }
-        if (source.getMouvementContrat() != null
-                && source.getMouvementContrat().getStatut() != StatutMouvementContrat.VALIDE) {
-            throw new BadRequestException("La quittance est liée à un mouvement non validé");
+        if (contract == null || Boolean.TRUE.equals(contract.getProspection())) {
+            throw new BadRequestException("L'écriture sélectionnée n'appartient pas à un contrat validé");
         }
-        if (source.getElementFacturable() != null
-                && source.getElementFacturable().getStatut() == StatutElementFacturable.ANNULE) {
-            throw new BadRequestException("La quittance sélectionnée est annulée");
-        }
-    }
-
-    private void validateSourcePeriod(Quittance source, LocalDate periodStart, LocalDate periodEnd) {
-        if (source.getDateDebut() == null
-                || source.getDateDebut().isBefore(periodStart)
-                || source.getDateDebut().isAfter(periodEnd)) {
+        if (contract.getTypeContrat() == TypeContrat.CONVENTION
+                && "facture".equalsIgnoreCase(trimToNull(contract.getModeReglement()))) {
             throw new BadRequestException(
-                    "La période du document doit inclure la date d'effet de chaque quittance"
+                    "Les conventions réglées sur facture doivent être traitées dans la facturation des conventions"
+            );
+        }
+        if (element.getMouvementContrat() != null
+                && element.getMouvementContrat().getStatut() != StatutMouvementContrat.VALIDE) {
+            throw new BadRequestException("L'écriture est liée à un mouvement non validé");
+        }
+        if (element.getNature() == NatureElementFacturable.ASSISTANCE) {
+            if (source.assistance() == null || !Boolean.TRUE.equals(source.assistance().getActif())) {
+                throw new BadRequestException("L'assistance sélectionnée n'est plus active");
+            }
+            return;
+        }
+        Quittance quittance = source.quittance();
+        if (quittance == null
+                || !Boolean.TRUE.equals(quittance.getGlobale())
+                || Boolean.TRUE.equals(quittance.getAlternative())
+                || Boolean.TRUE.equals(quittance.getPayee())) {
+            throw new BadRequestException("L'écriture assurance n'a pas de quittance globale valide");
+        }
+    }
+
+    private void validateSourcePeriod(BillableSource source, LocalDate periodStart, LocalDate periodEnd) {
+        LocalDate effectiveDate = source.element().getDateDebut();
+        if (effectiveDate == null
+                || effectiveDate.isBefore(periodStart)
+                || effectiveDate.isAfter(periodEnd)) {
+            throw new BadRequestException(
+                    "La période du document doit inclure la date d'effet de chaque écriture"
             );
         }
     }
@@ -369,9 +414,9 @@ public class DocumentClientService {
         return "%s-%s-%d-%06d".formatted(prefix, agence.getCode(), year, current);
     }
 
-    private Map<Long, Client> loadSubscribers(Collection<Quittance> sources) {
-        Set<Long> contractIds = sources.stream()
-                .map(source -> source.getContrat().getId())
+    private Map<Long, Client> loadSubscribersFromContracts(Collection<Contrat> contracts) {
+        Set<Long> contractIds = contracts.stream()
+                .map(Contrat::getId)
                 .collect(Collectors.toSet());
         if (contractIds.isEmpty()) {
             return Map.of();
@@ -424,34 +469,40 @@ public class DocumentClientService {
     }
 
     private SourceDocumentClientResponse toSourceResponse(
-            Quittance source,
+            BillableSource source,
             Payer payer,
             Client subscriber,
             Set<Long> alreadyInvoiced
     ) {
-        BigDecimal ttc = money(source.getPrimeTotale());
+        ElementFacturable element = source.element();
+        Contrat contract = element.getContrat();
+        BigDecimal ttc = money(element.getPrimeTotale());
         return SourceDocumentClientResponse.builder()
-                .quittanceId(source.getId())
-                .contratId(source.getContrat().getId())
-                .mouvementId(source.getMouvementContrat() == null ? null : source.getMouvementContrat().getId())
-                .dossier(source.getContrat().getNumeroDossier())
-                .police(source.getContrat().getNumeroPolice())
-                .typeContrat(source.getContrat().getTypeContrat())
-                .mouvement(movementLabel(source))
-                .compagnie(source.getCompagnieAssurance().getNom())
-                .dateEffet(source.getDateDebut())
-                .dateEcheance(source.getDateFin())
+                .elementFacturableId(element.getId())
+                .nature(element.getNature())
+                .quittanceId(source.quittance() == null ? null : source.quittance().getId())
+                .contratId(contract.getId())
+                .mouvementId(element.getMouvementContrat() == null
+                        ? null : element.getMouvementContrat().getId())
+                .dossier(contract.getNumeroDossier())
+                .police(contract.getNumeroPolice())
+                .typeContrat(contract.getTypeContrat())
+                .mouvement(sourceLabel(source))
+                .reference(sourceReference(source))
+                .compagnie(sourceCompany(source))
+                .dateEffet(element.getDateDebut())
+                .dateEcheance(element.getDateFin())
                 .payeurType(payer.group() == null ? "CLIENT" : "GROUPE")
                 .payeurId(payer.group() == null ? payer.client().getId() : payer.group().getId())
                 .payeurNom(payer.name())
                 .souscripteurId(subscriber == null ? null : subscriber.getId())
                 .souscripteurNom(subscriber == null ? null : subscriber.getNomAffichage())
-                .primeNette(money(source.getPrimeNette()))
-                .taxes(taxes(source))
-                .accessoires(accessories(source))
+                .primeNette(money(element.getPrimeNette()))
+                .taxes(taxes(element))
+                .accessoires(accessories(element))
                 .montantTtc(ttc)
-                .dejaFacturee(alreadyInvoiced.contains(source.getId()))
-                .facturable(ttc.signum() > 0 && !alreadyInvoiced.contains(source.getId()))
+                .dejaFacturee(alreadyInvoiced.contains(element.getId()))
+                .facturable(ttc.signum() > 0 && !alreadyInvoiced.contains(element.getId()))
                 .build();
     }
 
@@ -464,6 +515,8 @@ public class DocumentClientService {
                         .quittanceId(line.getQuittance() == null ? null : line.getQuittance().getId())
                         .elementFacturableId(line.getElementFacturable() == null
                                 ? null : line.getElementFacturable().getId())
+                        .nature(line.getElementFacturable() == null
+                                ? null : line.getElementFacturable().getNature())
                         .echeanceFacturationConventionId(line.getEcheanceFacturationConvention() == null
                                 ? null : line.getEcheanceFacturationConvention().getId())
                         .contratId(line.getQuittance() != null
@@ -531,7 +584,7 @@ public class DocumentClientService {
         echeanceFacturationConventionRepository.saveAll(schedules);
     }
 
-    private SourceDocumentClientPageResponse.PageInfo pageInfo(Page<Quittance> page) {
+    private SourceDocumentClientPageResponse.PageInfo pageInfo(Page<?> page) {
         return SourceDocumentClientPageResponse.PageInfo.builder()
                 .number(page.getNumber())
                 .size(page.getSize())
@@ -563,11 +616,90 @@ public class DocumentClientService {
         return firstNonBlank(source.getMouvementContrat().getNumeroMouvement(), "Mouvement");
     }
 
-    private BigDecimal taxes(Quittance source) {
+    private Map<Long, Quittance> loadQuittancesByElement(Collection<Long> elementIds) {
+        if (elementIds.isEmpty()) {
+            return Map.of();
+        }
+        return quittanceRepository.findGlobalByElementFacturableIds(elementIds).stream()
+                .collect(Collectors.toMap(
+                        quittance -> quittance.getElementFacturable().getId(),
+                        quittance -> quittance,
+                        (current, candidate) -> candidate.getId() > current.getId() ? candidate : current
+                ));
+    }
+
+    private Map<Long, AssistanceContrat> loadAssistancesByElement(Collection<Long> elementIds) {
+        if (elementIds.isEmpty()) {
+            return Map.of();
+        }
+        return assistanceContratRepository.findActiveByElementFacturableIds(elementIds).stream()
+                .collect(Collectors.toMap(
+                        assistance -> assistance.getElementFacturable().getId(),
+                        assistance -> assistance,
+                        (current, candidate) -> candidate.getId() > current.getId() ? candidate : current
+                ));
+    }
+
+    private BillableSource resolveSource(
+            ElementFacturable element,
+            Map<Long, Quittance> quittances,
+            Map<Long, AssistanceContrat> assistances
+    ) {
+        if (element.getNature() == NatureElementFacturable.ASSISTANCE) {
+            AssistanceContrat assistance = assistances.get(element.getId());
+            if (assistance == null) {
+                throw new BadRequestException("L'écriture d'assistance " + element.getId() + " est incomplète");
+            }
+            return new BillableSource(element, null, assistance);
+        }
+        Quittance quittance = quittances.get(element.getId());
+        if (quittance == null) {
+            throw new BadRequestException("L'écriture assurance " + element.getId() + " n'a pas de quittance valide");
+        }
+        return new BillableSource(element, quittance, null);
+    }
+
+    private String sourceLabel(BillableSource source) {
+        if (source.assistance() != null) {
+            return "Assistance - " + firstNonBlank(
+                    source.assistance().getProduit(),
+                    source.element().getLibelle(),
+                    "Produit d'assistance"
+            );
+        }
+        return movementLabel(source.quittance());
+    }
+
+    private String sourceReference(BillableSource source) {
+        if (source.assistance() != null) {
+            return firstNonBlank(
+                    source.assistance().getNumeroContratOuQuittance(),
+                    source.element().getReferenceSource()
+            );
+        }
+        return source.quittance().getNumeroQuittance();
+    }
+
+    private String sourceCompany(BillableSource source) {
+        if (source.assistance() != null && source.assistance().getCompagnieAssistance() != null) {
+            return source.assistance().getCompagnieAssistance().getNom();
+        }
+        if (source.element().getCompagnieAssurance() != null) {
+            return source.element().getCompagnieAssurance().getNom();
+        }
+        return firstNonBlank(
+                source.element().getContrat().getCompagnieAssurance() == null
+                        ? null
+                        : source.element().getContrat().getCompagnieAssurance().getNom(),
+                "Compagnie non renseignée"
+        );
+    }
+
+    private BigDecimal taxes(ElementFacturable source) {
         return money(money(source.getTaxe()).add(money(source.getTaxeParafiscale())));
     }
 
-    private BigDecimal accessories(Quittance source) {
+    private BigDecimal accessories(ElementFacturable source) {
         return money(money(source.getAccessoire()).add(money(source.getCnpac())));
     }
 
@@ -629,6 +761,13 @@ public class DocumentClientService {
             String name,
             String identifier,
             String address
+    ) {
+    }
+
+    private record BillableSource(
+            ElementFacturable element,
+            Quittance quittance,
+            AssistanceContrat assistance
     ) {
     }
 }

@@ -7,7 +7,6 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,15 +17,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "lignes_documents_clients",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_ligne_document_client_affectation",
-                columnNames = {"document_id", "affectation_quittance_compagnie_id"}
-        ),
-        indexes = {
+@Table(name = "lignes_documents_clients", indexes = {
         @Index(name = "idx_ligne_document_client_document", columnList = "document_id"),
         @Index(name = "idx_ligne_document_client_quittance", columnList = "quittance_id"),
-        @Index(name = "idx_ligne_document_client_affectation", columnList = "affectation_quittance_compagnie_id")
+        @Index(name = "idx_ligne_document_client_element", columnList = "element_facturable_id")
 })
 @Getter
 @Setter
@@ -44,11 +38,7 @@ public class LigneDocumentClient extends BaseEntity {
     private Quittance quittance;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "affectation_quittance_compagnie_id")
-    private AffectationQuittanceCompagnie affectationQuittanceCompagnie;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "element_facturable_id")
+    @JoinColumn(name = "element_facturable_id", nullable = false)
     private ElementFacturable elementFacturable;
 
     @ManyToOne(fetch = FetchType.LAZY)

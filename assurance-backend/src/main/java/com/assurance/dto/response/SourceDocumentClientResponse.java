@@ -1,6 +1,7 @@
 package com.assurance.dto.response;
 
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.NatureElementFacturable;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,6 +11,8 @@ import java.time.LocalDate;
 @Getter
 @Builder
 public class SourceDocumentClientResponse {
+    private Long elementFacturableId;
+    private NatureElementFacturable nature;
     private Long quittanceId;
     private Long contratId;
     private Long mouvementId;
@@ -17,6 +20,7 @@ public class SourceDocumentClientResponse {
     private String police;
     private TypeContrat typeContrat;
     private String mouvement;
+    private String reference;
     private String compagnie;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;

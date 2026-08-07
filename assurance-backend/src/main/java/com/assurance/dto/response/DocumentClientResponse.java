@@ -2,6 +2,7 @@ package com.assurance.dto.response;
 
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeDocumentClient;
+import com.assurance.enums.NatureElementFacturable;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -41,6 +42,7 @@ public class DocumentClientResponse {
         private Long id;
         private Long quittanceId;
         private Long elementFacturableId;
+        private NatureElementFacturable nature;
         private Long echeanceFacturationConventionId;
         private Long contratId;
         private Long mouvementId;

@@ -241,7 +241,8 @@ export const comptaApi = {
       ...result,
       rows: result.rows.map((row) => ({
         ...row,
-        quittanceId: String(row.quittanceId),
+        elementFacturableId: String(row.elementFacturableId),
+        quittanceId: row.quittanceId == null ? null : String(row.quittanceId),
         contratId: String(row.contratId),
         mouvementId: row.mouvementId == null ? null : String(row.mouvementId),
         payeurId: String(row.payeurId),

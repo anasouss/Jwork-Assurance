@@ -531,4 +531,24 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             @Param("agenceId") Long agenceId,
             @Param("ids") Collection<Long> ids
     );
+
+    @EntityGraph(attributePaths = {
+            "contrat",
+            "contrat.compagnieAssurance",
+            "mouvementContrat",
+            "mouvementContrat.typeMouvement",
+            "compagnieAssurance",
+            "elementFacturable"
+    })
+    @Query("""
+            select q
+            from Quittance q
+            where q.elementFacturable.id in :elementIds
+              and q.globale = true
+              and q.alternative = false
+              and q.payee = false
+            """)
+    List<Quittance> findGlobalByElementFacturableIds(
+            @Param("elementIds") Collection<Long> elementIds
+    );
 }

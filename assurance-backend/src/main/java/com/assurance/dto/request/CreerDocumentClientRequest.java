@@ -18,7 +18,7 @@ public class CreerDocumentClientRequest {
     private TypeDocumentClient typeDocument;
 
     @NotEmpty
-    private List<Long> quittanceIds;
+    private List<Long> elementFacturableIds;
 
     @NotNull
     private LocalDate periodeDebut;

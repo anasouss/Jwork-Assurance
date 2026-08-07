@@ -3,6 +3,7 @@ package com.assurance.service;
 import com.assurance.entity.Agence;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.LigneDocumentClient;
+import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.exception.BadRequestException;
 import com.itextpdf.barcodes.BarcodeQRCode;
@@ -79,7 +80,7 @@ public class ReleveClientPdfRenderer {
             if (source.getStatut() == StatutDocumentClient.ANNULE) {
                 writeCancellation(document, source, bold);
             }
-            writeFooters(pdf, source, regular);
+            writeFooters(pdf, source, regular, bold);
 
             document.close();
             return output.toByteArray();
@@ -163,13 +164,14 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeClientReference(Document document, DocumentClient source, PdfFont bold) {
-        Table reference = new Table(new float[]{2.7f, 0.5f, 1.2f})
-                .setWidth(UnitValue.createPercentValue(39))
+        Table reference = new Table(new float[]{1.5f, 1.2f, 0.6f, 1.8f})
+                .setWidth(UnitValue.createPercentValue(46))
                 .setMarginLeft(11)
                 .setMarginBottom(12);
         reference.addCell(referenceCell("L’ID Client :", bold, TextAlignment.LEFT));
-        reference.addCell(referenceCell("Réf :", null, TextAlignment.LEFT));
         reference.addCell(referenceCell(value(source.getPayeurIdentifiant()), null, TextAlignment.LEFT));
+        reference.addCell(referenceCell("Réf :", null, TextAlignment.LEFT));
+        reference.addCell(referenceCell(value(source.getNumero()), null, TextAlignment.LEFT));
         document.add(reference);
     }
 
@@ -196,7 +198,7 @@ public class ReleveClientPdfRenderer {
                 .setWidth(UnitValue.createPercentValue(100))
                 .setKeepTogether(false);
         addHeader(table, "L’assuré", tableHeader);
-        addHeader(table, "Police N°", tableHeader);
+        addHeader(table, "Police / référence", tableHeader);
         addHeader(table, "Du", tableHeader);
         addHeader(table, "Au", tableHeader);
         addHeader(table, "Prime Nette", tableHeader);
@@ -215,15 +217,23 @@ public class ReleveClientPdfRenderer {
     private void addStatementLine(Table table, DocumentClient source, LigneDocumentClient line, PdfFont bold) {
         BigDecimal balance = money(line.getDebit()).subtract(money(line.getCredit()));
         addValue(table, source.getPayeurNom(), TextAlignment.LEFT, null);
-        addValue(table, line.getNumeroPolice(), TextAlignment.CENTER, null);
+        addValue(table, statementReference(line), TextAlignment.CENTER, null);
         addValue(table, date(line.getDateOperation()), TextAlignment.CENTER, null);
         addValue(table, date(line.getDateEcheance()), TextAlignment.CENTER, null);
-        addValue(table, amount(line.getPrimeNette()), TextAlignment.RIGHT, null);
-        addValue(table, amount(line.getTaxes()), TextAlignment.RIGHT, null);
-        addValue(table, amount(line.getMontantTtc()), TextAlignment.RIGHT, null);
-        addValue(table, positiveAmount(line.getCredit()), TextAlignment.RIGHT, null);
-        addValue(table, amount(balance), TextAlignment.RIGHT, bold);
+        addValue(table, amount(line.getPrimeNette()), TextAlignment.CENTER, null);
+        addValue(table, amount(line.getTaxes()), TextAlignment.CENTER, null);
+        addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, null);
+        addValue(table, positiveAmount(line.getCredit()), TextAlignment.CENTER, null);
+        addValue(table, amount(balance), TextAlignment.CENTER, bold);
         addValue(table, value(line.getMouvement()), TextAlignment.LEFT, null);
+    }
+
+    private String statementReference(LigneDocumentClient line) {
+        if (line.getElementFacturable() != null
+                && line.getElementFacturable().getNature() == NatureElementFacturable.ASSISTANCE) {
+            return value(line.getNumeroQuittance());
+        }
+        return value(line.getNumeroPolice());
     }
 
     private void addHeader(Table table, String text, PdfFont font) {
@@ -306,7 +316,7 @@ public class ReleveClientPdfRenderer {
                 .setMarginTop(12));
     }
 
-    private void writeFooters(PdfDocument pdf, DocumentClient source, PdfFont regular) {
+    private void writeFooters(PdfDocument pdf, DocumentClient source, PdfFont regular, PdfFont bold) {
         Agence agency = source.getAgence();
         for (int index = 1; index <= pdf.getNumberOfPages(); index++) {
             PdfPage page = pdf.getPage(index);
@@ -337,9 +347,8 @@ public class ReleveClientPdfRenderer {
                 canvas.add(footerParagraph(legal, regular));
             }
             if (!bank.isBlank()) {
-                canvas.add(footerParagraph(bank, regular));
+                canvas.add(footerParagraph(bank, bold));
             }
-            canvas.add(footerParagraph("Relevé " + source.getNumero(), regular));
             canvas.close();
         }
     }
@@ -384,7 +393,7 @@ public class ReleveClientPdfRenderer {
 
     private String bankLine(Agence agency) {
         StringBuilder result = new StringBuilder();
-        append(result, "N° de compte bancaire : ", agency.getRib());
+        append(result, "RIB : ", agency.getRib());
         append(result, "Banque : ", agency.getBanque());
         return result.toString();
     }

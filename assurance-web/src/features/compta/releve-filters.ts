@@ -19,6 +19,7 @@ export type DocumentFilters = {
 
 export type ReleveSearchState = {
   operationType: ClientDocumentType;
+  payerScope: "ALL" | "CLIENT" | "GROUPE";
   payerType: "CLIENT" | "GROUPE";
   payerId: string;
   tab: ReleveTab;
@@ -46,10 +47,19 @@ export const DOCUMENT_DEFAULTS: DocumentFilters = {
 export function releveSearchStateFromParams(params: URLSearchParams): ReleveSearchState {
   const sourceType = params.get("sourceTypeContrat");
   const documentStatus = params.get("documentStatut");
+  const payerId = params.get("payeurId") ?? "";
+  const payerType = params.get("payeurType") === "GROUPE" ? "GROUPE" : "CLIENT";
+  const requestedScope = params.get("cible");
+  const payerScope = requestedScope === "CLIENT" || requestedScope === "GROUPE"
+    ? requestedScope
+    : payerId
+      ? payerType
+      : "ALL";
   return {
     operationType: params.get("operationType") === "FACTURE" ? "FACTURE" : "RELEVE",
-    payerType: params.get("payeurType") === "GROUPE" ? "GROUPE" : "CLIENT",
-    payerId: params.get("payeurId") ?? "",
+    payerScope,
+    payerType,
+    payerId,
     tab: params.get("tab") === "documents" ? "documents" : "sources",
     sourceFilters: {
       brancheId: params.get("sourceBrancheId") ?? "ALL",
@@ -72,6 +82,7 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
 export function releveSearchParams(state: ReleveSearchState) {
   const params = new URLSearchParams();
   if (state.operationType === "FACTURE") params.set("operationType", "FACTURE");
+  if (state.payerScope !== "ALL") params.set("cible", state.payerScope);
   if (state.payerType === "GROUPE") params.set("payeurType", "GROUPE");
   if (state.payerId) params.set("payeurId", state.payerId);
   if (state.tab === "documents") params.set("tab", "documents");

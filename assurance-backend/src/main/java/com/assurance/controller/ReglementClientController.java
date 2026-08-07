@@ -6,9 +6,11 @@ import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CreanceClientPageResponse;
+import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.security.TenantContext;
 import com.assurance.service.ReglementClientService;
 import jakarta.validation.Valid;
@@ -151,6 +153,29 @@ public class ReglementClientController {
     public ResponseEntity<ApiResponse<List<ReglementClientResponse.Instrument>>> pendingInstruments() {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.pendingInstruments(
                 TenantContext.getCurrentAgence()
+        )));
+    }
+
+    @GetMapping("/instruments")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> instruments(
+            @RequestParam(defaultValue = "EN_ATTENTE") StatutInstrumentReglement statut,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.searchInstruments(
+                TenantContext.getCurrentAgence(),
+                statut,
+                dateDu,
+                dateAu,
+                search,
+                page,
+                size
         )));
     }
 

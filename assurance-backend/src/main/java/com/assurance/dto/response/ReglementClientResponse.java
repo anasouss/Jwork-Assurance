@@ -39,6 +39,7 @@ public class ReglementClientResponse {
         private BigDecimal montant;
         private LocalDate dateInstrument;
         private LocalDate dateEcheance;
+        private LocalDate dateStatut;
         private String referenceInstrument;
         private String banqueEmettrice;
         private Long compteTresorerieId;

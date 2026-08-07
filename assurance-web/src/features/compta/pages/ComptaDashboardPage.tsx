@@ -65,19 +65,19 @@ const groups: ComptaGroup[] = [
       {
         title: "Caisses et banques",
         icon: Banknote,
-        href: "/app/compta/tresorerie",
+        href: "/app/compta/tresorerie/comptes",
         permission: "tresorerie:view",
       },
       {
-        title: "Chèques et effets",
+        title: "Instruments à encaisser",
         icon: ScrollText,
-        href: "/app/compta/tresorerie",
+        href: "/app/compta/tresorerie/instruments",
         permission: "tresorerie:view",
       },
       {
         title: "Journal de trésorerie",
         icon: Landmark,
-        href: "/app/compta/tresorerie",
+        href: "/app/compta/tresorerie/journal",
         permission: "tresorerie:view",
       },
     ],

@@ -26,6 +26,7 @@ import type {
   RuleRequest,
   TypeContrat,
   PaymentInstrument,
+  PaymentInstrumentPage,
   ReplacePaymentInstrumentRequest,
   TreasuryAccount,
   TreasuryMovement,
@@ -387,6 +388,23 @@ export const comptaApi = {
     return unwrap(await apiFetch<ApiResponse<PaymentInstrument[]>>(
       "/api/v1/compta/reglements-clients/instruments/en-attente"
     )).map(normalizePaymentInstrument);
+  },
+
+  async paymentInstruments(params: {
+    statut: PaymentInstrument["statut"];
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<PaymentInstrumentPage>>(
+      `/api/v1/compta/reglements-clients/instruments${buildQueryString(params)}`
+    ));
+    return {
+      ...result,
+      rows: result.rows.map(normalizePaymentInstrument),
+    };
   },
 
   async changePaymentInstrumentStatus(

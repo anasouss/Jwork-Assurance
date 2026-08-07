@@ -426,11 +426,17 @@ export type PaymentInstrument = {
   montant: number;
   dateInstrument: string;
   dateEcheance?: string | null;
+  dateStatut?: string | null;
   referenceInstrument?: string | null;
   banqueEmettrice?: string | null;
   compteTresorerieId?: string | null;
   compteTresorerie?: string | null;
   affectations: PaymentAllocation[];
+};
+
+export type PaymentInstrumentPage = {
+  page: PageInfo;
+  rows: PaymentInstrument[];
 };
 
 export type ClientPayment = {

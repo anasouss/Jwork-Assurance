@@ -66,6 +66,14 @@ public class TresorerieService {
         if (compteRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, accountId)) {
             throw new BadRequestException("Un compte de trésorerie utilise déjà ce code");
         }
+        if (request.getTypeCompte() != account.getTypeCompte()) {
+            throw new BadRequestException("Le type d'un compte de trésorerie ne peut pas être modifié");
+        }
+        if (money(request.getSoldeInitial()).compareTo(money(account.getSoldeInitial())) != 0) {
+            throw new BadRequestException(
+                    "Le solde initial ne peut pas être modifié. Utilisez une écriture d'ajustement."
+            );
+        }
         return toResponse(compteRepository.save(apply(account, request, code)));
     }
 

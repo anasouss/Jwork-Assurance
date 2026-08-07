@@ -5,6 +5,7 @@ import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.response.CreanceClientPageResponse;
+import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
@@ -554,6 +555,64 @@ public class ReglementClientService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public InstrumentReglementPageResponse searchInstruments(
+            Long agenceId,
+            StatutInstrumentReglement status,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search,
+            int page,
+            int size
+    ) {
+        if (dateDu != null && dateAu != null && dateDu.isAfter(dateAu)) {
+            throw new BadRequestException("La date de début doit précéder la date de fin");
+        }
+        Page<InstrumentReglementClient> result = instrumentRepository.searchByStatus(
+                agenceId,
+                status,
+                dateDu,
+                dateAu,
+                search == null || search.isBlank() ? null : search.trim(),
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
+        );
+        return InstrumentReglementPageResponse.builder()
+                .page(SourceDocumentClientPageResponse.PageInfo.builder()
+                        .number(result.getNumber())
+                        .size(result.getSize())
+                        .totalElements(result.getTotalElements())
+                        .totalPages(result.getTotalPages())
+                        .first(result.isFirst())
+                        .last(result.isLast())
+                        .build())
+                .rows(result.getContent().stream().map(this::toInstrumentRegisterResponse).toList())
+                .build();
+    }
+
+    private ReglementClientResponse.Instrument toInstrumentRegisterResponse(
+            InstrumentReglementClient instrument
+    ) {
+        return ReglementClientResponse.Instrument.builder()
+                .id(instrument.getId())
+                .reglementId(instrument.getReglement().getId())
+                .numeroReglement(instrument.getReglement().getNumero())
+                .payeurNom(instrument.getReglement().getPayeurNom())
+                .mode(instrument.getMode())
+                .statut(instrument.getStatut())
+                .montant(instrument.getMontant())
+                .dateInstrument(instrument.getDateInstrument())
+                .dateEcheance(instrument.getDateEcheance())
+                .dateStatut(instrument.getDateStatut())
+                .referenceInstrument(instrument.getReferenceInstrument())
+                .banqueEmettrice(instrument.getBanqueEmettrice())
+                .compteTresorerieId(instrument.getCompteTresorerie() == null
+                        ? null : instrument.getCompteTresorerie().getId())
+                .compteTresorerie(instrument.getCompteTresorerie() == null
+                        ? null : instrument.getCompteTresorerie().getLibelle())
+                .affectations(List.of())
+                .build();
+    }
+
     private InstrumentReglementClient buildInstrument(
             Agence agence,
             ReglementClient payment,
@@ -1093,6 +1152,7 @@ public class ReglementClientService {
                 .montant(instrument.getMontant())
                 .dateInstrument(instrument.getDateInstrument())
                 .dateEcheance(instrument.getDateEcheance())
+                .dateStatut(instrument.getDateStatut())
                 .referenceInstrument(instrument.getReferenceInstrument())
                 .banqueEmettrice(instrument.getBanqueEmettrice())
                 .compteTresorerieId(instrument.getCompteTresorerie() == null

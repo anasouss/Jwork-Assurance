@@ -19,7 +19,13 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
   },
   {
     matches: startsWith("/app/sinistre"),
-    anyOf: ["sinistre:view", "sinistre:create", "sinistre:manage"],
+    anyOf: [
+      "sinistre:view",
+      "sinistre:create",
+      "sinistre:manage",
+      "sinistre:finance",
+      "sinistre:referentiel",
+    ],
   },
   {
     matches: startsWith("/app/companies/contacts"),

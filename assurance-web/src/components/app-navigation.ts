@@ -35,7 +35,7 @@ export type AppNavigationItem = AppModule & {
 export const appModules: AppModule[] = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true },
   { title: "Production", url: "/app/production", icon: BadgeCheck, permission: "contrat:view" },
-  { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, permissions: ["sinistre:view", "sinistre:create", "sinistre:manage"] },
+  { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, permissions: ["sinistre:view", "sinistre:create", "sinistre:manage", "sinistre:finance", "sinistre:referentiel"] },
   { title: "Compagnies", url: "/app/companies", icon: Building2, permissions: ["referentiel:view", "referentiel:manage", "contact-compagnie:view", "contact-compagnie:manage"] },
   { title: "CRM", url: "/app/crm", icon: Users, permission: "client:view" },
   {
@@ -62,8 +62,8 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "production", title: "Commandes attestations", url: "/app/production/attestations-stock/commandes", icon: ClipboardList, permission: "contrat:view" },
   { module: "production", title: "Réceptions attestations", url: "/app/production/attestations-stock/receptions", icon: Truck, permission: "contrat:view" },
   { module: "production", title: "Paramètres", url: "/app/production/parametres", icon: Settings, permission: "referentiel:view" },
-  { module: "sinistre", title: "Tableau de bord", url: "/app/sinistre", icon: LayoutDashboard, exact: true, permissions: ["sinistre:view", "sinistre:manage"] },
-  { module: "sinistre", title: "Dossiers sinistre", url: "/app/sinistre/dossiers", icon: Files, permissions: ["sinistre:view", "sinistre:manage"] },
+  { module: "sinistre", title: "Tableau de bord", url: "/app/sinistre", icon: LayoutDashboard, exact: true, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
+  { module: "sinistre", title: "Dossiers sinistre", url: "/app/sinistre/dossiers", icon: Files, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
   { module: "sinistre", title: "Déclarer", url: "/app/sinistre/declarer", icon: FilePlus2, permission: "sinistre:create" },
   { module: "sinistre", title: "Experts & garages", url: "/app/sinistre/referentiels", icon: Users, permission: "sinistre:referentiel" },
   { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permission: "referentiel:view" },

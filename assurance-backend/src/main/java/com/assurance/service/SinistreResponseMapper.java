@@ -41,6 +41,7 @@ public class SinistreResponseMapper {
     private final ProvisionSinistreRepository provisionRepository;
     private final SinistreOperationRepository operationRepository;
     private final SinistreEvenementRepository evenementRepository;
+    private final SinistreReadinessService readinessService;
 
     public SinistreSummaryResponse toSummary(Sinistre sinistre) {
         SinistreCouverture couverture = resolveCouverture(sinistre);
@@ -87,6 +88,7 @@ public class SinistreResponseMapper {
         List<SinistreEvenement> evenements = evenementRepository
                 .findBySinistreIdOrderByCreatedAtDesc(sinistre.getId());
         Totaux totaux = totals(provisions, operations);
+        BigDecimal totalIndemnisable = readinessService.totalIndemnisable(sinistre.getId());
 
         return SinistreDetailResponse.builder()
                 .id(sinistre.getId())
@@ -112,10 +114,11 @@ public class SinistreResponseMapper {
                 .couverture(toCoverage(sinistre, couverture))
                 .totaux(SinistreDetailResponse.Totaux.builder()
                         .provisionCourante(totaux.provision())
+                        .totalIndemnisable(totalIndemnisable)
                         .totalRegle(totaux.reglements())
                         .totalFrais(totaux.frais())
                         .totalRecours(totaux.recours())
-                        .resteARegler(totaux.resteARegler())
+                        .resteARegler(remaining(totalIndemnisable, totaux.reglements()))
                         .build())
                 .garanties(garanties.stream().map(this::toGuarantee).toList())
                 .parties(parties.stream().map(this::toParty).toList())
@@ -124,7 +127,34 @@ public class SinistreResponseMapper {
                 .provisions(provisions.stream().map(this::toProvision).toList())
                 .operations(operations.stream().map(this::toOperation).toList())
                 .evenements(evenements.stream().map(this::toEvent).toList())
+                .workflow(toWorkflow(sinistre, documents))
                 .build();
+    }
+
+    private SinistreDetailResponse.Workflow toWorkflow(
+            Sinistre sinistre,
+            List<SinistreDocument> documents
+    ) {
+        return SinistreDetailResponse.Workflow.builder()
+                .transitions(readinessService.transitions(sinistre).stream()
+                        .map(item -> SinistreDetailResponse.Workflow.Transition.builder()
+                                .statut(item.statut())
+                                .autorisee(item.allowed())
+                                .blocages(item.blockers())
+                                .build())
+                        .toList())
+                .documentsRecus((int) documents.stream()
+                        .filter(item -> item.getStatut() == com.assurance.enums.StatutDocumentSinistre.RECU)
+                        .count())
+                .documentsRejetes((int) documents.stream()
+                        .filter(item -> item.getStatut() == com.assurance.enums.StatutDocumentSinistre.REJETE)
+                        .count())
+                .build();
+    }
+
+    private BigDecimal remaining(BigDecimal indemnity, BigDecimal paid) {
+        BigDecimal result = indemnity.subtract(paid);
+        return result.signum() < 0 ? BigDecimal.ZERO : result;
     }
 
     private SinistreCouverture resolveCouverture(Sinistre sinistre) {
@@ -284,11 +314,7 @@ public class SinistreResponseMapper {
         BigDecimal reglements = sum(active, TypeOperationSinistre.REGLEMENT);
         BigDecimal frais = sum(active, TypeOperationSinistre.FRAIS);
         BigDecimal recours = sum(active, TypeOperationSinistre.RECOURS);
-        BigDecimal reste = provision.subtract(reglements);
-        if (reste.signum() < 0) {
-            reste = BigDecimal.ZERO;
-        }
-        return new Totaux(provision, reglements, frais, recours, reste);
+        return new Totaux(provision, reglements, frais, recours);
     }
 
     private BigDecimal sum(List<SinistreOperation> operations, TypeOperationSinistre type) {
@@ -306,8 +332,7 @@ public class SinistreResponseMapper {
             BigDecimal provision,
             BigDecimal reglements,
             BigDecimal frais,
-            BigDecimal recours,
-            BigDecimal resteARegler
+            BigDecimal recours
     ) {
     }
 }

@@ -18,43 +18,26 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { statusLabels } from "../format";
-import type { StatutSinistre } from "../types";
-
-const NEXT: Record<StatutSinistre, StatutSinistre[]> = {
-  BROUILLON: ["DECLARE", "ANNULE"],
-  DECLARE: ["DOSSIER_INCOMPLET", "TRANSMIS_COMPAGNIE", "ANNULE"],
-  DOSSIER_INCOMPLET: ["DECLARE", "TRANSMIS_COMPAGNIE", "ANNULE"],
-  TRANSMIS_COMPAGNIE: ["EXPERTISE", "EN_ATTENTE_REGLEMENT", "REJETE"],
-  EXPERTISE: ["EN_ATTENTE_REGLEMENT", "REJETE"],
-  EN_ATTENTE_REGLEMENT: ["PARTIELLEMENT_REGLE", "REGLE", "REJETE"],
-  PARTIELLEMENT_REGLE: ["EN_ATTENTE_REGLEMENT", "REGLE", "CLOTURE"],
-  REGLE: ["CLOTURE", "ROUVERT"],
-  CLOTURE: ["ROUVERT"],
-  REJETE: ["CLOTURE", "ROUVERT"],
-  ANNULE: [],
-  ROUVERT: [
-    "DOSSIER_INCOMPLET",
-    "TRANSMIS_COMPAGNIE",
-    "EXPERTISE",
-    "EN_ATTENTE_REGLEMENT",
-  ],
-};
+import type { SinistreDetail, StatutSinistre } from "../types";
 
 export function SinistreTransitionDialog({
   open,
-  current,
+  transitions,
   saving,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
-  current: StatutSinistre;
+  transitions: SinistreDetail["workflow"]["transitions"];
   saving: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (statut: StatutSinistre, motif?: string) => void;
 }) {
   const [statut, setStatut] = useState<StatutSinistre | "">("");
   const [motif, setMotif] = useState("");
+  const selected = transitions.find((item) => item.statut === statut);
+  const reasonRequired =
+    statut === "ANNULE" || statut === "REJETE" || statut === "ROUVERT";
   useEffect(() => {
     if (open) {
       setStatut("");
@@ -81,29 +64,47 @@ export function SinistreTransitionDialog({
                 <SelectValue placeholder="Sélectionner" />
               </SelectTrigger>
               <SelectContent>
-                {NEXT[current].map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {statusLabels[value]}
+                {transitions.map((item) => (
+                  <SelectItem
+                    key={item.statut}
+                    value={item.statut}
+                    disabled={!item.autorisee}
+                  >
+                    {statusLabels[item.statut]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <Label>Motif / observation</Label>
+            <Label>
+              Motif / observation{reasonRequired ? " *" : ""}
+            </Label>
             <Textarea
               value={motif}
               maxLength={500}
               onChange={(event) => setMotif(event.target.value)}
             />
           </div>
+          {selected && !selected.autorisee ? (
+            <ul className="grid gap-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {selected.blocages.map((blocker) => (
+                <li key={blocker}>{blocker}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
           <Button
-            disabled={!statut || saving}
+            disabled={
+              !statut ||
+              !selected?.autorisee ||
+              (reasonRequired && !motif.trim()) ||
+              saving
+            }
             onClick={() => {
               if (statut) onSubmit(statut, motif.trim() || undefined);
             }}
@@ -114,8 +115,4 @@ export function SinistreTransitionDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-export function hasAvailableTransition(statut: StatutSinistre) {
-  return NEXT[statut].length > 0;
 }

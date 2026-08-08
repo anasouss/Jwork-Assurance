@@ -56,6 +56,7 @@ public class SinistreService {
     private final SinistreCouvertureService couvertureService;
     private final SinistreNumeroService numeroService;
     private final SinistreWorkflowService workflowService;
+    private final SinistreReadinessService readinessService;
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
 
@@ -186,7 +187,13 @@ public class SinistreService {
     ) {
         Utilisateur acteur = resolveCurrentUser(agenceId, utilisateurId);
         Sinistre sinistre = resolve(agenceId, id);
-        validateTransitionPrerequisites(sinistre, request.getStatut());
+        List<String> blockers = readinessService.blockers(sinistre, request.getStatut());
+        if (!blockers.isEmpty()) {
+            throw new BadRequestException(String.join(". ", blockers));
+        }
+        if (requiresReason(request.getStatut()) && !hasText(request.getMotif())) {
+            throw new BadRequestException("Le motif est obligatoire pour ce changement de statut");
+        }
         StatutSinistre ancien = sinistre.getStatut();
         workflowService.transition(sinistre, request.getStatut());
         sinistreRepository.save(sinistre);
@@ -305,27 +312,10 @@ public class SinistreService {
         }
     }
 
-    private void validateTransitionPrerequisites(Sinistre sinistre, StatutSinistre cible) {
-        if (cible == StatutSinistre.DECLARE || cible == StatutSinistre.TRANSMIS_COMPAGNIE) {
-            boolean garantieImpliquee = garantieRepository.findBySinistreIdOrderBySnapshotCode(sinistre.getId())
-                    .stream()
-                    .anyMatch(SinistreGarantie::isImpliquee);
-            if (!hasText(sinistre.getCirconstances())) {
-                throw new BadRequestException("Les circonstances sont obligatoires pour déclarer le sinistre");
-            }
-            if (!garantieImpliquee) {
-                throw new BadRequestException("Sélectionnez au moins une garantie impliquée");
-            }
-        }
-        if (cible == StatutSinistre.EXPERTISE
-                && missionRepository.findBySinistreIdOrderByDateMissionDescCreatedAtDesc(sinistre.getId()).isEmpty()) {
-            throw new BadRequestException("Une mission d'expertise est obligatoire avant de passer en expertise");
-        }
-        if (cible == StatutSinistre.REGLE
-                && operationRepository.totalByType(sinistre.getId(), com.assurance.enums.TypeOperationSinistre.REGLEMENT)
-                .compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Un règlement est obligatoire avant de marquer le sinistre comme réglé");
-        }
+    private boolean requiresReason(StatutSinistre target) {
+        return target == StatutSinistre.ANNULE
+                || target == StatutSinistre.REJETE
+                || target == StatutSinistre.ROUVERT;
     }
 
     private Utilisateur resolveGestionnaire(Long agenceId, Long gestionnaireId) {

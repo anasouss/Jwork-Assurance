@@ -34,6 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.util.EnumSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +52,7 @@ public class SinistreDossierService {
     private final GarageSinistreRepository garageRepository;
     private final SinistreService sinistreService;
     private final SinistreWorkflowService workflowService;
+    private final SinistreReadinessService readinessService;
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
 
@@ -64,6 +68,7 @@ public class SinistreDossierService {
         assertEditable(context.sinistre());
         SinistreGarantie garantie = garantieRepository.findByIdAndSinistreId(garantieId, sinistreId)
                 .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", garantieId));
+        validateGuaranteeDecision(request);
         garantie.setImpliquee(Boolean.TRUE.equals(request.getImpliquee()));
         garantie.setDecisionCouverture(request.getDecisionCouverture());
         garantie.setFranchiseAppliquee(request.getFranchiseAppliquee());
@@ -72,12 +77,20 @@ public class SinistreDossierService {
             garantie.setMontantIndemnisable(null);
         }
         garantieRepository.save(garantie);
+        BigDecimal paid = readinessService.totalSettled(sinistreId);
+        BigDecimal indemnity = readinessService.totalIndemnisable(sinistreId);
+        if (paid.compareTo(indemnity) > 0) {
+            throw new BadRequestException(
+                    "Le montant indemnisable ne peut pas être inférieur aux indemnisations déjà enregistrées"
+            );
+        }
         evenementService.record(
                 context.sinistre(),
                 context.acteur(),
                 TypeEvenementSinistre.MODIFICATION,
                 "Décision de couverture mise à jour pour la garantie " + garantie.getSnapshotCode()
         );
+        synchronizeSettlementStatus(context);
         return responseMapper.toDetail(context.sinistre());
     }
 
@@ -90,6 +103,9 @@ public class SinistreDossierService {
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
         assertEditable(context.sinistre());
+        if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
+            throw new BadRequestException("Déclarez le sinistre avant d'enregistrer une provision");
+        }
         partieRepository.save(SinistrePartie.builder()
                 .sinistre(context.sinistre())
                 .type(request.getType())
@@ -120,6 +136,9 @@ public class SinistreDossierService {
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
         assertEditable(context.sinistre());
+        if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
+            throw new BadRequestException("Déclarez le sinistre avant d'enregistrer une opération financière");
+        }
         SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
                 .orElseThrow(() -> new ResourceNotFoundException("SinistrePartie", partieId));
         String nom = partie.getNom();
@@ -226,6 +245,24 @@ public class SinistreDossierService {
         if (request.getType() == TypeOperationSinistre.ANNULATION) {
             throw new BadRequestException("Utilisez l'action d'annulation d'une opération existante");
         }
+        if (request.getType() == TypeOperationSinistre.REGLEMENT
+                && !SETTLEMENT_STATUSES.contains(context.sinistre().getStatut())) {
+            throw new BadRequestException(
+                    "Passez le sinistre en attente de règlement avant d'enregistrer une indemnisation"
+            );
+        }
+        if (request.getType() == TypeOperationSinistre.REGLEMENT) {
+            BigDecimal indemnity = readinessService.totalIndemnisable(sinistreId);
+            BigDecimal afterPayment = readinessService.totalSettled(sinistreId).add(request.getMontant());
+            if (indemnity.signum() <= 0) {
+                throw new BadRequestException("Aucun montant indemnisable accepté n'est enregistré");
+            }
+            if (afterPayment.compareTo(indemnity) > 0) {
+                throw new BadRequestException(
+                        "Le règlement dépasse le solde indemnisable restant"
+                );
+            }
+        }
         operationRepository.save(SinistreOperation.builder()
                 .sinistre(context.sinistre())
                 .saisiPar(context.acteur())
@@ -243,6 +280,9 @@ public class SinistreDossierService {
                 TypeEvenementSinistre.OPERATION_FINANCIERE,
                 "Opération " + request.getType() + " enregistrée pour " + request.getMontant()
         );
+        if (request.getType() == TypeOperationSinistre.REGLEMENT) {
+            synchronizeSettlementStatus(context);
+        }
         return responseMapper.toDetail(context.sinistre());
     }
 
@@ -280,7 +320,60 @@ public class SinistreDossierService {
                 TypeEvenementSinistre.OPERATION_FINANCIERE,
                 "Opération financière annulée : " + operationId
         );
+        if (operation.getType() == TypeOperationSinistre.REGLEMENT) {
+            synchronizeSettlementStatus(context);
+        }
         return responseMapper.toDetail(context.sinistre());
+    }
+
+    private static final Set<StatutSinistre> SETTLEMENT_STATUSES = EnumSet.of(
+            StatutSinistre.EN_ATTENTE_REGLEMENT,
+            StatutSinistre.PARTIELLEMENT_REGLE,
+            StatutSinistre.REGLE
+    );
+
+    private void validateGuaranteeDecision(UpdateSinistreGarantieRequest request) {
+        boolean accepted = request.getDecisionCouverture() == DecisionCouvertureSinistre.ACCEPTEE
+                || request.getDecisionCouverture() == DecisionCouvertureSinistre.PARTIELLE;
+        if (Boolean.TRUE.equals(request.getImpliquee())
+                && accepted
+                && (request.getMontantIndemnisable() == null
+                || request.getMontantIndemnisable().signum() <= 0)) {
+            throw new BadRequestException(
+                    "Un montant indemnisable positif est obligatoire pour une garantie acceptée"
+            );
+        }
+    }
+
+    private void synchronizeSettlementStatus(Context context) {
+        Sinistre sinistre = context.sinistre();
+        if (!SETTLEMENT_STATUSES.contains(sinistre.getStatut())) {
+            return;
+        }
+        BigDecimal indemnity = readinessService.totalIndemnisable(sinistre.getId());
+        BigDecimal paid = readinessService.totalSettled(sinistre.getId());
+        StatutSinistre target;
+        if (paid.signum() <= 0) {
+            target = StatutSinistre.EN_ATTENTE_REGLEMENT;
+        } else if (indemnity.signum() > 0 && paid.compareTo(indemnity) >= 0) {
+            target = StatutSinistre.REGLE;
+        } else {
+            target = StatutSinistre.PARTIELLEMENT_REGLE;
+        }
+        if (target == sinistre.getStatut()) {
+            return;
+        }
+        StatutSinistre previous = sinistre.getStatut();
+        workflowService.transition(sinistre, target);
+        sinistreRepository.save(sinistre);
+        evenementService.record(
+                sinistre,
+                context.acteur(),
+                TypeEvenementSinistre.CHANGEMENT_STATUT,
+                "Statut financier recalculé selon les indemnisations enregistrées",
+                previous,
+                target
+        );
     }
 
     private Context context(Long agenceId, Long utilisateurId, Long sinistreId) {

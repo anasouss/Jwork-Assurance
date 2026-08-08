@@ -39,7 +39,12 @@ public class SinistreWorkflowService {
 
     public boolean isEditable(StatutSinistre statut) {
         return statut != StatutSinistre.CLOTURE
-                && statut != StatutSinistre.ANNULE;
+                && statut != StatutSinistre.ANNULE
+                && statut != StatutSinistre.REJETE;
+    }
+
+    public Set<StatutSinistre> availableTransitions(StatutSinistre statut) {
+        return TRANSITIONS.getOrDefault(statut, Set.of());
     }
 
     private static Map<StatutSinistre, Set<StatutSinistre>> transitions() {
@@ -74,11 +79,12 @@ public class SinistreWorkflowService {
         ));
         values.put(StatutSinistre.PARTIELLEMENT_REGLE, EnumSet.of(
                 StatutSinistre.EN_ATTENTE_REGLEMENT,
-                StatutSinistre.REGLE,
-                StatutSinistre.CLOTURE
+                StatutSinistre.REGLE
         ));
         values.put(StatutSinistre.REGLE, EnumSet.of(
                 StatutSinistre.CLOTURE,
+                StatutSinistre.EN_ATTENTE_REGLEMENT,
+                StatutSinistre.PARTIELLEMENT_REGLE,
                 StatutSinistre.ROUVERT
         ));
         values.put(StatutSinistre.REJETE, EnumSet.of(

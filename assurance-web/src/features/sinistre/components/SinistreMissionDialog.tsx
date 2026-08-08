@@ -158,6 +158,7 @@ export function SinistreMissionDialog({
               <SelectContent>
                 <SelectItem value="A_MANDATER">À mandater</SelectItem>
                 <SelectItem value="MANDATEE">Mandatée</SelectItem>
+                <SelectItem value="EN_COURS">En cours</SelectItem>
                 <SelectItem value="RAPPORT_RECU">Rapport reçu</SelectItem>
                 <SelectItem value="VALIDEE">Validée</SelectItem>
                 <SelectItem value="ANNULEE">Annulée</SelectItem>

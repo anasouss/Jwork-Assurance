@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Banknote,
+  CircleAlert,
+  CircleCheck,
   Download,
   FileCheck2,
   FilePlus2,
@@ -26,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -50,11 +53,10 @@ import { downloadBlob } from "@/lib/download";
 import { referenceApi } from "@/features/production/api/references";
 import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
-import { formatDate, formatMoney, natureLabels } from "../format";
+import { formatDate, formatMoney, natureLabels, statusLabels } from "../format";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
 import {
   SinistreTransitionDialog,
-  hasAvailableTransition,
 } from "../components/SinistreTransitionDialog";
 import { SinistrePartyDialog } from "../components/SinistrePartyDialog";
 import {
@@ -283,18 +285,22 @@ export default function SinistreDetailPage() {
             · {dossier.couverture.assure}
           </p>
         </div>
-        {canManage && hasAvailableTransition(dossier.statut) ? (
+        {canManage && dossier.workflow.transitions.length > 0 ? (
           <Button onClick={() => setTransitionOpen(true)}>
             Faire évoluer le dossier
           </Button>
         ) : null}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Metric
           label="Provision"
           value={formatMoney(dossier.totaux.provisionCourante)}
         />
         <Metric label="Réglé" value={formatMoney(dossier.totaux.totalRegle)} />
+        <Metric
+          label="Indemnisable"
+          value={formatMoney(dossier.totaux.totalIndemnisable)}
+        />
         <Metric label="Frais" value={formatMoney(dossier.totaux.totalFrais)} />
         <Metric
           label="Recours"
@@ -305,6 +311,7 @@ export default function SinistreDetailPage() {
           value={formatMoney(dossier.totaux.resteARegler)}
         />
       </div>
+      <WorkflowReadiness dossier={dossier} />
       <Tabs defaultValue="synthese" className="grid gap-4">
         <TabsList className="h-auto justify-start overflow-x-auto">
           <TabsTrigger value="synthese">Synthèse</TabsTrigger>
@@ -745,7 +752,7 @@ export default function SinistreDetailPage() {
       </Tabs>
       <SinistreTransitionDialog
         open={transitionOpen}
-        current={dossier.statut}
+        transitions={dossier.workflow.transitions}
         saving={transition.isPending}
         onOpenChange={setTransitionOpen}
         onSubmit={(statut, motif) => transition.mutate({ statut, motif })}
@@ -1055,6 +1062,7 @@ function GuaranteeRow({
   const [decision, setDecision] = useState<DecisionCouverture>(
     item.decisionCouverture,
   );
+  const [involved, setInvolved] = useState(item.impliquee);
   const [franchise, setFranchise] = useState(
     item.franchiseAppliquee == null ? "" : String(item.franchiseAppliquee),
   );
@@ -1062,6 +1070,7 @@ function GuaranteeRow({
     item.montantIndemnisable == null ? "" : String(item.montantIndemnisable),
   );
   useEffect(() => {
+    setInvolved(item.impliquee);
     setDecision(item.decisionCouverture);
     setFranchise(
       item.franchiseAppliquee == null ? "" : String(item.franchiseAppliquee),
@@ -1073,9 +1082,17 @@ function GuaranteeRow({
   return (
     <div className="grid items-end gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_190px_150px_170px_auto]">
       <div>
-        <p className="font-medium">
-          {item.code} · {item.libelle}
-        </p>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={involved}
+            disabled={!editable}
+            onCheckedChange={(checked) => setInvolved(checked === true)}
+            aria-label={`Garantie impliquée ${item.libelle}`}
+          />
+          <p className="font-medium">
+            {item.code} · {item.libelle}
+          </p>
+        </div>
         <p className="text-xs text-muted-foreground">
           Capital {formatMoney(item.capital)} · franchise contractuelle{" "}
           {item.tauxFranchise ?? 0}% / {formatMoney(item.franchiseMinimale)}
@@ -1093,6 +1110,7 @@ function GuaranteeRow({
           <SelectContent>
             <SelectItem value="A_ETUDIER">À étudier</SelectItem>
             <SelectItem value="ACCEPTEE">Acceptée</SelectItem>
+            <SelectItem value="PARTIELLE">Partiellement acceptée</SelectItem>
             <SelectItem value="REFUSEE">Refusée</SelectItem>
           </SelectContent>
         </Select>
@@ -1124,7 +1142,7 @@ function GuaranteeRow({
           onClick={() =>
             onSave({
               decisionCouverture: decision,
-              impliquee: item.impliquee,
+              impliquee: involved,
               franchiseAppliquee: franchise ? Number(franchise) : undefined,
               montantIndemnisable: indemnisable
                 ? Number(indemnisable)
@@ -1136,6 +1154,65 @@ function GuaranteeRow({
         </Button>
       ) : null}
     </div>
+  );
+}
+
+function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {
+  const blocked = dossier.workflow.transitions.filter(
+    (transition) => !transition.autorisee,
+  );
+  if (
+    blocked.length === 0 &&
+    dossier.workflow.documentsRecus === 0 &&
+    dossier.workflow.documentsRejetes === 0
+  ) {
+    return null;
+  }
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Préparation du dossier</h2>
+          <p className="text-sm text-muted-foreground">
+            Contrôles appliqués avant chaque changement d’étape.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-sm">
+          {dossier.workflow.documentsRecus > 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1">
+              <CircleAlert className="size-4 text-amber-600" />
+              {dossier.workflow.documentsRecus} document(s) à contrôler
+            </span>
+          ) : null}
+          {dossier.workflow.documentsRejetes > 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-2 py-1 text-red-700">
+              <CircleAlert className="size-4" />
+              {dossier.workflow.documentsRejetes} document(s) rejeté(s)
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-emerald-700">
+              <CircleCheck className="size-4" /> Aucun document rejeté
+            </span>
+          )}
+        </div>
+      </div>
+      {blocked.length > 0 ? (
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {blocked.map((transition) => (
+            <div key={transition.statut} className="rounded-md bg-muted p-3">
+              <p className="text-sm font-medium">
+                Avant « {statusLabels[transition.statut]} »
+              </p>
+              <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
+                {transition.blocages.map((blocker) => (
+                  <li key={blocker}>{blocker}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 function Field({

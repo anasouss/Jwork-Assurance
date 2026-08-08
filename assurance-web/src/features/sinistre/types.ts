@@ -22,7 +22,11 @@ export type NatureSinistre =
   | "ASSISTANCE"
   | "AUTRE";
 
-export type DecisionCouverture = "A_ETUDIER" | "ACCEPTEE" | "REFUSEE";
+export type DecisionCouverture =
+  | "A_ETUDIER"
+  | "ACCEPTEE"
+  | "PARTIELLE"
+  | "REFUSEE";
 export type TypePartie =
   | "CONDUCTEUR"
   | "PASSAGER"
@@ -152,6 +156,7 @@ export type SinistreDetail = SinistreSummary & {
   };
   totaux: {
     provisionCourante: number;
+    totalIndemnisable: number;
     totalRegle: number;
     totalFrais: number;
     totalRecours: number;
@@ -208,7 +213,13 @@ export type SinistreDetail = SinistreSummary & {
     dateRapport?: string | null;
     montantEstime?: number | null;
     montantAccepte?: number | null;
-    statut: "A_MANDATER" | "MANDATEE" | "RAPPORT_RECU" | "VALIDEE" | "ANNULEE";
+    statut:
+      | "A_MANDATER"
+      | "MANDATEE"
+      | "EN_COURS"
+      | "RAPPORT_RECU"
+      | "VALIDEE"
+      | "ANNULEE";
     notes?: string | null;
   }>;
   provisions: Array<{
@@ -241,6 +252,15 @@ export type SinistreDetail = SinistreSummary & {
     utilisateur: string;
     createdAt: string;
   }>;
+  workflow: {
+    transitions: Array<{
+      statut: StatutSinistre;
+      autorisee: boolean;
+      blocages: string[];
+    }>;
+    documentsRecus: number;
+    documentsRejetes: number;
+  };
 };
 
 export type Intervenant = {

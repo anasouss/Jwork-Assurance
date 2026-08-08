@@ -50,6 +50,7 @@ public class SinistreDetailResponse {
     private List<Provision> provisions;
     private List<Operation> operations;
     private List<Evenement> evenements;
+    private Workflow workflow;
 
     @Data
     @Builder
@@ -76,10 +77,27 @@ public class SinistreDetailResponse {
     @Builder
     public static class Totaux {
         private BigDecimal provisionCourante;
+        private BigDecimal totalIndemnisable;
         private BigDecimal totalRegle;
         private BigDecimal totalFrais;
         private BigDecimal totalRecours;
         private BigDecimal resteARegler;
+    }
+
+    @Data
+    @Builder
+    public static class Workflow {
+        private List<Transition> transitions;
+        private int documentsRecus;
+        private int documentsRejetes;
+
+        @Data
+        @Builder
+        public static class Transition {
+            private StatutSinistre statut;
+            private boolean autorisee;
+            private List<String> blocages;
+        }
     }
 
     @Data

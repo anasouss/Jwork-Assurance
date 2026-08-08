@@ -120,10 +120,21 @@ export function SinistreFinanceDialog({
                 />
               </Field>
               <Field label="Mode de règlement">
-                <Input
+                <Select
                   value={modeReglement}
-                  onChange={(event) => setModeReglement(event.target.value)}
-                />
+                  onValueChange={setModeReglement}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VIREMENT">Virement</SelectItem>
+                    <SelectItem value="CHEQUE">Chèque</SelectItem>
+                    <SelectItem value="ESPECES">Espèces</SelectItem>
+                    <SelectItem value="COMPENSATION">Compensation</SelectItem>
+                    <SelectItem value="AUTRE">Autre</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
             </>
           ) : null}

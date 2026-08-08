@@ -48,7 +48,7 @@ public class SinistreController {
     private final SinistreDashboardService dashboardService;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
     public ResponseEntity<ApiResponse<SinistreDashboardResponse>> dashboard() {
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.get(TenantContext.getCurrentAgence())
@@ -69,7 +69,7 @@ public class SinistreController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
     public ResponseEntity<ApiResponse<PagedResponse<SinistreSummaryResponse>>> list(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) StatutSinistre statut,
@@ -104,7 +104,7 @@ public class SinistreController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 sinistreService.get(TenantContext.getCurrentAgence(), id)

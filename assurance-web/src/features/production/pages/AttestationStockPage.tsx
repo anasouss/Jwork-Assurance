@@ -713,7 +713,10 @@ function StockPieCard({
       <CardContent className="space-y-3">
         <DonutChart
           data={chartData}
+          centerLabel="disponibles"
           emptyText="Aucun stock disponible."
+          innerRadius={54}
+          outerRadius={78}
           valueFormatter={formatInteger}
           onSelect={(usageId) => {
             const selected = company.rows.find((item) => item.groupeUsageAttestationId === usageId);

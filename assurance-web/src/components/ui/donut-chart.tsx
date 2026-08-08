@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Cell, LabelList, Legend, Pie, PieChart } from "recharts";
+import { Cell, Pie, PieChart } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
@@ -23,6 +23,7 @@ type DonutChartProps = {
   outerRadius?: number;
   showLegend?: boolean;
   showValues?: boolean;
+  centerLabel?: string;
   valueFormatter?: (value: number) => string;
   onSelect?: (key: string) => void;
 };
@@ -38,6 +39,7 @@ export function DonutChart({
   outerRadius = 100,
   showLegend = true,
   showValues = true,
+  centerLabel,
   valueFormatter = defaultValueFormatter,
   onSelect,
 }: DonutChartProps) {
@@ -53,52 +55,91 @@ export function DonutChart({
 
   if (!chartData.length) {
     return (
-      <div className={cn("grid h-[300px] place-items-center text-sm text-muted-foreground", className)}>
+      <div className={cn("grid min-h-60 place-items-center text-sm text-muted-foreground", className)}>
         {emptyText}
       </div>
     );
   }
 
+  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+
   return (
-    <ChartContainer config={chartConfig} className={cn("h-[300px] w-full aspect-auto", className)}>
-      <PieChart>
-        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-        <Pie
-          data={chartData}
-          dataKey="value"
-          nameKey="name"
-          innerRadius={innerRadius}
-          outerRadius={outerRadius}
-          cornerRadius={8}
-          paddingAngle={4}
-          strokeWidth={0}
-        >
-          {chartData.map((item) => (
-            <Cell
-              key={item.key}
-              fill={item.color}
-              className={cn(onSelect && "cursor-pointer")}
-              onClick={() => onSelect?.(item.key)}
-            />
-          ))}
-          {showValues ? (
-            <LabelList
+    <div
+      className={cn(
+        "grid min-h-60 items-center gap-4 sm:grid-cols-[160px_minmax(0,1fr)]",
+        !showLegend && "grid-cols-1 sm:grid-cols-1",
+        className,
+      )}
+    >
+      <div className="relative h-40">
+        <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
+          <PieChart>
+            <Pie
+              data={chartData}
               dataKey="value"
-              stroke="none"
-              fontSize={12}
-              fontWeight={600}
-              fill="currentColor"
-              formatter={(value) => valueFormatter(Number(value ?? 0))}
+              nameKey="name"
+              innerRadius={innerRadius}
+              outerRadius={outerRadius}
+              paddingAngle={3}
+              strokeWidth={0}
+            >
+              {chartData.map((item) => (
+                <Cell
+                  key={item.key}
+                  fill={item.color}
+                  className={cn(onSelect && "cursor-pointer")}
+                  onClick={() => onSelect?.(item.key)}
+                />
+              ))}
+            </Pie>
+            <ChartTooltip
+              content={(
+                <ChartTooltipContent
+                  hideLabel
+                  formatter={(value: unknown) => valueFormatter(Number(value ?? 0))}
+                />
+              )}
             />
-          ) : null}
-        </Pie>
-        {showLegend ? (
-          <Legend
-            formatter={(value) => chartConfig[value]?.label ?? value}
-            wrapperStyle={{ fontSize: 12 }}
-          />
-        ) : null}
-      </PieChart>
-    </ChartContainer>
+          </PieChart>
+        </ChartContainer>
+        <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
+          <span className="text-2xl font-semibold tabular-nums">{valueFormatter(total)}</span>
+          {centerLabel ? <span className="text-xs text-muted-foreground">{centerLabel}</span> : null}
+        </div>
+      </div>
+
+      {showLegend ? (
+        <div className="grid min-w-0 gap-1">
+          {chartData.map((item) => {
+            const content = (
+              <>
+                <span className="flex min-w-0 items-center gap-2 text-sm">
+                  <span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+                  <span className="truncate">{item.label}</span>
+                </span>
+                {showValues ? (
+                  <span className="shrink-0 font-semibold tabular-nums">{valueFormatter(item.value)}</span>
+                ) : null}
+              </>
+            );
+
+            return onSelect ? (
+              <button
+                key={item.key}
+                type="button"
+                className="flex min-w-0 items-center justify-between gap-3 border-b py-2 text-left last:border-0 hover:text-primary"
+                onClick={() => onSelect(item.key)}
+              >
+                {content}
+              </button>
+            ) : (
+              <div key={item.key} className="flex min-w-0 items-center justify-between gap-3 border-b py-2 last:border-0">
+                {content}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }

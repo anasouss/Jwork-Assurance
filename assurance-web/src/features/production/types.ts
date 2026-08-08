@@ -367,6 +367,7 @@ export type Quittance = QuittancePreview & {
 };
 
 export type TypeContrat = "PARTICULIER" | "CONVENTION" | "FLOTTE";
+export type ModeSaisieGaranties = "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE";
 export type TypeClient = "PERSONNE_PHYSIQUE" | "PERSONNE_MORALE";
 export type GenreClient = "HOMME" | "FEMME";
 export type RoleClientContrat = "SOUSCRIPTEUR" | "PROPRIETAIRE" | "CONDUCTEUR" | "BENEFICIAIRE";
@@ -781,7 +782,7 @@ export type CreateContratRequest = {
   modeFacturation?: ModeFacturationContrat;
   fractionnement?: "ANNUEL" | "SEMESTRIEL" | "TRIMESTRIEL" | "MENSUEL";
   tauxRc?: number;
-  modeSaisieGaranties?: "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE";
+  modeSaisieGaranties?: ModeSaisieGaranties;
   saisiePrimeNette?: boolean;
   nombreVehicules?: number;
   nombreRemorques?: number;
@@ -1176,7 +1177,7 @@ export type ContratSummary = {
   periodicite?: string | null;
   fractionnement?: string | null;
   tauxRc?: number | null;
-  modeSaisieGaranties?: string | null;
+  modeSaisieGaranties?: ModeSaisieGaranties | null;
   saisiePrimeNette?: boolean | null;
   nombreVehicules?: number | null;
   nombreRemorques?: number | null;
@@ -1317,7 +1318,7 @@ export type ContratListItem = {
   dateEffet?: string | null;
   dateEcheance?: string | null;
   typeRenouvellement?: string | null;
-  modeSaisieGaranties?: "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE" | null;
+  modeSaisieGaranties?: ModeSaisieGaranties | null;
   brouillon?: boolean | null;
   prospection?: boolean | null;
   premierTypeVehicule?: string | null;

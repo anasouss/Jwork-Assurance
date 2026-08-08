@@ -19,6 +19,35 @@ type Vehicule = NonNullable<ContratSummary["vehicules"]>[number];
 type Remorque = NonNullable<ContratSummary["remorques"]>[number];
 type Mouvement = NonNullable<ContratSummary["mouvements"]>[number];
 
+type DisplayGarantie = {
+  garantie: Garantie;
+  depth: 0 | 1;
+};
+
+const VEHICLE_GUARANTEE_DISPLAY_ORDER = [
+  "RC",
+  "DR",
+  "I",
+  "V",
+  "VOR",
+  "BG",
+  "BOR",
+  "BTP",
+  "DC",
+  "DV",
+  "RVE",
+  "RF",
+  "PF",
+] as const;
+
+const VEHICLE_GUARANTEE_PARENT_BY_CODE: Record<string, string> = {
+  VOR: "V",
+  BOR: "BG",
+  BTP: "BG",
+  RVE: "DV",
+  RF: "DV",
+};
+
 export default function ContratShowPage() {
   const { contratId = "" } = useParams();
   const [searchParams] = useSearchParams();
@@ -502,6 +531,7 @@ function GarantiesTable({
 }) {
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return null;
+  const displayGaranties = vehicleGuaranteesForDisplay(vehiculeGaranties);
   return (
     <div className="overflow-hidden">
       <Table className="text-[10px]">
@@ -514,9 +544,14 @@ function GarantiesTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {vehiculeGaranties.map((garantie) => (
+          {displayGaranties.map(({ garantie, depth }) => (
             <TableRow key={garantie.contratGarantieId}>
-              <TableCell className="px-2 py-0.5 font-medium">{garantieName(garantie)}</TableCell>
+              <TableCell className="px-2 py-0.5 font-medium">
+                <span className={depth === 1 ? "inline-flex items-center gap-1 pl-5" : undefined}>
+                  {depth === 1 ? <span aria-hidden="true">*</span> : null}
+                  {garantieName(garantie)}
+                </span>
+              </TableCell>
               <TableCell className="px-2 py-0.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
               <TableCell className="px-2 py-0.5">{franchiseLabel(garantie)}</TableCell>
               <TableCell className="px-2 py-0.5 text-right font-semibold">{showPrimes ? moneyAmount(garantie.prime) : "-"}</TableCell>
@@ -953,6 +988,28 @@ function garantieName(garantie: Garantie) {
   return text(garantie.libelle ?? garantie.code);
 }
 
+function vehicleGuaranteesForDisplay(garanties: Garantie[]): DisplayGarantie[] {
+  const entries = garanties.map((garantie, originalIndex) => ({
+    garantie,
+    code: String(garantie.code ?? "").trim().toUpperCase(),
+    originalIndex,
+  }));
+  const selectedCodes = new Set(entries.map((entry) => entry.code).filter(Boolean));
+  const orderByCode = new Map<string, number>(
+    VEHICLE_GUARANTEE_DISPLAY_ORDER.map((code, index) => [code, index]),
+  );
+  const ordered = [...entries].sort((left, right) => {
+    const leftOrder = orderByCode.get(left.code) ?? VEHICLE_GUARANTEE_DISPLAY_ORDER.length + left.originalIndex;
+    const rightOrder = orderByCode.get(right.code) ?? VEHICLE_GUARANTEE_DISPLAY_ORDER.length + right.originalIndex;
+    return leftOrder - rightOrder || left.originalIndex - right.originalIndex;
+  });
+
+  return ordered.map(({ garantie, code }) => ({
+    garantie,
+    depth: selectedCodes.has(VEHICLE_GUARANTEE_PARENT_BY_CODE[code]) ? 1 : 0,
+  }));
+}
+
 function franchiseLabel(garantie: Garantie) {
   const taux = Number(garantie.tauxFranchise) > 0 ? `${compactNumber(Number(garantie.tauxFranchise))} %` : null;
   const min = Number(garantie.franchiseMinimale) > 0 ? `min ${compactNumber(Number(garantie.franchiseMinimale))} DH` : null;
@@ -1280,13 +1337,15 @@ function drawPdfGaranties(
 ) {
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return;
-  drawPdfTable(ctx, ["Les Garanties du Véhicule", "Valeur assurée", "Franchise", primeLabel], vehiculeGaranties.map((garantie) => [
-    garantieName(garantie),
+  const displayGaranties = vehicleGuaranteesForDisplay(vehiculeGaranties);
+  drawPdfTable(ctx, ["Les Garanties du Véhicule", "Valeur assurée", "Franchise", primeLabel], displayGaranties.map(({ garantie, depth }) => [
+    `${depth === 1 ? "* " : ""}${garantieName(garantie)}`,
     formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
     franchiseLabel(garantie),
     showPrimes ? moneyAmount(garantie.prime) : "-",
   ]), [68, 36, 48, 28], {
     alignments: ["left", "center", "center", "right"],
+    firstColumnIndents: displayGaranties.map(({ depth }) => depth === 1 ? 5 : 0),
   });
 }
 
@@ -1333,6 +1392,7 @@ function drawPdfTable(
   options: {
     emphasizedRows?: Set<number>;
     alignments?: Array<"left" | "center" | "right">;
+    firstColumnIndents?: number[];
   } = {},
 ) {
   if (!rows.length) return;
@@ -1358,7 +1418,12 @@ function drawPdfTable(
   ctx.y += headerHeight;
 
   for (const [rowIndex, row] of rows.entries()) {
-    const wrapped = row.map((cell, index) => wrapPdfText(ctx, cell, actualWidths[index] - 3));
+    const firstColumnIndent = options.firstColumnIndents?.[rowIndex] ?? 0;
+    const wrapped = row.map((cell, index) => wrapPdfText(
+      ctx,
+      cell,
+      actualWidths[index] - 3 - (index === 0 ? firstColumnIndent : 0),
+    ));
     const rowHeight = Math.max(4.8, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
     ensurePdfSpace(ctx, rowHeight + 1);
     cursorX = tableX + 1.5;
@@ -1371,7 +1436,8 @@ function drawPdfTable(
       ctx.pdf.setFontSize(6.3);
       ctx.pdf.setTextColor(2, 6, 23);
       const align = options.alignments?.[index] ?? (index === 0 ? "left" : "right");
-      const textX = pdfCellTextX(cursorX, actualWidths[index], align);
+      const textX = pdfCellTextX(cursorX, actualWidths[index], align)
+        + (index === 0 && align === "left" ? firstColumnIndent : 0);
       ctx.pdf.text(wrapped[index], textX, ctx.y + 3.2, { align, maxWidth: actualWidths[index] - 3 });
       cursorX += actualWidths[index];
     });

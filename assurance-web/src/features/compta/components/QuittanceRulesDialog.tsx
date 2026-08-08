@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toDateOnly } from "@/features/production/date";
 import { accountingKeys } from "@/lib/query-keys";
 import { comptaApi } from "../api";
+import { formatAccountingMoney } from "../format";
 import type { ModeCalculCommission, ModeVentilationQuittance, Rule, RuleRequest, TypeContrat } from "../types";
 
 type Props = {
@@ -926,5 +927,5 @@ function rateLabel(value: number) {
 }
 
 function moneyLabel(value: number) {
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value);
+  return formatAccountingMoney(value);
 }

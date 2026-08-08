@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { parseAccountingAmount } from "../format";
 import type {
   TreasuryAccount,
   TreasuryAccountType,
@@ -47,12 +48,12 @@ export default function TresorerieComptesPage() {
   const saveAccount = useMutation({
     mutationFn: () => {
       const request = {
-        code: accountCode,
-        libelle: accountLabel,
+        code: accountCode.trim(),
+        libelle: accountLabel.trim(),
         typeCompte: accountType,
-        nomBanque: bankName || undefined,
-        rib: rib || undefined,
-        soldeInitial: Number(initialBalance.replace(",", ".")) || 0,
+        nomBanque: bankName.trim() || undefined,
+        rib: rib.trim() || undefined,
+        soldeInitial: parseAccountingAmount(initialBalance),
         actif: accountActive,
       } satisfies UpsertTreasuryAccountRequest;
 
@@ -184,7 +185,7 @@ export default function TresorerieComptesPage() {
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {editingAccount ? "Modifier le compte" : "Ajouter un compte"}
+              {editingAccount ? "Modifier le compte" : "Ajouter un compte de trésorerie"}
             </DialogTitle>
             <DialogDescription>
               {editingAccount
@@ -193,8 +194,8 @@ export default function TresorerieComptesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
-            <div>
-              <Label>Type</Label>
+            <div className="grid gap-2">
+              <Label>Type de compte</Label>
               <Select
                 value={accountType}
                 disabled={Boolean(editingAccount)}
@@ -208,40 +209,61 @@ export default function TresorerieComptesPage() {
               </Select>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Code</Label>
-                <Input value={accountCode} onChange={(event) => setAccountCode(event.target.value)} />
+              <div className="grid gap-2">
+                <Label htmlFor="treasury-account-code">Code *</Label>
+                <Input
+                  id="treasury-account-code"
+                  value={accountCode}
+                  placeholder={accountType === "CAISSE" ? "CAISSE-PRINCIPALE" : "BANQUE-CIH"}
+                  onChange={(event) => setAccountCode(event.target.value)}
+                />
               </div>
-              <div>
-                <Label>Libellé</Label>
-                <Input value={accountLabel} onChange={(event) => setAccountLabel(event.target.value)} />
+              <div className="grid gap-2">
+                <Label htmlFor="treasury-account-label">Libellé *</Label>
+                <Input
+                  id="treasury-account-label"
+                  value={accountLabel}
+                  placeholder={accountType === "CAISSE" ? "Caisse principale" : "Compte courant"}
+                  onChange={(event) => setAccountLabel(event.target.value)}
+                />
               </div>
             </div>
             {accountType === "BANQUE" && (
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label>Banque</Label>
-                  <Input value={bankName} onChange={(event) => setBankName(event.target.value)} />
+                <div className="grid gap-2">
+                  <Label htmlFor="treasury-bank-name">Banque *</Label>
+                  <Input
+                    id="treasury-bank-name"
+                    value={bankName}
+                    placeholder="Nom de la banque"
+                    onChange={(event) => setBankName(event.target.value)}
+                  />
                 </div>
-                <div>
-                  <Label>RIB</Label>
-                  <Input value={rib} onChange={(event) => setRib(event.target.value)} />
+                <div className="grid gap-2">
+                  <Label htmlFor="treasury-bank-rib">RIB</Label>
+                  <Input
+                    id="treasury-bank-rib"
+                    value={rib}
+                    placeholder="Optionnel"
+                    onChange={(event) => setRib(event.target.value)}
+                  />
                 </div>
               </div>
             )}
-            <div>
-              <Label>Solde initial</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="treasury-opening-balance">Solde initial</Label>
               <Input
+                id="treasury-opening-balance"
                 inputMode="decimal"
                 disabled={Boolean(editingAccount)}
                 value={initialBalance}
                 onChange={(event) => setInitialBalance(event.target.value)}
               />
-              {editingAccount && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Le solde initial est figé après la création du compte.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                {editingAccount
+                  ? "Le solde initial est figé après la création du compte."
+                  : "Solde comptable au démarrage du compte."}
+              </p>
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
               <Checkbox
@@ -254,10 +276,15 @@ export default function TresorerieComptesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Annuler</Button>
             <Button
-              disabled={!accountCode.trim() || !accountLabel.trim() || saveAccount.isPending}
+              disabled={
+                !accountCode.trim()
+                || !accountLabel.trim()
+                || (accountType === "BANQUE" && !bankName.trim())
+                || saveAccount.isPending
+              }
               onClick={() => saveAccount.mutate()}
             >
-              {editingAccount ? "Enregistrer" : "Créer"}
+              {editingAccount ? "Enregistrer" : "Créer le compte"}
             </Button>
           </DialogFooter>
         </DialogContent>

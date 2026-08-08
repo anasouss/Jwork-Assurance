@@ -158,6 +158,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/ReglementsClientsPage")),
       },
       {
+        path: "compta/reglements/historique",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ReglementsEnregistresPage")),
+      },
+      {
         path: "compta/tresorerie",
         element: <Navigate to="/app/compta/tresorerie/comptes" replace />,
       },

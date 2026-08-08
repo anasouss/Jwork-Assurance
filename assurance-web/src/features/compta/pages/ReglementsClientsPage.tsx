@@ -3,15 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   Banknote,
-  FileText,
   History,
   Plus,
-  ReceiptText,
   RotateCcw,
   Search,
   Trash2,
-  XCircle,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,18 +26,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { formatAccountingAmount, parseAccountingAmount } from "../format";
 import type {
-  ClientPayment,
   ClientPaymentMode,
   ClientReceivable,
   CreateClientPaymentRequest,
-  PaymentInstrument,
   TreasuryAccount,
 } from "../types";
 
@@ -73,7 +69,6 @@ export default function ReglementsClientsPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canCreate = permissions.includes("reglement-client:create")
     || permissions.includes("reglement-client:manage");
-  const canManage = permissions.includes("reglement-client:manage");
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [receivableKind, setReceivableKind] = useState<ReceivableKind>("DIRECT");
@@ -84,15 +79,6 @@ export default function ReglementsClientsPage() {
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
   const [instruments, setInstruments] = useState<InstrumentDraft[]>([newInstrument()]);
-  const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
-  const [cancelReason, setCancelReason] = useState("");
-  const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
-  const [replacement, setReplacement] = useState<InstrumentDraft>(newInstrument());
-  const [paymentPage, setPaymentPage] = useState(0);
-  const [paymentSearch, setPaymentSearch] = useState("");
-  const [appliedPaymentSearch, setAppliedPaymentSearch] = useState("");
-  const [paymentDateFrom, setPaymentDateFrom] = useState("");
-  const [paymentDateTo, setPaymentDateTo] = useState("");
 
   const receivables = useQuery({
     queryKey: ["compta", "client-receivables", receivableKind, appliedSearch, page],
@@ -107,23 +93,6 @@ export default function ReglementsClientsPage() {
         page,
         size: PAGE_SIZE,
       }),
-  });
-  const payments = useQuery({
-    queryKey: [
-      "compta",
-      "client-payments",
-      appliedPaymentSearch,
-      paymentDateFrom,
-      paymentDateTo,
-      paymentPage,
-    ],
-    queryFn: () => comptaApi.clientPayments({
-      search: appliedPaymentSearch || undefined,
-      dateDu: paymentDateFrom || undefined,
-      dateAu: paymentDateTo || undefined,
-      page: paymentPage,
-      size: PAGE_SIZE,
-    }),
   });
   const accounts = useQuery({
     queryKey: ["compta", "treasury-accounts"],
@@ -161,49 +130,6 @@ export default function ReglementsClientsPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Règlement impossible"),
   });
 
-  const cancelPayment = useMutation({
-    mutationFn: () => comptaApi.cancelClientPayment(paymentToCancel!.id, cancelReason.trim()),
-    onSuccess: async (payment) => {
-      toast.success(`Règlement ${payment.numero} annulé`);
-      setPaymentToCancel(undefined);
-      setCancelReason("");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
-      ]);
-    },
-    onError: (error) => toast.error(
-      error instanceof Error ? error.message : "Annulation impossible"
-    ),
-  });
-
-  const replaceInstrument = useMutation({
-    mutationFn: () => comptaApi.replacePaymentInstrument(instrumentToReplace!.id, {
-      mode: replacement.mode,
-      montant: instrumentToReplace!.montant,
-      dateInstrument: replacement.dateInstrument || today,
-      dateEcheance: replacement.dateEcheance || undefined,
-      referenceInstrument: replacement.referenceInstrument.trim() || undefined,
-      banqueEmettrice: replacement.banqueEmettrice.trim() || undefined,
-      compteTresorerieId: replacement.compteTresorerieId || undefined,
-    }),
-    onSuccess: async () => {
-      toast.success("Instrument remplacé");
-      setInstrumentToReplace(undefined);
-      setReplacement(newInstrument());
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
-      ]);
-    },
-    onError: (error) => toast.error(
-      error instanceof Error ? error.message : "Remplacement impossible"
-    ),
-  });
 
   function toggle(row: ClientReceivable, checked: boolean) {
     if (checked && payerKey && sourcePayerKey(row) !== payerKey) {
@@ -233,61 +159,45 @@ export default function ReglementsClientsPage() {
 
   return (
     <div className="grid gap-5">
-      <header>
-        <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Comptabilité</div>
-        <h1 className="mt-1 text-xl font-semibold">Règlements clients</h1>
-        <p className="text-sm text-muted-foreground">Encaissements, paiements partiels et moyens de règlement.</p>
-      </header>
-
-      <Tabs defaultValue="receivables" className="gap-4">
-        <TabsList variant="line">
-          <TabsTrigger value="receivables">
-            <ReceiptText className="size-4" />
-            Créances ouvertes
-          </TabsTrigger>
-          <TabsTrigger value="payments">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium text-orange-700 dark:text-orange-400">
+            Comptabilité
+          </div>
+          <h1 className="mt-1 text-xl font-semibold">Encaissements clients</h1>
+          <p className="text-sm text-muted-foreground">
+            Créances ouvertes, paiements partiels et moyens de règlement.
+          </p>
+        </div>
+        <Button asChild variant="outline">
+          <Link to="/app/compta/reglements/historique">
             <History className="size-4" />
             Règlements enregistrés
-          </TabsTrigger>
-        </TabsList>
+          </Link>
+        </Button>
+      </header>
 
-        <TabsContent value="receivables" className="grid gap-4">
-          <div
-            className="inline-flex w-fit rounded-md border bg-muted/40 p-1"
-            role="radiogroup"
-            aria-label="Source des créances"
+      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[220px_1fr_auto]">
+        <div className="grid gap-2">
+          <Label>Origine</Label>
+          <Select
+            value={receivableKind}
+            onValueChange={(value) => {
+              setReceivableKind(value as ReceivableKind);
+              setSelected({});
+              setPage(0);
+            }}
           >
-            <Button
-              type="button"
-              size="sm"
-              variant={receivableKind === "DIRECT" ? "secondary" : "ghost"}
-              className="shadow-none"
-              onClick={() => {
-                setReceivableKind("DIRECT");
-                setSelected({});
-                setPage(0);
-              }}
-            >
-              <ReceiptText className="size-4" />
-              Écritures directes
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={receivableKind === "INVOICE" ? "secondary" : "ghost"}
-              className="shadow-none"
-              onClick={() => {
-                setReceivableKind("INVOICE");
-                setSelected({});
-                setPage(0);
-              }}
-            >
-              <FileText className="size-4" />
-              Factures émises
-            </Button>
-          </div>
-          <section className="flex flex-wrap items-end gap-3 rounded-md border bg-card p-4">
-            <div className="min-w-72 flex-1">
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DIRECT">Écritures directes</SelectItem>
+              <SelectItem value="INVOICE">Factures émises</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid min-w-72 flex-1 gap-2">
               <Label htmlFor="receivable-search">
                 {receivableKind === "INVOICE"
                   ? "Client, groupe ou numéro de facture"
@@ -304,7 +214,8 @@ export default function ReglementsClientsPage() {
                   }
                 }}
               />
-            </div>
+        </div>
+        <div className="flex items-end gap-2">
             <Button
               onClick={() => {
                 setPage(0);
@@ -325,9 +236,10 @@ export default function ReglementsClientsPage() {
             >
               <RotateCcw className="size-4" />
             </Button>
-          </section>
+        </div>
+      </section>
 
-          <section className="overflow-hidden rounded-md border bg-card">
+      <section className="overflow-hidden rounded-md border bg-card">
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div>
                 <h2 className="font-semibold">Éléments à encaisser</h2>
@@ -413,166 +325,7 @@ export default function ReglementsClientsPage() {
                 onPageChange={setPage}
               />
             )}
-          </section>
-        </TabsContent>
-
-        <TabsContent value="payments" className="grid gap-4">
-          <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_180px_180px_auto]">
-            <div>
-              <Label htmlFor="payment-search">Payeur, numéro ou référence</Label>
-              <Input
-                id="payment-search"
-                value={paymentSearch}
-                onChange={(event) => setPaymentSearch(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    setPaymentPage(0);
-                    setAppliedPaymentSearch(paymentSearch.trim());
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <Label>Date du</Label>
-              <DatePicker
-                date={paymentDateFrom}
-                onSelect={(value) => {
-                  setPaymentDateFrom(toDateOnly(value) ?? "");
-                  setPaymentPage(0);
-                }}
-              />
-            </div>
-            <div>
-              <Label>Date au</Label>
-              <DatePicker
-                date={paymentDateTo}
-                onSelect={(value) => {
-                  setPaymentDateTo(toDateOnly(value) ?? "");
-                  setPaymentPage(0);
-                }}
-              />
-            </div>
-            <div className="flex items-end gap-2">
-              <Button
-                size="icon"
-                title="Rechercher"
-                onClick={() => {
-                  setPaymentPage(0);
-                  setAppliedPaymentSearch(paymentSearch.trim());
-                }}
-              >
-                <Search className="size-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="outline"
-                title="Réinitialiser"
-                onClick={() => {
-                  setPaymentPage(0);
-                  setPaymentSearch("");
-                  setAppliedPaymentSearch("");
-                  setPaymentDateFrom("");
-                  setPaymentDateTo("");
-                }}
-              >
-                <RotateCcw className="size-4" />
-              </Button>
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-md border bg-card">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-sm">
-                <thead className="bg-orange-600 text-xs uppercase text-white">
-                  <tr>
-                    <th className="px-4 py-3 text-left">N° règlement</th>
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-left">Payeur</th>
-                    <th className="px-4 py-3 text-right">Montant</th>
-                    <th className="px-4 py-3 text-left">Moyens</th>
-                    <th className="px-4 py-3 text-center">Statut</th>
-                    <th className="px-4 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {payments.isLoading ? <TableRowsSkeleton colSpan={7} rows={8} /> :
-                    (payments.data?.rows ?? []).map((row) => (
-                      <tr key={row.id} className="hover:bg-muted/30">
-                        <td className="px-4 py-3 font-semibold">{row.numero}</td>
-                        <td className="px-4 py-3">{date(row.dateReglement)}</td>
-                        <td className="px-4 py-3">{row.payeurNom}</td>
-                        <td className="px-4 py-3 text-right font-semibold">
-                          {money(row.montantTotal)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {row.instruments.map((item) => (
-                              <span key={item.id} className="inline-flex items-center gap-1.5">
-                                <Badge variant="outline">{modeLabels[item.mode]}</Badge>
-                                <InstrumentStatusBadge value={item.statut} />
-                                {item.statut === "REJETE" && canManage && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setInstrumentToReplace(item);
-                                      setReplacement({
-                                        ...newInstrument(),
-                                        montant: String(item.montant),
-                                      });
-                                    }}
-                                  >
-                                    Remplacer
-                                  </Button>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <Badge variant={row.statut === "VALIDE" ? "default" : "destructive"}>
-                            {row.statut === "VALIDE" ? "Validé" : "Annulé"}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {row.statut === "VALIDE" && canManage ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Annuler le règlement"
-                              onClick={() => {
-                                setPaymentToCancel(row);
-                                setCancelReason("");
-                              }}
-                            >
-                              <XCircle className="size-4 text-red-600" />
-                            </Button>
-                          ) : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  {!payments.isLoading && (payments.data?.rows.length ?? 0) === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                        Aucun règlement ne correspond à la recherche.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {payments.data && (
-              <ServerPagination
-                page={payments.data.page.number}
-                totalPages={payments.data.page.totalPages}
-                totalElements={payments.data.page.totalElements}
-                loading={payments.isFetching}
-                onPageChange={setPaymentPage}
-              />
-            )}
-          </section>
-        </TabsContent>
-      </Tabs>
+      </section>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[1120px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1120px]">
@@ -673,7 +426,7 @@ export default function ReglementsClientsPage() {
                     )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div>
+                    <div className="grid gap-2">
                       <Label>Mode</Label>
                       <Select
                         value={instrument.mode}
@@ -690,7 +443,7 @@ export default function ReglementsClientsPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="grid gap-2">
                       <div className="flex items-center justify-between gap-2">
                         <Label>Montant</Label>
                         <Button
@@ -721,7 +474,7 @@ export default function ReglementsClientsPage() {
                         )}
                       />
                     </div>
-                    <div>
+                    <div className="grid gap-2">
                       <Label>Date de l’instrument</Label>
                       <DatePicker
                         date={instrument.dateInstrument}
@@ -731,7 +484,7 @@ export default function ReglementsClientsPage() {
                       />
                     </div>
                     {instrument.mode === "EFFET" && (
-                      <div>
+                      <div className="grid gap-2">
                         <Label>Date d’échéance</Label>
                         <DatePicker
                           date={instrument.dateEcheance}
@@ -754,7 +507,7 @@ export default function ReglementsClientsPage() {
                     )}
                     {instrument.mode !== "ESPECES" && (
                       <>
-                        <div>
+                        <div className="grid gap-2">
                           <Label>Référence</Label>
                           <Input
                             value={instrument.referenceInstrument}
@@ -764,7 +517,7 @@ export default function ReglementsClientsPage() {
                             )}
                           />
                         </div>
-                        <div>
+                        <div className="grid gap-2">
                           <Label>Banque émettrice</Label>
                           <Input
                             value={instrument.banqueEmettrice}
@@ -787,7 +540,7 @@ export default function ReglementsClientsPage() {
               ))}
             </div>
 
-            <div>
+            <div className="grid gap-2">
               <Label>Notes</Label>
               <Textarea
                 value={notes}
@@ -818,152 +571,6 @@ export default function ReglementsClientsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={Boolean(paymentToCancel)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPaymentToCancel(undefined);
-            setCancelReason("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Annuler le règlement</DialogTitle>
-            <DialogDescription>
-              {paymentToCancel?.numero} · {money(paymentToCancel?.montantTotal ?? 0)}
-            </DialogDescription>
-          </DialogHeader>
-          <div>
-            <Label htmlFor="payment-cancel-reason">Motif d’annulation</Label>
-            <Textarea
-              id="payment-cancel-reason"
-              value={cancelReason}
-              onChange={(event) => setCancelReason(event.target.value)}
-              placeholder="Motif obligatoire"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentToCancel(undefined)}>
-              Conserver le règlement
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!cancelReason.trim() || cancelPayment.isPending}
-              onClick={() => cancelPayment.mutate()}
-            >
-              Annuler le règlement
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(instrumentToReplace)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setInstrumentToReplace(undefined);
-            setReplacement(newInstrument());
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remplacer l’instrument rejeté</DialogTitle>
-            <DialogDescription>
-              Le montant et les affectations sont conservés: {money(instrumentToReplace?.montant ?? 0)}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Mode</Label>
-              <Select
-                value={replacement.mode}
-                onValueChange={(value) => setReplacement((current) => ({
-                  ...current,
-                  mode: value as ClientPaymentMode,
-                  compteTresorerieId: "",
-                }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(modeLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Date</Label>
-              <DatePicker
-                date={replacement.dateInstrument}
-                onSelect={(value) => setReplacement((current) => ({
-                  ...current,
-                  dateInstrument: toDateOnly(value) ?? "",
-                }))}
-              />
-            </div>
-            {replacement.mode === "EFFET" && (
-              <div>
-                <Label>Échéance</Label>
-                <DatePicker
-                  date={replacement.dateEcheance}
-                  onSelect={(value) => setReplacement((current) => ({
-                    ...current,
-                    dateEcheance: toDateOnly(value) ?? "",
-                  }))}
-                />
-              </div>
-            )}
-            {replacement.mode === "ESPECES" ? (
-              <AccountSelect
-                accounts={accounts.data ?? []}
-                type="CAISSE"
-                value={replacement.compteTresorerieId}
-                onChange={(value) => setReplacement((current) => ({
-                  ...current,
-                  compteTresorerieId: value,
-                }))}
-              />
-            ) : (
-              <>
-                <div>
-                  <Label>Référence</Label>
-                  <Input
-                    value={replacement.referenceInstrument}
-                    onChange={(event) => setReplacement((current) => ({
-                      ...current,
-                      referenceInstrument: event.target.value,
-                    }))}
-                  />
-                </div>
-                <div>
-                  <Label>Banque émettrice</Label>
-                  <Input
-                    value={replacement.banqueEmettrice}
-                    onChange={(event) => setReplacement((current) => ({
-                      ...current,
-                      banqueEmettrice: event.target.value,
-                    }))}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInstrumentToReplace(undefined)}>
-              Annuler
-            </Button>
-            <Button
-              disabled={replaceInstrument.isPending
-                || !instrumentValid(replacement, accounts.data ?? [])}
-              onClick={() => replaceInstrument.mutate()}
-            >
-              Enregistrer le remplacement
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -978,7 +585,7 @@ type AccountSelectProps = {
 function AccountSelect({ accounts, type, value, onChange }: AccountSelectProps) {
   const options = accounts.filter((account) => account.actif && account.typeCompte === type);
   return (
-    <div>
+    <div className="grid gap-2">
       <Label>{type === "CAISSE" ? "Caisse" : "Compte bancaire"}</Label>
       <Select value={value} onValueChange={onChange} disabled={options.length === 0}>
         <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -1014,21 +621,6 @@ function SummaryCell({ label, value, tone = "default" }: SummaryCellProps) {
       </div>
     </div>
   );
-}
-
-function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }) {
-  const labels: Record<PaymentInstrument["statut"], string> = {
-    EN_ATTENTE: "En attente",
-    CONFIRME: "Confirmé",
-    REJETE: "Rejeté",
-    REMPLACE: "Remplacé",
-  };
-  const variant = value === "REJETE"
-    ? "destructive"
-    : value === "CONFIRME"
-      ? "default"
-      : "secondary";
-  return <Badge variant={variant}>{labels[value]}</Badge>;
 }
 
 function StatusBadge({ value }: { value: ClientReceivable["statut"] }) {
@@ -1150,7 +742,7 @@ function receivableTargetKey(row: ClientReceivable) {
 }
 
 function numeric(value: string) {
-  return Number(value.replace(",", ".")) || 0;
+  return parseAccountingAmount(value);
 }
 
 function round(value: number) {
@@ -1158,10 +750,7 @@ function round(value: number) {
 }
 
 function money(value: number) {
-  return new Intl.NumberFormat("fr-MA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  return formatAccountingAmount(value);
 }
 
 function date(value?: string | null) {

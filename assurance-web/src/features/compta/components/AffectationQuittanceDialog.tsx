@@ -35,6 +35,7 @@ import { toDateOnly } from "@/features/production/date";
 import { accountingKeys } from "@/lib/query-keys";
 import { comptaApi } from "../api";
 import { classifyAllocationDifference } from "../allocation-tolerance";
+import { formatAccountingMoney } from "../format";
 import type {
   AllocationLine,
   AllocationRequest,
@@ -880,8 +881,5 @@ function categoryLabel(category?: AllocationLine["categorieQuittance"]) {
 }
 
 function money(value: number) {
-  return `${new Intl.NumberFormat("fr-MA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)} MAD`;
+  return formatAccountingMoney(value);
 }

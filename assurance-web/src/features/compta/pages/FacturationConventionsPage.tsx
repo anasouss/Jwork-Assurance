@@ -22,6 +22,7 @@ import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { formatAccountingAmount } from "../format";
 import type {
   ConventionBillingInstallment,
   ConventionBillingStatus,
@@ -414,7 +415,7 @@ function isSelectable(row: ConventionBillingInstallment) {
 }
 
 function money(value: number) {
-  return new Intl.NumberFormat("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
+  return formatAccountingAmount(value);
 }
 
 function shortDate(value: string) {

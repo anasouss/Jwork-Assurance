@@ -17,6 +17,7 @@ import { toDateOnly } from "@/features/production/date";
 import { accountingKeys } from "@/lib/query-keys";
 import { comptaApi } from "../api";
 import { classifyAllocationDifference } from "../allocation-tolerance";
+import { formatAccountingMoney } from "../format";
 import type { AllocationLine, ImportPreview, QuittanceAllocation } from "../types";
 
 type BatchLine = {
@@ -331,5 +332,5 @@ function toBatchLine(line: AllocationLine): BatchLine {
   return { key: line.id ?? crypto.randomUUID(), quittanceId: line.quittanceId ?? "", numeroQuittanceCompagnie: line.numeroQuittanceCompagnie, dateEffet: line.dateEffet, dateEcheance: line.dateEcheance ?? "", acteSource: line.acteSource, categorieSource: line.categorieSource, statutSource: line.statutSource, fichierSource: line.fichierSource, primeNette: line.primeNette, montantTaxes: line.montantTaxes, accessoires: line.accessoires, montantTtc: line.montantTtc, commissionNette: line.commissionNette, montantRetenue: line.montantRetenue, netCompagnie: line.netCompagnie };
 }
 
-function money(value: number) { return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value); }
+function money(value: number) { return formatAccountingMoney(value); }
 function dateLabel(value?: string | null) { return value ? new Intl.DateTimeFormat("fr-FR").format(new Date(`${value}T00:00:00`)) : "—"; }

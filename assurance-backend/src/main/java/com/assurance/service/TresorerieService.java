@@ -189,6 +189,10 @@ public class TresorerieService {
             UpsertCompteTresorerieRequest request,
             String code
     ) {
+        if (request.getTypeCompte() == com.assurance.enums.TypeCompteTresorerie.BANQUE
+                && trimToNull(request.getNomBanque()) == null) {
+            throw new BadRequestException("Le nom de la banque est obligatoire pour un compte bancaire");
+        }
         account.setCode(code);
         account.setLibelle(request.getLibelle().trim());
         account.setTypeCompte(request.getTypeCompte());

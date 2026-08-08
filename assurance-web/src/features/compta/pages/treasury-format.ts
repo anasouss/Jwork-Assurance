@@ -1,13 +1,11 @@
 import type { PaymentInstrument } from "../types";
+import { formatAccountingAmount } from "../format";
 
 export const TREASURY_PAGE_SIZE = 25;
 export const TODAY = new Date().toISOString().slice(0, 10);
 
 export function formatTreasuryMoney(value: number) {
-  return new Intl.NumberFormat("fr-MA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  return formatAccountingAmount(value);
 }
 
 export function formatTreasuryDate(value?: string | null) {

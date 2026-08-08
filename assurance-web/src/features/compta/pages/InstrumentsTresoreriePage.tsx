@@ -168,7 +168,7 @@ export default function InstrumentsTresoreriePage() {
       </div>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_180px_180px_auto]">
-        <div>
+        <div className="grid gap-2">
           <Label htmlFor="instrument-search">Payeur, règlement, banque ou référence</Label>
           <Input
             id="instrument-search"
@@ -182,7 +182,7 @@ export default function InstrumentsTresoreriePage() {
             }}
           />
         </div>
-        <div>
+        <div className="grid gap-2">
           <Label>{filterDateLabel} du</Label>
           <DatePicker
             date={dateFrom}
@@ -192,7 +192,7 @@ export default function InstrumentsTresoreriePage() {
             }}
           />
         </div>
-        <div>
+        <div className="grid gap-2">
           <Label>{filterDateLabel} au</Label>
           <DatePicker
             date={dateTo}
@@ -335,7 +335,7 @@ export default function InstrumentsTresoreriePage() {
                 </span>
               </div>
             )}
-            <div>
+            <div className="grid gap-2">
               <Label>Date d’opération</Label>
               <DatePicker
                 date={operationDate}
@@ -343,7 +343,7 @@ export default function InstrumentsTresoreriePage() {
               />
             </div>
             {action === "CONFIRME" && (
-              <div>
+              <div className="grid gap-2">
                 <Label>Compte bancaire crédité</Label>
                 <Select value={accountId} onValueChange={setAccountId}>
                   <SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger>
@@ -363,7 +363,7 @@ export default function InstrumentsTresoreriePage() {
                 )}
               </div>
             )}
-            <div>
+            <div className="grid gap-2">
               <Label>{action === "REJETE" ? "Motif du rejet" : "Observation"}</Label>
               <Textarea value={reason} onChange={(event) => setReason(event.target.value)} />
             </div>

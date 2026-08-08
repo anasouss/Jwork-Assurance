@@ -70,7 +70,7 @@ export default function JournalTresoreriePage() {
       </header>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-5">
-        <div>
+        <div className="grid gap-2">
           <Label>Compte</Label>
           <Select
             value={accountId}
@@ -90,7 +90,7 @@ export default function JournalTresoreriePage() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="grid gap-2">
           <Label>Date du</Label>
           <DatePicker
             date={dateFrom}
@@ -100,7 +100,7 @@ export default function JournalTresoreriePage() {
             }}
           />
         </div>
-        <div>
+        <div className="grid gap-2">
           <Label>Date au</Label>
           <DatePicker
             date={dateTo}
@@ -110,7 +110,7 @@ export default function JournalTresoreriePage() {
             }}
           />
         </div>
-        <div className="lg:col-span-2">
+        <div className="grid gap-2 lg:col-span-2">
           <Label htmlFor="movement-search">Libellé, référence ou règlement</Label>
           <div className="flex gap-2">
             <Input

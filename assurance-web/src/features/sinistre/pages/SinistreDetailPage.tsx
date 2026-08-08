@@ -659,8 +659,9 @@ export default function SinistreDetailPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Montant</TableHead>
-                    <TableHead>Référence / bénéficiaire</TableHead>
+                    <TableHead>Flux</TableHead>
+                    <TableHead>Moyen / référence</TableHead>
+                    <TableHead className="text-right">Montant</TableHead>
                     <TableHead>Saisie par</TableHead>
                     <TableHead className="w-16" />
                   </TableRow>
@@ -677,13 +678,16 @@ export default function SinistreDetailPage() {
                     >
                       <TableCell>{formatDate(item.dateOperation)}</TableCell>
                       <TableCell>{item.type}</TableCell>
-                      <TableCell className="font-medium">
-                        {formatMoney(item.montant)}
+                      <TableCell>
+                        {operationFlow(item)}
                       </TableCell>
                       <TableCell>
-                        {[item.reference, item.beneficiaire]
+                        {[paymentModeLabel(item.modeReglement), item.reference]
                           .filter(Boolean)
                           .join(" · ") || "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatMoney(item.montant)}
                       </TableCell>
                       <TableCell>{item.saisiePar}</TableCell>
                       <TableCell>
@@ -706,7 +710,7 @@ export default function SinistreDetailPage() {
                   {dossier.operations.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Aucune opération financière.
@@ -766,6 +770,7 @@ export default function SinistreDetailPage() {
       <SinistreFinanceDialog
         open={financeMode !== null}
         mode={financeMode ?? "PROVISION"}
+        dossier={dossier}
         saving={finance.isPending}
         onOpenChange={(open) => {
           if (!open) setFinanceMode(null);
@@ -1155,6 +1160,33 @@ function GuaranteeRow({
       ) : null}
     </div>
   );
+}
+
+function operationFlow(
+  operation: SinistreDetail["operations"][number],
+) {
+  const company = operation.compagnieAssurance || "Compagnie";
+  const counterparty = operation.contrepartie || "Contrepartie non renseignée";
+  if (operation.type === "RECOURS") {
+    return `${counterparty} → ${company}`;
+  }
+  if (operation.type === "ANNULATION") {
+    return `Annulation · ${counterparty}`;
+  }
+  return `${company} → ${counterparty}`;
+}
+
+function paymentModeLabel(
+  mode: SinistreDetail["operations"][number]["modeReglement"],
+) {
+  if (!mode) return null;
+  return {
+    VIREMENT: "Virement",
+    CHEQUE: "Chèque",
+    ESPECES: "Espèces",
+    COMPENSATION: "Compensation",
+    AUTRE: "Autre",
+  }[mode];
 }
 
 function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {

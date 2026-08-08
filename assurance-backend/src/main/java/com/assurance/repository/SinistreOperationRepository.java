@@ -13,12 +13,22 @@ import java.util.Optional;
 
 public interface SinistreOperationRepository extends JpaRepository<SinistreOperation, Long> {
 
-    @EntityGraph(attributePaths = {"saisiPar", "operationAnnulee"})
+    @EntityGraph(attributePaths = {
+            "saisiPar",
+            "operationAnnulee",
+            "compagnieAssurance",
+            "contrepartieClient",
+            "contrepartiePartie",
+            "contrepartieExpert",
+            "contrepartieGarage"
+    })
     List<SinistreOperation> findBySinistreIdOrderByDateOperationDescCreatedAtDesc(Long sinistreId);
 
     Optional<SinistreOperation> findByIdAndSinistreId(Long id, Long sinistreId);
 
     boolean existsByOperationAnnuleeId(Long operationId);
+
+    boolean existsByContrepartiePartieId(Long partieId);
 
     @Query("""
             select coalesce(sum(o.montant), 0)

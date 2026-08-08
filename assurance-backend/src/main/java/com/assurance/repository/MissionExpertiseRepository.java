@@ -13,4 +13,8 @@ public interface MissionExpertiseRepository extends JpaRepository<MissionExperti
     List<MissionExpertise> findBySinistreIdOrderByDateMissionDescCreatedAtDesc(Long sinistreId);
 
     Optional<MissionExpertise> findByIdAndSinistreId(Long id, Long sinistreId);
+
+    boolean existsBySinistreIdAndExpertId(Long sinistreId, Long expertId);
+
+    boolean existsBySinistreIdAndGarageId(Long sinistreId, Long garageId);
 }

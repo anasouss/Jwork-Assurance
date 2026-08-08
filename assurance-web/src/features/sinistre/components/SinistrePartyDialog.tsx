@@ -23,9 +23,9 @@ import type { TypePartie } from "../types";
 const LABELS: Record<TypePartie, string> = {
   CONDUCTEUR: "Conducteur",
   PASSAGER: "Passager",
-  TIERS: "Tiers",
-  TEMOIN: "Témoin",
-  AUTRE: "Autre",
+  ADVERSAIRE: "Adversaire",
+  VICTIME: "Victime",
+  BENEFICIAIRE: "Bénéficiaire",
 };
 
 export function SinistrePartyDialog({
@@ -40,7 +40,7 @@ export function SinistrePartyDialog({
   onSubmit: (request: object) => void;
 }) {
   const [form, setForm] = useState({
-    type: "TIERS" as TypePartie,
+    type: "ADVERSAIRE" as TypePartie,
     nom: "",
     telephone: "",
     cin: "",
@@ -53,7 +53,7 @@ export function SinistrePartyDialog({
   useEffect(() => {
     if (open)
       setForm({
-        type: "TIERS",
+        type: "ADVERSAIRE",
         nom: "",
         telephone: "",
         cin: "",
@@ -72,7 +72,7 @@ export function SinistrePartyDialog({
         <DialogHeader>
           <DialogTitle>Ajouter une partie impliquée</DialogTitle>
           <DialogDescription>
-            Conducteur, tiers, passager ou témoin lié au sinistre.
+            Conducteur, adversaire, passager, victime ou bénéficiaire lié au sinistre.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">

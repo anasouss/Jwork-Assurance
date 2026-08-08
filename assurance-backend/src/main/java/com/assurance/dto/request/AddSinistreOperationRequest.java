@@ -1,5 +1,7 @@
 package com.assurance.dto.request;
 
+import com.assurance.enums.ModeReglementSinistre;
+import com.assurance.enums.TypeContrepartieSinistre;
 import com.assurance.enums.TypeOperationSinistre;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -25,11 +27,19 @@ public class AddSinistreOperationRequest {
     @Size(max = 120)
     private String reference;
 
-    @Size(max = 180)
-    private String beneficiaire;
+    @NotNull
+    private TypeContrepartieSinistre typeContrepartie;
 
-    @Size(max = 80)
-    private String modeReglement;
+    private Long contrepartieId;
+
+    @Size(max = 180)
+    private String contrepartieNomLibre;
+
+    @Size(max = 500)
+    private String justificationContrepartieLibre;
+
+    @NotNull
+    private ModeReglementSinistre modeReglement;
 
     @Size(max = 500)
     private String notes;

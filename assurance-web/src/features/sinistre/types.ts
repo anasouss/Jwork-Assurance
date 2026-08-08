@@ -30,10 +30,22 @@ export type DecisionCouverture =
 export type TypePartie =
   | "CONDUCTEUR"
   | "PASSAGER"
-  | "TIERS"
-  | "TEMOIN"
-  | "AUTRE";
+  | "ADVERSAIRE"
+  | "VICTIME"
+  | "BENEFICIAIRE";
 export type TypeOperation = "REGLEMENT" | "RECOURS" | "FRAIS" | "ANNULATION";
+export type ModeReglementSinistre =
+  | "VIREMENT"
+  | "CHEQUE"
+  | "ESPECES"
+  | "COMPENSATION"
+  | "AUTRE";
+export type TypeContrepartieSinistre =
+  | "CLIENT"
+  | "PARTIE"
+  | "EXPERT"
+  | "GARAGE"
+  | "AUTRE";
 export type TypeDocument =
   | "DECLARATION"
   | "CONSTAT"
@@ -236,8 +248,14 @@ export type SinistreDetail = SinistreSummary & {
     dateOperation: string;
     montant: number;
     reference?: string | null;
+    compagnieAssuranceId?: string | null;
+    compagnieAssurance?: string | null;
+    typeContrepartie?: TypeContrepartieSinistre | null;
+    contrepartieId?: string | null;
+    contrepartie?: string | null;
+    justificationContrepartieLibre?: string | null;
     beneficiaire?: string | null;
-    modeReglement?: string | null;
+    modeReglement?: ModeReglementSinistre | null;
     notes?: string | null;
     operationAnnuleeId?: string | null;
     saisiePar: string;

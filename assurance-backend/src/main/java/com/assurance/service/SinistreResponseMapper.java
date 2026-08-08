@@ -269,19 +269,51 @@ public class SinistreResponseMapper {
     }
 
     private SinistreDetailResponse.Operation toOperation(SinistreOperation item) {
+        String counterparty = item.getContrepartieNomSnapshot();
         return SinistreDetailResponse.Operation.builder()
                 .id(item.getId())
                 .type(item.getType())
                 .dateOperation(item.getDateOperation())
                 .montant(item.getMontant())
                 .reference(item.getReference())
-                .beneficiaire(item.getBeneficiaire())
+                .compagnieAssuranceId(item.getCompagnieAssurance() == null
+                        ? null
+                        : item.getCompagnieAssurance().getId())
+                .compagnieAssurance(item.getCompagnieAssurance() == null
+                        ? null
+                        : item.getCompagnieAssurance().getNom())
+                .typeContrepartie(item.getTypeContrepartie())
+                .contrepartieId(counterpartyId(item))
+                .contrepartie(counterparty)
+                .justificationContrepartieLibre(item.getJustificationContrepartieLibre())
+                .beneficiaire(counterparty)
                 .modeReglement(item.getModeReglement())
                 .notes(item.getNotes())
                 .operationAnnuleeId(item.getOperationAnnulee() == null ? null : item.getOperationAnnulee().getId())
                 .saisiePar(fullName(item.getSaisiPar()))
                 .createdAt(item.getCreatedAt())
                 .build();
+    }
+
+    private Long counterpartyId(SinistreOperation item) {
+        if (item.getTypeContrepartie() == null) {
+            return null;
+        }
+        return switch (item.getTypeContrepartie()) {
+            case CLIENT -> item.getContrepartieClient() == null
+                    ? null
+                    : item.getContrepartieClient().getId();
+            case PARTIE -> item.getContrepartiePartie() == null
+                    ? null
+                    : item.getContrepartiePartie().getId();
+            case EXPERT -> item.getContrepartieExpert() == null
+                    ? null
+                    : item.getContrepartieExpert().getId();
+            case GARAGE -> item.getContrepartieGarage() == null
+                    ? null
+                    : item.getContrepartieGarage().getId();
+            case AUTRE -> null;
+        };
     }
 
     private SinistreDetailResponse.Evenement toEvent(SinistreEvenement item) {

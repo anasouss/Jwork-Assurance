@@ -1,6 +1,7 @@
 package com.assurance.dto.response;
 
 import com.assurance.enums.DecisionCouvertureSinistre;
+import com.assurance.enums.ModeReglementSinistre;
 import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutDocumentSinistre;
 import com.assurance.enums.StatutMissionExpertise;
@@ -9,6 +10,7 @@ import com.assurance.enums.TypeDocumentSinistre;
 import com.assurance.enums.TypeEvenementSinistre;
 import com.assurance.enums.TypeOperationSinistre;
 import com.assurance.enums.TypePartieSinistre;
+import com.assurance.enums.TypeContrepartieSinistre;
 import lombok.Builder;
 import lombok.Data;
 
@@ -185,8 +187,15 @@ public class SinistreDetailResponse {
         private LocalDate dateOperation;
         private BigDecimal montant;
         private String reference;
+        private Long compagnieAssuranceId;
+        private String compagnieAssurance;
+        private TypeContrepartieSinistre typeContrepartie;
+        private Long contrepartieId;
+        private String contrepartie;
+        private String justificationContrepartieLibre;
+        /** @deprecated Use contrepartie. Kept for API compatibility. */
         private String beneficiaire;
-        private String modeReglement;
+        private ModeReglementSinistre modeReglement;
         private String notes;
         private Long operationAnnuleeId;
         private String saisiePar;

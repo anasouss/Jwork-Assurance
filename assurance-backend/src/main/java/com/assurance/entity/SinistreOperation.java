@@ -1,5 +1,7 @@
 package com.assurance.entity;
 
+import com.assurance.enums.ModeReglementSinistre;
+import com.assurance.enums.TypeContrepartieSinistre;
 import com.assurance.enums.TypeOperationSinistre;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -54,11 +56,42 @@ public class SinistreOperation extends BaseEntity {
     @Column(length = 120)
     private String reference;
 
-    @Column(length = 180)
-    private String beneficiaire;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "compagnie_assurance_id", nullable = false)
+    private CompagnieAssurance compagnieAssurance;
 
-    @Column(name = "mode_reglement", length = 80)
-    private String modeReglement;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_contrepartie", nullable = false, length = 30)
+    private TypeContrepartieSinistre typeContrepartie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contrepartie_client_id")
+    private Client contrepartieClient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contrepartie_partie_id")
+    private SinistrePartie contrepartiePartie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contrepartie_expert_id")
+    private ExpertSinistre contrepartieExpert;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contrepartie_garage_id")
+    private GarageSinistre contrepartieGarage;
+
+    @Column(name = "contrepartie_nom_snapshot", length = 180)
+    private String contrepartieNomSnapshot;
+
+    @Column(name = "contrepartie_nom_libre", length = 180)
+    private String contrepartieNomLibre;
+
+    @Column(name = "justification_contrepartie_libre", length = 500)
+    private String justificationContrepartieLibre;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_reglement", nullable = false, length = 80)
+    private ModeReglementSinistre modeReglement;
 
     @Column(length = 500)
     private String notes;

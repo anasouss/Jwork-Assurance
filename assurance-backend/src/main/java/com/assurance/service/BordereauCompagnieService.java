@@ -560,7 +560,14 @@ public class BordereauCompagnieService {
             return source.getActeSource().trim();
         }
         if (source.getQuittance().getMouvementContrat() != null) {
-            return source.getQuittance().getMouvementContrat().getLibelle();
+            var mouvement = source.getQuittance().getMouvementContrat();
+            if (mouvement.getTypeMouvement() != null
+                    && trimToNull(mouvement.getTypeMouvement().getLibelle()) != null) {
+                return mouvement.getTypeMouvement().getLibelle().trim();
+            }
+            if (trimToNull(mouvement.getNumeroMouvement()) != null) {
+                return mouvement.getNumeroMouvement().trim();
+            }
         }
         return source.getQuittance().getType();
     }

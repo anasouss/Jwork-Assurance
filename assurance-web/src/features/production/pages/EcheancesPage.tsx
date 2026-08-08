@@ -1,7 +1,19 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownAZ, Download, Eye, FilePenLine, FileText, MoreHorizontal, RefreshCw, RotateCcw, Search } from "lucide-react";
+import {
+  ArrowDownAZ,
+  CircleCheck,
+  Download,
+  Eye,
+  FilePenLine,
+  FileText,
+  MoreHorizontal,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  TriangleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -382,8 +394,8 @@ function EcheanceTableRow({
       <td className="px-3 py-2 align-middle font-semibold">{text(row.typeContratLabel)}</td>
       <td className="px-3 py-2 align-middle">{text(row.compagnie)}</td>
       <td className="px-3 py-2 align-middle">{text(row.telephone)}</td>
-      <td className={cn("px-3 py-2 align-middle", text(row.observation) !== "-" && "font-semibold text-red-600")}>
-        {text(row.observation)}
+      <td className="max-w-72 px-3 py-2 align-middle">
+        <ObservationStatus row={row} />
       </td>
       <td className="px-3 py-2 align-middle">
         <DropdownMenu>
@@ -419,6 +431,35 @@ function EcheanceTableRow({
         </DropdownMenu>
       </td>
     </tr>
+  );
+}
+
+function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
+  const message = text(row.observation);
+  const level = row.observationNiveau
+    ?? (message !== "-" && message !== "À jour" ? "BLOQUANT" : "AUCUNE");
+
+  if (level === "AUCUNE") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+        <CircleCheck className="size-3.5" />
+        À jour
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-start gap-1.5 text-xs font-semibold leading-5",
+        level === "BLOQUANT"
+          ? "text-red-700 dark:text-red-300"
+          : "text-amber-700 dark:text-amber-300"
+      )}
+    >
+      <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+      {message}
+    </span>
   );
 }
 

@@ -870,6 +870,7 @@ export type EcheanceAutomobileRow = {
   compagnie?: string | null;
   telephone?: string | null;
   observation?: string | null;
+  observationNiveau?: "AUCUNE" | "AVERTISSEMENT" | "BLOQUANT" | null;
   preTermeDraftId?: string | null;
   renouvellementTermeCompagnieEligible: boolean;
 };

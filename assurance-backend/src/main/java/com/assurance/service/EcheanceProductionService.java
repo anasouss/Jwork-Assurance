@@ -9,6 +9,7 @@ import com.assurance.entity.Vehicule;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.StatutContrat;
+import com.assurance.enums.TypeClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.ContratRepository;
 import com.assurance.service.renewal.RenewalPolicy;
@@ -148,6 +149,7 @@ public class EcheanceProductionService {
         ContratClient link = souscripteur(contrat);
         Client client = link == null ? null : link.getClient();
         Vehicule vehicule = contrat.getTypeContrat() == TypeContrat.FLOTTE ? null : firstVehicule(contrat);
+        ObservationResult observation = observation(contrat, client);
         return EcheanceAutomobileResponse.Row.builder()
                 .contratId(contrat.getId())
                 .dossier(firstNonBlank(contrat.getNumeroDossier(), contrat.getNumeroContrat(), "#" + contrat.getId()))
@@ -172,7 +174,8 @@ public class EcheanceProductionService {
                         "-"
                 ))
                 .telephone(primaryPhone(client))
-                .observation(observation(client, vehicule))
+                .observation(observation.message())
+                .observationNiveau(observation.level())
                 .preTermeDraftId(preTermeDraft == null ? null : preTermeDraft.getId())
                 .renouvellementTermeCompagnieEligible(renewalPolicy.isCompanyTermEligible(contrat))
                 .build();
@@ -212,7 +215,13 @@ public class EcheanceProductionService {
     }
 
     private Vehicule firstVehicule(Contrat contrat) {
-        return contrat.getVehicules() == null || contrat.getVehicules().isEmpty() ? null : contrat.getVehicules().get(0);
+        if (contrat.getVehicules() == null) {
+            return null;
+        }
+        return contrat.getVehicules().stream()
+                .filter(vehicle -> !Boolean.FALSE.equals(vehicle.getActif()))
+                .findFirst()
+                .orElse(null);
     }
 
     private String primaryPhone(Client client) {
@@ -241,18 +250,177 @@ public class EcheanceProductionService {
         return firstNonBlank(client.getTelephone(), "-");
     }
 
-    private String observation(Client client, Vehicule vehicule) {
+    private ObservationResult observation(Contrat contrat, Client subscriber) {
         LocalDate today = LocalDate.now();
-        if (client != null && client.getDateValiditePermis() != null && client.getDateValiditePermis().isBefore(today)) {
-            return "Permis expiré";
+        LocalDate renewalDate = contrat.getDateEcheance();
+        Set<String> messages = new LinkedHashSet<>();
+        AlertAccumulator alerts = new AlertAccumulator();
+
+        Client driver = conducteur(contrat, subscriber);
+        if (driver != null && driver.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE) {
+            addDocumentAlert(
+                    messages,
+                    alerts,
+                    driver.getDateValiditePermis(),
+                    today,
+                    renewalDate,
+                    "Permis expiré",
+                    "Permis expirant avant l’échéance",
+                    "Validité du permis manquante"
+            );
         }
-        if (client != null && client.getCinValidite() != null && client.getCinValidite().isBefore(today)) {
-            return "CIN expiré";
+
+        if (subscriber != null
+                && subscriber.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE
+                && subscriber.getCin() != null
+                && !subscriber.getCin().isBlank()) {
+            addDocumentAlert(
+                    messages,
+                    alerts,
+                    subscriber.getCinValidite(),
+                    today,
+                    renewalDate,
+                    "CIN expirée",
+                    "CIN expirant avant l’échéance",
+                    "Validité de la CIN manquante"
+            );
         }
-        if (vehicule != null && vehicule.getDateExpirationCarteGrise() != null && vehicule.getDateExpirationCarteGrise().isBefore(today)) {
-            return "Carte grise expirée";
+
+        List<Vehicule> vehicles = contrat.getVehicules() == null
+                ? List.of()
+                : contrat.getVehicules().stream()
+                        .filter(vehicle -> !Boolean.FALSE.equals(vehicle.getActif()))
+                        .toList();
+        if (contrat.getTypeContrat() == TypeContrat.FLOTTE) {
+            addFleetRegistrationAlerts(messages, alerts, vehicles, today, renewalDate);
+        } else if (!vehicles.isEmpty()) {
+            addDocumentAlert(
+                    messages,
+                    alerts,
+                    vehicles.get(0).getDateExpirationCarteGrise(),
+                    today,
+                    renewalDate,
+                    "Carte grise expirée",
+                    "Carte grise expirant avant l’échéance",
+                    "Validité de la carte grise manquante"
+            );
         }
-        return "-";
+
+        if (messages.isEmpty()) {
+            return new ObservationResult("À jour", "AUCUNE");
+        }
+        return new ObservationResult(
+                String.join(" · ", messages),
+                alerts.expired ? "BLOQUANT" : "AVERTISSEMENT"
+        );
+    }
+
+    private Client conducteur(Contrat contrat, Client fallback) {
+        if (contrat.getClients() == null) {
+            return fallback;
+        }
+        Client designatedDriver = contrat.getClients().stream()
+                .filter(link -> link.getRole() == RoleClientContrat.CONDUCTEUR)
+                .map(ContratClient::getClient)
+                .findFirst()
+                .orElse(null);
+        if (designatedDriver != null) {
+            return designatedDriver;
+        }
+        return contrat.getClients().stream()
+                .filter(link -> link.getRole() == RoleClientContrat.PROPRIETAIRE)
+                .map(ContratClient::getClient)
+                .filter(client -> !Boolean.FALSE.equals(client.getConducteurHabituel()))
+                .findFirst()
+                .orElse(fallback);
+    }
+
+    private void addFleetRegistrationAlerts(
+            Set<String> messages,
+            AlertAccumulator alerts,
+            List<Vehicule> vehicles,
+            LocalDate today,
+            LocalDate renewalDate
+    ) {
+        int expired = 0;
+        int beforeRenewal = 0;
+        int missing = 0;
+        for (Vehicule vehicle : vehicles) {
+            DocumentStatus status = documentStatus(
+                    vehicle.getDateExpirationCarteGrise(),
+                    today,
+                    renewalDate
+            );
+            if (status == DocumentStatus.EXPIRED) {
+                expired++;
+            } else if (status == DocumentStatus.BEFORE_RENEWAL) {
+                beforeRenewal++;
+            } else if (status == DocumentStatus.MISSING) {
+                missing++;
+            }
+        }
+        if (expired > 0) {
+            alerts.expired = true;
+            messages.add(expired + " carte(s) grise(s) expirée(s)");
+        }
+        if (beforeRenewal > 0) {
+            messages.add(beforeRenewal + " carte(s) grise(s) expirant avant l’échéance");
+        }
+        if (missing > 0) {
+            messages.add(missing + " validité(s) de carte grise manquante(s)");
+        }
+    }
+
+    private void addDocumentAlert(
+            Set<String> messages,
+            AlertAccumulator alerts,
+            LocalDate validityDate,
+            LocalDate today,
+            LocalDate renewalDate,
+            String expiredMessage,
+            String beforeRenewalMessage,
+            String missingMessage
+    ) {
+        DocumentStatus status = documentStatus(validityDate, today, renewalDate);
+        if (status == DocumentStatus.EXPIRED) {
+            alerts.expired = true;
+            messages.add(expiredMessage);
+        } else if (status == DocumentStatus.BEFORE_RENEWAL) {
+            messages.add(beforeRenewalMessage);
+        } else if (status == DocumentStatus.MISSING) {
+            messages.add(missingMessage);
+        }
+    }
+
+    private DocumentStatus documentStatus(
+            LocalDate validityDate,
+            LocalDate today,
+            LocalDate renewalDate
+    ) {
+        if (validityDate == null) {
+            return DocumentStatus.MISSING;
+        }
+        if (validityDate.isBefore(today)) {
+            return DocumentStatus.EXPIRED;
+        }
+        if (renewalDate != null && validityDate.isBefore(renewalDate)) {
+            return DocumentStatus.BEFORE_RENEWAL;
+        }
+        return DocumentStatus.VALID;
+    }
+
+    private enum DocumentStatus {
+        VALID,
+        EXPIRED,
+        BEFORE_RENEWAL,
+        MISSING
+    }
+
+    private record ObservationResult(String message, String level) {
+    }
+
+    private static final class AlertAccumulator {
+        private boolean expired;
     }
 
     private EcheanceAutomobileResponse.Summary summary(List<EcheanceAutomobileResponse.Row> rows, long totalElements) {

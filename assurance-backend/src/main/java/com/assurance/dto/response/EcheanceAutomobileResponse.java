@@ -54,6 +54,7 @@ public class EcheanceAutomobileResponse {
         private String compagnie;
         private String telephone;
         private String observation;
+        private String observationNiveau;
         private Long preTermeDraftId;
         private boolean renouvellementTermeCompagnieEligible;
     }

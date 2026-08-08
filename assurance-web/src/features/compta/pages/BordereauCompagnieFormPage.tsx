@@ -252,14 +252,17 @@ export default function BordereauCompagnieFormPage() {
           setSubmittedSearch(search.trim());
         }}>
           <Label htmlFor="bordereau-source-search">Rechercher une écriture</Label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               id="bordereau-source-search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Police, dossier, mouvement ou N° quittance compagnie"
             />
-            <Button type="submit" variant="outline"><Search className="size-4" />Filtrer</Button>
+            <Button type="submit" variant="outline">
+              <Search className="size-4" />
+              Filtrer
+            </Button>
           </div>
         </form>
       </section>
@@ -291,90 +294,101 @@ export default function BordereauCompagnieFormPage() {
           </div>
           <Badge variant="secondary">{rows.length} écriture(s)</Badge>
         </div>
-        <div className="max-h-[560px] overflow-auto">
-        <Table className="min-w-[1180px]">
-          <TableHeader className="sticky top-0 z-10 bg-orange-600 text-xs uppercase text-white shadow-sm">
-            <TableRow className="hover:bg-orange-600">
-              <TableHead className="w-12 bg-orange-600 px-4 text-center text-white">
-                <Checkbox
-                  checked={allSelected}
-                  aria-label="Sélectionner toutes les écritures disponibles"
-                  onCheckedChange={(checked) => setSelectedIds(checked ? rows.map((row) => row.id) : [])}
-                />
-              </TableHead>
-              <TableHead className="bg-orange-600 text-white">Mouvement</TableHead>
-              <TableHead className="bg-orange-600 text-white">Police</TableHead>
-              <TableHead className="bg-orange-600 text-white">N° quittance</TableHead>
-              <TableHead className="bg-orange-600 text-white">Date d’effet</TableHead>
-              <TableHead className="bg-orange-600 text-right text-white">Prime nette</TableHead>
-              <TableHead className="bg-orange-600 text-right text-white">Taxes</TableHead>
-              <TableHead className="bg-orange-600 text-right text-white">TTC</TableHead>
-              <TableHead className="bg-orange-600 text-right text-white">Commission</TableHead>
-              <TableHead className="bg-orange-600 text-right text-white">Retenue</TableHead>
-              <TableHead className="bg-orange-600 text-right text-white">Net compagnie</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => {
-              const selected = selectedIds.includes(row.id);
-              return (
-              <TableRow
-                key={row.id}
-                data-state={selected ? "selected" : undefined}
-                className="data-[state=selected]:bg-orange-50/80 dark:data-[state=selected]:bg-orange-950/25"
-              >
-                <TableCell className="px-4 text-center">
+        <div className="max-h-[560px] overflow-auto [&>[data-slot=table-container]]:overflow-visible">
+          <Table className="min-w-[1180px]">
+            <TableHeader className="sticky top-0 z-10 bg-orange-600 text-xs uppercase text-white shadow-sm">
+              <TableRow className="hover:bg-orange-600">
+                <TableHead className="w-12 bg-orange-600 px-4 text-center text-white">
                   <Checkbox
-                    checked={selected}
-                    aria-label={`Sélectionner la quittance ${row.numeroQuittanceCompagnie || row.id}`}
-                    onCheckedChange={(checked) => setSelectedIds((current) => checked
-                      ? [...new Set([...current, row.id])]
-                      : current.filter((id) => id !== row.id))}
+                    checked={allSelected}
+                    aria-label="Sélectionner toutes les écritures disponibles"
+                    onCheckedChange={(checked) => setSelectedIds(checked
+                      ? rows.map((row) => row.id)
+                      : [])}
                   />
-                </TableCell>
-                <TableCell>
-                  <div className="font-medium">{row.mouvement || "-"}</div>
-                  {row.numeroDossier ? <div className="text-xs text-muted-foreground">{row.numeroDossier}</div> : null}
-                </TableCell>
-                <TableCell className="font-medium">{row.numeroPolice || "-"}</TableCell>
-                <TableCell className="font-mono text-xs">{row.numeroQuittanceCompagnie || "-"}</TableCell>
-                <TableCell>{date(row.dateEffet)}</TableCell>
-                <TableCell className="text-right">{money(row.primeNette)}</TableCell>
-                <TableCell className="text-right">{money(row.montantTaxes)}</TableCell>
-                <TableCell className="text-right font-semibold">{money(row.montantTtc)}</TableCell>
-                <TableCell className="text-right">{money(row.commissionNette)}</TableCell>
-                <TableCell className="text-right">{money(row.montantRetenue)}</TableCell>
-                <TableCell className="text-right font-semibold">{money(row.netCompagnie)}</TableCell>
+                </TableHead>
+                <TableHead className="bg-orange-600 text-white">Mouvement</TableHead>
+                <TableHead className="bg-orange-600 text-white">Police</TableHead>
+                <TableHead className="bg-orange-600 text-white">N° quittance</TableHead>
+                <TableHead className="bg-orange-600 text-white">Date d’effet</TableHead>
+                <TableHead className="bg-orange-600 text-right text-white">Prime nette</TableHead>
+                <TableHead className="bg-orange-600 text-right text-white">Taxes</TableHead>
+                <TableHead className="bg-orange-600 text-right text-white">TTC</TableHead>
+                <TableHead className="bg-orange-600 text-right text-white">Commission</TableHead>
+                <TableHead className="bg-orange-600 text-right text-white">Retenue</TableHead>
+                <TableHead className="bg-orange-600 text-right text-white">Net compagnie</TableHead>
               </TableRow>
-            );})}
-            {!sources.isLoading && rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="h-28 text-center text-muted-foreground">
-                  {compagnieId ? "Aucune écriture disponible pour ces critères." : "Choisissez une compagnie."}
-                </TableCell>
-              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => {
+                const selected = selectedIds.includes(row.id);
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={selected ? "selected" : undefined}
+                    className="data-[state=selected]:bg-orange-50/80 dark:data-[state=selected]:bg-orange-950/25"
+                  >
+                    <TableCell className="px-4 text-center">
+                      <Checkbox
+                        checked={selected}
+                        aria-label={`Sélectionner la quittance ${row.numeroQuittanceCompagnie || row.id}`}
+                        onCheckedChange={(checked) => setSelectedIds((current) => checked
+                          ? [...new Set([...current, row.id])]
+                          : current.filter((id) => id !== row.id))}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{row.mouvement || "-"}</div>
+                      {row.numeroDossier ? (
+                        <div className="text-xs text-muted-foreground">{row.numeroDossier}</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="font-medium">{row.numeroPolice || "-"}</TableCell>
+                    <TableCell className="font-mono text-xs">{row.numeroQuittanceCompagnie || "-"}</TableCell>
+                    <TableCell>{date(row.dateEffet)}</TableCell>
+                    <TableCell className="text-right">{money(row.primeNette)}</TableCell>
+                    <TableCell className="text-right">{money(row.montantTaxes)}</TableCell>
+                    <TableCell className="text-right font-semibold">{money(row.montantTtc)}</TableCell>
+                    <TableCell className="text-right">{money(row.commissionNette)}</TableCell>
+                    <TableCell className="text-right">{money(row.montantRetenue)}</TableCell>
+                    <TableCell className="text-right font-semibold">{money(row.netCompagnie)}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {!sources.isLoading && rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="h-28 text-center text-muted-foreground">
+                    {compagnieId
+                      ? "Aucune écriture disponible pour ces critères."
+                      : "Choisissez une compagnie."}
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {sources.isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="h-28 text-center text-muted-foreground">
+                    Chargement...
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+            {selectedRows.length > 0 ? (
+              <TableFooter className="sticky bottom-0 z-10 bg-background shadow-[0_-1px_0_hsl(var(--border))]">
+                <TableRow className="hover:bg-background">
+                  <TableCell />
+                  <TableCell colSpan={4} className="font-semibold">
+                    Total de la sélection · {selectedRows.length} ligne(s)
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">{money(totals.primeNette)}</TableCell>
+                  <TableCell className="text-right font-semibold">{money(totals.taxes)}</TableCell>
+                  <TableCell className="text-right font-semibold">{money(totals.ttc)}</TableCell>
+                  <TableCell className="text-right font-semibold">{money(totals.commission)}</TableCell>
+                  <TableCell className="text-right font-semibold">{money(totals.retenue)}</TableCell>
+                  <TableCell className="text-right font-bold">{money(totals.net)}</TableCell>
+                </TableRow>
+              </TableFooter>
             ) : null}
-            {sources.isLoading ? (
-              <TableRow><TableCell colSpan={11} className="h-28 text-center text-muted-foreground">Chargement...</TableCell></TableRow>
-            ) : null}
-          </TableBody>
-          {selectedRows.length > 0 ? (
-            <TableFooter className="sticky bottom-0 z-10 bg-background shadow-[0_-1px_0_hsl(var(--border))]">
-              <TableRow className="hover:bg-background">
-                <TableCell />
-                <TableCell colSpan={4} className="font-semibold">
-                  Total de la sélection · {selectedRows.length} ligne(s)
-                </TableCell>
-                <TableCell className="text-right font-semibold">{money(totals.primeNette)}</TableCell>
-                <TableCell className="text-right font-semibold">{money(totals.taxes)}</TableCell>
-                <TableCell className="text-right font-semibold">{money(totals.ttc)}</TableCell>
-                <TableCell className="text-right font-semibold">{money(totals.commission)}</TableCell>
-                <TableCell className="text-right font-semibold">{money(totals.retenue)}</TableCell>
-                <TableCell className="text-right font-bold">{money(totals.net)}</TableCell>
-              </TableRow>
-            </TableFooter>
-          ) : null}
-        </Table>
+          </Table>
         </div>
       </section>
 
@@ -387,7 +401,7 @@ export default function BordereauCompagnieFormPage() {
             placeholder="Informations internes facultatives sur ce bordereau"
           />
         </Field>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Building2 className="size-4" />
             {selectedRows.length > 0

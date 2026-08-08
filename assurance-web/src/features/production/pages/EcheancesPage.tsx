@@ -496,10 +496,17 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
               </div>
               <ul className="grid gap-2.5">
                 {group.alerts.map((alert, index) => (
-                  <li key={`${group.kind}-${index}-${alert.message}`} className="grid grid-cols-[6px_1fr] gap-2.5 text-sm">
+                  <li
+                    key={`${group.kind}-${index}-${alert.message}`}
+                    className="grid grid-cols-[6px_1fr] gap-2.5 text-sm"
+                  >
                     <span className={cn("mt-1.5 size-1.5 rounded-full", group.dotClassName)} />
                     <div className="min-w-0 leading-5">
-                      {alert.subject ? <div className="break-all font-semibold text-foreground">{alert.subject}</div> : null}
+                      {alert.subject ? (
+                        <div className="break-all font-semibold text-foreground">
+                          {alert.subject}
+                        </div>
+                      ) : null}
                       <div className="text-muted-foreground">{alert.message}</div>
                     </div>
                   </li>

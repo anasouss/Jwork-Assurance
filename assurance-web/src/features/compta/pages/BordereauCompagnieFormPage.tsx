@@ -294,9 +294,9 @@ export default function BordereauCompagnieFormPage() {
           </div>
           <Badge variant="secondary">{rows.length} écriture(s)</Badge>
         </div>
-        <div className="max-h-[560px] overflow-auto [&>[data-slot=table-container]]:overflow-visible">
+        <div>
           <Table className="min-w-[1180px]">
-            <TableHeader className="sticky top-0 z-10 bg-orange-600 text-xs uppercase text-white shadow-sm">
+            <TableHeader className="bg-orange-600 text-xs uppercase text-white">
               <TableRow className="hover:bg-orange-600">
                 <TableHead className="w-12 bg-orange-600 px-4 text-center text-white">
                   <Checkbox
@@ -373,7 +373,7 @@ export default function BordereauCompagnieFormPage() {
               ) : null}
             </TableBody>
             {selectedRows.length > 0 ? (
-              <TableFooter className="sticky bottom-0 z-10 bg-background shadow-[0_-1px_0_hsl(var(--border))]">
+              <TableFooter className="bg-muted/50">
                 <TableRow className="hover:bg-background">
                   <TableCell />
                   <TableCell colSpan={4} className="font-semibold">
@@ -438,7 +438,7 @@ function ModeButton({
       type="button"
       disabled={disabled}
       className={active
-        ? "h-9 rounded-sm bg-background px-3 text-sm font-semibold shadow-sm"
+        ? "h-9 rounded-sm bg-amber-100 px-3 text-sm font-semibold text-amber-950 shadow-sm dark:bg-amber-400/20 dark:text-amber-100"
         : "h-9 rounded-sm px-3 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"}
       onClick={onClick}
     >

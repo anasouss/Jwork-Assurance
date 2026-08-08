@@ -453,9 +453,7 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
     .map((alert) => alert.trim())
     .filter(Boolean);
   const blocking = level === "BLOQUANT";
-  const compactLabel = blocking
-    ? `${alerts.length} alerte${alerts.length > 1 ? "s" : ""}`
-    : `${alerts.length} document${alerts.length > 1 ? "s" : ""} à vérifier`;
+  const compactLabel = `${alerts.length} document${alerts.length > 1 ? "s" : ""} à vérifier`;
 
   return (
     <Popover>

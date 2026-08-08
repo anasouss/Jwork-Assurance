@@ -257,10 +257,21 @@ public class EcheanceProductionService {
         AlertAccumulator alerts = new AlertAccumulator();
 
         Client driver = conducteur(contrat, subscriber);
+        boolean separateDriver = driver != null
+                && subscriber != null
+                && !sameClient(driver, subscriber);
         if (driver != null && driver.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE) {
             addDocumentAlert(
                     messages,
                     alerts,
+                    separateDriver
+                            ? "Conducteur " + firstNonBlank(
+                                    driver.getNomAffichage(),
+                                    driver.getCodeClient(),
+                                    driver.getCin(),
+                                    "désigné"
+                            )
+                            : null,
                     driver.getDateValiditePermis(),
                     today,
                     renewalDate,
@@ -277,6 +288,7 @@ public class EcheanceProductionService {
             addDocumentAlert(
                     messages,
                     alerts,
+                    separateDriver ? "Souscripteur" : null,
                     subscriber.getCinValidite(),
                     today,
                     renewalDate,
@@ -297,6 +309,7 @@ public class EcheanceProductionService {
             addDocumentAlert(
                     messages,
                     alerts,
+                    vehicleObservationLabel(vehicles.get(0)),
                     vehicles.get(0).getDateExpirationCarteGrise(),
                     today,
                     renewalDate,
@@ -307,7 +320,7 @@ public class EcheanceProductionService {
         }
 
         if (messages.isEmpty()) {
-            return new ObservationResult("À jour", "AUCUNE");
+            return new ObservationResult("", "AUCUNE");
         }
         return new ObservationResult(
                 String.join(" · ", messages),
@@ -342,38 +355,42 @@ public class EcheanceProductionService {
             LocalDate today,
             LocalDate renewalDate
     ) {
-        int expired = 0;
-        int beforeRenewal = 0;
-        int missing = 0;
         for (Vehicule vehicle : vehicles) {
-            DocumentStatus status = documentStatus(
+            addDocumentAlert(
+                    messages,
+                    alerts,
+                    vehicleObservationLabel(vehicle),
                     vehicle.getDateExpirationCarteGrise(),
                     today,
-                    renewalDate
+                    renewalDate,
+                    "Carte grise expirée",
+                    "Carte grise expirant avant l’échéance",
+                    "Validité de la carte grise manquante"
             );
-            if (status == DocumentStatus.EXPIRED) {
-                expired++;
-            } else if (status == DocumentStatus.BEFORE_RENEWAL) {
-                beforeRenewal++;
-            } else if (status == DocumentStatus.MISSING) {
-                missing++;
-            }
         }
-        if (expired > 0) {
-            alerts.expired = true;
-            messages.add(expired + " carte(s) grise(s) expirée(s)");
+    }
+
+    private String vehicleObservationLabel(Vehicule vehicle) {
+        return firstNonBlank(
+                vehicle.getImmatriculation(),
+                vehicle.getId() == null ? null : "Véhicule #" + vehicle.getId(),
+                "Véhicule"
+        );
+    }
+
+    private boolean sameClient(Client left, Client right) {
+        if (left == right) {
+            return true;
         }
-        if (beforeRenewal > 0) {
-            messages.add(beforeRenewal + " carte(s) grise(s) expirant avant l’échéance");
-        }
-        if (missing > 0) {
-            messages.add(missing + " validité(s) de carte grise manquante(s)");
-        }
+        return left.getId() != null
+                && right.getId() != null
+                && left.getId().equals(right.getId());
     }
 
     private void addDocumentAlert(
             Set<String> messages,
             AlertAccumulator alerts,
+            String subject,
             LocalDate validityDate,
             LocalDate today,
             LocalDate renewalDate,
@@ -384,12 +401,16 @@ public class EcheanceProductionService {
         DocumentStatus status = documentStatus(validityDate, today, renewalDate);
         if (status == DocumentStatus.EXPIRED) {
             alerts.expired = true;
-            messages.add(expiredMessage);
+            messages.add(documentAlertMessage(subject, expiredMessage));
         } else if (status == DocumentStatus.BEFORE_RENEWAL) {
-            messages.add(beforeRenewalMessage);
+            messages.add(documentAlertMessage(subject, beforeRenewalMessage));
         } else if (status == DocumentStatus.MISSING) {
-            messages.add(missingMessage);
+            messages.add(documentAlertMessage(subject, missingMessage));
         }
+    }
+
+    private String documentAlertMessage(String subject, String message) {
+        return hasText(subject) ? subject + " : " + message : message;
     }
 
     private DocumentStatus documentStatus(

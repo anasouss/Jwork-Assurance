@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Cell, Pie, PieChart } from "recharts";
+import { Cell, LabelList, Pie, PieChart } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
@@ -23,6 +23,7 @@ type DonutChartProps = {
   outerRadius?: number;
   showLegend?: boolean;
   showValues?: boolean;
+  showSliceValues?: boolean;
   centerLabel?: string;
   valueFormatter?: (value: number) => string;
   onSelect?: (key: string) => void;
@@ -39,6 +40,7 @@ export function DonutChart({
   outerRadius = 100,
   showLegend = true,
   showValues = true,
+  showSliceValues = false,
   centerLabel,
   valueFormatter = defaultValueFormatter,
   onSelect,
@@ -91,6 +93,18 @@ export function DonutChart({
                   onClick={() => onSelect?.(item.key)}
                 />
               ))}
+              {showSliceValues ? (
+                <LabelList
+                  dataKey="value"
+                  position="inside"
+                  fill="#ffffff"
+                  stroke="#111827"
+                  strokeWidth={0.75}
+                  fontSize={12}
+                  fontWeight={700}
+                  formatter={(value) => valueFormatter(Number(value ?? 0))}
+                />
+              ) : null}
             </Pie>
             <ChartTooltip
               content={(

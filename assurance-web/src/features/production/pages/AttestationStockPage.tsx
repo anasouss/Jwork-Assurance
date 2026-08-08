@@ -717,6 +717,8 @@ function StockPieCard({
           emptyText="Aucun stock disponible."
           innerRadius={54}
           outerRadius={78}
+          showLegend={false}
+          showSliceValues
           valueFormatter={formatInteger}
           onSelect={(usageId) => {
             const selected = company.rows.find((item) => item.groupeUsageAttestationId === usageId);

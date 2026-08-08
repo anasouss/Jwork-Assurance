@@ -3,7 +3,6 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Boxes, ClipboardList, Plus, Settings2, TriangleAlert, Truck } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DonutChart, type DonutChartDatum } from "@/components/ui/donut-chart";
@@ -701,19 +700,15 @@ function StockPieCard({
   const thresholdAlerts = company.rows.filter(
     (item) => item.stockFaible && item.minimumStock != null,
   );
-  const total = chartData.reduce((sum, item) => sum + item.value, 0);
   return (
     <Card className="border-border/70 shadow-none">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center justify-between gap-3 text-base">
-          <span>{company.compagnieAssuranceNom}</span>
-          <Badge variant="outline">{formatInteger(total)}</Badge>
-        </CardTitle>
+        <CardTitle className="text-base">{company.compagnieAssuranceNom}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <DonutChart
           data={chartData}
-          showCenterValue={false}
+          centerLabel="disponibles"
           className="min-h-64 sm:grid-cols-[220px_minmax(0,1fr)]"
           chartClassName="h-56"
           emptyText="Aucun stock disponible."

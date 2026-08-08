@@ -75,6 +75,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -329,6 +330,7 @@ public class ReferentielController {
         compagnieAssuranceRepository.findByCode(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code compagnie deja utilise");
         });
+        validateCompagnieDossierPrefix(request.getPrefixeDossier(), null);
         CompagnieAssurance compagnie = new CompagnieAssurance();
         applyCompagnieAssuranceRequest(compagnie, request);
         return ResponseEntity.ok(ApiResponse.success(
@@ -349,6 +351,7 @@ public class ReferentielController {
                 .ifPresent(existing -> {
                     throw new BadRequestException("Code compagnie deja utilise");
                 });
+        validateCompagnieDossierPrefix(request.getPrefixeDossier(), id);
         applyCompagnieAssuranceRequest(compagnie, request);
         return ResponseEntity.ok(ApiResponse.success(
                 toCompagnieAssuranceResponse(compagnieAssuranceRepository.save(compagnie)),
@@ -1239,6 +1242,7 @@ public class ReferentielController {
         compagnie.setIce(blankToNull(request.getIce()));
         compagnie.setPrefixeAttestation(blankToNull(request.getPrefixeAttestation()));
         compagnie.setPrefixeCarteVerte(blankToNull(request.getPrefixeCarteVerte()));
+        compagnie.setPrefixeDossier(normalizeDossierPrefix(request.getPrefixeDossier()));
         compagnie.setOrdreAffichage(request.getOrdreAffichage() == null ? 100 : request.getOrdreAffichage());
         compagnie.setActif(request.getActif() == null ? true : request.getActif());
     }
@@ -1254,9 +1258,27 @@ public class ReferentielController {
                 .putValue("ice", compagnie.getIce())
                 .putValue("prefixeAttestation", compagnie.getPrefixeAttestation())
                 .putValue("prefixeCarteVerte", compagnie.getPrefixeCarteVerte())
+                .putValue("prefixeDossier", compagnie.getPrefixeDossier())
                 .putValue("ordreAffichage", compagnie.getOrdreAffichage())
                 .putValue("actif", compagnie.getActif())
                 .map();
+    }
+
+    private void validateCompagnieDossierPrefix(String value, Long currentCompanyId) {
+        String prefix = normalizeDossierPrefix(value);
+        if (prefix == null) {
+            return;
+        }
+        compagnieAssuranceRepository.findByPrefixeDossierIgnoreCase(prefix)
+                .filter(existing -> !existing.getId().equals(currentCompanyId))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("Préfixe dossier deja utilise");
+                });
+    }
+
+    private String normalizeDossierPrefix(String value) {
+        String prefix = blankToNull(value);
+        return prefix == null ? null : prefix.toUpperCase(Locale.ROOT);
     }
 
     private void applyGarantieRequest(Garantie garantie, UpsertGarantieRequest request) {

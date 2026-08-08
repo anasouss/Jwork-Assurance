@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface CompagnieAssuranceRepository extends JpaRepository<CompagnieAssurance, Long> {
     Optional<CompagnieAssurance> findByCode(String code);
+
+    Optional<CompagnieAssurance> findByPrefixeDossierIgnoreCase(String prefixeDossier);
 }

@@ -5963,10 +5963,26 @@ public class ContratService {
         do {
             int numero = sequence.getProchainNumero() == null ? 1 : sequence.getProchainNumero();
             sequence.setProchainNumero(numero + 1);
-            numeroDossier = prefixe + "/" + annee + "/" + String.format(Locale.ROOT, "%05d", numero);
+            numeroDossier = formatNumeroDossier(compagnie, prefixe, annee, numero);
         } while (contratRepository.existsByAgenceIdAndNumeroDossier(agence.getId(), numeroDossier));
         numeroDossierSequenceRepository.save(sequence);
         return numeroDossier;
+    }
+
+    static String formatNumeroDossier(
+            CompagnieAssurance compagnie,
+            String legacyPrefix,
+            int annee,
+            int numero
+    ) {
+        String configuredPrefix = compagnie == null ? null : compagnie.getPrefixeDossier();
+        if (configuredPrefix != null && !configuredPrefix.isBlank()) {
+            return configuredPrefix.trim().toUpperCase(Locale.ROOT)
+                    + String.format(Locale.ROOT, "%02d", Math.floorMod(annee, 100))
+                    + "-"
+                    + String.format(Locale.ROOT, "%04d", numero);
+        }
+        return legacyPrefix + "/" + annee + "/" + String.format(Locale.ROOT, "%05d", numero);
     }
 
     private synchronized String nextNumeroDevis(Agence agence, CompagnieAssurance compagnie) {

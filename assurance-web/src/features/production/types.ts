@@ -1045,6 +1045,7 @@ export type UpsertCompagnieAssuranceRequest = {
   ice?: string;
   prefixeAttestation?: string;
   prefixeCarteVerte?: string;
+  prefixeDossier?: string;
   ordreAffichage?: number;
   actif?: boolean;
 };

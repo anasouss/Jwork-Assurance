@@ -51,6 +51,9 @@ public class CompagnieAssurance extends BaseEntity {
     @Column(name = "prefixe_carte_verte", length = 40)
     private String prefixeCarteVerte;
 
+    @Column(name = "prefixe_dossier", length = 10, unique = true)
+    private String prefixeDossier;
+
     @Builder.Default
     @Column(name = "ordre_affichage", nullable = false)
     private Integer ordreAffichage = 100;

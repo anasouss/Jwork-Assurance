@@ -60,6 +60,7 @@ export default function CompaniesPage() {
         companyField(compagnie, "ville"),
         companyField(compagnie, "rc"),
         companyField(compagnie, "ice"),
+        companyField(compagnie, "prefixeDossier"),
       ].some((value) => String(value ?? "").toLowerCase().includes(term));
     });
   }, [compagnies.data, search, status]);
@@ -128,6 +129,7 @@ export default function CompaniesPage() {
                 <TableHead>ICE</TableHead>
                 <TableHead>Préfixe attestation</TableHead>
                 <TableHead>Préfixe carte verte</TableHead>
+                <TableHead>Préfixe dossier</TableHead>
                 <TableHead>Actif</TableHead>
                 <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
@@ -147,6 +149,7 @@ export default function CompaniesPage() {
                   <TableCell>{companyField(compagnie, "ice") || "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "prefixeAttestation") || "-"}</TableCell>
                   <TableCell>{companyField(compagnie, "prefixeCarteVerte") || "-"}</TableCell>
+                  <TableCell>{companyField(compagnie, "prefixeDossier") || "-"}</TableCell>
                   <TableCell>{compagnie.actif === false ? "Non" : "Oui"}</TableCell>
                   <TableCell className="text-right">
                     <TableRowActions
@@ -174,7 +177,7 @@ export default function CompaniesPage() {
               ))}
               {!compagnies.isLoading && filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Aucune compagnie.</TableCell>
+                  <TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Aucune compagnie.</TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
@@ -198,6 +201,14 @@ export default function CompaniesPage() {
             </Field>
             <Field label="Nom" required>
               <Input value={payload.nom} onChange={(event) => update(setPayload, { nom: event.target.value })} />
+            </Field>
+            <Field label="Préfixe dossier">
+              <Input
+                value={payload.prefixeDossier ?? ""}
+                maxLength={10}
+                placeholder="AT"
+                onChange={(event) => update(setPayload, { prefixeDossier: event.target.value.toUpperCase() })}
+              />
             </Field>
             <Field label="RC">
               <Input value={payload.rc ?? ""} onChange={(event) => update(setPayload, { rc: event.target.value })} />
@@ -277,6 +288,7 @@ function companyPayload(compagnie: ReferenceOption): UpsertCompagnieAssuranceReq
     ice: companyField(compagnie, "ice"),
     prefixeAttestation: companyField(compagnie, "prefixeAttestation"),
     prefixeCarteVerte: companyField(compagnie, "prefixeCarteVerte"),
+    prefixeDossier: companyField(compagnie, "prefixeDossier"),
     ordreAffichage: companyNumber(compagnie, "ordreAffichage") ?? 100,
     actif: compagnie.actif !== false,
   };
@@ -299,7 +311,12 @@ function companyNumber(compagnie: ReferenceOption, key: string) {
 
 function cleanCompanyPayload(payload: UpsertCompagnieAssuranceRequest): UpsertCompagnieAssuranceRequest {
   return Object.fromEntries(
-    Object.entries(payload).map(([key, value]) => [key, typeof value === "string" && value.trim() === "" ? undefined : value])
+    Object.entries(payload).map(([key, value]) => {
+      if (typeof value !== "string") return [key, value];
+      const normalized = value.trim();
+      if (!normalized) return [key, undefined];
+      return [key, key === "prefixeDossier" ? normalized.toUpperCase() : normalized];
+    })
   ) as UpsertCompagnieAssuranceRequest;
 }
 

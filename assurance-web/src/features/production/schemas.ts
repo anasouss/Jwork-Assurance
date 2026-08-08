@@ -217,6 +217,9 @@ export const compagnieAssuranceSchema = z.object({
   ice: z.string().optional(),
   prefixeAttestation: z.string().optional(),
   prefixeCarteVerte: z.string().optional(),
+  prefixeDossier: z.string()
+    .regex(/^[A-Za-z0-9]{1,10}$/, "Le préfixe dossier doit contenir entre 1 et 10 lettres ou chiffres")
+    .optional(),
   ordreAffichage: z.number().int().min(0).optional(),
   actif: z.boolean().optional(),
 });

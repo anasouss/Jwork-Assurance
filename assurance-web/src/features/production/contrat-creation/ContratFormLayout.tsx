@@ -57,6 +57,12 @@ export function ContratFormLayout({
   const assistanceCategorieClientId = form.categorieClientId;
   const compagniesAssistance = form.assistanceContext.data?.compagnies ?? [];
   const produitsAssistance = form.assistanceContext.data?.produits ?? [];
+  const persistedAssistances = form.draftQuery.data?.assistances ?? [];
+  const persistedAssistance = form.assistanceDraft.modified
+    ? undefined
+    : persistedAssistances.find(
+      (assistance) => String(assistance.id) === String(form.assistanceDraft.assistanceId)
+    ) ?? persistedAssistances[0];
   const selectedUsage = form.availableUsages.find((usage) => usage.id === form.usageId);
   const selectedSousClasseCode = form.vehicules[0]?.sousClasse;
   const selectedSousClasse = (form.refs.sousClasses.data ?? []).find(
@@ -240,6 +246,7 @@ export function ContratFormLayout({
       showAssistanceRow={showConvention || form.typeContrat === "PARTICULIER"}
       assistanceDraft={form.assistanceDraft}
       setAssistanceDraft={form.setAssistanceDraft}
+      assistancePreview={persistedAssistance}
       compagniesAssistance={compagniesAssistance}
       produitsAssistance={produitsAssistance}
       assistanceUsageId={form.usageId}
@@ -418,7 +425,7 @@ export function ContratFormLayout({
       <ManualQuittanceSection
         lignes={form.quittances}
         setLignes={form.setQuittances}
-        assistances={form.preview?.assistances}
+        assistances={form.preview?.assistances ?? (form.assistanceDraft.modified ? [] : persistedAssistances)}
         openSection={activeSection}
         onSectionOpenChange={handleSectionOpenChange}
       />

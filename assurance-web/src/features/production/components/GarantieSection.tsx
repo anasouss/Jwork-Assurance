@@ -69,6 +69,7 @@ export function GarantieSection({
   showAssistanceRow = false,
   assistanceDraft,
   setAssistanceDraft,
+  assistancePreview,
   compagniesAssistance = [],
   produitsAssistance = [],
   assistanceUsageId,
@@ -102,6 +103,7 @@ export function GarantieSection({
   showAssistanceRow?: boolean;
   assistanceDraft?: AssistanceDraft;
   setAssistanceDraft?: (value: AssistanceDraft) => void;
+  assistancePreview?: AssistanceContrat;
   compagniesAssistance?: ReferenceOption[];
   produitsAssistance?: ReferenceOption[];
   assistanceUsageId?: string;
@@ -625,7 +627,7 @@ export function GarantieSection({
             <AssistanceTable
               assistance={assistanceDraft}
               onChange={(patch) => {
-                const next = { ...assistanceDraft, ...patch };
+                const next = { ...assistanceDraft, ...patch, modified: true };
                 setAssistanceDraft(next);
                 if (patch.enabled !== undefined) {
                   setAssistanceEnabled?.(Boolean(patch.enabled));
@@ -635,7 +637,7 @@ export function GarantieSection({
               produitsAssistance={produitsAssistance}
               usageId={assistanceUsageId}
               categorieClientId={assistanceCategorieClientId}
-              preview={preview?.assistances?.[0]}
+              preview={preview?.assistances?.[0] ?? assistancePreview}
             />
           </div>
         ) : (

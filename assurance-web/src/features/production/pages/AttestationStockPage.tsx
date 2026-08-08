@@ -714,11 +714,11 @@ function StockPieCard({
         <DonutChart
           data={chartData}
           centerLabel="disponibles"
+          className="min-h-64 sm:grid-cols-[220px_minmax(0,1fr)]"
+          chartClassName="h-56"
           emptyText="Aucun stock disponible."
-          innerRadius={54}
-          outerRadius={78}
-          showLegend={false}
-          showSliceValues
+          innerRadius={72}
+          outerRadius={104}
           valueFormatter={formatInteger}
           onSelect={(usageId) => {
             const selected = company.rows.find((item) => item.groupeUsageAttestationId === usageId);

@@ -79,6 +79,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -673,7 +674,13 @@ public class AffectationQuittanceService {
     ) {
         RegleAffectationQuittance entity = regleRepository.findByAgenceIdAndId(agenceId, ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règle d'affectation", ruleId));
-        requireUnusedRule(entity);
+        if (isRuleUsed(entity) && hasVersionedChanges(entity, request)) {
+            throw new BadRequestException(
+                    "Cette règle a déjà produit des affectations. "
+                            + "Seuls les paramètres d'import Excel et le statut peuvent être modifiés. "
+                            + "Créez une nouvelle règle datée pour modifier le calcul"
+            );
+        }
         CompagnieAssurance compagnie = requireCompagnie(request.getCompagnieAssuranceId());
         validateRule(request, agenceId, ruleId);
         entity.setCompagnieAssurance(compagnie);
@@ -690,18 +697,50 @@ public class AffectationQuittanceService {
     }
 
     private void requireUnusedRule(RegleAffectationQuittance rule) {
-        long allocations = regleRepository.countAllocationsUsingRule(
+        if (isRuleUsed(rule)) {
+            throw new BadRequestException(
+                    "Cette règle a déjà produit des affectations et ne peut pas être supprimée"
+            );
+        }
+    }
+
+    private boolean isRuleUsed(RegleAffectationQuittance rule) {
+        return regleRepository.countAllocationsUsingRule(
                 rule.getAgence().getId(),
                 rule.getCompagnieAssurance().getId(),
                 rule.getTypeContrat(),
                 rule.getDateDebut(),
                 rule.getDateFin() != null ? rule.getDateFin() : OPEN_ENDED_DATE
-        );
-        if (allocations > 0) {
-            throw new BadRequestException(
-                    "Cette règle a déjà produit des affectations. Créez une nouvelle règle datée pour modifier le calcul"
-            );
+        ) > 0;
+    }
+
+    private boolean hasVersionedChanges(
+            RegleAffectationQuittance rule,
+            UpsertRegleAffectationQuittanceRequest request
+    ) {
+        return !Objects.equals(rule.getCompagnieAssurance().getId(), request.getCompagnieAssuranceId())
+                || rule.getTypeContrat() != request.getTypeContrat()
+                || rule.getModeAffectation() != request.getModeAffectation()
+                || rule.getModeVentilation() != request.getModeVentilation()
+                || rule.getModeCalculCommission() != request.getModeCalculCommission()
+                || decimalChanged(rule.getTauxCommissionAutomobile(), request.getTauxCommissionAutomobile())
+                || decimalChanged(rule.getTauxCommissionEvcat(), request.getTauxCommissionEvcat())
+                || decimalChanged(rule.getTauxCommissionCorporel(), request.getTauxCommissionCorporel())
+                || decimalChanged(rule.getTauxTvaIncluseCommission(), request.getTauxTvaIncluseCommission())
+                || !Objects.equals(rule.getRetenueParDefaut(), request.getRetenueParDefaut())
+                || decimalChanged(rule.getTauxRetenue(), request.getTauxRetenue())
+                || decimalChanged(rule.getSeuilAvertissementEcart(), request.getSeuilAvertissementEcart())
+                || decimalChanged(rule.getMargeManquanteMaximale(), request.getMargeManquanteMaximale())
+                || decimalChanged(rule.getMargeDepassementMaximale(), request.getMargeDepassementMaximale())
+                || !Objects.equals(rule.getDateDebut(), request.getDateDebut())
+                || !Objects.equals(rule.getDateFin(), request.getDateFin());
+    }
+
+    private boolean decimalChanged(BigDecimal current, BigDecimal requested) {
+        if (current == null || requested == null) {
+            return current != requested;
         }
+        return current.compareTo(requested) != 0;
     }
 
     private List<AffectationQuittanceCompagnie> buildAutomaticAffectations(

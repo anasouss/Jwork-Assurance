@@ -265,6 +265,12 @@ export function QuittanceRulesDialog({
                 <Settings2 className="size-4" />
                 {editing ? "Modifier la règle" : "Nouvelle règle"}
               </div>
+              {editing ? (
+                <p className="text-sm text-muted-foreground">
+                  Les paramètres d’import Excel et le statut restent modifiables sans affecter les
+                  affectations existantes. Les paramètres financiers et la période sont versionnés.
+                </p>
+              ) : null}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Field label="Compagnie" required>
                   <Select

@@ -406,7 +406,11 @@ function EcheanceTableRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link to={editContratPath(row)}>
+              <Link
+                to={`/app/production/contrats/${row.contratId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <Eye className="size-4" />
                 Ouvrir le dossier
               </Link>
@@ -608,12 +612,6 @@ function sortRows(rows: EcheanceAutomobileRow[], sort: { key: SortKey; direction
     const result = left.localeCompare(right, "fr", { numeric: true, sensitivity: "base" });
     return sort.direction === "asc" ? result : -result;
   });
-}
-
-function editContratPath(row: EcheanceAutomobileRow) {
-  if (row.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${row.contratId}`;
-  if (row.typeContrat === "CONVENTION") return `/app/production/ajouter-dossier/convention/${row.contratId}`;
-  return `/app/production/ajouter-dossier/particulier/${row.contratId}`;
 }
 
 function formatDate(value?: string | null) {

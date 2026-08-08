@@ -452,6 +452,11 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
     .split("·")
     .map((alert) => alert.trim())
     .filter(Boolean);
+  const alertDetails = alerts.map(parseObservationAlert);
+  const alertGroups = OBSERVATION_GROUPS.map((group) => ({
+    ...group,
+    alerts: alertDetails.filter((alert) => alert.kind === group.kind),
+  })).filter((group) => group.alerts.length > 0);
   const blocking = level === "BLOQUANT";
   const compactLabel = `${alerts.length} document${alerts.length > 1 ? "s" : ""} à vérifier`;
 
@@ -472,30 +477,72 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
           {compactLabel}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div
-          className={cn(
-            "flex items-center gap-2 border-b px-4 py-3 text-sm font-semibold",
-            blocking ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"
-          )}
-        >
-          <TriangleAlert className="size-4" />
-          {blocking ? "Documents expirés" : "Documents à vérifier"}
+      <PopoverContent align="end" className="w-96 overflow-hidden p-0">
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <TriangleAlert className="size-4 text-amber-600" />
+            Documents à vérifier
+          </div>
+          <span className="text-xs font-medium tabular-nums text-muted-foreground">{alerts.length}</span>
         </div>
-        <ul className="grid gap-2 p-4 text-sm">
-          {alerts.map((alert, index) => (
-            <li key={`${index}-${alert}`} className="flex gap-2 leading-5">
-              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-current" />
-              <span>{alert}</span>
-            </li>
+        <div className="px-4 py-3">
+          {alertGroups.map((group, groupIndex) => (
+            <section
+              key={group.kind}
+              className={cn(groupIndex > 0 && "mt-4 border-t pt-3")}
+            >
+              <div className={cn("mb-2 text-xs font-semibold", group.className)}>
+                {group.label} ({group.alerts.length})
+              </div>
+              <ul className="grid gap-2.5">
+                {group.alerts.map((alert, index) => (
+                  <li key={`${group.kind}-${index}-${alert.message}`} className="grid grid-cols-[6px_1fr] gap-2.5 text-sm">
+                    <span className={cn("mt-1.5 size-1.5 rounded-full", group.dotClassName)} />
+                    <div className="min-w-0 leading-5">
+                      {alert.subject ? <div className="break-all font-semibold text-foreground">{alert.subject}</div> : null}
+                      <div className="text-muted-foreground">{alert.message}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
         <div className="border-t px-4 py-2 text-xs text-muted-foreground">
           Échéance du contrat : {formatDate(row.dateEcheance)}
         </div>
       </PopoverContent>
     </Popover>
   );
+}
+
+type ObservationAlertKind = "EXPIRED" | "UPCOMING" | "MISSING" | "OTHER";
+
+const OBSERVATION_GROUPS: Array<{
+  kind: ObservationAlertKind;
+  label: string;
+  className: string;
+  dotClassName: string;
+}> = [
+  { kind: "EXPIRED", label: "Expirés", className: "text-red-700", dotClassName: "bg-red-600" },
+  { kind: "UPCOMING", label: "À renouveler avant l’échéance", className: "text-amber-700", dotClassName: "bg-amber-500" },
+  { kind: "MISSING", label: "Informations manquantes", className: "text-amber-700", dotClassName: "bg-amber-500" },
+  { kind: "OTHER", label: "Autres vérifications", className: "text-muted-foreground", dotClassName: "bg-slate-400" },
+];
+
+function parseObservationAlert(value: string) {
+  const separatorIndex = value.indexOf(" : ");
+  const subject = separatorIndex >= 0 ? value.slice(0, separatorIndex).trim() : null;
+  const message = separatorIndex >= 0 ? value.slice(separatorIndex + 3).trim() : value;
+  const normalized = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  let kind: ObservationAlertKind = "OTHER";
+  if (normalized.includes("expirant avant")) kind = "UPCOMING";
+  else if (normalized.includes("manquant")) kind = "MISSING";
+  else if (normalized.includes("expire")) kind = "EXPIRED";
+  return { subject, message, kind };
 }
 
 function toSearchParams(filters: EcheanceFilters): EcheanceSearchParams {

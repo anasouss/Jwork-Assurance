@@ -3,7 +3,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowDownAZ,
-  CircleCheck,
   Download,
   Eye,
   FilePenLine,
@@ -446,12 +445,7 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
     ?? (message !== "-" && normalizedMessage !== "a jour" ? "BLOQUANT" : "AUCUNE");
 
   if (level === "AUCUNE") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-        <CircleCheck className="size-3.5" />
-        À jour
-      </span>
-    );
+    return null;
   }
 
   const alerts = message
@@ -461,7 +455,7 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
   const blocking = level === "BLOQUANT";
   const compactLabel = blocking
     ? `${alerts.length} alerte${alerts.length > 1 ? "s" : ""}`
-    : `${alerts.length} point${alerts.length > 1 ? "s" : ""} à vérifier`;
+    : `${alerts.length} document${alerts.length > 1 ? "s" : ""} à vérifier`;
 
   return (
     <Popover>

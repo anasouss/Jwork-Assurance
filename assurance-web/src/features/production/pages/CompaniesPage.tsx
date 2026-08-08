@@ -206,7 +206,6 @@ export default function CompaniesPage() {
               <Input
                 value={payload.prefixeDossier ?? ""}
                 maxLength={10}
-                placeholder="AT"
                 onChange={(event) => update(setPayload, { prefixeDossier: event.target.value.toUpperCase() })}
               />
             </Field>

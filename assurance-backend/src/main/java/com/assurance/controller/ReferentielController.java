@@ -291,6 +291,7 @@ public class ReferentielController {
                 .libelle(request.getLibelle())
                 .champMoteur(request.getChampMoteur())
                 .conducteurPermisRequis(Boolean.TRUE.equals(request.getConducteurPermisRequis()))
+                .assistanceAutorisee(Boolean.TRUE.equals(request.getAssistanceAutorisee()))
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
         return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasse), "Sous-classe creee"));
@@ -312,6 +313,7 @@ public class ReferentielController {
         sousClasse.setLibelle(request.getLibelle());
         sousClasse.setChampMoteur(request.getChampMoteur());
         sousClasse.setConducteurPermisRequis(Boolean.TRUE.equals(request.getConducteurPermisRequis()));
+        sousClasse.setAssistanceAutorisee(Boolean.TRUE.equals(request.getAssistanceAutorisee()));
         sousClasse.setActif(request.getActif() == null ? true : request.getActif());
         return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasseRepository.save(sousClasse)), "Sous-classe modifiee"));
     }
@@ -1129,6 +1131,7 @@ public class ReferentielController {
                 .libelle(sousClasse.getLibelle())
                 .champMoteur(sousClasse.getChampMoteur())
                 .conducteurPermisRequis(sousClasse.getConducteurPermisRequis())
+                .assistanceAutorisee(sousClasse.getAssistanceAutorisee())
                 .actif(sousClasse.getActif())
                 .build();
     }

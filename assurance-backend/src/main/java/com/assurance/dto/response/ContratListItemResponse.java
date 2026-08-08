@@ -1,6 +1,7 @@
 package com.assurance.dto.response;
 
 import com.assurance.enums.ModeTermeRenouvellement;
+import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
 import lombok.Builder;
@@ -35,6 +36,7 @@ public class ContratListItemResponse {
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String typeRenouvellement;
+    private ModeSaisieGarantieContrat modeSaisieGaranties;
     private Boolean brouillon;
     private Boolean prospection;
     private String premierTypeVehicule;

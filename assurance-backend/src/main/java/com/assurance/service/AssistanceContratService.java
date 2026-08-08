@@ -29,6 +29,7 @@ import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.MouvementVehiculeRepository;
 import com.assurance.repository.ProduitAssistanceRepository;
+import com.assurance.repository.SousClasseRepository;
 import com.assurance.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -54,6 +55,7 @@ public class AssistanceContratService {
     private final MouvementVehiculeRepository mouvementVehiculeRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final ProduitAssistanceRepository produitAssistanceRepository;
+    private final SousClasseRepository sousClasseRepository;
     private final AssistanceContratRepository assistanceContratRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final TarifProduitAssistanceService tarifProduitAssistanceService;
@@ -77,6 +79,7 @@ public class AssistanceContratService {
                 .toList();
         List<Vehicule> vehiculesEligibles = vehiculesContexte.stream()
                 .filter(vehicule -> !vehiculesAvecAssistance.contains(vehicule.getId()))
+                .filter(vehicule -> assistanceAutorisee(contrat, vehicule))
                 .toList();
         Long categorieClientId = resolveAssistanceCategorieClientId(contrat);
         Set<Long> usageIds = vehiculesContexte.stream()
@@ -242,6 +245,9 @@ public class AssistanceContratService {
             Vehicule vehicule,
             UpsertAssistanceContratRequest request
     ) {
+        if (!assistanceAutorisee(contrat, vehicule)) {
+            throw new BadRequestException("L'assistance n'est pas autorisée pour la sous-classe du véhicule");
+        }
         if (request.getCompagnieAssistanceId() == null || request.getProduitAssistanceId() == null) {
             throw new BadRequestException("La compagnie et le produit d'assistance sont obligatoires");
         }
@@ -300,6 +306,18 @@ public class AssistanceContratService {
                 primeNette,
                 primeTotale
         );
+    }
+
+    private boolean assistanceAutorisee(Contrat contrat, Vehicule vehicule) {
+        if (contrat.getTypeContrat() != TypeContrat.CONVENTION
+                || vehicule.getSousClasse() == null
+                || vehicule.getSousClasse().isBlank()) {
+            return true;
+        }
+        return sousClasseRepository.findByCodeIgnoreCase(vehicule.getSousClasse().trim())
+                .filter(sousClasse -> !Boolean.FALSE.equals(sousClasse.getActif()))
+                .map(sousClasse -> Boolean.TRUE.equals(sousClasse.getAssistanceAutorisee()))
+                .orElse(false);
     }
 
     @Transactional

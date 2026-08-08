@@ -166,11 +166,11 @@ public class DataSeeder implements CommandLineRunner {
         seedCarburant("HYBRIDE_E", "Hybride essence");
         seedCarburant("HYBRIDE_D", "Hybride diesel");
 
-        seedSousClasse("SC1", "SC1", ChampMoteurSousClasse.CYLINDREE, false);
-        seedSousClasse("SC2", "SC2", ChampMoteurSousClasse.CYLINDREE, false);
-        seedSousClasse("SC3", "SC3", ChampMoteurSousClasse.PUISSANCE_FISCALE, false);
-        seedSousClasse("SC5", "SC5", ChampMoteurSousClasse.PUISSANCE_FISCALE, true);
-        seedSousClasse("SC6", "SC6", ChampMoteurSousClasse.PUISSANCE_FISCALE, true);
+        seedSousClasse("SC1", "SC1", ChampMoteurSousClasse.CYLINDREE, false, false);
+        seedSousClasse("SC2", "SC2", ChampMoteurSousClasse.CYLINDREE, false, false);
+        seedSousClasse("SC3", "SC3", ChampMoteurSousClasse.PUISSANCE_FISCALE, false, false);
+        seedSousClasse("SC5", "SC5", ChampMoteurSousClasse.PUISSANCE_FISCALE, true, true);
+        seedSousClasse("SC6", "SC6", ChampMoteurSousClasse.PUISSANCE_FISCALE, true, false);
         sousClasseRepository.findByCodeIgnoreCase("SC4").ifPresent(sousClasse -> {
             sousClasse.setActif(false);
             sousClasseRepository.save(sousClasse);
@@ -789,7 +789,8 @@ public class DataSeeder implements CommandLineRunner {
             String code,
             String libelle,
             ChampMoteurSousClasse champMoteur,
-            boolean conducteurPermisRequis
+            boolean conducteurPermisRequis,
+            boolean assistanceAutorisee
     ) {
         SousClasse sousClasse = sousClasseRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 sousClasseRepository.save(SousClasse.builder()
@@ -797,6 +798,7 @@ public class DataSeeder implements CommandLineRunner {
                         .libelle(libelle)
                         .champMoteur(champMoteur)
                         .conducteurPermisRequis(conducteurPermisRequis)
+                        .assistanceAutorisee(assistanceAutorisee)
                         .actif(true)
                         .build())
         );

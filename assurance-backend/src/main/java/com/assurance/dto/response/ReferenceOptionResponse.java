@@ -16,4 +16,5 @@ public class ReferenceOptionResponse {
     private String compagnieAssuranceLibelle;
     private ChampMoteurSousClasse champMoteur;
     private Boolean conducteurPermisRequis;
+    private Boolean assistanceAutorisee;
 }

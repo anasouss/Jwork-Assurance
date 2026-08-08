@@ -44,4 +44,8 @@ public class SousClasse extends BaseEntity {
     @Builder.Default
     @Column(name = "conducteur_permis_requis", nullable = false, columnDefinition = "boolean default false")
     private Boolean conducteurPermisRequis = false;
+
+    @Builder.Default
+    @Column(name = "assistance_autorisee", nullable = false, columnDefinition = "boolean default false")
+    private Boolean assistanceAutorisee = false;
 }

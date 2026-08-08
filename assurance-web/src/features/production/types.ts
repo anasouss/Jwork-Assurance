@@ -15,6 +15,7 @@ export type ReferenceOption = {
   critereSelectionTarif?: "TAUX_PRIME" | "TAUX_FRANCHISE" | null;
   champMoteur?: "CYLINDREE" | "PUISSANCE_FISCALE" | null;
   conducteurPermisRequis?: boolean | null;
+  assistanceAutorisee?: boolean | null;
   [key: string]: unknown;
 };
 
@@ -1079,6 +1080,7 @@ export type UpsertCodeReferenceRequest = {
 export type UpsertSousClasseRequest = UpsertCodeReferenceRequest & {
   champMoteur: "CYLINDREE" | "PUISSANCE_FISCALE";
   conducteurPermisRequis?: boolean;
+  assistanceAutorisee?: boolean;
 };
 
 export type TypePieceJointe = {
@@ -1315,6 +1317,7 @@ export type ContratListItem = {
   dateEffet?: string | null;
   dateEcheance?: string | null;
   typeRenouvellement?: string | null;
+  modeSaisieGaranties?: "MANUELLE" | "MANUELLE_AVEC_PRIME_NETTE" | "AUTOMATIQUE_GRILLE" | null;
   brouillon?: boolean | null;
   prospection?: boolean | null;
   premierTypeVehicule?: string | null;

@@ -78,6 +78,7 @@ export function SousClassesSettingsPage() {
       libelle: editing.libelle,
       champMoteur: editing.champMoteur ?? "PUISSANCE_FISCALE",
       conducteurPermisRequis: Boolean(editing.conducteurPermisRequis),
+      assistanceAutorisee: Boolean(editing.assistanceAutorisee),
       actif: editing.actif !== false,
     } : emptySubclassPayload);
   }, [editing]);
@@ -140,6 +141,11 @@ export function SousClassesSettingsPage() {
               checked={Boolean(payload.conducteurPermisRequis)}
               onChange={(value) => setPayload((current) => ({ ...current, conducteurPermisRequis: value }))}
             />
+            <Flag
+              label="Assistance autorisée"
+              checked={Boolean(payload.assistanceAutorisee)}
+              onChange={(value) => setPayload((current) => ({ ...current, assistanceAutorisee: value }))}
+            />
             <Flag label="Active" checked={payload.actif !== false} onChange={(value) => setPayload((current) => ({ ...current, actif: value }))} />
             <div className="flex gap-2">
               <Button
@@ -163,6 +169,7 @@ export function SousClassesSettingsPage() {
                   <TableHead>Libellé</TableHead>
                   <TableHead>Caractéristique moteur</TableHead>
                   <TableHead>Conducteur / permis</TableHead>
+                  <TableHead>Assistance</TableHead>
                   <TableHead>Active</TableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -174,6 +181,7 @@ export function SousClassesSettingsPage() {
                     <TableCell>{item.libelle}</TableCell>
                     <TableCell>{item.champMoteur === "CYLINDREE" ? "Cylindrée" : "Puissance fiscale"}</TableCell>
                     <TableCell>{item.conducteurPermisRequis ? "Requis" : "Non requis"}</TableCell>
+                    <TableCell>{item.assistanceAutorisee ? "Autorisée" : "Non autorisée"}</TableCell>
                     <TableCell>{item.actif === false ? "Non" : "Oui"}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon-sm" aria-label={`Modifier ${item.libelle}`} onClick={() => { setEditing(item); setDialogOpen(true); }}>
@@ -196,6 +204,7 @@ const emptySubclassPayload: UpsertSousClasseRequest = {
   libelle: "",
   champMoteur: "PUISSANCE_FISCALE",
   conducteurPermisRequis: false,
+  assistanceAutorisee: false,
   actif: true,
 };
 

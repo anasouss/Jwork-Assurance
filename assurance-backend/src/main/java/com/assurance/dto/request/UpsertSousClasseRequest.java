@@ -18,5 +18,6 @@ public class UpsertSousClasseRequest {
     private ChampMoteurSousClasse champMoteur;
 
     private Boolean conducteurPermisRequis;
+    private Boolean assistanceAutorisee;
     private Boolean actif;
 }

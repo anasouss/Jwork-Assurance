@@ -13,6 +13,7 @@ import com.assurance.entity.Remorque;
 import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.CategorieQuittance;
+import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.StatutMouvementContrat;
@@ -170,6 +171,9 @@ public class HistoriqueFinancierRecalculService {
         }
         if (Boolean.TRUE.equals(contrat.getBrouillon()) || Boolean.TRUE.equals(contrat.getProspection())) {
             blocages.add("Les brouillons et les prospections ne peuvent pas être recalculés.");
+        }
+        if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE) {
+            blocages.add("Le recalcul est réservé aux contrats tarifés automatiquement par une grille.");
         }
         return blocages;
     }

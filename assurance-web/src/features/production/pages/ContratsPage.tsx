@@ -369,7 +369,8 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const canViewPieces = permissions.includes("piece-jointe:view") || permissions.includes("contrat:view");
   const canRecalculateFinancialHistory = permissions.includes("contrat:recalculate-financial-history")
     && !child
-    && isActiveContrat(contrat);
+    && isActiveContrat(contrat)
+    && contrat.modeSaisieGaranties === "AUTOMATIQUE_GRILLE";
   const hasActiveAvenants = (contrat.mouvements ?? []).some((item) => {
     const statut = String(item.statut ?? "").trim().toUpperCase();
     return !isInitialContractMovement(item) && statut !== "ANNULE";

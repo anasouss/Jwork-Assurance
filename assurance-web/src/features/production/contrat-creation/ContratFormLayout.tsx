@@ -68,6 +68,11 @@ export function ContratFormLayout({
   const selectedSousClasse = (form.refs.sousClasses.data ?? []).find(
     (item) => (item.code ?? item.libelle) === selectedSousClasseCode
   );
+  const showAssistanceRow = form.typeContrat === "PARTICULIER" || Boolean(
+    showConvention
+    && selectedUsage
+    && (!selectedUsage.bySousClasse || selectedSousClasse?.assistanceAutorisee)
+  );
   const requireDriverDetails = !(
     showConvention
     && selectedUsage?.bySousClasse
@@ -115,6 +120,18 @@ export function ContratFormLayout({
       setActiveSection(workflowSections[0] ?? "souscripteur");
     }
   }, [activeSection, workflowSections]);
+
+  useEffect(() => {
+    if (showAssistanceRow) {
+      return;
+    }
+    if (form.assistanceEnabled) {
+      form.setAssistanceEnabled(false);
+    }
+    if (form.assistanceDraft.enabled) {
+      form.setAssistanceDraft({ enabled: false });
+    }
+  }, [form.assistanceDraft.enabled, form.assistanceEnabled, form.setAssistanceDraft, form.setAssistanceEnabled, showAssistanceRow]);
 
   useEffect(() => {
     if (!souscripteurGroupe || form.groupeFacturationId) {
@@ -243,7 +260,7 @@ export function ContratFormLayout({
       showTotalsSummary={showConvention}
       assistanceEnabled={form.assistanceEnabled}
       setAssistanceEnabled={form.setAssistanceEnabled}
-      showAssistanceRow={showConvention || form.typeContrat === "PARTICULIER"}
+      showAssistanceRow={showAssistanceRow}
       assistanceDraft={form.assistanceDraft}
       setAssistanceDraft={form.setAssistanceDraft}
       assistancePreview={persistedAssistance}

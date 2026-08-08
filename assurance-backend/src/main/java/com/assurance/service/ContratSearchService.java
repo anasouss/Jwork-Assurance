@@ -230,6 +230,7 @@ public class ContratSearchService {
                 .dateEffet(contract.getDateEffet())
                 .dateEcheance(contract.getDateEcheance())
                 .typeRenouvellement(contract.getTypeRenouvellement())
+                .modeSaisieGaranties(contract.getModeSaisieGaranties())
                 .brouillon(contract.getBrouillon())
                 .prospection(contract.getProspection())
                 .premierTypeVehicule(firstVehicle == null ? null : firstVehicle.getTypeVehicule().name())

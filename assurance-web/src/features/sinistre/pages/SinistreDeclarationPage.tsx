@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
 import { contractApi } from "@/features/production/api/contracts";
 import { referenceApi } from "@/features/production/api/references";
 import type { ContratListItem } from "@/features/production/types";
@@ -238,10 +239,9 @@ export default function SinistreDeclarationPage() {
             />
           </Field>
           <Field label="Heure">
-            <Input
-              type="time"
+            <TimePicker
               value={heureSinistre}
-              onChange={(event) => setHeureSinistre(event.target.value)}
+              onChange={setHeureSinistre}
             />
           </Field>
           <Field label="Date de déclaration *">

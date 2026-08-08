@@ -1,16 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  FileCheck2,
+  ListChecks,
+  Save,
+  Search,
+  X,
+} from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
@@ -171,7 +188,7 @@ export default function BordereauCompagnieFormPage() {
         </Button>
       </header>
 
-      <section className="grid gap-4 rounded-md border bg-card p-4">
+      <section className="grid gap-4 rounded-md border border-l-4 border-l-orange-500 bg-card p-4">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Compagnie">
             <Select
@@ -217,72 +234,110 @@ export default function BordereauCompagnieFormPage() {
             <DatePicker date={dateAu} onSelect={(value) => setDateAu(toDateOnly(value) ?? "")} />
           </Field>
         </div>
-        <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-          {base === "EMISSION"
-            ? "Le bordereau reprend les écritures compagnie émises, indépendamment de leur encaissement client."
-            : "Le bordereau reprend uniquement les écritures dont l’encaissement client est confirmé."}
+        <div className="flex items-start gap-3 border-y bg-muted/20 px-3 py-2.5 text-sm">
+          <FileCheck2 className="mt-0.5 size-4 shrink-0 text-orange-600" />
+          <div>
+            <div className="font-medium text-foreground">
+              {base === "EMISSION" ? "Déclaration des émissions" : "Déclaration des encaissements"}
+            </div>
+            <div className="text-muted-foreground">
+              {base === "EMISSION"
+                ? "Toutes les écritures compagnie émises sur la période sont proposées, quel que soit leur état d’encaissement client."
+                : "Seules les écritures dont l’encaissement client est intégralement confirmé sont proposées."}
+            </div>
+          </div>
         </div>
-        <form className="flex gap-2" onSubmit={(event) => {
+        <form className="grid gap-2" onSubmit={(event) => {
           event.preventDefault();
           setSubmittedSearch(search.trim());
         }}>
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Police, dossier, mouvement ou N° quittance compagnie"
-          />
-          <Button type="submit" variant="outline"><Search className="size-4" />Filtrer</Button>
+          <Label htmlFor="bordereau-source-search">Rechercher une écriture</Label>
+          <div className="flex gap-2">
+            <Input
+              id="bordereau-source-search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Police, dossier, mouvement ou N° quittance compagnie"
+            />
+            <Button type="submit" variant="outline"><Search className="size-4" />Filtrer</Button>
+          </div>
         </form>
       </section>
 
-      <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-3">
-        <Summary label="Lignes sélectionnées" value={String(selectedRows.length)} />
-        <Summary label="TTC compagnie" value={money(totals.ttc)} />
-        <Summary label="Net compagnie" value={money(totals.net)} />
+      <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto]">
+        <Summary icon={<ListChecks className="size-4" />} label="Lignes sélectionnées" value={String(selectedRows.length)} />
+        <Summary label="TTC sélectionné" value={money(totals.ttc)} />
+        <Summary label="Net compagnie" value={money(totals.net)} emphasized />
+        <div className="flex min-w-56 items-center justify-end gap-2 border-t p-4 sm:col-span-2 xl:col-span-1 xl:border-l xl:border-t-0">
+          {selectedRows.length > 0 ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
+              <X className="size-4" />Effacer
+            </Button>
+          ) : null}
+          <Button disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
+            <Save className="size-4" />
+            {editing ? "Enregistrer" : "Créer le brouillon"}
+          </Button>
+        </div>
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-4 py-3">
-          <h2 className="font-semibold">Écritures disponibles</h2>
-          <p className="text-xs text-muted-foreground">
-            Une écriture ne peut appartenir qu’à un seul bordereau actif.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+          <div>
+            <h2 className="font-semibold">Écritures disponibles</h2>
+            <p className="text-xs text-muted-foreground">
+              Une écriture ne peut appartenir qu’à un seul bordereau actif.
+            </p>
+          </div>
+          <Badge variant="secondary">{rows.length} écriture(s)</Badge>
         </div>
-        <Table className="min-w-[1080px]">
-          <TableHeader className="bg-muted/35 text-xs uppercase">
-            <TableRow>
-              <TableHead className="w-12 px-4 text-center">
+        <div className="max-h-[560px] overflow-auto">
+        <Table className="min-w-[1180px]">
+          <TableHeader className="sticky top-0 z-10 bg-orange-600 text-xs uppercase text-white shadow-sm">
+            <TableRow className="hover:bg-orange-600">
+              <TableHead className="w-12 bg-orange-600 px-4 text-center text-white">
                 <Checkbox
                   checked={allSelected}
+                  aria-label="Sélectionner toutes les écritures disponibles"
                   onCheckedChange={(checked) => setSelectedIds(checked ? rows.map((row) => row.id) : [])}
                 />
               </TableHead>
-              <TableHead>Mouvement</TableHead>
-              <TableHead>Police</TableHead>
-              <TableHead>N° quittance</TableHead>
-              <TableHead>Date d’effet</TableHead>
-              <TableHead className="text-right">Prime nette</TableHead>
-              <TableHead className="text-right">Taxes</TableHead>
-              <TableHead className="text-right">TTC</TableHead>
-              <TableHead className="text-right">Commission</TableHead>
-              <TableHead className="text-right">Retenue</TableHead>
-              <TableHead className="text-right">Net compagnie</TableHead>
+              <TableHead className="bg-orange-600 text-white">Mouvement</TableHead>
+              <TableHead className="bg-orange-600 text-white">Police</TableHead>
+              <TableHead className="bg-orange-600 text-white">N° quittance</TableHead>
+              <TableHead className="bg-orange-600 text-white">Date d’effet</TableHead>
+              <TableHead className="bg-orange-600 text-right text-white">Prime nette</TableHead>
+              <TableHead className="bg-orange-600 text-right text-white">Taxes</TableHead>
+              <TableHead className="bg-orange-600 text-right text-white">TTC</TableHead>
+              <TableHead className="bg-orange-600 text-right text-white">Commission</TableHead>
+              <TableHead className="bg-orange-600 text-right text-white">Retenue</TableHead>
+              <TableHead className="bg-orange-600 text-right text-white">Net compagnie</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id} data-state={selectedIds.includes(row.id) ? "selected" : undefined}>
+            {rows.map((row) => {
+              const selected = selectedIds.includes(row.id);
+              return (
+              <TableRow
+                key={row.id}
+                data-state={selected ? "selected" : undefined}
+                className="data-[state=selected]:bg-orange-50/80 dark:data-[state=selected]:bg-orange-950/25"
+              >
                 <TableCell className="px-4 text-center">
                   <Checkbox
-                    checked={selectedIds.includes(row.id)}
+                    checked={selected}
+                    aria-label={`Sélectionner la quittance ${row.numeroQuittanceCompagnie || row.id}`}
                     onCheckedChange={(checked) => setSelectedIds((current) => checked
                       ? [...new Set([...current, row.id])]
                       : current.filter((id) => id !== row.id))}
                   />
                 </TableCell>
-                <TableCell className="font-medium">{row.mouvement || "-"}</TableCell>
-                <TableCell>{row.numeroPolice || "-"}</TableCell>
-                <TableCell>{row.numeroQuittanceCompagnie || "-"}</TableCell>
+                <TableCell>
+                  <div className="font-medium">{row.mouvement || "-"}</div>
+                  {row.numeroDossier ? <div className="text-xs text-muted-foreground">{row.numeroDossier}</div> : null}
+                </TableCell>
+                <TableCell className="font-medium">{row.numeroPolice || "-"}</TableCell>
+                <TableCell className="font-mono text-xs">{row.numeroQuittanceCompagnie || "-"}</TableCell>
                 <TableCell>{date(row.dateEffet)}</TableCell>
                 <TableCell className="text-right">{money(row.primeNette)}</TableCell>
                 <TableCell className="text-right">{money(row.montantTaxes)}</TableCell>
@@ -291,7 +346,7 @@ export default function BordereauCompagnieFormPage() {
                 <TableCell className="text-right">{money(row.montantRetenue)}</TableCell>
                 <TableCell className="text-right font-semibold">{money(row.netCompagnie)}</TableCell>
               </TableRow>
-            ))}
+            );})}
             {!sources.isLoading && rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="h-28 text-center text-muted-foreground">
@@ -303,14 +358,42 @@ export default function BordereauCompagnieFormPage() {
               <TableRow><TableCell colSpan={11} className="h-28 text-center text-muted-foreground">Chargement...</TableCell></TableRow>
             ) : null}
           </TableBody>
+          {selectedRows.length > 0 ? (
+            <TableFooter className="sticky bottom-0 z-10 bg-background shadow-[0_-1px_0_hsl(var(--border))]">
+              <TableRow className="hover:bg-background">
+                <TableCell />
+                <TableCell colSpan={4} className="font-semibold">
+                  Total de la sélection · {selectedRows.length} ligne(s)
+                </TableCell>
+                <TableCell className="text-right font-semibold">{money(totals.primeNette)}</TableCell>
+                <TableCell className="text-right font-semibold">{money(totals.taxes)}</TableCell>
+                <TableCell className="text-right font-semibold">{money(totals.ttc)}</TableCell>
+                <TableCell className="text-right font-semibold">{money(totals.commission)}</TableCell>
+                <TableCell className="text-right font-semibold">{money(totals.retenue)}</TableCell>
+                <TableCell className="text-right font-bold">{money(totals.net)}</TableCell>
+              </TableRow>
+            </TableFooter>
+          ) : null}
         </Table>
+        </div>
       </section>
 
-      <section className="grid gap-4 rounded-md border bg-card p-4">
+      <section className="grid gap-4 border-t pt-5">
         <Field label="Notes internes">
-          <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
+          <Textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            rows={3}
+            placeholder="Informations internes facultatives sur ce bordereau"
+          />
         </Field>
-        <div className="flex justify-end border-t pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Building2 className="size-4" />
+            {selectedRows.length > 0
+              ? `${selectedRows.length} écriture(s) seront figées dans le brouillon.`
+              : "Sélectionnez au moins une écriture pour continuer."}
+          </div>
           <Button disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
             <Save className="size-4" />
             {editing ? "Enregistrer les modifications" : "Créer le brouillon"}
@@ -350,11 +433,21 @@ function ModeButton({
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function Summary({
+  icon,
+  label,
+  value,
+  emphasized = false,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: string;
+  emphasized?: boolean;
+}) {
   return (
     <div className="border-b p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <div className="text-xs uppercase text-muted-foreground">{label}</div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
+      <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">{icon}{label}</div>
+      <div className={emphasized ? "mt-1 text-xl font-bold" : "mt-1 text-lg font-semibold"}>{value}</div>
     </div>
   );
 }

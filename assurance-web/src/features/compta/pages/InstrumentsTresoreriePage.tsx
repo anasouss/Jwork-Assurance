@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, RotateCcw, Search } from "lucide-react";
+import { AlertCircle, Ban, CheckCircle2, Clock3, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
@@ -29,7 +30,7 @@ import {
   TREASURY_PAGE_SIZE,
 } from "./treasury-format";
 
-type InstrumentRegisterStatus = "EN_ATTENTE" | "CONFIRME";
+type InstrumentRegisterStatus = "EN_ATTENTE" | "CONFIRME" | "REJETE";
 type InstrumentAction = "CONFIRME" | "REJETE";
 
 export default function InstrumentsTresoreriePage() {
@@ -81,7 +82,7 @@ export default function InstrumentsTresoreriePage() {
       motif: reason.trim() || undefined,
     }),
     onSuccess: async () => {
-      toast.success(action === "CONFIRME" ? "Encaissement confirmé" : "Instrument rejeté");
+      toast.success(action === "CONFIRME" ? "Encaissement confirmé" : "Moyen de paiement rejeté");
       closeAction();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
@@ -121,8 +122,14 @@ export default function InstrumentsTresoreriePage() {
     setPage(0);
   }
 
+  const pending = status === "EN_ATTENTE";
   const confirmed = status === "CONFIRME";
-  const filterDateLabel = confirmed ? "Date de confirmation" : "Date de l’instrument";
+  const rejected = status === "REJETE";
+  const filterDateLabel = pending
+    ? "Date du moyen de paiement"
+    : rejected
+      ? "Date du rejet"
+      : "Date de confirmation";
 
   return (
     <div className="grid gap-5">
@@ -130,42 +137,31 @@ export default function InstrumentsTresoreriePage() {
         <div className="text-sm font-medium text-orange-700 dark:text-orange-400">
           Trésorerie
         </div>
-        <h1 className="mt-1 text-xl font-semibold">Instruments à encaisser</h1>
+        <h1 className="mt-1 text-xl font-semibold">Suivi des encaissements</h1>
         <p className="text-sm text-muted-foreground">
-          Confirmation bancaire et suivi des chèques, effets, virements et cartes.
+          Suivi des chèques, effets, virements, cartes et versements bancaires.
         </p>
       </header>
 
-      <div
-        className="inline-flex w-fit rounded-md border bg-muted/40 p-1"
-        role="radiogroup"
-        aria-label="Statut des instruments"
+      <Tabs
+        value={status}
+        onValueChange={(value) => {
+          setStatus(value as InstrumentRegisterStatus);
+          setPage(0);
+        }}
       >
-        <Button
-          type="button"
-          size="sm"
-          variant={!confirmed ? "secondary" : "ghost"}
-          className="shadow-none"
-          onClick={() => {
-            setStatus("EN_ATTENTE");
-            setPage(0);
-          }}
-        >
-          À encaisser
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={confirmed ? "secondary" : "ghost"}
-          className="shadow-none"
-          onClick={() => {
-            setStatus("CONFIRME");
-            setPage(0);
-          }}
-        >
-          Confirmés
-        </Button>
-      </div>
+        <TabsList aria-label="Statut des moyens de paiement">
+          <TabsTrigger value="EN_ATTENTE">
+            <Clock3 className="size-4" /> À encaisser
+          </TabsTrigger>
+          <TabsTrigger value="CONFIRME">
+            <CheckCircle2 className="size-4" /> Confirmés
+          </TabsTrigger>
+          <TabsTrigger value="REJETE">
+            <Ban className="size-4" /> Rejetés
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_180px_180px_auto]">
         <div className="grid gap-2">
@@ -229,10 +225,10 @@ export default function InstrumentsTresoreriePage() {
                 <th className="px-4 py-3 text-left">Mode</th>
                 <th className="px-4 py-3 text-left">Référence</th>
                 <th className="px-4 py-3 text-left">
-                  {confirmed ? "Confirmé le" : "Date instrument"}
+                  {pending ? "Date du moyen" : rejected ? "Rejeté le" : "Confirmé le"}
                 </th>
                 <th className="px-4 py-3 text-left">
-                  {confirmed ? "Compte crédité" : "Échéance"}
+                  {pending ? "Échéance" : rejected ? "Motif" : "Compte crédité"}
                 </th>
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3 text-right">Actions</th>
@@ -248,21 +244,23 @@ export default function InstrumentsTresoreriePage() {
                   <td className="px-4 py-3">{paymentModeLabel(instrument.mode)}</td>
                   <td className="px-4 py-3">{instrument.referenceInstrument || "-"}</td>
                   <td className="px-4 py-3">
-                    {formatTreasuryDate(confirmed
-                      ? instrument.dateStatut
-                      : instrument.dateInstrument)}
+                    {formatTreasuryDate(pending
+                      ? instrument.dateInstrument
+                      : instrument.dateStatut)}
                   </td>
                   <td className="px-4 py-3">
-                    {confirmed
-                      ? instrument.compteTresorerie || "-"
-                      : formatTreasuryDate(instrument.dateEcheance)}
+                    {pending
+                      ? formatTreasuryDate(instrument.dateEcheance)
+                      : rejected
+                        ? instrument.motifStatut || "-"
+                        : instrument.compteTresorerie || "-"}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">
                     {formatTreasuryMoney(instrument.montant)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      {!confirmed && (
+                      {pending && (
                         <Button
                           size="sm"
                           disabled={!canManage}
@@ -271,14 +269,17 @@ export default function InstrumentsTresoreriePage() {
                           Confirmer
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!canManage}
-                        onClick={() => openAction(instrument, "REJETE")}
-                      >
-                        {confirmed ? "Signaler un rejet" : "Rejeter"}
-                      </Button>
+                      {!rejected && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!canManage}
+                          onClick={() => openAction(instrument, "REJETE")}
+                        >
+                          {confirmed ? "Signaler un rejet" : "Rejeter"}
+                        </Button>
+                      )}
+                      {rejected && <span className="text-muted-foreground">-</span>}
                     </div>
                   </td>
                 </tr>
@@ -286,7 +287,7 @@ export default function InstrumentsTresoreriePage() {
               {!instruments.isLoading && (instruments.data?.rows.length ?? 0) === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
-                    Aucun instrument ne correspond à la recherche.
+                    Aucun moyen de paiement ne correspond à la recherche.
                   </td>
                 </tr>
               )}
@@ -319,7 +320,7 @@ export default function InstrumentsTresoreriePage() {
                 ? "Confirmer l’encaissement"
                 : activeInstrument?.statut === "CONFIRME"
                   ? "Signaler un rejet bancaire"
-                  : "Rejeter l’instrument"}
+                  : "Rejeter le moyen de paiement"}
             </DialogTitle>
             <DialogDescription>
               {activeInstrument?.numeroReglement} · {formatTreasuryMoney(activeInstrument?.montant ?? 0)}

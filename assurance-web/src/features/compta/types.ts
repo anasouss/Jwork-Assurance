@@ -429,6 +429,7 @@ export type PaymentInstrument = {
   dateStatut?: string | null;
   referenceInstrument?: string | null;
   banqueEmettrice?: string | null;
+  motifStatut?: string | null;
   compteTresorerieId?: string | null;
   compteTresorerie?: string | null;
   affectations: PaymentAllocation[];

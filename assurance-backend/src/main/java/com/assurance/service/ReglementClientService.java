@@ -152,10 +152,8 @@ public class ReglementClientService {
     ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
-        Page<DocumentClient> result = documentClientRepository.search(
+        Page<DocumentClient> result = documentClientRepository.searchOpenInvoices(
                 agenceId,
-                TypeDocumentClient.FACTURE,
-                StatutDocumentClient.EMIS,
                 dateDu,
                 dateAu,
                 payeurType,
@@ -258,6 +256,11 @@ public class ReglementClientService {
                 : elementRepository.findClientDocumentSourcesForUpdate(agenceId, elementIds);
         if (elements.size() != elementIds.size()) {
             throw new BadRequestException("Une ou plusieurs créances sont introuvables ou annulées");
+        }
+        if (!elementIds.isEmpty() && !documentClientService.findIssuedInvoiceElementIds(elementIds).isEmpty()) {
+            throw new BadRequestException(
+                    "Une ou plusieurs créances figurent désormais sur une facture émise"
+            );
         }
         List<DocumentClient> documents = documentIds.isEmpty()
                 ? List.of()
@@ -605,6 +608,7 @@ public class ReglementClientService {
                 .dateStatut(instrument.getDateStatut())
                 .referenceInstrument(instrument.getReferenceInstrument())
                 .banqueEmettrice(instrument.getBanqueEmettrice())
+                .motifStatut(instrument.getMotifStatut())
                 .compteTresorerieId(instrument.getCompteTresorerie() == null
                         ? null : instrument.getCompteTresorerie().getId())
                 .compteTresorerie(instrument.getCompteTresorerie() == null
@@ -1155,6 +1159,7 @@ public class ReglementClientService {
                 .dateStatut(instrument.getDateStatut())
                 .referenceInstrument(instrument.getReferenceInstrument())
                 .banqueEmettrice(instrument.getBanqueEmettrice())
+                .motifStatut(instrument.getMotifStatut())
                 .compteTresorerieId(instrument.getCompteTresorerie() == null
                         ? null : instrument.getCompteTresorerie().getId())
                 .compteTresorerie(instrument.getCompteTresorerie() == null

@@ -152,7 +152,7 @@ export default function ReglementsEnregistresPage() {
           </div>
           <h1 className="mt-1 text-xl font-semibold">Règlements enregistrés</h1>
           <p className="text-sm text-muted-foreground">
-            Historique, annulations et remplacement des instruments rejetés.
+            Historique, annulations et remplacement des moyens de paiement rejetés.
           </p>
         </div>
         <Button asChild variant="outline">
@@ -347,7 +347,7 @@ export default function ReglementsEnregistresPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remplacer l’instrument rejeté</DialogTitle>
+            <DialogTitle>Remplacer le moyen de paiement rejeté</DialogTitle>
             <DialogDescription>
               Le montant et les affectations sont conservés :{" "}
               {formatAccountingAmount(instrumentToReplace?.montant)}

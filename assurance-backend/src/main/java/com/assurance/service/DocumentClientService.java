@@ -323,6 +323,18 @@ public class DocumentClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
     }
 
+    @Transactional(readOnly = true)
+    public Set<Long> findIssuedInvoiceElementIds(Collection<Long> elementIds) {
+        if (elementIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(ligneDocumentClientRepository.findElementFacturableIdsAlreadyIssued(
+                elementIds,
+                TypeDocumentClient.FACTURE,
+                StatutDocumentClient.EMIS
+        ));
+    }
+
     private void validateRequest(CreerDocumentClientRequest request) {
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
             if (request.getDateEcheance() == null) {
@@ -358,6 +370,17 @@ public class DocumentClientService {
         ));
         if (!alreadyInvoiced.isEmpty()) {
             throw new BadRequestException("Une ou plusieurs écritures figurent déjà sur une facture émise");
+        }
+        if (affectationReglementClientRepository.existsActiveByElementFacturableIds(
+                sources.stream().map(source -> source.element().getId()).toList(),
+                Set.of(
+                        StatutAffectationReglement.EN_ATTENTE,
+                        StatutAffectationReglement.CONFIRMEE
+                )
+        )) {
+            throw new BadRequestException(
+                    "Une ou plusieurs écritures possèdent déjà un règlement direct actif"
+            );
         }
     }
 

@@ -42,14 +42,14 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                     :dateDu is null
                     or (:statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                         and instrument.dateInstrument >= :dateDu)
-                    or (:statut = com.assurance.enums.StatutInstrumentReglement.CONFIRME
+                    or (:statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                         and instrument.dateStatut >= :dateDu)
               )
               and (
                     :dateAu is null
                     or (:statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                         and instrument.dateInstrument <= :dateAu)
-                    or (:statut = com.assurance.enums.StatutInstrumentReglement.CONFIRME
+                    or (:statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                         and instrument.dateStatut <= :dateAu)
               )
               and (
@@ -62,7 +62,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             order by
               case when instrument.statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                    then coalesce(instrument.dateEcheance, instrument.dateInstrument) end asc,
-              case when instrument.statut = com.assurance.enums.StatutInstrumentReglement.CONFIRME
+              case when instrument.statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                    then instrument.dateStatut end desc,
               instrument.id desc
             """)

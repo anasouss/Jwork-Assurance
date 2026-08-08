@@ -3,8 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   Banknote,
+  FileText,
   History,
   Plus,
+  ReceiptText,
   RotateCcw,
   Search,
   Trash2,
@@ -26,6 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
@@ -164,7 +167,7 @@ export default function ReglementsClientsPage() {
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">
             Comptabilité
           </div>
-          <h1 className="mt-1 text-xl font-semibold">Encaissements clients</h1>
+          <h1 className="mt-1 text-xl font-semibold">Règlements clients</h1>
           <p className="text-sm text-muted-foreground">
             Créances ouvertes, paiements partiels et moyens de règlement.
           </p>
@@ -177,45 +180,45 @@ export default function ReglementsClientsPage() {
         </Button>
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[220px_1fr_auto]">
-        <div className="grid gap-2">
-          <Label>Origine</Label>
-          <Select
-            value={receivableKind}
-            onValueChange={(value) => {
-              setReceivableKind(value as ReceivableKind);
-              setSelected({});
-              setPage(0);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="DIRECT">Écritures directes</SelectItem>
-              <SelectItem value="INVOICE">Factures émises</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid min-w-72 flex-1 gap-2">
-              <Label htmlFor="receivable-search">
-                {receivableKind === "INVOICE"
-                  ? "Client, groupe ou numéro de facture"
-                  : "Client, police, référence ou assistance"}
-              </Label>
-              <Input
-                id="receivable-search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    setPage(0);
-                    setAppliedSearch(search.trim());
-                  }
-                }}
-              />
-        </div>
-        <div className="flex items-end gap-2">
+      <section className="grid gap-4 rounded-md border bg-card p-4">
+        <Tabs
+          value={receivableKind}
+          onValueChange={(value) => {
+            setReceivableKind(value as ReceivableKind);
+            setPage(0);
+          }}
+        >
+          <TabsList aria-label="Origine des créances">
+            <TabsTrigger value="DIRECT">
+              <ReceiptText className="size-4" />
+              Écritures directes
+            </TabsTrigger>
+            <TabsTrigger value="INVOICE">
+              <FileText className="size-4" />
+              Factures émises
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+          <div className="grid min-w-72 flex-1 gap-2">
+            <Label htmlFor="receivable-search">
+              {receivableKind === "INVOICE"
+                ? "Client, groupe ou numéro de facture"
+                : "Client, police, référence ou assistance"}
+            </Label>
+            <Input
+              id="receivable-search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  setPage(0);
+                  setAppliedSearch(search.trim());
+                }
+              }}
+            />
+          </div>
+          <div className="flex items-end gap-2">
             <Button
               onClick={() => {
                 setPage(0);
@@ -236,7 +239,14 @@ export default function ReglementsClientsPage() {
             >
               <RotateCcw className="size-4" />
             </Button>
+          </div>
         </div>
+        {selectedRows.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {selectedRows.length} créance(s) sélectionnée(s), pour {money(selectedTotal)}.
+            Vous pouvez changer d’onglet pour compléter ce règlement avec la même cible.
+          </p>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
@@ -475,7 +485,7 @@ export default function ReglementsClientsPage() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label>Date de l’instrument</Label>
+                      <Label>Date du moyen de paiement</Label>
                       <DatePicker
                         date={instrument.dateInstrument}
                         onSelect={(value) => updateInstrument(instrument.key, {

@@ -40,4 +40,16 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             Long documentClientId,
             Set<StatutAffectationReglement> statuts
     );
+
+    @Query("""
+            select count(allocation) > 0
+            from AffectationReglementClient allocation
+            where allocation.elementFacturable.id in :elementIds
+              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.statut in :statuts
+            """)
+    boolean existsActiveByElementFacturableIds(
+            @Param("elementIds") Collection<Long> elementIds,
+            @Param("statuts") Set<StatutAffectationReglement> statuts
+    );
 }

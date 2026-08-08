@@ -452,6 +452,13 @@ export const comptaApi = {
     )));
   },
 
+  async changeTreasuryAccountStatus(id: string, actif: boolean) {
+    return normalizeTreasuryAccount(unwrap(await apiFetch<ApiResponse<TreasuryAccount>>(
+      `/api/v1/compta/tresorerie/comptes/${id}/statut`,
+      { method: "PUT", body: JSON.stringify({ actif }) }
+    )));
+  },
+
   async treasuryMovements() {
     return unwrap(await apiFetch<ApiResponse<TreasuryMovement[]>>(
       "/api/v1/compta/tresorerie/mouvements"

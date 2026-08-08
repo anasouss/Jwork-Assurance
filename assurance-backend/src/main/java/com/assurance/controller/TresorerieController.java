@@ -1,5 +1,6 @@
 package com.assurance.controller;
 
+import com.assurance.dto.request.ChangerStatutCompteTresorerieRequest;
 import com.assurance.dto.request.UpsertCompteTresorerieRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CompteTresorerieResponse;
@@ -61,6 +62,21 @@ public class TresorerieController {
                 accountId,
                 request
         ), "Compte de trésorerie modifié"));
+    }
+
+    @PutMapping("/comptes/{accountId}/statut")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    public ResponseEntity<ApiResponse<CompteTresorerieResponse>> changeAccountStatus(
+            @PathVariable Long accountId,
+            @Valid @RequestBody ChangerStatutCompteTresorerieRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(tresorerieService.changeAccountStatus(
+                TenantContext.getCurrentAgence(),
+                accountId,
+                request.getActif()
+        ), Boolean.TRUE.equals(request.getActif())
+                ? "Compte de trésorerie activé"
+                : "Compte de trésorerie désactivé"));
     }
 
     @GetMapping("/mouvements")

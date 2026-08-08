@@ -5,7 +5,6 @@ import {
   Building2,
   FileCheck2,
   FileText,
-  History,
   Landmark,
   ReceiptText,
   Scale,
@@ -53,15 +52,9 @@ const groups: ComptaGroup[] = [
         permission: "quittance:view",
       },
       {
-        title: "Encaissements clients",
+        title: "Règlements clients",
         icon: WalletCards,
         href: "/app/compta/reglements",
-        permission: "reglement-client:view",
-      },
-      {
-        title: "Règlements enregistrés",
-        icon: History,
-        href: "/app/compta/reglements/historique",
         permission: "reglement-client:view",
       },
     ],
@@ -76,7 +69,7 @@ const groups: ComptaGroup[] = [
         permission: "tresorerie:view",
       },
       {
-        title: "Instruments à encaisser",
+        title: "Suivi des encaissements",
         icon: ScrollText,
         href: "/app/compta/tresorerie/instruments",
         permission: "tresorerie:view",

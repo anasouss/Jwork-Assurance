@@ -55,6 +55,72 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
     );
 
     @EntityGraph(attributePaths = {
+            "clientPayeur",
+            "groupePayeur"
+    })
+    @Query(value = """
+            select distinct d
+            from DocumentClient d
+            where d.agence.id = :agenceId
+              and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+              and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              and coalesce((
+                    select sum(paymentAllocation.montant)
+                    from AffectationReglementClient paymentAllocation
+                    where paymentAllocation.documentClient = d
+                      and paymentAllocation.statut = com.assurance.enums.StatutAffectationReglement.CONFIRMEE
+                      and paymentAllocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              ), 0) < d.totalDocument
+              and (:dateDu is null or d.dateEmission >= :dateDu)
+              and (:dateAu is null or d.dateEmission <= :dateAu)
+              and (:payeurId is null or (
+                    (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
+                    or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
+              ))
+              and (
+                    :search is null
+                    or lower(d.numero) like concat('%', :search, '%')
+                    or lower(d.payeurNom) like concat('%', :search, '%')
+                    or lower(coalesce(d.payeurIdentifiant, '')) like concat('%', :search, '%')
+              )
+            order by d.dateEmission desc, d.id desc
+            """, countQuery = """
+            select count(d.id)
+            from DocumentClient d
+            where d.agence.id = :agenceId
+              and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+              and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              and coalesce((
+                    select sum(paymentAllocation.montant)
+                    from AffectationReglementClient paymentAllocation
+                    where paymentAllocation.documentClient = d
+                      and paymentAllocation.statut = com.assurance.enums.StatutAffectationReglement.CONFIRMEE
+                      and paymentAllocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              ), 0) < d.totalDocument
+              and (:dateDu is null or d.dateEmission >= :dateDu)
+              and (:dateAu is null or d.dateEmission <= :dateAu)
+              and (:payeurId is null or (
+                    (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
+                    or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
+              ))
+              and (
+                    :search is null
+                    or lower(d.numero) like concat('%', :search, '%')
+                    or lower(d.payeurNom) like concat('%', :search, '%')
+                    or lower(coalesce(d.payeurIdentifiant, '')) like concat('%', :search, '%')
+              )
+            """)
+    Page<DocumentClient> searchOpenInvoices(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu,
+            @Param("payeurType") String payeurType,
+            @Param("payeurId") Long payeurId,
+            @Param("search") String search,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {
             "agence",
             "clientPayeur",
             "clientPayeur.ville",

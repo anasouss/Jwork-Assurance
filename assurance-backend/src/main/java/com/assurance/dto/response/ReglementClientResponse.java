@@ -42,6 +42,7 @@ public class ReglementClientResponse {
         private LocalDate dateStatut;
         private String referenceInstrument;
         private String banqueEmettrice;
+        private String motifStatut;
         private Long compteTresorerieId;
         private String compteTresorerie;
         private List<Affectation> affectations;

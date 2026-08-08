@@ -1,10 +1,19 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, Landmark, Plus, WalletCards } from "lucide-react";
+import { Edit3, Landmark, Plus, Power, PowerOff, WalletCards } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +47,7 @@ export default function TresorerieComptesPage() {
   const [bankName, setBankName] = useState("");
   const [rib, setRib] = useState("");
   const [initialBalance, setInitialBalance] = useState("0");
-  const [accountActive, setAccountActive] = useState(true);
+  const [accountToToggle, setAccountToToggle] = useState<TreasuryAccount>();
 
   const accounts = useQuery({
     queryKey: ["compta", "treasury-accounts"],
@@ -54,7 +63,7 @@ export default function TresorerieComptesPage() {
         nomBanque: bankName.trim() || undefined,
         rib: rib.trim() || undefined,
         soldeInitial: parseAccountingAmount(initialBalance),
-        actif: accountActive,
+        actif: editingAccount?.actif ?? true,
       } satisfies UpsertTreasuryAccountRequest;
 
       return editingAccount
@@ -73,6 +82,21 @@ export default function TresorerieComptesPage() {
     ),
   });
 
+  const changeStatus = useMutation({
+    mutationFn: (account: TreasuryAccount) => comptaApi.changeTreasuryAccountStatus(
+      account.id,
+      !account.actif
+    ),
+    onSuccess: async (account) => {
+      toast.success(account.actif ? "Compte activé" : "Compte désactivé");
+      setAccountToToggle(undefined);
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] });
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Changement de statut impossible"
+    ),
+  });
+
   function openNewAccount() {
     setEditingAccount(undefined);
     setAccountType("CAISSE");
@@ -81,7 +105,6 @@ export default function TresorerieComptesPage() {
     setBankName("");
     setRib("");
     setInitialBalance("0");
-    setAccountActive(true);
     setDialogOpen(true);
   }
 
@@ -93,7 +116,6 @@ export default function TresorerieComptesPage() {
     setBankName(account.nomBanque ?? "");
     setRib(account.rib ?? "");
     setInitialBalance(String(account.soldeInitial));
-    setAccountActive(account.actif);
     setDialogOpen(true);
   }
 
@@ -141,15 +163,28 @@ export default function TresorerieComptesPage() {
                   {account.actif ? "Actif" : "Inactif"}
                 </Badge>
                 {canManage && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    title="Modifier le compte"
-                    onClick={() => openAccount(account)}
-                  >
-                    <Edit3 className="size-4" />
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Modifier le compte"
+                      onClick={() => openAccount(account)}
+                    >
+                      <Edit3 className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title={account.actif ? "Désactiver le compte" : "Activer le compte"}
+                      onClick={() => setAccountToToggle(account)}
+                    >
+                      {account.actif
+                        ? <PowerOff className="size-4" />
+                        : <Power className="size-4" />}
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -265,13 +300,6 @@ export default function TresorerieComptesPage() {
                   : "Solde comptable au démarrage du compte."}
               </p>
             </div>
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-              <Checkbox
-                checked={accountActive}
-                onCheckedChange={(value) => setAccountActive(value === true)}
-              />
-              Compte actif
-            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Annuler</Button>
@@ -289,6 +317,42 @@ export default function TresorerieComptesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(accountToToggle)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAccountToToggle(undefined);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {accountToToggle?.actif ? "Désactiver ce compte ?" : "Activer ce compte ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {accountToToggle?.actif
+                ? "Le compte ne pourra plus être sélectionné pour de nouveaux encaissements. Son historique et son solde resteront conservés."
+                : "Le compte sera de nouveau disponible pour les nouveaux encaissements."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!accountToToggle || changeStatus.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (accountToToggle) {
+                  changeStatus.mutate(accountToToggle);
+                }
+              }}
+            >
+              {accountToToggle?.actif ? "Désactiver" : "Activer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

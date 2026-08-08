@@ -11,6 +11,7 @@ import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.enums.NatureMouvementTresorerie;
 import com.assurance.enums.SensMouvementTresorerie;
+import com.assurance.enums.TypeCompteTresorerie;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
@@ -75,6 +76,17 @@ public class TresorerieService {
             );
         }
         return toResponse(compteRepository.save(apply(account, request, code)));
+    }
+
+    @Transactional
+    public CompteTresorerieResponse changeAccountStatus(
+            Long agenceId,
+            Long accountId,
+            Boolean active
+    ) {
+        CompteTresorerie account = findAccount(agenceId, accountId);
+        account.setActif(Boolean.TRUE.equals(active));
+        return toResponse(compteRepository.save(account));
     }
 
     @Transactional(readOnly = true)
@@ -189,7 +201,7 @@ public class TresorerieService {
             UpsertCompteTresorerieRequest request,
             String code
     ) {
-        if (request.getTypeCompte() == com.assurance.enums.TypeCompteTresorerie.BANQUE
+        if (request.getTypeCompte() == TypeCompteTresorerie.BANQUE
                 && trimToNull(request.getNomBanque()) == null) {
             throw new BadRequestException("Le nom de la banque est obligatoire pour un compte bancaire");
         }
@@ -201,7 +213,7 @@ public class TresorerieService {
         account.setDevise("MAD");
         account.setSoldeInitial(money(request.getSoldeInitial()));
         account.setActif(request.getActif() == null || request.getActif());
-        if (account.getTypeCompte() == com.assurance.enums.TypeCompteTresorerie.CAISSE) {
+        if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE) {
             account.setNomBanque(null);
             account.setRib(null);
         }

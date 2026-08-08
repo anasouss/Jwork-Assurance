@@ -24,6 +24,7 @@ type DonutChartProps = {
   outerRadius?: number;
   showLegend?: boolean;
   showValues?: boolean;
+  showCenterValue?: boolean;
   centerLabel?: string;
   valueFormatter?: (value: number) => string;
   onSelect?: (key: string) => void;
@@ -41,6 +42,7 @@ export function DonutChart({
   outerRadius = 100,
   showLegend = true,
   showValues = true,
+  showCenterValue = true,
   centerLabel,
   valueFormatter = defaultValueFormatter,
   onSelect,
@@ -104,10 +106,12 @@ export function DonutChart({
             />
           </PieChart>
         </ChartContainer>
-        <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
-          <span className="text-2xl font-semibold tabular-nums">{valueFormatter(total)}</span>
-          {centerLabel ? <span className="text-xs text-muted-foreground">{centerLabel}</span> : null}
-        </div>
+        {showCenterValue ? (
+          <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
+            <span className="text-2xl font-semibold tabular-nums">{valueFormatter(total)}</span>
+            {centerLabel ? <span className="text-xs text-muted-foreground">{centerLabel}</span> : null}
+          </div>
+        ) : null}
       </div>
 
       {showLegend ? (

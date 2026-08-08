@@ -713,7 +713,7 @@ function StockPieCard({
       <CardContent className="space-y-3">
         <DonutChart
           data={chartData}
-          centerLabel="disponibles"
+          showCenterValue={false}
           className="min-h-64 sm:grid-cols-[220px_minmax(0,1fr)]"
           chartClassName="h-56"
           emptyText="Aucun stock disponible."

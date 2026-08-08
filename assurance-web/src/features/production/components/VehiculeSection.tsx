@@ -37,6 +37,7 @@ export function VehiculeSection({
   tarifsUsage = [],
   allowMultipleVehicules = true,
   showUsage = true,
+  showSousClasse = true,
   showAttestation = true,
   controleStockAttestation = true,
   showRemorqueFlag = false,
@@ -60,6 +61,7 @@ export function VehiculeSection({
   tarifsUsage?: ReferenceOption[];
   allowMultipleVehicules?: boolean;
   showUsage?: boolean;
+  showSousClasse?: boolean;
   showAttestation?: boolean;
   controleStockAttestation?: boolean;
   showRemorqueFlag?: boolean;
@@ -244,7 +246,7 @@ export function VehiculeSection({
                     />
                   </Field>
                 ) : null}
-                {needsSousClasse ? (
+                {needsSousClasse && showSousClasse ? (
                   <Field label="Sous-classe" required error={errors[`vehicules.${index}.sousClasse`]}>
                     <AutocompleteSelect
                       value={vehicule.sousClasse ?? ""}

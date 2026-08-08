@@ -203,6 +203,7 @@ export function ContratFormLayout({
       tarifsUsage={form.refs.tarifsUsage.data ?? []}
       allowMultipleVehicules={allowMultipleVehicules}
       showUsage={form.typeContrat !== "PARTICULIER" && !showConvention}
+      showSousClasse={form.typeContrat !== "PARTICULIER"}
       showAttestation={form.typeContrat !== "PARTICULIER" && !showConvention}
       controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
       showRemorqueFlag={showConvention || form.typeContrat === "PARTICULIER"}

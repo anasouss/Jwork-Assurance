@@ -56,6 +56,7 @@ export default function ContratShowPage() {
   const convention = optionLabel(conventionsQuery.data, contrat.conventionId);
   const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
   const isVehicleReplacement = String(selectedMouvement?.code ?? "").toUpperCase() === "CHV_M";
+  const showGuaranteePrimes = contrat.typeContrat !== "PARTICULIER" || Boolean(contrat.saisiePrimeNette);
   const selectedActNumber = selectedMouvement?.numeroMouvement ?? "1";
   const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement ? `-acte-${selectedActNumber}` : ""}.pdf`;
   const openPdf = async () => {
@@ -162,7 +163,7 @@ export default function ContratShowPage() {
             />
           </Section>
 
-          <Section title="Clients" icon={<UserRound className="size-4" />}>
+          <Section title="Informations Client" icon={<UserRound className="size-4" />}>
             <PartiesGrid
               souscripteur={souscripteur}
               proprietaire={proprietaire}
@@ -189,7 +190,7 @@ export default function ContratShowPage() {
             />
           ))}
 
-          <PersonnesSection garanties={personneGaranties(contrat)} />
+          <PersonnesSection garanties={personneGaranties(contrat)} showPrimes={showGuaranteePrimes} />
           <AssistancesSection assistances={contrat.assistances ?? []} />
           <QuittanceSection
             contrat={contrat}
@@ -367,7 +368,10 @@ function VehicleSection({
   const hasGaranties = garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   return (
     <>
-      <Section title={`Véhicule ${index + 1}`} icon={<Car className="size-4" />}>
+      <Section
+        title={(contrat.vehicules?.length ?? 0) > 1 ? `Informations Véhicule ${index + 1}` : "Informations Véhicule"}
+        icon={<Car className="size-4" />}
+      >
         <InfoGrid
           items={[
             ["Usage", [vehicule.usageCode, vehicule.usageLibelle].filter(Boolean).join(" - ")],
@@ -386,10 +390,11 @@ function VehicleSection({
         />
       </Section>
       {hasGaranties ? (
-        <Section title={(contrat.vehicules?.length ?? 0) > 1 ? `Garanties véhicule ${index + 1}` : "Garanties véhicule"}>
+        <Section title={(contrat.vehicules?.length ?? 0) > 1 ? `Les Garanties assurées ${index + 1}` : "Les Garanties assurées"}>
           <GarantiesTable
             garanties={garanties}
             primeLabel={replacementSnapshot ? "Prime différentielle" : "Prime nette"}
+            showPrimes={contrat.typeContrat !== "PARTICULIER" || Boolean(contrat.saisiePrimeNette)}
           />
         </Section>
       ) : null}
@@ -416,17 +421,20 @@ function RemorqueSection({ contrat, remorque, index }: { contrat: ContratSummary
       </Section>
       {hasGaranties ? (
         <Section title={(contrat.remorques?.length ?? 0) > 1 ? `Garanties remorque ${index + 1}` : "Garanties remorque"}>
-          <GarantiesTable garanties={garanties} />
+          <GarantiesTable
+            garanties={garanties}
+            showPrimes={contrat.typeContrat !== "PARTICULIER" || Boolean(contrat.saisiePrimeNette)}
+          />
         </Section>
       ) : null}
     </>
   );
 }
 
-function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
+function PersonnesSection({ garanties, showPrimes }: { garanties: Garantie[]; showPrimes: boolean }) {
   if (!garanties.length) return null;
   return (
-    <Section title="Protection personnes">
+    <Section title="Les Garanties des Personnes">
       <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2 [&_th]:text-[9px] [&_th]:uppercase">
         <TableHeader>
           <TableRow className="bg-slate-100">
@@ -444,7 +452,7 @@ function PersonnesSection({ garanties }: { garanties: Garantie[] }) {
               <TableCell className="text-right">{amountOrDash(garantie.montantDeces)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantInvalidite)}</TableCell>
               <TableCell className="text-right">{amountOrDash(garantie.montantFraisMedicaux)}</TableCell>
-              <TableCell className="text-right font-semibold">{moneyAmount(garantie.prime)}</TableCell>
+              <TableCell className="text-right font-semibold">{showPrimes ? moneyAmount(garantie.prime) : "-"}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -460,7 +468,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
       <Table className="text-[10px] [&_td]:px-2 [&_td]:py-1 [&_th]:h-6 [&_th]:px-2 [&_th]:text-[9px] [&_th]:uppercase">
         <TableHeader>
           <TableRow className="bg-slate-100">
-            <TableHead>Véhicule</TableHead>
+            <TableHead>N° contrat</TableHead>
             <TableHead>Compagnie</TableHead>
             <TableHead>Produit</TableHead>
             <TableHead>Période</TableHead>
@@ -470,7 +478,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
         <TableBody>
           {assistances.map((assistance) => (
             <TableRow key={assistance.id}>
-              <TableCell className="font-medium">{text(assistance.vehiculeImmatriculation)}</TableCell>
+              <TableCell className="font-medium">{text(assistance.numeroContratOuQuittance)}</TableCell>
               <TableCell>{text(assistance.compagnieAssistanceLibelle)}</TableCell>
               <TableCell>{text(assistance.produit)}</TableCell>
               <TableCell>{formatDate(assistance.dateEffet)} au {formatDate(assistance.dateEcheance)}</TableCell>
@@ -483,7 +491,15 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
   );
 }
 
-function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: Garantie[]; primeLabel?: string }) {
+function GarantiesTable({
+  garanties,
+  primeLabel = "Prime nette",
+  showPrimes,
+}: {
+  garanties: Garantie[];
+  primeLabel?: string;
+  showPrimes: boolean;
+}) {
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return null;
   return (
@@ -491,7 +507,7 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
       <Table className="text-[10px]">
         <TableHeader>
           <TableRow className="bg-slate-100">
-            <TableHead className="h-6 px-2 text-[9px] uppercase">Garantie assurée</TableHead>
+            <TableHead className="h-6 px-2 text-[9px] uppercase">Les Garanties du Véhicule</TableHead>
             <TableHead className="h-6 px-2 text-right text-[9px] uppercase">Valeur assurée</TableHead>
             <TableHead className="h-6 px-2 text-[9px] uppercase">Franchise</TableHead>
             <TableHead className="h-6 px-2 text-right text-[9px] uppercase">{primeLabel}</TableHead>
@@ -503,7 +519,7 @@ function GarantiesTable({ garanties, primeLabel = "Prime nette" }: { garanties: 
               <TableCell className="px-2 py-0.5 font-medium">{garantieName(garantie)}</TableCell>
               <TableCell className="px-2 py-0.5 text-right">{formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree)}</TableCell>
               <TableCell className="px-2 py-0.5">{franchiseLabel(garantie)}</TableCell>
-              <TableCell className="px-2 py-0.5 text-right font-semibold">{moneyAmount(garantie.prime)}</TableCell>
+              <TableCell className="px-2 py-0.5 text-right font-semibold">{showPrimes ? moneyAmount(garantie.prime) : "-"}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -572,7 +588,9 @@ function financialSummaryRows(contrat: ContratSummary) {
   const hasAssistance = assistance.primeTotale !== 0;
   const rows = lignes.map((ligne) => ({
     key: `${ligne.categorie}-${ligne.ordre}`,
-    label: ligne.globale ? (hasAssistance ? "Total automobile" : "Total général") : text(ligne.categorie),
+    label: ligne.globale
+      ? (hasAssistance ? "Total automobile" : "Total général")
+      : String(ligne.categorie ?? "").toUpperCase() === "CORPOREL" ? "PTA" : text(ligne.categorie),
     primeNette: numberOrZero(ligne.primeNette),
     taxe: numberOrZero(ligne.taxe),
     taxeParafiscale: numberOrZero(ligne.taxeParafiscale),
@@ -994,6 +1012,8 @@ async function openContratPdf(params: {
   };
 
   pdf.setProperties({ title: params.filename.replace(/\.pdf$/i, "") });
+  const showGuaranteePrimes = params.contrat.typeContrat !== "PARTICULIER"
+    || Boolean(params.contrat.saisiePrimeNette);
   drawPdfHeader(ctx, params);
   drawPdfSection(ctx, "CONTRAT", () => {
     drawPdfInfoGrid(ctx, [
@@ -1008,12 +1028,15 @@ async function openContratPdf(params: {
     ]);
   });
 
-  drawPdfSection(ctx, "CLIENTS", () => {
+  drawPdfSection(ctx, "INFORMATIONS CLIENT", () => {
     drawPdfParties(ctx, params.souscripteur, params.proprietaire, params.conducteur);
   });
 
   for (const [index, vehicule] of (params.contrat.vehicules ?? []).entries()) {
-    drawPdfSection(ctx, `VÉHICULE ${index + 1}`, () => {
+    const vehicleTitle = (params.contrat.vehicules?.length ?? 0) > 1
+      ? `INFORMATIONS VÉHICULE ${index + 1}`
+      : "INFORMATIONS VÉHICULE";
+    drawPdfSection(ctx, vehicleTitle, () => {
       drawPdfInfoGrid(ctx, [
         ["Usage", [vehicule.usageCode, vehicule.usageLibelle].filter(Boolean).join(" - ")],
         ["Marque", text(vehicule.marque)],
@@ -1031,12 +1054,15 @@ async function openContratPdf(params: {
     });
     const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
     if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
-      const title = (params.contrat.vehicules?.length ?? 0) > 1 ? `GARANTIES VÉHICULE ${index + 1}` : "GARANTIES VÉHICULE";
+      const title = (params.contrat.vehicules?.length ?? 0) > 1
+        ? `LES GARANTIES ASSURÉES ${index + 1}`
+        : "LES GARANTIES ASSURÉES";
       drawPdfSection(ctx, title, () => {
         drawPdfGaranties(
           ctx,
           garanties,
           String(params.mouvement?.code ?? "").toUpperCase() === "CHV_M" ? "Prime différentielle" : "Prime nette",
+          showGuaranteePrimes,
         );
       });
     }
@@ -1057,14 +1083,14 @@ async function openContratPdf(params: {
     if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
       const title = (params.contrat.remorques?.length ?? 0) > 1 ? `GARANTIES REMORQUE ${index + 1}` : "GARANTIES REMORQUE";
       drawPdfSection(ctx, title, () => {
-        drawPdfGaranties(ctx, garanties);
+        drawPdfGaranties(ctx, garanties, "Prime nette", showGuaranteePrimes);
       });
     }
   }
 
   const personnes = personneGaranties(params.contrat);
   if (personnes.length) {
-    drawPdfSection(ctx, "PROTECTION PERSONNES", () => drawPdfPersonnes(ctx, personnes));
+    drawPdfSection(ctx, "LES GARANTIES DES PERSONNES", () => drawPdfPersonnes(ctx, personnes, showGuaranteePrimes));
   }
 
   const assistances = params.contrat.assistances ?? [];
@@ -1246,32 +1272,37 @@ function drawPdfParties(
   ctx.y = startY + height;
 }
 
-function drawPdfGaranties(ctx: PdfContext, garanties: Garantie[], primeLabel = "Prime nette") {
+function drawPdfGaranties(
+  ctx: PdfContext,
+  garanties: Garantie[],
+  primeLabel = "Prime nette",
+  showPrimes = true,
+) {
   const vehiculeGaranties = garanties.filter((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE");
   if (!vehiculeGaranties.length) return;
-  drawPdfTable(ctx, ["Garantie assurée", "Valeur assurée", "Franchise", primeLabel], vehiculeGaranties.map((garantie) => [
+  drawPdfTable(ctx, ["Les Garanties du Véhicule", "Valeur assurée", "Franchise", primeLabel], vehiculeGaranties.map((garantie) => [
     garantieName(garantie),
     formatOptionalAmount(garantie.capital ?? garantie.valeurAssuree),
     franchiseLabel(garantie),
-    moneyAmount(garantie.prime),
+    showPrimes ? moneyAmount(garantie.prime) : "-",
   ]), [68, 36, 48, 28], {
     alignments: ["left", "center", "center", "right"],
   });
 }
 
-function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[]) {
+function drawPdfPersonnes(ctx: PdfContext, garanties: Garantie[], showPrimes: boolean) {
   drawPdfTable(ctx, ["Garantie", "Décès", "Invalidité", "Frais médicaux", "Prime nette"], garanties.map((garantie) => [
     garantieName(garantie),
     amountOrDash(garantie.montantDeces),
     amountOrDash(garantie.montantInvalidite),
     amountOrDash(garantie.montantFraisMedicaux),
-    moneyAmount(garantie.prime),
+    showPrimes ? moneyAmount(garantie.prime) : "-",
   ]), [60, 30, 30, 34, 26]);
 }
 
 function drawPdfAssistances(ctx: PdfContext, assistances: AssistanceContrat[]) {
-  drawPdfTable(ctx, ["Véhicule", "Compagnie", "Produit", "Période", "Prime TTC"], assistances.map((assistance) => [
-    text(assistance.vehiculeImmatriculation),
+  drawPdfTable(ctx, ["N° contrat", "Compagnie", "Produit", "Période", "Prime TTC"], assistances.map((assistance) => [
+    text(assistance.numeroContratOuQuittance),
     text(assistance.compagnieAssistanceLibelle),
     text(assistance.produit),
     `${formatDate(assistance.dateEffet)} au ${formatDate(assistance.dateEcheance)}`,

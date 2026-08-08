@@ -857,6 +857,14 @@ export function useContratCreationForm(
             "Catégorie obligatoire."
           );
         }
+        const monoUsage = refs.usages.data?.find((usage) => usage.id === usageId);
+        if (monoUsage?.bySousClasse) {
+          requireField(
+            "vehicules.0.sousClasse",
+            request.vehicules[0]?.sousClasse,
+            "Sous-classe obligatoire."
+          );
+        }
       }
       requireField("compagnieAssuranceId", compagnieAssuranceId, "Compagnie obligatoire.");
       if (!options?.prospectionMode) {

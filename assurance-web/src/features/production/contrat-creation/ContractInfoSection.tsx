@@ -52,6 +52,24 @@ export function ContractInfoSection({
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
   );
   const selectedUsage = (form.refs.usages.data ?? []).find((item) => item.id === form.usageId);
+  const availableSousClasses = useMemo(() => {
+    if (!selectedUsage?.bySousClasse) {
+      return [];
+    }
+    const activeSousClasses = (form.refs.sousClasses.data ?? []).filter((item) => item.actif !== false);
+    const tarifsUsage = form.refs.tarifsUsage.data ?? [];
+    if (!form.usageId || tarifsUsage.length === 0) {
+      return activeSousClasses;
+    }
+    const configuredIds = new Set(
+      tarifsUsage
+        .filter((tarif) => String(tarif.usageId ?? "") === form.usageId && tarif.actif !== false)
+        .map((tarif) => String(tarif.sousClasseId ?? ""))
+        .filter(Boolean)
+    );
+    return activeSousClasses.filter((sousClasse) => configuredIds.has(sousClasse.id));
+  }, [form.refs.sousClasses.data, form.refs.tarifsUsage.data, form.usageId, selectedUsage?.bySousClasse]);
+  const selectedSousClasse = form.vehicules[0]?.sousClasse ?? "";
   const selectedConvention = filteredConventions.find((item) => item.id === form.conventionId);
   const souscripteurIndex = form.clients.findIndex((client) => client.role === "SOUSCRIPTEUR");
   const souscripteur = souscripteurIndex >= 0 ? form.clients[souscripteurIndex] : undefined;
@@ -181,6 +199,31 @@ export function ContractInfoSection({
                 invalidText="Sélectionnez un usage existant."
               />
             )}
+          </Field>
+        ) : null}
+        {form.typeContrat === "PARTICULIER" && selectedUsage?.bySousClasse ? (
+          <Field label="Sous-classe" required error={form.validationErrors["vehicules.0.sousClasse"]}>
+            <AutocompleteSelect
+              value={selectedSousClasse}
+              placeholder="Sous-classe"
+              emptyText="Aucune sous-classe tarifée pour cet usage"
+              invalidText="Sous-classe invalide : choisissez une option existante."
+              options={availableSousClasses.map((sousClasse) => ({
+                value: sousClasse.code ?? sousClasse.libelle,
+                label: sousClasse.code ? `${sousClasse.code} - ${sousClasse.libelle}` : sousClasse.libelle,
+                keywords: sousClasse.libelle,
+              }))}
+              onValueChange={(value) => form.setVehicules(form.vehicules.map((vehicule, index) => (
+                index === 0
+                  ? {
+                      ...vehicule,
+                      sousClasse: value || undefined,
+                      puissanceFiscale: undefined,
+                      cylindree: undefined,
+                    }
+                  : vehicule
+              )))}
+            />
           </Field>
         ) : null}
         {showGrille ? (
@@ -320,6 +363,15 @@ export function ContractInfoSection({
                 </SelectContent>
               </Select>
             </Field>
+            {form.typeContrat === "PARTICULIER" && form.showContractEcheance ? (
+              <Field label="Échéance" required error={form.validationErrors.echeance}>
+                <EcheanceInput
+                  value={form.effectiveEcheance}
+                  disabled={Boolean(conventionHasFixedEcheance)}
+                  onValueChange={form.setEcheance}
+                />
+              </Field>
+            ) : null}
             {showFractionnement && (!readOnlyConventionContext || showConventionDateToDateFractionnement) ? (
               <Field label="Périodicité">
                 <Select
@@ -347,7 +399,7 @@ export function ContractInfoSection({
             <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
               <DatePicker disabled={form.renewalMode || form.lockDateEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
             </Field>
-            {form.showContractEcheance ? (
+            {form.typeContrat !== "PARTICULIER" && form.showContractEcheance ? (
               <Field label="Échéance" required error={form.validationErrors.echeance}>
                 <EcheanceInput
                   value={form.effectiveEcheance}

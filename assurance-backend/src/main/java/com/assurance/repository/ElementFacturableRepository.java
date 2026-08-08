@@ -339,4 +339,28 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
             @Param("agenceId") Long agenceId,
             @Param("ids") Collection<Long> ids
     );
+
+    @EntityGraph(attributePaths = {
+            "contrat",
+            "contrat.compagnieAssurance",
+            "contrat.payeurPrime",
+            "contrat.payeurPrime.ville",
+            "contrat.groupeFacturation",
+            "contrat.groupeFacturation.clientTresorerie",
+            "mouvementContrat",
+            "mouvementContrat.typeMouvement",
+            "compagnieAssurance"
+    })
+    @Query("""
+            select e
+            from ElementFacturable e
+            where e.agence.id = :agenceId
+              and e.id in :ids
+              and e.actif = true
+              and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+            """)
+    List<ElementFacturable> findClientDocumentSources(
+            @Param("agenceId") Long agenceId,
+            @Param("ids") Collection<Long> ids
+    );
 }

@@ -8,6 +8,7 @@ import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.InstrumentReglementCompagnie;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.enums.NatureMouvementTresorerie;
 import com.assurance.enums.SensMouvementTresorerie;
@@ -191,6 +192,68 @@ public class TresorerieService {
                 .build());
     }
 
+    @Transactional
+    public MouvementTresorerie recordCompanyInstrumentExit(
+            InstrumentReglementCompagnie instrument,
+            CompteTresorerie account,
+            LocalDate operationDate
+    ) {
+        if (!instrument.getAgence().getId().equals(account.getAgence().getId())) {
+            throw new BadRequestException("Le compte de trésorerie appartient à une autre agence");
+        }
+        if (account.getTypeCompte() != TypeCompteTresorerie.BANQUE) {
+            throw new BadRequestException("Un règlement compagnie doit utiliser un compte bancaire");
+        }
+        if (mouvementRepository.existsByInstrumentReglementCompagnieIdAndMouvementExtourneIdIsNull(
+                instrument.getId()
+        )) {
+            throw new BadRequestException("Ce moyen de paiement possède déjà une écriture de trésorerie");
+        }
+        return mouvementRepository.save(MouvementTresorerie.builder()
+                .agence(instrument.getAgence())
+                .compteTresorerie(account)
+                .instrumentReglementCompagnie(instrument)
+                .nature(NatureMouvementTresorerie.REGLEMENT_COMPAGNIE)
+                .sens(SensMouvementTresorerie.SORTIE)
+                .dateOperation(operationDate)
+                .dateValeur(operationDate)
+                .montant(money(instrument.getMontant()))
+                .reference(instrument.getReferenceInstrument())
+                .libelle("Règlement compagnie " + instrument.getReglement().getNumero())
+                .build());
+    }
+
+    @Transactional
+    public MouvementTresorerie reverseCompanyInstrumentExit(
+            InstrumentReglementCompagnie instrument,
+            String reason,
+            LocalDate operationDate
+    ) {
+        MouvementTresorerie original = mouvementRepository
+                .findFirstByAgenceIdAndInstrumentReglementCompagnieIdAndNatureOrderByIdDesc(
+                        instrument.getAgence().getId(),
+                        instrument.getId(),
+                        NatureMouvementTresorerie.REGLEMENT_COMPAGNIE
+                )
+                .orElseThrow(() -> new BadRequestException("Aucune écriture de trésorerie à extourner"));
+        if (mouvementRepository.existsByMouvementExtourneId(original.getId())) {
+            throw new BadRequestException("Cette écriture de trésorerie est déjà extournée");
+        }
+        return mouvementRepository.save(MouvementTresorerie.builder()
+                .agence(original.getAgence())
+                .compteTresorerie(original.getCompteTresorerie())
+                .instrumentReglementCompagnie(instrument)
+                .nature(NatureMouvementTresorerie.ANNULATION_REGLEMENT_COMPAGNIE)
+                .sens(SensMouvementTresorerie.ENTREE)
+                .dateOperation(operationDate)
+                .dateValeur(operationDate)
+                .montant(original.getMontant())
+                .reference(original.getReference())
+                .libelle("Extourne " + original.getLibelle() + " - " + reason)
+                .mouvementExtourneId(original.getId())
+                .build());
+    }
+
     public CompteTresorerie findAccount(Long agenceId, Long accountId) {
         return compteRepository.findByIdAndAgenceId(accountId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Compte de trésorerie", accountId));
@@ -243,6 +306,8 @@ public class TresorerieService {
                 .compteTresorerie(movement.getCompteTresorerie().getLibelle())
                 .instrumentReglementId(movement.getInstrumentReglement() == null
                         ? null : movement.getInstrumentReglement().getId())
+                .instrumentReglementCompagnieId(movement.getInstrumentReglementCompagnie() == null
+                        ? null : movement.getInstrumentReglementCompagnie().getId())
                 .nature(movement.getNature())
                 .sens(movement.getSens())
                 .dateOperation(movement.getDateOperation())

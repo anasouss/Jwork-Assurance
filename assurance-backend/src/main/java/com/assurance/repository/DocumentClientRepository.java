@@ -152,4 +152,21 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             @Param("agenceId") Long agenceId,
             @Param("documentIds") Collection<Long> documentIds
     );
+
+    @EntityGraph(attributePaths = {
+            "clientPayeur",
+            "groupePayeur"
+    })
+    @Query("""
+            select distinct d
+            from DocumentClient d
+            where d.agence.id = :agenceId
+              and d.id in :documentIds
+              and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+              and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
+            """)
+    List<DocumentClient> findIssuedInvoices(
+            @Param("agenceId") Long agenceId,
+            @Param("documentIds") Collection<Long> documentIds
+    );
 }

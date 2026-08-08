@@ -68,6 +68,20 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     anyOf: ["reglement-client:view", "reglement-client:create", "reglement-client:manage"],
   },
   {
+    matches: startsWith("/app/compta/bordereaux-compagnies"),
+    anyOf: [
+      "bordereau-compagnie:view",
+      "bordereau-compagnie:create",
+      "bordereau-compagnie:validate",
+      "bordereau-compagnie:transmit",
+      "bordereau-compagnie:reconcile",
+      "bordereau-compagnie:cancel",
+      "reglement-compagnie:view",
+      "reglement-compagnie:create",
+      "reglement-compagnie:manage",
+    ],
+  },
+  {
     matches: startsWith("/app/compta/tresorerie"),
     anyOf: ["tresorerie:view", "tresorerie:manage"],
   },
@@ -82,6 +96,8 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
       "reglement-client:manage",
       "tresorerie:view",
       "tresorerie:manage",
+      "bordereau-compagnie:view",
+      "reglement-compagnie:view",
     ],
   },
   {

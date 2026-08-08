@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { TableCell, TableRow } from "@/components/ui/table";
 
 type TableRowsSkeletonProps = {
   rows?: number;
@@ -8,10 +9,10 @@ type TableRowsSkeletonProps = {
 
 export function TableRowsSkeleton({ rows = 6, colSpan, cellClassName = "px-3 py-3" }: TableRowsSkeletonProps) {
   return Array.from({ length: rows }, (_, index) => (
-    <tr key={index} className="border-b" aria-hidden="true">
-      <td colSpan={colSpan} className={cellClassName}>
+    <TableRow key={index} aria-hidden="true">
+      <TableCell colSpan={colSpan} className={cellClassName}>
         <Skeleton className="h-9 w-full" />
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   ));
 }

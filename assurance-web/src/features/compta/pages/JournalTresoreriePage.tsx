@@ -6,6 +6,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
@@ -142,55 +143,53 @@ export default function JournalTresoreriePage() {
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[950px] text-sm">
-            <thead className="bg-orange-600 text-xs uppercase text-white">
-              <tr>
-                <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-left">Compte</th>
-                <th className="px-4 py-3 text-left">Libellé</th>
-                <th className="px-4 py-3 text-left">Référence</th>
-                <th className="px-4 py-3 text-right">Entrée</th>
-                <th className="px-4 py-3 text-right">Sortie</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+        <Table className="min-w-[950px]">
+            <TableHeader className="bg-orange-600 text-xs uppercase text-white">
+              <TableRow className="hover:bg-orange-600">
+                <TableHead className="px-4 text-white">Date</TableHead>
+                <TableHead className="px-4 text-white">Compte</TableHead>
+                <TableHead className="px-4 text-white">Libellé</TableHead>
+                <TableHead className="px-4 text-white">Référence</TableHead>
+                <TableHead className="px-4 text-right text-white">Entrée</TableHead>
+                <TableHead className="px-4 text-right text-white">Sortie</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {movements.isLoading ? (
                 <TableRowsSkeleton colSpan={6} rows={8} />
               ) : (movements.data?.rows ?? []).map((movement) => (
-                <tr key={movement.id} className="hover:bg-muted/30">
-                  <td className="px-4 py-3">{formatTreasuryDate(movement.dateOperation)}</td>
-                  <td className="px-4 py-3 font-semibold">{movement.compteTresorerie}</td>
-                  <td className="px-4 py-3">{movement.libelle}</td>
-                  <td className="px-4 py-3">{movement.reference || "-"}</td>
-                  <td className="px-4 py-3 text-right text-emerald-700">
+                <TableRow key={movement.id}>
+                  <TableCell className="px-4 py-3">{formatTreasuryDate(movement.dateOperation)}</TableCell>
+                  <TableCell className="px-4 py-3 font-semibold">{movement.compteTresorerie}</TableCell>
+                  <TableCell className="px-4 py-3">{movement.libelle}</TableCell>
+                  <TableCell className="px-4 py-3">{movement.reference || "-"}</TableCell>
+                  <TableCell className="px-4 py-3 text-right text-emerald-700">
                     {movement.sens === "ENTREE" ? (
                       <span className="inline-flex items-center gap-1">
                         <ArrowDownLeft className="size-4" />
                         {formatTreasuryMoney(movement.montant)}
                       </span>
                     ) : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right text-red-700">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right text-red-700">
                     {movement.sens === "SORTIE" ? (
                       <span className="inline-flex items-center gap-1">
                         <ArrowUpRight className="size-4" />
                         {formatTreasuryMoney(movement.montant)}
                       </span>
                     ) : "-"}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
               {!movements.isLoading && (movements.data?.rows.length ?? 0) === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun mouvement ne correspond aux filtres.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+        </Table>
         {movements.data && (
           <ServerPagination
             page={movements.data.page.number}

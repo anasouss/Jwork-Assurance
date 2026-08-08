@@ -50,6 +50,10 @@ public class MouvementTresorerie extends BaseEntity {
     @JoinColumn(name = "instrument_reglement_id")
     private InstrumentReglementClient instrumentReglement;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instrument_reglement_compagnie_id")
+    private InstrumentReglementCompagnie instrumentReglementCompagnie;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private NatureMouvementTresorerie nature;

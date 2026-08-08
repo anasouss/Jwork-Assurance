@@ -4,6 +4,7 @@ import com.assurance.dto.request.AnnulerReglementClientRequest;
 import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
+import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
@@ -91,6 +92,17 @@ public class ReglementClientController {
                         size
                 )
         ));
+    }
+
+    @PostMapping("/creances/selection")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<ApiResponse<List<CreanceClientPageResponse.Ligne>>> selectedReceivables(
+            @Valid @RequestBody SelectionCreancesClientRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.selectedReceivables(
+                TenantContext.getCurrentAgence(),
+                request
+        )));
     }
 
     @GetMapping

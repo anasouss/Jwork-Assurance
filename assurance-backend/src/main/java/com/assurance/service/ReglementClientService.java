@@ -4,6 +4,7 @@ import com.assurance.dto.request.AnnulerReglementClientRequest;
 import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
+import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
@@ -226,6 +227,67 @@ public class ReglementClientService {
     @Transactional(readOnly = true)
     public ReglementClientResponse detail(Long agenceId, Long paymentId) {
         return toResponse(findPayment(agenceId, paymentId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<CreanceClientPageResponse.Ligne> selectedReceivables(
+            Long agenceId,
+            SelectionCreancesClientRequest request
+    ) {
+        List<Long> elementIds = distinctIds(request.getElementFacturableIds());
+        List<Long> documentIds = distinctIds(request.getDocumentClientIds());
+        if (elementIds.isEmpty() && documentIds.isEmpty()) {
+            throw new BadRequestException("Sélectionnez au moins une créance");
+        }
+
+        List<SourceDocumentClientResponse> directSources = documentClientService
+                .findSourcesByIds(agenceId, elementIds);
+        if (directSources.stream().anyMatch(SourceDocumentClientResponse::isDejaFacturee)) {
+            throw new BadRequestException(
+                    "Une ou plusieurs créances figurent désormais sur une facture émise"
+            );
+        }
+        List<DocumentClient> documents = documentIds.isEmpty()
+                ? List.of()
+                : documentClientRepository.findIssuedInvoices(agenceId, documentIds);
+        if (documents.size() != documentIds.size()) {
+            throw new BadRequestException("Une ou plusieurs factures sont introuvables ou annulées");
+        }
+        Map<Long, DocumentClient> documentsById = documents.stream()
+                .collect(Collectors.toMap(DocumentClient::getId, Function.identity()));
+
+        Map<Long, AllocationAmounts> directAmounts = loadAllocationAmounts(elementIds);
+        Map<Long, AllocationAmounts> documentAmounts = loadDocumentAllocationAmounts(documentIds);
+        List<CreanceClientPageResponse.Ligne> rows = new ArrayList<>();
+        directSources.stream()
+                .map(source -> toReceivable(
+                        source,
+                        directAmounts.getOrDefault(
+                                source.getElementFacturableId(),
+                                AllocationAmounts.empty()
+                        )
+                ))
+                .forEach(rows::add);
+        documentIds.stream()
+                .map(documentsById::get)
+                .map(document -> toReceivable(
+                        toInvoiceSource(document),
+                        documentAmounts.getOrDefault(document.getId(), AllocationAmounts.empty())
+                ))
+                .forEach(rows::add);
+
+        if (rows.stream().anyMatch(row -> row.getSoldeOuvert().signum() <= 0)) {
+            throw new BadRequestException(
+                    "Une ou plusieurs créances ne présentent plus de solde disponible"
+            );
+        }
+        Set<String> payers = rows.stream()
+                .map(row -> row.getSource().getPayeurType() + ":" + row.getSource().getPayeurId())
+                .collect(Collectors.toSet());
+        if (payers.size() != 1) {
+            throw new BadRequestException("Les créances sélectionnées doivent appartenir au même payeur");
+        }
+        return rows;
     }
 
     @Transactional
@@ -1187,6 +1249,13 @@ public class ReglementClientService {
 
     private <T> BigDecimal sum(List<T> rows, Function<T, BigDecimal> extractor) {
         return rows.stream().map(extractor).map(this::money).reduce(ZERO, BigDecimal::add);
+    }
+
+    private List<Long> distinctIds(Collection<Long> ids) {
+        return ids == null ? List.of() : ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     private BigDecimal money(BigDecimal value) {

@@ -85,7 +85,12 @@ const groups: ComptaGroup[] = [
   {
     title: "Compagnie",
     actions: [
-      { title: "Bordereaux compagnies", icon: Building2, disabled: true },
+      {
+        title: "Bordereaux compagnies",
+        icon: Building2,
+        href: "/app/compta/bordereaux-compagnies",
+        permission: "bordereau-compagnie:view",
+      },
       { title: "Rapprochement compagnie", icon: FileCheck2, disabled: true },
       { title: "Balance compagnie", icon: Scale, disabled: true },
     ],

@@ -15,7 +15,15 @@ import type {
   CreateClientDocumentRequest,
   ClientPayment,
   ClientPaymentPage,
+  ClientReceivable,
   ClientReceivablePage,
+  CompanyBordereau,
+  CompanyBordereauBase,
+  CompanyBordereauPage,
+  CompanyBordereauSource,
+  CompanyBordereauStatus,
+  CompanyPayment,
+  CreateCompanyPaymentRequest,
   CreateClientPaymentRequest,
   ImportPreview,
   QuittanceAllocation,
@@ -31,6 +39,7 @@ import type {
   TreasuryAccount,
   TreasuryMovement,
   TreasuryMovementPage,
+  UpsertCompanyBordereauRequest,
   UpsertTreasuryAccountRequest,
 } from "./types";
 
@@ -358,6 +367,19 @@ export const comptaApi = {
     )));
   },
 
+  async selectedClientReceivables(request: {
+    elementFacturableIds: string[];
+    documentClientIds: string[];
+  }) {
+    return unwrap(await apiFetch<ApiResponse<ClientReceivable[]>>(
+      "/api/v1/compta/reglements-clients/creances/selection",
+      {
+        method: "POST",
+        body: JSON.stringify(request),
+      }
+    )).map(normalizeClientReceivable);
+  },
+
   async clientPayments(params: {
     dateDu?: string;
     dateAu?: string;
@@ -430,6 +452,149 @@ export const comptaApi = {
       `/api/v1/compta/reglements-clients/instruments/${id}/remplacement`,
       { method: "POST", body: JSON.stringify(request) }
     )));
+  },
+
+  async companyBordereauSources(params: {
+    compagnieId?: string;
+    base: CompanyBordereauBase;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+  }) {
+    return unwrap(await apiFetch<ApiResponse<CompanyBordereauSource[]>>(
+      `/api/v1/compta/bordereaux-compagnies/sources${buildQueryString(params)}`
+    )).map(normalizeCompanyBordereauSource);
+  },
+
+  async companyBordereaux(params: {
+    compagnieId?: string;
+    statut?: CompanyBordereauStatus;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    return normalizeCompanyBordereauPage(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereauPage>>(
+        `/api/v1/compta/bordereaux-compagnies${buildQueryString(params)}`
+      )
+    ));
+  },
+
+  async companyBordereau(id: string) {
+    return normalizeCompanyBordereau(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereau>>(
+        `/api/v1/compta/bordereaux-compagnies/${id}`
+      )
+    ));
+  },
+
+  async createCompanyBordereau(request: UpsertCompanyBordereauRequest) {
+    return normalizeCompanyBordereau(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereau>>(
+        "/api/v1/compta/bordereaux-compagnies",
+        { method: "POST", body: JSON.stringify(request) }
+      )
+    ));
+  },
+
+  async updateCompanyBordereau(id: string, request: UpsertCompanyBordereauRequest) {
+    return normalizeCompanyBordereau(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereau>>(
+        `/api/v1/compta/bordereaux-compagnies/${id}`,
+        { method: "PUT", body: JSON.stringify(request) }
+      )
+    ));
+  },
+
+  async validateCompanyBordereau(id: string) {
+    return normalizeCompanyBordereau(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereau>>(
+        `/api/v1/compta/bordereaux-compagnies/${id}/validation`,
+        { method: "POST" }
+      )
+    ));
+  },
+
+  async transmitCompanyBordereau(id: string, request: {
+    dateTransmission: string;
+    canalTransmission: string;
+    referenceTransmission?: string;
+  }) {
+    return normalizeCompanyBordereau(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereau>>(
+        `/api/v1/compta/bordereaux-compagnies/${id}/transmission`,
+        { method: "POST", body: JSON.stringify(request) }
+      )
+    ));
+  },
+
+  async reconcileCompanyBordereau(id: string, request: {
+    statut: "RAPPROCHE" | "AVEC_ECART";
+    ecart: number;
+    note?: string;
+    dateAccuseReception?: string;
+    referenceAccuseReception?: string;
+  }) {
+    return normalizeCompanyBordereau(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereau>>(
+        `/api/v1/compta/bordereaux-compagnies/${id}/rapprochement`,
+        { method: "POST", body: JSON.stringify(request) }
+      )
+    ));
+  },
+
+  async cancelCompanyBordereau(id: string, motif: string) {
+    return normalizeCompanyBordereau(unwrap(
+      await apiFetch<ApiResponse<CompanyBordereau>>(
+        `/api/v1/compta/bordereaux-compagnies/${id}/annulation`,
+        { method: "POST", body: JSON.stringify({ motif }) }
+      )
+    ));
+  },
+
+  async createCompanyPayment(request: CreateCompanyPaymentRequest) {
+    return normalizeCompanyPayment(unwrap(
+      await apiFetch<ApiResponse<CompanyPayment>>(
+        "/api/v1/compta/bordereaux-compagnies/reglements",
+        { method: "POST", body: JSON.stringify(request) }
+      )
+    ));
+  },
+
+  async companyPayment(id: string) {
+    return normalizeCompanyPayment(unwrap(
+      await apiFetch<ApiResponse<CompanyPayment>>(
+        `/api/v1/compta/bordereaux-compagnies/reglements/${id}`
+      )
+    ));
+  },
+
+  async changeCompanyPaymentInstrumentStatus(
+    id: string,
+    request: {
+      statut: "CONFIRME" | "REJETE";
+      compteTresorerieId?: string;
+      dateOperation?: string;
+      motif?: string;
+    }
+  ) {
+    return normalizeCompanyPayment(unwrap(
+      await apiFetch<ApiResponse<CompanyPayment>>(
+        `/api/v1/compta/bordereaux-compagnies/instruments/${id}/statut`,
+        { method: "PUT", body: JSON.stringify(request) }
+      )
+    ));
+  },
+
+  async cancelCompanyPayment(id: string, motif: string) {
+    return normalizeCompanyPayment(unwrap(
+      await apiFetch<ApiResponse<CompanyPayment>>(
+        `/api/v1/compta/bordereaux-compagnies/reglements/${id}/annulation`,
+        { method: "POST", body: JSON.stringify({ motif }) }
+      )
+    ));
   },
 
   async treasuryAccounts() {
@@ -541,25 +706,29 @@ function normalizeClientDocument(document: ClientDocument): ClientDocument {
 function normalizeClientReceivablePage(page: ClientReceivablePage): ClientReceivablePage {
   return {
     ...page,
-    rows: page.rows.map((row) => ({
-      ...row,
-      source: {
-        ...row.source,
-        elementFacturableId: row.source.elementFacturableId == null
-          ? null
-          : String(row.source.elementFacturableId),
-        documentClientId: row.source.documentClientId == null
-          ? null
-          : String(row.source.documentClientId),
-        quittanceId: row.source.quittanceId == null ? null : String(row.source.quittanceId),
-        contratId: row.source.contratId == null ? "" : String(row.source.contratId),
-        mouvementId: row.source.mouvementId == null ? null : String(row.source.mouvementId),
-        payeurId: String(row.source.payeurId),
-        souscripteurId: row.source.souscripteurId == null
-          ? null
-          : String(row.source.souscripteurId),
-      },
-    })),
+    rows: page.rows.map(normalizeClientReceivable),
+  };
+}
+
+function normalizeClientReceivable(row: ClientReceivable): ClientReceivable {
+  return {
+    ...row,
+    source: {
+      ...row.source,
+      elementFacturableId: row.source.elementFacturableId == null
+        ? null
+        : String(row.source.elementFacturableId),
+      documentClientId: row.source.documentClientId == null
+        ? null
+        : String(row.source.documentClientId),
+      quittanceId: row.source.quittanceId == null ? null : String(row.source.quittanceId),
+      contratId: row.source.contratId == null ? "" : String(row.source.contratId),
+      mouvementId: row.source.mouvementId == null ? null : String(row.source.mouvementId),
+      payeurId: String(row.source.payeurId),
+      souscripteurId: row.source.souscripteurId == null
+        ? null
+        : String(row.source.souscripteurId),
+    },
   };
 }
 
@@ -616,5 +785,70 @@ function normalizeTreasuryMovement(movement: TreasuryMovement): TreasuryMovement
     instrumentReglementId: movement.instrumentReglementId == null
       ? null
       : String(movement.instrumentReglementId),
+    instrumentReglementCompagnieId: movement.instrumentReglementCompagnieId == null
+      ? null
+      : String(movement.instrumentReglementCompagnieId),
+  };
+}
+
+function normalizeCompanyBordereauSource(
+  source: CompanyBordereauSource
+): CompanyBordereauSource {
+  return {
+    ...source,
+    id: String(source.id),
+    compagnieId: String(source.compagnieId),
+    quittanceId: String(source.quittanceId),
+  };
+}
+
+function normalizeCompanyBordereauPage(
+  page: CompanyBordereauPage
+): CompanyBordereauPage {
+  return {
+    ...page,
+    rows: page.rows.map(normalizeCompanyBordereau),
+  };
+}
+
+function normalizeCompanyBordereau(
+  bordereau: CompanyBordereau
+): CompanyBordereau {
+  return {
+    ...bordereau,
+    id: String(bordereau.id),
+    compagnieId: String(bordereau.compagnieId),
+    lignes: (bordereau.lignes ?? []).map((line) => ({
+      ...line,
+      id: String(line.id),
+      affectationId: String(line.affectationId),
+    })),
+    reglements: (bordereau.reglements ?? []).map((payment) => ({
+      ...payment,
+      reglementId: String(payment.reglementId),
+      instrumentId: String(payment.instrumentId),
+      compteTresorerieId: payment.compteTresorerieId == null
+        ? null
+        : String(payment.compteTresorerieId),
+    })),
+  };
+}
+
+function normalizeCompanyPayment(payment: CompanyPayment): CompanyPayment {
+  return {
+    ...payment,
+    id: String(payment.id),
+    compagnieId: String(payment.compagnieId),
+    instruments: payment.instruments.map((instrument) => ({
+      ...instrument,
+      id: String(instrument.id),
+      compteTresorerieId: instrument.compteTresorerieId == null
+        ? null
+        : String(instrument.compteTresorerieId),
+      affectations: instrument.affectations.map((allocation) => ({
+        ...allocation,
+        bordereauId: String(allocation.bordereauId),
+      })),
+    })),
   };
 }

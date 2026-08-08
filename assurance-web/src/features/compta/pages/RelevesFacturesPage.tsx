@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,7 +26,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
+import {
+  AutocompleteSelect,
+  type AutocompleteOption,
+} from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,10 +54,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
-import type { ClientResponse, GroupeClient } from "@/features/production/types";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { RelevePdfOptionsDialog } from "../components/RelevePdfOptionsDialog";
+import {
+  usePayerSearch,
+  type PayerSelection,
+} from "../components/use-payer-search";
 import {
   DOCUMENT_DEFAULTS,
   SOURCE_DEFAULTS,
@@ -71,17 +77,7 @@ import type {
   ReferenceOption,
 } from "../types";
 
-type SelectedPayer = {
-  type: "CLIENT" | "GROUPE";
-  id: string;
-  name: string;
-  identifier: string;
-  groupName?: string;
-  treasuryName?: string;
-  memberCount?: number;
-};
-
-type PayerScope = "ALL" | SelectedPayer["type"];
+type PayerScope = "ALL" | PayerSelection["type"];
 
 const PAGE_SIZE = 25;
 
@@ -101,31 +97,17 @@ export default function RelevesFacturesPage() {
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
   const [deleteTarget, setDeleteTarget] = useState<ClientDocument>();
   const payerScope = urlState.payerScope;
-  const [payerSearch, setPayerSearch] = useState("");
-  const deferredPayerSearch = useDeferredValue(payerSearch.trim());
-  const [selectedPayer, setSelectedPayer] = useState<SelectedPayer>();
+  const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
+  const payerSearch = usePayerSearch(
+    payerScope === "ALL" ? undefined : payerScope,
+    selectedPayer
+  );
 
   useEffect(() => {
     setSourceFilters(urlState.sourceFilters);
     setDocumentFilters(urlState.documentFilters);
   }, [urlState]);
 
-  const clients = useQuery({
-    queryKey: ["compta", "document-payers", "clients", deferredPayerSearch],
-    queryFn: () => clientApi.listClients({
-      query: deferredPayerSearch || undefined,
-      page: 0,
-      size: 30,
-    }),
-    enabled: payerScope === "CLIENT",
-    staleTime: 30_000,
-  });
-  const groups = useQuery({
-    queryKey: ["groupes-clients"],
-    queryFn: clientApi.listGroupesClients,
-    enabled: payerScope === "GROUPE",
-    staleTime: 60_000,
-  });
   const requestedClient = useQuery({
     queryKey: ["crm-client", requestedPayerId],
     queryFn: () => clientApi.getClientCrm(requestedPayerId),
@@ -179,7 +161,7 @@ export default function RelevesFacturesPage() {
     setSearchParams(releveSearchParams({ ...urlState, ...patch }), { replace: true });
   }
 
-  function changePayer(payer?: SelectedPayer, scope: PayerScope = payer?.type ?? payerScope) {
+  function changePayer(payer?: PayerSelection, scope: PayerScope = payer?.type ?? payerScope) {
     setSelectedPayer(payer);
     setSelected({});
     updateUrl({
@@ -209,7 +191,7 @@ export default function RelevesFacturesPage() {
       return;
     }
     if (requestedPayerType === "GROUPE") {
-      const group = groups.data?.find((item) => item.id === requestedPayerId);
+      const group = payerSearch.groups.find((item) => item.id === requestedPayerId);
       if (!group) return;
       setSelectedPayer({
         type: "GROUPE",
@@ -220,7 +202,14 @@ export default function RelevesFacturesPage() {
         memberCount: group.membres.length,
       });
     }
-  }, [groups.data, requestedClient.data, requestedPayerId, requestedPayerType, selectedPayer?.id, urlState.payerScope]);
+  }, [
+    payerSearch.groups,
+    requestedClient.data,
+    requestedPayerId,
+    requestedPayerType,
+    selectedPayer?.id,
+    selectedPayer?.type,
+  ]);
 
   const selectedRows = useMemo(() => Object.values(selected), [selected]);
   const selectedPayerKey = selectedRows.length
@@ -294,15 +283,14 @@ export default function RelevesFacturesPage() {
       <PayerAccountSelector
         mode={payerScope}
         selected={selectedPayer}
-        clients={clients.data?.items ?? []}
-        groups={groups.data ?? []}
-        loading={clients.isFetching || groups.isFetching}
-        onQueryChange={setPayerSearch}
+        options={payerSearch.options}
+        loading={payerSearch.loading}
+        onQueryChange={payerSearch.setQuery}
         onModeChange={(mode) => {
-          setPayerSearch("");
+          payerSearch.clearQuery();
           changePayer(undefined, mode);
         }}
-        onSelect={changePayer}
+        onSelect={(value) => changePayer(payerSearch.resolve(value))}
       />
 
       <Tabs
@@ -513,81 +501,13 @@ function OperationSelector(props: {
 
 function PayerAccountSelector(props: {
   mode: PayerScope;
-  selected?: SelectedPayer;
-  clients: ClientResponse[];
-  groups: GroupeClient[];
+  selected?: PayerSelection;
+  options: AutocompleteOption[];
   loading: boolean;
   onModeChange: (mode: PayerScope) => void;
   onQueryChange: (query: string) => void;
-  onSelect: (payer?: SelectedPayer) => void;
+  onSelect: (value: string) => void;
 }) {
-  const clientOptions = useMemo(() => {
-    const options = props.clients.map((client) => {
-      const identifier = client.codeClient || client.rc || client.cin || client.ice || "";
-      return {
-        value: client.id,
-        label: [client.nomAffichage || "Client", identifier].filter(Boolean).join(" · "),
-        keywords: [client.codeClient, client.rc, client.cin, client.ice, client.email].filter(Boolean).join(" "),
-      };
-    });
-    if (props.selected?.type === "CLIENT" && !options.some((option) => option.value === props.selected?.id)) {
-      options.unshift({
-        value: props.selected.id,
-        label: [props.selected.name, props.selected.identifier].filter(Boolean).join(" · "),
-        keywords: props.selected.identifier,
-      });
-    }
-    return options;
-  }, [props.clients, props.selected]);
-
-  const groupOptions = useMemo(() => {
-    const options = props.groups.map((group) => ({
-      value: group.id,
-      label: `${group.code} · ${group.libelle}`,
-      keywords: [group.clientTeteNom, group.clientTresorerieNom, ...group.membres.map((member) => member.clientNom)]
-        .filter(Boolean)
-        .join(" "),
-    }));
-    if (props.selected?.type === "GROUPE" && !options.some((option) => option.value === props.selected?.id)) {
-      options.unshift({
-        value: props.selected.id,
-        label: [props.selected.identifier, props.selected.name].filter(Boolean).join(" · "),
-        keywords: props.selected.treasuryName ?? "",
-      });
-    }
-    return options;
-  }, [props.groups, props.selected]);
-
-  function select(value: string) {
-    if (!value) {
-      props.onSelect();
-      return;
-    }
-    if (props.mode === "ALL") return;
-    if (props.mode === "CLIENT") {
-      const client = props.clients.find((item) => item.id === value);
-      if (!client) return;
-      props.onSelect({
-        type: "CLIENT",
-        id: client.id,
-        name: client.nomAffichage || "Client",
-        identifier: client.codeClient || client.rc || client.cin || client.ice || "",
-        groupName: client.groupe?.libelle || undefined,
-      });
-      return;
-    }
-    const group = props.groups.find((item) => item.id === value);
-    if (!group) return;
-    props.onSelect({
-      type: "GROUPE",
-      id: group.id,
-      name: group.libelle,
-      identifier: group.code,
-      treasuryName: group.clientTresorerieNom || undefined,
-      memberCount: group.membres.length,
-    });
-  }
-
   const Icon = props.mode === "GROUPE" ? Building2 : Users;
   return (
     <section className="overflow-visible rounded-md border bg-card">
@@ -617,9 +537,9 @@ function PayerAccountSelector(props: {
         ) : (
           <FilterField label={props.mode === "CLIENT" ? "Rechercher un client" : "Rechercher un groupe"}>
             <AutocompleteSelect
-              options={props.mode === "CLIENT" ? clientOptions : groupOptions}
+              options={props.options}
               value={props.selected?.type === props.mode ? props.selected.id : ""}
-              onValueChange={select}
+              onValueChange={props.onSelect}
               onQueryChange={props.mode === "CLIENT" ? props.onQueryChange : undefined}
               placeholder={props.mode === "CLIENT" ? "Nom, RC, CIN, ICE ou code" : "Code, groupe ou membre"}
               emptyText={props.loading ? "Chargement..." : "Aucun résultat"}

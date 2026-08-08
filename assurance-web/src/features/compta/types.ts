@@ -519,7 +519,15 @@ export type TreasuryMovement = {
   compteTresorerieId: string;
   compteTresorerie: string;
   instrumentReglementId?: string | null;
-  nature: "REGLEMENT_CLIENT" | "REJET_INSTRUMENT" | "REMISE_BANQUE" | "TRANSFERT" | "AJUSTEMENT";
+  instrumentReglementCompagnieId?: string | null;
+  nature:
+    | "REGLEMENT_CLIENT"
+    | "REJET_INSTRUMENT"
+    | "REMISE_BANQUE"
+    | "TRANSFERT"
+    | "AJUSTEMENT"
+    | "REGLEMENT_COMPAGNIE"
+    | "ANNULATION_REGLEMENT_COMPAGNIE";
   sens: "ENTREE" | "SORTIE";
   dateOperation: string;
   dateValeur?: string | null;
@@ -531,4 +539,168 @@ export type TreasuryMovement = {
 export type TreasuryMovementPage = {
   page: PageInfo;
   rows: TreasuryMovement[];
+};
+
+export type CompanyBordereauBase = "EMISSION" | "ENCAISSEMENT";
+export type CompanyBordereauStatus = "BROUILLON" | "VALIDE" | "TRANSMIS" | "ANNULE";
+export type CompanyReconciliationStatus = "A_RAPPROCHER" | "AVEC_ECART" | "RAPPROCHE";
+export type CompanyPaymentMode = "VIREMENT" | "CHEQUE" | "EFFET" | "COMPENSATION";
+export type CompanyPaymentStatus = "VALIDE" | "ANNULE";
+
+export type CompanyBordereauSource = {
+  id: string;
+  compagnieId: string;
+  compagnie: string;
+  quittanceId: string;
+  numeroQuittanceCompagnie?: string | null;
+  numeroPolice?: string | null;
+  numeroDossier?: string | null;
+  mouvement?: string | null;
+  dateEffet: string;
+  dateEcheance?: string | null;
+  primeNette: number;
+  montantTaxes: number;
+  accessoires: number;
+  montantTtc: number;
+  commissionNette: number;
+  montantRetenue: number;
+  netCompagnie: number;
+  encaissementConfirme: boolean;
+};
+
+export type CompanyBordereauLine = Omit<CompanyBordereauSource, "id" | "compagnieId" | "compagnie" | "quittanceId" | "encaissementConfirme"> & {
+  id: string;
+  affectationId: string;
+  ordre: number;
+};
+
+export type CompanyBordereauPaymentSummary = {
+  reglementId: string;
+  numeroReglement: string;
+  instrumentId: string;
+  mode: CompanyPaymentMode;
+  statut: PaymentInstrumentStatus;
+  montant: number;
+  montantAffecte: number;
+  dateInstrument: string;
+  dateEcheance?: string | null;
+  referenceInstrument?: string | null;
+  compteTresorerieId?: string | null;
+  compteTresorerie?: string | null;
+};
+
+export type CompanyBordereau = {
+  id: string;
+  numero: string;
+  compagnieId: string;
+  compagnie: string;
+  baseBordereau: CompanyBordereauBase;
+  statut: CompanyBordereauStatus;
+  statutRapprochement: CompanyReconciliationStatus;
+  statutReglement: "NON_REGLE" | "EN_ATTENTE" | "PARTIELLEMENT_REGLE" | "REGLE" | "ANNULE";
+  periodeDebut: string;
+  periodeFin: string;
+  dateValidation?: string | null;
+  dateTransmission?: string | null;
+  canalTransmission?: string | null;
+  referenceTransmission?: string | null;
+  dateAccuseReception?: string | null;
+  referenceAccuseReception?: string | null;
+  primeNette: number;
+  montantTaxes: number;
+  accessoires: number;
+  montantTtc: number;
+  commissionNette: number;
+  montantRetenue: number;
+  netCompagnie: number;
+  montantRegle: number;
+  montantEnAttente: number;
+  soldeRestant: number;
+  ecartRapprochement: number;
+  noteRapprochement?: string | null;
+  notes?: string | null;
+  creePar: string;
+  validePar?: string | null;
+  dateAnnulation?: string | null;
+  motifAnnulation?: string | null;
+  lignes: CompanyBordereauLine[];
+  reglements: CompanyBordereauPaymentSummary[];
+};
+
+export type CompanyBordereauPage = {
+  summary: {
+    total: number;
+    netCompagnie: number;
+    montantRegle: number;
+    soldeRestant: number;
+  };
+  page: PageInfo;
+  rows: CompanyBordereau[];
+};
+
+export type UpsertCompanyBordereauRequest = {
+  compagnieId?: string;
+  baseBordereau?: CompanyBordereauBase;
+  periodeDebut: string;
+  periodeFin: string;
+  notes?: string;
+  affectationIds: string[];
+};
+
+export type CompanyPaymentAllocation = {
+  bordereauId: string;
+  numeroBordereau: string;
+  montant: number;
+  statut: string;
+};
+
+export type CompanyPaymentInstrument = {
+  id: string;
+  mode: CompanyPaymentMode;
+  statut: PaymentInstrumentStatus;
+  montant: number;
+  dateInstrument: string;
+  dateEcheance?: string | null;
+  dateStatut?: string | null;
+  referenceInstrument?: string | null;
+  banqueBeneficiaire?: string | null;
+  motifStatut?: string | null;
+  compteTresorerieId?: string | null;
+  compteTresorerie?: string | null;
+  affectations: CompanyPaymentAllocation[];
+};
+
+export type CompanyPayment = {
+  id: string;
+  numero: string;
+  compagnieId: string;
+  compagnie: string;
+  dateReglement: string;
+  statut: CompanyPaymentStatus;
+  montantTotal: number;
+  montantNonAffecte: number;
+  notes?: string | null;
+  creePar: string;
+  dateAnnulation?: string | null;
+  motifAnnulation?: string | null;
+  instruments: CompanyPaymentInstrument[];
+};
+
+export type CreateCompanyPaymentRequest = {
+  compagnieId: string;
+  dateReglement: string;
+  notes?: string;
+  instruments: Array<{
+    mode: CompanyPaymentMode;
+    montant: number;
+    dateInstrument: string;
+    dateEcheance?: string;
+    referenceInstrument?: string;
+    banqueBeneficiaire?: string;
+    compteTresorerieId?: string;
+    affectations: Array<{
+      bordereauId: string;
+      montant: number;
+    }>;
+  }>;
 };

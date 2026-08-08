@@ -140,6 +140,51 @@ public class DocumentClientService {
     }
 
     @Transactional(readOnly = true)
+    public List<SourceDocumentClientResponse> findSourcesByIds(
+            Long agenceId,
+            Collection<Long> requestedIds
+    ) {
+        List<Long> ids = requestedIds == null
+                ? List.of()
+                : requestedIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        List<ElementFacturable> elements = elementFacturableRepository
+                .findClientDocumentSources(agenceId, ids);
+        if (elements.size() != ids.size()) {
+            throw new BadRequestException("Une ou plusieurs créances sont introuvables ou annulées");
+        }
+
+        Map<Long, Quittance> quittances = loadQuittancesByElement(ids);
+        Map<Long, AssistanceContrat> assistances = loadAssistancesByElement(ids);
+        Map<Long, Client> subscribers = loadSubscribersFromContracts(elements.stream()
+                .map(ElementFacturable::getContrat)
+                .toList());
+        Set<Long> alreadyInvoiced = new HashSet<>(
+                ligneDocumentClientRepository.findElementFacturableIdsAlreadyIssued(
+                        ids,
+                        TypeDocumentClient.FACTURE,
+                        StatutDocumentClient.EMIS
+                )
+        );
+        Map<Long, SourceDocumentClientResponse> byId = elements.stream()
+                .map(element -> resolveSource(element, quittances, assistances))
+                .map(source -> toSourceResponse(
+                        source,
+                        resolvePayer(source.element().getContrat(), subscribers),
+                        subscribers.get(source.element().getContrat().getId()),
+                        alreadyInvoiced
+                ))
+                .collect(Collectors.toMap(
+                        SourceDocumentClientResponse::getElementFacturableId,
+                        source -> source
+                ));
+        return ids.stream().map(byId::get).toList();
+    }
+
+    @Transactional(readOnly = true)
     public DocumentClientPageResponse searchDocuments(
             Long agenceId,
             String payeurType,

@@ -15,6 +15,7 @@ public class MouvementTresorerieResponse {
     private Long compteTresorerieId;
     private String compteTresorerie;
     private Long instrumentReglementId;
+    private Long instrumentReglementCompagnieId;
     private NatureMouvementTresorerie nature;
     private SensMouvementTresorerie sens;
     private LocalDate dateOperation;

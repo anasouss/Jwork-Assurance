@@ -158,8 +158,32 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/ReglementsClientsPage")),
       },
       {
+        path: "compta/reglements/nouveau",
+        lazy: lazyRoute(() => import("@/features/compta/pages/NouveauReglementClientPage")),
+      },
+      {
         path: "compta/reglements/historique",
         lazy: lazyRoute(() => import("@/features/compta/pages/ReglementsEnregistresPage")),
+      },
+      {
+        path: "compta/bordereaux-compagnies",
+        lazy: lazyRoute(() => import("@/features/compta/pages/BordereauxCompagniesPage")),
+      },
+      {
+        path: "compta/bordereaux-compagnies/nouveau",
+        lazy: lazyRoute(() => import("@/features/compta/pages/BordereauCompagnieFormPage")),
+      },
+      {
+        path: "compta/bordereaux-compagnies/reglement",
+        lazy: lazyRoute(() => import("@/features/compta/pages/NouveauReglementCompagniePage")),
+      },
+      {
+        path: "compta/bordereaux-compagnies/:bordereauId/modifier",
+        lazy: lazyRoute(() => import("@/features/compta/pages/BordereauCompagnieFormPage")),
+      },
+      {
+        path: "compta/bordereaux-compagnies/:bordereauId",
+        lazy: lazyRoute(() => import("@/features/compta/pages/BordereauCompagnieDetailPage")),
       },
       {
         path: "compta/tresorerie",

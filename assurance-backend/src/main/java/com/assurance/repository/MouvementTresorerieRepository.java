@@ -15,17 +15,29 @@ import java.util.Optional;
 
 public interface MouvementTresorerieRepository extends JpaRepository<MouvementTresorerie, Long> {
 
-    @EntityGraph(attributePaths = {"compteTresorerie", "instrumentReglement", "instrumentReglement.reglement"})
+    @EntityGraph(attributePaths = {
+            "compteTresorerie",
+            "instrumentReglement",
+            "instrumentReglement.reglement",
+            "instrumentReglementCompagnie",
+            "instrumentReglementCompagnie.reglement"
+    })
     List<MouvementTresorerie> findByAgenceIdOrderByDateOperationDescIdDesc(Long agenceId);
 
     @EntityGraph(attributePaths = {
             "compteTresorerie",
             "instrumentReglement",
-            "instrumentReglement.reglement"
+            "instrumentReglement.reglement",
+            "instrumentReglementCompagnie",
+            "instrumentReglementCompagnie.reglement"
     })
     @Query("""
             select m
             from MouvementTresorerie m
+            left join m.instrumentReglement instrumentClient
+            left join instrumentClient.reglement reglementClient
+            left join m.instrumentReglementCompagnie instrumentCompagnie
+            left join instrumentCompagnie.reglement reglementCompagnie
             where m.agence.id = :agenceId
               and (:compteId is null or m.compteTresorerie.id = :compteId)
               and (:dateDu is null or m.dateOperation >= :dateDu)
@@ -35,7 +47,8 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
                     or lower(m.libelle) like concat('%', :search, '%')
                     or lower(coalesce(m.reference, '')) like concat('%', :search, '%')
                     or lower(m.compteTresorerie.libelle) like concat('%', :search, '%')
-                    or lower(coalesce(m.instrumentReglement.reglement.numero, '')) like concat('%', :search, '%')
+                    or lower(coalesce(reglementClient.numero, '')) like concat('%', :search, '%')
+                    or lower(coalesce(reglementCompagnie.numero, '')) like concat('%', :search, '%')
               )
             order by m.dateOperation desc, m.id desc
             """)
@@ -50,7 +63,15 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
 
     boolean existsByInstrumentReglementIdAndMouvementExtourneIdIsNull(Long instrumentId);
 
+    boolean existsByInstrumentReglementCompagnieIdAndMouvementExtourneIdIsNull(Long instrumentId);
+
     Optional<MouvementTresorerie> findFirstByAgenceIdAndInstrumentReglementIdAndNatureOrderByIdDesc(
+            Long agenceId,
+            Long instrumentId,
+            com.assurance.enums.NatureMouvementTresorerie nature
+    );
+
+    Optional<MouvementTresorerie> findFirstByAgenceIdAndInstrumentReglementCompagnieIdAndNatureOrderByIdDesc(
             Long agenceId,
             Long instrumentId,
             com.assurance.enums.NatureMouvementTresorerie nature

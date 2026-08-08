@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { downloadBlob } from "@/lib/download";
@@ -394,7 +395,7 @@ function EcheanceTableRow({
       <td className="px-3 py-2 align-middle font-semibold">{text(row.typeContratLabel)}</td>
       <td className="px-3 py-2 align-middle">{text(row.compagnie)}</td>
       <td className="px-3 py-2 align-middle">{text(row.telephone)}</td>
-      <td className="max-w-72 px-3 py-2 align-middle">
+      <td className="w-48 px-3 py-2 align-middle">
         <ObservationStatus row={row} />
       </td>
       <td className="px-3 py-2 align-middle">
@@ -436,8 +437,13 @@ function EcheanceTableRow({
 
 function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
   const message = text(row.observation);
+  const normalizedMessage = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
   const level = row.observationNiveau
-    ?? (message !== "-" && message !== "À jour" ? "BLOQUANT" : "AUCUNE");
+    ?? (message !== "-" && normalizedMessage !== "a jour" ? "BLOQUANT" : "AUCUNE");
 
   if (level === "AUCUNE") {
     return (
@@ -448,18 +454,55 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
     );
   }
 
+  const alerts = message
+    .split("·")
+    .map((alert) => alert.trim())
+    .filter(Boolean);
+  const blocking = level === "BLOQUANT";
+  const compactLabel = blocking
+    ? `${alerts.length} alerte${alerts.length > 1 ? "s" : ""}`
+    : `${alerts.length} point${alerts.length > 1 ? "s" : ""} à vérifier`;
+
   return (
-    <span
-      className={cn(
-        "inline-flex items-start gap-1.5 text-xs font-semibold leading-5",
-        level === "BLOQUANT"
-          ? "text-red-700 dark:text-red-300"
-          : "text-amber-700 dark:text-amber-300"
-      )}
-    >
-      <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-      {message}
-    </span>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-semibold",
+            blocking
+              ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300"
+              : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300"
+          )}
+          aria-label={`${compactLabel}. Afficher le détail`}
+        >
+          <TriangleAlert className="size-3.5 shrink-0" />
+          {compactLabel}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div
+          className={cn(
+            "flex items-center gap-2 border-b px-4 py-3 text-sm font-semibold",
+            blocking ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"
+          )}
+        >
+          <TriangleAlert className="size-4" />
+          {blocking ? "Documents expirés" : "Documents à vérifier"}
+        </div>
+        <ul className="grid gap-2 p-4 text-sm">
+          {alerts.map((alert, index) => (
+            <li key={`${index}-${alert}`} className="flex gap-2 leading-5">
+              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-current" />
+              <span>{alert}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="border-t px-4 py-2 text-xs text-muted-foreground">
+          Échéance du contrat : {formatDate(row.dateEcheance)}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

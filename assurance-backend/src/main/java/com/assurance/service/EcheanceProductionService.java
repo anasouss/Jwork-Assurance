@@ -101,7 +101,7 @@ public class EcheanceProductionService {
                 "Contrat",
                 "Compagnie",
                 "Telephone",
-                "Observation"
+                "Alertes documents"
         ), true);
         int page = 0;
         Page<Long> idsPage;

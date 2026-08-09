@@ -72,6 +72,7 @@ public class SinistreController {
     @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
     public ResponseEntity<ApiResponse<PagedResponse<SinistreSummaryResponse>>> list(
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) Long clientId,
             @RequestParam(required = false) StatutSinistre statut,
             @RequestParam(required = false) NatureSinistre nature,
             @RequestParam(required = false) LocalDate dateDu,
@@ -82,6 +83,7 @@ public class SinistreController {
         return ResponseEntity.ok(ApiResponse.success(sinistreService.list(
                 TenantContext.getCurrentAgence(),
                 query,
+                clientId,
                 statut,
                 nature,
                 dateDu,

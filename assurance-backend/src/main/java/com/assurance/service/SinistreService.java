@@ -129,6 +129,7 @@ public class SinistreService {
     public PagedResponse<SinistreSummaryResponse> list(
             Long agenceId,
             String query,
+            Long clientId,
             StatutSinistre statut,
             com.assurance.enums.NatureSinistre nature,
             LocalDate dateDu,
@@ -139,7 +140,7 @@ public class SinistreService {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Page<Sinistre> result = sinistreRepository.findAll(
-                specification(agenceId, query, statut, nature, dateDu, dateAu),
+                specification(agenceId, query, clientId, statut, nature, dateDu, dateAu),
                 PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"))
         );
         return PagedResponse.<SinistreSummaryResponse>builder()
@@ -341,6 +342,7 @@ public class SinistreService {
     private Specification<Sinistre> specification(
             Long agenceId,
             String query,
+            Long clientId,
             StatutSinistre statut,
             com.assurance.enums.NatureSinistre nature,
             LocalDate dateDu,
@@ -349,6 +351,9 @@ public class SinistreService {
         return (root, criteriaQuery, builder) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
             predicates.add(builder.equal(root.get("agence").get("id"), agenceId));
+            if (clientId != null) {
+                predicates.add(builder.equal(root.get("client").get("id"), clientId));
+            }
             if (statut != null) {
                 predicates.add(builder.equal(root.get("statut"), statut));
             }

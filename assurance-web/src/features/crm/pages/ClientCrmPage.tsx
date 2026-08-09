@@ -42,6 +42,8 @@ import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "@/features/compta/api";
 import type { ClientDocument } from "@/features/compta/types";
+import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
+import { natureLabels, statusLabels } from "@/features/sinistre/format";
 import type {
   ClientInput,
   ClientPage,
@@ -553,6 +555,12 @@ function ClientDetail({
   canManageClients: boolean;
 }) {
   const client = detail.client;
+  const canViewClaims = useAuthStore((state) => {
+    const permissions = state.user?.permissions ?? [];
+    return ["sinistre:view", "sinistre:manage", "sinistre:finance"].some(
+      (permission) => permissions.includes(permission),
+    );
+  });
   const documentsQuery = useQuery({
     queryKey: ["crm", "client-documents", client.id],
     queryFn: () => comptaApi.searchClientDocuments({
@@ -572,6 +580,12 @@ function ClientDetail({
       size: 8,
     }),
     enabled: activeTab === "accounting",
+  });
+  const claimsRequest = { clientId: client.id, page: 0, size: 25 };
+  const claimsQuery = useQuery({
+    queryKey: sinistreKeys.list(claimsRequest),
+    queryFn: () => sinistreApi.list(claimsRequest),
+    enabled: activeTab === "claims" && canViewClaims,
   });
   const movements = detail.contrats.flatMap((contract) => contract.mouvements);
   const groupMembers = uniqueGroupMembers(detail.groupes, client.id);
@@ -619,7 +633,7 @@ function ClientDetail({
             <TabsTrigger value="contracts" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-950 dark:data-[state=active]:bg-emerald-900/50 dark:data-[state=active]:text-emerald-100"><FolderOpen className="size-4" />Contrats</TabsTrigger>
             <TabsTrigger value="documents" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950 dark:data-[state=active]:bg-amber-900/50 dark:data-[state=active]:text-amber-100"><FileText className="size-4" />Documents</TabsTrigger>
             <TabsTrigger value="accounting" className="data-[state=active]:bg-cyan-100 data-[state=active]:text-cyan-950 dark:data-[state=active]:bg-cyan-900/50 dark:data-[state=active]:text-cyan-100"><CircleDollarSign className="size-4" />Comptabilité</TabsTrigger>
-            <TabsTrigger value="claims" className="data-[state=active]:bg-slate-200 data-[state=active]:text-slate-950 dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-slate-100"><ShieldCheck className="size-4" />Sinistres <Badge variant="secondary" className="ml-1">À venir</Badge></TabsTrigger>
+            <TabsTrigger value="claims" className="data-[state=active]:bg-red-100 data-[state=active]:text-red-950 dark:data-[state=active]:bg-red-900/40 dark:data-[state=active]:text-red-100"><ShieldCheck className="size-4" />Sinistres</TabsTrigger>
           </TabsList>
         </div>
 
@@ -712,9 +726,56 @@ function ClientDetail({
         </TabsContent>
 
         <TabsContent value="claims" className="m-0 p-5">
-          <div className="grid min-h-64 place-items-center rounded-md border border-dashed bg-muted/20 p-8 text-center">
-            <div className="max-w-md"><ShieldCheck className="mx-auto size-9 text-muted-foreground" /><h3 className="mt-3 font-semibold">Espace sinistres à venir</h3><p className="mt-1 text-sm text-muted-foreground">Les déclarations, dossiers sinistres et indemnisations seront reliés à ce portefeuille lorsque le module Sinistres sera disponible.</p></div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-semibold">Dossiers sinistre</h3>
+              <p className="text-sm text-muted-foreground">
+                Déclarations et suivi financier de ce client assuré.
+              </p>
+            </div>
+            {canViewClaims ? (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/app/sinistre/dossiers">
+                  Ouvrir le module Sinistres
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            ) : null}
           </div>
+          {!canViewClaims ? (
+            <EmptyState text="Vous n’avez pas l’autorisation de consulter les dossiers sinistre." />
+          ) : claimsQuery.isLoading ? (
+            <div className="grid gap-2">
+              {Array.from({ length: 3 }, (_, index) => (
+                <Skeleton key={index} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : claimsQuery.data?.items.length ? (
+            <div className="divide-y rounded-md border">
+              {claimsQuery.data.items.map((claim) => (
+                <Link
+                  key={claim.id}
+                  to={`/app/sinistre/dossiers/${claim.id}`}
+                  className="grid gap-2 p-3 hover:bg-muted/50 sm:grid-cols-[minmax(180px,1fr)_160px_150px_150px_auto] sm:items-center"
+                >
+                  <div>
+                    <p className="font-medium">{claim.numeroSinistre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {claim.numeroPolice || claim.numeroDossier || "Sans police"}
+                    </p>
+                  </div>
+                  <span className="text-sm">{natureLabels[claim.nature]}</span>
+                  <span className="text-sm">{dateLabel(claim.dateSinistre)}</span>
+                  <Badge variant="outline">{statusLabels[claim.statut]}</Badge>
+                  <span className="text-right text-sm font-medium">
+                    {money(claim.totalRegle)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyState text="Aucun dossier sinistre n’est rattaché à ce client." />
+          )}
         </TabsContent>
       </Tabs>
     </section>

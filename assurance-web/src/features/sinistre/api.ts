@@ -44,6 +44,7 @@ export const sinistreApi = {
 
   async list(params: {
     query?: string;
+    clientId?: string;
     statut?: StatutSinistre;
     nature?: NatureSinistre;
     dateDu?: string;

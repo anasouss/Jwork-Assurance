@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, Landmark, Plus, Power, PowerOff, Users, WalletCards } from "lucide-react";
+import {
+  Edit3,
+  Landmark,
+  Plus,
+  Power,
+  PowerOff,
+  Users,
+  WalletCards,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -39,6 +48,7 @@ import type {
 import { formatTreasuryMoney } from "./treasury-format";
 
 export default function TresorerieComptesPage() {
+  const navigate = useNavigate();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
   const queryClient = useQueryClient();
@@ -196,7 +206,19 @@ export default function TresorerieComptesPage() {
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {(accounts.data ?? []).map((account) => (
-          <article key={account.id} className="rounded-md border bg-card p-4">
+          <article
+            key={account.id}
+            role="link"
+            tabIndex={0}
+            className="cursor-pointer rounded-md border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => navigate(`/app/compta/tresorerie/comptes/${account.id}`)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                navigate(`/app/compta/tresorerie/comptes/${account.id}`);
+              }
+            }}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 {account.typeCompte === "CAISSE"
@@ -221,7 +243,10 @@ export default function TresorerieComptesPage() {
                       variant="ghost"
                       size="icon"
                       title="Modifier le compte"
-                      onClick={() => openAccount(account)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openAccount(account);
+                      }}
                     >
                       <Edit3 className="size-4" />
                     </Button>
@@ -230,7 +255,8 @@ export default function TresorerieComptesPage() {
                       variant="ghost"
                       size="icon"
                       title="Affecter les utilisateurs"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setAssignmentDraft({});
                         setAssignmentAccount(account);
                       }}
@@ -242,7 +268,10 @@ export default function TresorerieComptesPage() {
                       variant="ghost"
                       size="icon"
                       title={account.actif ? "Désactiver le compte" : "Activer le compte"}
-                      onClick={() => setAccountToToggle(account)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setAccountToToggle(account);
+                      }}
                     >
                       {account.actif
                         ? <PowerOff className="size-4" />

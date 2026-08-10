@@ -179,7 +179,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/sessions-caisse")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<SessionCaisseResponse>> openCashSession(
             @Valid @RequestBody OuvrirSessionCaisseRequest request
     ) {
@@ -190,7 +190,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/sessions-caisse/{sessionId}/cloture")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<SessionCaisseResponse>> closeCashSession(
             @PathVariable Long sessionId,
             @Valid @RequestBody CloturerSessionCaisseRequest request
@@ -228,7 +228,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/operations/transferts")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<OperationTresorerieResponse>> createTransfer(
             @Valid @RequestBody CreerTransfertTresorerieRequest request
     ) {
@@ -239,7 +239,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/operations/ajustements")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<OperationTresorerieResponse>> createAdjustment(
             @Valid @RequestBody CreerAjustementTresorerieRequest request
     ) {
@@ -250,7 +250,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/operations/{operationId}/annulation")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<OperationTresorerieResponse>> cancelOperation(
             @PathVariable Long operationId,
             @Valid @RequestBody AnnulerOperationTresorerieRequest request

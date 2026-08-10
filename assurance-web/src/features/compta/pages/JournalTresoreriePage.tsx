@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownLeft, ArrowUpRight, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,10 +18,11 @@ import {
 } from "./treasury-format";
 
 export default function JournalTresoreriePage() {
+  const [searchParams] = useSearchParams();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const [accountId, setAccountId] = useState("ALL");
+  const [accountId, setAccountId] = useState(searchParams.get("compteId") || "ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 

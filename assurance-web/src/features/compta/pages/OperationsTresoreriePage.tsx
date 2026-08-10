@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRightLeft, Scale, Search, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,11 +29,13 @@ import { formatTreasuryDate, formatTreasuryMoney, TREASURY_PAGE_SIZE } from "./t
 type EntryMode = "TRANSFERT" | "AJUSTEMENT";
 
 export default function OperationsTresoreriePage() {
+  const [searchParams] = useSearchParams();
+  const initialAccountId = searchParams.get("compteId") || "";
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<EntryMode>("TRANSFERT");
-  const [sourceId, setSourceId] = useState("");
+  const [sourceId, setSourceId] = useState(initialAccountId);
   const [destinationId, setDestinationId] = useState("");
-  const [adjustmentAccountId, setAdjustmentAccountId] = useState("");
+  const [adjustmentAccountId, setAdjustmentAccountId] = useState(initialAccountId);
   const [direction, setDirection] = useState<"ENTREE" | "SORTIE">("ENTREE");
   const [amount, setAmount] = useState("");
   const [operationDate, setOperationDate] = useState(toDateOnly(new Date()) ?? "");
@@ -50,8 +53,9 @@ export default function OperationsTresoreriePage() {
     queryFn: comptaApi.treasuryAccounts,
   });
   const operations = useQuery({
-    queryKey: ["compta", "treasury-operations", appliedSearch, page],
+    queryKey: ["compta", "treasury-operations", initialAccountId, appliedSearch, page],
     queryFn: () => comptaApi.treasuryOperations({
+      compteId: initialAccountId || undefined,
       search: appliedSearch || undefined,
       page,
       size: TREASURY_PAGE_SIZE,

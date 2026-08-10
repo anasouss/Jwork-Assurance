@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LockKeyhole, Play, Square } from "lucide-react";
 import { toast } from "sonner";
@@ -23,9 +24,11 @@ import type { CashSession } from "../types";
 import { formatTreasuryMoney } from "./treasury-format";
 
 export default function SessionsCaissePage() {
+  const [searchParams] = useSearchParams();
+  const initialAccountId = searchParams.get("compteId") || "";
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
-  const [cashAccountId, setCashAccountId] = useState("");
+  const [cashAccountId, setCashAccountId] = useState(initialAccountId);
   const [countedAmount, setCountedAmount] = useState("");
   const [note, setNote] = useState("");
   const [sessionToClose, setSessionToClose] = useState<CashSession>();
@@ -72,7 +75,7 @@ export default function SessionsCaissePage() {
   function resetDialog() {
     setOpenDialog(false);
     setSessionToClose(undefined);
-    setCashAccountId("");
+    setCashAccountId(initialAccountId);
     setCountedAmount("");
     setNote("");
   }
@@ -118,7 +121,9 @@ export default function SessionsCaissePage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(sessions.data ?? []).map((session) => (
+            {(sessions.data ?? [])
+              .filter((session) => !initialAccountId || session.compteTresorerieId === initialAccountId)
+              .map((session) => (
               <TableRow key={session.id}>
                 <TableCell className="font-semibold">{session.compteTresorerie}</TableCell>
                 <TableCell>{session.utilisateur}</TableCell>
@@ -147,7 +152,9 @@ export default function SessionsCaissePage() {
                 </TableCell>
               </TableRow>
             ))}
-            {!sessions.isLoading && (sessions.data?.length ?? 0) === 0 && (
+            {!sessions.isLoading && (sessions.data ?? []).filter(
+              (session) => !initialAccountId || session.compteTresorerieId === initialAccountId
+            ).length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
                   Aucune session de caisse enregistrée.

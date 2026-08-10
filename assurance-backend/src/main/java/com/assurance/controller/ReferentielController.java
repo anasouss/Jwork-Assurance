@@ -21,6 +21,7 @@ import com.assurance.dto.request.UpsertTarifProduitAssistanceRequest;
 import com.assurance.dto.request.UpsertTarifUsageRequest;
 import com.assurance.dto.request.UpsertUsageRequest;
 import com.assurance.dto.response.ApiResponse;
+import com.assurance.dto.response.GrilleTarifaireCatalogueResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.entity.CategorieClient;
 import com.assurance.entity.CategorieTransport;
@@ -53,6 +54,7 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.*;
 import com.assurance.security.TenantContext;
 import com.assurance.service.RichTextSanitizer;
+import com.assurance.service.GrilleTarifaireCatalogueService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -108,6 +110,7 @@ public class ReferentielController {
     private final TarifProduitAssistanceRepository tarifProduitAssistanceRepository;
     private final AgenceRepository agenceRepository;
     private final RichTextSanitizer richTextSanitizer;
+    private final GrilleTarifaireCatalogueService grilleTarifaireCatalogueService;
 
     @GetMapping("/branches-assurance")
     @Transactional(readOnly = true)
@@ -560,6 +563,25 @@ public class ReferentielController {
                         .actif(grille.getActif())
                         .build())
                 .toList()));
+    }
+
+    @GetMapping("/grilles-tarifaires/catalogue")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<List<GrilleTarifaireCatalogueResponse>>> catalogueGrillesTarifaires(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Long compagnieAssuranceId,
+            @RequestParam(required = false) Long conventionId,
+            @RequestParam(required = false) Long usageId,
+            @RequestParam(required = false) Boolean actif
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(grilleTarifaireCatalogueService.search(
+                TenantContext.getCurrentAgence(),
+                query,
+                compagnieAssuranceId,
+                conventionId,
+                usageId,
+                actif
+        )));
     }
 
     @GetMapping("/tarifs-usage")

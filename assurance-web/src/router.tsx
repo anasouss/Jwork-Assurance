@@ -218,6 +218,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/CompaniesConventionsPage")),
       },
       {
+        path: "companies/grilles-tarifaires",
+        lazy: lazyRoute(() => import("@/features/production/pages/CompaniesPricingGridsPage")),
+      },
+      {
         path: "companies/contacts",
         lazy: lazyRoute(() => import("@/features/production/pages/CompanyContactsPage")),
       },

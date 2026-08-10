@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
@@ -28,12 +29,14 @@ export function GrilleTarifaireDialog({
   const [compagnieAssuranceId, setCompagnieAssuranceId] = useState("");
   const [libelle, setLibelle] = useState("");
   const [description, setDescription] = useState("");
+  const [actif, setActif] = useState(true);
 
   useEffect(() => {
     if (!open) return;
     setCompagnieAssuranceId(grille?.compagnieAssuranceId ?? defaultCompagnieAssuranceId ?? "");
     setLibelle(grille?.libelle ?? "");
     setDescription(grille?.description ?? "");
+    setActif(grille?.actif !== false);
   }, [defaultCompagnieAssuranceId, grille, open]);
 
   return (
@@ -61,12 +64,16 @@ export function GrilleTarifaireDialog({
           <Field label="Description">
             <Input value={description} onChange={(event) => setDescription(event.target.value)} />
           </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={actif} onCheckedChange={(checked) => setActif(checked === true)} />
+            Grille active
+          </label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
             disabled={submitting}
-            onClick={() => onSubmit({ compagnieAssuranceId, libelle, description, actif: true })}
+            onClick={() => onSubmit({ compagnieAssuranceId, libelle, description, actif })}
           >
             Enregistrer
           </Button>

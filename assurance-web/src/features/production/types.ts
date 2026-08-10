@@ -905,6 +905,27 @@ export type UpsertGrilleTarifaireRequest = {
   actif?: boolean;
 };
 
+export type GrilleTarifaireCatalogueReference = {
+  id: string;
+  code?: string | null;
+  libelle: string;
+};
+
+export type GrilleTarifaireCatalogueItem = {
+  id: string;
+  libelle: string;
+  description?: string | null;
+  actif: boolean;
+  compagnieAssuranceId: string;
+  compagnieAssuranceCode?: string | null;
+  compagnieAssuranceLibelle: string;
+  conventions: GrilleTarifaireCatalogueReference[];
+  usages: GrilleTarifaireCatalogueReference[];
+  nombreLignes: number;
+  nombreFormulesPersonne: number;
+  updatedAt: string;
+};
+
 export type UpsertLigneGrilleTarifaireRequest = {
   id?: string;
   garantieId: string;

@@ -22,6 +22,14 @@ public interface GrilleTarifaireRepository extends JpaRepository<GrilleTarifaire
     );
 
     @EntityGraph(attributePaths = "compagnieAssurance")
+    @Query("""
+            select grille
+            from GrilleTarifaire grille
+            where grille.agence is null or grille.agence.id = :agenceId
+            """)
+    List<GrilleTarifaire> findAccessibleAll(@Param("agenceId") Long agenceId);
+
+    @EntityGraph(attributePaths = "compagnieAssurance")
     List<GrilleTarifaire> findAllByOrderByCreatedAtDesc();
 
     @EntityGraph(attributePaths = "compagnieAssurance")

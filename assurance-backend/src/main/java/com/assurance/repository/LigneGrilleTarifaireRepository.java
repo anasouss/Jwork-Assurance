@@ -2,12 +2,14 @@ package com.assurance.repository;
 
 import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.enums.ModeTarificationGarantie;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface LigneGrilleTarifaireRepository extends JpaRepository<LigneGrilleTarifaire, Long> {
     @Query("""
@@ -22,6 +24,9 @@ public interface LigneGrilleTarifaireRepository extends JpaRepository<LigneGrill
     );
 
     List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndActifTrue(Long grilleTarifaireId);
+
+    @EntityGraph(attributePaths = {"grilleTarifaire", "usage"})
+    List<LigneGrilleTarifaire> findByGrilleTarifaireIdInAndActifTrue(Set<Long> grilleTarifaireIds);
 
     List<LigneGrilleTarifaire> findByGrilleTarifaireIdAndUsageIdAndActifTrue(Long grilleTarifaireId, Long usageId);
 

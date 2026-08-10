@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Ambulance, Building2, Handshake, Package, Users } from "lucide-react";
+import { Ambulance, Building2, Handshake, Package, TableProperties, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -31,6 +31,13 @@ export default function CompaniesDashboardPage() {
       description: "Produits conventionnés par compagnie.",
       icon: Handshake,
       href: "/app/companies/conventions",
+      permission: "referentiel:view",
+    },
+    {
+      title: "Grilles tarifaires",
+      description: "Catalogue des grilles et configurations par usage.",
+      icon: TableProperties,
+      href: "/app/companies/grilles-tarifaires",
       permission: "referentiel:view",
     },
     {
@@ -68,7 +75,7 @@ export default function CompaniesDashboardPage() {
       </div>
 
       <section className="-mx-4 border-y bg-card px-4 py-5">
-        <div className="mx-auto grid w-full max-w-7xl gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mx-auto grid w-full max-w-7xl gap-3 md:grid-cols-2 lg:grid-cols-3">
           {actions.map((item) => {
             const content = (
               <>

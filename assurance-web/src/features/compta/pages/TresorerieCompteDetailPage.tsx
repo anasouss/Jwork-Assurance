@@ -121,7 +121,6 @@ export default function TresorerieCompteDetailPage() {
         <Summary
           label="Solde comptable"
           value={account ? formatTreasuryMoney(account.soldeCourant) : "-"}
-          tone="emerald"
         />
         <Summary
           label="Type"
@@ -131,7 +130,6 @@ export default function TresorerieCompteDetailPage() {
           <Summary
             label="État de la caisse"
             value={openSession ? "Ouverte" : "Fermée"}
-            tone={openSession ? "emerald" : "amber"}
           />
         ) : (
           <Summary label="Banque" value={account?.nomBanque || "Non renseignée"} />
@@ -159,7 +157,7 @@ export default function TresorerieCompteDetailPage() {
       )}
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b border-l-4 border-l-emerald-600 bg-muted/30 p-4">
+        <div className="border-b bg-muted/30 p-4">
           <h2 className="font-semibold">Derniers mouvements</h2>
         </div>
         {movements.isLoading || (movements.data?.rows.length ?? 0) > 0 ? (
@@ -209,7 +207,7 @@ export default function TresorerieCompteDetailPage() {
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b border-l-4 border-l-amber-500 bg-muted/30 p-4">
+        <div className="border-b bg-muted/30 p-4">
           <h2 className="font-semibold">Dernières opérations internes</h2>
         </div>
         {operations.isLoading || (operations.data?.rows.length ?? 0) > 0 ? (
@@ -254,20 +252,12 @@ export default function TresorerieCompteDetailPage() {
 function Summary({
   label,
   value,
-  tone = "neutral",
 }: {
   label: string;
   value: string;
-  tone?: "neutral" | "emerald" | "amber";
 }) {
-  const accent = tone === "emerald"
-    ? "border-l-emerald-600"
-    : tone === "amber"
-      ? "border-l-amber-500"
-      : "border-l-border";
-
   return (
-    <div className={`rounded-md border border-l-4 bg-card p-4 ${accent}`}>
+    <div className="rounded-md border bg-card p-4">
       <div className="text-xs uppercase text-muted-foreground">{label}</div>
       <div className="mt-2 text-xl font-semibold">{value}</div>
     </div>

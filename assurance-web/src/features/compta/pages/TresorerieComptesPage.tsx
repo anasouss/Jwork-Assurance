@@ -496,9 +496,7 @@ function AccountSection({
 
   return (
     <section>
-      <div className={`flex items-start justify-between gap-3 border-b border-l-4 pb-3 pl-3 ${
-        isCash ? "border-l-amber-500" : "border-l-sky-600"
-      }`}>
+      <div className="flex items-start justify-between gap-3 border-b pb-3">
         <div className="flex items-start gap-3">
           <div className={`grid size-9 shrink-0 place-items-center rounded-md ${
             isCash
@@ -524,9 +522,7 @@ function AccountSection({
             key={account.id}
             role="link"
             tabIndex={0}
-            className={`cursor-pointer rounded-md border border-l-4 bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              isCash ? "border-l-amber-500" : "border-l-sky-600"
-            }`}
+            className="cursor-pointer rounded-md border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => onOpen(account)}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {

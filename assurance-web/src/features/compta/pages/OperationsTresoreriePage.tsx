@@ -136,23 +136,39 @@ export default function OperationsTresoreriePage() {
       <section className="rounded-md border bg-card p-4">
         <div className="mb-4 inline-flex rounded-md border p-1">
           <Button
-            variant={mode === "TRANSFERT" ? "secondary" : "ghost"}
+            variant="ghost"
+            className={mode === "TRANSFERT"
+              ? "bg-amber-100 text-amber-950 shadow-sm hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-50"
+              : undefined}
             onClick={() => setMode("TRANSFERT")}
           >
-            <ArrowRightLeft className="size-4" /> Transfert
+            <ArrowRightLeft className="size-4" /> Transférer
           </Button>
           <Button
-            variant={mode === "AJUSTEMENT" ? "secondary" : "ghost"}
+            variant="ghost"
+            className={mode === "AJUSTEMENT"
+              ? "bg-amber-100 text-amber-950 shadow-sm hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-50"
+              : undefined}
             onClick={() => setMode("AJUSTEMENT")}
           >
-            <Scale className="size-4" /> Ajustement
+            <Scale className="size-4" /> Corriger le solde
           </Button>
         </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          {mode === "TRANSFERT"
+            ? "Déplacez des fonds vers un autre compte de trésorerie."
+            : "Enregistrez une correction exceptionnelle et justifiée du solde comptable."}
+        </p>
         <div className="grid gap-4 lg:grid-cols-4">
           {mode === "TRANSFERT" ? (
             <>
               <Field label="Compte source">
-                <AccountSelect value={sourceId} accounts={activeAccounts} onChange={setSourceId} />
+                <AccountSelect
+                  value={sourceId}
+                  accounts={activeAccounts}
+                  disabled={Boolean(initialAccountId)}
+                  onChange={setSourceId}
+                />
               </Field>
               <Field label="Compte destination">
                 <AccountSelect value={destinationId} accounts={activeAccounts} onChange={setDestinationId} />
@@ -164,6 +180,7 @@ export default function OperationsTresoreriePage() {
                 <AccountSelect
                   value={adjustmentAccountId}
                   accounts={activeAccounts}
+                  disabled={Boolean(initialAccountId)}
                   onChange={setAdjustmentAccountId}
                 />
               </Field>
@@ -323,14 +340,16 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function AccountSelect({
   value,
   accounts,
+  disabled = false,
   onChange,
 }: {
   value: string;
   accounts: Array<{ id: string; libelle: string; typeCompte: string }>;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} disabled={disabled} onValueChange={onChange}>
       <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
       <SelectContent>
         {accounts.map((account) => (

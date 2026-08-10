@@ -49,7 +49,7 @@ export default function SessionsCaissePage() {
       note: note.trim() || undefined,
     }),
     onSuccess: async () => {
-      toast.success("Session de caisse ouverte");
+      toast.success("Caisse ouverte");
       resetDialog();
       await queryClient.invalidateQueries({ queryKey: ["compta", "cash-sessions"] });
     },
@@ -62,7 +62,7 @@ export default function SessionsCaissePage() {
       note: note.trim() || undefined,
     }),
     onSuccess: async () => {
-      toast.success("Session de caisse clôturée");
+      toast.success("Caisse clôturée");
       resetDialog();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "cash-sessions"] }),
@@ -96,13 +96,13 @@ export default function SessionsCaissePage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-          <h1 className="mt-1 text-xl font-semibold">Sessions de caisse</h1>
+          <h1 className="mt-1 text-xl font-semibold">Ouverture et clôture de caisse</h1>
           <p className="text-sm text-muted-foreground">
             Ouverture, comptage et clôture quotidienne des caisses affectées.
           </p>
         </div>
         <Button onClick={() => setOpenDialog(true)}>
-          <Play className="size-4" /> Ouvrir une session
+          <Play className="size-4" /> Ouvrir la caisse
         </Button>
       </header>
 
@@ -143,7 +143,7 @@ export default function SessionsCaissePage() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      title="Clôturer la session"
+                      title="Clôturer la caisse"
                       onClick={() => beginClose(session)}
                     >
                       <Square className="size-4" />
@@ -157,7 +157,7 @@ export default function SessionsCaissePage() {
             ).length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                  Aucune session de caisse enregistrée.
+                  Aucune activité de caisse enregistrée.
                 </TableCell>
               </TableRow>
             )}
@@ -169,7 +169,7 @@ export default function SessionsCaissePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {sessionToClose ? "Clôturer la session" : "Ouvrir une session de caisse"}
+              {sessionToClose ? "Clôturer la caisse" : "Ouvrir la caisse"}
             </DialogTitle>
             <DialogDescription>
               {sessionToClose

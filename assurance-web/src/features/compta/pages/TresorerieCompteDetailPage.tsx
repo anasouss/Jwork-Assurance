@@ -107,7 +107,7 @@ export default function TresorerieCompteDetailPage() {
             <Button variant="outline" asChild>
               <Link to={`/app/compta/tresorerie/sessions-caisse?compteId=${accountId}`}>
                 <LockKeyhole className="size-4" />
-                Sessions de caisse
+                Ouverture et clôture de caisse
               </Link>
             </Button>
           )}

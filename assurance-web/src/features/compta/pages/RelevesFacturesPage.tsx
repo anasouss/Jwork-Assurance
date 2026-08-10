@@ -349,7 +349,7 @@ export default function RelevesFacturesPage() {
                       <Header>Compagnie</Header>
                       <Header>Date d'effet</Header>
                       <Header align="right">Prime nette</Header>
-                      <Header align="right">Taxes</Header>
+                      <Header align="right">Taxes et frais</Header>
                       <Header align="right">TTC</Header>
                       <Header>Éligibilité</Header>
                       <Header align="center">Détail</Header>
@@ -388,7 +388,7 @@ export default function RelevesFacturesPage() {
                         <td className="px-3 py-3">{row.compagnie}</td>
                         <td className="whitespace-nowrap px-3 py-3">{formatDate(row.dateEffet)}</td>
                         <MoneyCell value={row.primeNette} />
-                        <MoneyCell value={row.taxes} />
+                        <MoneyCell value={taxesAndFees(row)} />
                         <MoneyCell value={row.montantTtc} strong />
                         <td className="px-3 py-3">
                           {urlState.operationType === "RELEVE"
@@ -807,7 +807,7 @@ function IssueDialog(props: {
                   <Header>Mouvement</Header>
                   <Header>Date</Header>
                   <Header align="right">Prime nette</Header>
-                  <Header align="right">Taxes</Header>
+                  <Header align="right">Taxes et frais</Header>
                   <Header align="right">TTC</Header>
                 </tr>
               </thead>
@@ -823,7 +823,7 @@ function IssueDialog(props: {
                     <td className="px-3 py-2">{row.mouvement}</td>
                     <td className="px-3 py-2">{formatDate(row.dateEffet)}</td>
                     <MoneyCell value={row.primeNette} />
-                    <MoneyCell value={row.taxes} />
+                    <MoneyCell value={taxesAndFees(row)} />
                     <MoneyCell value={row.montantTtc} strong />
                   </tr>
                 ))}
@@ -896,7 +896,7 @@ function DocumentDetailDialog(props: { id?: string; onOpenChange: (open: boolean
                     <Header>Police / référence</Header>
                     <Header>Mouvement</Header>
                     <Header align="right">Prime nette</Header>
-                    <Header align="right">Taxes</Header>
+                    <Header align="right">Taxes et frais</Header>
                     <Header align="right">Débit</Header>
                     <Header align="right">Crédit</Header>
                   </tr>
@@ -917,7 +917,7 @@ function DocumentDetailDialog(props: { id?: string; onOpenChange: (open: boolean
                       </td>
                       <td className="px-3 py-2">{line.mouvement}</td>
                       <MoneyCell value={line.primeNette} />
-                      <MoneyCell value={line.taxes} />
+                      <MoneyCell value={taxesAndFees(line)} />
                       <MoneyCell value={line.debit} />
                       <MoneyCell value={line.credit} />
                     </tr>
@@ -1171,6 +1171,10 @@ function formatMoney(value: number) {
     maximumFractionDigits: 2,
   }).format(value || 0).replace(/[\u00a0\u202f]/g, " ");
   return `${amount} MAD`;
+}
+
+function taxesAndFees(value: { taxes: number; accessoires: number }) {
+  return value.taxes + value.accessoires;
 }
 
 function formatDate(value?: string | null) {

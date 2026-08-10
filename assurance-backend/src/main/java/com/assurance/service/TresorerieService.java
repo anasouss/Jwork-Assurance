@@ -11,6 +11,7 @@ import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.InstrumentReglementCompagnie;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.enums.NatureMouvementTresorerie;
+import com.assurance.enums.NiveauAccesCompteTresorerie;
 import com.assurance.enums.SensMouvementTresorerie;
 import com.assurance.enums.TypeCompteTresorerie;
 import com.assurance.exception.BadRequestException;
@@ -37,10 +38,15 @@ public class TresorerieService {
     private final AgenceRepository agenceRepository;
     private final CompteTresorerieRepository compteRepository;
     private final MouvementTresorerieRepository mouvementRepository;
+    private final TresorerieAccessService accessService;
+    private final SessionCaisseService sessionCaisseService;
 
     @Transactional(readOnly = true)
-    public List<CompteTresorerieResponse> listAccounts(Long agenceId) {
-        return compteRepository.findByAgenceIdOrderByTypeCompteAscLibelleAsc(agenceId).stream()
+    public List<CompteTresorerieResponse> listAccounts(Long agenceId, boolean administration) {
+        List<CompteTresorerie> accounts = administration
+                ? compteRepository.findByAgenceIdOrderByTypeCompteAscLibelleAsc(agenceId)
+                : accessService.visibleAccounts(agenceId, accessService.currentUserId());
+        return accounts.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -54,7 +60,9 @@ public class TresorerieService {
         Agence agence = agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         CompteTresorerie account = apply(CompteTresorerie.builder().agence(agence).build(), request, code);
-        return toResponse(compteRepository.save(account));
+        account = compteRepository.save(account);
+        accessService.assignCreatorAsSupervisor(account);
+        return toResponse(account);
     }
 
     @Transactional
@@ -63,7 +71,7 @@ public class TresorerieService {
             Long accountId,
             UpsertCompteTresorerieRequest request
     ) {
-        CompteTresorerie account = findAccount(agenceId, accountId);
+        CompteTresorerie account = requireAccount(agenceId, accountId);
         String code = normalizeCode(request.getCode());
         if (compteRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, accountId)) {
             throw new BadRequestException("Un compte de trésorerie utilise déjà ce code");
@@ -85,14 +93,19 @@ public class TresorerieService {
             Long accountId,
             Boolean active
     ) {
-        CompteTresorerie account = findAccount(agenceId, accountId);
+        CompteTresorerie account = requireAccount(agenceId, accountId);
+        if (!Boolean.TRUE.equals(active) && sessionCaisseService.hasOpenSession(agenceId, accountId)) {
+            throw new BadRequestException("Clôturez la session de caisse avant de désactiver ce compte");
+        }
         account.setActif(Boolean.TRUE.equals(active));
         return toResponse(compteRepository.save(account));
     }
 
     @Transactional(readOnly = true)
     public List<MouvementTresorerieResponse> listMovements(Long agenceId) {
+        List<Long> visibleIds = visibleAccountIds(agenceId);
         return mouvementRepository.findByAgenceIdOrderByDateOperationDescIdDesc(agenceId).stream()
+                .filter(row -> visibleIds.contains(row.getCompteTresorerie().getId()))
                 .map(this::toResponse)
                 .toList();
     }
@@ -110,11 +123,16 @@ public class TresorerieService {
         if (dateDu != null && dateAu != null && dateDu.isAfter(dateAu)) {
             throw new BadRequestException("La date de début doit précéder la date de fin");
         }
-        if (accountId != null) {
-            findAccount(agenceId, accountId);
+        List<Long> visibleIds = visibleAccountIds(agenceId);
+        if (visibleIds.isEmpty()) {
+            return emptyMovementPage(page, size);
+        }
+        if (accountId != null && !visibleIds.contains(accountId)) {
+            accessService.requireAccess(agenceId, accountId, NiveauAccesCompteTresorerie.CONSULTATION);
         }
         Page<MouvementTresorerie> result = mouvementRepository.search(
                 agenceId,
+                visibleIds,
                 accountId,
                 dateDu,
                 dateAu,
@@ -144,6 +162,11 @@ public class TresorerieService {
         if (!instrument.getAgence().getId().equals(account.getAgence().getId())) {
             throw new BadRequestException("Le compte de trésorerie appartient à une autre agence");
         }
+        accessService.requireAccess(
+                instrument.getAgence().getId(),
+                account.getId(),
+                NiveauAccesCompteTresorerie.UTILISATION
+        );
         if (mouvementRepository.existsByInstrumentReglementIdAndMouvementExtourneIdIsNull(instrument.getId())) {
             throw new BadRequestException("Cet instrument possède déjà une écriture de trésorerie");
         }
@@ -151,6 +174,10 @@ public class TresorerieService {
                 .agence(instrument.getAgence())
                 .compteTresorerie(account)
                 .instrumentReglement(instrument)
+                .sessionCaisse(sessionCaisseService.requireOpenSession(
+                        instrument.getAgence().getId(),
+                        account
+                ))
                 .nature(NatureMouvementTresorerie.REGLEMENT_CLIENT)
                 .sens(SensMouvementTresorerie.ENTREE)
                 .dateOperation(operationDate)
@@ -177,10 +204,19 @@ public class TresorerieService {
         if (mouvementRepository.existsByMouvementExtourneId(original.getId())) {
             throw new BadRequestException("Cette écriture de trésorerie est déjà extournée");
         }
+        accessService.requireAccess(
+                instrument.getAgence().getId(),
+                original.getCompteTresorerie().getId(),
+                NiveauAccesCompteTresorerie.UTILISATION
+        );
         return mouvementRepository.save(MouvementTresorerie.builder()
                 .agence(original.getAgence())
                 .compteTresorerie(original.getCompteTresorerie())
                 .instrumentReglement(instrument)
+                .sessionCaisse(sessionCaisseService.requireOpenSession(
+                        instrument.getAgence().getId(),
+                        original.getCompteTresorerie()
+                ))
                 .nature(NatureMouvementTresorerie.REJET_INSTRUMENT)
                 .sens(SensMouvementTresorerie.SORTIE)
                 .dateOperation(operationDate)
@@ -204,6 +240,11 @@ public class TresorerieService {
         if (account.getTypeCompte() != TypeCompteTresorerie.BANQUE) {
             throw new BadRequestException("Un règlement compagnie doit utiliser un compte bancaire");
         }
+        accessService.requireAccess(
+                instrument.getAgence().getId(),
+                account.getId(),
+                NiveauAccesCompteTresorerie.UTILISATION
+        );
         if (mouvementRepository.existsByInstrumentReglementCompagnieIdAndMouvementExtourneIdIsNull(
                 instrument.getId()
         )) {
@@ -239,6 +280,11 @@ public class TresorerieService {
         if (mouvementRepository.existsByMouvementExtourneId(original.getId())) {
             throw new BadRequestException("Cette écriture de trésorerie est déjà extournée");
         }
+        accessService.requireAccess(
+                instrument.getAgence().getId(),
+                original.getCompteTresorerie().getId(),
+                NiveauAccesCompteTresorerie.UTILISATION
+        );
         return mouvementRepository.save(MouvementTresorerie.builder()
                 .agence(original.getAgence())
                 .compteTresorerie(original.getCompteTresorerie())
@@ -255,8 +301,12 @@ public class TresorerieService {
     }
 
     public CompteTresorerie findAccount(Long agenceId, Long accountId) {
-        return compteRepository.findByIdAndAgenceId(accountId, agenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Compte de trésorerie", accountId));
+        CompteTresorerie account = requireAccount(agenceId, accountId);
+        accessService.requireAccess(agenceId, accountId, NiveauAccesCompteTresorerie.UTILISATION);
+        if (!Boolean.TRUE.equals(account.getActif())) {
+            throw new BadRequestException("Ce compte de trésorerie est inactif");
+        }
+        return account;
     }
 
     private CompteTresorerie apply(
@@ -308,6 +358,12 @@ public class TresorerieService {
                         ? null : movement.getInstrumentReglement().getId())
                 .instrumentReglementCompagnieId(movement.getInstrumentReglementCompagnie() == null
                         ? null : movement.getInstrumentReglementCompagnie().getId())
+                .operationTresorerieId(movement.getOperationTresorerie() == null
+                        ? null : movement.getOperationTresorerie().getId())
+                .numeroOperationTresorerie(movement.getOperationTresorerie() == null
+                        ? null : movement.getOperationTresorerie().getNumero())
+                .sessionCaisseId(movement.getSessionCaisse() == null
+                        ? null : movement.getSessionCaisse().getId())
                 .nature(movement.getNature())
                 .sens(movement.getSens())
                 .dateOperation(movement.getDateOperation())
@@ -315,6 +371,31 @@ public class TresorerieService {
                 .montant(movement.getMontant())
                 .reference(movement.getReference())
                 .libelle(movement.getLibelle())
+                .build();
+    }
+
+    private CompteTresorerie requireAccount(Long agenceId, Long accountId) {
+        return compteRepository.findByIdAndAgenceId(accountId, agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Compte de trésorerie", accountId));
+    }
+
+    private List<Long> visibleAccountIds(Long agenceId) {
+        return accessService.visibleAccounts(agenceId, accessService.currentUserId()).stream()
+                .map(CompteTresorerie::getId)
+                .toList();
+    }
+
+    private MouvementTresoreriePageResponse emptyMovementPage(int page, int size) {
+        return MouvementTresoreriePageResponse.builder()
+                .page(SourceDocumentClientPageResponse.PageInfo.builder()
+                        .number(Math.max(page, 0))
+                        .size(Math.min(Math.max(size, 1), 100))
+                        .totalElements(0)
+                        .totalPages(0)
+                        .first(true)
+                        .last(true)
+                        .build())
+                .rows(List.of())
                 .build();
     }
 

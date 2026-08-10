@@ -54,6 +54,14 @@ public class MouvementTresorerie extends AuditedEntity {
     @JoinColumn(name = "instrument_reglement_compagnie_id")
     private InstrumentReglementCompagnie instrumentReglementCompagnie;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operation_tresorerie_id")
+    private OperationTresorerie operationTresorerie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_caisse_id")
+    private SessionCaisse sessionCaisse;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private NatureMouvementTresorerie nature;

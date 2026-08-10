@@ -520,6 +520,9 @@ export type TreasuryMovement = {
   compteTresorerie: string;
   instrumentReglementId?: string | null;
   instrumentReglementCompagnieId?: string | null;
+  operationTresorerieId?: string | null;
+  numeroOperationTresorerie?: string | null;
+  sessionCaisseId?: string | null;
   nature:
     | "REGLEMENT_CLIENT"
     | "REJET_INSTRUMENT"
@@ -539,6 +542,103 @@ export type TreasuryMovement = {
 export type TreasuryMovementPage = {
   page: PageInfo;
   rows: TreasuryMovement[];
+};
+
+export type TreasuryAccessLevel =
+  | "CONSULTATION"
+  | "UTILISATION"
+  | "GESTION"
+  | "SUPERVISION";
+
+export type TreasuryAccountAssignment = {
+  id: string;
+  utilisateurId: string;
+  utilisateur: string;
+  email: string;
+  niveauAcces: TreasuryAccessLevel;
+  actif: boolean;
+};
+
+export type TreasuryUser = {
+  id: string;
+  nomComplet: string;
+  email: string;
+  role?: string | null;
+  actif: boolean;
+};
+
+export type CashSession = {
+  id: string;
+  compteTresorerieId: string;
+  compteTresorerie: string;
+  utilisateurId: string;
+  utilisateur: string;
+  statut: "OUVERTE" | "CLOTUREE";
+  ouverteLe: string;
+  fermeeLe?: string | null;
+  soldeTheoriqueOuverture: number;
+  montantOuverture: number;
+  ecartOuverture: number;
+  soldeTheoriqueCloture?: number | null;
+  montantCompteCloture?: number | null;
+  ecartCloture?: number | null;
+  noteOuverture?: string | null;
+  noteCloture?: string | null;
+};
+
+export type TreasuryOperationType =
+  | "TRANSFERT"
+  | "AJUSTEMENT"
+  | "ANNULATION_TRANSFERT"
+  | "ANNULATION_AJUSTEMENT";
+
+export type TreasuryOperation = {
+  id: string;
+  numero: string;
+  typeOperation: TreasuryOperationType;
+  statut: "CONFIRMEE" | "ANNULEE";
+  compteSourceId?: string | null;
+  compteSource?: string | null;
+  compteDestinationId?: string | null;
+  compteDestination?: string | null;
+  sensAjustement?: "ENTREE" | "SORTIE" | null;
+  montant: number;
+  dateOperation: string;
+  dateValeur?: string | null;
+  reference?: string | null;
+  motif: string;
+  confirmeeLe: string;
+  confirmeeParId: string;
+  confirmeePar: string;
+  operationExtourneeId?: string | null;
+  operationExtourneeNumero?: string | null;
+  annuleeLe?: string | null;
+  motifAnnulation?: string | null;
+};
+
+export type TreasuryOperationPage = {
+  page: PageInfo;
+  rows: TreasuryOperation[];
+};
+
+export type CreateTreasuryTransferRequest = {
+  compteSourceId: string;
+  compteDestinationId: string;
+  montant: number;
+  dateOperation: string;
+  dateValeur?: string;
+  reference?: string;
+  motif: string;
+};
+
+export type CreateTreasuryAdjustmentRequest = {
+  compteTresorerieId: string;
+  sens: "ENTREE" | "SORTIE";
+  montant: number;
+  dateOperation: string;
+  dateValeur?: string;
+  reference?: string;
+  motif: string;
 };
 
 export type CompanyBordereauBase = "EMISSION" | "ENCAISSEMENT";

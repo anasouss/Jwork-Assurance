@@ -20,7 +20,9 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
             "instrumentReglement",
             "instrumentReglement.reglement",
             "instrumentReglementCompagnie",
-            "instrumentReglementCompagnie.reglement"
+            "instrumentReglementCompagnie.reglement",
+            "operationTresorerie",
+            "sessionCaisse"
     })
     List<MouvementTresorerie> findByAgenceIdOrderByDateOperationDescIdDesc(Long agenceId);
 
@@ -29,7 +31,9 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
             "instrumentReglement",
             "instrumentReglement.reglement",
             "instrumentReglementCompagnie",
-            "instrumentReglementCompagnie.reglement"
+            "instrumentReglementCompagnie.reglement",
+            "operationTresorerie",
+            "sessionCaisse"
     })
     @Query("""
             select m
@@ -39,6 +43,7 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
             left join m.instrumentReglementCompagnie instrumentCompagnie
             left join instrumentCompagnie.reglement reglementCompagnie
             where m.agence.id = :agenceId
+              and m.compteTresorerie.id in :comptesVisibles
               and (:compteId is null or m.compteTresorerie.id = :compteId)
               and (:dateDu is null or m.dateOperation >= :dateDu)
               and (:dateAu is null or m.dateOperation <= :dateAu)
@@ -54,6 +59,7 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
             """)
     Page<MouvementTresorerie> search(
             @Param("agenceId") Long agenceId,
+            @Param("comptesVisibles") java.util.Collection<Long> comptesVisibles,
             @Param("compteId") Long compteId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
@@ -86,4 +92,17 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
             where m.compteTresorerie.id = :compteId
             """)
     BigDecimal balanceForAccount(@Param("compteId") Long compteId);
+
+    @Query("""
+            select coalesce(sum(case when m.sens = com.assurance.enums.SensMouvementTresorerie.ENTREE
+                                     then m.montant else -m.montant end), 0)
+            from MouvementTresorerie m
+            where m.sessionCaisse.id = :sessionId
+            """)
+    BigDecimal netForSession(@Param("sessionId") Long sessionId);
+
+    List<MouvementTresorerie> findByAgenceIdAndOperationTresorerieIdOrderByIdAsc(
+            Long agenceId,
+            Long operationId
+    );
 }

@@ -202,6 +202,14 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/JournalTresoreriePage")),
       },
       {
+        path: "compta/tresorerie/operations",
+        lazy: lazyRoute(() => import("@/features/compta/pages/OperationsTresoreriePage")),
+      },
+      {
+        path: "compta/tresorerie/sessions-caisse",
+        lazy: lazyRoute(() => import("@/features/compta/pages/SessionsCaissePage")),
+      },
+      {
         path: "crm",
         lazy: lazyRoute(() => import("@/features/crm/pages/ClientCrmPage")),
       },

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, Landmark, Plus, Power, PowerOff, WalletCards } from "lucide-react";
+import { Edit3, Landmark, Plus, Power, PowerOff, Users, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,11 +26,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { parseAccountingAmount } from "../format";
 import type {
   TreasuryAccount,
+  TreasuryAccessLevel,
   TreasuryAccountType,
   UpsertTreasuryAccountRequest,
 } from "../types";
@@ -48,11 +51,37 @@ export default function TresorerieComptesPage() {
   const [rib, setRib] = useState("");
   const [initialBalance, setInitialBalance] = useState("0");
   const [accountToToggle, setAccountToToggle] = useState<TreasuryAccount>();
+  const [assignmentAccount, setAssignmentAccount] = useState<TreasuryAccount>();
+  const [assignmentDraft, setAssignmentDraft] = useState<Record<
+    string,
+    { actif: boolean; niveauAcces: TreasuryAccessLevel }
+  >>({});
 
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-accounts", { administration: canManage }],
+    queryFn: canManage
+      ? comptaApi.treasuryAdministrationAccounts
+      : comptaApi.treasuryAccounts,
   });
+
+  const treasuryUsers = useQuery({
+    queryKey: ["compta", "treasury-users"],
+    queryFn: comptaApi.treasuryUsers,
+    enabled: Boolean(assignmentAccount),
+  });
+  const assignments = useQuery({
+    queryKey: ["compta", "treasury-account-assignments", assignmentAccount?.id],
+    queryFn: () => comptaApi.treasuryAccountAssignments(assignmentAccount!.id),
+    enabled: Boolean(assignmentAccount),
+  });
+
+  useEffect(() => {
+    if (!assignmentAccount || !assignments.data) return;
+    setAssignmentDraft(Object.fromEntries(assignments.data.map((row) => [
+      row.utilisateurId,
+      { actif: row.actif, niveauAcces: row.niveauAcces },
+    ])));
+  }, [assignmentAccount, assignments.data]);
 
   const saveAccount = useMutation({
     mutationFn: () => {
@@ -94,6 +123,29 @@ export default function TresorerieComptesPage() {
     },
     onError: (error) => toast.error(
       error instanceof Error ? error.message : "Changement de statut impossible"
+    ),
+  });
+
+  const saveAssignments = useMutation({
+    mutationFn: () => comptaApi.saveTreasuryAccountAssignments(
+      assignmentAccount!.id,
+      Object.entries(assignmentDraft)
+        .filter(([, row]) => row.actif)
+        .map(([utilisateurId, row]) => ({
+          utilisateurId,
+          niveauAcces: row.niveauAcces,
+          actif: true,
+        }))
+    ),
+    onSuccess: async () => {
+      toast.success("Affectations du compte enregistrées");
+      await queryClient.invalidateQueries({
+        queryKey: ["compta", "treasury-account-assignments", assignmentAccount?.id],
+      });
+      setAssignmentAccount(undefined);
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Enregistrement des accès impossible"
     ),
   });
 
@@ -172,6 +224,18 @@ export default function TresorerieComptesPage() {
                       onClick={() => openAccount(account)}
                     >
                       <Edit3 className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Affecter les utilisateurs"
+                      onClick={() => {
+                        setAssignmentDraft({});
+                        setAssignmentAccount(account);
+                      }}
+                    >
+                      <Users className="size-4" />
                     </Button>
                     <Button
                       type="button"
@@ -313,6 +377,90 @@ export default function TresorerieComptesPage() {
               onClick={() => saveAccount.mutate()}
             >
               {editingAccount ? "Enregistrer" : "Créer le compte"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(assignmentAccount)}
+        onOpenChange={(open) => {
+          if (!open) setAssignmentAccount(undefined);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Accès au compte</DialogTitle>
+            <DialogDescription>
+              {assignmentAccount?.libelle}. Les permissions de rôle restent obligatoires en plus de cet accès.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-14">Accès</TableHead>
+                  <TableHead>Utilisateur</TableHead>
+                  <TableHead>Rôle</TableHead>
+                  <TableHead className="w-52">Niveau</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(treasuryUsers.data ?? []).map((user) => {
+                  const row = assignmentDraft[user.id] ?? {
+                    actif: false,
+                    niveauAcces: "CONSULTATION" as TreasuryAccessLevel,
+                  };
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={row.actif}
+                          disabled={!user.actif}
+                          onCheckedChange={(checked) => setAssignmentDraft((current) => ({
+                            ...current,
+                            [user.id]: { ...row, actif: checked === true },
+                          }))}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{user.nomComplet}</div>
+                        <div className="text-xs text-muted-foreground">{user.email}</div>
+                      </TableCell>
+                      <TableCell>{user.role || "-"}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={row.niveauAcces}
+                          disabled={!row.actif}
+                          onValueChange={(value) => setAssignmentDraft((current) => ({
+                            ...current,
+                            [user.id]: {
+                              actif: true,
+                              niveauAcces: value as TreasuryAccessLevel,
+                            },
+                          }))}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CONSULTATION">Consultation</SelectItem>
+                            <SelectItem value="UTILISATION">Utilisation</SelectItem>
+                            <SelectItem value="GESTION">Gestion</SelectItem>
+                            <SelectItem value="SUPERVISION">Supervision</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignmentAccount(undefined)}>
+              Annuler
+            </Button>
+            <Button disabled={saveAssignments.isPending} onClick={() => saveAssignments.mutate()}>
+              Enregistrer les accès
             </Button>
           </DialogFooter>
         </DialogContent>

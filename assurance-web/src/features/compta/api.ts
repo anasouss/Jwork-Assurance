@@ -37,6 +37,15 @@ import type {
   PaymentInstrumentPage,
   ReplacePaymentInstrumentRequest,
   TreasuryAccount,
+  TreasuryAccountAssignment,
+  TreasuryAccessLevel,
+  TreasuryUser,
+  CashSession,
+  TreasuryOperation,
+  TreasuryOperationPage,
+  TreasuryOperationType,
+  CreateTreasuryTransferRequest,
+  CreateTreasuryAdjustmentRequest,
   TreasuryMovement,
   TreasuryMovementPage,
   UpsertCompanyBordereauRequest,
@@ -603,6 +612,98 @@ export const comptaApi = {
     )).map(normalizeTreasuryAccount);
   },
 
+  async treasuryAdministrationAccounts() {
+    return unwrap(await apiFetch<ApiResponse<TreasuryAccount[]>>(
+      "/api/v1/compta/tresorerie/comptes/administration"
+    )).map(normalizeTreasuryAccount);
+  },
+
+  async treasuryUsers() {
+    return unwrap(await apiFetch<ApiResponse<TreasuryUser[]>>(
+      "/api/v1/compta/tresorerie/utilisateurs"
+    )).map((user) => ({ ...user, id: String(user.id) }));
+  },
+
+  async treasuryAccountAssignments(accountId: string) {
+    return unwrap(await apiFetch<ApiResponse<TreasuryAccountAssignment[]>>(
+      `/api/v1/compta/tresorerie/comptes/${accountId}/affectations`
+    )).map(normalizeTreasuryAssignment);
+  },
+
+  async saveTreasuryAccountAssignments(
+    accountId: string,
+    assignments: Array<{
+      utilisateurId: string;
+      niveauAcces: TreasuryAccessLevel;
+      actif: boolean;
+    }>
+  ) {
+    return unwrap(await apiFetch<ApiResponse<TreasuryAccountAssignment[]>>(
+      `/api/v1/compta/tresorerie/comptes/${accountId}/affectations`,
+      { method: "PUT", body: JSON.stringify({ affectations: assignments }) }
+    )).map(normalizeTreasuryAssignment);
+  },
+
+  async cashSessions() {
+    return unwrap(await apiFetch<ApiResponse<CashSession[]>>(
+      "/api/v1/compta/tresorerie/sessions-caisse"
+    )).map(normalizeCashSession);
+  },
+
+  async openCashSession(request: {
+    compteTresorerieId: string;
+    montantCompte: number;
+    note?: string;
+  }) {
+    return normalizeCashSession(unwrap(await apiFetch<ApiResponse<CashSession>>(
+      "/api/v1/compta/tresorerie/sessions-caisse",
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async closeCashSession(id: string, request: { montantCompte: number; note?: string }) {
+    return normalizeCashSession(unwrap(await apiFetch<ApiResponse<CashSession>>(
+      `/api/v1/compta/tresorerie/sessions-caisse/${id}/cloture`,
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async treasuryOperations(params: {
+    compteId?: string;
+    type?: TreasuryOperationType;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<TreasuryOperationPage>>(
+      `/api/v1/compta/tresorerie/operations${buildQueryString(params)}`
+    ));
+    return { ...result, rows: result.rows.map(normalizeTreasuryOperation) };
+  },
+
+  async createTreasuryTransfer(request: CreateTreasuryTransferRequest) {
+    return normalizeTreasuryOperation(unwrap(await apiFetch<ApiResponse<TreasuryOperation>>(
+      "/api/v1/compta/tresorerie/operations/transferts",
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async createTreasuryAdjustment(request: CreateTreasuryAdjustmentRequest) {
+    return normalizeTreasuryOperation(unwrap(await apiFetch<ApiResponse<TreasuryOperation>>(
+      "/api/v1/compta/tresorerie/operations/ajustements",
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async cancelTreasuryOperation(id: string, dateOperation: string, motif: string) {
+    return normalizeTreasuryOperation(unwrap(await apiFetch<ApiResponse<TreasuryOperation>>(
+      `/api/v1/compta/tresorerie/operations/${id}/annulation`,
+      { method: "POST", body: JSON.stringify({ dateOperation, motif }) }
+    )));
+  },
+
   async createTreasuryAccount(request: UpsertTreasuryAccountRequest) {
     return normalizeTreasuryAccount(unwrap(await apiFetch<ApiResponse<TreasuryAccount>>(
       "/api/v1/compta/tresorerie/comptes",
@@ -788,6 +889,46 @@ function normalizeTreasuryMovement(movement: TreasuryMovement): TreasuryMovement
     instrumentReglementCompagnieId: movement.instrumentReglementCompagnieId == null
       ? null
       : String(movement.instrumentReglementCompagnieId),
+    operationTresorerieId: movement.operationTresorerieId == null
+      ? null
+      : String(movement.operationTresorerieId),
+    sessionCaisseId: movement.sessionCaisseId == null
+      ? null
+      : String(movement.sessionCaisseId),
+  };
+}
+
+function normalizeTreasuryAssignment(
+  assignment: TreasuryAccountAssignment
+): TreasuryAccountAssignment {
+  return {
+    ...assignment,
+    id: String(assignment.id),
+    utilisateurId: String(assignment.utilisateurId),
+  };
+}
+
+function normalizeCashSession(session: CashSession): CashSession {
+  return {
+    ...session,
+    id: String(session.id),
+    compteTresorerieId: String(session.compteTresorerieId),
+    utilisateurId: String(session.utilisateurId),
+  };
+}
+
+function normalizeTreasuryOperation(operation: TreasuryOperation): TreasuryOperation {
+  return {
+    ...operation,
+    id: String(operation.id),
+    compteSourceId: operation.compteSourceId == null ? null : String(operation.compteSourceId),
+    compteDestinationId: operation.compteDestinationId == null
+      ? null
+      : String(operation.compteDestinationId),
+    confirmeeParId: String(operation.confirmeeParId),
+    operationExtourneeId: operation.operationExtourneeId == null
+      ? null
+      : String(operation.operationExtourneeId),
   };
 }
 

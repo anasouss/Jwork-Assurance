@@ -1,11 +1,13 @@
 import { Link } from "react-router-dom";
 import {
   Archive,
+  ArrowRightLeft,
   Banknote,
   Building2,
   FileCheck2,
   FileText,
   Landmark,
+  LockKeyhole,
   ReceiptText,
   Scale,
   ScrollText,
@@ -79,6 +81,18 @@ const groups: ComptaGroup[] = [
         icon: Landmark,
         href: "/app/compta/tresorerie/journal",
         permission: "tresorerie:view",
+      },
+      {
+        title: "Transferts et ajustements",
+        icon: ArrowRightLeft,
+        href: "/app/compta/tresorerie/operations",
+        permission: "tresorerie:manage",
+      },
+      {
+        title: "Sessions de caisse",
+        icon: LockKeyhole,
+        href: "/app/compta/tresorerie/sessions-caisse",
+        permission: "tresorerie:manage",
       },
     ],
   },

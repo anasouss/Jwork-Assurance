@@ -150,19 +150,21 @@ export default function JournalTresoreriePage() {
                 <TableHead className="px-4 text-white">Compte</TableHead>
                 <TableHead className="px-4 text-white">Libellé</TableHead>
                 <TableHead className="px-4 text-white">Référence</TableHead>
+                <TableHead className="px-4 text-white">Opération</TableHead>
                 <TableHead className="px-4 text-right text-white">Entrée</TableHead>
                 <TableHead className="px-4 text-right text-white">Sortie</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {movements.isLoading ? (
-                <TableRowsSkeleton colSpan={6} rows={8} />
+                <TableRowsSkeleton colSpan={7} rows={8} />
               ) : (movements.data?.rows ?? []).map((movement) => (
                 <TableRow key={movement.id}>
                   <TableCell className="px-4 py-3">{formatTreasuryDate(movement.dateOperation)}</TableCell>
                   <TableCell className="px-4 py-3 font-semibold">{movement.compteTresorerie}</TableCell>
                   <TableCell className="px-4 py-3">{movement.libelle}</TableCell>
                   <TableCell className="px-4 py-3">{movement.reference || "-"}</TableCell>
+                  <TableCell className="px-4 py-3">{movement.numeroOperationTresorerie || "-"}</TableCell>
                   <TableCell className="px-4 py-3 text-right text-emerald-700">
                     {movement.sens === "ENTREE" ? (
                       <span className="inline-flex items-center gap-1">
@@ -183,7 +185,7 @@ export default function JournalTresoreriePage() {
               ))}
               {!movements.isLoading && (movements.data?.rows.length ?? 0) === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun mouvement ne correspond aux filtres.
                   </TableCell>
                 </TableRow>

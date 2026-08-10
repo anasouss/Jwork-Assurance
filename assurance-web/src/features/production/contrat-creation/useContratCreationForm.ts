@@ -736,6 +736,9 @@ export function useContratCreationForm(
       if (!vehicule.nombrePlaces?.trim()) {
         nextErrors[`vehicules.${index}.nombrePlaces`] = "Nombre de places obligatoire.";
       }
+      if (!vehicule.dateExpirationCarteGrise) {
+        nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "Date validité CG obligatoire.";
+      }
       if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
         nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
       }
@@ -929,6 +932,11 @@ export function useContratCreationForm(
         }
         requireField(`vehicules.${index}.crm`, vehicule.crm, "CRM obligatoire.");
         requireField(`vehicules.${index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");
+        requireField(
+          `vehicules.${index}.dateExpirationCarteGrise`,
+          vehicule.dateExpirationCarteGrise,
+          "Date validité CG obligatoire."
+        );
         if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
           nextErrors[`vehicules.${index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
         }
@@ -1022,6 +1030,11 @@ export function useContratCreationForm(
         }
         requireField(`vehicules.${target.index}.crm`, vehicule.crm, "CRM obligatoire.");
         requireField(`vehicules.${target.index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");
+        requireField(
+          `vehicules.${target.index}.dateExpirationCarteGrise`,
+          vehicule.dateExpirationCarteGrise,
+          "Date validité CG obligatoire."
+        );
         if (isBeforeToday(vehicule.dateExpirationCarteGrise, today)) {
           nextErrors[`vehicules.${target.index}.dateExpirationCarteGrise`] = "La validité CG ne doit pas être expirée.";
         }

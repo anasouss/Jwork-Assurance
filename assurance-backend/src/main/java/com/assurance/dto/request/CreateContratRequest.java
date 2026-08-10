@@ -117,6 +117,7 @@ public class CreateContratRequest {
         private String sousClasse;
         private String ptc;
         private LocalDate datePremiereCirculation;
+        @NotNull(message = "Date validité CG obligatoire")
         private LocalDate dateExpirationCarteGrise;
         private LocalDate dateEffet;
         private LocalDate dateEcheance;

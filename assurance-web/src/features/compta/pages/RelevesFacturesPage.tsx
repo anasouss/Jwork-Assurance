@@ -1126,7 +1126,7 @@ function Header(props: { children?: ReactNode; align?: "left" | "right" | "cente
 }
 
 function MoneyCell({ value, strong }: { value: number; strong?: boolean }) {
-  return <td className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${strong ? "font-semibold" : ""}`}>{formatMoney(value)}</td>;
+  return <td className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${strong ? "font-semibold" : ""}`}>{formatAmount(value)}</td>;
 }
 
 function SummaryLine({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
@@ -1166,11 +1166,15 @@ function PageFooter(props: {
 }
 
 function formatMoney(value: number) {
+  return `${formatAmount(value)} MAD`;
+}
+
+function formatAmount(value: number) {
   const amount = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value || 0).replace(/[\u00a0\u202f]/g, " ");
-  return `${amount} MAD`;
+  return amount;
 }
 
 function taxesAndFees(value: { taxes: number; accessoires: number }) {

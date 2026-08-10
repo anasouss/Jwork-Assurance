@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { TableRowsSkeleton } from "@/components/shared";
 import { comptaApi } from "../api";
 import { parseAccountingAmount } from "../format";
 import type { CashSession } from "../types";
@@ -90,6 +91,9 @@ export default function SessionsCaissePage() {
     account.typeCompte === "CAISSE" && account.actif
   );
   const dialogVisible = openDialog || Boolean(sessionToClose);
+  const visibleSessions = (sessions.data ?? []).filter(
+    (session) => !initialAccountId || session.compteTresorerieId === initialAccountId
+  );
 
   return (
     <div className="grid gap-5">
@@ -107,23 +111,22 @@ export default function SessionsCaissePage() {
       </header>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Caisse</TableHead>
-              <TableHead>Caissier</TableHead>
-              <TableHead>Ouverture</TableHead>
-              <TableHead>Clôture</TableHead>
-              <TableHead className="text-right">Montant d'ouverture</TableHead>
-              <TableHead className="text-right">Écart de clôture</TableHead>
-              <TableHead>Statut</TableHead>
-              <TableHead className="w-14" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(sessions.data ?? [])
-              .filter((session) => !initialAccountId || session.compteTresorerieId === initialAccountId)
-              .map((session) => (
+        {sessions.isLoading || visibleSessions.length > 0 ? (
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow>
+                <TableHead>Caisse</TableHead>
+                <TableHead>Caissier</TableHead>
+                <TableHead>Ouverture</TableHead>
+                <TableHead>Clôture</TableHead>
+                <TableHead className="text-right">Montant d'ouverture</TableHead>
+                <TableHead className="text-right">Écart de clôture</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead className="w-14" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.isLoading ? <TableRowsSkeleton colSpan={8} rows={4} /> : visibleSessions.map((session) => (
               <TableRow key={session.id}>
                 <TableCell className="font-semibold">{session.compteTresorerie}</TableCell>
                 <TableCell>{session.utilisateur}</TableCell>
@@ -151,18 +154,20 @@ export default function SessionsCaissePage() {
                   )}
                 </TableCell>
               </TableRow>
-            ))}
-            {!sessions.isLoading && (sessions.data ?? []).filter(
-              (session) => !initialAccountId || session.compteTresorerieId === initialAccountId
-            ).length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                  Aucune activité de caisse enregistrée.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="flex items-center gap-3 px-4 py-6 text-muted-foreground">
+            <div className="grid size-9 shrink-0 place-items-center rounded-md bg-muted">
+              <LockKeyhole className="size-5" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-foreground">Aucune activité de caisse</div>
+              <p className="text-sm">Ouvrez la caisse pour commencer la journée et enregistrer son comptage.</p>
+            </div>
+          </div>
+        )}
       </section>
 
       <Dialog open={dialogVisible} onOpenChange={(open) => !open && resetDialog()}>

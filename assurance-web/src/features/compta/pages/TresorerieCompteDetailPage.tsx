@@ -11,6 +11,7 @@ import {
   List,
   LockKeyhole,
   ReceiptText,
+  ShieldCheck,
   WalletCards,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -100,17 +101,17 @@ export default function TresorerieCompteDetailPage() {
               Journal complet
             </Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant={account?.typeCompte === "CAISSE" ? "outline" : "default"} asChild>
             <Link to={`/app/compta/tresorerie/operations?compteId=${accountId}`}>
               <ArrowRightLeft className="size-4" />
               Transférer ou corriger
             </Link>
           </Button>
           {account?.typeCompte === "CAISSE" && (
-            <Button variant="outline" asChild>
+            <Button asChild>
               <Link to={`/app/compta/tresorerie/sessions-caisse?compteId=${accountId}`}>
                 <LockKeyhole className="size-4" />
-                Ouverture et clôture de caisse
+                {openSession ? "Clôturer la caisse" : "Ouvrir la caisse"}
               </Link>
             </Button>
           )}
@@ -121,37 +122,44 @@ export default function TresorerieCompteDetailPage() {
         <Summary
           label="Solde comptable"
           value={account ? formatTreasuryMoney(account.soldeCourant) : "-"}
+          icon={<CircleDollarSign className="size-4" />}
         />
         <Summary
           label="Type"
           value={account?.typeCompte === "CAISSE" ? "Caisse" : "Compte bancaire"}
+          icon={account?.typeCompte === "CAISSE"
+            ? <WalletCards className="size-4" />
+            : <Landmark className="size-4" />}
         />
         {account?.typeCompte === "CAISSE" ? (
           <Summary
-            label="État de la caisse"
+            label="Ouverture de caisse"
             value={openSession ? "Ouverte" : "Fermée"}
+            icon={<LockKeyhole className="size-4" />}
           />
         ) : (
-          <Summary label="Banque" value={account?.nomBanque || "Non renseignée"} />
+          <Summary
+            label="Banque"
+            value={account?.nomBanque || "Non renseignée"}
+            icon={<Landmark className="size-4" />}
+          />
         )}
         <div className="rounded-md border bg-card p-4">
-          <div className="text-xs uppercase text-muted-foreground">Statut</div>
+          <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+            <ShieldCheck className="size-4" />
+            Statut
+          </div>
           <Badge className="mt-2" variant={account?.actif ? "default" : "secondary"}>
             {account?.actif ? "Actif" : "Inactif"}
           </Badge>
         </div>
       </section>
 
-      {account?.typeCompte === "CAISSE" && (
-        <section className={openSession
-          ? "rounded-md border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30"
-          : "rounded-md border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/30"}
-        >
+      {account?.typeCompte === "CAISSE" && openSession && (
+        <section className="rounded-md border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
           <h2 className="font-semibold">Activité de caisse</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {openSession
-              ? `La caisse est ouverte par ${openSession.utilisateur}.`
-              : "La caisse est actuellement fermée."}
+            La caisse est ouverte par {openSession.utilisateur}.
           </p>
         </section>
       )}
@@ -252,13 +260,18 @@ export default function TresorerieCompteDetailPage() {
 function Summary({
   label,
   value,
+  icon,
 }: {
   label: string;
   value: string;
+  icon: ReactNode;
 }) {
   return (
     <div className="rounded-md border bg-card p-4">
-      <div className="text-xs uppercase text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+        {icon}
+        {label}
+      </div>
       <div className="mt-2 text-xl font-semibold">{value}</div>
     </div>
   );

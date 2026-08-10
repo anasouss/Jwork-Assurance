@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, Landmark, Scale, Search, Undo2, WalletCards } from "lucide-react";
+import { ArrowRightLeft, History, Landmark, Scale, Search, Undo2, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -128,7 +128,7 @@ export default function OperationsTresoreriePage() {
     <div className="grid gap-5">
       <header>
         <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-        <h1 className="mt-1 text-xl font-semibold">Transferts et ajustements</h1>
+        <h1 className="mt-1 text-xl font-semibold">Transferts et corrections</h1>
         <p className="text-sm text-muted-foreground">
           Déplacez des fonds entre comptes ou corrigez un solde avec une justification auditée.
         </p>
@@ -227,7 +227,7 @@ export default function OperationsTresoreriePage() {
                   onChange={setAdjustmentAccountId}
                 />
               </Field>
-              <Field label="Sens de l'ajustement">
+              <Field label="Sens de la correction">
                 <Select value={direction} onValueChange={(value) => setDirection(value as typeof direction)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -261,7 +261,7 @@ export default function OperationsTresoreriePage() {
         </div>
         <div className="mt-4 flex justify-end">
           <Button disabled={!formValid || createOperation.isPending} onClick={() => createOperation.mutate()}>
-            {mode === "TRANSFERT" ? "Enregistrer le transfert" : "Enregistrer l'ajustement"}
+            {mode === "TRANSFERT" ? "Enregistrer le transfert" : "Enregistrer la correction"}
           </Button>
         </div>
       </section>
@@ -293,22 +293,23 @@ export default function OperationsTresoreriePage() {
             </Button>
           </div>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>N° opération</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Destination</TableHead>
-              <TableHead className="text-right">Montant</TableHead>
-              <TableHead>Statut</TableHead>
-              <TableHead className="w-14" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {operations.isLoading ? <TableRowsSkeleton colSpan={8} rows={6} /> :
-              (operations.data?.rows ?? []).map((operation) => (
+        {operations.isLoading || (operations.data?.rows.length ?? 0) > 0 ? (
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow>
+                <TableHead>N° opération</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Destination</TableHead>
+                <TableHead className="text-right">Montant</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead className="w-14" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {operations.isLoading ? <TableRowsSkeleton colSpan={8} rows={6} /> :
+                (operations.data?.rows ?? []).map((operation) => (
                 <TableRow key={operation.id}>
                   <TableCell className="font-medium">{operation.numero}</TableCell>
                   <TableCell>{formatTreasuryDate(operation.dateOperation)}</TableCell>
@@ -330,10 +331,21 @@ export default function OperationsTresoreriePage() {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
-          </TableBody>
-        </Table>
-        {operations.data && (
+                ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="flex items-center gap-3 px-4 py-6 text-muted-foreground">
+            <div className="grid size-9 shrink-0 place-items-center rounded-md bg-muted">
+              <History className="size-5" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-foreground">Aucune opération enregistrée</div>
+              <p className="text-sm">Les transferts, corrections et contre-écritures apparaîtront ici.</p>
+            </div>
+          </div>
+        )}
+        {operations.data && operations.data.page.totalElements > 0 && (
           <ServerPagination
             page={operations.data.page.number}
             totalPages={operations.data.page.totalPages}
@@ -408,9 +420,9 @@ function AccountSelect({
 function operationTypeLabel(type: TreasuryOperation["typeOperation"]) {
   const labels: Record<TreasuryOperation["typeOperation"], string> = {
     TRANSFERT: "Transfert",
-    AJUSTEMENT: "Ajustement",
+    AJUSTEMENT: "Correction",
     ANNULATION_TRANSFERT: "Annulation de transfert",
-    ANNULATION_AJUSTEMENT: "Annulation d'ajustement",
+    ANNULATION_AJUSTEMENT: "Annulation de correction",
   };
   return labels[type];
 }

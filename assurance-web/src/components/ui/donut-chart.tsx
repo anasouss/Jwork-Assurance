@@ -32,6 +32,7 @@ type DonutChartProps = {
 
 const integerFormatter = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
 const defaultValueFormatter = (value: number) => integerFormatter.format(value);
+const whiteSegmentBorder = "#CBD5E1";
 
 export function DonutChart({
   data,
@@ -91,6 +92,8 @@ export function DonutChart({
                 <Cell
                   key={item.key}
                   fill={item.color}
+                  stroke={isWhite(item.color) ? whiteSegmentBorder : "transparent"}
+                  strokeWidth={isWhite(item.color) ? 2 : 0}
                   className={cn(onSelect && "cursor-pointer")}
                   onClick={() => onSelect?.(item.key)}
                 />
@@ -120,7 +123,13 @@ export function DonutChart({
             const content = (
               <>
                 <span className="flex min-w-0 items-center gap-2 text-sm">
-                  <span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+                  <span
+                    className="size-2.5 shrink-0 rounded-sm"
+                    style={{
+                      backgroundColor: item.color,
+                      border: isWhite(item.color) ? `1px solid ${whiteSegmentBorder}` : undefined,
+                    }}
+                  />
                   <span className="truncate">{item.label}</span>
                 </span>
                 {showValues ? (
@@ -148,4 +157,9 @@ export function DonutChart({
       ) : null}
     </div>
   );
+}
+
+function isWhite(color: string) {
+  return ["#fff", "#ffffff", "rgb(255,255,255)", "rgba(255,255,255,1)"]
+    .includes(color.replaceAll(" ", "").toLowerCase());
 }

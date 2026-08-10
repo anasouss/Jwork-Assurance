@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, Scale, Search, Undo2 } from "lucide-react";
+import { ArrowRightLeft, Landmark, Scale, Search, Undo2, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -34,6 +34,7 @@ export default function OperationsTresoreriePage() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<EntryMode>("TRANSFERT");
   const [sourceId, setSourceId] = useState(initialAccountId);
+  const [destinationType, setDestinationType] = useState<"CAISSE" | "BANQUE" | "">("");
   const [destinationId, setDestinationId] = useState("");
   const [adjustmentAccountId, setAdjustmentAccountId] = useState(initialAccountId);
   const [direction, setDirection] = useState<"ENTREE" | "SORTIE">("ENTREE");
@@ -120,7 +121,7 @@ export default function OperationsTresoreriePage() {
     && Boolean(operationDate)
     && Boolean(reason.trim())
     && (mode === "TRANSFERT"
-      ? Boolean(sourceId && destinationId && sourceId !== destinationId)
+      ? Boolean(sourceId && destinationType && destinationId && sourceId !== destinationId)
       : Boolean(adjustmentAccountId));
 
   return (
@@ -167,11 +168,53 @@ export default function OperationsTresoreriePage() {
                   value={sourceId}
                   accounts={activeAccounts}
                   disabled={Boolean(initialAccountId)}
-                  onChange={setSourceId}
+                  onChange={(value) => {
+                    setSourceId(value);
+                    if (destinationId === value) setDestinationId("");
+                  }}
                 />
               </Field>
+              <Field label="Destination">
+                <div className="grid grid-cols-2 rounded-md border p-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={destinationType === "CAISSE"
+                      ? "bg-amber-100 text-amber-950 shadow-sm hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-50"
+                      : undefined}
+                    onClick={() => {
+                      setDestinationType("CAISSE");
+                      setDestinationId("");
+                    }}
+                  >
+                    <WalletCards className="size-4" />
+                    Caisse
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={destinationType === "BANQUE"
+                      ? "bg-amber-100 text-amber-950 shadow-sm hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-50"
+                      : undefined}
+                    onClick={() => {
+                      setDestinationType("BANQUE");
+                      setDestinationId("");
+                    }}
+                  >
+                    <Landmark className="size-4" />
+                    Compte bancaire
+                  </Button>
+                </div>
+              </Field>
               <Field label="Compte destination">
-                <AccountSelect value={destinationId} accounts={activeAccounts} onChange={setDestinationId} />
+                <AccountSelect
+                  value={destinationId}
+                  accounts={activeAccounts.filter((account) =>
+                    account.typeCompte === destinationType && account.id !== sourceId
+                  )}
+                  disabled={!destinationType}
+                  onChange={setDestinationId}
+                />
               </Field>
             </>
           ) : (

@@ -160,7 +160,7 @@ export default function SessionsCaissePage() {
         ) : (
           <div className="flex items-center gap-3 px-4 py-6 text-muted-foreground">
             <div className="grid size-9 shrink-0 place-items-center rounded-md bg-muted">
-              <LockKeyhole className="size-5" />
+              <LockKeyhole className="size-5 text-amber-600" />
             </div>
             <div>
               <div className="text-sm font-medium text-foreground">Aucune activité de caisse</div>

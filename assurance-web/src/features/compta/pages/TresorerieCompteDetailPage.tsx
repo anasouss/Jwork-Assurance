@@ -123,6 +123,7 @@ export default function TresorerieCompteDetailPage() {
           label="Solde comptable"
           value={account ? formatTreasuryMoney(account.soldeCourant) : "-"}
           icon={<CircleDollarSign className="size-4" />}
+          tone={Number(account?.soldeCourant ?? 0) < 0 ? "red" : "emerald"}
         />
         <Summary
           label="Type"
@@ -130,23 +131,32 @@ export default function TresorerieCompteDetailPage() {
           icon={account?.typeCompte === "CAISSE"
             ? <WalletCards className="size-4" />
             : <Landmark className="size-4" />}
+          tone={account?.typeCompte === "CAISSE" ? "amber" : "sky"}
         />
         {account?.typeCompte === "CAISSE" ? (
           <Summary
             label="Ouverture de caisse"
             value={openSession ? "Ouverte" : "Fermée"}
             icon={<LockKeyhole className="size-4" />}
+            tone={openSession ? "emerald" : "amber"}
           />
         ) : (
           <Summary
             label="Banque"
             value={account?.nomBanque || "Non renseignée"}
             icon={<Landmark className="size-4" />}
+            tone="sky"
           />
         )}
         <div className="rounded-md border bg-card p-4">
           <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
-            <ShieldCheck className="size-4" />
+            <span className={`grid size-7 place-items-center rounded-md ${
+              account?.actif
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                : "bg-muted text-muted-foreground"
+            }`}>
+              <ShieldCheck className="size-4" />
+            </span>
             Statut
           </div>
           <Badge className="mt-2" variant={account?.actif ? "default" : "secondary"}>
@@ -166,11 +176,14 @@ export default function TresorerieCompteDetailPage() {
 
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="border-b bg-muted/30 p-4">
-          <h2 className="font-semibold">Derniers mouvements</h2>
+          <h2 className="flex items-center gap-2 font-semibold">
+            <CircleDollarSign className="size-5 text-emerald-600" />
+            Derniers mouvements
+          </h2>
         </div>
         {movements.isLoading || (movements.data?.rows.length ?? 0) > 0 ? (
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Libellé</TableHead>
@@ -216,11 +229,14 @@ export default function TresorerieCompteDetailPage() {
 
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="border-b bg-muted/30 p-4">
-          <h2 className="font-semibold">Dernières opérations internes</h2>
+          <h2 className="flex items-center gap-2 font-semibold">
+            <ReceiptText className="size-5 text-amber-600" />
+            Dernières opérations internes
+          </h2>
         </div>
         {operations.isLoading || (operations.data?.rows.length ?? 0) > 0 ? (
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead>N° opération</TableHead>
                 <TableHead>Date</TableHead>
@@ -261,15 +277,26 @@ function Summary({
   label,
   value,
   icon,
+  tone,
 }: {
   label: string;
   value: string;
   icon: ReactNode;
+  tone: "emerald" | "amber" | "sky" | "red";
 }) {
+  const iconTone = {
+    emerald: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    amber: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+    sky: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+    red: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+  }[tone];
+
   return (
     <div className="rounded-md border bg-card p-4">
       <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
-        {icon}
+        <span className={`grid size-7 place-items-center rounded-md ${iconTone}`}>
+          {icon}
+        </span>
         {label}
       </div>
       <div className="mt-2 text-xl font-semibold">{value}</div>

@@ -269,7 +269,10 @@ export default function OperationsTresoreriePage() {
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b p-4">
           <div>
-            <h2 className="font-semibold">Historique des opérations</h2>
+            <h2 className="flex items-center gap-2 font-semibold">
+              <History className="size-5 text-sky-600" />
+              Historique des opérations
+            </h2>
             <p className="text-sm text-muted-foreground">Les annulations apparaissent comme des contre-écritures.</p>
           </div>
           <div className="flex gap-2">

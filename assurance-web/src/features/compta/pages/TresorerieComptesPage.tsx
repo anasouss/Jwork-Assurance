@@ -361,7 +361,7 @@ export default function TresorerieComptesPage() {
           </DialogHeader>
           <div className="overflow-auto rounded-md border">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/40">
                 <TableRow>
                   <TableHead className="w-14">Accès</TableHead>
                   <TableHead>Utilisateur</TableHead>

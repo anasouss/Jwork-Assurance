@@ -154,13 +154,13 @@ export default function InstrumentsTresoreriePage() {
       >
         <TabsList aria-label="Statut des moyens de paiement">
           <TabsTrigger value="EN_ATTENTE">
-            <Clock3 className="size-4" /> À encaisser
+            <Clock3 className="size-4 text-amber-600" /> À encaisser
           </TabsTrigger>
           <TabsTrigger value="CONFIRME">
-            <CheckCircle2 className="size-4" /> Confirmés
+            <CheckCircle2 className="size-4 text-emerald-600" /> Confirmés
           </TabsTrigger>
           <TabsTrigger value="REJETE">
-            <Ban className="size-4" /> Rejetés
+            <Ban className="size-4 text-red-600" /> Rejetés
           </TabsTrigger>
         </TabsList>
       </Tabs>

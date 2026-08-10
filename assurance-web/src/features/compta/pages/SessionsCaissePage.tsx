@@ -94,6 +94,7 @@ export default function SessionsCaissePage() {
   const visibleSessions = (sessions.data ?? []).filter(
     (session) => !initialAccountId || session.compteTresorerieId === initialAccountId
   );
+  const contextualCashAccount = cashAccounts.find((account) => account.id === initialAccountId);
 
   return (
     <div className="grid gap-5">
@@ -179,11 +180,13 @@ export default function SessionsCaissePage() {
             <DialogDescription>
               {sessionToClose
                 ? `${sessionToClose.compteTresorerie} · ${sessionToClose.utilisateur}`
+                : contextualCashAccount
+                  ? `${contextualCashAccount.libelle}. Le montant compté est comparé au solde comptable de cette caisse.`
                 : "Le montant compté est comparé au solde comptable de la caisse."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            {!sessionToClose && (
+            {!sessionToClose && !initialAccountId && (
               <div className="grid gap-2">
                 <Label>Caisse</Label>
                 <Select value={cashAccountId} onValueChange={setCashAccountId}>

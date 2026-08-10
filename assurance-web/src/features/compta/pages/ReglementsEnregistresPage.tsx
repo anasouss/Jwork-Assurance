@@ -33,6 +33,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import {
+  requiresBankAccountAtEntry,
+  requiresPaymentReference,
+  showsOriginatingBank,
+} from "../client-payment-methods";
 import { formatAccountingAmount } from "../format";
 import type {
   ClientPayment,
@@ -397,6 +402,8 @@ export default function ReglementsEnregistresPage() {
             {replacement.mode === "ESPECES" ? (
               <AccountSelect
                 accounts={accounts.data ?? []}
+                type="CAISSE"
+                label="Caisse créditée"
                 value={replacement.compteTresorerieId}
                 onChange={(value) => setReplacement((current) => ({
                   ...current,
@@ -415,16 +422,34 @@ export default function ReglementsEnregistresPage() {
                     }))}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label>Banque émettrice</Label>
-                  <Input
-                    value={replacement.banqueEmettrice}
-                    onChange={(event) => setReplacement((current) => ({
+                {requiresBankAccountAtEntry(replacement.mode) && (
+                  <AccountSelect
+                    accounts={accounts.data ?? []}
+                    type="BANQUE"
+                    label="Compte bancaire crédité"
+                    value={replacement.compteTresorerieId}
+                    onChange={(value) => setReplacement((current) => ({
                       ...current,
-                      banqueEmettrice: event.target.value,
+                      compteTresorerieId: value,
                     }))}
                   />
-                </div>
+                )}
+                {showsOriginatingBank(replacement.mode) && (
+                  <div className="grid gap-2">
+                    <Label>
+                      {replacement.mode === "CHEQUE" || replacement.mode === "EFFET"
+                        ? "Banque émettrice"
+                        : "Banque d’origine"}
+                    </Label>
+                    <Input
+                      value={replacement.banqueEmettrice}
+                      onChange={(event) => setReplacement((current) => ({
+                        ...current,
+                        banqueEmettrice: event.target.value,
+                      }))}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -446,19 +471,23 @@ export default function ReglementsEnregistresPage() {
 
 function AccountSelect({
   accounts,
+  type,
+  label,
   value,
   onChange,
 }: {
   accounts: TreasuryAccount[];
+  type: TreasuryAccount["typeCompte"];
+  label: string;
   value: string;
   onChange: (value: string) => void;
 }) {
   const options = accounts.filter(
-    (account) => account.actif && account.typeCompte === "CAISSE"
+    (account) => account.actif && account.typeCompte === type
   );
   return (
     <div className="grid gap-2">
-      <Label>Caisse</Label>
+      <Label>{label}</Label>
       <Select value={value} onValueChange={onChange} disabled={options.length === 0}>
         <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
         <SelectContent>
@@ -469,7 +498,7 @@ function AccountSelect({
       </Select>
       {options.length === 0 && (
         <p className="text-xs text-amber-700 dark:text-amber-300">
-          Aucune caisse active disponible
+          Aucun {type === "CAISSE" ? "compte de caisse" : "compte bancaire"} actif disponible
         </p>
       )}
     </div>
@@ -510,13 +539,16 @@ function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
         && account.typeCompte === "CAISSE"
     );
   }
-  const referenceRequired = [
-    "CHEQUE",
-    "EFFET",
-    "VIREMENT",
-    "VERSEMENT_BANCAIRE",
-  ].includes(row.mode);
-  if (referenceRequired && !row.referenceInstrument.trim()) return false;
+  if (requiresBankAccountAtEntry(row.mode)) {
+    const validBankAccount = accounts.some(
+      (account) => account.id === row.compteTresorerieId
+        && account.actif
+        && account.typeCompte === "BANQUE"
+    );
+    if (!validBankAccount) return false;
+  }
+  if (requiresPaymentReference(row.mode)
+    && !row.referenceInstrument.trim()) return false;
   return row.mode !== "EFFET" || Boolean(row.dateEcheance);
 }
 

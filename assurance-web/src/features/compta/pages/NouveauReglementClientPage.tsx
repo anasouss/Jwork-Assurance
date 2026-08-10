@@ -25,6 +25,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import {
+  requiresBankAccountAtEntry,
+  requiresPaymentReference,
+  showsOriginatingBank,
+} from "../client-payment-methods";
 import { formatAccountingAmount, parseAccountingAmount } from "../format";
 import type {
   ClientPaymentMode,
@@ -92,6 +97,9 @@ export default function NouveauReglementClientPage() {
   const remainingAmount = round(selectedTotal - paymentTotal);
   const activeCashAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "CAISSE"
+  );
+  const activeBankAccounts = (accounts.data ?? []).filter(
+    (account) => account.actif && account.typeCompte === "BANQUE"
   );
 
   useEffect(() => {
@@ -347,6 +355,8 @@ export default function NouveauReglementClientPage() {
               {method.mode === "ESPECES" ? (
                 <AccountSelect
                   accounts={accounts.data ?? []}
+                  type="CAISSE"
+                  label="Caisse créditée"
                   value={method.compteTresorerieId}
                   onChange={(value) => updateMethod(
                     method.key,
@@ -365,16 +375,34 @@ export default function NouveauReglementClientPage() {
                       )}
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Banque émettrice</Label>
-                    <Input
-                      value={method.banqueEmettrice}
-                      onChange={(event) => updateMethod(
+                  {requiresBankAccountAtEntry(method.mode) ? (
+                    <AccountSelect
+                      accounts={accounts.data ?? []}
+                      type="BANQUE"
+                      label="Compte bancaire crédité"
+                      value={method.compteTresorerieId}
+                      onChange={(value) => updateMethod(
                         method.key,
-                        { banqueEmettrice: event.target.value }
+                        { compteTresorerieId: value }
                       )}
                     />
-                  </div>
+                  ) : null}
+                  {showsOriginatingBank(method.mode) ? (
+                    <div className="grid gap-2">
+                      <Label>
+                        {method.mode === "CHEQUE" || method.mode === "EFFET"
+                          ? "Banque émettrice"
+                          : "Banque d’origine"}
+                      </Label>
+                      <Input
+                        value={method.banqueEmettrice}
+                        onChange={(event) => updateMethod(
+                          method.key,
+                          { banqueEmettrice: event.target.value }
+                        )}
+                      />
+                    </div>
+                  ) : null}
                 </>
               )}
             </div>
@@ -385,6 +413,14 @@ export default function NouveauReglementClientPage() {
               <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                 <AlertCircle className="size-4 shrink-0" />
                 Aucune caisse active n’est disponible.
+              </div>
+            ) : null}
+            {requiresBankAccountAtEntry(method.mode)
+              && !accounts.isLoading
+              && activeBankAccounts.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                <AlertCircle className="size-4 shrink-0" />
+                Aucun compte bancaire actif n’est disponible.
               </div>
             ) : null}
           </section>
@@ -444,15 +480,17 @@ function InvalidSelection({ message }: { message: string }) {
 
 function AccountSelect(props: {
   accounts: TreasuryAccount[];
+  type: TreasuryAccount["typeCompte"];
+  label: string;
   value: string;
   onChange: (value: string) => void;
 }) {
   const options = props.accounts.filter(
-    (account) => account.actif && account.typeCompte === "CAISSE"
+    (account) => account.actif && account.typeCompte === props.type
   );
   return (
     <div className="grid gap-2">
-      <Label>Caisse</Label>
+      <Label>{props.label}</Label>
       <Select
         value={props.value}
         onValueChange={props.onChange}
@@ -570,13 +608,16 @@ function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[]) {
         && account.typeCompte === "CAISSE"
     );
   }
-  const referenceRequired = [
-    "CHEQUE",
-    "EFFET",
-    "VIREMENT",
-    "VERSEMENT_BANCAIRE",
-  ].includes(method.mode);
-  if (referenceRequired && !method.referenceInstrument.trim()) return false;
+  if (requiresBankAccountAtEntry(method.mode)) {
+    const validBankAccount = accounts.some(
+      (account) => account.id === method.compteTresorerieId
+        && account.actif
+        && account.typeCompte === "BANQUE"
+    );
+    if (!validBankAccount) return false;
+  }
+  if (requiresPaymentReference(method.mode)
+    && !method.referenceInstrument.trim()) return false;
   return method.mode !== "EFFET" || Boolean(method.dateEcheance);
 }
 

@@ -74,6 +74,12 @@ import java.util.stream.Collectors;
 public class ReglementClientService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private static final Set<ModeReglementClient> BANK_ACCOUNT_REQUIRED_MODES = Set.of(
+            ModeReglementClient.VIREMENT,
+            ModeReglementClient.VERSEMENT_BANCAIRE,
+            ModeReglementClient.CARTE,
+            ModeReglementClient.PRELEVEMENT
+    );
 
     private final DocumentClientService documentClientService;
     private final DocumentClientRepository documentClientRepository;
@@ -701,6 +707,12 @@ public class ReglementClientService {
         }
         if (cash && (account == null || account.getTypeCompte() != TypeCompteTresorerie.CAISSE)) {
             throw new BadRequestException("Un règlement en espèces doit être rattaché à une caisse active");
+        }
+        if (!cash && account != null && account.getTypeCompte() != TypeCompteTresorerie.BANQUE) {
+            throw new BadRequestException("Ce moyen de règlement doit être rattaché à un compte bancaire");
+        }
+        if (BANK_ACCOUNT_REQUIRED_MODES.contains(request.getMode()) && account == null) {
+            throw new BadRequestException("Sélectionnez le compte bancaire crédité");
         }
         validateInstrumentReference(request);
         return InstrumentReglementClient.builder()

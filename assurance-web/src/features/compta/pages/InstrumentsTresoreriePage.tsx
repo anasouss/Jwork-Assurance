@@ -103,7 +103,9 @@ export default function InstrumentsTresoreriePage() {
   function openAction(instrument: PaymentInstrument, nextAction: InstrumentAction) {
     setAction(nextAction);
     setActiveInstrument(instrument);
-    setAccountId("");
+    setAccountId(nextAction === "CONFIRME"
+      ? instrument.compteTresorerieId ?? ""
+      : "");
     setOperationDate(TODAY);
     setReason("");
   }

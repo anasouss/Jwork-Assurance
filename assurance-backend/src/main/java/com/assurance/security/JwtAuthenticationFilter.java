@@ -43,6 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (userDetails instanceof UserPrincipal principal) {
                         TenantContext.setCurrentUser(principal.getId());
                         TenantContext.setCurrentAgence(principal.getAgenceId());
+                        TenantContext.setCurrentUsername(principal.getUsername());
                     }
                 } catch (RuntimeException ex) {
                     rejectInvalidToken(response);

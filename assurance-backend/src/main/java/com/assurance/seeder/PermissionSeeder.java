@@ -78,6 +78,7 @@ public class PermissionSeeder implements CommandLineRunner {
             permission("user:manage", "Gerer les utilisateurs", "admin"),
             permission("role:view", "Consulter les roles", "admin"),
             permission("role:manage", "Gerer les roles", "admin"),
+            permission("audit:view", "Consulter l'historique d'audit", "admin"),
             restricted("config:view", "Consulter la configuration", "config"),
             restricted("config:manage", "Gerer la configuration", "config"),
             permission("referentiel:view", "Consulter les referentiels", "referentiel"),

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -5,9 +6,11 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   ArrowUpRight,
+  CircleDollarSign,
   Landmark,
   List,
   LockKeyhole,
+  ReceiptText,
   WalletCards,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +103,7 @@ export default function TresorerieCompteDetailPage() {
           <Button variant="outline" asChild>
             <Link to={`/app/compta/tresorerie/operations?compteId=${accountId}`}>
               <ArrowRightLeft className="size-4" />
-              Transférer ou ajuster
+              Transférer ou corriger
             </Link>
           </Button>
           {account?.typeCompte === "CAISSE" && (
@@ -118,12 +121,21 @@ export default function TresorerieCompteDetailPage() {
         <Summary
           label="Solde comptable"
           value={account ? formatTreasuryMoney(account.soldeCourant) : "-"}
+          tone="emerald"
         />
         <Summary
           label="Type"
           value={account?.typeCompte === "CAISSE" ? "Caisse" : "Compte bancaire"}
         />
-        <Summary label="Banque" value={account?.nomBanque || "-"} />
+        {account?.typeCompte === "CAISSE" ? (
+          <Summary
+            label="État de la caisse"
+            value={openSession ? "Ouverte" : "Fermée"}
+            tone={openSession ? "emerald" : "amber"}
+          />
+        ) : (
+          <Summary label="Banque" value={account?.nomBanque || "Non renseignée"} />
+        )}
         <div className="rounded-md border bg-card p-4">
           <div className="text-xs uppercase text-muted-foreground">Statut</div>
           <Badge className="mt-2" variant={account?.actif ? "default" : "secondary"}>
@@ -133,32 +145,36 @@ export default function TresorerieCompteDetailPage() {
       </section>
 
       {account?.typeCompte === "CAISSE" && (
-        <section className="rounded-md border bg-card p-4">
-          <h2 className="font-semibold">Session actuelle</h2>
+        <section className={openSession
+          ? "rounded-md border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30"
+          : "rounded-md border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/30"}
+        >
+          <h2 className="font-semibold">Activité de caisse</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {openSession
-              ? `Ouverte par ${openSession.utilisateur}`
-              : "Aucune session ouverte sur cette caisse."}
+              ? `La caisse est ouverte par ${openSession.utilisateur}.`
+              : "La caisse est actuellement fermée."}
           </p>
         </section>
       )}
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b p-4">
+        <div className="border-b border-l-4 border-l-emerald-600 bg-muted/30 p-4">
           <h2 className="font-semibold">Derniers mouvements</h2>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Libellé</TableHead>
-              <TableHead>Référence</TableHead>
-              <TableHead className="text-right">Entrée</TableHead>
-              <TableHead className="text-right">Sortie</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {movements.isLoading ? <TableRowsSkeleton colSpan={5} rows={5} /> : (movements.data?.rows ?? []).map((movement) => (
+        {movements.isLoading || (movements.data?.rows.length ?? 0) > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Libellé</TableHead>
+                <TableHead>Référence</TableHead>
+                <TableHead className="text-right">Entrée</TableHead>
+                <TableHead className="text-right">Sortie</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {movements.isLoading ? <TableRowsSkeleton colSpan={5} rows={5} /> : (movements.data?.rows ?? []).map((movement) => (
               <TableRow key={movement.id}>
                 <TableCell>{formatTreasuryDate(movement.dateOperation)}</TableCell>
                 <TableCell className="font-medium">{movement.libelle}</TableCell>
@@ -180,34 +196,35 @@ export default function TresorerieCompteDetailPage() {
                   ) : "-"}
                 </TableCell>
               </TableRow>
-            ))}
-            {!movements.isLoading && (movements.data?.rows.length ?? 0) === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                  Aucun mouvement enregistré.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <EmptyState
+            icon={<CircleDollarSign className="size-5" />}
+            title="Aucun mouvement enregistré"
+            description="Les encaissements, décaissements et transferts apparaîtront ici."
+          />
+        )}
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b p-4">
+        <div className="border-b border-l-4 border-l-amber-500 bg-muted/30 p-4">
           <h2 className="font-semibold">Dernières opérations internes</h2>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>N° opération</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Motif</TableHead>
-              <TableHead className="text-right">Montant</TableHead>
-              <TableHead>Statut</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(operations.data?.rows ?? []).map((operation) => (
+        {operations.isLoading || (operations.data?.rows.length ?? 0) > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>N° opération</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Motif</TableHead>
+                <TableHead className="text-right">Montant</TableHead>
+                <TableHead>Statut</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {operations.isLoading ? <TableRowsSkeleton colSpan={5} rows={3} /> : (operations.data?.rows ?? []).map((operation) => (
               <TableRow key={operation.id}>
                 <TableCell className="font-medium">{operation.numero}</TableCell>
                 <TableCell>{formatTreasuryDate(operation.dateOperation)}</TableCell>
@@ -219,26 +236,62 @@ export default function TresorerieCompteDetailPage() {
                   {operation.statut === "ANNULEE" ? "Annulée" : "Confirmée"}
                 </TableCell>
               </TableRow>
-            ))}
-            {!operations.isLoading && (operations.data?.rows.length ?? 0) === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                  Aucune opération interne enregistrée.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <EmptyState
+            icon={<ReceiptText className="size-5" />}
+            title="Aucune opération interne"
+            description="Les transferts, corrections et contre-écritures apparaîtront ici."
+          />
+        )}
       </section>
     </div>
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function Summary({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "emerald" | "amber";
+}) {
+  const accent = tone === "emerald"
+    ? "border-l-emerald-600"
+    : tone === "amber"
+      ? "border-l-amber-500"
+      : "border-l-border";
+
   return (
-    <div className="rounded-md border bg-card p-4">
+    <div className={`rounded-md border border-l-4 bg-card p-4 ${accent}`}>
       <div className="text-xs uppercase text-muted-foreground">{label}</div>
       <div className="mt-2 text-xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-6 text-muted-foreground">
+      <div className="grid size-9 shrink-0 place-items-center rounded-md bg-muted">
+        {icon}
+      </div>
+      <div>
+        <div className="text-sm font-medium text-foreground">{title}</div>
+        <p className="text-sm">{description}</p>
+      </div>
     </div>
   );
 }

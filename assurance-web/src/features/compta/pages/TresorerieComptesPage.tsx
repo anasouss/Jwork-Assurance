@@ -204,103 +204,38 @@ export default function TresorerieComptesPage() {
         </Button>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {(accounts.data ?? []).map((account) => (
-          <article
-            key={account.id}
-            role="link"
-            tabIndex={0}
-            className="cursor-pointer rounded-md border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={() => navigate(`/app/compta/tresorerie/comptes/${account.id}`)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                navigate(`/app/compta/tresorerie/comptes/${account.id}`);
-              }
-            }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                {account.typeCompte === "CAISSE"
-                  ? <WalletCards className="size-5" />
-                  : <Landmark className="size-5" />}
-                <div>
-                  <h2 className="font-semibold">{account.libelle}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {account.code}
-                    {account.nomBanque ? ` · ${account.nomBanque}` : ""}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Badge variant={account.actif ? "default" : "secondary"}>
-                  {account.actif ? "Actif" : "Inactif"}
-                </Badge>
-                {canManage && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title="Modifier le compte"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openAccount(account);
-                      }}
-                    >
-                      <Edit3 className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title="Affecter les utilisateurs"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setAssignmentDraft({});
-                        setAssignmentAccount(account);
-                      }}
-                    >
-                      <Users className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title={account.actif ? "Désactiver le compte" : "Activer le compte"}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setAccountToToggle(account);
-                      }}
-                    >
-                      {account.actif
-                        ? <PowerOff className="size-4" />
-                        : <Power className="size-4" />}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="mt-5 flex items-end justify-between gap-3">
-              <div>
-                <div className="text-2xl font-semibold">
-                  {formatTreasuryMoney(account.soldeCourant)}
-                </div>
-                <div className="text-xs text-muted-foreground">Solde comptable</div>
-              </div>
-              <div className="text-right text-xs text-muted-foreground">
-                <div>{account.typeCompte === "CAISSE" ? "Caisse" : "Compte bancaire"}</div>
-                {account.rib && <div>{account.rib}</div>}
-              </div>
-            </div>
-          </article>
-        ))}
-        {!accounts.isLoading && (accounts.data?.length ?? 0) === 0 && (
-          <div className="rounded-md border border-dashed p-10 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
-            Aucun compte de trésorerie n’est configuré.
-          </div>
-        )}
-      </section>
+      <div className="grid gap-5">
+        <AccountSection
+          title="Caisses"
+          description="Espèces, ouverture quotidienne et clôture de caisse."
+          type="CAISSE"
+          accounts={(accounts.data ?? []).filter((account) => account.typeCompte === "CAISSE")}
+          loading={accounts.isLoading}
+          canManage={canManage}
+          onOpen={(account) => navigate(`/app/compta/tresorerie/comptes/${account.id}`)}
+          onEdit={openAccount}
+          onAssign={(account) => {
+            setAssignmentDraft({});
+            setAssignmentAccount(account);
+          }}
+          onToggle={setAccountToToggle}
+        />
+        <AccountSection
+          title="Comptes bancaires"
+          description="Virements, versements et suivi des soldes bancaires."
+          type="BANQUE"
+          accounts={(accounts.data ?? []).filter((account) => account.typeCompte === "BANQUE")}
+          loading={accounts.isLoading}
+          canManage={canManage}
+          onOpen={(account) => navigate(`/app/compta/tresorerie/comptes/${account.id}`)}
+          onEdit={openAccount}
+          onAssign={(account) => {
+            setAssignmentDraft({});
+            setAssignmentAccount(account);
+          }}
+          onToggle={setAccountToToggle}
+        />
+      </div>
 
       <Dialog
         open={dialogOpen}
@@ -531,5 +466,158 @@ export default function TresorerieComptesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function AccountSection({
+  title,
+  description,
+  type,
+  accounts,
+  loading,
+  canManage,
+  onOpen,
+  onEdit,
+  onAssign,
+  onToggle,
+}: {
+  title: string;
+  description: string;
+  type: TreasuryAccountType;
+  accounts: TreasuryAccount[];
+  loading: boolean;
+  canManage: boolean;
+  onOpen: (account: TreasuryAccount) => void;
+  onEdit: (account: TreasuryAccount) => void;
+  onAssign: (account: TreasuryAccount) => void;
+  onToggle: (account: TreasuryAccount) => void;
+}) {
+  const isCash = type === "CAISSE";
+
+  return (
+    <section>
+      <div className={`flex items-start justify-between gap-3 border-b border-l-4 pb-3 pl-3 ${
+        isCash ? "border-l-amber-500" : "border-l-sky-600"
+      }`}>
+        <div className="flex items-start gap-3">
+          <div className={`grid size-9 shrink-0 place-items-center rounded-md ${
+            isCash
+              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+              : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+          }`}>
+            {isCash ? <WalletCards className="size-5" /> : <Landmark className="size-5" />}
+          </div>
+          <div>
+            <h2 className="font-semibold">{title}</h2>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <Badge variant="secondary">{accounts.length}</Badge>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {loading && Array.from({ length: 2 }).map((_, index) => (
+          <div key={index} className="h-36 animate-pulse rounded-md border bg-muted/40" />
+        ))}
+        {!loading && accounts.map((account) => (
+          <article
+            key={account.id}
+            role="link"
+            tabIndex={0}
+            className={`cursor-pointer rounded-md border border-l-4 bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              isCash ? "border-l-amber-500" : "border-l-sky-600"
+            }`}
+            onClick={() => onOpen(account)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen(account);
+              }
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                {isCash
+                  ? <WalletCards className="size-5 shrink-0 text-amber-700" />
+                  : <Landmark className="size-5 shrink-0 text-sky-700" />}
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold">{account.libelle}</h3>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {account.code}
+                    {account.nomBanque ? ` · ${account.nomBanque}` : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Badge variant={account.actif ? "default" : "secondary"}>
+                  {account.actif ? "Actif" : "Inactif"}
+                </Badge>
+                {canManage && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Modifier le compte"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEdit(account);
+                      }}
+                    >
+                      <Edit3 className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Affecter les utilisateurs"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onAssign(account);
+                      }}
+                    >
+                      <Users className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title={account.actif ? "Désactiver le compte" : "Activer le compte"}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggle(account);
+                      }}
+                    >
+                      {account.actif
+                        ? <PowerOff className="size-4" />
+                        : <Power className="size-4" />}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 flex items-end justify-between gap-3">
+              <div>
+                <div className="text-2xl font-semibold">
+                  {formatTreasuryMoney(account.soldeCourant)}
+                </div>
+                <div className="text-xs text-muted-foreground">Solde comptable</div>
+              </div>
+              <div className="max-w-[45%] text-right text-xs text-muted-foreground">
+                <div>{isCash ? "Caisse" : "Compte bancaire"}</div>
+                {account.rib && <div className="truncate">{account.rib}</div>}
+              </div>
+            </div>
+          </article>
+        ))}
+        {!loading && accounts.length === 0 && (
+          <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+            {isCash
+              ? "Aucune caisse n’est configurée."
+              : "Aucun compte bancaire n’est configuré."}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

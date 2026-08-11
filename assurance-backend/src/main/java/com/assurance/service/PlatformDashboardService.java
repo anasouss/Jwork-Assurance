@@ -16,7 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -57,8 +61,73 @@ public class PlatformDashboardService {
                 .dateAu(dateAu)
                 .agenceId(agenceId)
                 .summary(summary(rows))
+                .productionTrend(productionTrend(agenceId, dateDu, dateAu))
                 .agencies(rows)
                 .build();
+    }
+
+    private List<PlatformDashboardResponse.ProductionTrendPoint> productionTrend(
+            Long agenceId,
+            LocalDate dateDu,
+            LocalDate dateAu
+    ) {
+        if (ChronoUnit.DAYS.between(dateDu, dateAu) <= 62) {
+            return dailyProductionTrend(agenceId, dateDu, dateAu);
+        }
+        return monthlyProductionTrend(agenceId, dateDu, dateAu);
+    }
+
+    private List<PlatformDashboardResponse.ProductionTrendPoint> dailyProductionTrend(
+            Long agenceId,
+            LocalDate dateDu,
+            LocalDate dateAu
+    ) {
+        Map<LocalDate, Object[]> rows = new LinkedHashMap<>();
+        for (Object[] row : quittanceRepository.sumDashboardProductionByDay(agenceId, dateDu, dateAu)) {
+            rows.put((LocalDate) row[0], row);
+        }
+
+        List<PlatformDashboardResponse.ProductionTrendPoint> result = new ArrayList<>();
+        LocalDate cursor = dateDu;
+        while (!cursor.isAfter(dateAu)) {
+            Object[] row = rows.get(cursor);
+            result.add(PlatformDashboardResponse.ProductionTrendPoint.builder()
+                    .date(cursor)
+                    .granularite("DAY")
+                    .primeNette(row == null ? BigDecimal.ZERO : decimal(row[1]))
+                    .primeTotale(row == null ? BigDecimal.ZERO : decimal(row[2]))
+                    .quittances(row == null ? 0L : number(row[3]))
+                    .build());
+            cursor = cursor.plusDays(1);
+        }
+        return result;
+    }
+
+    private List<PlatformDashboardResponse.ProductionTrendPoint> monthlyProductionTrend(
+            Long agenceId,
+            LocalDate dateDu,
+            LocalDate dateAu
+    ) {
+        Map<YearMonth, Object[]> rows = new LinkedHashMap<>();
+        for (Object[] row : quittanceRepository.sumDashboardProductionByMonth(agenceId, dateDu, dateAu)) {
+            rows.put(YearMonth.of(integer(row[0]), integer(row[1])), row);
+        }
+
+        List<PlatformDashboardResponse.ProductionTrendPoint> result = new ArrayList<>();
+        YearMonth cursor = YearMonth.from(dateDu);
+        YearMonth end = YearMonth.from(dateAu);
+        while (!cursor.isAfter(end)) {
+            Object[] row = rows.get(cursor);
+            result.add(PlatformDashboardResponse.ProductionTrendPoint.builder()
+                    .date(cursor.atDay(1))
+                    .granularite("MONTH")
+                    .primeNette(row == null ? BigDecimal.ZERO : decimal(row[2]))
+                    .primeTotale(row == null ? BigDecimal.ZERO : decimal(row[3]))
+                    .quittances(row == null ? 0L : number(row[4]))
+                    .build());
+            cursor = cursor.plusMonths(1);
+        }
+        return result;
     }
 
     private void requirePlatformMode(Long userId, Long currentAgenceId) {
@@ -160,6 +229,10 @@ public class PlatformDashboardService {
 
     private long number(Object value) {
         return value instanceof Number number ? number.longValue() : Long.parseLong(String.valueOf(value));
+    }
+
+    private int integer(Object value) {
+        return value instanceof Number number ? number.intValue() : Integer.parseInt(String.valueOf(value));
     }
 
     private BigDecimal decimal(Object value) {

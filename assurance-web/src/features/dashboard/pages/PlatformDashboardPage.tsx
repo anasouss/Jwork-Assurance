@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import {
   Building2,
   CalendarClock,
@@ -13,12 +15,14 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -32,7 +36,7 @@ import { useDashboardDateRange, type DatePreset } from "@/hooks/use-dashboard-da
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { platformDashboardApi } from "../api";
-import type { PlatformAgencyRow } from "../types";
+import type { PlatformAgencyRow, PlatformProductionTrendPoint } from "../types";
 
 const presets: Array<{ value: DatePreset; label: string }> = [
   { value: "7d", label: "7 jours" },
@@ -88,7 +92,7 @@ export default function PlatformDashboardPage() {
 
   return (
     <div className="mx-auto grid w-full max-w-[1700px] gap-5">
-      <header className="flex flex-col gap-4 border-b pb-5 xl:flex-row xl:items-end xl:justify-between">
+      <header className="grid gap-4 border-b pb-5">
         <div>
           <p className="text-sm font-medium text-blue-700 dark:text-blue-400">Administration plateforme</p>
           <h1 className="mt-1 text-2xl font-semibold">Vue des agences</h1>
@@ -96,8 +100,8 @@ export default function PlatformDashboardPage() {
             Production consolidée et activité opérationnelle par agence.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="grid min-w-64 gap-1.5 text-sm">
+        <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_220px_220px_auto]">
+          <label className="grid gap-1.5 text-sm">
             <span className="font-medium">Agence</span>
             <Select value={agencyId} onValueChange={setAgencyId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -110,7 +114,7 @@ export default function PlatformDashboardPage() {
             </Select>
           </label>
           <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">Du</span>
+            <span className="font-medium">Date du</span>
             <DatePicker
               date={range.fromStr}
               maxDate={dateOnly(range.toStr)}
@@ -120,7 +124,7 @@ export default function PlatformDashboardPage() {
             />
           </label>
           <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">Au</span>
+            <span className="font-medium">Date au</span>
             <DatePicker
               date={range.toStr}
               minDate={dateOnly(range.fromStr)}
@@ -129,19 +133,22 @@ export default function PlatformDashboardPage() {
               }}
             />
           </label>
-          <div className="flex items-center gap-1 rounded-md border bg-muted/30 p-1">
-            {presets.map((preset) => (
-              <Button
-                key={preset.value}
-                type="button"
-                size="sm"
-                variant={range.activePreset === preset.value ? "default" : "ghost"}
-                className={cn("h-8", range.activePreset === preset.value && "bg-blue-600 hover:bg-blue-700")}
-                onClick={() => range.setPreset(preset.value)}
-              >
-                {preset.label}
-              </Button>
-            ))}
+          <div className="grid gap-1.5 text-sm md:col-span-2 xl:col-span-1">
+            <span className="font-medium">Période rapide</span>
+            <div className="flex h-9 items-center gap-1 rounded-md border bg-muted/30 p-1">
+              {presets.map((preset) => (
+                <Button
+                  key={preset.value}
+                  type="button"
+                  size="sm"
+                  variant={range.activePreset === preset.value ? "default" : "ghost"}
+                  className={cn("h-7 flex-1", range.activePreset === preset.value && "bg-blue-600 hover:bg-blue-700")}
+                  onClick={() => range.setPreset(preset.value)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
       </header>
@@ -178,10 +185,10 @@ export default function PlatformDashboardPage() {
 
           <section className="grid gap-5 xl:grid-cols-2">
             <DashboardPanel
-              title="Production par agence"
-              description="Prime nette et montant TTC sur la période sélectionnée."
+              title="Évolution de la production"
+              description="Prime nette et montant TTC dans le temps sur la période sélectionnée."
             >
-              <AgencyProductionChart rows={dashboard.data.agencies} />
+              <ProductionTrendChart rows={dashboard.data.productionTrend} />
             </DashboardPanel>
             <DashboardPanel
               title="Portefeuille par agence"
@@ -293,26 +300,29 @@ function DashboardPanel({
   );
 }
 
-function AgencyProductionChart({ rows }: { rows: PlatformAgencyRow[] }) {
-  const chartRows = [...rows]
-    .filter((row) => row.primeTotale > 0)
-    .sort((left, right) => right.primeTotale - left.primeTotale)
-    .slice(0, 10);
-  if (!chartRows.length) return <EmptyChart message="Aucune production sur cette période." />;
+function ProductionTrendChart({ rows }: { rows: PlatformProductionTrendPoint[] }) {
+  const hasProduction = rows.some((row) => row.primeTotale > 0);
+  if (!rows.length || !hasProduction) return <EmptyChart message="Aucune production sur cette période." />;
+  const monthly = rows[0]?.granularite === "MONTH";
+  const chartRows = rows.map((row) => ({
+    ...row,
+    label: format(dateOnly(row.date), monthly ? "MMM yy" : "dd MMM", { locale: fr }),
+  }));
 
   return (
     <ChartContainer config={productionChartConfig} className="h-[300px] w-full aspect-auto">
-      <BarChart data={chartRows} layout="vertical" margin={{ left: 8, right: 14 }}>
-        <CartesianGrid horizontal={false} />
-        <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => compactMoney(Number(value))} />
-        <YAxis type="category" dataKey="code" tickLine={false} axisLine={false} width={92} />
+      <LineChart data={chartRows} margin={{ left: 4, right: 12, top: 12, bottom: 0 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={28} />
+        <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => compactMoney(Number(value))} />
         <ChartTooltip
-          cursor={{ fill: "rgba(148, 163, 184, 0.10)" }}
+          cursor={false}
           content={<ChartTooltipContent formatter={(value: unknown) => moneyAmount(Number(value))} />}
         />
-        <Bar dataKey="primeNette" fill="var(--color-primeNette)" radius={[0, 3, 3, 0]} />
-        <Bar dataKey="primeTotale" fill="var(--color-primeTotale)" radius={[0, 3, 3, 0]} />
-      </BarChart>
+        <ChartLegend content={<ChartLegendContent />} />
+        <Line dataKey="primeTotale" type="monotone" stroke="var(--color-primeTotale)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+        <Line dataKey="primeNette" type="monotone" stroke="var(--color-primeNette)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+      </LineChart>
     </ChartContainer>
   );
 }
@@ -334,6 +344,7 @@ function AgencyPortfolioChart({ rows }: { rows: PlatformAgencyRow[] }) {
           cursor={{ fill: "rgba(148, 163, 184, 0.10)" }}
           content={<ChartTooltipContent formatter={(value: unknown) => `${Number(value).toLocaleString("fr-FR")} dossier(s)`} />}
         />
+        <ChartLegend content={<ChartLegendContent />} />
         <Bar dataKey="activeContracts" stackId="portfolio" fill="var(--color-activeContracts)" radius={[3, 0, 0, 3]} />
         <Bar dataKey="draftContracts" stackId="portfolio" fill="var(--color-draftContracts)" />
         <Bar dataKey="prospects" stackId="portfolio" fill="var(--color-prospects)" radius={[0, 3, 3, 0]} />

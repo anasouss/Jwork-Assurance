@@ -62,7 +62,16 @@ export type PlatformDashboardData = {
   dateAu: string;
   agenceId?: string | null;
   summary: PlatformDashboardSummary;
+  productionTrend: PlatformProductionTrendPoint[];
   agencies: PlatformAgencyRow[];
+};
+
+export type PlatformProductionTrendPoint = {
+  date: string;
+  granularite: "DAY" | "MONTH";
+  primeNette: number;
+  primeTotale: number;
+  quittances: number;
 };
 
 export type PlatformDashboardSummary = {

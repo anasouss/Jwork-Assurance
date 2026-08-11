@@ -15,7 +15,18 @@ public class PlatformDashboardResponse {
     private LocalDate dateAu;
     private Long agenceId;
     private Summary summary;
+    private List<ProductionTrendPoint> productionTrend;
     private List<AgencyRow> agencies;
+
+    @Data
+    @Builder
+    public static class ProductionTrendPoint {
+        private LocalDate date;
+        private String granularite;
+        private BigDecimal primeNette;
+        private BigDecimal primeTotale;
+        private long quittances;
+    }
 
     @Data
     @Builder

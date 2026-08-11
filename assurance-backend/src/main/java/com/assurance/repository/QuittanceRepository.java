@@ -97,17 +97,40 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                    count(q)
             from Quittance q
             left join q.mouvementContrat m
-            where q.contrat.agence.id = :agenceId
-              and q.globale = true
+            where q.globale = true
               and q.alternative = false
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
               and q.dateDebut between :dateDu and :dateAu
+              and (:agenceId is null or q.contrat.agence.id = :agenceId)
             group by year(q.dateDebut), month(q.dateDebut)
             order by year(q.dateDebut), month(q.dateDebut)
             """)
     List<Object[]> sumDashboardProductionByMonth(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
+
+    @Query("""
+            select q.dateDebut,
+                   coalesce(sum(q.primeNette), 0),
+                   coalesce(sum(q.primeTotale), 0),
+                   count(q)
+            from Quittance q
+            left join q.mouvementContrat m
+            where q.globale = true
+              and q.alternative = false
+              and q.contrat.prospection = false
+              and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
+              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and q.dateDebut between :dateDu and :dateAu
+              and (:agenceId is null or q.contrat.agence.id = :agenceId)
+            group by q.dateDebut
+            order by q.dateDebut
+            """)
+    List<Object[]> sumDashboardProductionByDay(
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu

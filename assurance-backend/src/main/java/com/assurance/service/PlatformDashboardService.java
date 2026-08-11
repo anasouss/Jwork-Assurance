@@ -36,8 +36,11 @@ public class PlatformDashboardService {
             throw new BadRequestException("Agence introuvable");
         }
 
-        Map<Long, Long> users = countMap(utilisateurRepository.countActiveUsersByAgency(agenceId));
-        Map<Long, Long> contracts = countMap(contratRepository.countActiveContractsByAgency(agenceId));
+        LocalDate today = LocalDate.now();
+        Map<Long, UserTotals> users = userMap(utilisateurRepository.countUsersByAgency(agenceId));
+        Map<Long, PortfolioTotals> portfolios = portfolioMap(
+                contratRepository.countPlatformPortfolioByAgency(agenceId, today, today.plusDays(30))
+        );
         Map<Long, ProductionTotals> production = productionMap(
                 quittanceRepository.sumPlatformProductionByAgency(agenceId, dateDu, dateAu)
         );
@@ -46,7 +49,7 @@ public class PlatformDashboardService {
                 .filter(agence -> agenceId == null || agence.getId().equals(agenceId))
                 .toList();
         List<PlatformDashboardResponse.AgencyRow> rows = selectedAgencies.stream()
-                .map(agence -> toRow(agence, users, contracts, production))
+                .map(agence -> toRow(agence, users, portfolios, production))
                 .toList();
 
         return PlatformDashboardResponse.builder()
@@ -70,10 +73,12 @@ public class PlatformDashboardService {
 
     private PlatformDashboardResponse.AgencyRow toRow(
             Agence agence,
-            Map<Long, Long> users,
-            Map<Long, Long> contracts,
+            Map<Long, UserTotals> users,
+            Map<Long, PortfolioTotals> portfolios,
             Map<Long, ProductionTotals> production
     ) {
+        UserTotals userTotals = users.getOrDefault(agence.getId(), UserTotals.empty());
+        PortfolioTotals portfolio = portfolios.getOrDefault(agence.getId(), PortfolioTotals.empty());
         ProductionTotals totals = production.getOrDefault(agence.getId(), ProductionTotals.empty());
         return PlatformDashboardResponse.AgencyRow.builder()
                 .id(agence.getId())
@@ -81,8 +86,12 @@ public class PlatformDashboardService {
                 .nom(agence.getNom())
                 .ville(agence.getVille())
                 .statut(agence.getStatut())
-                .activeUsers(users.getOrDefault(agence.getId(), 0L))
-                .activeContracts(contracts.getOrDefault(agence.getId(), 0L))
+                .totalUsers(userTotals.total())
+                .activeUsers(userTotals.active())
+                .activeContracts(portfolio.active())
+                .draftContracts(portfolio.drafts())
+                .prospects(portfolio.prospects())
+                .upcomingExpiries(portfolio.upcomingExpiries())
                 .quittances(totals.quittances())
                 .primeNette(totals.primeNette())
                 .taxes(totals.taxes())
@@ -95,8 +104,12 @@ public class PlatformDashboardService {
                 .totalAgencies(agenceRepository.count())
                 .activeAgencies(agenceRepository.countByStatut(StatutAgence.ACTIVE))
                 .displayedAgencies(rows.size())
+                .totalUsers(rows.stream().mapToLong(PlatformDashboardResponse.AgencyRow::getTotalUsers).sum())
                 .activeUsers(rows.stream().mapToLong(PlatformDashboardResponse.AgencyRow::getActiveUsers).sum())
                 .activeContracts(rows.stream().mapToLong(PlatformDashboardResponse.AgencyRow::getActiveContracts).sum())
+                .draftContracts(rows.stream().mapToLong(PlatformDashboardResponse.AgencyRow::getDraftContracts).sum())
+                .prospects(rows.stream().mapToLong(PlatformDashboardResponse.AgencyRow::getProspects).sum())
+                .upcomingExpiries(rows.stream().mapToLong(PlatformDashboardResponse.AgencyRow::getUpcomingExpiries).sum())
                 .quittances(rows.stream().mapToLong(PlatformDashboardResponse.AgencyRow::getQuittances).sum())
                 .primeNette(sum(rows, PlatformDashboardResponse.AgencyRow::getPrimeNette))
                 .taxes(sum(rows, PlatformDashboardResponse.AgencyRow::getTaxes))
@@ -111,10 +124,23 @@ public class PlatformDashboardService {
         return rows.stream().map(getter).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private Map<Long, Long> countMap(List<Object[]> rows) {
-        Map<Long, Long> result = new HashMap<>();
+    private Map<Long, UserTotals> userMap(List<Object[]> rows) {
+        Map<Long, UserTotals> result = new HashMap<>();
         for (Object[] row : rows) {
-            result.put(number(row[0]), number(row[1]));
+            result.put(number(row[0]), new UserTotals(number(row[1]), number(row[2])));
+        }
+        return result;
+    }
+
+    private Map<Long, PortfolioTotals> portfolioMap(List<Object[]> rows) {
+        Map<Long, PortfolioTotals> result = new HashMap<>();
+        for (Object[] row : rows) {
+            result.put(number(row[0]), new PortfolioTotals(
+                    number(row[1]),
+                    number(row[2]),
+                    number(row[3]),
+                    number(row[4])
+            ));
         }
         return result;
     }
@@ -154,6 +180,18 @@ public class PlatformDashboardService {
     ) {
         private static ProductionTotals empty() {
             return new ProductionTotals(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0L);
+        }
+    }
+
+    private record UserTotals(long total, long active) {
+        private static UserTotals empty() {
+            return new UserTotals(0L, 0L);
+        }
+    }
+
+    private record PortfolioTotals(long active, long drafts, long prospects, long upcomingExpiries) {
+        private static PortfolioTotals empty() {
+            return new PortfolioTotals(0L, 0L, 0L, 0L);
         }
     }
 }

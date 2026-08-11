@@ -37,12 +37,13 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     boolean existsByRoleId(Long roleId);
 
     @Query("""
-            select u.agence.id, count(u)
+            select u.agence.id,
+                   count(u),
+                   sum(case when u.actif = true then 1 else 0 end)
             from Utilisateur u
             where u.agence is not null
-              and u.actif = true
               and (:agenceId is null or u.agence.id = :agenceId)
             group by u.agence.id
             """)
-    List<Object[]> countActiveUsersByAgency(@Param("agenceId") Long agenceId);
+    List<Object[]> countUsersByAgency(@Param("agenceId") Long agenceId);
 }

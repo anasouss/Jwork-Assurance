@@ -23,8 +23,12 @@ public class PlatformDashboardResponse {
         private long totalAgencies;
         private long activeAgencies;
         private long displayedAgencies;
+        private long totalUsers;
         private long activeUsers;
         private long activeContracts;
+        private long draftContracts;
+        private long prospects;
+        private long upcomingExpiries;
         private long quittances;
         private BigDecimal primeNette;
         private BigDecimal taxes;
@@ -39,8 +43,12 @@ public class PlatformDashboardResponse {
         private String nom;
         private String ville;
         private StatutAgence statut;
+        private long totalUsers;
         private long activeUsers;
         private long activeContracts;
+        private long draftContracts;
+        private long prospects;
+        private long upcomingExpiries;
         private long quittances;
         private BigDecimal primeNette;
         private BigDecimal taxes;

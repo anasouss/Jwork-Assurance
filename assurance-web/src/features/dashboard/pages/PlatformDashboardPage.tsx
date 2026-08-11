@@ -1,12 +1,29 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, CircleDollarSign, FileText, LoaderCircle, RefreshCw, Users } from "lucide-react";
+import {
+  Building2,
+  CalendarClock,
+  CircleDollarSign,
+  ClipboardPenLine,
+  FileText,
+  LoaderCircle,
+  ReceiptText,
+  RefreshCw,
+  Users,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { authApi } from "@/lib/api/auth";
@@ -23,6 +40,17 @@ const presets: Array<{ value: DatePreset; label: string }> = [
   { value: "thisMonth", label: "Ce mois" },
   { value: "3m", label: "3 mois" },
 ];
+
+const productionChartConfig = {
+  primeNette: { label: "Prime nette", color: "#2563eb" },
+  primeTotale: { label: "Production TTC", color: "#059669" },
+} satisfies ChartConfig;
+
+const portfolioChartConfig = {
+  activeContracts: { label: "Contrats actifs", color: "#059669" },
+  draftContracts: { label: "Brouillons", color: "#d97706" },
+  prospects: { label: "Prospections", color: "#7c3aed" },
+} satisfies ChartConfig;
 
 export default function PlatformDashboardPage() {
   const navigate = useNavigate();
@@ -83,25 +111,21 @@ export default function PlatformDashboardPage() {
           </label>
           <label className="grid gap-1.5 text-sm">
             <span className="font-medium">Du</span>
-            <Input
-              type="date"
-              value={range.fromStr}
-              onChange={(event) => {
-                if (event.target.value) {
-                  range.setCustomRange(new Date(`${event.target.value}T12:00:00`), range.to);
-                }
+            <DatePicker
+              date={range.fromStr}
+              maxDate={dateOnly(range.toStr)}
+              onSelect={(date) => {
+                if (date) range.setCustomRange(date, range.to);
               }}
             />
           </label>
           <label className="grid gap-1.5 text-sm">
             <span className="font-medium">Au</span>
-            <Input
-              type="date"
-              value={range.toStr}
-              onChange={(event) => {
-                if (event.target.value) {
-                  range.setCustomRange(range.from, new Date(`${event.target.value}T12:00:00`));
-                }
+            <DatePicker
+              date={range.toStr}
+              minDate={dateOnly(range.fromStr)}
+              onSelect={(date) => {
+                if (date) range.setCustomRange(range.from, date);
               }}
             />
           </label>
@@ -143,9 +167,28 @@ export default function PlatformDashboardPage() {
         <>
           <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={Building2} label="Agences actives" value={`${dashboard.data.summary.activeAgencies}`} detail={`${dashboard.data.summary.totalAgencies} au total`} />
-            <Metric icon={Users} label="Utilisateurs actifs" value={`${dashboard.data.summary.activeUsers}`} detail="Sur la sélection" />
-            <Metric icon={FileText} label="Contrats actifs" value={`${dashboard.data.summary.activeContracts}`} detail={`${dashboard.data.summary.quittances} quittance(s)`} />
+            <Metric icon={Users} label="Utilisateurs actifs" value={`${dashboard.data.summary.activeUsers}`} detail={`${dashboard.data.summary.totalUsers} compte(s) au total`} />
+            <Metric icon={FileText} label="Contrats actifs" value={`${dashboard.data.summary.activeContracts}`} detail="Portefeuille en cours" />
+            <Metric icon={CalendarClock} label="Échéances à 30 jours" value={`${dashboard.data.summary.upcomingExpiries}`} detail="À traiter dès aujourd'hui" />
+            <Metric icon={ClipboardPenLine} label="Dossiers en préparation" value={`${dashboard.data.summary.draftContracts}`} detail={`${dashboard.data.summary.prospects} prospection(s)`} />
+            <Metric icon={ReceiptText} label="Quittances émises" value={`${dashboard.data.summary.quittances}`} detail="Sur la période sélectionnée" />
+            <Metric icon={CircleDollarSign} label="Prime nette" value={moneyAmount(dashboard.data.summary.primeNette)} detail="Sur la période sélectionnée" />
             <Metric icon={CircleDollarSign} label="Production TTC" value={moneyAmount(dashboard.data.summary.primeTotale)} detail={`${moneyAmount(dashboard.data.summary.taxes)} taxes et frais`} />
+          </section>
+
+          <section className="grid gap-5 xl:grid-cols-2">
+            <DashboardPanel
+              title="Production par agence"
+              description="Prime nette et montant TTC sur la période sélectionnée."
+            >
+              <AgencyProductionChart rows={dashboard.data.agencies} />
+            </DashboardPanel>
+            <DashboardPanel
+              title="Portefeuille par agence"
+              description="Contrats actifs, brouillons et prospections actuellement enregistrés."
+            >
+              <AgencyPortfolioChart rows={dashboard.data.agencies} />
+            </DashboardPanel>
           </section>
 
           <section className="overflow-hidden rounded-md border bg-card">
@@ -162,7 +205,8 @@ export default function PlatformDashboardPage() {
                   <TableHead>Agence</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Utilisateurs</TableHead>
-                  <TableHead className="text-right">Contrats actifs</TableHead>
+                  <TableHead className="text-right">Portefeuille</TableHead>
+                  <TableHead className="text-right">Échéances 30 j</TableHead>
                   <TableHead className="text-right">Quittances</TableHead>
                   <TableHead className="text-right">Prime nette</TableHead>
                   <TableHead className="text-right">Taxes et frais</TableHead>
@@ -173,7 +217,7 @@ export default function PlatformDashboardPage() {
               <TableBody>
                 {dashboard.data.agencies.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-28 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="h-28 text-center text-muted-foreground">
                       Aucune agence ne correspond à la sélection.
                     </TableCell>
                   </TableRow>
@@ -184,8 +228,15 @@ export default function PlatformDashboardPage() {
                       <div className="text-xs text-muted-foreground">{row.code}{row.ville ? ` · ${row.ville}` : ""}</div>
                     </TableCell>
                     <TableCell><AgencyStatus status={row.statut} /></TableCell>
-                    <TableCell className="text-right tabular-nums">{row.activeUsers}</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.activeContracts}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <div className="font-medium">{row.activeUsers} actifs</div>
+                      <div className="text-xs text-muted-foreground">{row.totalUsers} au total</div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <div className="font-medium">{row.activeContracts} actifs</div>
+                      <div className="text-xs text-muted-foreground">{row.draftContracts} brouillon(s) · {row.prospects} prospection(s)</div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{row.upcomingExpiries}</TableCell>
                     <TableCell className="text-right tabular-nums">{row.quittances}</TableCell>
                     <TableCell className="text-right tabular-nums">{moneyAmount(row.primeNette)}</TableCell>
                     <TableCell className="text-right tabular-nums">{moneyAmount(row.taxes)}</TableCell>
@@ -220,4 +271,87 @@ function AgencyStatus({ status }: { status: PlatformAgencyRow["statut"] }) {
   if (status === "ACTIVE") return <Badge variant="success">Active</Badge>;
   if (status === "SUSPENDED") return <Badge variant="warning">Suspendue</Badge>;
   return <Badge variant="gray">Archivée</Badge>;
+}
+
+function DashboardPanel({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="min-w-0 rounded-md border bg-card">
+      <div className="border-b px-5 py-4">
+        <h2 className="font-semibold">{title}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="p-4 sm:p-5">{children}</div>
+    </section>
+  );
+}
+
+function AgencyProductionChart({ rows }: { rows: PlatformAgencyRow[] }) {
+  const chartRows = [...rows]
+    .filter((row) => row.primeTotale > 0)
+    .sort((left, right) => right.primeTotale - left.primeTotale)
+    .slice(0, 10);
+  if (!chartRows.length) return <EmptyChart message="Aucune production sur cette période." />;
+
+  return (
+    <ChartContainer config={productionChartConfig} className="h-[300px] w-full aspect-auto">
+      <BarChart data={chartRows} layout="vertical" margin={{ left: 8, right: 14 }}>
+        <CartesianGrid horizontal={false} />
+        <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => compactMoney(Number(value))} />
+        <YAxis type="category" dataKey="code" tickLine={false} axisLine={false} width={92} />
+        <ChartTooltip
+          cursor={{ fill: "rgba(148, 163, 184, 0.10)" }}
+          content={<ChartTooltipContent formatter={(value: unknown) => moneyAmount(Number(value))} />}
+        />
+        <Bar dataKey="primeNette" fill="var(--color-primeNette)" radius={[0, 3, 3, 0]} />
+        <Bar dataKey="primeTotale" fill="var(--color-primeTotale)" radius={[0, 3, 3, 0]} />
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+function AgencyPortfolioChart({ rows }: { rows: PlatformAgencyRow[] }) {
+  const chartRows = [...rows]
+    .filter((row) => row.activeContracts + row.draftContracts + row.prospects > 0)
+    .sort((left, right) => right.activeContracts - left.activeContracts)
+    .slice(0, 10);
+  if (!chartRows.length) return <EmptyChart message="Aucun dossier enregistré." />;
+
+  return (
+    <ChartContainer config={portfolioChartConfig} className="h-[300px] w-full aspect-auto">
+      <BarChart data={chartRows} layout="vertical" margin={{ left: 8, right: 14 }}>
+        <CartesianGrid horizontal={false} />
+        <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />
+        <YAxis type="category" dataKey="code" tickLine={false} axisLine={false} width={92} />
+        <ChartTooltip
+          cursor={{ fill: "rgba(148, 163, 184, 0.10)" }}
+          content={<ChartTooltipContent formatter={(value: unknown) => `${Number(value).toLocaleString("fr-FR")} dossier(s)`} />}
+        />
+        <Bar dataKey="activeContracts" stackId="portfolio" fill="var(--color-activeContracts)" radius={[3, 0, 0, 3]} />
+        <Bar dataKey="draftContracts" stackId="portfolio" fill="var(--color-draftContracts)" />
+        <Bar dataKey="prospects" stackId="portfolio" fill="var(--color-prospects)" radius={[0, 3, 3, 0]} />
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return <div className="grid min-h-[300px] place-items-center text-sm text-muted-foreground">{message}</div>;
+}
+
+function compactMoney(value: number) {
+  if (Math.abs(value) >= 1_000_000) return `${moneyAmount(value / 1_000_000)} M`;
+  if (Math.abs(value) >= 1_000) return `${moneyAmount(value / 1_000)} k`;
+  return moneyAmount(value);
+}
+
+function dateOnly(value: string) {
+  return new Date(`${value}T00:00:00`);
 }

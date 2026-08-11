@@ -69,8 +69,12 @@ export type PlatformDashboardSummary = {
   totalAgencies: number;
   activeAgencies: number;
   displayedAgencies: number;
+  totalUsers: number;
   activeUsers: number;
   activeContracts: number;
+  draftContracts: number;
+  prospects: number;
+  upcomingExpiries: number;
   quittances: number;
   primeNette: number;
   taxes: number;
@@ -83,8 +87,12 @@ export type PlatformAgencyRow = {
   nom: string;
   ville?: string | null;
   statut: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  totalUsers: number;
   activeUsers: number;
   activeContracts: number;
+  draftContracts: number;
+  prospects: number;
+  upcomingExpiries: number;
   quittances: number;
   primeNette: number;
   taxes: number;

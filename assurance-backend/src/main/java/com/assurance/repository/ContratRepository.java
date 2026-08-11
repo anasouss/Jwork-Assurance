@@ -61,15 +61,28 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
     List<Object[]> countActivePortfolioByType(@Param("agenceId") Long agenceId);
 
     @Query("""
-            select c.agence.id, count(c)
+            select c.agence.id,
+                   sum(case when c.prospection = false
+                                  and c.brouillon = false
+                                  and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+                            then 1 else 0 end),
+                   sum(case when c.prospection = false and c.brouillon = true
+                            then 1 else 0 end),
+                   sum(case when c.prospection = true then 1 else 0 end),
+                   sum(case when c.prospection = false
+                                  and c.brouillon = false
+                                  and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+                                  and c.dateEcheance between :dateDu and :dateAu
+                            then 1 else 0 end)
             from Contrat c
-            where c.prospection = false
-              and c.brouillon = false
-              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
-              and (:agenceId is null or c.agence.id = :agenceId)
+            where (:agenceId is null or c.agence.id = :agenceId)
             group by c.agence.id
             """)
-    List<Object[]> countActiveContractsByAgency(@Param("agenceId") Long agenceId);
+    List<Object[]> countPlatformPortfolioByAgency(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
 
     List<Contrat> findByAgenceIdOrderByCreatedAtDesc(Long agenceId);
 

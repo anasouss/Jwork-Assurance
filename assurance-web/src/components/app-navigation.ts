@@ -26,6 +26,8 @@ export type AppModule = {
   disabled?: boolean;
   permission?: string;
   permissions?: readonly string[];
+  requiresAgencyContext?: boolean;
+  platformOnly?: boolean;
 };
 
 export type AppNavigationItem = AppModule & {
@@ -54,7 +56,8 @@ export const appModules: AppModule[] = [
 ];
 
 export const appNavigation: AppNavigationItem[] = [
-  { module: "dashboard", title: "Vue générale", url: "/app", icon: LayoutDashboard, exact: true },
+  { module: "dashboard", title: "Vue plateforme", url: "/app/platform", icon: LayoutDashboard, platformOnly: true },
+  { module: "dashboard", title: "Vue générale", url: "/app", icon: LayoutDashboard, exact: true, requiresAgencyContext: true },
   { module: "production", title: "Tableau de bord", url: "/app/production", icon: ShieldCheck, exact: true, permission: "contrat:view" },
   { module: "production", title: "Ajouter dossier", url: "/app/production/ajouter-dossier", icon: FilePlus2, permission: "contrat:create" },
   { module: "production", title: "Contrats", url: "/app/production/contrats", icon: Files, permission: "contrat:view" },
@@ -79,11 +82,29 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "admin", title: "Utilisateurs & rôles", url: "/app/admin", icon: UserCog, exact: true, permission: "user:view" },
 ];
 
-export function canSeeNavigationItem(item: AppModule, userPermissions: readonly string[]) {
+export function canSeeNavigationItem(
+  item: AppModule,
+  userPermissions: readonly string[],
+  context?: { platformAdmin: boolean; hasAgencyContext: boolean }
+) {
+  if (context) {
+    const agencyRequired = item.requiresAgencyContext || routeRequiresAgencyContext(item.url);
+    if (agencyRequired && !context.hasAgencyContext) {
+      return false;
+    }
+    if (item.platformOnly && (!context.platformAdmin || context.hasAgencyContext)) {
+      return false;
+    }
+  }
   if (item.permissions?.length) {
     return item.permissions.some((permission) => userPermissions.includes(permission));
   }
   return !item.permission || userPermissions.includes(item.permission);
+}
+
+export function routeRequiresAgencyContext(pathname: string) {
+  return ["/app/production", "/app/sinistre", "/app/companies", "/app/crm", "/app/compta"]
+    .some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 export function moduleForPath(pathname: string): AppNavigationItem["module"] {

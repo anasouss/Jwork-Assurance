@@ -30,6 +30,33 @@ import java.time.LocalDateTime;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class AuditEvent {
 
+    public static AuditEvent agencyContextChanged(
+            Long agenceId,
+            Long actorUserId,
+            String actorName,
+            String sessionId,
+            String beforeData,
+            String afterData,
+            String requestId,
+            String source
+    ) {
+        return new AuditEvent(
+                null,
+                agenceId,
+                actorUserId,
+                actorName,
+                AuditActorType.USER,
+                "AgencyContext",
+                sessionId,
+                AuditAction.UPDATED,
+                LocalDateTime.now(),
+                beforeData,
+                afterData,
+                requestId,
+                source
+        );
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

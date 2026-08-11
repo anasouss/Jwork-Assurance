@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "refresh_tokens", indexes = {
         @Index(name = "idx_refresh_user", columnList = "user_id"),
+        @Index(name = "idx_refresh_effective_agence", columnList = "effective_agence_id"),
         @Index(name = "idx_refresh_validity", columnList = "revoked, expires_at"),
         @Index(name = "idx_refresh_activity", columnList = "last_activity_at")
 })
@@ -37,6 +38,10 @@ public class RefreshSession {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private Utilisateur user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "effective_agence_id")
+    private Agence effectiveAgence;
 
     @Column(nullable = false, unique = true, length = 120)
     private String token;

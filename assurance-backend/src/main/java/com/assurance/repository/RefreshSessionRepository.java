@@ -20,6 +20,25 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
     @Query("select rt from RefreshSession rt where rt.token = :token")
     Optional<RefreshSession> findByTokenForUpdate(@Param("token") String token);
 
+    @Query("""
+            select case when count(rt) > 0 then true else false end
+            from RefreshSession rt
+            where rt.id = :sessionId
+              and rt.user.id = :userId
+              and rt.revoked = false
+              and rt.expiresAt > :now
+              and (
+                    (:agenceId is null and rt.effectiveAgence is null)
+                    or rt.effectiveAgence.id = :agenceId
+              )
+            """)
+    boolean existsValidContext(
+            @Param("sessionId") Long sessionId,
+            @Param("userId") Long userId,
+            @Param("agenceId") Long agenceId,
+            @Param("now") LocalDateTime now
+    );
+
     List<RefreshSession> findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByLastActivityAtDesc(
             Long userId,
             LocalDateTime now

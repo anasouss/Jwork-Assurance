@@ -167,7 +167,11 @@ async function executeRequest(
   }
 
   try {
-    return await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    return await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      credentials: "include",
+      headers,
+    });
   } catch (error) {
     throw mapNetworkError ? mapNetworkError(error) : error;
   }

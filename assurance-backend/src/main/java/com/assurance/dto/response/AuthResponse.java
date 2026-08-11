@@ -24,6 +24,8 @@ public class AuthResponse {
         private String roleName;
         private Long agenceId;
         private String agenceName;
+        private boolean platformAdmin;
+        private String operatingMode;
         private Set<String> permissions;
     }
 }

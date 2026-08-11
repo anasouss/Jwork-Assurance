@@ -14,13 +14,19 @@ import {
 } from "@/components/ui/sidebar";
 import type { ComponentProps } from "react";
 import { useAuthStore } from "@/store/auth-store";
+import { AgencyContextSelector } from "@/components/agency-context-selector";
+import { hasAgencyContext, isPlatformAdmin } from "@/lib/platform-context";
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation();
-  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const user = useAuthStore((state) => state.user);
+  const permissions = user?.permissions ?? [];
   const activeModule = moduleForPath(pathname);
   const visibleNavigation = appNavigation.filter(
-    (item) => item.module === activeModule && canSeeNavigationItem(item, permissions)
+    (item) => item.module === activeModule && canSeeNavigationItem(item, permissions, {
+      platformAdmin: isPlatformAdmin(user),
+      hasAgencyContext: hasAgencyContext(user),
+    })
   );
 
   return (
@@ -38,6 +44,9 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
           <div className={`mt-1 inline-flex rounded-md px-2 py-1 text-xs font-semibold ${moduleActiveClass(activeModule)}`}>
             {moduleTitle(activeModule)}
           </div>
+        </div>
+        <div className="px-2 pb-2 group-data-[collapsible=icon]:px-0">
+          <AgencyContextSelector />
         </div>
       </SidebarHeader>
       <SidebarContent>

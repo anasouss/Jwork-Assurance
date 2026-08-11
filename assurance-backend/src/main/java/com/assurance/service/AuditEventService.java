@@ -4,8 +4,11 @@ import com.assurance.dto.response.AuditEventResponse;
 import com.assurance.dto.response.PageMetadata;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.entity.AuditEvent;
+import com.assurance.entity.Agence;
+import com.assurance.entity.Utilisateur;
 import com.assurance.enums.AuditAction;
 import com.assurance.repository.AuditEventRepository;
+import com.assurance.security.AuditRequestContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +21,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +31,25 @@ public class AuditEventService {
 
     private final AuditEventRepository auditEventRepository;
     private final ObjectMapper objectMapper;
+
+    @Transactional
+    public void recordAgencyContextChange(
+            Utilisateur actor,
+            Long sessionId,
+            Agence before,
+            Agence after
+    ) {
+        auditEventRepository.save(AuditEvent.agencyContextChanged(
+                after != null ? after.getId() : before != null ? before.getId() : null,
+                actor.getId(),
+                actor.getFullName(),
+                String.valueOf(sessionId),
+                contextJson(before),
+                contextJson(after),
+                AuditRequestContext.getRequestId(),
+                AuditRequestContext.getSource()
+        ));
+    }
 
     @Transactional(readOnly = true)
     public PagedResponse<AuditEventResponse> search(
@@ -86,6 +109,19 @@ public class AuditEventService {
             return objectMapper.readTree(json);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Trace d'audit JSON invalide", exception);
+        }
+    }
+
+    private String contextJson(Agence agence) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "mode", agence == null ? "PLATFORM" : "AGENCY",
+                    "agenceId", agence == null ? "" : String.valueOf(agence.getId()),
+                    "agenceCode", agence == null ? "" : agence.getCode(),
+                    "agenceName", agence == null ? "" : agence.getNom()
+            ));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Impossible de journaliser le changement de contexte agence", exception);
         }
     }
 

@@ -6,7 +6,16 @@ export type AuthUser = {
   roleName: string | null;
   agenceId: string | null;
   agenceName: string | null;
+  platformAdmin: boolean;
+  operatingMode: "PLATFORM" | "AGENCY";
   permissions: string[];
+};
+
+export type AgencyContextOption = {
+  id: string;
+  code: string;
+  nom: string;
+  ville?: string | null;
 };
 
 export type AuthResponse = {

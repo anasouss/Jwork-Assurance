@@ -60,6 +60,17 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             """)
     List<Object[]> countActivePortfolioByType(@Param("agenceId") Long agenceId);
 
+    @Query("""
+            select c.agence.id, count(c)
+            from Contrat c
+            where c.prospection = false
+              and c.brouillon = false
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and (:agenceId is null or c.agence.id = :agenceId)
+            group by c.agence.id
+            """)
+    List<Object[]> countActiveContractsByAgency(@Param("agenceId") Long agenceId);
+
     List<Contrat> findByAgenceIdOrderByCreatedAtDesc(Long agenceId);
 
     @EntityGraph(attributePaths = {"compagnieAssurance", "convention", "contratOrigine"})

@@ -1,4 +1,4 @@
-import type { ApiResponse, AuthResponse, AuthSession } from "@/lib/types";
+import type { AgencyContextOption, ApiResponse, AuthResponse, AuthSession } from "@/lib/types";
 import { API_BASE_URL, apiFetch, normalizeApiIds, refreshAuthSession } from "./base";
 import { clearAuth, saveAuth } from "@/lib/auth";
 
@@ -78,6 +78,31 @@ export const authApi = {
     if (!result.success) {
       throw new Error(result.message || "Session impossible à révoquer");
     }
+  },
+
+  async agencyContextOptions(): Promise<AgencyContextOption[]> {
+    const result = await apiFetch<ApiResponse<AgencyContextOption[]>>(
+      "/api/v1/auth/agency-context/options"
+    );
+    return result.data ?? [];
+  },
+
+  async enterAgencyContext(agencyId: string): Promise<AuthResponse> {
+    const result = await apiFetch<ApiResponse<AuthResponse>>(
+      `/api/v1/auth/agency-context/${agencyId}`,
+      { method: "POST" }
+    );
+    saveAuth(result.data);
+    return result.data;
+  },
+
+  async exitAgencyContext(): Promise<AuthResponse> {
+    const result = await apiFetch<ApiResponse<AuthResponse>>(
+      "/api/v1/auth/agency-context",
+      { method: "DELETE" }
+    );
+    saveAuth(result.data);
+    return result.data;
   },
 };
 

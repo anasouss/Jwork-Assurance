@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Bell, Download, KeyRound, LogOut, User, UserRound } from "lucide-react";
+import { Bell, Building2, Download, Globe2, KeyRound, LogOut, RotateCcw, User, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -27,10 +27,11 @@ import {
 import { useAuthStore } from "@/store/auth-store";
 import { authApi } from "@/lib/api/auth";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { hasAgencyContext, isPlatformAdmin } from "@/lib/platform-context";
 
 export function AppHeader() {
   const { pathname } = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, logout, exitAgencyContext, isSwitchingContext } = useAuthStore();
   const { canInstall, install } = usePwaInstall();
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -46,6 +47,8 @@ export function AppHeader() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const agencyContext = hasAgencyContext(user);
+  const platformAdmin = isPlatformAdmin(user);
 
   return (
     <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center border-b bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/90 sm:px-4">
@@ -59,7 +62,10 @@ export function AppHeader() {
 
         <nav className="hidden min-w-0 items-center justify-center gap-1 overflow-x-auto lg:flex">
           {appModules
-            .filter((item) => canSeeNavigationItem(item, permissions))
+            .filter((item) => canSeeNavigationItem(item, permissions, {
+              platformAdmin,
+              hasAgencyContext: agencyContext,
+            }))
             .map((item) => {
               if (item.disabled) {
                 return (
@@ -94,6 +100,34 @@ export function AppHeader() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <div className="hidden h-9 items-center gap-2 rounded-md border bg-muted/30 px-2.5 text-xs font-medium sm:flex">
+            {agencyContext ? (
+              <Building2 className="size-4 text-emerald-600" />
+            ) : (
+              <Globe2 className="size-4 text-blue-600" />
+            )}
+            <span className="max-w-40 truncate">{agencyContext ? user?.agenceName : "Plateforme"}</span>
+            {platformAdmin && agencyContext ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="-mr-1 size-6"
+                disabled={isSwitchingContext}
+                title="Retour à la plateforme"
+                onClick={async () => {
+                  try {
+                    await exitAgencyContext();
+                    window.location.assign("/app/platform");
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Retour à la plateforme impossible");
+                  }
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
           {canInstall ? (
             <Button
               type="button"
@@ -125,7 +159,9 @@ export function AppHeader() {
               <DropdownMenuLabel className="font-normal">
                 <div className="text-sm font-medium">{fullName}</div>
                 <div className="text-xs text-muted-foreground">{user?.email}</div>
-                <div className="mt-2 text-xs text-muted-foreground">{user?.agenceName ?? "Agence"} · {user?.roleName ?? user?.roleCode}</div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {agencyContext ? user?.agenceName : "Plateforme"} · {user?.roleName ?? user?.roleCode}
+                </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

@@ -46,6 +46,34 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             @Param("dateAu") LocalDate dateAu
     );
 
+    @Query("""
+            select q.contrat.agence.id,
+                   coalesce(sum(q.primeNette), 0),
+                   coalesce(sum(
+                       coalesce(q.taxe, 0)
+                       + coalesce(q.taxeParafiscale, 0)
+                       + coalesce(q.accessoire, 0)
+                       + coalesce(q.cnpac, 0)
+                   ), 0),
+                   coalesce(sum(q.primeTotale), 0),
+                   count(q)
+            from Quittance q
+            left join q.mouvementContrat m
+            where q.globale = true
+              and q.alternative = false
+              and q.contrat.prospection = false
+              and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
+              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and q.dateDebut between :dateDu and :dateAu
+              and (:agenceId is null or q.contrat.agence.id = :agenceId)
+            group by q.contrat.agence.id
+            """)
+    List<Object[]> sumPlatformProductionByAgency(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
+
     interface DashboardProductionTotals {
         BigDecimal getPrimeNette();
 

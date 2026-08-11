@@ -4,6 +4,7 @@ import com.assurance.dto.request.LoginRequest;
 import com.assurance.dto.request.ChangePasswordRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AuthResponse;
+import com.assurance.dto.response.AgencyContextOptionResponse;
 import com.assurance.dto.response.SessionResponse;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AuthService;
@@ -72,7 +73,47 @@ public class AuthController {
     @GetMapping("/sessions")
     public ResponseEntity<ApiResponse<List<SessionResponse>>> sessions() {
         return ResponseEntity.ok(ApiResponse.success(
-                authService.getActiveSessions(TenantContext.getCurrentUser(), null)
+                authService.getActiveSessions(
+                        TenantContext.getCurrentUser(),
+                        TenantContext.getCurrentSession()
+                )
+        ));
+    }
+
+    @GetMapping("/agency-context/options")
+    public ResponseEntity<ApiResponse<List<AgencyContextOptionResponse>>> agencyContextOptions() {
+        return ResponseEntity.ok(ApiResponse.success(
+                authService.getAgencyContextOptions(TenantContext.getCurrentUser())
+        ));
+    }
+
+    @PostMapping("/agency-context/{agenceId}")
+    public ResponseEntity<ApiResponse<AuthResponse>> enterAgencyContext(
+            @PathVariable Long agenceId,
+            @CookieValue(name = REFRESH_COOKIE, required = false) String refreshCookie
+    ) {
+        return noStore(ApiResponse.success(
+                authService.enterAgencyContext(
+                        TenantContext.getCurrentUser(),
+                        TenantContext.getCurrentSession(),
+                        refreshCookie,
+                        agenceId
+                ),
+                "Contexte agence activé"
+        ));
+    }
+
+    @DeleteMapping("/agency-context")
+    public ResponseEntity<ApiResponse<AuthResponse>> exitAgencyContext(
+            @CookieValue(name = REFRESH_COOKIE, required = false) String refreshCookie
+    ) {
+        return noStore(ApiResponse.success(
+                authService.exitAgencyContext(
+                        TenantContext.getCurrentUser(),
+                        TenantContext.getCurrentSession(),
+                        refreshCookie
+                ),
+                "Retour à la plateforme"
         ));
     }
 
@@ -112,6 +153,13 @@ public class AuthController {
                 .path("/api/v1/auth")
                 .maxAge(0)
                 .build();
+    }
+
+    private ResponseEntity<ApiResponse<AuthResponse>> noStore(ApiResponse<AuthResponse> response) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .body(response);
     }
 
 }

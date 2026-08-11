@@ -56,3 +56,37 @@ export type DashboardRecentActivity = {
   dateEffet?: string | null;
   primeTotale: number;
 };
+
+export type PlatformDashboardData = {
+  dateDu: string;
+  dateAu: string;
+  agenceId?: string | null;
+  summary: PlatformDashboardSummary;
+  agencies: PlatformAgencyRow[];
+};
+
+export type PlatformDashboardSummary = {
+  totalAgencies: number;
+  activeAgencies: number;
+  displayedAgencies: number;
+  activeUsers: number;
+  activeContracts: number;
+  quittances: number;
+  primeNette: number;
+  taxes: number;
+  primeTotale: number;
+};
+
+export type PlatformAgencyRow = {
+  id: string;
+  code: string;
+  nom: string;
+  ville?: string | null;
+  statut: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  activeUsers: number;
+  activeContracts: number;
+  quittances: number;
+  primeNette: number;
+  taxes: number;
+  primeTotale: number;
+};

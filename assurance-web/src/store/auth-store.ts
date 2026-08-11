@@ -9,9 +9,12 @@ type AuthState = {
   isAuthenticated: boolean;
   isHydrated: boolean;
   isLoading: boolean;
+  isSwitchingContext: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  enterAgencyContext: (agencyId: string) => Promise<void>;
+  exitAgencyContext: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
 };
@@ -32,12 +35,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isHydrated: false,
   isLoading: false,
+  isSwitchingContext: false,
   error: null,
   clearError: () => set({ error: null }),
   hydrate: async () => {
     set({ isLoading: true, error: null });
     const storedUser = getStoredUser();
-    if (storedUser && getAccessToken()) {
+    const hasCurrentAuthShape = storedUser
+      && typeof storedUser.platformAdmin === "boolean"
+      && (storedUser.operatingMode === "PLATFORM" || storedUser.operatingMode === "AGENCY");
+    if (hasCurrentAuthShape && getAccessToken()) {
       set({
         user: storedUser,
         isAuthenticated: true,
@@ -87,9 +94,38 @@ export const useAuthStore = create<AuthState>((set) => ({
     await authApi.logout();
     set({ user: null, isAuthenticated: false, isHydrated: true });
   },
+  enterAgencyContext: async (agencyId) => {
+    set({ isSwitchingContext: true, error: null });
+    try {
+      const auth = await authApi.enterAgencyContext(agencyId);
+      queryClient.clear();
+      set({ user: auth.user, isSwitchingContext: false });
+    } catch (error) {
+      set({
+        isSwitchingContext: false,
+        error: error instanceof Error ? error.message : "Contexte agence impossible à activer",
+      });
+      throw error;
+    }
+  },
+  exitAgencyContext: async () => {
+    set({ isSwitchingContext: true, error: null });
+    try {
+      const auth = await authApi.exitAgencyContext();
+      queryClient.clear();
+      set({ user: auth.user, isSwitchingContext: false });
+    } catch (error) {
+      set({
+        isSwitchingContext: false,
+        error: error instanceof Error ? error.message : "Retour à la plateforme impossible",
+      });
+      throw error;
+    }
+  },
 }));
 
 subscribeToAuth((auth) => {
+  const previousAgencyId = useAuthStore.getState().user?.agenceId ?? null;
   if (!auth) {
     queryClient.clear();
     useAuthStore.setState({
@@ -99,6 +135,10 @@ subscribeToAuth((auth) => {
       isLoading: false,
     });
     return;
+  }
+
+  if (previousAgencyId !== auth.user.agenceId) {
+    queryClient.clear();
   }
 
   useAuthStore.setState({

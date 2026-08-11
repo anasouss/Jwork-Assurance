@@ -32,14 +32,16 @@ public class JwtTokenProvider {
         cle = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(Utilisateur user) {
+    public String generateAccessToken(Utilisateur user, Long effectiveAgenceId, Long sessionId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenExpiration);
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("email", user.getEmail())
                 .claim("role", user.getRoleCode())
-                .claim("agenceId", user.getAgence() != null ? user.getAgence().getId() : null)
+                .claim("agenceId", effectiveAgenceId)
+                .claim("sessionId", sessionId)
+                .claim("platformAdmin", isPlatformAdmin(user))
                 .claim("permissions", user.getPermissions())
                 .issuedAt(now)
                 .expiration(expiry)
@@ -55,6 +57,28 @@ public class JwtTokenProvider {
 
     public Long getUserIdFromToken(String token) {
         return Long.valueOf(getClaims(token).getSubject());
+    }
+
+    public Long getAgenceIdFromToken(String token) {
+        Object value = getClaims(token).get("agenceId");
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(String.valueOf(value));
+    }
+
+    public Long getSessionIdFromToken(String token) {
+        Object value = getClaims(token).get("sessionId");
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(String.valueOf(value));
     }
 
     public Claims getClaims(String token) {
@@ -76,5 +100,9 @@ public class JwtTokenProvider {
 
     public long getAccessTokenExpirationInSeconds() {
         return accessTokenExpiration / 1000;
+    }
+
+    private boolean isPlatformAdmin(Utilisateur user) {
+        return user.getAgence() == null && "SUPER_ADMIN".equalsIgnoreCase(user.getRoleCode());
     }
 }

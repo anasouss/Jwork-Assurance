@@ -4,6 +4,7 @@ public final class TenantContext {
 
     private static final ThreadLocal<Long> CURRENT_AGENCY = new ThreadLocal<>();
     private static final ThreadLocal<Long> CURRENT_USER = new ThreadLocal<>();
+    private static final ThreadLocal<Long> CURRENT_SESSION = new ThreadLocal<>();
     private static final ThreadLocal<String> CURRENT_USERNAME = new ThreadLocal<>();
 
     private TenantContext() {
@@ -25,6 +26,14 @@ public final class TenantContext {
         return CURRENT_USER.get();
     }
 
+    public static void setCurrentSession(Long sessionId) {
+        CURRENT_SESSION.set(sessionId);
+    }
+
+    public static Long getCurrentSession() {
+        return CURRENT_SESSION.get();
+    }
+
     public static void setCurrentUsername(String username) {
         CURRENT_USERNAME.set(username);
     }
@@ -36,6 +45,7 @@ public final class TenantContext {
     public static void clear() {
         CURRENT_AGENCY.remove();
         CURRENT_USER.remove();
+        CURRENT_SESSION.remove();
         CURRENT_USERNAME.remove();
     }
 }

@@ -16,6 +16,8 @@ const session = (accessToken: string): AuthResponse => ({
     roleName: "Agent",
     agenceId: "1",
     agenceName: "Agence Test",
+    platformAdmin: false,
+    operatingMode: "AGENCY",
     permissions: ["contrat:view"],
   },
 });

@@ -770,9 +770,21 @@ public class ReleveBancaireService {
                         .nom(name)
                         .build());
         profile.setFormat(format);
-        profile.setConfigurationJson(writeJson(configuration));
+        profile.setConfigurationJson(writeJson(reusableConfiguration(configuration)));
         profile.setActif(true);
         return profileRepository.save(profile);
+    }
+
+    private ConfigurationImportReleveBancaireRequest reusableConfiguration(
+            ConfigurationImportReleveBancaireRequest configuration
+    ) {
+        ConfigurationImportReleveBancaireRequest reusable = objectMapper.convertValue(
+                configuration,
+                ConfigurationImportReleveBancaireRequest.class
+        );
+        reusable.setEnregistrerProfil(false);
+        reusable.setNomProfil(null);
+        return reusable;
     }
 
     private FormatReleveBancaire detectFormat(String filename) {

@@ -4,17 +4,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
+  FileSpreadsheet,
   FileSearch,
   Plus,
   RefreshCw,
   Save,
+  Settings2,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -76,6 +85,7 @@ export default function RapprochementBancairePage() {
   const [file, setFile] = useState<File | null>(null);
   const [profileId, setProfileId] = useState("");
   const [configuration, setConfiguration] = useState(EMPTY_CONFIGURATION);
+  const [importOptionsOpen, setImportOptionsOpen] = useState(false);
   const [preview, setPreview] = useState<BankStatementImport | null>(null);
   const [matches, setMatches] = useState<Record<string, MatchDraft[]>>({});
   const [ignoredIds, setIgnoredIds] = useState<Set<string>>(new Set());
@@ -158,6 +168,9 @@ export default function RapprochementBancairePage() {
       setImportId(result.id ?? "");
       setPreview(null);
       setFile(null);
+      setProfileId("");
+      setConfiguration(EMPTY_CONFIGURATION);
+      setImportOptionsOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["compta", "bank-statements", accountId] });
       await queryClient.invalidateQueries({
         queryKey: ["compta", "bank-statement-profiles", accountId],
@@ -229,7 +242,10 @@ export default function RapprochementBancairePage() {
             setAccountId(value);
             setImportId("");
             setProfileId("");
+            setConfiguration(EMPTY_CONFIGURATION);
+            setFile(null);
             setPreview(null);
+            setImportOptionsOpen(false);
           }}>
             <SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger>
             <SelectContent>
@@ -243,68 +259,138 @@ export default function RapprochementBancairePage() {
 
       {canManage && !importId && (
         <section className="grid gap-4 rounded-md border p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-semibold">Importer un relevé</h2>
-              <p className="text-sm text-muted-foreground">
-                L’aperçu ne sauvegarde rien. Confirmez seulement après contrôle du mapping.
-              </p>
-            </div>
+          <div>
+            <h2 className="font-semibold">Importer un relevé</h2>
+            <p className="text-sm text-muted-foreground">
+              Sélectionnez le fichier reçu de la banque. La prévisualisation ne sauvegarde rien.
+            </p>
+          </div>
+
+          <label className="flex min-h-28 cursor-pointer items-center justify-between gap-4 rounded-md border border-dashed px-5 py-4 transition-colors hover:bg-muted/40">
             <Input
-              className="max-w-md"
               type="file"
               accept=".csv,.xls,.xlsx,.mt940,.sta,.txt"
+              className="sr-only"
+              onClick={(event) => { event.currentTarget.value = ""; }}
               onChange={(event) => {
                 setFile(event.target.files?.[0] ?? null);
                 setPreview(null);
               }}
             />
-          </div>
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="grid size-11 shrink-0 place-items-center rounded-md bg-orange-50 text-orange-700">
+                <FileSpreadsheet className="size-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium">
+                  {file?.name ?? "Choisir un relevé bancaire"}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  CSV, Excel ou MT940. Le fichier sera d’abord analysé sans être enregistré.
+                </span>
+              </span>
+            </span>
+            <span className="shrink-0 text-sm font-medium text-primary">
+              {file ? "Remplacer" : "Parcourir"}
+            </span>
+          </label>
 
-          <div className="grid gap-3 border-t pt-4 md:grid-cols-4">
-            <Field label="Profil de mapping">
-              <Select value={profileId || "__none__"} onValueChange={(value) => {
-                const nextProfileId = value === "__none__" ? "" : value;
+          <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-4">
+            <Field label="Configuration d’import">
+              <Select value={profileId || "__auto__"} onValueChange={(value) => {
+                const nextProfileId = value === "__auto__" ? "" : value;
                 setProfileId(nextProfileId);
                 const profile = profiles.data?.find((item) => item.id === nextProfileId);
-                if (profile) setConfiguration(profile.configuration);
+                setConfiguration(profile ? {
+                  ...profile.configuration,
+                  enregistrerProfil: false,
+                  nomProfil: undefined,
+                } : EMPTY_CONFIGURATION);
                 setPreview(null);
               }}>
-                <SelectTrigger><SelectValue placeholder="Aucun profil" /></SelectTrigger>
+                <SelectTrigger className="w-80 max-w-full">
+                  <SelectValue placeholder="Détection automatique" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Aucun profil</SelectItem>
+                  <SelectItem value="__auto__">Détection automatique</SelectItem>
                   {(profiles.data ?? []).map((profile) => (
                     <SelectItem key={profile.id} value={profile.id}>{profile.nom}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Ligne d’en-tête">
-              <Input type="number" min={1} value={configuration.ligneEntete}
-                onChange={(event) => updateConfiguration("ligneEntete", Number(event.target.value))} />
-            </Field>
-            <Field label="Format de date">
-              <Input value={configuration.formatDate}
-                onChange={(event) => updateConfiguration("formatDate", event.target.value)} />
-            </Field>
-            <Field label="Séparateur décimal">
-              <Select value={configuration.separateurDecimal}
-                onValueChange={(value) => updateConfiguration("separateurDecimal", value)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value=",">Virgule</SelectItem>
-                  <SelectItem value=".">Point</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <div className="flex items-end">
-              <Button onClick={() => previewMutation.mutate()}
-                disabled={!file || previewMutation.isPending}>
-                {previewMutation.isPending ? <RefreshCw className="size-4 animate-spin" /> : <FileSearch className="size-4" />}
+            <div className="flex flex-wrap gap-2">
+              {file ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setFile(null);
+                    setPreview(null);
+                  }}
+                >
+                  <X className="size-4" /> Retirer
+                </Button>
+              ) : null}
+              <Button
+                onClick={() => previewMutation.mutate()}
+                disabled={!file || previewMutation.isPending}
+              >
+                {previewMutation.isPending
+                  ? <RefreshCw className="size-4 animate-spin" />
+                  : <FileSearch className="size-4" />}
                 Prévisualiser
               </Button>
             </div>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            La détection automatique convient dans la plupart des cas. Une configuration enregistrée
+            sert uniquement lorsqu’une banque fournit régulièrement le même modèle de fichier.
+          </p>
+
+          <Collapsible open={importOptionsOpen} onOpenChange={setImportOptionsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="outline" size="sm">
+                <Settings2 className="size-4" />
+                Options d’import
+                <ChevronDown className={`size-4 transition-transform ${importOptionsOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <div className="grid gap-3 rounded-md bg-muted/30 p-4 md:grid-cols-3">
+                <Field label="Ligne d’en-tête">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={configuration.ligneEntete}
+                    onChange={(event) => updateConfiguration(
+                      "ligneEntete",
+                      Number(event.target.value)
+                    )}
+                  />
+                </Field>
+                <Field label="Format de date">
+                  <Input
+                    value={configuration.formatDate}
+                    onChange={(event) => updateConfiguration("formatDate", event.target.value)}
+                  />
+                </Field>
+                <Field label="Séparateur décimal">
+                  <Select
+                    value={configuration.separateurDecimal}
+                    onValueChange={(value) => updateConfiguration("separateurDecimal", value)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=",">Virgule</SelectItem>
+                      <SelectItem value=".">Point</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {preview && (
             <PreviewWorkspace
@@ -397,36 +483,62 @@ function PreviewWorkspace({
   onConfirm: () => void;
   busy: boolean;
 }) {
+  const [mappingOpen, setMappingOpen] = useState(!preview.configurationComplete);
+  const missingConfigurationName = configuration.enregistrerProfil
+    && !configuration.nomProfil?.trim();
+
+  useEffect(() => {
+    setMappingOpen(!preview.configurationComplete);
+  }, [preview.configurationComplete, preview.entetes]);
+
   return (
     <div className="grid gap-4 border-t pt-4">
       {preview.format !== "MT940" && (
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
-          {COLUMN_FIELDS.map(([key, label, required]) => (
-            <Field key={key} label={`${label}${required ? " *" : ""}`}>
-              <Select
-                value={configuration.colonnes[key] ?? "__none__"}
-                onValueChange={(value) => setConfiguration({
-                  ...configuration,
-                  colonnes: {
-                    ...configuration.colonnes,
-                    [key]: value === "__none__" ? undefined : value,
-                  },
-                })}
-              >
-                <SelectTrigger><SelectValue placeholder="Non associé" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Non associé</SelectItem>
-                  {preview.entetes.map((header) => (
-                    <SelectItem key={header} value={header}>{header}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          ))}
-        </div>
+        <Collapsible open={mappingOpen} onOpenChange={setMappingOpen}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Correspondance des colonnes</h3>
+              <p className="text-xs text-muted-foreground">
+                Vérifiez les associations uniquement si la détection automatique est incorrecte.
+              </p>
+            </div>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="outline" size="sm">
+                {mappingOpen ? "Masquer" : "Modifier"}
+                <ChevronDown className={`size-4 transition-transform ${mappingOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="pt-3">
+            <div className="grid gap-3 rounded-md bg-muted/30 p-4 md:grid-cols-3 xl:grid-cols-5">
+              {COLUMN_FIELDS.map(([key, label, required]) => (
+                <Field key={key} label={`${label}${required ? " *" : ""}`}>
+                  <Select
+                    value={configuration.colonnes[key] ?? "__none__"}
+                    onValueChange={(value) => setConfiguration({
+                      ...configuration,
+                      colonnes: {
+                        ...configuration.colonnes,
+                        [key]: value === "__none__" ? undefined : value,
+                      },
+                    })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Non associée" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Non associée</SelectItem>
+                      {preview.entetes.map((header) => (
+                        <SelectItem key={header} value={header}>{header}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm">
+      <div className="grid gap-2 rounded-md border px-4 py-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
           <Checkbox
             checked={configuration.enregistrerProfil}
             onCheckedChange={(checked) => setConfiguration({
@@ -435,27 +547,34 @@ function PreviewWorkspace({
               nomProfil: checked ? configuration.nomProfil : undefined,
             })}
           />
-          Enregistrer ce mapping comme profil
+          Réutiliser cette configuration lors des prochains imports
         </label>
         {configuration.enregistrerProfil && (
-          <Input
-            className="max-w-80"
-            value={configuration.nomProfil ?? ""}
-            onChange={(event) => setConfiguration({
-              ...configuration,
-              nomProfil: event.target.value,
-            })}
-            placeholder="Nom du profil"
-            aria-label="Nom du profil de mapping"
-          />
+          <div className="grid max-w-96 gap-1.5">
+            <Label>Nom de la configuration</Label>
+            <Input
+              value={configuration.nomProfil ?? ""}
+              onChange={(event) => setConfiguration({
+                ...configuration,
+                nomProfil: event.target.value,
+              })}
+              aria-label="Nom de la configuration d’import"
+            />
+            {missingConfigurationName ? (
+              <span className="text-xs text-destructive">Saisissez un nom avant de confirmer.</span>
+            ) : null}
+          </div>
         )}
+        <p className="text-xs text-muted-foreground">
+          Elle sera enregistrée uniquement lors de la confirmation de l’import.
+        </p>
       </div>
       <div className="flex flex-wrap items-center gap-4 rounded-md bg-muted/40 px-4 py-3 text-sm">
         <strong>{preview.nombreLignes} opération(s)</strong>
         <span>Débits: {formatTreasuryMoney(preview.totalDebits)}</span>
         <span>Crédits: {formatTreasuryMoney(preview.totalCredits)}</span>
         <Badge variant={preview.configurationComplete ? "default" : "destructive"}>
-          {preview.configurationComplete ? "Mapping complet" : "Mapping à compléter"}
+          {preview.configurationComplete ? "Configuration complète" : "Configuration à compléter"}
         </Badge>
       </div>
       <StatementTable rows={preview.lignes.slice(0, 20)} />
@@ -463,7 +582,10 @@ function PreviewWorkspace({
         <Button variant="outline" onClick={onRefresh} disabled={busy}>
           <RefreshCw className="size-4" /> Actualiser l’aperçu
         </Button>
-        <Button onClick={onConfirm} disabled={busy || !preview.configurationComplete}>
+        <Button
+          onClick={onConfirm}
+          disabled={busy || !preview.configurationComplete || missingConfigurationName}
+        >
           <Upload className="size-4" /> Confirmer l’import
         </Button>
       </div>

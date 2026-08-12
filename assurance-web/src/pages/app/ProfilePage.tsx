@@ -23,6 +23,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [sessionToRevoke, setSessionToRevoke] = useState<AuthSession | null>(null);
+  const [revokeOthersOpen, setRevokeOthersOpen] = useState(false);
   const currentSessionId = getSessionId();
 
   const sessionsQuery = useQuery({
@@ -53,6 +54,18 @@ export default function ProfilePage() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Session impossible à révoquer");
+    },
+  });
+
+  const revokeOthersMutation = useMutation({
+    mutationFn: authApi.revokeOtherSessions,
+    onSuccess: async () => {
+      toast.success("Les autres sessions ont été révoquées");
+      setRevokeOthersOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["auth", "sessions"] });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Sessions impossibles à révoquer");
     },
   });
 
@@ -156,11 +169,21 @@ export default function ProfilePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="size-4" />
-              Sessions actives
-            </CardTitle>
-            <CardDescription>Révoquez les accès ouverts sur d'autres appareils si nécessaire.</CardDescription>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="grid gap-1.5">
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="size-4" />
+                  Sessions actives
+                </CardTitle>
+                <CardDescription>Révoquez les accès ouverts sur d'autres appareils si nécessaire.</CardDescription>
+              </div>
+              {sortedSessions.length > 1 ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setRevokeOthersOpen(true)}>
+                  <LogOut className="size-4" />
+                  Révoquer les autres
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="grid gap-3">
             {sessionsQuery.isLoading ? (
@@ -221,6 +244,27 @@ export default function ProfilePage() {
               }}
             >
               Révoquer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={revokeOthersOpen} onOpenChange={setRevokeOthersOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Révoquer toutes les autres sessions ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tous les autres navigateurs et appareils devront se reconnecter. Cette session restera active.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={revokeOthersMutation.isPending}
+              onClick={() => revokeOthersMutation.mutate()}
+            >
+              Révoquer les autres
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,5 +1,6 @@
 import type { ApiResponse, AuthResponse } from "@/lib/types";
 import { clearAuth, getAccessToken, getStoredAuth, saveAuth } from "@/lib/auth";
+import { deviceRequestHeaders } from "@/lib/device-info";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8080";
@@ -26,7 +27,7 @@ async function clearRefreshCookie(): Promise<void> {
   await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
     method: "DELETE",
     credentials: "include",
-    headers: AUTH_REQUEST_HEADERS,
+    headers: { ...AUTH_REQUEST_HEADERS, ...deviceRequestHeaders() },
   }).catch(() => {});
 }
 

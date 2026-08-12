@@ -51,4 +51,17 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
     @Modifying
     @Query("update RefreshSession rt set rt.revoked = true where rt.user.id = :userId and rt.id <> :currentSessionId")
     void revokeAllByUserIdExcept(@Param("userId") Long userId, @Param("currentSessionId") Long currentSessionId);
+
+    @Modifying
+    @Query("""
+            update RefreshSession rt
+            set rt.revoked = true
+            where rt.user.id = :userId
+              and rt.deviceId = :deviceId
+              and rt.revoked = false
+            """)
+    void revokeActiveByUserIdAndDeviceId(
+            @Param("userId") Long userId,
+            @Param("deviceId") String deviceId
+    );
 }

@@ -22,7 +22,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_refresh_user", columnList = "user_id"),
         @Index(name = "idx_refresh_effective_agence", columnList = "effective_agence_id"),
         @Index(name = "idx_refresh_validity", columnList = "revoked, expires_at"),
-        @Index(name = "idx_refresh_activity", columnList = "last_activity_at")
+        @Index(name = "idx_refresh_activity", columnList = "last_activity_at"),
+        @Index(name = "idx_refresh_user_device", columnList = "user_id, device_id, revoked")
 })
 @Getter
 @Setter
@@ -61,6 +62,9 @@ public class RefreshSession {
 
     @Column(name = "device_name", length = 120)
     private String deviceName;
+
+    @Column(name = "device_id", length = 80)
+    private String deviceId;
 
     @Column(name = "device_type", length = 40)
     private String deviceType;

@@ -137,8 +137,12 @@ public class AuthService {
                 .stream()
                 .map(session -> SessionResponse.builder()
                         .id(session.getId())
-                        .deviceName(session.getDeviceName())
-                        .deviceType(session.getDeviceType())
+                        .deviceName(session.getDeviceName() != null
+                                ? session.getDeviceName()
+                                : DeviceInfoParser.parseDeviceName(session.getUserAgent()))
+                        .deviceType(session.getDeviceType() != null
+                                ? session.getDeviceType()
+                                : DeviceInfoParser.parseDeviceType(session.getUserAgent()))
                         .ipAddress(session.getIpAddress())
                         .current(currentSessionId != null && currentSessionId.equals(session.getId()))
                         .lastActivityAt(session.getLastActivityAt())
@@ -156,6 +160,14 @@ public class AuthService {
         }
         session.setRevoked(true);
         refreshTokenRepository.save(session);
+    }
+
+    @Transactional
+    public void revokeOtherSessions(Long userId, Long currentSessionId) {
+        if (currentSessionId == null) {
+            throw new UnauthorizedException("Session actuelle introuvable");
+        }
+        refreshTokenRepository.revokeAllByUserIdExcept(userId, currentSessionId);
     }
 
     @Transactional
@@ -180,6 +192,10 @@ public class AuthService {
         if (effectiveAgence != null && effectiveAgence.getStatut() != StatutAgence.ACTIVE) {
             throw new UnauthorizedException("L'agence associée à cette session n'est pas active");
         }
+        String deviceId = DeviceInfoParser.parseDeviceId(request);
+        if (deviceId != null) {
+            refreshTokenRepository.revokeActiveByUserIdAndDeviceId(user.getId(), deviceId);
+        }
         String refreshTokenValue = tokenProvider.generateRefreshToken();
         RefreshSession refreshToken = RefreshSession.builder()
                 .user(user)
@@ -189,6 +205,7 @@ public class AuthService {
                 .ipAddress(DeviceInfoParser.getClientIp(request))
                 .userAgent(DeviceInfoParser.buildUserAgent(request))
                 .deviceName(DeviceInfoParser.parseDeviceName(request))
+                .deviceId(deviceId)
                 .deviceType(DeviceInfoParser.parseDeviceType(request))
                 .lastActivityAt(LocalDateTime.now())
                 .build();

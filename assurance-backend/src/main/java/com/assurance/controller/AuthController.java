@@ -123,6 +123,15 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(null, "Session revoquee"));
     }
 
+    @DeleteMapping("/sessions/others")
+    public ResponseEntity<ApiResponse<Void>> revokeOtherSessions() {
+        authService.revokeOtherSessions(
+                TenantContext.getCurrentUser(),
+                TenantContext.getCurrentSession()
+        );
+        return ResponseEntity.ok(ApiResponse.success(null, "Autres sessions revoquees"));
+    }
+
     @PostMapping("/password")
     public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         authService.changePassword(TenantContext.getCurrentUser(), request);

@@ -25,6 +25,7 @@ import com.assurance.repository.RefreshSessionRepository;
 import com.assurance.repository.RoleRepository;
 import com.assurance.repository.UtilisateurRepository;
 import com.assurance.security.TenantContext;
+import com.assurance.util.DeviceInfoParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -715,8 +716,12 @@ public class AdminService {
     private SessionResponse toSessionResponse(RefreshSession session) {
         return SessionResponse.builder()
                 .id(session.getId())
-                .deviceName(session.getDeviceName())
-                .deviceType(session.getDeviceType())
+                .deviceName(session.getDeviceName() != null
+                        ? session.getDeviceName()
+                        : DeviceInfoParser.parseDeviceName(session.getUserAgent()))
+                .deviceType(session.getDeviceType() != null
+                        ? session.getDeviceType()
+                        : DeviceInfoParser.parseDeviceType(session.getUserAgent()))
                 .ipAddress(session.getIpAddress())
                 .current(false)
                 .lastActivityAt(session.getLastActivityAt())

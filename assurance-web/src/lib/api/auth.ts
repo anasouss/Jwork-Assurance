@@ -1,6 +1,7 @@
 import type { AgencyContextOption, ApiResponse, AuthResponse, AuthSession } from "@/lib/types";
 import { API_BASE_URL, apiFetch, normalizeApiIds, refreshAuthSession } from "./base";
 import { clearAuth, saveAuth } from "@/lib/auth";
+import { deviceRequestHeaders } from "@/lib/device-info";
 
 export type LoginRequest = {
   email: string;
@@ -17,6 +18,7 @@ export const authApi = {
         headers: {
           "Content-Type": "application/json",
           "X-Auth-Request": "1",
+          ...deviceRequestHeaders(),
         },
         body: JSON.stringify(data),
       });
@@ -77,6 +79,15 @@ export const authApi = {
     });
     if (!result.success) {
       throw new Error(result.message || "Session impossible à révoquer");
+    }
+  },
+
+  async revokeOtherSessions(): Promise<void> {
+    const result = await apiFetch<ApiResponse<void>>("/api/v1/auth/sessions/others", {
+      method: "DELETE",
+    });
+    if (!result.success) {
+      throw new Error(result.message || "Les autres sessions ne peuvent pas être révoquées");
     }
   },
 

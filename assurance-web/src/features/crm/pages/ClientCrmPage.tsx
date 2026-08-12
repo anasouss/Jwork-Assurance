@@ -196,8 +196,8 @@ export default function ClientCrmPage() {
       )}
 
       <Dialog open={clientPickerOpen} onOpenChange={setClientPickerOpen}>
-        <DialogContent className="max-h-[88vh] overflow-hidden p-0 sm:max-w-4xl">
-          <DialogHeader className="border-b px-6 py-5">
+        <DialogContent className="max-h-[88vh] gap-0 overflow-hidden p-0 sm:max-w-5xl">
+          <DialogHeader className="border-b px-5 py-4">
             <DialogTitle>Changer de client</DialogTitle>
             <DialogDescription>Recherchez par nom, identifiant ou groupe.</DialogDescription>
           </DialogHeader>
@@ -285,8 +285,8 @@ function ClientPicker({
 }) {
   return (
     <div className="min-w-0">
-      <div className="grid gap-3 border-b p-4 sm:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_220px_220px_220px]">
-        <label className="relative">
+      <div className="grid gap-3 border-b p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <label className="relative min-w-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
@@ -296,7 +296,7 @@ function ClientPicker({
           />
         </label>
         <Select value={groupeId} onValueChange={onGroupChange}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="TOUS">Tous les groupes</SelectItem>
             {groupes.map((groupe) => (
@@ -305,7 +305,7 @@ function ClientPicker({
           </SelectContent>
         </Select>
         <Select value={origineId} onValueChange={onOriginChange}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="TOUTES">Toutes les origines</SelectItem>
             {(acquisitionOptions?.origines ?? []).map((origin) => (
@@ -314,7 +314,7 @@ function ClientPicker({
           </SelectContent>
         </Select>
         <Select value={collaborateurId} onValueChange={onCollaboratorChange}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="TOUS">Tous les membres de l’équipe</SelectItem>
             {(acquisitionOptions?.collaborateurs ?? []).filter((user) => user.actif).map((user) => (

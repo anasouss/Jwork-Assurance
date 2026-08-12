@@ -55,7 +55,7 @@ const EMPTY_CONFIGURATION: BankStatementImportConfiguration = {
   ligneEntete: 1,
   encodage: "UTF-8",
   formatDate: "dd/MM/yyyy",
-  separateurDecimal: ",",
+  separateurDecimal: "AUTO",
   colonnes: {},
   enregistrerProfil: false,
 };
@@ -358,7 +358,7 @@ export default function RapprochementBancairePage() {
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-3">
-              <div className="grid gap-3 rounded-md bg-muted/30 p-4 md:grid-cols-3">
+              <div className="grid gap-3 rounded-md bg-muted/30 p-4 md:grid-cols-2">
                 <Field label="Ligne d’en-tête">
                   <Input
                     type="number"
@@ -375,18 +375,6 @@ export default function RapprochementBancairePage() {
                     value={configuration.formatDate}
                     onChange={(event) => updateConfiguration("formatDate", event.target.value)}
                   />
-                </Field>
-                <Field label="Séparateur décimal">
-                  <Select
-                    value={configuration.separateurDecimal}
-                    onValueChange={(value) => updateConfiguration("separateurDecimal", value)}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value=",">Virgule</SelectItem>
-                      <SelectItem value=".">Point</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </Field>
               </div>
             </CollapsibleContent>

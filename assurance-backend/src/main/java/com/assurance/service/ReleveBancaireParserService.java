@@ -142,7 +142,7 @@ public class ReleveBancaireParserService {
             while ((row = reader.readLine()) != null) {
                 Matcher balance = MT940_BALANCE.matcher(row.trim());
                 if (balance.matches()) {
-                    BigDecimal amount = parseAmount(balance.group(2), ",");
+                    BigDecimal amount = parseAmount(balance.group(2), "AUTO");
                     if (row.startsWith(":60")) {
                         opening = amount;
                     } else {
@@ -156,7 +156,7 @@ public class ReleveBancaireParserService {
                         lines.add(pending);
                     }
                     number++;
-                    BigDecimal amount = parseAmount(operation.group(3), ",");
+                    BigDecimal amount = parseAmount(operation.group(3), "AUTO");
                     boolean debit = operation.group(2).endsWith("D");
                     String tail = operation.group(4).trim();
                     pending = new NormalizedLine(
@@ -502,22 +502,55 @@ public class ReleveBancaireParserService {
                 .replace(" ", "")
                 .replace("MAD", "")
                 .replace("DH", "")
+                .replace("'", "")
                 .trim();
         boolean parentheses = value.startsWith("(") && value.endsWith(")");
         if (parentheses) {
             value = value.substring(1, value.length() - 1);
         }
-        if (",".equals(decimalSeparator) || (value.contains(",") && !value.contains("."))) {
-            value = value.replace(".", "").replace(',', '.');
-        } else {
-            value = value.replace(",", "");
-        }
+        value = normalizeAmountSeparators(value, decimalSeparator);
         try {
             BigDecimal amount = new BigDecimal(value).setScale(2, RoundingMode.HALF_UP);
             return parentheses ? amount.negate() : amount;
         } catch (NumberFormatException error) {
             throw new BadRequestException("Montant bancaire invalide: " + raw);
         }
+    }
+
+    private String normalizeAmountSeparators(String value, String configuredSeparator) {
+        if (",".equals(configuredSeparator)) {
+            return value.replace(".", "").replace(',', '.');
+        }
+        if (".".equals(configuredSeparator)) {
+            return value.replace(",", "");
+        }
+
+        int lastComma = value.lastIndexOf(',');
+        int lastPoint = value.lastIndexOf('.');
+        if (lastComma >= 0 && lastPoint >= 0) {
+            return lastComma > lastPoint
+                    ? value.replace(".", "").replace(',', '.')
+                    : value.replace(",", "");
+        }
+        if (lastComma >= 0) {
+            return normalizeSingleSeparator(value, ',');
+        }
+        if (lastPoint >= 0) {
+            return normalizeSingleSeparator(value, '.');
+        }
+        return value;
+    }
+
+    private String normalizeSingleSeparator(String value, char separator) {
+        int lastSeparator = value.lastIndexOf(separator);
+        int fractionalDigits = value.length() - lastSeparator - 1;
+        boolean decimal = fractionalDigits > 0
+                && fractionalDigits <= 2
+                && value.indexOf(separator) == lastSeparator;
+        if (!decimal) {
+            return value.replace(String.valueOf(separator), "");
+        }
+        return separator == ',' ? value.replace(',', '.') : value;
     }
 
     private String extractMt940Reference(String tail) {

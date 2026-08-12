@@ -55,4 +55,28 @@ class ReleveBancaireParserServiceTest {
         assertThat(result.lines()).isEmpty();
         assertThat(result.preview()).hasSize(1);
     }
+
+    @Test
+    void detectsFrenchAndInternationalAmountsInTheSameFile() throws Exception {
+        Path file = temporaryDirectory.resolve("mixed-amounts.csv");
+        Files.writeString(file, """
+                Date;Libellé;Débit;Crédit
+                10/08/2026;Format français;;1.234,50
+                11/08/2026;Format international;;1,234.50
+                12/08/2026;Point décimal;25.75;
+                13/08/2026;Virgule décimale;25,75;
+                """);
+
+        ReleveBancaireParserService.ParseResult result = service.parse(
+                file,
+                FormatReleveBancaire.CSV,
+                new ConfigurationImportReleveBancaireRequest()
+        );
+
+        assertThat(result.lines()).hasSize(4);
+        assertThat(result.lines().get(0).credit()).isEqualByComparingTo("1234.50");
+        assertThat(result.lines().get(1).credit()).isEqualByComparingTo("1234.50");
+        assertThat(result.lines().get(2).debit()).isEqualByComparingTo("25.75");
+        assertThat(result.lines().get(3).debit()).isEqualByComparingTo("25.75");
+    }
 }

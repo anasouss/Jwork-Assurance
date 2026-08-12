@@ -25,8 +25,8 @@ public class ConfigurationImportReleveBancaireRequest {
     @Size(max = 40)
     private String formatDate = "dd/MM/yyyy";
 
-    @Size(max = 2)
-    private String separateurDecimal = ",";
+    @Size(max = 10)
+    private String separateurDecimal = "AUTO";
 
     @Valid
     private Colonnes colonnes = new Colonnes();

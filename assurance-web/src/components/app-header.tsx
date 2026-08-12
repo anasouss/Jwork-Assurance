@@ -100,34 +100,36 @@ export function AppHeader() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <div className="hidden h-9 items-center gap-2 rounded-md border bg-muted/30 px-2.5 text-xs font-medium sm:flex">
-            {agencyContext ? (
-              <Building2 className="size-4 text-emerald-600" />
-            ) : (
-              <Globe2 className="size-4 text-blue-600" />
-            )}
-            <span className="max-w-40 truncate">{agencyContext ? user?.agenceName : "Plateforme"}</span>
-            {platformAdmin && agencyContext ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="-mr-1 size-6"
-                disabled={isSwitchingContext}
-                title="Retour à la plateforme"
-                onClick={async () => {
-                  try {
-                    await exitAgencyContext();
-                    window.location.assign("/app/platform");
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Retour à la plateforme impossible");
-                  }
-                }}
-              >
-                <RotateCcw className="size-3.5" />
-              </Button>
-            ) : null}
-          </div>
+          {platformAdmin ? (
+            <div className="hidden h-9 items-center gap-2 rounded-md border bg-muted/30 px-2.5 text-xs font-medium sm:flex">
+              {agencyContext ? (
+                <Building2 className="size-4 text-emerald-600" />
+              ) : (
+                <Globe2 className="size-4 text-blue-600" />
+              )}
+              <span className="max-w-40 truncate">{agencyContext ? user?.agenceName : "Plateforme"}</span>
+              {agencyContext ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-1 size-6"
+                  disabled={isSwitchingContext}
+                  title="Retour à la plateforme"
+                  onClick={async () => {
+                    try {
+                      await exitAgencyContext();
+                      window.location.assign("/app/platform");
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : "Retour à la plateforme impossible");
+                    }
+                  }}
+                >
+                  <RotateCcw className="size-3.5" />
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {canInstall ? (
             <Button
               type="button"
@@ -160,7 +162,9 @@ export function AppHeader() {
                 <div className="text-sm font-medium">{fullName}</div>
                 <div className="text-xs text-muted-foreground">{user?.email}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {agencyContext ? user?.agenceName : "Plateforme"} · {user?.roleName ?? user?.roleCode}
+                  {platformAdmin
+                    ? `${agencyContext ? user?.agenceName : "Plateforme"} · ${user?.roleName ?? user?.roleCode}`
+                    : user?.roleName ?? user?.roleCode}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

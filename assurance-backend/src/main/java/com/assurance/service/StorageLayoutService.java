@@ -88,6 +88,16 @@ public class StorageLayoutService {
         return resolveClaimDocument(Path.of(storageKey));
     }
 
+    public Path resolveBankStatement(Path storageKey) {
+        Path key = validateKey(storageKey, 3);
+        return agencyRoot(key)
+                .resolve("treasury")
+                .resolve("bank-statements")
+                .resolve(key.getName(1).toString())
+                .resolve(key.getName(2).toString())
+                .normalize();
+    }
+
     private Path agencyRoot(Path key) {
         Path resolved = root.resolve("agencies").resolve(key.getName(0).toString()).normalize();
         if (!resolved.startsWith(root)) {

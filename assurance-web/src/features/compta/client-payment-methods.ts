@@ -17,8 +17,6 @@ const ORIGINATING_BANK_MODES = new Set<ClientPaymentMode>([
 const REFERENCE_REQUIRED_MODES = new Set<ClientPaymentMode>([
   "CHEQUE",
   "EFFET",
-  "VIREMENT",
-  "VERSEMENT_BANCAIRE",
 ]);
 
 export function requiresBankAccountAtEntry(mode: ClientPaymentMode) {

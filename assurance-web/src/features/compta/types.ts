@@ -621,6 +621,124 @@ export type TreasuryOperationPage = {
   rows: TreasuryOperation[];
 };
 
+export type BankStatementFormat = "CSV" | "XLSX" | "MT940";
+export type BankStatementImportStatus = "BROUILLON" | "VALIDE" | "ANNULE";
+export type BankStatementLineStatus =
+  | "NON_RAPPROCHEE"
+  | "SUGGEREE"
+  | "PARTIELLEMENT_RAPPROCHEE"
+  | "RAPPROCHEE"
+  | "IGNOREE";
+export type BankReconciliationStatus = "SUGGERE" | "SELECTIONNE" | "VALIDE" | "ANNULE";
+
+export type BankStatementColumnMapping = {
+  dateOperation?: string;
+  dateValeur?: string;
+  libelle?: string;
+  reference?: string;
+  contrepartie?: string;
+  compteContrepartie?: string;
+  debit?: string;
+  credit?: string;
+  montant?: string;
+  sens?: string;
+  solde?: string;
+};
+
+export type BankStatementImportConfiguration = {
+  ligneEntete: number;
+  feuille?: string;
+  separateur?: string;
+  encodage: string;
+  formatDate: string;
+  separateurDecimal: string;
+  colonnes: BankStatementColumnMapping;
+  enregistrerProfil: boolean;
+  nomProfil?: string;
+};
+
+export type BankStatementSuggestion = {
+  instrumentId: string;
+  numeroReglement: string;
+  payeur: string;
+  mode: ClientPaymentMode;
+  referenceInstrument?: string | null;
+  dateInstrument: string;
+  montant: number;
+  score: number;
+  motif?: string | null;
+};
+
+export type BankReconciliation = {
+  id: string;
+  instrumentId: string;
+  numeroReglement: string;
+  payeur: string;
+  mode: ClientPaymentMode;
+  referenceInstrument?: string | null;
+  montantInstrument: number;
+  montant: number;
+  score?: number | null;
+  motif?: string | null;
+  statut: BankReconciliationStatus;
+};
+
+export type BankStatementLine = {
+  id?: string;
+  numeroLigne: number;
+  dateOperation: string;
+  dateValeur?: string | null;
+  libelle: string;
+  referenceBancaire?: string | null;
+  contrepartie?: string | null;
+  compteContrepartie?: string | null;
+  debit: number;
+  credit: number;
+  solde?: number | null;
+  statut: BankStatementLineStatus;
+  rapprochements: BankReconciliation[];
+  suggestions: BankStatementSuggestion[];
+};
+
+export type BankStatementImport = {
+  id?: string;
+  compteTresorerieId?: string;
+  compteTresorerie?: string;
+  nomFichier: string;
+  format: BankStatementFormat;
+  statut?: BankStatementImportStatus;
+  configuration: BankStatementImportConfiguration;
+  configurationComplete: boolean;
+  entetes: string[];
+  apercu: Array<Record<string, string>>;
+  soldeOuverture?: number | null;
+  soldeCloture?: number | null;
+  totalDebits: number;
+  totalCredits: number;
+  nombreLignes: number;
+  createdAt?: string;
+  valideLe?: string | null;
+  lignes: BankStatementLine[];
+};
+
+export type BankStatementImportPage = {
+  items: BankStatementImport[];
+  page: PageInfo;
+};
+
+export type BankStatementImportProfile = {
+  id: string;
+  compteTresorerieId: string;
+  nom: string;
+  format: BankStatementFormat;
+  configuration: BankStatementImportConfiguration;
+};
+
+export type SaveBankReconciliationsRequest = {
+  selections: Array<{ ligneId: string; instrumentId: string; montant: number }>;
+  lignesIgnorees: string[];
+};
+
 export type CreateTreasuryTransferRequest = {
   compteSourceId: string;
   compteDestinationId: string;

@@ -8,6 +8,7 @@ import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.LigneReleveBancaire;
 import com.assurance.entity.InstrumentReglementCompagnie;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.enums.NatureMouvementTresorerie;
@@ -159,6 +160,16 @@ public class TresorerieService {
             CompteTresorerie account,
             LocalDate operationDate
     ) {
+        return recordInstrumentEntry(instrument, account, operationDate, null);
+    }
+
+    @Transactional
+    public MouvementTresorerie recordInstrumentEntry(
+            InstrumentReglementClient instrument,
+            CompteTresorerie account,
+            LocalDate operationDate,
+            LigneReleveBancaire bankStatementLine
+    ) {
         if (!instrument.getAgence().getId().equals(account.getAgence().getId())) {
             throw new BadRequestException("Le compte de trésorerie appartient à une autre agence");
         }
@@ -174,6 +185,7 @@ public class TresorerieService {
                 .agence(instrument.getAgence())
                 .compteTresorerie(account)
                 .instrumentReglement(instrument)
+                .ligneReleveBancaire(bankStatementLine)
                 .sessionCaisse(sessionCaisseService.requireOpenSession(
                         instrument.getAgence().getId(),
                         account

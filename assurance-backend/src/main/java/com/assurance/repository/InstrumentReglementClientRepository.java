@@ -7,11 +7,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 
 public interface InstrumentReglementClientRepository extends JpaRepository<InstrumentReglementClient, Long> {
 
@@ -83,4 +85,23 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             "affectations.documentClient"
     })
     Optional<InstrumentReglementClient> findByIdAndAgenceId(Long id, Long agenceId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "reglement",
+            "compteTresorerie",
+            "affectations",
+            "affectations.elementFacturable",
+            "affectations.documentClient"
+    })
+    @Query("""
+            select instrument
+            from InstrumentReglementClient instrument
+            where instrument.id = :id
+              and instrument.agence.id = :agenceId
+            """)
+    Optional<InstrumentReglementClient> findByIdAndAgenceIdForUpdate(
+            @Param("id") Long id,
+            @Param("agenceId") Long agenceId
+    );
 }

@@ -4,6 +4,10 @@ import type {
   AllocationRequest,
   BatchAllocationRequest,
   BatchAllocationResponse,
+  BankStatementImport,
+  BankStatementImportConfiguration,
+  BankStatementImportPage,
+  BankStatementImportProfile,
   ClientDocument,
   ClientDocumentPage,
   ClientDocumentSourcePage,
@@ -50,6 +54,7 @@ import type {
   TreasuryMovementPage,
   UpsertCompanyBordereauRequest,
   UpsertTreasuryAccountRequest,
+  SaveBankReconciliationsRequest,
 } from "./types";
 
 const unwrap = <T,>(response: ApiResponse<T>) => response.data;
@@ -747,7 +752,83 @@ export const comptaApi = {
       rows: result.rows.map(normalizeTreasuryMovement),
     };
   },
+
+  async previewBankStatement(file: File, configuration: BankStatementImportConfiguration) {
+    return uploadBankStatement(
+      "/api/v1/compta/tresorerie/releves-bancaires/previsualisation",
+      file,
+      configuration
+    );
+  },
+
+  async importBankStatement(
+    accountId: string,
+    file: File,
+    configuration: BankStatementImportConfiguration,
+    profileId?: string
+  ) {
+    return uploadBankStatement(
+      `/api/v1/compta/tresorerie/releves-bancaires${buildQueryString({
+        compteId: accountId,
+        profilId: profileId,
+      })}`,
+      file,
+      configuration
+    );
+  },
+
+  async bankStatementImports(accountId: string, page = 0, size = 20) {
+    return unwrap(await apiFetch<ApiResponse<BankStatementImportPage>>(
+      `/api/v1/compta/tresorerie/releves-bancaires${buildQueryString({
+        compteId: accountId,
+        page,
+        size,
+      })}`
+    ));
+  },
+
+  async bankStatementProfiles(accountId: string) {
+    return unwrap(await apiFetch<ApiResponse<BankStatementImportProfile[]>>(
+      `/api/v1/compta/tresorerie/releves-bancaires/profils${buildQueryString({
+        compteId: accountId,
+      })}`
+    ));
+  },
+
+  async bankStatementImport(id: string) {
+    return unwrap(await apiFetch<ApiResponse<BankStatementImport>>(
+      `/api/v1/compta/tresorerie/releves-bancaires/${id}`
+    ));
+  },
+
+  async saveBankReconciliations(id: string, request: SaveBankReconciliationsRequest) {
+    return unwrap(await apiFetch<ApiResponse<BankStatementImport>>(
+      `/api/v1/compta/tresorerie/releves-bancaires/${id}/rapprochements`,
+      { method: "PUT", body: JSON.stringify(request) }
+    ));
+  },
+
+  async validateBankReconciliation(id: string) {
+    return unwrap(await apiFetch<ApiResponse<BankStatementImport>>(
+      `/api/v1/compta/tresorerie/releves-bancaires/${id}/validation`,
+      { method: "POST" }
+    ));
+  },
 };
+
+async function uploadBankStatement(
+  path: string,
+  file: File,
+  configuration: BankStatementImportConfiguration
+) {
+  const data = new FormData();
+  data.append("file", file);
+  data.append(
+    "configuration",
+    new Blob([JSON.stringify(configuration)], { type: "application/json" })
+  );
+  return unwrap(await apiUpload<ApiResponse<BankStatementImport>>(path, data));
+}
 
 function normalizeReference(option: ReferenceOption): ReferenceOption {
   return {

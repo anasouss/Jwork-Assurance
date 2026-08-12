@@ -21,6 +21,8 @@ import com.assurance.entity.DocumentClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.GroupeClient;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.LigneReleveBancaire;
+import com.assurance.entity.MouvementTresorerie;
 import com.assurance.entity.Quittance;
 import com.assurance.entity.ReglementClient;
 import com.assurance.entity.SequenceReglementClient;
@@ -791,11 +793,65 @@ public class ReglementClientService {
         }
     }
 
-    private void confirmInstrument(
+    @Transactional
+    public MouvementTresorerie confirmInstrumentFromBankStatement(
+            Long agenceId,
+            Long instrumentId,
+            Long accountId,
+            LocalDate operationDate,
+            LigneReleveBancaire bankStatementLine
+    ) {
+        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(
+                        instrumentId,
+                        agenceId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Instrument de règlement",
+                        instrumentId
+                ));
+        MouvementTresorerie movement = confirmInstrument(
+                agenceId,
+                instrument,
+                accountId,
+                operationDate,
+                bankStatementLine
+        );
+        instrument.setDateStatut(operationDate);
+        instrument.setMotifStatut("Confirmé par rapprochement bancaire");
+        instrumentRepository.save(instrument);
+        refreshUnallocatedAmount(instrument.getReglement());
+        recalculatePaymentFlags(
+                instrument.getAffectations().stream()
+                        .map(AffectationReglementClient::getElementFacturable)
+                        .filter(Objects::nonNull)
+                        .map(ElementFacturable::getId)
+                        .distinct()
+                        .toList(),
+                instrument.getAffectations().stream()
+                        .map(AffectationReglementClient::getDocumentClient)
+                        .filter(Objects::nonNull)
+                        .map(DocumentClient::getId)
+                        .distinct()
+                        .toList()
+        );
+        return movement;
+    }
+
+    private MouvementTresorerie confirmInstrument(
             Long agenceId,
             InstrumentReglementClient instrument,
             Long accountId,
             LocalDate operationDate
+    ) {
+        return confirmInstrument(agenceId, instrument, accountId, operationDate, null);
+    }
+
+    private MouvementTresorerie confirmInstrument(
+            Long agenceId,
+            InstrumentReglementClient instrument,
+            Long accountId,
+            LocalDate operationDate,
+            LigneReleveBancaire bankStatementLine
     ) {
         if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE) {
             throw new BadRequestException("Seul un instrument en attente peut être confirmé");
@@ -816,7 +872,12 @@ public class ReglementClientService {
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.CONFIRMEE));
         instrumentRepository.saveAndFlush(instrument);
-        tresorerieService.recordInstrumentEntry(instrument, account, operationDate);
+        return tresorerieService.recordInstrumentEntry(
+                instrument,
+                account,
+                operationDate,
+                bankStatementLine
+        );
     }
 
     private void rejectInstrument(
@@ -840,8 +901,7 @@ public class ReglementClientService {
     }
 
     private void validateInstrumentReference(CreerReglementClientRequest.Instrument request) {
-        if (Set.of(ModeReglementClient.CHEQUE, ModeReglementClient.EFFET,
-                        ModeReglementClient.VIREMENT, ModeReglementClient.VERSEMENT_BANCAIRE)
+        if (Set.of(ModeReglementClient.CHEQUE, ModeReglementClient.EFFET)
                 .contains(request.getMode())
                 && (request.getReferenceInstrument() == null || request.getReferenceInstrument().isBlank())) {
             throw new BadRequestException("La référence du moyen de règlement est obligatoire");

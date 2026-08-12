@@ -11,6 +11,7 @@ import {
   List,
   LockKeyhole,
   ReceiptText,
+  ScanSearch,
   ShieldCheck,
   WalletCards,
 } from "lucide-react";
@@ -107,6 +108,14 @@ export default function TresorerieCompteDetailPage() {
               Transférer ou corriger
             </Link>
           </Button>
+          {account?.typeCompte === "BANQUE" && (
+            <Button asChild>
+              <Link to={`/app/compta/tresorerie/rapprochement-bancaire?compteId=${accountId}`}>
+                <ScanSearch className="size-4" />
+                Rapprocher un relevé
+              </Link>
+            </Button>
+          )}
           {account?.typeCompte === "CAISSE" && (
             <Button asChild>
               <Link to={`/app/compta/tresorerie/sessions-caisse?compteId=${accountId}`}>

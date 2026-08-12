@@ -328,7 +328,7 @@ function ClientPicker({
         <Select value={collaborateurId} onValueChange={onCollaboratorChange}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="TOUS">Tous les collaborateurs</SelectItem>
+            <SelectItem value="TOUS">Tous les membres de l’équipe</SelectItem>
             {(acquisitionOptions?.collaborateurs ?? []).filter((user) => user.actif).map((user) => (
               <SelectItem key={user.id} value={user.id}>{user.nom}</SelectItem>
             ))}
@@ -399,7 +399,7 @@ type OriginDraft = Omit<OrigineCommerciale, "id"> & { id?: string };
 
 const originTypeLabels: Record<TypeOrigineCommerciale, string> = {
   PASSAGE_AGENCE: "Passage en agence",
-  COLLABORATEUR: "Collaborateur",
+  COLLABORATEUR: "Équipe de l’agence",
   CLIENT: "Client recommandant",
   PARTENAIRE: "Partenaire",
   CAMPAGNE: "Campagne",

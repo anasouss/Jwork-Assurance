@@ -32,7 +32,7 @@ public class AcquisitionClientService {
 
     private static final List<DefaultOrigin> DEFAULT_ORIGINS = List.of(
             new DefaultOrigin("PASSAGE_AGENCE", "Passage en agence", TypeOrigineCommerciale.PASSAGE_AGENCE, 10),
-            new DefaultOrigin("COLLABORATEUR", "Recommandation d'un collaborateur", TypeOrigineCommerciale.COLLABORATEUR, 20),
+            new DefaultOrigin("COLLABORATEUR", "Équipe de l'agence", TypeOrigineCommerciale.COLLABORATEUR, 20),
             new DefaultOrigin("CLIENT", "Recommandation d'un client", TypeOrigineCommerciale.CLIENT, 30),
             new DefaultOrigin("SITE_WEB", "Site web", TypeOrigineCommerciale.SITE_WEB, 40),
             new DefaultOrigin("RESEAUX_SOCIAUX", "Réseaux sociaux", TypeOrigineCommerciale.RESEAUX_SOCIAUX, 50),
@@ -204,7 +204,7 @@ public class AcquisitionClientService {
             return null;
         }
         Utilisateur user = utilisateurRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Collaborateur", userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Membre de l'équipe", userId));
         if (user.getAgence() == null || !agenceId.equals(user.getAgence().getId())) {
             throw new BadRequestException("Le collaborateur n'appartient pas à cette agence");
         }
@@ -231,13 +231,13 @@ public class AcquisitionClientService {
             Client referringClient
     ) {
         if (type == TypeOrigineCommerciale.COLLABORATEUR && employee == null) {
-            throw new BadRequestException("Le collaborateur à l'origine du client est obligatoire");
+            throw new BadRequestException("Le membre de l'équipe à l'origine du client est obligatoire");
         }
         if (type == TypeOrigineCommerciale.CLIENT && referringClient == null) {
             throw new BadRequestException("Le client recommandant est obligatoire");
         }
         if (type != TypeOrigineCommerciale.COLLABORATEUR && employee != null) {
-            throw new BadRequestException("Cette origine commerciale n'accepte pas de collaborateur recommandant");
+            throw new BadRequestException("Cette origine commerciale n'accepte pas de membre de l'équipe");
         }
         if (type != TypeOrigineCommerciale.CLIENT && referringClient != null) {
             throw new BadRequestException("Cette origine commerciale n'accepte pas de client recommandant");

@@ -94,12 +94,12 @@ export function AcquisitionFields({
       ) : null}
 
       {selectedOrigin?.type === "COLLABORATEUR" && value ? (
-        <Field label="Collaborateur recommandant" required>
+        <Field label="Membre de l’équipe à l’origine du client" required>
           <Select
             value={value.recommandeParUtilisateurId ?? ""}
             onValueChange={(id) => patch({ recommandeParUtilisateurId: id, recommandeParClientId: null })}
           >
-            <SelectTrigger><SelectValue placeholder="Choisir un collaborateur" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Choisir un membre de l’équipe" /></SelectTrigger>
             <SelectContent>
               {(options?.collaborateurs ?? []).filter((user) => user.actif).map((user) => (
                 <SelectItem key={user.id} value={user.id}>{user.nom}</SelectItem>

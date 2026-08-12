@@ -23,6 +23,7 @@ type AutocompleteSelectProps = {
   invalidText?: string;
   disabled?: boolean;
   openOnFocus?: boolean;
+  autoComplete?: string;
   className?: string;
 };
 
@@ -39,8 +40,10 @@ export function AutocompleteSelect({
   invalidText = "Choisissez une option existante.",
   disabled = false,
   openOnFocus = true,
+  autoComplete = "off",
   className,
 }: AutocompleteSelectProps) {
+  const inputId = React.useId();
   const selectedOption = options.find((option) => option.value === value);
   const selectedLabel = selectedOption?.label ?? customValue ?? "";
   const [open, setOpen] = React.useState(false);
@@ -107,6 +110,11 @@ export function AutocompleteSelect({
   return (
     <div className={cn("relative grid gap-1.5", className)}>
       <Input
+        name={`lookup-${inputId.replace(/:/g, "")}`}
+        autoComplete={autoComplete}
+        data-1p-ignore="true"
+        data-lpignore="true"
+        data-form-type="other"
         value={query}
         disabled={disabled}
         placeholder={placeholder}

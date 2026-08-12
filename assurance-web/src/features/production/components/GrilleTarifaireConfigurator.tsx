@@ -411,7 +411,16 @@ export function GrilleTarifaireConfigurator({
                     </TableCell>
                     <TableCell className="text-right">
                       {index === 0 && multiEntry ? (
-                        <Button type="button" variant="ghost" size="icon" disabled={!enabled} onClick={() => addDraft(garantie, rowMode)}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+                          aria-label="Ajouter une ligne tarifaire"
+                          title="Ajouter une ligne"
+                          disabled={!enabled}
+                          onClick={() => addDraft(garantie, rowMode)}
+                        >
                           <Plus className="size-4" />
                         </Button>
                       ) : null}
@@ -420,6 +429,9 @@ export function GrilleTarifaireConfigurator({
                           type="button"
                           variant="ghost"
                           size="icon"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          aria-label="Supprimer la ligne tarifaire"
+                          title="Supprimer la ligne"
                           disabled={!enabled}
                           onClick={() => removeDraft(draft)}
                         >
@@ -554,7 +566,16 @@ function PersonnesLinesTable({
                   </TableCell>
                   <TableCell className="text-right">
                     {index === 0 && canAddMultipleRows(garantie) ? (
-                        <Button type="button" variant="ghost" size="icon" disabled={!groupEnabled} onClick={() => addDraft(garantie)}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+                          aria-label="Ajouter une formule"
+                          title="Ajouter une formule"
+                          disabled={!groupEnabled}
+                          onClick={() => addDraft(garantie)}
+                        >
                           <Plus className="size-4" />
                         </Button>
                     ) : null}
@@ -563,6 +584,9 @@ function PersonnesLinesTable({
                           type="button"
                           variant="ghost"
                           size="icon"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          aria-label="Supprimer la formule"
+                          title="Supprimer la formule"
                           disabled={!groupEnabled}
                           onClick={() => removeDraft(draft)}
                         >

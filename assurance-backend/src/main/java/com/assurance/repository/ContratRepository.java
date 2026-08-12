@@ -136,7 +136,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
               and (:dateAu is null or
                     (:typeDate = 'EFFET' and c.dateEffet <= :dateAu) or
                     (:typeDate = 'ECHEANCE' and c.dateEcheance <= :dateAu))
-            order by c.updatedAt desc, c.id desc
+            order by c.createdAt desc, c.id desc
             """,
             countQuery = """
             select count(c.id)

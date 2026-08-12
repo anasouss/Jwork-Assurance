@@ -74,7 +74,8 @@ export default function AdminPage() {
   const canManageAgencies = canManagePlatformAgencies || canManageOwnAgency;
   const canViewAgencies = permissions.includes("agence:view") || permissions.includes("config:view");
   const canAccessAgencySettings = canViewAgencies || canManageOwnAgency;
-  const isPlatformAdmin = user?.roleCode === "SUPER_ADMIN";
+  const isPlatformAdmin = Boolean(user?.platformAdmin);
+  const isPlatformMode = isPlatformAdmin && user?.operatingMode === "PLATFORM";
 
   const users = useQuery({ queryKey: ["admin", "users"], queryFn: adminApi.users, staleTime: 30_000 });
   const roles = useQuery({ queryKey: ["admin", "roles"], queryFn: adminApi.roles, staleTime: 30_000 });
@@ -89,7 +90,7 @@ export default function AdminPage() {
     queryKey: ["admin", "platform-admins"],
     queryFn: adminApi.platformAdmins,
     staleTime: 30_000,
-    enabled: isPlatformAdmin,
+    enabled: isPlatformMode,
   });
 
   const availableAgencies = useMemo<AdminAgency[]>(() => {
@@ -110,21 +111,21 @@ export default function AdminPage() {
     <div className="grid gap-5">
       <div className="flex flex-col gap-1">
         <p className="text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-400">
-          {isPlatformAdmin ? "Administration de la plateforme" : "Administration d’agence"}
+          {isPlatformMode ? "Administration de la plateforme" : "Administration d’agence"}
         </p>
         <h1 className="text-2xl font-semibold">Accès et organisation</h1>
         <p className="text-sm text-muted-foreground">
-          {isPlatformAdmin
+          {isPlatformMode
             ? "Gérez les agences, leurs accès et les administrateurs globaux de la plateforme."
             : "Gérez les comptes de l’agence, leurs rôles et les appareils connectés."}
         </p>
       </div>
 
-      <div className={`grid gap-3 ${isPlatformAdmin ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
+      <div className={`grid gap-3 ${isPlatformMode ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
         <SummaryCard icon={Users} label="Utilisateurs" value={users.data?.length ?? 0} detail={`${users.data?.filter((item) => item.actif).length ?? 0} actifs`} />
         <SummaryCard icon={ShieldCheck} label="Rôles d’agence" value={roles.data?.length ?? 0} detail={`${permissionsQuery.data?.length ?? 0} permissions disponibles`} />
-        <SummaryCard icon={Building2} label="Agences accessibles" value={availableAgencies.length} detail={canViewAgencies ? "Périmètre plateforme" : user?.agenceName ?? "Agence courante"} />
-        {isPlatformAdmin ? (
+        <SummaryCard icon={Building2} label={isPlatformMode ? "Agences accessibles" : "Agence"} value={availableAgencies.length} detail={isPlatformMode ? "Périmètre plateforme" : user?.agenceName ?? "Agence courante"} />
+        {isPlatformMode ? (
           <SummaryCard
             icon={ShieldCheck}
             label="Administrateurs plateforme"
@@ -138,8 +139,8 @@ export default function AdminPage() {
         <TabsList className="w-fit">
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="roles">Rôles & permissions</TabsTrigger>
-          {canAccessAgencySettings ? <TabsTrigger value="agencies">{canViewAgencies ? "Agences" : "Mon agence"}</TabsTrigger> : null}
-          {isPlatformAdmin ? <TabsTrigger value="platform-admins">Administrateurs plateforme</TabsTrigger> : null}
+          {canAccessAgencySettings ? <TabsTrigger value="agencies">{isPlatformMode ? "Agences" : "Mon agence"}</TabsTrigger> : null}
+          {isPlatformMode ? <TabsTrigger value="platform-admins">Administrateurs plateforme</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="users">
@@ -147,6 +148,9 @@ export default function AdminPage() {
             users={users.data ?? []}
             roles={roles.data ?? []}
             agencies={availableAgencies}
+            canSelectAgency={isPlatformMode}
+            currentAgencyId={user?.agenceId ?? undefined}
+            currentAgencyName={user?.agenceName ?? undefined}
             canManage={canManageUsers}
             currentUserId={user?.id}
             onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "users"] })}
@@ -171,14 +175,14 @@ export default function AdminPage() {
             <AgenciesPanel
               agencies={agencies.data ?? []}
               canManage={canManageAgencies}
-              canCreate={canManagePlatformAgencies}
-              canEditPlatformFields={canManagePlatformAgencies}
+              canCreate={isPlatformMode && canManagePlatformAgencies}
+              canEditPlatformFields={isPlatformMode && canManagePlatformAgencies}
               onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "agencies"] })}
             />
           </TabsContent>
         ) : null}
 
-        {isPlatformAdmin ? (
+        {isPlatformMode ? (
           <TabsContent value="platform-admins">
             <PlatformAdminsPanel
               users={platformAdmins.data ?? []}
@@ -223,6 +227,9 @@ function UsersPanel({
   users,
   roles,
   agencies,
+  canSelectAgency,
+  currentAgencyId,
+  currentAgencyName,
   canManage,
   currentUserId,
   onChanged,
@@ -230,6 +237,9 @@ function UsersPanel({
   users: AdminUser[];
   roles: AdminRole[];
   agencies: AdminAgency[];
+  canSelectAgency: boolean;
+  currentAgencyId?: string;
+  currentAgencyName?: string;
   canManage: boolean;
   currentUserId?: string;
   onChanged: () => void;
@@ -245,12 +255,14 @@ function UsersPanel({
 
   useEffect(() => {
     if (!dialogOpen) return;
-    const defaultAgencyId = agencies[0]?.id;
+    const defaultAgencyId = canSelectAgency
+      ? agencies[0]?.id
+      : currentAgencyId ?? agencies[0]?.id;
     const defaultRoleId = roles.find(
       (role) => String(role.agenceId) === String(defaultAgencyId),
     )?.id;
     setForm(editing ? userToForm(editing) : emptyUser(defaultAgencyId, defaultRoleId));
-  }, [agencies, dialogOpen, editing, roles]);
+  }, [agencies, canSelectAgency, currentAgencyId, dialogOpen, editing, roles]);
 
   const rolesForAgency = useMemo(
     () => roles.filter(
@@ -372,7 +384,11 @@ function UsersPanel({
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier utilisateur" : "Ajouter utilisateur"}</DialogTitle>
-            <DialogDescription>Associez l'utilisateur à une agence et un rôle.</DialogDescription>
+            <DialogDescription>
+              {canSelectAgency
+                ? "Associez l'utilisateur à une agence et un rôle."
+                : `Attribuez un rôle à cet utilisateur${currentAgencyName ? ` dans l’agence ${currentAgencyName}` : " dans l’agence courante"}.`}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <LabeledInput label="Prénom" value={form.prenom} onChange={(value) => setForm({ ...form, prenom: value })} />
@@ -380,22 +396,24 @@ function UsersPanel({
             <LabeledInput label="Email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
             <LabeledInput label="Téléphone" value={form.telephone ?? ""} onChange={(value) => setForm({ ...form, telephone: value })} />
             <LabeledInput label={editing ? "Nouveau mot de passe" : "Mot de passe"} type="password" value={form.password ?? ""} onChange={(value) => setForm({ ...form, password: value })} />
-            <label className="grid gap-1.5 text-sm">
-              <span className="font-medium">Agence</span>
-              <Select
-                value={form.agenceId ?? ""}
-                onValueChange={(value) => setForm({
-                  ...form,
-                  agenceId: value,
-                  roleId: roles.find(
-                    (role) => String(role.agenceId) === String(value),
-                  )?.id ?? "",
-                })}
-              >
-                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                <SelectContent>{agencies.map((agence) => <SelectItem key={agence.id} value={agence.id}>{agence.nom}</SelectItem>)}</SelectContent>
-              </Select>
-            </label>
+            {canSelectAgency ? (
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Agence</span>
+                <Select
+                  value={form.agenceId ?? ""}
+                  onValueChange={(value) => setForm({
+                    ...form,
+                    agenceId: value,
+                    roleId: roles.find(
+                      (role) => String(role.agenceId) === String(value),
+                    )?.id ?? "",
+                  })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                  <SelectContent>{agencies.map((agence) => <SelectItem key={agence.id} value={agence.id}>{agence.nom}</SelectItem>)}</SelectContent>
+                </Select>
+              </label>
+            ) : null}
             <label className="grid gap-1.5 text-sm">
               <span className="font-medium">Rôle</span>
               <Select value={form.roleId} onValueChange={(value) => setForm({ ...form, roleId: value })}>

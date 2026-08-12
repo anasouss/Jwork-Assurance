@@ -168,7 +168,10 @@ public class AdminService {
     public List<AdminUtilisateurResponse> listUsers() {
         Utilisateur actor = currentUser();
         requireAny(actor, "user:view", "user:manage", "config:view");
-        List<Utilisateur> users = can(actor, "agence:view")
+        Long contextAgenceId = TenantContext.getCurrentAgence();
+        List<Utilisateur> users = contextAgenceId != null
+                ? utilisateurRepository.findByAgenceIdOrderByNomAscPrenomAsc(contextAgenceId)
+                : can(actor, "agence:view")
                 ? utilisateurRepository.findAllByOrderByNomAscPrenomAsc()
                 : utilisateurRepository.findByAgenceIdOrderByNomAscPrenomAsc(requiredActorAgence(actor));
         return users.stream()
@@ -295,7 +298,10 @@ public class AdminService {
     public List<AdminRoleResponse> listRoles() {
         Utilisateur actor = currentUser();
         requireAny(actor, "role:view", "role:manage", "config:view");
-        List<Role> roles = can(actor, "agence:view")
+        Long contextAgenceId = TenantContext.getCurrentAgence();
+        List<Role> roles = contextAgenceId != null
+                ? roleRepository.findByAgenceIdOrAgenceIsNullOrderByNomAsc(contextAgenceId)
+                : can(actor, "agence:view")
                 ? roleRepository.findAllByOrderByNomAsc()
                 : roleRepository.findByAgenceIdOrAgenceIsNullOrderByNomAsc(requiredActorAgence(actor));
         return roles.stream()
@@ -377,6 +383,10 @@ public class AdminService {
     public List<AdminAgenceResponse> listAgencies() {
         Utilisateur actor = currentUser();
         requireAny(actor, "agence:view", "config:view", "agence:manage-self");
+        Long contextAgenceId = TenantContext.getCurrentAgence();
+        if (contextAgenceId != null) {
+            return List.of(AdminAgenceResponse.from(managedAgency(actor, contextAgenceId)));
+        }
         if (can(actor, "agence:manage-self") && !can(actor, "agence:view") && !can(actor, "config:view")) {
             return List.of(AdminAgenceResponse.from(managedAgency(actor, requiredActorAgence(actor))));
         }
@@ -568,7 +578,13 @@ public class AdminService {
     }
 
     private Agence resolveManagedAgence(Utilisateur actor, Long agenceId) {
-        Long effectiveAgenceId = can(actor, "agence:view") ? agenceId : requiredActorAgence(actor);
+        Long contextAgenceId = TenantContext.getCurrentAgence();
+        if (contextAgenceId != null && agenceId != null && !contextAgenceId.equals(agenceId)) {
+            throw new UnauthorizedException("Agence hors du contexte de travail actif");
+        }
+        Long effectiveAgenceId = contextAgenceId != null
+                ? contextAgenceId
+                : can(actor, "agence:view") ? agenceId : requiredActorAgence(actor);
         if (effectiveAgenceId == null) {
             throw new BadRequestException("Agence obligatoire");
         }
@@ -583,6 +599,13 @@ public class AdminService {
     }
 
     private void ensureManagedAgence(Utilisateur actor, Agence agence) {
+        Long contextAgenceId = TenantContext.getCurrentAgence();
+        if (contextAgenceId != null) {
+            if (agence == null || !contextAgenceId.equals(agence.getId())) {
+                throw new UnauthorizedException("Agence hors du contexte de travail actif");
+            }
+            return;
+        }
         if (can(actor, "agence:view") || can(actor, "config:manage")) {
             return;
         }

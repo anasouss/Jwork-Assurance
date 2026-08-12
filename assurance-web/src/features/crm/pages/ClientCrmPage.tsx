@@ -12,9 +12,12 @@ import {
   FileText,
   FolderOpen,
   History,
+  Megaphone,
+  Pencil,
   Plus,
   ReceiptText,
   Search,
+  Settings2,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -38,6 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { useAuthStore } from "@/store/auth-store";
 import { clientApi } from "@/features/production/api/clients";
+import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "@/features/compta/api";
@@ -46,10 +50,14 @@ import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
 import { natureLabels, statusLabels } from "@/features/sinistre/format";
 import type {
   ClientInput,
+  AcquisitionClient,
+  AcquisitionOptions,
   ClientPage,
   ClientResponse,
   GroupeClient,
+  OrigineCommerciale,
   RelationGroupeClient,
+  TypeOrigineCommerciale,
   TypeClient,
 } from "@/features/production/types";
 
@@ -62,6 +70,8 @@ export default function ClientCrmPage() {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
   const [groupeId, setGroupeId] = useState("TOUS");
+  const [origineId, setOrigineId] = useState("TOUTES");
+  const [collaborateurId, setCollaborateurId] = useState("TOUS");
   const [page, setPage] = useState(0);
   const selectedClientId = searchParams.get("clientId") ?? "";
   const activeTab = normalizePortfolioTab(searchParams.get("tab"));
@@ -69,17 +79,25 @@ export default function ClientCrmPage() {
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [originSettingsOpen, setOriginSettingsOpen] = useState(false);
 
   const groupesQuery = useQuery({
     queryKey: ["groupes-clients"],
     queryFn: clientApi.listGroupesClients,
     staleTime: 60_000,
   });
+  const acquisitionOptionsQuery = useQuery({
+    queryKey: ["crm", "acquisition-options"],
+    queryFn: clientApi.acquisitionOptions,
+    staleTime: 60_000,
+  });
   const clientsQuery = useQuery({
-    queryKey: ["crm-clients", deferredQuery, groupeId, page],
+    queryKey: ["crm-clients", deferredQuery, groupeId, origineId, collaborateurId, page],
     queryFn: () => clientApi.listClients({
       query: deferredQuery || undefined,
       groupeId: groupeId === "TOUS" ? undefined : groupeId,
+      origineCommercialeId: origineId === "TOUTES" ? undefined : origineId,
+      collaborateurId: collaborateurId === "TOUS" ? undefined : collaborateurId,
       page,
       size: 25,
     }),
@@ -119,6 +137,12 @@ export default function ClientCrmPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canManageClients ? (
+            <Button type="button" variant="outline" onClick={() => setOriginSettingsOpen(true)}>
+              <Settings2 className="size-4" />
+              Origines commerciales
+            </Button>
+          ) : null}
+          {canManageClients ? (
             <Button type="button" variant="outline" onClick={() => setGroupDialogOpen(true)}>
               <Users className="size-4" />
               Nouveau groupe
@@ -151,6 +175,11 @@ export default function ClientCrmPage() {
             groupeId={groupeId}
             onGroupChange={(value) => { setGroupeId(value); setPage(0); }}
             groupes={groupesQuery.data ?? []}
+            origineId={origineId}
+            onOriginChange={(value) => { setOrigineId(value); setPage(0); }}
+            collaborateurId={collaborateurId}
+            onCollaboratorChange={(value) => { setCollaborateurId(value); setPage(0); }}
+            acquisitionOptions={acquisitionOptionsQuery.data}
             clients={clientsQuery.data?.items ?? []}
             loading={clientsQuery.isLoading}
             page={clientsQuery.data?.page}
@@ -189,6 +218,11 @@ export default function ClientCrmPage() {
             groupeId={groupeId}
             onGroupChange={(value) => { setGroupeId(value); setPage(0); }}
             groupes={groupesQuery.data ?? []}
+            origineId={origineId}
+            onOriginChange={(value) => { setOrigineId(value); setPage(0); }}
+            collaborateurId={collaborateurId}
+            onCollaboratorChange={(value) => { setCollaborateurId(value); setPage(0); }}
+            acquisitionOptions={acquisitionOptionsQuery.data}
             clients={clientsQuery.data?.items ?? []}
             loading={clientsQuery.isLoading}
             page={clientsQuery.data?.page}
@@ -203,6 +237,7 @@ export default function ClientCrmPage() {
         onOpenChange={setGroupDialogOpen}
         onSaved={refreshCrm}
       />
+      <OriginSettingsDialog open={originSettingsOpen} onOpenChange={setOriginSettingsOpen} />
       <ClientDialog
         open={clientDialogOpen}
         onOpenChange={setClientDialogOpen}
@@ -233,6 +268,11 @@ function ClientPicker({
   groupeId,
   onGroupChange,
   groupes,
+  origineId,
+  onOriginChange,
+  collaborateurId,
+  onCollaboratorChange,
+  acquisitionOptions,
   clients,
   loading,
   page,
@@ -244,6 +284,11 @@ function ClientPicker({
   groupeId: string;
   onGroupChange: (value: string) => void;
   groupes: GroupeClient[];
+  origineId: string;
+  onOriginChange: (value: string) => void;
+  collaborateurId: string;
+  onCollaboratorChange: (value: string) => void;
+  acquisitionOptions?: AcquisitionOptions;
   clients: ClientResponse[];
   loading: boolean;
   page?: ClientPage["page"];
@@ -252,7 +297,7 @@ function ClientPicker({
 }) {
   return (
     <div className="min-w-0">
-      <div className="grid gap-3 border-b p-4 sm:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="grid gap-3 border-b p-4 sm:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_220px_220px_220px]">
         <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -268,6 +313,24 @@ function ClientPicker({
             <SelectItem value="TOUS">Tous les groupes</SelectItem>
             {groupes.map((groupe) => (
               <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={origineId} onValueChange={onOriginChange}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="TOUTES">Toutes les origines</SelectItem>
+            {(acquisitionOptions?.origines ?? []).map((origin) => (
+              <SelectItem key={origin.id} value={origin.id}>{origin.libelle}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={collaborateurId} onValueChange={onCollaboratorChange}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="TOUS">Tous les collaborateurs</SelectItem>
+            {(acquisitionOptions?.collaborateurs ?? []).filter((user) => user.actif).map((user) => (
+              <SelectItem key={user.id} value={user.id}>{user.nom}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -332,6 +395,166 @@ type ClientDraft = ClientInput["client"] & {
   relationGroupe?: RelationGroupeClient;
 };
 
+type OriginDraft = Omit<OrigineCommerciale, "id"> & { id?: string };
+
+const originTypeLabels: Record<TypeOrigineCommerciale, string> = {
+  PASSAGE_AGENCE: "Passage en agence",
+  COLLABORATEUR: "Collaborateur",
+  CLIENT: "Client recommandant",
+  PARTENAIRE: "Partenaire",
+  CAMPAGNE: "Campagne",
+  SITE_WEB: "Site web",
+  RESEAUX_SOCIAUX: "Réseaux sociaux",
+  AUTRE: "Autre",
+};
+
+function OriginSettingsDialog({ open, onOpenChange }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState<OriginDraft>();
+  const optionsQuery = useQuery({
+    queryKey: ["crm", "acquisition-options"],
+    queryFn: clientApi.acquisitionOptions,
+    enabled: open,
+    staleTime: 60_000,
+  });
+  const saveMutation = useMutation({
+    mutationFn: (origin: OriginDraft) => {
+      const request = {
+        code: origin.code,
+        libelle: origin.libelle,
+        type: origin.type,
+        actif: origin.actif,
+        ordre: origin.ordre,
+      };
+      return origin.id
+        ? clientApi.updateOrigin(origin.id, request)
+        : clientApi.createOrigin(request);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["crm", "acquisition-options"] });
+      setDraft(undefined);
+      toast.success("Origine commerciale enregistrée");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
+  });
+
+  const startCreate = () => setDraft({
+    code: "",
+    libelle: "",
+    type: "PARTENAIRE",
+    actif: true,
+    ordre: 100,
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !saveMutation.isPending && onOpenChange(next)}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Origines commerciales</DialogTitle>
+          <DialogDescription>
+            Gérez les canaux, partenaires et campagnes utilisés pour attribuer l’acquisition des clients.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex justify-end">
+          <Button type="button" size="sm" onClick={startCreate} disabled={Boolean(draft)}>
+            <Plus className="size-4" />
+            Ajouter une origine
+          </Button>
+        </div>
+
+        {draft ? (
+          <section className="grid gap-4 rounded-md border bg-slate-50/60 p-4 dark:bg-slate-950/20 sm:grid-cols-2">
+            <Field label="Code" required>
+              <Input
+                value={draft.code}
+                maxLength={60}
+                onChange={(event) => setDraft({ ...draft, code: event.target.value })}
+              />
+            </Field>
+            <Field label="Libellé" required>
+              <Input
+                value={draft.libelle}
+                maxLength={160}
+                onChange={(event) => setDraft({ ...draft, libelle: event.target.value })}
+              />
+            </Field>
+            <Field label="Type" required>
+              <Select
+                value={draft.type}
+                onValueChange={(value) => setDraft({ ...draft, type: value as TypeOrigineCommerciale })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(originTypeLabels) as [TypeOrigineCommerciale, string][]).map(([value, text]) => (
+                    <SelectItem key={value} value={value}>{text}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Ordre">
+              <Input
+                type="number"
+                min={0}
+                value={draft.ordre}
+                onChange={(event) => setDraft({ ...draft, ordre: Math.max(Number(event.target.value) || 0, 0) })}
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <Checkbox
+                checked={draft.actif}
+                onCheckedChange={(checked) => setDraft({ ...draft, actif: checked === true })}
+              />
+              Origine active
+            </label>
+            <div className="flex justify-end gap-2 sm:col-span-2">
+              <Button type="button" variant="outline" onClick={() => setDraft(undefined)}>Annuler</Button>
+              <Button
+                type="button"
+                disabled={!draft.code.trim() || !draft.libelle.trim() || saveMutation.isPending}
+                onClick={() => saveMutation.mutate(draft)}
+              >
+                {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+            </div>
+          </section>
+        ) : null}
+
+        <div className="overflow-hidden rounded-md border">
+          <div className="grid grid-cols-[1fr_170px_80px_44px] gap-3 border-b bg-slate-100 px-3 py-2 text-xs font-semibold uppercase dark:bg-slate-900">
+            <span>Origine</span><span>Type</span><span>Statut</span><span />
+          </div>
+          {(optionsQuery.data?.origines ?? []).map((origin) => (
+            <div key={origin.id} className="grid grid-cols-[1fr_170px_80px_44px] items-center gap-3 border-b px-3 py-2 text-sm last:border-0">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{origin.libelle}</p>
+                <p className="truncate text-xs text-muted-foreground">{origin.code}</p>
+              </div>
+              <span>{originTypeLabels[origin.type]}</span>
+              <Badge variant="outline" className="w-fit">{origin.actif ? "Active" : "Inactive"}</Badge>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                title="Modifier l’origine"
+                onClick={() => setDraft({ ...origin })}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </div>
+          ))}
+          {!optionsQuery.isLoading && !optionsQuery.data?.origines.length ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">Aucune origine configurée.</p>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ClientDialog({
   open,
   onOpenChange,
@@ -353,6 +576,12 @@ function ClientDialog({
   const categoriesQuery = useQuery({
     queryKey: ["referentiel", "categories-client"],
     queryFn: () => referenceApi.list("categories-client"),
+    staleTime: 60_000,
+    enabled: open,
+  });
+  const acquisitionOptionsQuery = useQuery({
+    queryKey: ["crm", "acquisition-options"],
+    queryFn: clientApi.acquisitionOptions,
     staleTime: 60_000,
     enabled: open,
   });
@@ -379,6 +608,7 @@ function ClientDialog({
         telephones: draft.telephone?.trim()
           ? [{ numero: draft.telephone.trim(), principal: true, whatsapp: false }]
           : [],
+        acquisition: draft.acquisition,
       });
       return client;
     },
@@ -399,6 +629,7 @@ function ClientDialog({
         ? draft.genre && draft.nom?.trim() && draft.prenom?.trim() && draft.cin?.trim() && draft.cinValidite
         : draft.raisonSociale?.trim() && draft.rc?.trim())
   );
+  const acquisitionValid = isAcquisitionValid(draft.acquisition, acquisitionOptionsQuery.data);
 
   return (
     <Dialog
@@ -525,12 +756,27 @@ function ClientDialog({
             </Field>
           ) : null}
         </div>
+        <section className="rounded-md border">
+          <div className="border-b bg-blue-50/60 px-4 py-3 dark:bg-blue-950/20">
+            <h3 className="flex items-center gap-2 font-semibold">
+              <Megaphone className="size-4 text-blue-600" />
+              Acquisition commerciale
+            </h3>
+          </div>
+          <div className="p-4">
+            <AcquisitionFields
+              value={draft.acquisition}
+              options={acquisitionOptionsQuery.data}
+              onChange={(acquisition) => update({ acquisition })}
+            />
+          </div>
+        </section>
         <DialogFooter>
           <Button type="button" variant="outline" disabled={createMutation.isPending} onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
             type="button"
             className="bg-blue-600 text-white hover:bg-blue-700"
-            disabled={!valid || createMutation.isPending}
+            disabled={!valid || !acquisitionValid || createMutation.isPending}
             onClick={() => createMutation.mutate()}
           >
             {createMutation.isPending ? "Enregistrement..." : "Créer le client"}
@@ -555,6 +801,24 @@ function ClientDetail({
   canManageClients: boolean;
 }) {
   const client = detail.client;
+  const queryClient = useQueryClient();
+  const [acquisitionOpen, setAcquisitionOpen] = useState(false);
+  const [acquisitionDraft, setAcquisitionDraft] = useState<AcquisitionClient | undefined>();
+  const acquisitionOptionsQuery = useQuery({
+    queryKey: ["crm", "acquisition-options"],
+    queryFn: clientApi.acquisitionOptions,
+    staleTime: 60_000,
+    enabled: acquisitionOpen,
+  });
+  const acquisitionMutation = useMutation({
+    mutationFn: (request: AcquisitionClient) => clientApi.updateAcquisition(client.id, request),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["crm-client", client.id] });
+      toast.success("Origine du client enregistrée");
+      setAcquisitionOpen(false);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
+  });
   const canViewClaims = useAuthStore((state) => {
     const permissions = state.user?.permissions ?? [];
     return ["sinistre:view", "sinistre:manage", "sinistre:finance"].some(
@@ -647,6 +911,42 @@ function ClientDetail({
               <Info label="Email" value={client.email} />
               <Info label="Organisation" value={client.groupe?.libelle ?? "Client indépendant"} />
             </dl>
+          </PortfolioSection>
+          <PortfolioSection
+            title="Acquisition commerciale"
+            icon={<Megaphone className="size-4" />}
+            tone="cyan"
+            action={canManageClients ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAcquisitionDraft(detail.acquisition ? { ...detail.acquisition } : undefined);
+                  setAcquisitionOpen(true);
+                }}
+              >
+                {detail.acquisition ? "Corriger" : "Renseigner"}
+              </Button>
+            ) : undefined}
+          >
+            {detail.acquisition ? (
+              <dl className="grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">
+                <Info label="Origine" value={detail.acquisition.origineLibelle} />
+                <Info label="Date d’acquisition" value={dateLabel(detail.acquisition.dateAcquisition)} />
+                <Info
+                  label="Recommandé par"
+                  value={detail.acquisition.recommandeParUtilisateurNom || detail.acquisition.recommandeParClientNom}
+                />
+                <Info label="Attribution saisie par" value={detail.acquisition.saisiParNom} />
+                {detail.acquisition.notes ? (
+                  <div className="sm:col-span-2">
+                    <Info label="Note" value={detail.acquisition.notes} />
+                  </div>
+                ) : null}
+              </dl>
+            ) : (
+              <EmptyState text="L’origine commerciale de ce client n’est pas renseignée." />
+            )}
           </PortfolioSection>
           <PortfolioSection
             title="Organisation et groupe"
@@ -778,6 +1078,36 @@ function ClientDetail({
           )}
         </TabsContent>
       </Tabs>
+      <Dialog open={acquisitionOpen} onOpenChange={setAcquisitionOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Origine du client</DialogTitle>
+            <DialogDescription>
+              Corrigez l’attribution commerciale initiale sans modifier l’utilisateur qui a créé la fiche.
+            </DialogDescription>
+          </DialogHeader>
+          <AcquisitionFields
+            value={acquisitionDraft}
+            options={acquisitionOptionsQuery.data}
+            excludedClientId={client.id}
+            onChange={setAcquisitionDraft}
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAcquisitionOpen(false)}>Annuler</Button>
+            <Button
+              type="button"
+              className="bg-blue-600 text-white hover:bg-blue-700"
+              disabled={
+                !isAcquisitionValid(acquisitionDraft, acquisitionOptionsQuery.data)
+                || acquisitionMutation.isPending
+              }
+              onClick={() => acquisitionDraft && acquisitionMutation.mutate(acquisitionDraft)}
+            >
+              {acquisitionMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -1244,6 +1574,20 @@ function emptyClientDraft(typeClient: TypeClient = "PERSONNE_MORALE"): ClientDra
     conducteurHabituel: true,
     sahara: false,
   };
+}
+
+function isAcquisitionValid(
+  acquisition: AcquisitionClient | undefined,
+  options: AcquisitionOptions | undefined,
+) {
+  if (!acquisition) return true;
+  if (!acquisition.origineCommercialeId || !acquisition.dateAcquisition) return false;
+
+  const origin = options?.origines.find((item) => item.id === acquisition.origineCommercialeId);
+  if (!origin || !origin.actif) return false;
+  if (origin.type === "COLLABORATEUR") return Boolean(acquisition.recommandeParUtilisateurId);
+  if (origin.type === "CLIENT") return Boolean(acquisition.recommandeParClientId);
+  return true;
 }
 
 function clean(value?: string) {

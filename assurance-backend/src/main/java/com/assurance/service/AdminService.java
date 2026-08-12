@@ -52,6 +52,7 @@ public class AdminService {
     private final PasswordEncoder passwordEncoder;
     private final AgencyLogoStorageService agencyLogoStorageService;
     private final AgencySignatureStorageService agencySignatureStorageService;
+    private final AcquisitionClientService acquisitionClientService;
 
     @Transactional(readOnly = true)
     public List<AdminUtilisateurResponse> listPlatformAdmins() {
@@ -418,7 +419,9 @@ public class AdminService {
                 .rib(blankToNull(request.getRib()))
                 .statut(request.getStatut() == null ? StatutAgence.ACTIVE : request.getStatut())
                 .build();
-        return AdminAgenceResponse.from(agenceRepository.save(agence));
+        Agence saved = agenceRepository.save(agence);
+        acquisitionClientService.provisionDefaultOrigins(saved.getId());
+        return AdminAgenceResponse.from(saved);
     }
 
     @Transactional

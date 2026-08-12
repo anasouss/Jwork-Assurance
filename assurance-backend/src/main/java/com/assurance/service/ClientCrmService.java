@@ -36,12 +36,15 @@ public class ClientCrmService {
     private final QuittanceRepository quittanceRepository;
     private final ClientService clientService;
     private final GroupeClientService groupeClientService;
+    private final AcquisitionClientService acquisitionClientService;
 
     @Transactional(readOnly = true)
     public ClientPageResponse search(
             Long agenceId,
             String query,
             Long groupeId,
+            Long origineCommercialeId,
+            Long collaborateurId,
             int page,
             int size
     ) {
@@ -52,6 +55,8 @@ public class ClientCrmService {
                 agenceId,
                 normalizedQuery,
                 groupeId,
+                origineCommercialeId,
+                collaborateurId,
                 PageRequest.of(safePage, safeSize, Sort.unsorted())
         );
         return ClientPageResponse.builder()
@@ -133,6 +138,7 @@ public class ClientCrmService {
         }
         return ClientCrmResponse.builder()
                 .client(clientService.toResponse(client))
+                .acquisition(acquisitionClientService.find(agenceId, clientId))
                 .groupes(groupeClientService.groupsForClient(agenceId, clientId))
                 .contrats(contractViews)
                 .totalQuittances(total)

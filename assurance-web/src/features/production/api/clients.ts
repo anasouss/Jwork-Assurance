@@ -1,11 +1,14 @@
 import { apiFetch, buildQueryString } from "@/lib/api/base";
 import type {
   ApiResponse,
+  AcquisitionClient,
+  AcquisitionOptions,
   ClientCrm,
   ClientInput,
   ClientPage,
   ClientResponse,
   GroupeClient,
+  OrigineCommerciale,
   RelationGroupeClient,
   VehiculeResponse,
 } from "../types";
@@ -31,7 +34,14 @@ export const clientApi = {
   },
 
   async listClients(
-    params: { query?: string; groupeId?: string; page?: number; size?: number } = {}
+    params: {
+      query?: string;
+      groupeId?: string;
+      origineCommercialeId?: string;
+      collaborateurId?: string;
+      page?: number;
+      size?: number;
+    } = {}
   ) {
     return unwrap(
       await apiFetch<ApiResponse<ClientPage>>(`/api/v1/clients${buildQueryString(params)}`)
@@ -40,6 +50,39 @@ export const clientApi = {
 
   async getClientCrm(clientId: string) {
     return unwrap(await apiFetch<ApiResponse<ClientCrm>>(`/api/v1/clients/${clientId}`));
+  },
+
+  async acquisitionOptions() {
+    return unwrap(
+      await apiFetch<ApiResponse<AcquisitionOptions>>("/api/v1/clients/acquisition/options")
+    );
+  },
+
+  async updateAcquisition(clientId: string, request: AcquisitionClient) {
+    return unwrap(
+      await apiFetch<ApiResponse<AcquisitionClient>>(`/api/v1/clients/${clientId}/acquisition`, {
+        method: "PUT",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async createOrigin(request: Omit<OrigineCommerciale, "id">) {
+    return unwrap(
+      await apiFetch<ApiResponse<OrigineCommerciale>>("/api/v1/clients/origines-commerciales", {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async updateOrigin(id: string, request: Omit<OrigineCommerciale, "id">) {
+    return unwrap(
+      await apiFetch<ApiResponse<OrigineCommerciale>>(`/api/v1/clients/origines-commerciales/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(request),
+      })
+    );
   },
 
   async createClient(

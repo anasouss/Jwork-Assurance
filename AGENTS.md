@@ -34,7 +34,8 @@ Never edit generated or local-only directories such as `target/`, `dist/`, `node
 4. Assume the worktree may contain user changes. Never reset, revert, or overwrite changes you did not make.
 5. Use `apply_patch` for manual edits.
 6. Check `git diff` and `git diff --check` for the files changed.
-7. Verify according to risk. Do not run a full backend or frontend build after every small copy, spacing, or styling change.
+7. Verify according to risk. Do not compile, package, or run a full backend/frontend build after every small change.
+8. Batch related edits first, then run at most one appropriate verification command when the completed batch justifies it. Do not repeatedly run `mvn package`, `npm run build`, or equivalent commands while making incremental fixes.
 
 ## Commands
 
@@ -67,10 +68,12 @@ Use `npm run check` when a broad frontend verification is justified. The fronten
 
 ### Verification Policy
 
-- Text, spacing, or narrowly scoped CSS change: inspect the diff; use a targeted visual check when layout is affected.
-- Type or API contract change: run frontend typecheck or the narrow relevant tests.
-- Backend service, repository, security, calculation, or persistence change: run focused tests, then broader tests if the change crosses module boundaries.
-- Deployment blocker or explicit release verification: run the applicable production build once after the related edits are complete.
+- Text, spacing, label, icon, or narrowly scoped CSS change: inspect the diff only; use a targeted visual check when layout is affected. Do not compile or package.
+- Small implementation fix with no changed public contract: inspect the diff and run only a narrow test when one is useful. Do not run a production build by default.
+- Type or API contract change: run frontend typecheck or the narrow relevant tests after all related edits are complete; a frontend production build is not automatically required.
+- Backend service, repository, security, calculation, or persistence change: run focused tests after all related edits are complete. Run broader tests only when the change crosses module boundaries or has meaningful regression risk.
+- Run `mvn package`, `npm run build`, or another full production build only for a deployment blocker, release verification, build-specific failure, or an explicit user request. Run it once after the whole related change set is complete.
+- If the user asks not to compile or package, do not do so unless a later explicit request overrides that instruction.
 - PDF or printable document change: render representative output and inspect it visually; test multi-page and print-friendly behavior.
 
 ## Backend Conventions

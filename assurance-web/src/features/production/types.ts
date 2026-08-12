@@ -374,6 +374,47 @@ export type RoleClientContrat = "SOUSCRIPTEUR" | "PROPRIETAIRE" | "CONDUCTEUR" |
 export type RelationGroupeClient = "TETE_GROUPE" | "FILIALE" | "SOCIETE_LIEE";
 export type TypePayeurPrime = "SOUSCRIPTEUR" | "TRESORERIE_GROUPE" | "MEMBRE_GROUPE" | "TIERS_MANDATE";
 export type ModeFacturationContrat = "DIRECTE" | "CONSOLIDEE_GROUPE";
+export type TypeOrigineCommerciale =
+  | "PASSAGE_AGENCE"
+  | "COLLABORATEUR"
+  | "CLIENT"
+  | "PARTENAIRE"
+  | "CAMPAGNE"
+  | "SITE_WEB"
+  | "RESEAUX_SOCIAUX"
+  | "AUTRE";
+
+export type OrigineCommerciale = {
+  id: string;
+  code: string;
+  libelle: string;
+  type: TypeOrigineCommerciale;
+  actif: boolean;
+  ordre: number;
+};
+
+export type AcquisitionClient = {
+  id?: string;
+  origineCommercialeId: string;
+  origineCode?: string | null;
+  origineLibelle?: string | null;
+  origineType?: TypeOrigineCommerciale | null;
+  recommandeParUtilisateurId?: string | null;
+  recommandeParUtilisateurNom?: string | null;
+  recommandeParClientId?: string | null;
+  recommandeParClientNom?: string | null;
+  dateAcquisition?: string | null;
+  notes?: string | null;
+  saisiParId?: string | null;
+  saisiParNom?: string | null;
+  modifieParId?: string | null;
+  modifieParNom?: string | null;
+};
+
+export type AcquisitionOptions = {
+  origines: OrigineCommerciale[];
+  collaborateurs: { id: string; nom: string; actif: boolean }[];
+};
 
 export type ClientInput = {
   clientId?: string;
@@ -406,6 +447,7 @@ export type ClientInput = {
     sahara?: boolean;
     justificatifSahara?: string;
     telephones?: { numero: string; principal?: boolean; whatsapp?: boolean }[];
+    acquisition?: AcquisitionClient;
   };
 };
 
@@ -481,6 +523,7 @@ export type PagedResponse<T> = {
 
 export type ClientCrm = {
   client: ClientResponse;
+  acquisition?: AcquisitionClient | null;
   groupes: GroupeClient[];
   contrats: {
     id: string;

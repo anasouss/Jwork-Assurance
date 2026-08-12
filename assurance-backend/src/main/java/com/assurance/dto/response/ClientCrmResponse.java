@@ -11,6 +11,7 @@ import java.util.List;
 @Builder
 public class ClientCrmResponse {
     private ClientResponse client;
+    private AcquisitionClientResponse acquisition;
     private List<GroupeClientResponse> groupes;
     private List<ContratView> contrats;
     private BigDecimal totalQuittances;

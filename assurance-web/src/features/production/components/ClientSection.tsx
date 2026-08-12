@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Info, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Info, Loader2, Megaphone, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +13,7 @@ import { SectionCard } from "./SectionCard";
 import { Field } from "./Field";
 import { toDateOnly } from "../date";
 import { clientApi } from "../api/clients";
+import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import type { ClientInput, ClientResponse, GenreClient, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -69,6 +71,11 @@ export function ClientSection({
   const [sameAsSouscripteur, setSameAsSouscripteur] = useState(false);
   const [lookupByIndex, setLookupByIndex] = useState<Record<number, LookupState>>({});
   const lookupTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const acquisitionOptionsQuery = useQuery({
+    queryKey: ["crm", "acquisition-options"],
+    queryFn: clientApi.acquisitionOptions,
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     const proprietaire = clients.find((client) => client.role === "PROPRIETAIRE");
@@ -111,7 +118,15 @@ export function ClientSection({
                 ...client,
                 clientId: sharedClientId,
                 sameAsRole: client.role === "PROPRIETAIRE" ? "SOUSCRIPTEUR" : undefined,
-                client: { ...client.client, ...patch },
+                client: {
+                  ...client.client,
+                  ...patch,
+                  acquisition: client.role === "SOUSCRIPTEUR"
+                    ? (Object.prototype.hasOwnProperty.call(patch, "acquisition")
+                        ? patch.acquisition
+                        : client.client.acquisition)
+                    : client.client.acquisition,
+                },
               }
             : client
         )
@@ -309,13 +324,13 @@ export function ClientSection({
     setClients(
       clients.map((client) =>
         client.role === "SOUSCRIPTEUR"
-          ? { ...client, client: sharedClient }
+          ? { ...client, client: { ...sharedClient } }
           : client.role === "PROPRIETAIRE"
             ? {
                 ...client,
                 clientId: souscripteur.clientId,
                 sameAsRole: "SOUSCRIPTEUR",
-                client: sharedClient,
+                client: { ...sharedClient, acquisition: undefined },
               }
             : client
       )
@@ -604,8 +619,9 @@ export function ClientSection({
                 </div>
               ) : null}
               {item.role === "SOUSCRIPTEUR" ? (
-                <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2 lg:grid-cols-4">
-                  <Field label="Organisation">
+                <div className="mt-4 space-y-4 border-t pt-4">
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                    <Field label="Organisation">
                     <Select
                       value={item.groupeClientId ?? "INDEPENDANT"}
                       onValueChange={(value) => {
@@ -637,8 +653,8 @@ export function ClientSection({
                         ))}
                       </SelectContent>
                     </Select>
-                  </Field>
-                  {item.groupeClientId ? (
+                    </Field>
+                    {item.groupeClientId ? (
                     <>
                       <Field label="Lien avec le groupe">
                         <Select
@@ -659,6 +675,22 @@ export function ClientSection({
                         {formatGroupContext(groupesClients.find((groupe) => groupe.id === item.groupeClientId))}
                       </div>
                     </>
+                    ) : null}
+                  </div>
+                  {!item.clientId ? (
+                    <section className="rounded-md border">
+                      <div className="flex items-center gap-2 border-b bg-blue-50/60 px-3 py-2 text-sm font-semibold dark:bg-blue-950/20">
+                        <Megaphone className="size-4 text-blue-600" />
+                        Acquisition commerciale
+                      </div>
+                      <div className="p-3">
+                        <AcquisitionFields
+                          value={item.client.acquisition}
+                          options={acquisitionOptionsQuery.data}
+                          onChange={(acquisition) => updateClient(index, { acquisition })}
+                        />
+                      </div>
+                    </section>
                   ) : null}
                 </div>
               ) : null}

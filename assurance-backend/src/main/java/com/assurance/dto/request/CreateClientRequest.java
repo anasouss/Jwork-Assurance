@@ -50,6 +50,7 @@ public class CreateClientRequest {
     private Boolean sahara;
     private String justificatifSahara;
     private List<TelephoneInput> telephones;
+    private AcquisitionClientRequest acquisition;
 
     @Data
     public static class TelephoneInput {

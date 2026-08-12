@@ -43,12 +43,34 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
                           and (membre.dateFin is null or membre.dateFin > current_date)
                     )
               )
+              and (
+                    :origineCommercialeId is null
+                    or exists (
+                        select acquisition.id
+                        from AcquisitionClient acquisition
+                        where acquisition.client = client
+                          and acquisition.agence.id = :agenceId
+                          and acquisition.origineCommerciale.id = :origineCommercialeId
+                    )
+              )
+              and (
+                    :collaborateurId is null
+                    or exists (
+                        select acquisition.id
+                        from AcquisitionClient acquisition
+                        where acquisition.client = client
+                          and acquisition.agence.id = :agenceId
+                          and acquisition.recommandeParUtilisateur.id = :collaborateurId
+                    )
+              )
             order by coalesce(client.raisonSociale, client.nom), client.prenom
             """)
     Page<Client> searchCrm(
             @Param("agenceId") Long agenceId,
             @Param("query") String query,
             @Param("groupeId") Long groupeId,
+            @Param("origineCommercialeId") Long origineCommercialeId,
+            @Param("collaborateurId") Long collaborateurId,
             Pageable pageable
     );
 }

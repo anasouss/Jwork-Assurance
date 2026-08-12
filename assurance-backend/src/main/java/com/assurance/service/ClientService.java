@@ -15,6 +15,7 @@ import com.assurance.repository.CategorieClientRepository;
 import com.assurance.repository.ClientRepository;
 import com.assurance.repository.ClientTelephoneRepository;
 import com.assurance.repository.VilleRepository;
+import com.assurance.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class ClientService {
     private final VilleRepository villeRepository;
     private final CategorieClientRepository categorieClientRepository;
     private final GroupeClientService groupeClientService;
+    private final AcquisitionClientService acquisitionClientService;
 
     @Transactional
     public ClientResponse create(Long agenceId, CreateClientRequest request) {
@@ -140,6 +142,14 @@ public class ClientService {
         client = clientRepository.save(client);
         client.setCodeClient(generateClientCode(client.getId()));
         saveTelephones(client, request);
+        if (request.getAcquisition() != null) {
+            acquisitionClientService.upsert(
+                    agenceId,
+                    client,
+                    request.getAcquisition(),
+                    TenantContext.getCurrentUser()
+            );
+        }
         return client;
     }
 
@@ -160,6 +170,14 @@ public class ClientService {
         clientTelephoneRepository.deleteAll(client.getTelephones());
         client.getTelephones().clear();
         saveTelephones(client, request);
+        if (request.getAcquisition() != null) {
+            acquisitionClientService.upsert(
+                    agenceId,
+                    client,
+                    request.getAcquisition(),
+                    TenantContext.getCurrentUser()
+            );
+        }
         return client;
     }
 

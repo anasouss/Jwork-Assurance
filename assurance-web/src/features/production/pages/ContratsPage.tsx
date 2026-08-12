@@ -192,7 +192,9 @@ export default function ContratsPage() {
             <table className="w-full min-w-[1320px] border-collapse text-sm">
               <thead className="bg-emerald-600 text-xs uppercase leading-tight text-white dark:bg-emerald-700">
                 <tr>
-                  <TableHeaderCell>Dossier N°</TableHeaderCell>
+                  <TableHeaderCell className="w-36 min-w-36 whitespace-nowrap">
+                    Dossier N°
+                  </TableHeaderCell>
                   <TableHeaderCell className="w-10" />
                   <TableHeaderCell>Code client</TableHeaderCell>
                   <TableHeaderCell>Assuré</TableHeaderCell>
@@ -730,7 +732,11 @@ function TableCell({ className, children }: { className?: string; children?: Rea
 }
 
 function TableCellStrong({ children }: { children?: React.ReactNode }) {
-  return <td className="px-3 py-2 align-middle font-medium">{children}</td>;
+  return (
+    <td className="w-36 min-w-36 whitespace-nowrap px-3 py-2 align-middle font-medium">
+      {children}
+    </td>
+  );
 }
 
 function movementLines(contrat: ContratListItem): MovementLine[] {

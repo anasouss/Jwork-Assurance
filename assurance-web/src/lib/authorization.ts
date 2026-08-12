@@ -107,6 +107,10 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     ],
   },
   {
+    matches: startsWith("/app/crm/parametres"),
+    anyOf: ["client:manage"],
+  },
+  {
     matches: startsWith("/app/crm"),
     anyOf: ["client:view", "client:create", "client:manage"],
   },

@@ -13,11 +13,9 @@ import {
   FolderOpen,
   History,
   Megaphone,
-  Pencil,
   Plus,
   ReceiptText,
   Search,
-  Settings2,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -55,9 +53,7 @@ import type {
   ClientPage,
   ClientResponse,
   GroupeClient,
-  OrigineCommerciale,
   RelationGroupeClient,
-  TypeOrigineCommerciale,
   TypeClient,
 } from "@/features/production/types";
 
@@ -79,7 +75,6 @@ export default function ClientCrmPage() {
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
-  const [originSettingsOpen, setOriginSettingsOpen] = useState(false);
 
   const groupesQuery = useQuery({
     queryKey: ["groupes-clients"],
@@ -136,12 +131,6 @@ export default function ClientCrmPage() {
           <p className="text-sm text-muted-foreground">Identité, organisation, contrats, documents et situation comptable.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManageClients ? (
-            <Button type="button" variant="outline" onClick={() => setOriginSettingsOpen(true)}>
-              <Settings2 className="size-4" />
-              Origines commerciales
-            </Button>
-          ) : null}
           {canManageClients ? (
             <Button type="button" variant="outline" onClick={() => setGroupDialogOpen(true)}>
               <Users className="size-4" />
@@ -237,7 +226,6 @@ export default function ClientCrmPage() {
         onOpenChange={setGroupDialogOpen}
         onSaved={refreshCrm}
       />
-      <OriginSettingsDialog open={originSettingsOpen} onOpenChange={setOriginSettingsOpen} />
       <ClientDialog
         open={clientDialogOpen}
         onOpenChange={setClientDialogOpen}
@@ -394,166 +382,6 @@ type ClientDraft = ClientInput["client"] & {
   groupeClientId?: string;
   relationGroupe?: RelationGroupeClient;
 };
-
-type OriginDraft = Omit<OrigineCommerciale, "id"> & { id?: string };
-
-const originTypeLabels: Record<TypeOrigineCommerciale, string> = {
-  PASSAGE_AGENCE: "Passage en agence",
-  COLLABORATEUR: "Équipe de l’agence",
-  CLIENT: "Client recommandant",
-  PARTENAIRE: "Partenaire",
-  CAMPAGNE: "Campagne",
-  SITE_WEB: "Site web",
-  RESEAUX_SOCIAUX: "Réseaux sociaux",
-  AUTRE: "Autre",
-};
-
-function OriginSettingsDialog({ open, onOpenChange }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<OriginDraft>();
-  const optionsQuery = useQuery({
-    queryKey: ["crm", "acquisition-options"],
-    queryFn: clientApi.acquisitionOptions,
-    enabled: open,
-    staleTime: 60_000,
-  });
-  const saveMutation = useMutation({
-    mutationFn: (origin: OriginDraft) => {
-      const request = {
-        code: origin.code,
-        libelle: origin.libelle,
-        type: origin.type,
-        actif: origin.actif,
-        ordre: origin.ordre,
-      };
-      return origin.id
-        ? clientApi.updateOrigin(origin.id, request)
-        : clientApi.createOrigin(request);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["crm", "acquisition-options"] });
-      setDraft(undefined);
-      toast.success("Origine commerciale enregistrée");
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
-  });
-
-  const startCreate = () => setDraft({
-    code: "",
-    libelle: "",
-    type: "PARTENAIRE",
-    actif: true,
-    ordre: 100,
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={(next) => !saveMutation.isPending && onOpenChange(next)}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Origines commerciales</DialogTitle>
-          <DialogDescription>
-            Gérez les canaux, partenaires et campagnes utilisés pour attribuer l’acquisition des clients.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex justify-end">
-          <Button type="button" size="sm" onClick={startCreate} disabled={Boolean(draft)}>
-            <Plus className="size-4" />
-            Ajouter une origine
-          </Button>
-        </div>
-
-        {draft ? (
-          <section className="grid gap-4 rounded-md border bg-slate-50/60 p-4 dark:bg-slate-950/20 sm:grid-cols-2">
-            <Field label="Code" required>
-              <Input
-                value={draft.code}
-                maxLength={60}
-                onChange={(event) => setDraft({ ...draft, code: event.target.value })}
-              />
-            </Field>
-            <Field label="Libellé" required>
-              <Input
-                value={draft.libelle}
-                maxLength={160}
-                onChange={(event) => setDraft({ ...draft, libelle: event.target.value })}
-              />
-            </Field>
-            <Field label="Type" required>
-              <Select
-                value={draft.type}
-                onValueChange={(value) => setDraft({ ...draft, type: value as TypeOrigineCommerciale })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.entries(originTypeLabels) as [TypeOrigineCommerciale, string][]).map(([value, text]) => (
-                    <SelectItem key={value} value={value}>{text}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Ordre">
-              <Input
-                type="number"
-                min={0}
-                value={draft.ordre}
-                onChange={(event) => setDraft({ ...draft, ordre: Math.max(Number(event.target.value) || 0, 0) })}
-              />
-            </Field>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <Checkbox
-                checked={draft.actif}
-                onCheckedChange={(checked) => setDraft({ ...draft, actif: checked === true })}
-              />
-              Origine active
-            </label>
-            <div className="flex justify-end gap-2 sm:col-span-2">
-              <Button type="button" variant="outline" onClick={() => setDraft(undefined)}>Annuler</Button>
-              <Button
-                type="button"
-                disabled={!draft.code.trim() || !draft.libelle.trim() || saveMutation.isPending}
-                onClick={() => saveMutation.mutate(draft)}
-              >
-                {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-              </Button>
-            </div>
-          </section>
-        ) : null}
-
-        <div className="overflow-hidden rounded-md border">
-          <div className="grid grid-cols-[1fr_170px_80px_44px] gap-3 border-b bg-slate-100 px-3 py-2 text-xs font-semibold uppercase dark:bg-slate-900">
-            <span>Origine</span><span>Type</span><span>Statut</span><span />
-          </div>
-          {(optionsQuery.data?.origines ?? []).map((origin) => (
-            <div key={origin.id} className="grid grid-cols-[1fr_170px_80px_44px] items-center gap-3 border-b px-3 py-2 text-sm last:border-0">
-              <div className="min-w-0">
-                <p className="truncate font-medium">{origin.libelle}</p>
-                <p className="truncate text-xs text-muted-foreground">{origin.code}</p>
-              </div>
-              <span>{originTypeLabels[origin.type]}</span>
-              <Badge variant="outline" className="w-fit">{origin.actif ? "Active" : "Inactive"}</Badge>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                title="Modifier l’origine"
-                onClick={() => setDraft({ ...origin })}
-              >
-                <Pencil className="size-4" />
-              </Button>
-            </div>
-          ))}
-          {!optionsQuery.isLoading && !optionsQuery.data?.origines.length ? (
-            <p className="p-6 text-center text-sm text-muted-foreground">Aucune origine configurée.</p>
-          ) : null}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function ClientDialog({
   open,

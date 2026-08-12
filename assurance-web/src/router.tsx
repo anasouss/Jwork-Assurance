@@ -219,6 +219,14 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/crm/pages/ClientCrmPage")),
       },
       {
+        path: "crm/parametres",
+        lazy: lazyRoute(() => import("@/features/crm/pages/CrmSettingsPage")),
+      },
+      {
+        path: "crm/parametres/origines-commerciales",
+        lazy: lazyRoute(() => import("@/features/crm/pages/CommercialOriginsSettingsPage")),
+      },
+      {
         path: "companies",
         lazy: lazyRoute(() => import("@/features/production/pages/CompaniesDashboardPage")),
       },

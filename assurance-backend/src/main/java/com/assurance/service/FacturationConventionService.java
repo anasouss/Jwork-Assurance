@@ -512,7 +512,7 @@ public class FacturationConventionService {
         long current = sequence.getProchaineValeur();
         sequence.setProchaineValeur(current + 1);
         sequenceRepository.save(sequence);
-        return "FAC-%s-%d-%06d".formatted(agence.getCode(), year, current);
+        return "FAC-%02d-%06d".formatted(year % 100, current);
     }
 
     private boolean matches(EcheanceFacturationConventionPageResponse.Row row, String search) {

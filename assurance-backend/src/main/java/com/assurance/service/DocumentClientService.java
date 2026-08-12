@@ -496,7 +496,7 @@ public class DocumentClientService {
         sequence.setProchaineValeur(current + 1);
         sequenceDocumentClientRepository.save(sequence);
         String prefix = type == TypeDocumentClient.RELEVE ? "REL" : "FAC";
-        return "%s-%s-%d-%06d".formatted(prefix, agence.getCode(), year, current);
+        return "%s-%02d-%06d".formatted(prefix, year % 100, current);
     }
 
     private Map<Long, Client> loadSubscribersFromContracts(Collection<Contrat> contracts) {

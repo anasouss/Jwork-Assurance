@@ -30,6 +30,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboardDateRange, type DatePreset } from "@/hooks/use-dashboard-date-range";
 import { cn } from "@/lib/utils";
@@ -109,7 +110,7 @@ export default function AgencyDashboardPage() {
 
   return (
     <div className="mx-auto grid w-full max-w-[1600px] gap-5">
-      <header className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <header className="flex flex-col gap-4 border-b pb-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Pilotage de l'agence</p>
           <h1 className="mt-1 text-2xl font-semibold">Vue générale</h1>
@@ -117,22 +118,47 @@ export default function AgencyDashboardPage() {
             Production validée, portefeuille et tâches à traiter.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/30 p-1">
-          {presets.map((preset) => (
-            <Button
-              key={preset.value}
-              type="button"
-              size="sm"
-              variant={range.activePreset === preset.value ? "default" : "ghost"}
-              className={cn(
-                "h-8",
-                range.activePreset === preset.value && "bg-emerald-600 text-white hover:bg-emerald-700"
-              )}
-              onClick={() => range.setPreset(preset.value)}
-            >
-              {preset.label}
-            </Button>
-          ))}
+        <div className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-[190px_190px_auto]">
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Du</span>
+            <DatePicker
+              date={range.fromStr}
+              maxDate={dateOnly(range.toStr)}
+              onSelect={(date) => {
+                if (date) range.setCustomRange(date, range.to);
+              }}
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Au</span>
+            <DatePicker
+              date={range.toStr}
+              minDate={dateOnly(range.fromStr)}
+              onSelect={(date) => {
+                if (date) range.setCustomRange(range.from, date);
+              }}
+            />
+          </label>
+          <div className="grid gap-1.5 text-sm sm:col-span-2 xl:col-span-1">
+            <span className="font-medium">Période rapide</span>
+            <div className="flex h-9 items-center gap-1 rounded-md border bg-muted/30 p-1">
+              {presets.map((preset) => (
+                <Button
+                  key={preset.value}
+                  type="button"
+                  size="sm"
+                  variant={range.activePreset === preset.value ? "default" : "ghost"}
+                  className={cn(
+                    "h-7 flex-1",
+                    range.activePreset === preset.value && "bg-emerald-600 text-white hover:bg-emerald-700"
+                  )}
+                  onClick={() => range.setPreset(preset.value)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -535,4 +561,8 @@ function compactMoney(value: number) {
   if (Math.abs(value) >= 1_000_000) return `${moneyAmount(value / 1_000_000)} M`;
   if (Math.abs(value) >= 1_000) return `${moneyAmount(value / 1_000)} k`;
   return moneyAmount(value);
+}
+
+function dateOnly(value: string) {
+  return new Date(`${value}T00:00:00`);
 }

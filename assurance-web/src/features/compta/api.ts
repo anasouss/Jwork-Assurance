@@ -13,6 +13,7 @@ import type {
   ClientDocumentSourcePage,
   ClientDocumentStatus,
   ClientDocumentType,
+  ClientDocumentDueDateProposal,
   ConventionBillingPage,
   ConventionBillingStatus,
   CreateConventionInvoiceRequest,
@@ -109,6 +110,24 @@ export const comptaApi = {
         { method: "POST", body: JSON.stringify(request) }
       ))
     );
+  },
+
+  async proposeConventionInvoiceDueDate(echeanceIds: string[]) {
+    const proposal = unwrap(
+      await apiFetch<ApiResponse<ClientDocumentDueDateProposal>>(
+        "/api/v1/compta/facturation-conventions/echeance-proposee",
+        {
+          method: "POST",
+          body: JSON.stringify({ echeanceIds }),
+        }
+      )
+    );
+    return {
+      ...proposal,
+      conditionPaiementId: proposal.conditionPaiementId == null
+        ? null
+        : String(proposal.conditionPaiementId),
+    };
   },
 
   async searchQuittances(params: {
@@ -323,6 +342,24 @@ export const comptaApi = {
         })
       )
     );
+  },
+
+  async proposeClientDocumentDueDate(elementFacturableIds: string[]) {
+    const proposal = unwrap(
+      await apiFetch<ApiResponse<ClientDocumentDueDateProposal>>(
+        "/api/v1/compta/documents-clients/echeance-proposee",
+        {
+          method: "POST",
+          body: JSON.stringify({ elementFacturableIds }),
+        }
+      )
+    );
+    return {
+      ...proposal,
+      conditionPaiementId: proposal.conditionPaiementId == null
+        ? null
+        : String(proposal.conditionPaiementId),
+    };
   },
 
   async cancelClientDocument(id: string, motif: string) {
@@ -869,6 +906,9 @@ function normalizeClientDocument(document: ClientDocument): ClientDocument {
   return {
     ...document,
     id: String(document.id),
+    conditionPaiementClientId: document.conditionPaiementClientId == null
+      ? null
+      : String(document.conditionPaiementClientId),
     clientPayeurId: document.clientPayeurId == null ? null : String(document.clientPayeurId),
     groupePayeurId: document.groupePayeurId == null ? null : String(document.groupePayeurId),
     lignes: (document.lignes ?? []).map((line) => ({

@@ -1,8 +1,10 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.CreerFactureConventionRequest;
+import com.assurance.dto.request.PropositionEcheanceFactureConventionRequest;
 import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.EcheanceFacturationConventionPageResponse;
+import com.assurance.dto.response.PropositionEcheanceDocumentClientResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
@@ -66,6 +68,36 @@ public class FacturationConventionService {
     private final SequenceDocumentClientRepository sequenceRepository;
     private final AgenceRepository agenceRepository;
     private final DocumentClientService documentClientService;
+    private final ConditionPaiementClientService conditionPaiementClientService;
+
+    @Transactional(readOnly = true)
+    public PropositionEcheanceDocumentClientResponse proposeDueDate(
+            Long agenceId,
+            PropositionEcheanceFactureConventionRequest request
+    ) {
+        List<Long> ids = request.getEcheanceIds().stream().filter(Objects::nonNull).distinct().toList();
+        List<EcheanceFacturationConvention> selected = echeanceRepository.findSelected(agenceId, ids);
+        if (selected.size() != ids.size()) {
+            throw new BadRequestException("Une ou plusieurs échéances sont introuvables");
+        }
+        Payer payer = resolveSinglePayer(selected);
+        LocalDate emissionDate = LocalDate.now();
+        ConditionPaiementClientService.ResolvedCondition condition = conditionPaiementClientService.resolve(
+                agenceId,
+                payer.client(),
+                payer.group(),
+                emissionDate
+        );
+        return PropositionEcheanceDocumentClientResponse.builder()
+                .dateEmission(emissionDate)
+                .delaiJours(condition.days())
+                .dateEcheanceProposee(emissionDate.plusDays(condition.days()))
+                .origine(condition.origin())
+                .conditionPaiementId(condition.conditionId())
+                .dateFinCondition(condition.conditionEndDate())
+                .justificatifPresent(condition.evidencePresent())
+                .build();
+    }
 
     @Transactional
     public EcheanceFacturationConventionPageResponse search(
@@ -161,13 +193,7 @@ public class FacturationConventionService {
         }
 
         Set<Long> contractIds = selected.stream().map(item -> item.getContrat().getId()).collect(Collectors.toSet());
-        Map<Long, Client> subscribers = loadSubscribers(contractIds);
-        List<Payer> payers = selected.stream()
-                .map(item -> resolvePayer(item.getContrat(), subscribers))
-                .toList();
-        if (payers.stream().map(Payer::key).distinct().count() != 1) {
-            throw new BadRequestException("Les échéances sélectionnées doivent appartenir au même payeur");
-        }
+        Payer payer = resolveSinglePayer(selected);
 
         Map<Long, List<EcheanceFacturationConvention>> schedulesByContract = contractIds.stream()
                 .collect(Collectors.toMap(
@@ -191,7 +217,16 @@ public class FacturationConventionService {
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         LocalDate emissionDate = LocalDate.now();
-        Payer payer = payers.get(0);
+        ConditionPaiementClientService.ResolvedCondition paymentCondition = conditionPaiementClientService.resolve(
+                agenceId,
+                payer.client(),
+                payer.group(),
+                emissionDate
+        );
+        LocalDate dueDate = request.getDateEcheance() == null
+                ? emissionDate.plusDays(paymentCondition.days())
+                : request.getDateEcheance();
+        validateInvoiceDueDate(dueDate, emissionDate, paymentCondition.days());
         DocumentClient document = DocumentClient.builder()
                 .agence(agence)
                 .typeDocument(TypeDocumentClient.FACTURE)
@@ -202,10 +237,10 @@ public class FacturationConventionService {
                         .min(LocalDate::compareTo).orElseThrow())
                 .periodeFin(selected.stream().map(EcheanceFacturationConvention::getPeriodeFin)
                         .max(LocalDate::compareTo).orElseThrow())
-                .dateEcheance(request.getDateEcheance() == null
-                        ? selected.stream().map(EcheanceFacturationConvention::getDateEcheance)
-                        .max(LocalDate::compareTo).orElse(emissionDate)
-                        : request.getDateEcheance())
+                .dateEcheance(dueDate)
+                .delaiPaiementJours(paymentCondition.days())
+                .origineDelaiPaiement(paymentCondition.origin())
+                .conditionPaiementClient(paymentCondition.condition())
                 .clientPayeur(payer.client())
                 .groupePayeur(payer.group())
                 .payeurNom(payer.name())
@@ -498,6 +533,31 @@ public class FacturationConventionService {
                 firstNonBlank(payer.getCodeClient(), payer.getIce(), payer.getRc(), payer.getCin()),
                 clientAddress(payer)
         );
+    }
+
+    private Payer resolveSinglePayer(List<EcheanceFacturationConvention> selected) {
+        Set<Long> contractIds = selected.stream()
+                .map(item -> item.getContrat().getId())
+                .collect(Collectors.toSet());
+        Map<Long, Client> subscribers = loadSubscribers(contractIds);
+        List<Payer> payers = selected.stream()
+                .map(item -> resolvePayer(item.getContrat(), subscribers))
+                .toList();
+        if (payers.isEmpty() || payers.stream().map(Payer::key).distinct().count() != 1) {
+            throw new BadRequestException("Les échéances sélectionnées doivent appartenir au même payeur");
+        }
+        return payers.get(0);
+    }
+
+    private void validateInvoiceDueDate(LocalDate dueDate, LocalDate emissionDate, int maximumDays) {
+        if (dueDate.isBefore(emissionDate)) {
+            throw new BadRequestException("La date d'échéance ne peut pas être antérieure à la date d'émission");
+        }
+        if (dueDate.isAfter(emissionDate.plusDays(maximumDays))) {
+            throw new BadRequestException(
+                    "La date d'échéance dépasse le délai de paiement applicable de " + maximumDays + " jours"
+            );
+        }
     }
 
     private String nextNumber(Agence agence, int year) {

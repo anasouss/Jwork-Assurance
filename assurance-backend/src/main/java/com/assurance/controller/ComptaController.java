@@ -6,6 +6,8 @@ import com.assurance.dto.request.AnnulerDocumentClientRequest;
 import com.assurance.dto.request.EnregistrerAffectationQuittanceRequest;
 import com.assurance.dto.request.EnregistrerLotAffectationQuittanceRequest;
 import com.assurance.dto.request.UpsertRegleAffectationQuittanceRequest;
+import com.assurance.dto.request.PropositionEcheanceDocumentClientRequest;
+import com.assurance.dto.request.PropositionEcheanceFactureConventionRequest;
 import com.assurance.dto.response.AffectationQuittancePageResponse;
 import com.assurance.dto.response.AffectationQuittanceResponse;
 import com.assurance.dto.response.ApiResponse;
@@ -18,6 +20,7 @@ import com.assurance.dto.response.LotAffectationQuittanceResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
+import com.assurance.dto.response.PropositionEcheanceDocumentClientResponse;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeDocumentClient;
@@ -301,6 +304,16 @@ public class ComptaController {
         ));
     }
 
+    @PostMapping("/facturation-conventions/echeance-proposee")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<PropositionEcheanceDocumentClientResponse>> proposerEcheanceConvention(
+            @Valid @RequestBody PropositionEcheanceFactureConventionRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                facturationConventionService.proposeDueDate(TenantContext.getCurrentAgence(), request)
+        ));
+    }
+
     @GetMapping("/documents-clients")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<DocumentClientPageResponse>> documentsClients(
@@ -338,6 +351,16 @@ public class ComptaController {
                 request.getTypeDocument() == TypeDocumentClient.RELEVE
                         ? "Relevé émis"
                         : "Facture émise"
+        ));
+    }
+
+    @PostMapping("/documents-clients/echeance-proposee")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<PropositionEcheanceDocumentClientResponse>> proposerEcheance(
+            @Valid @RequestBody PropositionEcheanceDocumentClientRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                documentClientService.proposeDueDate(TenantContext.getCurrentAgence(), request)
         ));
     }
 

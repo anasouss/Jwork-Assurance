@@ -3,6 +3,7 @@ package com.assurance.dto.response;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeDocumentClient;
 import com.assurance.enums.NatureElementFacturable;
+import com.assurance.enums.OrigineDelaiPaiement;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -22,6 +23,9 @@ public class DocumentClientResponse {
     private LocalDate periodeDebut;
     private LocalDate periodeFin;
     private LocalDate dateEcheance;
+    private Integer delaiPaiementJours;
+    private OrigineDelaiPaiement origineDelaiPaiement;
+    private Long conditionPaiementClientId;
     private Long clientPayeurId;
     private Long groupePayeurId;
     private String payeurNom;

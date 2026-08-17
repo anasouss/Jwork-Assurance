@@ -555,6 +555,21 @@ export type ClientCrm = {
   totalImpayes: number;
 };
 
+export type ClientPaymentCondition = {
+  id: string;
+  payeurType: "CLIENT" | "GROUPE";
+  payeurId: string;
+  delaiJours: 30 | 60 | 90 | 120 | 180;
+  typeJustification: "POLITIQUE_AGENCE" | "ACCORD_CONTRACTUEL" | "DEROGATION_SECTORIELLE";
+  dateDebut: string;
+  dateFin?: string | null;
+  statut: "ACTIVE" | "EXPIREE" | "A_VENIR";
+  justificatifPresent: boolean;
+  nomFichier?: string | null;
+  commentaire?: string | null;
+  createdAt: string;
+};
+
 export type VehiculeInput = {
   vehiculeId?: string | number;
   typeVehicule: "AUTOMOBILE" | "CAMION" | "MOTO" | "BUS" | "TRACTEUR" | "AUTRE";

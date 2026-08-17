@@ -344,6 +344,9 @@ export type ClientDocument = {
   periodeDebut: string;
   periodeFin: string;
   dateEcheance?: string | null;
+  delaiPaiementJours?: number | null;
+  origineDelaiPaiement?: "DEFAUT_60_JOURS" | "CONDITION_CLIENT" | "CONDITION_GROUPE" | null;
+  conditionPaiementClientId?: string | null;
   clientPayeurId?: string | null;
   groupePayeurId?: string | null;
   payeurNom: string;
@@ -372,6 +375,16 @@ export type CreateClientDocumentRequest = {
   elementFacturableIds: string[];
   dateEcheance?: string;
   notes?: string;
+};
+
+export type ClientDocumentDueDateProposal = {
+  dateEmission: string;
+  delaiJours: number;
+  dateEcheanceProposee: string;
+  origine: "DEFAUT_60_JOURS" | "CONDITION_CLIENT" | "CONDITION_GROUPE";
+  conditionPaiementId?: string | null;
+  dateFinCondition?: string | null;
+  justificatifPresent: boolean;
 };
 
 export type ClientPaymentMode =

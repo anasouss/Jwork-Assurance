@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FilePlus2, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -78,14 +78,36 @@ export default function FacturationConventionsPage() {
   });
 
   const selectedRows = Object.values(selected);
+  const selectedIds = selectedRows.map((row) => row.id);
+  const selectedKey = selectedIds.join(",");
   const selectableRows = (installments.data?.rows ?? []).filter(isSelectable);
   const allPageSelected = selectableRows.length > 0
     && selectableRows.every((row) => Boolean(selected[row.id]));
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.montantTtc, 0);
+  const dueDateProposal = useQuery({
+    queryKey: ["compta", "convention-invoice-due-date", selectedIds],
+    queryFn: () => comptaApi.proposeConventionInvoiceDueDate(selectedIds),
+    enabled: issueOpen && selectedIds.length > 0,
+  });
+  const today = useMemo(() => startOfLocalDay(new Date()), []);
+  const maximumDueDate = dueDateProposal.data?.dateEcheanceProposee
+    ? parseLocalDate(dueDateProposal.data.dateEcheanceProposee)
+    : undefined;
+
+  useEffect(() => {
+    if (!issueOpen) return;
+    setDueDate("");
+  }, [issueOpen, selectedKey]);
+
+  useEffect(() => {
+    if (!dueDate && dueDateProposal.data?.dateEcheanceProposee) {
+      setDueDate(dueDateProposal.data.dateEcheanceProposee);
+    }
+  }, [dueDate, dueDateProposal.data]);
 
   const issue = useMutation({
     mutationFn: () => comptaApi.createConventionInvoice({
-      echeanceIds: selectedRows.map((row) => row.id),
+      echeanceIds: selectedIds,
       dateEcheance: dueDate || undefined,
       notes: notes.trim() || undefined,
     }),
@@ -353,9 +375,24 @@ export default function FacturationConventionsPage() {
               <Label>Date limite de paiement</Label>
               <DatePicker
                 date={dueDate || undefined}
-                minDate={new Date()}
+                minDate={today}
+                maxDate={maximumDueDate}
                 onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
               />
+              {dueDateProposal.isLoading ? (
+                <p className="text-xs text-muted-foreground">Calcul de l’échéance applicable...</p>
+              ) : dueDateProposal.isError ? (
+                <p className="text-xs text-destructive">Impossible de déterminer le délai applicable.</p>
+              ) : dueDateProposal.data ? (
+                <p className="text-xs text-muted-foreground">
+                  {dueDateProposal.data.origine === "DEFAUT_60_JOURS"
+                    ? "Délai par défaut"
+                    : dueDateProposal.data.origine === "CONDITION_GROUPE"
+                      ? "Condition du groupe"
+                      : "Condition du client"}
+                  {` : ${dueDateProposal.data.delaiJours} jours maximum.`}
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="invoice-notes">Notes</Label>
@@ -369,7 +406,11 @@ export default function FacturationConventionsPage() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setIssueOpen(false)}>Annuler</Button>
-            <Button type="button" disabled={issue.isPending} onClick={() => issue.mutate()}>
+            <Button
+              type="button"
+              disabled={issue.isPending || !dueDate || dueDateProposal.isLoading || dueDateProposal.isError}
+              onClick={() => issue.mutate()}
+            >
               {issue.isPending ? "Émission..." : "Émettre la facture"}
             </Button>
           </DialogFooter>
@@ -420,4 +461,13 @@ function money(value: number) {
 
 function shortDate(value: string) {
   return new Intl.DateTimeFormat("fr-FR").format(new Date(`${value}T00:00:00`));
+}
+
+function parseLocalDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function startOfLocalDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
 }

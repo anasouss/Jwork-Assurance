@@ -744,23 +744,46 @@ function IssueDialog(props: {
 }) {
   const queryClient = useQueryClient();
   const [dueDate, setDueDate] = useState("");
+  const [dueDateInitialized, setDueDateInitialized] = useState(false);
   const [notes, setNotes] = useState("");
+  const sourceIds = useMemo(
+    () => props.rows
+      .map((row) => row.elementFacturableId)
+      .filter((id): id is string => Boolean(id)),
+    [props.rows]
+  );
+  const sourceKey = sourceIds.join(",");
+  const dueDateProposal = useQuery({
+    queryKey: ["compta", "client-document-due-date", sourceIds],
+    queryFn: () => comptaApi.proposeClientDocumentDueDate(sourceIds),
+    enabled: props.open && props.type === "FACTURE" && sourceIds.length > 0,
+  });
   const invoiceEligible = props.rows.every((row) => row.facturable);
   const debit = props.rows.reduce((sum, row) => sum + Math.max(row.montantTtc, 0), 0);
   const credit = props.rows.reduce((sum, row) => sum + Math.abs(Math.min(row.montantTtc, 0)), 0);
+  const today = useMemo(() => startOfLocalDay(new Date()), []);
+  const maximumDueDate = dueDateProposal.data?.dateEcheanceProposee
+    ? parseLocalDate(dueDateProposal.data.dateEcheanceProposee)
+    : undefined;
 
   useEffect(() => {
     if (!props.open || !props.rows.length) return;
     setDueDate("");
+    setDueDateInitialized(false);
     setNotes("");
-  }, [props.open, props.rows, invoiceEligible]);
+  }, [props.open, props.type, sourceKey, invoiceEligible]);
+
+  useEffect(() => {
+    if (!dueDateInitialized && dueDateProposal.data?.dateEcheanceProposee) {
+      setDueDate(dueDateProposal.data.dateEcheanceProposee);
+      setDueDateInitialized(true);
+    }
+  }, [dueDateInitialized, dueDateProposal.data]);
 
   const issue = useMutation({
     mutationFn: () => comptaApi.createClientDocument({
       typeDocument: props.type,
-      elementFacturableIds: props.rows
-        .map((row) => row.elementFacturableId)
-        .filter((id): id is string => Boolean(id)),
+      elementFacturableIds: sourceIds,
       dateEcheance: props.type === "FACTURE" ? dueDate : undefined,
       notes: notes.trim() || undefined,
     }),
@@ -774,7 +797,8 @@ function IssueDialog(props: {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Émission impossible"),
   });
-  const invalid = props.type === "FACTURE" && (!dueDate || !invoiceEligible);
+  const invalid = props.type === "FACTURE"
+    && (!dueDate || !invoiceEligible || dueDateProposal.isLoading || dueDateProposal.isError);
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -793,10 +817,34 @@ function IssueDialog(props: {
               <FilterField label="Échéance de paiement *">
                 <DatePicker
                   date={dueDate}
-                  onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
-                  minDate={new Date()}
+                  onSelect={(date) => {
+                    setDueDate(toDateOnly(date) ?? "");
+                    setDueDateInitialized(true);
+                  }}
+                  minDate={today}
+                  maxDate={maximumDueDate}
                 />
               </FilterField>
+              {dueDateProposal.isLoading ? (
+                <p className="mt-1 text-xs text-muted-foreground">Calcul de l’échéance applicable...</p>
+              ) : dueDateProposal.isError ? (
+                <p className="mt-1 text-xs text-destructive">
+                  Impossible de déterminer le délai applicable. Réessayez avant d’émettre la facture.
+                </p>
+              ) : dueDateProposal.data ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {dueDateProposal.data.origine === "DEFAUT_60_JOURS"
+                    ? "Délai par défaut"
+                    : dueDateProposal.data.origine === "CONDITION_GROUPE"
+                      ? "Condition du groupe"
+                      : "Condition du client"}
+                  {` : ${dueDateProposal.data.delaiJours} jours maximum.`}
+                  {!dueDateProposal.data.justificatifPresent
+                    && dueDateProposal.data.origine !== "DEFAUT_60_JOURS"
+                    ? " Justificatif non joint."
+                    : ""}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <div className="overflow-x-auto rounded-md border">
@@ -1185,4 +1233,13 @@ function formatDate(value?: string | null) {
   if (!value) return "-";
   const [year, month, day] = value.split("-");
   return `${day}/${month}/${year}`;
+}
+
+function parseLocalDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function startOfLocalDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
 }

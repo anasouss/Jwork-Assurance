@@ -1,4 +1,4 @@
-import { apiFetch, buildQueryString } from "@/lib/api/base";
+import { apiFetch, apiFetchBlob, apiUpload, buildQueryString } from "@/lib/api/base";
 import type {
   ApiResponse,
   AcquisitionClient,
@@ -6,6 +6,7 @@ import type {
   ClientCrm,
   ClientInput,
   ClientPage,
+  ClientPaymentCondition,
   ClientResponse,
   GroupeClient,
   OrigineCommerciale,
@@ -50,6 +51,42 @@ export const clientApi = {
 
   async getClientCrm(clientId: string) {
     return unwrap(await apiFetch<ApiResponse<ClientCrm>>(`/api/v1/clients/${clientId}`));
+  },
+
+  async listPaymentConditions(payeurType: "CLIENT" | "GROUPE", payeurId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<ClientPaymentCondition[]>>(
+        `/api/v1/conditions-paiement-clients${buildQueryString({ payeurType, payeurId })}`
+      )
+    ).map(normalizePaymentCondition);
+  },
+
+  async createPaymentCondition(request: {
+    payeurType: "CLIENT" | "GROUPE";
+    payeurId: string;
+    delaiJours: number;
+    typeJustification: ClientPaymentCondition["typeJustification"];
+    dateDebut: string;
+    dateFin?: string;
+    commentaire?: string;
+    justificatif?: File;
+  }) {
+    const data = new FormData();
+    data.set("payeurType", request.payeurType);
+    data.set("payeurId", request.payeurId);
+    data.set("delaiJours", String(request.delaiJours));
+    data.set("typeJustification", request.typeJustification);
+    data.set("dateDebut", request.dateDebut);
+    if (request.dateFin) data.set("dateFin", request.dateFin);
+    if (request.commentaire) data.set("commentaire", request.commentaire);
+    if (request.justificatif) data.set("justificatif", request.justificatif);
+    return normalizePaymentCondition(unwrap(
+      await apiUpload<ApiResponse<ClientPaymentCondition>>("/api/v1/conditions-paiement-clients", data)
+    ));
+  },
+
+  async downloadPaymentConditionEvidence(id: string) {
+    return apiFetchBlob(`/api/v1/conditions-paiement-clients/${id}/justificatif`);
   },
 
   async acquisitionOptions() {
@@ -154,3 +191,11 @@ export const clientApi = {
     );
   },
 };
+
+function normalizePaymentCondition(condition: ClientPaymentCondition): ClientPaymentCondition {
+  return {
+    ...condition,
+    id: String(condition.id),
+    payeurId: String(condition.payeurId),
+  };
+}

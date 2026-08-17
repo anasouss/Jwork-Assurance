@@ -2,10 +2,12 @@ package com.assurance.service;
 
 import com.assurance.dto.request.CreerDocumentClientRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
+import com.assurance.dto.request.PropositionEcheanceDocumentClientRequest;
 import com.assurance.dto.response.DocumentClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.dto.response.SourceDocumentClientResponse;
+import com.assurance.dto.response.PropositionEcheanceDocumentClientResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Client;
@@ -78,6 +80,42 @@ public class DocumentClientService {
     private final AgenceRepository agenceRepository;
     private final EcheanceFacturationConventionRepository echeanceFacturationConventionRepository;
     private final AffectationReglementClientRepository affectationReglementClientRepository;
+    private final ConditionPaiementClientService conditionPaiementClientService;
+
+    @Transactional(readOnly = true)
+    public PropositionEcheanceDocumentClientResponse proposeDueDate(
+            Long agenceId,
+            PropositionEcheanceDocumentClientRequest request
+    ) {
+        List<Long> ids = request.getElementFacturableIds().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            throw new BadRequestException("Sélectionnez au moins une écriture");
+        }
+        List<ElementFacturable> elements = elementFacturableRepository.findClientDocumentSources(agenceId, ids);
+        if (elements.size() != ids.size()) {
+            throw new BadRequestException("Une ou plusieurs écritures sélectionnées sont introuvables");
+        }
+        Payer payer = resolveSinglePayer(elements);
+        LocalDate emissionDate = LocalDate.now();
+        ConditionPaiementClientService.ResolvedCondition condition = conditionPaiementClientService.resolve(
+                agenceId,
+                payer.client(),
+                payer.group(),
+                emissionDate
+        );
+        return PropositionEcheanceDocumentClientResponse.builder()
+                .dateEmission(emissionDate)
+                .delaiJours(condition.days())
+                .dateEcheanceProposee(emissionDate.plusDays(condition.days()))
+                .origine(condition.origin())
+                .conditionPaiementId(condition.conditionId())
+                .dateFinCondition(condition.conditionEndDate())
+                .justificatifPresent(condition.evidencePresent())
+                .build();
+    }
 
     @Transactional(readOnly = true)
     public SourceDocumentClientPageResponse searchSources(
@@ -265,6 +303,16 @@ public class DocumentClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         LocalDate emissionDate = LocalDate.now();
         Payer payer = payers.get(0);
+        ConditionPaiementClientService.ResolvedCondition paymentCondition =
+                conditionPaiementClientService.resolve(
+                        agenceId,
+                        payer.client(),
+                        payer.group(),
+                        emissionDate
+                );
+        if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
+            validateInvoiceDueDate(request.getDateEcheance(), emissionDate, paymentCondition.days());
+        }
         DocumentClient document = DocumentClient.builder()
                 .agence(agence)
                 .typeDocument(request.getTypeDocument())
@@ -273,7 +321,18 @@ public class DocumentClientService {
                 .dateEmission(emissionDate)
                 .periodeDebut(documentPeriod.start())
                 .periodeFin(documentPeriod.end())
-                .dateEcheance(request.getDateEcheance())
+                .dateEcheance(request.getTypeDocument() == TypeDocumentClient.FACTURE
+                        ? request.getDateEcheance()
+                        : null)
+                .delaiPaiementJours(request.getTypeDocument() == TypeDocumentClient.FACTURE
+                        ? paymentCondition.days()
+                        : null)
+                .origineDelaiPaiement(request.getTypeDocument() == TypeDocumentClient.FACTURE
+                        ? paymentCondition.origin()
+                        : null)
+                .conditionPaiementClient(request.getTypeDocument() == TypeDocumentClient.FACTURE
+                        ? paymentCondition.condition()
+                        : null)
                 .clientPayeur(payer.client())
                 .groupePayeur(payer.group())
                 .payeurNom(payer.name())
@@ -385,10 +444,33 @@ public class DocumentClientService {
             if (request.getDateEcheance() == null) {
                 throw new BadRequestException("La date d'échéance est obligatoire pour une facture");
             }
-            if (request.getDateEcheance().isBefore(LocalDate.now())) {
-                throw new BadRequestException("La date d'échéance ne peut pas être antérieure à la date d'émission");
-            }
         }
+    }
+
+    private void validateInvoiceDueDate(LocalDate dueDate, LocalDate emissionDate, int maximumDays) {
+        if (dueDate.isBefore(emissionDate)) {
+            throw new BadRequestException("La date d'échéance ne peut pas être antérieure à la date d'émission");
+        }
+        LocalDate maximumDate = emissionDate.plusDays(maximumDays);
+        if (dueDate.isAfter(maximumDate)) {
+            throw new BadRequestException(
+                    "La date d'échéance dépasse le délai de paiement applicable de " + maximumDays + " jours"
+            );
+        }
+    }
+
+    private Payer resolveSinglePayer(List<ElementFacturable> elements) {
+        Map<Long, Client> subscribers = loadSubscribersFromContracts(
+                elements.stream().map(ElementFacturable::getContrat).toList()
+        );
+        List<Payer> payers = elements.stream()
+                .map(element -> resolvePayer(element.getContrat(), subscribers))
+                .toList();
+        String payerKey = payers.get(0).key();
+        if (payers.stream().anyMatch(payer -> !payer.key().equals(payerKey))) {
+            throw new BadRequestException("Les écritures sélectionnées doivent appartenir au même payeur");
+        }
+        return payers.get(0);
     }
 
     private void validatePayer(String payeurType, Long payeurId) {
@@ -642,6 +724,11 @@ public class DocumentClientService {
                 .periodeDebut(document.getPeriodeDebut())
                 .periodeFin(document.getPeriodeFin())
                 .dateEcheance(document.getDateEcheance())
+                .delaiPaiementJours(document.getDelaiPaiementJours())
+                .origineDelaiPaiement(document.getOrigineDelaiPaiement())
+                .conditionPaiementClientId(document.getConditionPaiementClient() == null
+                        ? null
+                        : document.getConditionPaiementClient().getId())
                 .clientPayeurId(document.getClientPayeur() == null ? null : document.getClientPayeur().getId())
                 .groupePayeurId(document.getGroupePayeur() == null ? null : document.getGroupePayeur().getId())
                 .payeurNom(document.getPayeurNom())

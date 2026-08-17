@@ -2,6 +2,7 @@ package com.assurance.entity;
 
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeDocumentClient;
+import com.assurance.enums.OrigineDelaiPaiement;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -72,6 +73,17 @@ public class DocumentClient extends AuditedEntity {
 
     @Column(name = "date_echeance")
     private LocalDate dateEcheance;
+
+    @Column(name = "delai_paiement_jours")
+    private Integer delaiPaiementJours;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origine_delai_paiement", length = 30)
+    private OrigineDelaiPaiement origineDelaiPaiement;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "condition_paiement_client_id")
+    private ConditionPaiementClient conditionPaiementClient;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_payeur_id")

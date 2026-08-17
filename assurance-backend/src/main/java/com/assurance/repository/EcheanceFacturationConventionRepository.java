@@ -27,6 +27,25 @@ public interface EcheanceFacturationConventionRepository
 
     List<EcheanceFacturationConvention> findByDocumentClientId(Long documentClientId);
 
+    @EntityGraph(attributePaths = {
+            "contrat",
+            "contrat.compagnieAssurance",
+            "contrat.convention",
+            "contrat.payeurPrime",
+            "contrat.groupeFacturation"
+    })
+    @Query("""
+            select e
+            from EcheanceFacturationConvention e
+            where e.agence.id = :agenceId
+              and e.id in :ids
+            order by e.periodeDebut, e.id
+            """)
+    List<EcheanceFacturationConvention> findSelected(
+            @Param("agenceId") Long agenceId,
+            @Param("ids") List<Long> ids
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {
             "contrat",

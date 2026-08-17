@@ -4,15 +4,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   Building2,
+  CalendarClock,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
   Eye,
   FileText,
+  Download,
   FolderOpen,
   History,
   Megaphone,
+  Paperclip,
   Plus,
   ReceiptText,
   Search,
@@ -33,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,6 +46,7 @@ import { clientApi } from "@/features/production/api/clients";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
+import { downloadBlob } from "@/lib/download";
 import { comptaApi } from "@/features/compta/api";
 import type { ClientDocument } from "@/features/compta/types";
 import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
@@ -51,6 +56,7 @@ import type {
   AcquisitionClient,
   AcquisitionOptions,
   ClientPage,
+  ClientPaymentCondition,
   ClientResponse,
   GroupeClient,
   RelationGroupeClient,
@@ -632,6 +638,7 @@ function ClientDetail({
   const queryClient = useQueryClient();
   const [acquisitionOpen, setAcquisitionOpen] = useState(false);
   const [acquisitionDraft, setAcquisitionDraft] = useState<AcquisitionClient | undefined>();
+  const [paymentConditionOpen, setPaymentConditionOpen] = useState(false);
   const acquisitionOptionsQuery = useQuery({
     queryKey: ["crm", "acquisition-options"],
     queryFn: clientApi.acquisitionOptions,
@@ -674,6 +681,11 @@ function ClientDetail({
     enabled: activeTab === "accounting",
   });
   const claimsRequest = { clientId: client.id, page: 0, size: 25 };
+  const paymentConditionsQuery = useQuery({
+    queryKey: ["crm", "payment-conditions", "CLIENT", client.id],
+    queryFn: () => clientApi.listPaymentConditions("CLIENT", client.id),
+    enabled: activeTab === "overview" || activeTab === "accounting",
+  });
   const claimsQuery = useQuery({
     queryKey: sinistreKeys.list(claimsRequest),
     queryFn: () => sinistreApi.list(claimsRequest),
@@ -793,6 +805,22 @@ function ClientDetail({
                 </div>
               </div>
             )) : <EmptyState text="Ce client n’est rattaché à aucun groupe." />}
+          </PortfolioSection>
+          <PortfolioSection
+            title="Conditions de paiement"
+            icon={<CalendarClock className="size-4" />}
+            tone="amber"
+            action={canManageClients ? (
+              <Button size="sm" variant="outline" onClick={() => setPaymentConditionOpen(true)}>
+                <Plus className="size-4" />
+                Nouvelle condition
+              </Button>
+            ) : undefined}
+          >
+            <PaymentConditionHistory
+              rows={paymentConditionsQuery.data ?? []}
+              loading={paymentConditionsQuery.isLoading}
+            />
           </PortfolioSection>
           <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />} tone="emerald">
             {groupMembers.length ? (
@@ -936,8 +964,245 @@ function ClientDetail({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PaymentConditionDialog
+        open={paymentConditionOpen}
+        onOpenChange={setPaymentConditionOpen}
+        clientId={client.id}
+        onSaved={async () => {
+          await queryClient.invalidateQueries({
+            queryKey: ["crm", "payment-conditions", "CLIENT", client.id],
+          });
+        }}
+      />
     </section>
   );
+}
+
+function PaymentConditionHistory({
+  rows,
+  loading,
+}: {
+  rows: ClientPaymentCondition[];
+  loading: boolean;
+}) {
+  const download = useMutation({
+    mutationFn: async (row: ClientPaymentCondition) => ({
+      blob: await clientApi.downloadPaymentConditionEvidence(row.id),
+      name: row.nomFichier || `condition-paiement-${row.id}`,
+    }),
+    onSuccess: ({ blob, name }) => downloadBlob(blob, name),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Téléchargement impossible"),
+  });
+
+  if (loading) return <Skeleton className="h-24 w-full" />;
+  if (!rows.length) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm">Délai appliqué : <strong>60 jours</strong></p>
+        <p className="text-xs text-muted-foreground">
+          Aucune condition particulière n’est enregistrée. Le délai par défaut sera proposé sur les factures.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="divide-y rounded-md border">
+      {rows.map((row) => (
+        <div key={row.id} className="grid gap-2 p-3 sm:grid-cols-[120px_1fr_auto] sm:items-center">
+          <div>
+            <p className="text-lg font-semibold">{row.delaiJours} jours</p>
+            <Badge variant={row.statut === "ACTIVE" ? "default" : "outline"}>
+              {row.statut === "ACTIVE" ? "Active" : row.statut === "A_VENIR" ? "À venir" : "Expirée"}
+            </Badge>
+          </div>
+          <div className="min-w-0 text-sm">
+            <p>{paymentConditionTypeLabel(row.typeJustification)}</p>
+            <p className="text-xs text-muted-foreground">
+              Du {dateLabel(row.dateDebut)} {row.dateFin ? `au ${dateLabel(row.dateFin)}` : "sans date de fin"}
+            </p>
+            {row.commentaire ? <p className="mt-1 text-xs text-muted-foreground">{row.commentaire}</p> : null}
+          </div>
+          {row.justificatifPresent ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={download.isPending}
+              onClick={() => download.mutate(row)}
+            >
+              <Download className="size-4" />
+              Justificatif
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground">Sans justificatif</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PaymentConditionDialog({
+  open,
+  onOpenChange,
+  clientId,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clientId: string;
+  onSaved: () => Promise<void>;
+}) {
+  const initialStartDate = toDateOnly(new Date()) ?? "";
+  const [days, setDays] = useState("60");
+  const [type, setType] = useState<ClientPaymentCondition["typeJustification"]>("POLITIQUE_AGENCE");
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(defaultPaymentConditionEnd(initialStartDate));
+  const [comment, setComment] = useState("");
+  const [file, setFile] = useState<File>();
+
+  useEffect(() => {
+    if (!open) return;
+    setDays("60");
+    setType("POLITIQUE_AGENCE");
+    const nextStartDate = toDateOnly(new Date()) ?? "";
+    setStartDate(nextStartDate);
+    setEndDate(defaultPaymentConditionEnd(nextStartDate));
+    setComment("");
+    setFile(undefined);
+  }, [open]);
+
+  const save = useMutation({
+    mutationFn: () => clientApi.createPaymentCondition({
+      payeurType: "CLIENT",
+      payeurId: clientId,
+      delaiJours: Number(days),
+      typeJustification: type,
+      dateDebut: startDate,
+      dateFin: endDate || undefined,
+      commentaire: comment.trim() || undefined,
+      justificatif: file,
+    }),
+    onSuccess: async () => {
+      await onSaved();
+      toast.success("Condition de paiement enregistrée");
+      onOpenChange(false);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Nouvelle condition de paiement</DialogTitle>
+          <DialogDescription>
+            La version précédente reste dans l’historique. Le justificatif est facultatif.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldLabel label="Délai de paiement *">
+            <Select value={days} onValueChange={(value) => {
+              setDays(value);
+              if (value === "180") {
+                setType("DEROGATION_SECTORIELLE");
+              } else if (value === "90" || value === "120") {
+                setType("ACCORD_CONTRACTUEL");
+              } else if (type === "DEROGATION_SECTORIELLE") {
+                setType("POLITIQUE_AGENCE");
+              }
+            }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[30, 60, 90, 120, 180].map((value) => (
+                  <SelectItem key={value} value={String(value)}>{value} jours</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldLabel>
+          <FieldLabel label="Fondement *">
+            <Select value={type} onValueChange={(value) => setType(value as ClientPaymentCondition["typeJustification"])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  value="POLITIQUE_AGENCE"
+                  disabled={days === "90" || days === "120" || days === "180"}
+                >
+                  Politique de l’agence
+                </SelectItem>
+                <SelectItem value="ACCORD_CONTRACTUEL" disabled={days === "180"}>
+                  Accord contractuel
+                </SelectItem>
+                <SelectItem value="DEROGATION_SECTORIELLE" disabled={days !== "180"}>
+                  Dérogation sectorielle
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </FieldLabel>
+          <FieldLabel label="Valable à partir du *">
+            <DatePicker
+              date={startDate}
+              onSelect={(date) => {
+                const nextStartDate = toDateOnly(date) ?? "";
+                setStartDate(nextStartDate);
+                setEndDate(defaultPaymentConditionEnd(nextStartDate));
+              }}
+            />
+          </FieldLabel>
+          <FieldLabel label="Valable jusqu’au">
+            <DatePicker date={endDate} onSelect={(date) => setEndDate(toDateOnly(date) ?? "")} />
+          </FieldLabel>
+          <div className="sm:col-span-2">
+            <FieldLabel label="Justificatif (facultatif)">
+              <div className="flex items-center gap-3 rounded-md border p-3">
+                <Paperclip className="size-4 text-muted-foreground" />
+                <Input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  onChange={(event) => setFile(event.target.files?.[0])}
+                />
+              </div>
+            </FieldLabel>
+          </div>
+          <div className="sm:col-span-2">
+            <FieldLabel label="Note interne">
+              <Textarea value={comment} maxLength={500} onChange={(event) => setComment(event.target.value)} />
+            </FieldLabel>
+          </div>
+          {days === "180" ? (
+            <p className="text-xs text-amber-700 sm:col-span-2">
+              Le délai de 180 jours doit correspondre à une dérogation sectorielle applicable.
+            </p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
+          <Button
+            type="button"
+            disabled={!startDate || save.isPending}
+            onClick={() => save.mutate()}
+          >
+            {save.isPending ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FieldLabel({ label: text, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="grid gap-1.5 text-sm font-medium">
+      <span>{text}</span>
+      {children}
+    </label>
+  );
+}
+
+function paymentConditionTypeLabel(value: ClientPaymentCondition["typeJustification"]) {
+  if (value === "ACCORD_CONTRACTUEL") return "Accord contractuel";
+  if (value === "DEROGATION_SECTORIELLE") return "Dérogation sectorielle";
+  return "Politique de l’agence";
 }
 
 type PortfolioTab = "overview" | "contracts" | "documents" | "accounting" | "claims";
@@ -1451,6 +1716,14 @@ function dateLabel(value?: string | null) {
   if (!value) return "-";
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
+
+function defaultPaymentConditionEnd(startDate: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startDate);
+  if (!match) return "";
+  const endDate = new Date(Number(match[1]) + 1, Number(match[2]) - 1, Number(match[3]));
+  endDate.setDate(endDate.getDate() - 1);
+  return toDateOnly(endDate) ?? "";
 }
 
 function label(value?: string | null) {

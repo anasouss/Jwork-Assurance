@@ -98,6 +98,25 @@ public class StorageLayoutService {
                 .normalize();
     }
 
+    public Path resolveClientPaymentCondition(Long agenceId, String storageKey) {
+        if (agenceId == null) {
+            throw new IllegalArgumentException("L'agence est obligatoire");
+        }
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new IllegalArgumentException("La cle de stockage est obligatoire");
+        }
+        Path key = validateKey(Path.of(storageKey), 3);
+        if (!key.getName(0).toString().equals(agenceId.toString())) {
+            throw new IllegalArgumentException("La cle de stockage n'appartient pas a l'agence");
+        }
+        return agencyRoot(key)
+                .resolve("clients")
+                .resolve("payment-conditions")
+                .resolve(key.getName(1).toString())
+                .resolve(key.getName(2).toString())
+                .normalize();
+    }
+
     private Path agencyRoot(Path key) {
         Path resolved = root.resolve("agencies").resolve(key.getName(0).toString()).normalize();
         if (!resolved.startsWith(root)) {

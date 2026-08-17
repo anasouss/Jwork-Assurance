@@ -6,6 +6,7 @@ import com.assurance.entity.LigneDocumentClient;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.TypeDocumentClient;
 import com.assurance.exception.BadRequestException;
 import com.itextpdf.barcodes.BarcodeQRCode;
 import com.itextpdf.io.font.constants.StandardFonts;
@@ -83,10 +84,13 @@ public class ReleveClientPdfRenderer {
 
             writeLetterHead(document, pdf, source, bold);
             writeLetterIntroduction(document, source, regular, bold);
-            writeClientReference(document, source, bold);
-            writeStatementLines(document, source, bold, tableHeader, fleetAnnexes);
+            if (!isInvoice(source)) {
+                writeClientReference(document, source, bold);
+            }
+            writeDocumentLines(document, source, bold, tableHeader, fleetAnnexes);
             writeTotal(document, source, bold);
             writePaymentText(document, source);
+            writeNotes(document, source, bold);
             if (avecSignature) {
                 writeSignature(document, source.getAgence());
             }
@@ -157,6 +161,20 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeLetterIntroduction(Document document, DocumentClient source, PdfFont regular, PdfFont bold) {
+        if (isInvoice(source)) {
+            Paragraph invoiceNumber = new Paragraph()
+                    .setFontSize(10f)
+                    .setMarginTop(0)
+                    .setMarginLeft(7)
+                    .setMarginBottom(14);
+            invoiceNumber.add(new com.itextpdf.layout.element.Text("Facture N° : ")
+                    .setFont(regular)
+                    .setUnderline());
+            invoiceNumber.add(new com.itextpdf.layout.element.Text(value(source.getNumero())).setFont(bold));
+            document.add(invoiceNumber);
+            return;
+        }
+
         Paragraph subject = new Paragraph()
                 .setFontSize(10f)
                 .setMarginTop(0)
@@ -200,6 +218,21 @@ public class ReleveClientPdfRenderer {
                 .setPadding(3);
     }
 
+    private void writeDocumentLines(
+            Document document,
+            DocumentClient source,
+            PdfFont bold,
+            PdfFont tableHeader,
+            Map<LigneDocumentClient, Integer> fleetAnnexes
+    ) {
+        if (isInvoice(source)) {
+            writeInvoiceLines(document, source, bold, tableHeader, fleetAnnexes);
+            return;
+        }
+
+        writeStatementLines(document, source, bold, tableHeader, fleetAnnexes);
+    }
+
     private void writeStatementLines(
             Document document,
             DocumentClient source,
@@ -225,6 +258,47 @@ public class ReleveClientPdfRenderer {
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
                 .forEach(line -> addStatementLine(table, source, line, bold, fleetAnnexes.get(line)));
         document.add(table);
+    }
+
+    private void writeInvoiceLines(
+            Document document,
+            DocumentClient source,
+            PdfFont bold,
+            PdfFont tableHeader,
+            Map<LigneDocumentClient, Integer> fleetAnnexes
+    ) {
+        Table table = new Table(new float[]{14, 8, 8, 22, 9, 8, 8, 10})
+                .setWidth(UnitValue.createPercentValue(100))
+                .setKeepTogether(false);
+        addHeader(table, "N° Police / référence", tableHeader);
+        addHeader(table, "Date effet", tableHeader);
+        addHeader(table, "Date exp.", tableHeader);
+        addHeader(table, "Nature", tableHeader);
+        addHeader(table, "Prime nette", tableHeader);
+        addHeader(table, "Taxes", tableHeader);
+        addHeader(table, "Access.", tableHeader);
+        addHeader(table, "Total", tableHeader);
+
+        source.getLignes().stream()
+                .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
+                .forEach(line -> addInvoiceLine(table, line, bold, fleetAnnexes.get(line)));
+        document.add(table);
+    }
+
+    private void addInvoiceLine(
+            Table table,
+            LigneDocumentClient line,
+            PdfFont bold,
+            Integer fleetAnnexNumber
+    ) {
+        addValue(table, statementReference(line), TextAlignment.CENTER, null);
+        addValue(table, date(line.getDateOperation()), TextAlignment.CENTER, null);
+        addValue(table, date(line.getDateEcheance()), TextAlignment.CENTER, null);
+        addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null);
+        addValue(table, amount(line.getPrimeNette()), TextAlignment.CENTER, null);
+        addValue(table, amount(line.getTaxes()), TextAlignment.CENTER, null);
+        addValue(table, amount(line.getAccessoires()), TextAlignment.CENTER, null);
+        addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, bold);
     }
 
     private void addStatementLine(
@@ -349,7 +423,10 @@ public class ReleveClientPdfRenderer {
                 .setMarginRight(134)
                 .setMarginTop(9);
         total.addCell(new Cell()
-                .add(new Paragraph("Total").setFont(bold).setFontSize(8.5f).setMargin(0))
+                .add(new Paragraph(isInvoice(source) ? "Total TTC" : "Total")
+                        .setFont(bold)
+                        .setFontSize(8.5f)
+                        .setMargin(0))
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBorder(TABLE_BORDER)
                 .setPadding(4));
@@ -362,14 +439,43 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writePaymentText(Document document, DocumentClient source) {
-        document.add(new Paragraph("Le montant total à régler s'élève à " + amount(source.getTotalDocument()) + " Dhs")
+        String totalText = isInvoice(source)
+                ? "Le montant total de cette facture s'élève à "
+                : "Le montant total à régler s'élève à ";
+        document.add(new Paragraph(totalText + amount(source.getTotalDocument()) + " Dhs")
                 .setFontSize(9.5f)
                 .setMarginLeft(7)
                 .setMarginTop(18)
                 .setMarginBottom(3));
-        document.add(new Paragraph("Dès réception de votre règlement, nous vous ferons parvenir la (les) quittance(s) correspondante(s).")
+        String paymentText = isInvoice(source)
+                ? "Cette facture constitue un appel de prime et ne vaut pas preuve de règlement."
+                : "Dès réception de votre règlement, nous vous ferons parvenir la (les) quittance(s) correspondante(s).";
+        document.add(new Paragraph(paymentText)
                 .setFontSize(9.5f)
                 .setMarginLeft(7)
+                .setMarginTop(0));
+    }
+
+    private boolean isInvoice(DocumentClient source) {
+        return source.getTypeDocument() == TypeDocumentClient.FACTURE;
+    }
+
+    private void writeNotes(Document document, DocumentClient source, PdfFont bold) {
+        if (source.getNotes() == null || source.getNotes().isBlank()) {
+            return;
+        }
+        document.add(new Paragraph("Notes")
+                .setFont(bold)
+                .setFontSize(8.5f)
+                .setMarginLeft(7)
+                .setMarginTop(12)
+                .setMarginBottom(3));
+        document.add(new Paragraph(source.getNotes().trim())
+                .setFontSize(8.5f)
+                .setBorder(TABLE_BORDER)
+                .setPadding(6)
+                .setMarginLeft(7)
+                .setMarginRight(7)
                 .setMarginTop(0));
     }
 

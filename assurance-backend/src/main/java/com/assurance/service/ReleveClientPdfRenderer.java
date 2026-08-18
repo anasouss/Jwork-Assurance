@@ -164,14 +164,32 @@ public class ReleveClientPdfRenderer {
         if (isInvoice(source)) {
             Paragraph invoiceNumber = new Paragraph()
                     .setFontSize(10f)
-                    .setMarginTop(0)
-                    .setMarginLeft(7)
-                    .setMarginBottom(14);
+                    .setMargin(0);
             invoiceNumber.add(new com.itextpdf.layout.element.Text("Facture N° : ")
                     .setFont(regular)
                     .setUnderline());
             invoiceNumber.add(new com.itextpdf.layout.element.Text(value(source.getNumero())).setFont(bold));
-            document.add(invoiceNumber);
+
+            Table invoiceReference = new Table(new float[]{1, 1})
+                    .setWidth(UnitValue.createPercentValue(98))
+                    .setHorizontalAlignment(HorizontalAlignment.CENTER)
+                    .setMarginBottom(14);
+            invoiceReference.addCell(borderless(new Cell()).add(invoiceNumber));
+
+            Paragraph dueDate = new Paragraph()
+                    .setFontSize(10f)
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setMargin(0);
+            if (source.getDateEcheance() != null) {
+                dueDate.add(new com.itextpdf.layout.element.Text("Date d’échéance : ")
+                        .setFont(regular)
+                        .setUnderline());
+                dueDate.add(new com.itextpdf.layout.element.Text(
+                        LONG_DATE_FORMAT.format(source.getDateEcheance())
+                ).setFont(bold));
+            }
+            invoiceReference.addCell(borderless(new Cell()).add(dueDate));
+            document.add(invoiceReference);
             return;
         }
 

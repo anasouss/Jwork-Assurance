@@ -215,6 +215,26 @@ export default function RelevesFacturesPage() {
   const selectedPayerKey = selectedRows.length
     ? `${selectedRows[0].payeurType}:${selectedRows[0].payeurId}`
     : undefined;
+  const pageRows = sources.data?.rows ?? [];
+  const eligiblePageRows = pageRows.filter((row) =>
+    Boolean(row.elementFacturableId)
+      && (urlState.operationType === "RELEVE" || row.facturable)
+  );
+  const eligiblePayerKeys = new Set(
+    eligiblePageRows.map((row) => `${row.payeurType}:${row.payeurId}`)
+  );
+  const bulkPayerKey = selectedPayerKey
+    ?? (selectedPayer
+      ? `${selectedPayer.type}:${selectedPayer.id}`
+      : eligiblePayerKeys.size === 1
+        ? eligiblePayerKeys.values().next().value
+        : undefined);
+  const bulkSelectableRows = bulkPayerKey
+    ? eligiblePageRows.filter((row) => `${row.payeurType}:${row.payeurId}` === bulkPayerKey)
+    : [];
+  const allPageRowsSelected = bulkSelectableRows.length > 0
+    && bulkSelectableRows.every((row) => Boolean(selected[row.elementFacturableId!]));
+  const somePageRowsSelected = bulkSelectableRows.some((row) => Boolean(selected[row.elementFacturableId!]));
 
   function toggleSource(row: ClientDocumentSource, checked: boolean) {
     const elementFacturableId = row.elementFacturableId;
@@ -235,6 +255,19 @@ export default function RelevesFacturesPage() {
       const next = { ...current };
       if (checked) next[elementFacturableId] = row;
       else delete next[elementFacturableId];
+      return next;
+    });
+  }
+
+  function togglePageSources(checked: boolean) {
+    setSelected((current) => {
+      const next = { ...current };
+      for (const row of bulkSelectableRows) {
+        const id = row.elementFacturableId;
+        if (!id) continue;
+        if (checked) next[id] = row;
+        else delete next[id];
+      }
       return next;
     });
   }
@@ -342,7 +375,18 @@ export default function RelevesFacturesPage() {
                 <table className="w-full min-w-[1180px] text-sm">
                   <thead className="border-y bg-amber-600 text-white">
                     <tr>
-                      <th className="w-12 px-4 py-3 text-left" aria-label="Sélection" />
+                      <th className="w-12 px-4 py-3 text-left">
+                        <Checkbox
+                          checked={allPageRowsSelected ? true : somePageRowsSelected ? "indeterminate" : false}
+                          disabled={sources.isLoading || bulkSelectableRows.length === 0}
+                          onCheckedChange={(checked) => togglePageSources(checked === true)}
+                          aria-label="Sélectionner toutes les écritures éligibles de ce payeur"
+                          title={!bulkPayerKey && eligiblePageRows.length
+                            ? "Sélectionnez d'abord un client ou un groupe"
+                            : "Sélectionner toutes les écritures éligibles"}
+                          className="border-white/80 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-orange-700 data-[state=indeterminate]:border-white data-[state=indeterminate]:bg-white data-[state=indeterminate]:text-orange-700"
+                        />
+                      </th>
                       <Header>Cible / souscripteur</Header>
                       <Header>Police / référence</Header>
                       <Header>Mouvement</Header>
@@ -360,7 +404,7 @@ export default function RelevesFacturesPage() {
                     {!sources.isLoading && !(sources.data?.rows.length) ? (
                       <tr><td colSpan={11} className="h-32 text-center text-muted-foreground">Aucune écriture trouvée.</td></tr>
                     ) : null}
-                    {(sources.data?.rows ?? []).map((row) => (
+                    {pageRows.map((row) => (
                       <tr key={row.elementFacturableId} className="border-b hover:bg-muted/30">
                         <td className="px-4 py-3">
                           <Checkbox

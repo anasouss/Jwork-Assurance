@@ -6566,6 +6566,16 @@ public class ContratService {
             throw new BadRequestException("La prime nette est obligatoire pour la garantie " + garantie.getCode());
         }
         boolean saisieManuelleContrat = contratManuel && sourceValeurSelectionnee == SourceValeurGarantie.MANUEL;
+        boolean sourceValeurRequise = garantie.getTypeGarantie() == TypeGarantie.VEHICULE
+                && modeSelectionne != ModeTarificationGarantie.CAPITAL
+                && Boolean.TRUE.equals(garantie.getAvecCapital())
+                && sources.stream().anyMatch(source -> source == SourceValeurGarantie.VENALE
+                || source == SourceValeurGarantie.NEUF
+                || source == SourceValeurGarantie.GLACE
+                || source == SourceValeurGarantie.MANUEL);
+        if (sourceValeurRequise && sourceValeurSelectionnee == SourceValeurGarantie.AUCUNE) {
+            throw new BadRequestException("La source de valeur est obligatoire pour la garantie " + garantie.getCode());
+        }
         if (sourceValeurSelectionnee != SourceValeurGarantie.AUCUNE && !sources.contains(sourceValeurSelectionnee) && !saisieManuelleContrat) {
             throw new BadRequestException("La source " + sourceValeurSelectionnee + " n'est pas autorisee pour la garantie " + garantie.getCode());
         }

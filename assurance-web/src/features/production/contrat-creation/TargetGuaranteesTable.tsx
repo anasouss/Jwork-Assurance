@@ -208,7 +208,7 @@ export function TargetGuaranteesTable({
               const hasLine = isRc || lineOptions.length > 0;
               const disabled = guaranteeLocked || isRc || (automaticPricing && (!grilleSelected || !hasLine));
               const editable = checked && !isRc && !guaranteeLocked;
-              const warning = checked ? valueWarning(garantie, target, selectedLine) : "";
+              const warning = checked ? valueWarning(garantie, target, selectedLine, item) : "";
               const sourceOptions = target.kind === "vehicule" ? selectableTargetValueSources(garantie, target, selectedLine) : [];
               const selectedSource = target.kind === "vehicule" ? selectedTargetValueSource(garantie, item, target, selectedLine) : "";
               const manualValue = selectedSource === "MANUEL" && lineMode(selectedLine) !== "CAPITAL";
@@ -251,7 +251,7 @@ export function TargetGuaranteesTable({
                             })}
                           >
                             <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}>
-                              <SelectValue placeholder="Source" />
+                              <SelectValue placeholder="Choisir" />
                             </SelectTrigger>
                             <SelectContent>
                               {sourceOptions.map((source) => (
@@ -283,7 +283,7 @@ export function TargetGuaranteesTable({
                       </Select>
                     ) : sourceOptions.length > 1 ? (
                       <Select
-                        value={selectedSource}
+                        value={selectedSource === "AUCUNE" ? "" : selectedSource}
                         disabled={!editable}
                         onValueChange={(value) => {
                           if (value !== "MANUEL" && !hasTargetValue(target, value)) {
@@ -293,7 +293,7 @@ export function TargetGuaranteesTable({
                           update(garantie.id, { sourceValeurSelectionnee: value, valeurAssuree: undefined, capital: undefined });
                         }}
                       >
-                        <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}><SelectValue placeholder="Source" /></SelectTrigger>
+                        <SelectTrigger className={cn(controlClass(editable), "[&>span]:w-full [&>span]:text-right")}><SelectValue placeholder="Choisir" /></SelectTrigger>
                         <SelectContent>
                           {sourceOptions.map((source) => (
                             <SelectItem key={source} value={source}>{targetSourceOptionLabel(source, target)}</SelectItem>
@@ -660,7 +660,7 @@ function matchingPersonneFormules(formules: ReferenceOption[], garantie: Referen
     );
 }
 
-function valueWarning(garantie: ReferenceOption, target?: Target, line?: ReferenceOption) {
+function valueWarning(garantie: ReferenceOption, target?: Target, line?: ReferenceOption, item?: GarantieInput) {
   if (!target) {
     return "";
   }
@@ -671,6 +671,10 @@ function valueWarning(garantie: ReferenceOption, target?: Target, line?: Referen
     const allowedSources = allowedVehicleValueSources(garantie);
     if (allowedSources.length > 1) {
       if (allowedSources.some((allowedSource) => hasTargetValue(target, allowedSource))) {
+        const selectedSource = String(item?.sourceValeurSelectionnee ?? "").toUpperCase();
+        if (item && !configuredDefaultVehicleValueSource(garantie) && !allowedSources.includes(selectedSource)) {
+          return "Choisissez la valeur assurée";
+        }
         return validateValeurVenale(target) ?? "";
       }
       if (manualTargetValueAllowed(garantie)) {
@@ -774,15 +778,12 @@ function defaultTargetSource(garantie: ReferenceOption, target: Target, line?: R
   if (lineMode(line) === "CAPITAL") {
     return "AUCUNE";
   }
-  const sourceWithValue = allowedVehicleValueSources(garantie).find((allowedSource) => hasTargetValue(target, allowedSource));
-  if (sourceWithValue) {
-    return sourceWithValue;
+  const configuredSource = configuredDefaultVehicleValueSource(garantie);
+  if (configuredSource) {
+    return configuredSource;
   }
-  if (manualTargetValueAllowed(garantie)) {
-    return "MANUEL";
-  }
-  const source = configuredDefaultVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 1 ? allowedVehicleValueSources(garantie)[0] : "");
-  return source || (allowedVehicleValueSources(garantie).length > 0 ? allowedVehicleValueSources(garantie)[0] : defaultSource(garantie));
+  const availableSources = selectableTargetValueSources(garantie, target, line);
+  return availableSources.length === 1 ? availableSources[0] : "AUCUNE";
 }
 
 function manualTargetValueAllowed(garantie: ReferenceOption) {

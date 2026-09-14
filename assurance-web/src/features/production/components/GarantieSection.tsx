@@ -231,7 +231,7 @@ export function GarantieSection({
               const selectedLine = selectedLineFor(lineOptions, item);
               const selectedVehicle = vehicules[item?.vehiculeIndex ?? 0] ?? vehicules[0];
               const selectedSource = selectedValueSource(garantie, item, selectedLine, selectedVehicle);
-              const sourceOptions = availableVehicleValueSources(garantie, selectedVehicle, selectedLine);
+              const sourceOptions = selectableManualValueSources(garantie, selectedVehicle, selectedLine);
               const manualPricingSourceOptions = selectableManualValueSources(garantie, selectedVehicle, selectedLine);
               const manualValue = selectedSource === "MANUEL";
               const manualCapital = canEnterManualCapital(garantie, item, selectedLine);
@@ -307,10 +307,10 @@ export function GarantieSection({
                           />
                         ) : sourceOptions.length > 1 && !isRc ? (
                           <Select
-                            value={selectedSource}
+                            value={selectedSource === "AUCUNE" ? "" : selectedSource}
                             disabled={!editable}
                             onValueChange={(value) => {
-                              if (!hasVehicleValue(selectedVehicle, value)) {
+                              if (value !== "MANUEL" && !hasVehicleValue(selectedVehicle, value)) {
                                 toast.error(`Renseignez ${sourceLabel(value)} avant de sélectionner cette source.`);
                                 return;
                               }
@@ -322,7 +322,7 @@ export function GarantieSection({
                               update(garantie.id, patch);
                             }}
                           >
-                            <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Source" /></SelectTrigger>
+                            <SelectTrigger className={controlClass(editable)}><SelectValue placeholder="Choisir" /></SelectTrigger>
                             <SelectContent>
                               {sourceOptions.map((source) => (
                                 <SelectItem key={source} value={source}>{sourceOptionLabel(source, selectedVehicle)}</SelectItem>
@@ -442,7 +442,7 @@ export function GarantieSection({
                           />
                         ) : manualPricingSourceOptions.length > 1 ? (
                           <Select
-                            value={selectedSource}
+                            value={selectedSource === "AUCUNE" ? "" : selectedSource}
                             disabled={!editable}
                             onValueChange={(value) => {
                               if (value !== "MANUEL" && !hasVehicleValue(selectedVehicle, value)) {
@@ -457,7 +457,7 @@ export function GarantieSection({
                             }}
                           >
                             <SelectTrigger className={controlClass(editable)}>
-                              <SelectValue placeholder="Source de la valeur" />
+                              <SelectValue placeholder="Choisir" />
                             </SelectTrigger>
                             <SelectContent>
                               {manualPricingSourceOptions.map((source) => (
@@ -960,7 +960,7 @@ function lineSelectionPatch(garantie: ReferenceOption, line?: ReferenceOption): 
   const allowedSources = allowedVehicleValueSources(garantie);
   const source = mode === "CAPITAL"
     ? "AUCUNE"
-    : allowedSources.length <= 1 ? (configuredDefaultVehicleValueSource(garantie) || allowedSources[0] || defaultSource(garantie)) : undefined;
+    : configuredDefaultVehicleValueSource(garantie) || (allowedSources.length === 1 ? allowedSources[0] : undefined);
   return {
     ligneGrilleTarifaireId: line?.id,
     modeSelectionne: mode,
@@ -996,18 +996,12 @@ function selectedValueSource(garantie: ReferenceOption, item?: GarantieInput, li
   if (selected && (!vehicule || hasVehicleValue(vehicule, selected))) {
     return selected;
   }
-  const sourceWithValue = allowedVehicleValueSources(garantie).find((source) => vehicule && hasVehicleValue(vehicule, source));
-  if (sourceWithValue) {
-    return sourceWithValue;
+  const configuredSource = configuredDefaultVehicleValueSource(garantie);
+  if (configuredSource) {
+    return configuredSource;
   }
-  if (manualValueAllowed(garantie)) {
-    return "MANUEL";
-  }
-  const defaultValue = configuredDefaultVehicleValueSource(garantie) || (allowedVehicleValueSources(garantie).length === 1 ? allowedVehicleValueSources(garantie)[0] : "");
-  if (defaultValue) {
-    return defaultValue;
-  }
-  return allowedVehicleValueSources(garantie)[0] ?? defaultSource(garantie);
+  const availableSources = selectableManualValueSources(garantie, vehicule, line);
+  return availableSources.length === 1 ? availableSources[0] : "AUCUNE";
 }
 
 function initialVehicleValueSource(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {
@@ -1017,18 +1011,12 @@ function initialVehicleValueSource(garantie: ReferenceOption, vehicule?: Vehicul
   if (defaultSource(garantie) === "MANUEL") {
     return "MANUEL";
   }
-  const availableSource = availableVehicleValueSources(garantie, vehicule, line)[0];
-  if (availableSource) {
-    return availableSource;
+  const configuredSource = configuredDefaultVehicleValueSource(garantie);
+  if (configuredSource) {
+    return configuredSource;
   }
-  if (manualValueAllowed(garantie)) {
-    return "MANUEL";
-  }
-  const allowedSources = allowedVehicleValueSources(garantie);
-  return configuredDefaultVehicleValueSource(garantie)
-    || (allowedSources.length === 1 ? allowedSources[0] : "")
-    || allowedSources[0]
-    || defaultSource(garantie);
+  const availableSources = selectableManualValueSources(garantie, vehicule, line);
+  return availableSources.length === 1 ? availableSources[0] : "AUCUNE";
 }
 
 function availableVehicleValueSources(garantie: ReferenceOption, vehicule?: VehiculeInput, line?: ReferenceOption) {

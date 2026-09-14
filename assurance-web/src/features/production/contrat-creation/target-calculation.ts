@@ -4,6 +4,7 @@ import { numberOrZero, roundMoney } from "../utils/format";
 export type CalculationTarget = {
   kind: "vehicule" | "remorque";
   index: number;
+  entityId?: string;
 };
 
 export type TargetQuittanceSummary = {
@@ -72,10 +73,31 @@ export function previewForTarget(
   targetPreview: QuittancePreview | null | undefined,
   target?: CalculationTarget
 ) {
-  if (!target || !targetPreview) return preview;
-  if (backendTargetSummary(targetPreview, target)) return targetPreview;
-  if ((targetPreview.garanties ?? []).some((line) => previewLineMatchesTarget(line, target))) return targetPreview;
-  return preview;
+  if (!target) return preview;
+  if (!targetPreview) return withTargetAssistances(preview, undefined, target);
+  if (backendTargetSummary(targetPreview, target)) {
+    return withTargetAssistances(targetPreview, preview, target);
+  }
+  if ((targetPreview.garanties ?? []).some((line) => previewLineMatchesTarget(line, target))) {
+    return withTargetAssistances(targetPreview, preview, target);
+  }
+  return withTargetAssistances(preview, undefined, target);
+}
+
+function withTargetAssistances(
+  selected: QuittancePreview | null | undefined,
+  fallback: QuittancePreview | null | undefined,
+  target: CalculationTarget
+) {
+  if (!selected) return selected;
+  const source = selected.assistances?.length ? selected.assistances : fallback?.assistances;
+  if (!source) return selected;
+  if (target.kind !== "vehicule") return { ...selected, assistances: [] };
+
+  const assistances = target.entityId
+    ? source.filter((assistance) => String(assistance.vehiculeId ?? "") === String(target.entityId))
+    : source.length === 1 ? source : [];
+  return { ...selected, assistances };
 }
 
 export function remapAssistancesAfterVehicleRemoval(

@@ -588,7 +588,8 @@ export function useContratCreationForm(
         draftId,
         draft,
         { kind: "vehicule", index: 0 },
-        assistanceDraft
+        assistanceDraft,
+        !options?.prospectionMode
       );
     },
     onSuccess: async () => {
@@ -607,7 +608,13 @@ export function useContratCreationForm(
       }
       if (target.kind === "vehicule") {
         const draft = await contractCreationApi.saveDraftVehiculeGaranties(draftId, target.index, targetGaranties(request.garanties, target));
-        return syncDraftVehiculeAssistance(draftId, draft, target, targetAssistances[targetKey(target)]);
+        return syncDraftVehiculeAssistance(
+          draftId,
+          draft,
+          target,
+          targetAssistances[targetKey(target)],
+          !options?.prospectionMode
+        );
       }
       if (part === "info") {
         return contractCreationApi.saveDraftRemorque(draftId, target.index, request.remorques[target.index]);
@@ -1568,7 +1575,8 @@ async function syncDraftVehiculeAssistance(
   draftId: string,
   draft: ContratSummary,
   target: ContratTargetKey,
-  assistance?: AssistanceDraft
+  assistance: AssistanceDraft | undefined,
+  includeContractReference: boolean
 ) {
   const vehiculeId = draft.vehicules?.[target.index]?.vehiculeId;
   const existing = findDraftAssistanceForVehicule(draft, vehiculeId);
@@ -1593,7 +1601,9 @@ async function syncDraftVehiculeAssistance(
     dateSouscription: emptyToUndefined(assistance.dateSouscription ?? ""),
     dateEffet: emptyToUndefined(assistance.dateEffet ?? ""),
     echeanceCode: emptyToUndefined(assistance.echeanceCode ?? ""),
-    numeroContratOuQuittance: emptyToUndefined(assistance.numeroContratOuQuittance ?? ""),
+    numeroContratOuQuittance: includeContractReference
+      ? emptyToUndefined(assistance.numeroContratOuQuittance ?? "")
+      : undefined,
   });
   return contractCreationApi.getContratDraft(draftId);
 }

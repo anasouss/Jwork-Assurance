@@ -53,6 +53,26 @@ describe("contract target calculations", () => {
     expect(previewForTarget(general, targetPreview, { kind: "vehicule", index: 0 })).toBe(general);
   });
 
+  it("keeps the saved assistance for the active vehicle when using a target summary", () => {
+    const general = quittance({
+      assistances: [
+        { id: "10", contratId: "1", vehiculeId: "100", primeNette: 288.6, primeTotale: 329 },
+        { id: "11", contratId: "1", vehiculeId: "200", primeNette: 350, primeTotale: 400 },
+      ],
+    });
+    const targetPreview = quittance({
+      targetSummaries: [{ kind: "VEHICULE", vehiculeIndex: 1, primeTotale: 1_000 }],
+    });
+
+    expect(previewForTarget(
+      general,
+      targetPreview,
+      { kind: "vehicule", index: 1, entityId: "200" }
+    )?.assistances).toEqual([
+      { id: "11", contratId: "1", vehiculeId: "200", primeNette: 350, primeTotale: 400 },
+    ]);
+  });
+
   it("matches a saved guarantee line by target and tariff line", () => {
     const preview = quittance({
       garanties: [

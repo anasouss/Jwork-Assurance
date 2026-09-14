@@ -23,6 +23,7 @@ import {
 export type ContractTarget = {
   kind: "vehicule" | "remorque";
   index: number;
+  entityId?: string;
   label: string;
   usageId?: string;
   categorieTransportId?: string;
@@ -168,6 +169,7 @@ export function ContractTargetsSection({
       ...vehicules.map((vehicule, index) => ({
         kind: "vehicule" as const,
         index,
+        entityId: vehicule.vehiculeId == null ? undefined : String(vehicule.vehiculeId),
         label: vehicleTargetLabel(vehicule, index),
         usageId: vehicule.usageId,
         categorieTransportId: vehicule.categorieTransportId,
@@ -178,6 +180,7 @@ export function ContractTargetsSection({
       ...remorques.map((remorque, index) => ({
         kind: "remorque" as const,
         index,
+        entityId: remorque.remorqueId == null ? undefined : String(remorque.remorqueId),
         label: remorqueTargetLabel(remorque, index),
         usageId: remorque.usageId,
         valeurAssuree: remorque.valeurAssuree,

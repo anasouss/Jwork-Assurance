@@ -201,9 +201,20 @@ export const tarifUsageSchema = z.object({
 export const bulkTarifUsageSchema = z.object({
   tarifIds: z.array(z.string()).optional(),
   usageIds: z.array(z.string()).optional(),
-  adjustmentType: z.enum(["PERCENT", "FIXED"]),
-  direction: z.enum(["INCREASE", "DECREASE"]),
-  value: z.number().positive("Valeur obligatoire"),
+  typeOperation: z.enum(["AJUSTEMENT", "REINITIALISATION"]),
+  typeCalcul: z.enum(["POURCENTAGE", "MONTANT_FIXE"]).optional(),
+  sens: z.enum(["HAUSSE", "BAISSE"]).optional(),
+  value: z.number().positive("Valeur obligatoire").optional(),
+  dateDebut: z.string().min(1, "Date de début obligatoire"),
+  dateFin: z.string().optional(),
+  motif: z.string().max(500, "Le motif ne peut pas dépasser 500 caractères").optional(),
+}).superRefine((value, context) => {
+  if (value.typeOperation === "AJUSTEMENT" && (!value.typeCalcul || !value.sens || !value.value)) {
+    context.addIssue({ code: "custom", message: "Type, sens et valeur obligatoires" });
+  }
+  if (value.dateFin && value.dateFin < value.dateDebut) {
+    context.addIssue({ code: "custom", path: ["dateFin"], message: "La date de fin doit suivre la date de début" });
+  }
 });
 
 export const compagnieAssuranceSchema = z.object({

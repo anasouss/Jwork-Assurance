@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   BulkUpdateTarifUsageRequest,
   ReferenceOption,
+  TarifUsageAdjustmentPage,
   UpsertFormuleGarantiePersonneRequest,
   UpsertGrilleTarifaireRequest,
   UpsertGrilleUsageConfigurationRequest,
@@ -35,9 +36,16 @@ export const pricingApi = {
   },
   async bulkUpdateUsageNetPremium(payload: BulkUpdateTarifUsageRequest) {
     return unwrap(
-      await apiFetch<ApiResponse<{ updatedRows: number }>>(
+      await apiFetch<ApiResponse<{ id: string; updatedRows: number }>>(
         "/api/v1/referentiel/tarifs-usage/bulk-prime-nette",
         { method: "POST", body: JSON.stringify(payload) },
+      ),
+    );
+  },
+  async usageRateAdjustmentHistory(page = 0, size = 20) {
+    return unwrap(
+      await apiFetch<ApiResponse<TarifUsageAdjustmentPage>>(
+        `/api/v1/referentiel/tarifs-usage/ajustements?page=${page}&size=${size}`,
       ),
     );
   },

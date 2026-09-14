@@ -1110,9 +1110,47 @@ export type UpsertGarantieRequest = {
 export type BulkUpdateTarifUsageRequest = {
   tarifIds?: string[];
   usageIds?: string[];
-  adjustmentType: "PERCENT" | "FIXED";
-  direction: "INCREASE" | "DECREASE";
-  value: number;
+  typeOperation: "AJUSTEMENT" | "REINITIALISATION";
+  typeCalcul?: "POURCENTAGE" | "MONTANT_FIXE";
+  sens?: "HAUSSE" | "BAISSE";
+  value?: number;
+  dateDebut: string;
+  dateFin?: string;
+  motif?: string;
+};
+
+export type TarifUsageAdjustment = {
+  id: string;
+  typeOperation: "AJUSTEMENT" | "REINITIALISATION";
+  typeCalcul?: "POURCENTAGE" | "MONTANT_FIXE" | null;
+  sens?: "HAUSSE" | "BAISSE" | null;
+  valeur?: number | null;
+  dateDebut: string;
+  dateFin?: string | null;
+  motif: string;
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  nombreTarifs: number;
+  lignes: Array<{
+    tarifUsageId: string;
+    usageCode?: string | null;
+    description?: string | null;
+    primeNetteInitiale: number;
+    primeNetteAppliquee: number;
+  }>;
+};
+
+export type TarifUsageAdjustmentPage = {
+  items: TarifUsageAdjustment[];
+  page: {
+    number: number;
+    size: number;
+    totalPages: number;
+    totalElements: number;
+    first: boolean;
+    last: boolean;
+  };
 };
 
 export type UpsertCompagnieAssuranceRequest = {

@@ -21,7 +21,9 @@ import com.assurance.dto.request.UpsertTarifProduitAssistanceRequest;
 import com.assurance.dto.request.UpsertTarifUsageRequest;
 import com.assurance.dto.request.UpsertUsageRequest;
 import com.assurance.dto.response.ApiResponse;
+import com.assurance.dto.response.AjustementTarifUsageResponse;
 import com.assurance.dto.response.GrilleTarifaireCatalogueResponse;
+import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.entity.CategorieClient;
 import com.assurance.entity.CategorieTransport;
@@ -49,12 +51,14 @@ import com.assurance.enums.CritereSelectionTarif;
 import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeEcheanceConvention;
 import com.assurance.enums.TypeGarantie;
+import com.assurance.enums.TypeOperationTarifUsage;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.*;
 import com.assurance.security.TenantContext;
 import com.assurance.service.RichTextSanitizer;
 import com.assurance.service.GrilleTarifaireCatalogueService;
+import com.assurance.service.TarifUsageAjustementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -71,7 +75,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -111,6 +115,7 @@ public class ReferentielController {
     private final AgenceRepository agenceRepository;
     private final RichTextSanitizer richTextSanitizer;
     private final GrilleTarifaireCatalogueService grilleTarifaireCatalogueService;
+    private final TarifUsageAjustementService tarifUsageAjustementService;
 
     @GetMapping("/branches-assurance")
     @Transactional(readOnly = true)
@@ -592,12 +597,13 @@ public class ReferentielController {
         List<TarifUsage> tarifs = usageId == null
                 ? tarifUsageRepository.findAll()
                 : tarifUsageRepository.findByUsage_IdAndActifTrue(usageId);
+        Map<Long, BigDecimal> effectivePremiums = tarifUsageAjustementService.resolvePrimeNettes(tarifs, LocalDate.now());
         return ResponseEntity.ok(ApiResponse.success(tarifs.stream()
                 .filter(tarif -> Boolean.TRUE.equals(tarif.getActif()))
                 .sorted(Comparator
                         .comparing((TarifUsage tarif) -> tarif.getUsage() != null ? tarif.getUsage().getCode() : "")
                         .thenComparing(TarifUsage::getPuissanceFiscaleMin, Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(this::toTarifUsageResponse)
+                .map(tarif -> toTarifUsageResponse(tarif, effectivePremiums.get(tarif.getId())))
                 .toList()));
     }
 
@@ -615,6 +621,10 @@ public class ReferentielController {
     ) {
         TarifUsage tarif = tarifUsageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TarifUsage", id));
+        if (tarifUsageAjustementService.hasHistory(id)
+                && amountsDiffer(tarif.getPrimeNette(), request.getPrimeNette())) {
+            throw new BadRequestException("Le tarif initial ne peut plus etre modifie apres un ajustement");
+        }
         applyTarifUsageRequest(tarif, request);
         return ResponseEntity.ok(ApiResponse.success(toTarifUsageResponse(tarifUsageRepository.save(tarif)), "Tarif usage modifie"));
     }
@@ -632,25 +642,22 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> bulkUpdatePrimeNette(
             @Valid @RequestBody BulkUpdateTarifUsageRequest request
     ) {
-        String adjustmentType = request.getAdjustmentType().trim().toUpperCase();
-        String direction = request.getDirection().trim().toUpperCase();
-        if (!"PERCENT".equals(adjustmentType) && !"FIXED".equals(adjustmentType)) {
-            throw new BadRequestException("Type d'ajustement non supporte");
-        }
-        if (!"INCREASE".equals(direction) && !"DECREASE".equals(direction)) {
-            throw new BadRequestException("Sens d'ajustement non supporte");
-        }
+        AjustementTarifUsageResponse result = tarifUsageAjustementService.apply(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("id", result.getId(), "updatedRows", result.getNombreTarifs()),
+                request.getTypeOperation() == TypeOperationTarifUsage.REINITIALISATION
+                        ? "Tarifs reinitialises"
+                        : "Ajustement tarifaire enregistre"
+        ));
+    }
 
-        List<TarifUsage> targetTarifs = resolveBulkTarifTargets(request);
-        targetTarifs.forEach(tarif -> tarif.setPrimeNette(adjustPrimeNette(
-                tarif.getPrimeNette(),
-                adjustmentType,
-                direction,
-                request.getValue()
-        )));
-        tarifUsageRepository.saveAll(targetTarifs);
-
-        return ResponseEntity.ok(ApiResponse.success(Map.of("updatedRows", targetTarifs.size()), "Primes nettes mises a jour"));
+    @GetMapping("/tarifs-usage/ajustements")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<PagedResponse<AjustementTarifUsageResponse>>> tarifUsageAdjustmentHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(tarifUsageAjustementService.history(page, size)));
     }
 
     @GetMapping("/conventions")
@@ -1601,6 +1608,10 @@ public class ReferentielController {
     }
 
     private Map<String, Object> toTarifUsageResponse(TarifUsage tarif) {
+        return toTarifUsageResponse(tarif, tarif.getPrimeNette());
+    }
+
+    private Map<String, Object> toTarifUsageResponse(TarifUsage tarif, BigDecimal effectivePrimeNette) {
         Usage usage = tarif.getUsage();
         CategorieTransport categorieTransport = tarif.getCategorieTransport();
         Carburant carburant = tarif.getCarburant();
@@ -1629,7 +1640,8 @@ public class ReferentielController {
                 .putValue("carburantCode", carburant != null ? carburant.getCode() : null)
                 .putValue("carburantLibelle", carburant != null ? carburant.getLibelle() : null)
                 .putValue("carburant", carburant != null ? carburant.getLibelle() : null)
-                .putValue("primeNette", tarif.getPrimeNette())
+                .putValue("primeNetteInitiale", tarif.getPrimeNette())
+                .putValue("primeNette", effectivePrimeNette)
                 .putValue("primeParPlace", tarif.getPrimeParPlace())
                 .putValue("actif", tarif.getActif())
                 .map();
@@ -1650,33 +1662,11 @@ public class ReferentielController {
                 .orElseThrow(() -> new ResourceNotFoundException("Carburant", carburantValue));
     }
 
-    private List<TarifUsage> resolveBulkTarifTargets(BulkUpdateTarifUsageRequest request) {
-        Set<Long> tarifIds = new HashSet<>(request.getTarifIds() == null ? List.of() : request.getTarifIds());
-        Set<Long> usageIds = new HashSet<>(request.getUsageIds() == null ? List.of() : request.getUsageIds());
-        return tarifUsageRepository.findAll().stream()
-                .filter(tarif -> Boolean.TRUE.equals(tarif.getActif()))
-                .filter(tarif -> tarifIds.isEmpty() || tarifIds.contains(tarif.getId()))
-                .filter(tarif -> !tarifIds.isEmpty()
-                        || usageIds.isEmpty()
-                        || (tarif.getUsage() != null && usageIds.contains(tarif.getUsage().getId())))
-                .toList();
-    }
-
-    private BigDecimal adjustPrimeNette(BigDecimal currentPrime, String adjustmentType, String direction, BigDecimal value) {
-        BigDecimal basePrime = currentPrime == null ? BigDecimal.ZERO : currentPrime;
-        BigDecimal adjusted;
-        if ("PERCENT".equals(adjustmentType)) {
-            BigDecimal factor = value.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
-            adjusted = "DECREASE".equals(direction)
-                    ? basePrime.multiply(BigDecimal.ONE.subtract(factor))
-                    : basePrime.multiply(BigDecimal.ONE.add(factor));
-        } else {
-            adjusted = "DECREASE".equals(direction) ? basePrime.subtract(value) : basePrime.add(value);
+    private boolean amountsDiffer(BigDecimal left, BigDecimal right) {
+        if (left == null || right == null) {
+            return left != right;
         }
-        if (adjusted.signum() < 0) {
-            adjusted = BigDecimal.ZERO;
-        }
-        return adjusted.setScale(2, RoundingMode.HALF_UP);
+        return left.compareTo(right) != 0;
     }
 
     private void applyLigneRequest(LigneGrilleTarifaire ligne, UpsertLigneGrilleTarifaireRequest request) {

@@ -1,11 +1,14 @@
 package com.assurance.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import com.assurance.enums.SensAjustementTarifUsage;
+import com.assurance.enums.TypeCalculAjustementTarifUsage;
+import com.assurance.enums.TypeOperationTarifUsage;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -13,13 +16,20 @@ public class BulkUpdateTarifUsageRequest {
     private List<Long> tarifIds;
     private List<Long> usageIds;
 
-    @NotBlank
-    private String adjustmentType;
+    @NotNull
+    private TypeOperationTarifUsage typeOperation;
 
-    @NotBlank
-    private String direction;
+    private TypeCalculAjustementTarifUsage typeCalcul;
+
+    private SensAjustementTarifUsage sens;
+
+    private BigDecimal value;
 
     @NotNull
-    @Positive
-    private BigDecimal value;
+    private LocalDate dateDebut;
+
+    private LocalDate dateFin;
+
+    @Size(max = 500)
+    private String motif;
 }

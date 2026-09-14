@@ -43,6 +43,7 @@ public class CalculGarantieService {
 
     private final ParametreApplicationService parametreApplicationService;
     private final TarifUsageRepository tarifUsageRepository;
+    private final TarifUsageAjustementService tarifUsageAjustementService;
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
     private final CompagnieGarantieRepository compagnieGarantieRepository;
@@ -249,7 +250,13 @@ public class CalculGarantieService {
         if (tarif == null || tarif.getPrimeNette() == null) {
             return null;
         }
-        BigDecimal prime = tarif.getPrimeNette();
+        BigDecimal prime = tarifUsageAjustementService.resolvePrimeNette(
+                tarif,
+                resolveTarifReferenceDate(contrat, vehicule == null ? null : vehicule.getDateEffet())
+        );
+        if (prime == null) {
+            return null;
+        }
         BigDecimal nombrePlaces = parsePositiveDecimal(vehicule.getNombrePlaces());
         if (tarif.getPrimeParPlace() != null && nombrePlaces != null) {
             prime = prime.add(tarif.getPrimeParPlace().multiply(nombrePlaces));
@@ -277,7 +284,14 @@ public class CalculGarantieService {
         if (tarif == null || tarif.getPrimeNette() == null) {
             return null;
         }
-        return tarif.getPrimeNette()
+        BigDecimal primeNette = tarifUsageAjustementService.resolvePrimeNette(
+                tarif,
+                resolveTarifReferenceDate(contrat, remorque == null ? null : remorque.getDateEffet())
+        );
+        if (primeNette == null) {
+            return null;
+        }
+        return primeNette
                 .multiply(prorata)
                 .multiply(crm)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -338,6 +352,16 @@ public class CalculGarantieService {
             return null;
         }
         return tarifs.size() == 1 ? tarifs.get(0) : null;
+    }
+
+    private LocalDate resolveTarifReferenceDate(Contrat contrat, LocalDate itemDateEffet) {
+        if (itemDateEffet != null) {
+            return itemDateEffet;
+        }
+        if (contrat != null && contrat.getDateEffet() != null) {
+            return contrat.getDateEffet();
+        }
+        return LocalDate.now();
     }
 
     private TarifUsage resolveTarifUsageRemorque(Remorque remorque) {

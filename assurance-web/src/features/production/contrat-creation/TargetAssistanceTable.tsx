@@ -18,6 +18,7 @@ type TargetAssistanceTableProps = {
   produitsAssistance: ReferenceOption[];
   categorieClientId?: string;
   preview?: AssistanceContrat;
+  showContractReference?: boolean;
 };
 
 export function TargetAssistanceTable({
@@ -28,6 +29,7 @@ export function TargetAssistanceTable({
   produitsAssistance,
   categorieClientId,
   preview,
+  showContractReference = true,
 }: TargetAssistanceTableProps) {
   const filteredProducts = produitsAssistance.filter((produit) => {
     if (assistance.compagnieAssistanceId && produit.compagnieAssistanceId !== assistance.compagnieAssistanceId) {
@@ -74,7 +76,7 @@ export function TargetAssistanceTable({
             <th className="px-3 py-3 text-left">Date souscription</th>
             <th className="px-3 py-3 text-left">Échéance</th>
             <th className="px-3 py-3 text-left">Date échéance</th>
-            <th className="px-3 py-3 text-left">N° contrat</th>
+            {showContractReference ? <th className="px-3 py-3 text-left">N° contrat</th> : null}
             <th className="px-3 py-3 text-left">Compagnie</th>
             <th className="px-3 py-3 text-left">Produit</th>
             <th className="px-3 py-3 text-right">Prime</th>
@@ -94,14 +96,16 @@ export function TargetAssistanceTable({
             <ResponsiveRecordCell label="Date échéance">
               <DatePicker disabled date={assistance.dateEcheance} onSelect={() => undefined} />
             </ResponsiveRecordCell>
-            <ResponsiveRecordCell label="N° contrat">
-              <Input
-                disabled={!assistance.enabled}
-                value={assistance.numeroContratOuQuittance ?? ""}
-                placeholder="N° contrat"
-                onChange={(event) => onChange({ numeroContratOuQuittance: event.target.value })}
-              />
-            </ResponsiveRecordCell>
+            {showContractReference ? (
+              <ResponsiveRecordCell label="N° contrat">
+                <Input
+                  disabled={!assistance.enabled}
+                  value={assistance.numeroContratOuQuittance ?? ""}
+                  placeholder="N° contrat"
+                  onChange={(event) => onChange({ numeroContratOuQuittance: event.target.value })}
+                />
+              </ResponsiveRecordCell>
+            ) : null}
             <ResponsiveRecordCell label="Compagnie">
               <Select
                 disabled={!assistance.enabled}

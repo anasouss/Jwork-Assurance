@@ -520,6 +520,7 @@ export function ContractTargetsSection({
                   onAssistanceChange={(patch) => updateAssistance(activeVehiculeTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   showAssistance={showAssistance}
+                  showAssistanceContractReference={!prospectionMode}
                   grilleSelected={grilleSelected}
                   pricingMode={normalizedPricingMode}
                   preview={activeVehiculePreview}
@@ -672,6 +673,7 @@ export function ContractTargetsSection({
                   onAssistanceChange={(patch) => updateAssistance(activeRemorqueTarget, patch)}
                   assistanceCategorieClientId={assistanceCategorieClientId}
                   showAssistance={showAssistance}
+                  showAssistanceContractReference={!prospectionMode}
                   grilleSelected={grilleSelected}
                   pricingMode={normalizedPricingMode}
                   preview={activeRemorquePreview}

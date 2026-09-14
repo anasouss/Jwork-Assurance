@@ -382,10 +382,10 @@ export function useContratCreationForm(
           const [kind, indexText] = key.split(":");
           const vehiculeIndex = Number(indexText);
           return kind === "vehicule" && Number.isInteger(vehiculeIndex)
-            ? assistanceRequestInput(assistance, vehiculeIndex)
+            ? assistanceRequestInput(assistance, vehiculeIndex, !options?.prospectionMode)
             : [];
         })
-      : assistanceRequestInput(assistanceDraft, 0),
+      : assistanceRequestInput(assistanceDraft, 0, !options?.prospectionMode),
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
@@ -1527,7 +1527,11 @@ function scopedTargetRequest(request: CreateContratRequest, target: ContratTarge
   };
 }
 
-function assistanceRequestInput(assistance: AssistanceDraft | undefined, vehiculeIndex: number) {
+function assistanceRequestInput(
+  assistance: AssistanceDraft | undefined,
+  vehiculeIndex: number,
+  includeContractReference: boolean
+) {
   if (!assistance?.enabled
       || !assistance.compagnieAssistanceId
       || !assistance.produitAssistanceId) {
@@ -1541,7 +1545,9 @@ function assistanceRequestInput(assistance: AssistanceDraft | undefined, vehicul
     dateSouscription: emptyToUndefined(assistance.dateSouscription ?? ""),
     dateEffet: emptyToUndefined(assistance.dateEffet ?? ""),
     echeanceCode: emptyToUndefined(assistance.echeanceCode ?? ""),
-    numeroContratOuQuittance: emptyToUndefined(assistance.numeroContratOuQuittance ?? ""),
+    numeroContratOuQuittance: includeContractReference
+      ? emptyToUndefined(assistance.numeroContratOuQuittance ?? "")
+      : undefined,
     typeQuittance: "AN",
   }];
 }

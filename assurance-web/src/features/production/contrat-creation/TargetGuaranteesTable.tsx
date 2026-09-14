@@ -72,6 +72,7 @@ export function TargetGuaranteesTable({
   onAssistanceChange,
   assistanceCategorieClientId,
   showAssistance,
+  showAssistanceContractReference,
   grilleSelected,
   pricingMode,
   preview,
@@ -96,6 +97,7 @@ export function TargetGuaranteesTable({
   onAssistanceChange: (patch: Partial<AssistanceDraft>) => void;
   assistanceCategorieClientId?: string;
   showAssistance?: boolean;
+  showAssistanceContractReference?: boolean;
   grilleSelected: boolean;
   pricingMode: PricingMode;
   preview?: QuittancePreview | null;
@@ -508,6 +510,7 @@ export function TargetGuaranteesTable({
           produitsAssistance={produitsAssistance}
           categorieClientId={assistanceCategorieClientId}
           preview={preview?.assistances?.[0]}
+          showContractReference={showAssistanceContractReference}
         />
       ) : null}
     </div>

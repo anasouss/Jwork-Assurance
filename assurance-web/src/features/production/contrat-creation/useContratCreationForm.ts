@@ -719,7 +719,9 @@ export function useContratCreationForm(
       if (
         requireDriverPermitValidity && (
           item.role === "CONDUCTEUR"
-          || (item.role === "PROPRIETAIRE" && (typeContrat === "FLOTTE" || (item.client.typeClient !== "PERSONNE_MORALE" && item.client.conducteurHabituel !== false)))
+          || (item.role === "PROPRIETAIRE"
+            && item.client.typeClient !== "PERSONNE_MORALE"
+            && item.client.conducteurHabituel !== false)
         )
         && !item.client.dateValiditePermis
       ) {
@@ -819,7 +821,8 @@ export function useContratCreationForm(
           requireDriverPermitValidity
           &&
           role === "PROPRIETAIRE"
-          && (typeContrat === "FLOTTE" || (client.typeClient !== "PERSONNE_MORALE" && client.conducteurHabituel !== false))
+          && client.typeClient !== "PERSONNE_MORALE"
+          && client.conducteurHabituel !== false
         ) {
           requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
         }

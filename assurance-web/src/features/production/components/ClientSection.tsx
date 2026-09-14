@@ -45,6 +45,7 @@ export function ClientSection({
   showOptionalRoles = false,
   showProprietaireCategorie = false,
   requireDriverDetails = true,
+  requireDriverPermitValidity = true,
   errors = {},
   onSaveSection,
   savedSections = {},
@@ -61,6 +62,7 @@ export function ClientSection({
   showOptionalRoles?: boolean;
   showProprietaireCategorie?: boolean;
   requireDriverDetails?: boolean;
+  requireDriverPermitValidity?: boolean;
   errors?: Record<string, string>;
   onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
   savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
@@ -562,7 +564,7 @@ export function ClientSection({
                       <Field label="N° de permis">
                         <Input value={item.client.numeroPermis ?? ""} onChange={(event) => updateClient(index, { numeroPermis: event.target.value })} />
                       </Field>
-                      <Field label="Date de validité du PC" required error={errors[`clients.${index}.client.dateValiditePermis`]}>
+                      <Field label="Date de validité du PC" required={requireDriverPermitValidity} error={errors[`clients.${index}.client.dateValiditePermis`]}>
                         <DatePicker date={item.client.dateValiditePermis} onSelect={(date) => updateClient(index, { dateValiditePermis: toDateOnly(date) })} />
                       </Field>
                     </div>
@@ -604,7 +606,7 @@ export function ClientSection({
                       <Field label="N° de permis">
                         <Input value={conducteur.client.client.numeroPermis ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { numeroPermis: event.target.value })} />
                       </Field>
-                      <Field label="Date de validité du PC" required error={errors[`clients.${conducteur.clientIndex}.client.dateValiditePermis`]}>
+                      <Field label="Date de validité du PC" required={requireDriverPermitValidity} error={errors[`clients.${conducteur.clientIndex}.client.dateValiditePermis`]}>
                         <DatePicker date={conducteur.client.client.dateValiditePermis} onSelect={(date) => updateClient(conducteur.clientIndex, { dateValiditePermis: toDateOnly(date) })} />
                       </Field>
                     </div>

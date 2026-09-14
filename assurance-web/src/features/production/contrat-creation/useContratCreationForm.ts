@@ -174,6 +174,9 @@ export function useContratCreationForm(
     && selectedUsage?.bySousClasse
     && !selectedSousClasse?.conducteurPermisRequis
   );
+  const requireDriverPermitValidity = requireDriverDetails
+    && typeContrat !== "FLOTTE"
+    && !options?.prospectionMode;
 
   useEffect(() => {
     if (typeContrat !== "CONVENTION" || !usageId || !selectedConvention) {
@@ -714,7 +717,7 @@ export function useContratCreationForm(
         nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
       }
       if (
-        requireDriverDetails && (
+        requireDriverPermitValidity && (
           item.role === "CONDUCTEUR"
           || (item.role === "PROPRIETAIRE" && (typeContrat === "FLOTTE" || (item.client.typeClient !== "PERSONNE_MORALE" && item.client.conducteurHabituel !== false)))
         )
@@ -813,7 +816,7 @@ export function useContratCreationForm(
           nextErrors[`clients.${index}.client.telephones`] = "Téléphone obligatoire.";
         }
         if (
-          requireDriverDetails
+          requireDriverPermitValidity
           &&
           role === "PROPRIETAIRE"
           && (typeContrat === "FLOTTE" || (client.typeClient !== "PERSONNE_MORALE" && client.conducteurHabituel !== false))
@@ -841,7 +844,9 @@ export function useContratCreationForm(
             requireField(`clients.${index}.client.cin`, client.cin, "CIN conducteur obligatoire.");
             requireField(`clients.${index}.client.nom`, client.nom, "Nom conducteur obligatoire.");
             requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom conducteur obligatoire.");
-            requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
+            if (requireDriverPermitValidity) {
+              requireField(`clients.${index}.client.dateValiditePermis`, client.dateValiditePermis, "Validité permis obligatoire.");
+            }
             if (isBeforeToday(client.dateValiditePermis, today)) {
               nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
             }

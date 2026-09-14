@@ -1366,6 +1366,9 @@ public class ContratService {
             return;
         }
 
+        boolean permitValidityRequired = request.getTypeContrat() != TypeContrat.FLOTTE
+                && !Boolean.TRUE.equals(request.getProspection());
+
         List<CreateContratRequest.ClientInput> clients = request.getClients() == null ? List.of() : request.getClients();
         CreateContratRequest.ClientInput proprietaire = clients.stream()
                 .filter(item -> item.getRole() == RoleClientContrat.PROPRIETAIRE)
@@ -1374,7 +1377,7 @@ public class ContratService {
         DriverDetails proprietaireDetails = driverDetails(request.getAgenceId(), proprietaire, clients, new HashSet<>());
         if (proprietaireDetails.typeClient() == TypeClient.PERSONNE_PHYSIQUE
                 && !Boolean.FALSE.equals(proprietaireDetails.conducteurHabituel())) {
-            validateDriverPermit(proprietaireDetails, request.getDateEffet());
+            validateDriverPermit(proprietaireDetails, request.getDateEffet(), permitValidityRequired);
             return;
         }
 
@@ -1384,7 +1387,8 @@ public class ContratService {
                 .orElseThrow(() -> new BadRequestException("Le conducteur est obligatoire pour cette sous-classe"));
         validateDriverPermit(
                 driverDetails(request.getAgenceId(), conducteur, clients, new HashSet<>()),
-                request.getDateEffet()
+                request.getDateEffet(),
+                permitValidityRequired
         );
     }
 
@@ -1416,12 +1420,15 @@ public class ContratService {
         return new DriverDetails(client.getTypeClient(), client.getConducteurHabituel(), client.getDateValiditePermis());
     }
 
-    private void validateDriverPermit(DriverDetails driver, LocalDate dateEffet) {
+    private void validateDriverPermit(DriverDetails driver, LocalDate dateEffet, boolean permitValidityRequired) {
         if (driver.typeClient() != TypeClient.PERSONNE_PHYSIQUE) {
             throw new BadRequestException("Le conducteur doit etre une personne physique");
         }
         if (driver.dateValiditePermis() == null) {
-            throw new BadRequestException("La validite du permis est obligatoire pour cette sous-classe");
+            if (permitValidityRequired) {
+                throw new BadRequestException("La validite du permis est obligatoire pour cette sous-classe");
+            }
+            return;
         }
         LocalDate referenceDate = dateEffet == null ? LocalDate.now() : dateEffet;
         if (driver.dateValiditePermis().isBefore(referenceDate)) {

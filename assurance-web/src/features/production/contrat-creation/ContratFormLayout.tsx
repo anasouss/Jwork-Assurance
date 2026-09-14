@@ -78,6 +78,9 @@ export function ContratFormLayout({
     && selectedUsage?.bySousClasse
     && !selectedSousClasse?.conducteurPermisRequis
   );
+  const requireDriverPermitValidity = requireDriverDetails
+    && form.typeContrat !== "FLOTTE"
+    && !form.prospectionMode;
   const flotteTargetUsages = useMemo(() => {
     if (order !== "flotte") {
       return form.availableUsages;
@@ -190,6 +193,7 @@ export function ContratFormLayout({
       showOptionalRoles={false}
       showProprietaireCategorie={order === "flotte"}
       requireDriverDetails={requireDriverDetails}
+      requireDriverPermitValidity={requireDriverPermitValidity}
       errors={form.validationErrors}
       onSaveSection={saveSectionAndAdvance}
       savedSections={form.savedSections}

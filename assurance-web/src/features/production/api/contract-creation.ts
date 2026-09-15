@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   ContratSummary,
   CreateContratRequest,
+  DraftTariffRecalculation,
   QuittancePreview,
 } from "../types";
 
@@ -99,6 +100,23 @@ export const contractCreationApi = {
       await apiFetch<ApiResponse<ContratSummary>>(
         `/api/v1/contrats/drafts/${id}/finaliser`,
         { method: "POST", body: JSON.stringify(request) }
+      )
+    );
+  },
+
+  async previewDraftTariffRecalculation(id: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<DraftTariffRecalculation>>(
+        `/api/v1/contrats/drafts/${id}/recalcul-tarifs/preview`
+      )
+    );
+  },
+
+  async applyDraftTariffRecalculation(id: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<ContratSummary>>(
+        `/api/v1/contrats/drafts/${id}/recalcul-tarifs`,
+        { method: "POST" }
       )
     );
   },

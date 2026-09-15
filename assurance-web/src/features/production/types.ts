@@ -915,6 +915,16 @@ export type QuittancePreview = {
   }[];
 };
 
+export type DraftTariffRecalculation = {
+  contratId: string;
+  applicable: boolean;
+  recalculNecessaire: boolean;
+  nombreGarantiesModifiees: number;
+  blocages: string[];
+  avant?: QuittancePreview | null;
+  apres?: QuittancePreview | null;
+};
+
 export type EcheanceAutomobileRow = {
   contratId: string;
   dossier?: string | null;

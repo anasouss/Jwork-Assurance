@@ -21,6 +21,7 @@ import com.assurance.dto.response.EcheanceAutomobileResponse;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.dto.response.RecalculHistoriqueFinancierResponse;
+import com.assurance.dto.response.RecalculTarifsBrouillonResponse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
@@ -138,6 +139,25 @@ public class ContratController {
             @RequestBody(required = false) List<CreateContratRequest.GarantieInput> request
     ) {
         return ResponseEntity.ok(ApiResponse.success(contratService.saveDraftRemorqueGaranties(TenantContext.getCurrentAgence(), id, index, request), "Garanties remorque enregistrees"));
+    }
+
+    @GetMapping("/drafts/{id}/recalcul-tarifs/preview")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<RecalculTarifsBrouillonResponse>> previewDraftTariffRecalculation(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.previewDraftTariffRecalculation(TenantContext.getCurrentAgence(), id)
+        ));
+    }
+
+    @PostMapping("/drafts/{id}/recalcul-tarifs")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<ContratResponse>> applyDraftTariffRecalculation(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.applyDraftTariffRecalculation(TenantContext.getCurrentAgence(), id),
+                "Tarifs du brouillon recalcules"
+        ));
     }
 
     @PostMapping("/drafts/{id}/finaliser")

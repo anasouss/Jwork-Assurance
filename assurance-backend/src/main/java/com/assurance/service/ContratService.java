@@ -13,6 +13,7 @@ import com.assurance.dto.response.AvenantDetailResponse;
 import com.assurance.dto.response.ClientResponse;
 import com.assurance.dto.response.ContratResponse;
 import com.assurance.dto.response.QuittanceResponse;
+import com.assurance.dto.response.RecalculTarifsBrouillonResponse;
 import com.assurance.entity.*;
 import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.CategorieQuittance;
@@ -388,6 +389,144 @@ public class ContratService {
         saveRemorqueGarantiesTarget(contrat, index, inputs);
         rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, mouvementInitial);
         return toResponse(contrat);
+    }
+
+    @Transactional(readOnly = true)
+    public RecalculTarifsBrouillonResponse previewDraftTariffRecalculation(Long agenceId, Long contratId) {
+        Contrat contrat = resolveDraft(agenceId, contratId);
+        return buildDraftTariffRecalculation(contrat).response();
+    }
+
+    @Transactional
+    public ContratResponse applyDraftTariffRecalculation(Long agenceId, Long contratId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        validateDraftForTariffRecalculation(contrat);
+        DraftTariffRecalculation recalculation = buildDraftTariffRecalculation(contrat);
+        if (!recalculation.response().isApplicable()) {
+            throw new BadRequestException(String.join(" ", recalculation.response().getBlocages()));
+        }
+        if (!recalculation.response().isRecalculNecessaire()) {
+            return toResponse(contrat);
+        }
+
+        List<ContratGarantie> current = recalculation.garantiesActuelles();
+        if (current.size() != recalculation.garanties().size()) {
+            throw new BadRequestException("Les garanties du brouillon ont change. Relancez la previsualisation");
+        }
+        for (int index = 0; index < current.size(); index++) {
+            applyTariffSnapshot(current.get(index), recalculation.garanties().get(index));
+        }
+        contratGarantieRepository.saveAll(current);
+        return toResponse(contrat);
+    }
+
+    private DraftTariffRecalculation buildDraftTariffRecalculation(Contrat contrat) {
+        validateDraftForTariffRecalculation(contrat);
+        List<Vehicule> vehicules = activeVehiculesForView(contrat);
+        List<Remorque> remorques = activeRemorquesForView(contrat);
+        List<ContratGarantie> current = activeGarantiesForView(contrat);
+        List<ContratGarantie> recalculated = new ArrayList<>();
+        List<String> blockers = new ArrayList<>();
+        int changed = 0;
+
+        for (ContratGarantie existing : current) {
+            try {
+                CreateContratRequest.GarantieInput input = tariffRecalculationInput(contrat, existing);
+                ContratGarantie next = buildCalculatedDraftGarantieForTarget(
+                        contrat,
+                        input,
+                        existing.getVehicule(),
+                        existing.getRemorque()
+                );
+                recalculated.add(next);
+                if (!sameTariffSnapshot(existing, next)) {
+                    changed++;
+                }
+            } catch (BadRequestException exception) {
+                blockers.add(tariffRecalculationTargetLabel(existing) + " : " + exception.getMessage());
+            }
+        }
+
+        QuittanceResponse before = calculateDraftQuittance(contrat, current, vehicules, remorques);
+        QuittanceResponse after = blockers.isEmpty()
+                ? calculateDraftQuittance(contrat, recalculated, vehicules, remorques)
+                : null;
+        RecalculTarifsBrouillonResponse response = RecalculTarifsBrouillonResponse.builder()
+                .contratId(contrat.getId())
+                .applicable(blockers.isEmpty())
+                .recalculNecessaire(blockers.isEmpty() && changed > 0)
+                .nombreGarantiesModifiees(changed)
+                .blocages(blockers)
+                .avant(before)
+                .apres(after)
+                .build();
+        return new DraftTariffRecalculation(response, current, recalculated);
+    }
+
+    private void validateDraftForTariffRecalculation(Contrat contrat) {
+        boolean editableProspection = Boolean.TRUE.equals(contrat.getProspection())
+                && contrat.getTypeContrat() == TypeContrat.FLOTTE
+                && contrat.getStatut() == StatutContrat.DRAFT;
+        if (contrat.getStatut() != StatutContrat.DRAFT
+                || (!Boolean.TRUE.equals(contrat.getBrouillon()) && !editableProspection)) {
+            throw new BadRequestException("Le recalcul tarifaire est reserve aux brouillons modifiables");
+        }
+        if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
+            throw new BadRequestException("Le recalcul global est disponible uniquement pour les contrats flotte");
+        }
+        if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE) {
+            throw new BadRequestException("Le recalcul est indisponible pour une saisie manuelle");
+        }
+        if (contrat.getGrilleTarifaire() == null) {
+            throw new BadRequestException("Aucune grille tarifaire n'est selectionnee");
+        }
+    }
+
+    private CreateContratRequest.GarantieInput tariffRecalculationInput(
+            Contrat contrat,
+            ContratGarantie existing
+    ) {
+        CreateContratRequest.GarantieInput input = new CreateContratRequest.GarantieInput();
+        input.setGarantieId(existing.getGarantie().getId());
+        input.setClientId(existing.getClient() == null ? null : existing.getClient().getId());
+        input.setModeSelectionne(existing.getModeSelectionne() == null ? null : existing.getModeSelectionne().name());
+        input.setSourceValeurSelectionnee(existing.getSourceValeurSelectionnee() == null
+                ? null
+                : existing.getSourceValeurSelectionnee().name());
+
+        LigneGrilleTarifaire line = existing.getLigneGrilleTarifaire();
+        if (line != null) {
+            if (!Boolean.TRUE.equals(line.getActif())
+                    || line.getGrilleTarifaire() == null
+                    || !Objects.equals(line.getGrilleTarifaire().getId(), contrat.getGrilleTarifaire().getId())) {
+                throw new BadRequestException("la ligne tarifaire selectionnee n'est plus active dans la grille du contrat");
+            }
+            input.setLigneGrilleTarifaireId(line.getId());
+        }
+
+        FormuleGarantiePersonne formula = existing.getFormuleGarantiePersonne();
+        if (formula != null) {
+            if (!Boolean.TRUE.equals(formula.getActif())
+                    || formula.getGrilleTarifaire() == null
+                    || !Objects.equals(formula.getGrilleTarifaire().getId(), contrat.getGrilleTarifaire().getId())) {
+                throw new BadRequestException("la formule personne selectionnee n'est plus active dans la grille du contrat");
+            }
+            input.setFormuleGarantiePersonneId(formula.getId());
+        }
+        if (existing.getSourceValeurSelectionnee() == SourceValeurGarantie.MANUEL) {
+            input.setCapital(existing.getCapital());
+        }
+        return input;
+    }
+
+    private String tariffRecalculationTargetLabel(ContratGarantie guarantee) {
+        String target = guarantee.getVehicule() != null
+                ? guarantee.getVehicule().getImmatriculation()
+                : guarantee.getRemorque() != null
+                ? guarantee.getRemorque().getImmatriculation()
+                : "Contrat";
+        return target + " / " + garantieLabel(guarantee.getGarantie());
     }
 
     private ContratResponse saveRemorqueGarantiesTarget(Contrat contrat, int index, List<CreateContratRequest.GarantieInput> inputs) {
@@ -1901,6 +2040,15 @@ public class ContratService {
             Vehicule vehicule,
             Remorque remorque
     ) {
+        return contratGarantieRepository.save(buildCalculatedDraftGarantieForTarget(contrat, input, vehicule, remorque));
+    }
+
+    private ContratGarantie buildCalculatedDraftGarantieForTarget(
+            Contrat contrat,
+            CreateContratRequest.GarantieInput input,
+            Vehicule vehicule,
+            Remorque remorque
+    ) {
         Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
         Client client = input.getClientId() == null ? null :
                 clientRepository.findByAgenceIdAndId(contrat.getAgence().getId(), input.getClientId())
@@ -1914,7 +2062,7 @@ public class ContratService {
         validateGarantieTarget(garantie, vehicule, remorque, client);
         validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
         validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
-        return saveContratGarantie(
+        return buildContratGarantie(
                 contrat,
                 garantie,
                 vehicule,
@@ -1940,7 +2088,33 @@ public class ContratService {
             FormuleGarantiePersonne formuleGarantiePersonne,
             GarantieMontants montants
     ) {
-        return contratGarantieRepository.save(ContratGarantie.builder()
+        return contratGarantieRepository.save(buildContratGarantie(
+                contrat,
+                garantie,
+                vehicule,
+                remorque,
+                client,
+                ligneGrilleTarifaire,
+                modeSelectionne,
+                sourceValeurSelectionnee,
+                formuleGarantiePersonne,
+                montants
+        ));
+    }
+
+    private ContratGarantie buildContratGarantie(
+            Contrat contrat,
+            Garantie garantie,
+            Vehicule vehicule,
+            Remorque remorque,
+            Client client,
+            LigneGrilleTarifaire ligneGrilleTarifaire,
+            ModeTarificationGarantie modeSelectionne,
+            SourceValeurGarantie sourceValeurSelectionnee,
+            FormuleGarantiePersonne formuleGarantiePersonne,
+            GarantieMontants montants
+    ) {
+        return ContratGarantie.builder()
                 .contrat(contrat)
                 .garantie(garantie)
                 .vehicule(vehicule)
@@ -1966,7 +2140,7 @@ public class ContratService {
                 .prime(montants.prime())
                 .tauxFranchise(montants.tauxFranchise())
                 .franchiseMinimale(montants.franchiseMinimale())
-                .build());
+                .build();
     }
 
     @Transactional
@@ -5477,14 +5651,26 @@ public class ContratService {
         if (garantiesActives.isEmpty()) {
             return null;
         }
-        int unitesCnpac = countCnpacUnits(garantiesActives, vehiculesActifs, remorquesActives);
+        return calculateDraftQuittance(contrat, garantiesActives, vehiculesActifs, remorquesActives);
+    }
+
+    private QuittanceResponse calculateDraftQuittance(
+            Contrat contrat,
+            List<ContratGarantie> garanties,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques
+    ) {
+        if (contrat.getDateEffet() == null || garanties == null || garanties.isEmpty()) {
+            return null;
+        }
+        int unitesCnpac = countCnpacUnits(garanties, vehicules, remorques);
         QuittanceCalculService.Resultat calcul = quittanceCalculService.calculer(
-                contrat, null, garantiesActives, unitesCnpac, contrat.getDateEffet());
+                contrat, null, garanties, unitesCnpac, contrat.getDateEffet());
         List<QuittanceResponse.TargetSummary> targetSummaries = elementFacturableCibleService.calculer(
                 contrat,
-                garantiesActives,
-                vehiculesActifs,
-                remorquesActives,
+                garanties,
+                vehicules,
+                remorques,
                 contrat.getDateEffet()
         );
         return QuittanceResponse.builder()
@@ -5501,11 +5687,68 @@ public class ContratService {
                 .cnpac(calcul.cnpac())
                 .primeTotale(calcul.primeTotale())
                 .lignes(calcul.lignes().stream().map(this::toQuittanceLigneResponse).toList())
-                .garanties(garantiesActives.stream()
-                        .map(garantie -> toQuittanceGarantieResponse(garantie, vehiculesActifs, remorquesActives))
+                .garanties(garanties.stream()
+                        .map(garantie -> toQuittanceGarantieResponse(garantie, vehicules, remorques))
                         .toList())
                 .targetSummaries(targetSummaries)
                 .build();
+    }
+
+    private boolean sameTariffSnapshot(ContratGarantie left, ContratGarantie right) {
+        return sameEntity(left.getLigneGrilleTarifaire(), right.getLigneGrilleTarifaire())
+                && sameEntity(left.getFormuleGarantiePersonne(), right.getFormuleGarantiePersonne())
+                && left.getModeSelectionne() == right.getModeSelectionne()
+                && left.getSourceValeurSelectionnee() == right.getSourceValeurSelectionnee()
+                && sameAmount(left.getValeurVenale(), right.getValeurVenale())
+                && sameAmount(left.getValeurNeuf(), right.getValeurNeuf())
+                && sameAmount(left.getValeurGlace(), right.getValeurGlace())
+                && Objects.equals(left.getFormule(), right.getFormule())
+                && sameAmount(left.getMontantDeces(), right.getMontantDeces())
+                && sameAmount(left.getMontantInvalidite(), right.getMontantInvalidite())
+                && sameAmount(left.getMontantFraisMedicaux(), right.getMontantFraisMedicaux())
+                && sameAmount(left.getMontantFraisHospitalisation(), right.getMontantFraisHospitalisation())
+                && sameAmount(left.getMontantFraisFuneraires(), right.getMontantFraisFuneraires())
+                && sameAmount(left.getMontantFraisChirurgie(), right.getMontantFraisChirurgie())
+                && sameAmount(left.getAccessoire(), right.getAccessoire())
+                && sameAmount(left.getCapital(), right.getCapital())
+                && sameAmount(left.getTaux(), right.getTaux())
+                && sameAmount(left.getPrime(), right.getPrime())
+                && sameAmount(left.getTauxFranchise(), right.getTauxFranchise())
+                && sameAmount(left.getFranchiseMinimale(), right.getFranchiseMinimale());
+    }
+
+    private void applyTariffSnapshot(ContratGarantie target, ContratGarantie source) {
+        target.setLigneGrilleTarifaire(source.getLigneGrilleTarifaire());
+        target.setModeSelectionne(source.getModeSelectionne());
+        target.setSourceValeurSelectionnee(source.getSourceValeurSelectionnee());
+        target.setFormuleGarantiePersonne(source.getFormuleGarantiePersonne());
+        target.setValeurVenale(source.getValeurVenale());
+        target.setValeurNeuf(source.getValeurNeuf());
+        target.setValeurGlace(source.getValeurGlace());
+        target.setFormule(source.getFormule());
+        target.setMontantDeces(source.getMontantDeces());
+        target.setMontantInvalidite(source.getMontantInvalidite());
+        target.setMontantFraisMedicaux(source.getMontantFraisMedicaux());
+        target.setMontantFraisHospitalisation(source.getMontantFraisHospitalisation());
+        target.setMontantFraisFuneraires(source.getMontantFraisFuneraires());
+        target.setMontantFraisChirurgie(source.getMontantFraisChirurgie());
+        target.setAccessoire(source.getAccessoire());
+        target.setCapital(source.getCapital());
+        target.setTaux(source.getTaux());
+        target.setPrime(source.getPrime());
+        target.setTauxFranchise(source.getTauxFranchise());
+        target.setFranchiseMinimale(source.getFranchiseMinimale());
+    }
+
+    private boolean sameEntity(BaseEntity left, BaseEntity right) {
+        return Objects.equals(left == null ? null : left.getId(), right == null ? null : right.getId());
+    }
+
+    private boolean sameAmount(BigDecimal left, BigDecimal right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.compareTo(right) == 0;
     }
 
     private QuittanceResponse buildSavedQuittanceGenerale(Contrat contrat) {
@@ -6918,6 +7161,13 @@ public class ContratService {
             String typeQuittance,
             BigDecimal primeNette,
             BigDecimal primeTotale
+    ) {
+    }
+
+    private record DraftTariffRecalculation(
+            RecalculTarifsBrouillonResponse response,
+            List<ContratGarantie> garantiesActuelles,
+            List<ContratGarantie> garanties
     ) {
     }
 

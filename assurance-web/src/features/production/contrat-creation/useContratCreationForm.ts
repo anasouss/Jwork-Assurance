@@ -655,6 +655,38 @@ export function useContratCreationForm(
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
 
+  const tariffRecalculationPreviewMutation = useMutation({
+    mutationFn: async () => {
+      if (!draftId) {
+        throw new Error("Brouillon introuvable");
+      }
+      return contractCreationApi.previewDraftTariffRecalculation(draftId);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Prévisualisation impossible"),
+  });
+
+  const tariffRecalculationMutation = useMutation({
+    mutationFn: async () => {
+      if (!draftId) {
+        throw new Error("Brouillon introuvable");
+      }
+      return contractCreationApi.applyDraftTariffRecalculation(draftId);
+    },
+    onSuccess: async (draft) => {
+      const hydrated = hydrateDraft(draft);
+      setGaranties(hydrated.garanties);
+      setPreview(hydrated.preview);
+      setTargetPreview(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["contrat-draft", draftId] }),
+        queryClient.invalidateQueries({ queryKey: ["lignes-grille"] }),
+        queryClient.invalidateQueries({ queryKey: ["formules-garantie-personne"] }),
+        queryClient.invalidateQueries({ queryKey: ["referentiel", "tarifs-usage"] }),
+      ]);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Recalcul impossible"),
+  });
+
   const validateRequiredGuaranteePrimes = (errors: Record<string, string>) => {
     if (typeContrat !== "PARTICULIER" || !request.saisiePrimeNette) {
       return;
@@ -1268,6 +1300,8 @@ export function useContratCreationForm(
     createMutation,
     saveDraftMutation,
     saveTargetDraftMutation,
+    tariffRecalculationPreviewMutation,
+    tariffRecalculationMutation,
     handlePreview,
     handlePreviewTarget,
     handleCreate,

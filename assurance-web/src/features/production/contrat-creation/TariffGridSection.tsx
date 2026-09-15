@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Plus, Settings } from "lucide-react";
+import { Edit, Plus, RefreshCw, Settings, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { pricingApi } from "../api/pricing";
@@ -32,6 +41,7 @@ export function TariffGridSection({
   const [configuratorOpen, setConfiguratorOpen] = useState(false);
   const [editingGrille, setEditingGrille] = useState<ReferenceOption | null>(null);
   const [selectedUsageId, setSelectedUsageId] = useState("");
+  const [recalculationDialogOpen, setRecalculationDialogOpen] = useState(false);
 
   const filteredGrilles = (form.refs.grilles.data ?? []).filter(
     (grille) => !form.compagnieAssuranceId || grille.compagnieAssuranceId === form.compagnieAssuranceId
@@ -139,6 +149,20 @@ export function TariffGridSection({
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
+          {form.draftId && (form.draftQuery.data?.garanties?.length ?? 0) > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!selectedGrille || form.tariffRecalculationPreviewMutation.isPending}
+              onClick={() => form.tariffRecalculationPreviewMutation.mutate(undefined, {
+                onSuccess: () => setRecalculationDialogOpen(true),
+              })}
+            >
+              <RefreshCw className={form.tariffRecalculationPreviewMutation.isPending ? "size-4 animate-spin" : "size-4"} />
+              Recalculer tous les véhicules
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -223,6 +247,20 @@ export function TariffGridSection({
         }}
       />
 
+      <TariffRecalculationDialog
+        open={recalculationDialogOpen}
+        onOpenChange={setRecalculationDialogOpen}
+        preview={form.tariffRecalculationPreviewMutation.data}
+        applying={form.tariffRecalculationMutation.isPending}
+        onApply={() => form.tariffRecalculationMutation.mutate(undefined, {
+          onSuccess: () => {
+            setRecalculationDialogOpen(false);
+            form.tariffRecalculationPreviewMutation.reset();
+            toast.success("Tarifs recalculés pour tous les véhicules");
+          },
+        })}
+      />
+
       <Sheet open={configuratorOpen} onOpenChange={setConfiguratorOpen}>
         <SheetContent side="right" className="w-[min(96vw,1180px)] overflow-y-auto sm:max-w-none">
           <SheetHeader>
@@ -245,6 +283,82 @@ export function TariffGridSection({
         </SheetContent>
       </Sheet>
     </SectionCard>
+  );
+}
+
+function TariffRecalculationDialog({
+  open,
+  onOpenChange,
+  preview,
+  applying,
+  onApply,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  preview?: import("../types").DraftTariffRecalculation;
+  applying: boolean;
+  onApply: () => void;
+}) {
+  const difference = (preview?.apres?.primeTotale ?? 0) - (preview?.avant?.primeTotale ?? 0);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Recalculer tous les véhicules</DialogTitle>
+          <DialogDescription>
+            Les garanties enregistrées seront recalculées depuis la grille actuelle. Les véhicules, les choix de garanties et les assistances seront conservés.
+          </DialogDescription>
+        </DialogHeader>
+
+        {preview?.blocages.length ? (
+          <Alert variant="destructive">
+            <TriangleAlert />
+            <AlertTitle>Recalcul impossible</AlertTitle>
+            <AlertDescription>
+              {preview.blocages.map((blocker) => <p key={blocker}>{blocker}</p>)}
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 rounded-md border p-3 text-sm">
+            <TariffAmount label="Total actuel" value={preview?.avant?.primeTotale} />
+            <TariffAmount label="Nouveau total" value={preview?.apres?.primeTotale} emphasized />
+            <TariffAmount label="Écart" value={difference} emphasized={difference !== 0} />
+          </div>
+        )}
+
+        {preview?.applicable && !preview.recalculNecessaire ? (
+          <p className="text-sm text-muted-foreground">Les tarifs enregistrés sont déjà à jour.</p>
+        ) : null}
+        {preview?.recalculNecessaire ? (
+          <p className="text-sm text-muted-foreground">
+            {preview.nombreGarantiesModifiees} garantie(s) seront actualisées. Cette opération ne modifie pas les assistances.
+          </p>
+        ) : null}
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>
+            Annuler
+          </Button>
+          <Button
+            type="button"
+            onClick={onApply}
+            disabled={!preview?.applicable || !preview.recalculNecessaire || applying}
+          >
+            <RefreshCw className={applying ? "size-4 animate-spin" : "size-4"} />
+            Appliquer le recalcul
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TariffAmount({ label, value, emphasized = false }: { label: string; value?: number | null; emphasized?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={emphasized ? "font-semibold tabular-nums" : "tabular-nums"}>{money(value)} MAD</div>
+    </div>
   );
 }
 

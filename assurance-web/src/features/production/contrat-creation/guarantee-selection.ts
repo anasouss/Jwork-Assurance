@@ -26,6 +26,13 @@ export function sameGuaranteeTarget(item: GarantieInput, target?: GuaranteeTarge
     : item.remorqueIndex === target.index;
 }
 
+export function isGuaranteeSelectionComplete(item: GarantieInput) {
+  if (String(item.modeSelectionne ?? "").toUpperCase() === "PROTECTION") {
+    return Boolean(item.formuleGarantiePersonneId);
+  }
+  return item.prime != null;
+}
+
 export function removeGuaranteeExclusionConflicts(
   selected: GarantieInput[],
   garanties: ReferenceOption[],

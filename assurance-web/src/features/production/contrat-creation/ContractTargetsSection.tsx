@@ -13,7 +13,11 @@ import type { ContratSectionKey } from "./useContratCreationForm";
 import { RemorqueForm, VehicleForm } from "./ContractTargetForms";
 import { TargetGuaranteesTable } from "./TargetGuaranteesTable";
 import { contractTargetKey as targetKey, guaranteeCalculationKey } from "./contract-target-key";
-import { sameGuaranteeTarget as sameTarget, targetedGuaranteeInput } from "./guarantee-selection";
+import {
+  isGuaranteeSelectionComplete,
+  sameGuaranteeTarget as sameTarget,
+  targetedGuaranteeInput,
+} from "./guarantee-selection";
 import {
   previewForTarget,
   remapAssistancesAfterVehicleRemoval,
@@ -26,6 +30,7 @@ export type ContractTarget = {
   entityId?: string;
   label: string;
   usageId?: string;
+  usageCode?: string;
   categorieTransportId?: string;
   valeurVenale?: number;
   valeurNeuf?: number;
@@ -172,6 +177,7 @@ export function ContractTargetsSection({
         entityId: vehicule.vehiculeId == null ? undefined : String(vehicule.vehiculeId),
         label: vehicleTargetLabel(vehicule, index),
         usageId: vehicule.usageId,
+        usageCode: usages.find((usage) => usage.id === vehicule.usageId)?.code,
         categorieTransportId: vehicule.categorieTransportId,
         valeurVenale: vehicule.valeurVenale,
         valeurNeuf: vehicule.valeurNeuf,
@@ -186,7 +192,7 @@ export function ContractTargetsSection({
         valeurAssuree: remorque.valeurAssuree,
       })),
     ],
-    [remorques, vehicules]
+    [remorques, usages, vehicules]
   );
   const [activeKey, setActiveKey] = useState(targetKey(targets[0]));
   const [activeTargetPart, setActiveTargetPart] = useState<"info" | "garanties">("info");
@@ -414,7 +420,14 @@ export function ContractTargetsSection({
                         )}
                         onClick={() => setActiveKey(targetKey(target))}
                       >
-                        <span className="font-medium">{target.label}</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          {target.usageCode ? (
+                            <Badge variant="outline" className="h-5 shrink-0 bg-background px-1.5 text-[10px]">
+                              {target.usageCode}
+                            </Badge>
+                          ) : null}
+                          <span className="truncate font-medium">{target.label}</span>
+                        </span>
                         <TargetStatusBadge saved={saved} count={selectedGaranties.filter((item) => sameTarget(item, target)).length} />
                       </button>
                     );
@@ -879,7 +892,7 @@ function targetSaved(
     return false;
   }
   const targetGaranties = selected.filter((item) => sameTarget(item, target));
-  return targetGaranties.length > 0 && targetGaranties.every((item) => item.prime != null);
+  return targetGaranties.length > 0 && targetGaranties.every(isGuaranteeSelectionComplete);
 }
 
 function vehicleTargetLabel(vehicule: VehiculeInput, index: number) {

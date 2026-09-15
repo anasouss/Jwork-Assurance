@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GarantieInput, ReferenceOption } from "../types";
 import {
+  isGuaranteeSelectionComplete,
   removeGuaranteeExclusionConflicts,
   sameGuaranteeTarget,
   targetedGuaranteeInput,
@@ -24,6 +25,21 @@ describe("guarantee target selection", () => {
     expect(sameGuaranteeTarget(item, { kind: "vehicule", index: 1 })).toBe(true);
     expect(sameGuaranteeTarget(item, { kind: "vehicule", index: 0 })).toBe(false);
     expect(sameGuaranteeTarget(item, { kind: "remorque", index: 1 })).toBe(false);
+  });
+
+  it("accepts a person guarantee with a formula even when it has no premium", () => {
+    expect(isGuaranteeSelectionComplete({
+      garantieId: "PP",
+      modeSelectionne: "PROTECTION",
+      formuleGarantiePersonneId: "14",
+    })).toBe(true);
+  });
+
+  it("requires a premium for a priced vehicle guarantee", () => {
+    expect(isGuaranteeSelectionComplete({
+      garantieId: "RC",
+      modeSelectionne: "TAUX",
+    })).toBe(false);
   });
 
   it("removes an incompatible guarantee only from the active target", () => {

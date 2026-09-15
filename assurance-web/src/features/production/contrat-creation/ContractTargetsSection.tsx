@@ -177,7 +177,7 @@ export function ContractTargetsSection({
         entityId: vehicule.vehiculeId == null ? undefined : String(vehicule.vehiculeId),
         label: vehicleTargetLabel(vehicule, index),
         usageId: vehicule.usageId,
-        usageCode: usages.find((usage) => usage.id === vehicule.usageId)?.code,
+        usageCode: usages.find((usage) => usage.id === vehicule.usageId)?.code ?? undefined,
         categorieTransportId: vehicule.categorieTransportId,
         valeurVenale: vehicule.valeurVenale,
         valeurNeuf: vehicule.valeurNeuf,

@@ -684,14 +684,16 @@ export function useContratCreationForm(
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
 
-  const tariffRecalculationPreviewMutation = useMutation({
-    mutationFn: async () => {
-      if (!draftId) {
-        throw new Error("Brouillon introuvable");
-      }
-      return contractCreationApi.previewDraftTariffRecalculation(draftId);
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Prévisualisation impossible"),
+  const tariffRecalculationPreviewQuery = useQuery({
+    queryKey: ["contrat-draft", draftId, "tariff-recalculation-preview"],
+    queryFn: () => contractCreationApi.previewDraftTariffRecalculation(draftId ?? ""),
+    enabled: Boolean(
+      draftId
+      && typeContrat === "FLOTTE"
+      && grilleTarifaireId
+      && (draftQuery.data?.garanties?.length ?? 0) > 0
+    ),
+    retry: false,
   });
 
   const tariffRecalculationMutation = useMutation({
@@ -1329,7 +1331,7 @@ export function useContratCreationForm(
     createMutation,
     saveDraftMutation,
     saveTargetDraftMutation,
-    tariffRecalculationPreviewMutation,
+    tariffRecalculationPreviewQuery,
     tariffRecalculationMutation,
     handlePreview,
     handlePreviewTarget,

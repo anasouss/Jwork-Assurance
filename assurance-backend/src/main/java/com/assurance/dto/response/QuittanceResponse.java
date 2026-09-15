@@ -61,6 +61,14 @@ public class QuittanceResponse {
         private String modeSelectionne;
         private String sourceValeurSelectionnee;
         private Long formuleGarantiePersonneId;
+        private String formule;
+        private BigDecimal montantDeces;
+        private BigDecimal montantInvalidite;
+        private BigDecimal montantFraisMedicaux;
+        private BigDecimal montantFraisHospitalisation;
+        private BigDecimal montantFraisFuneraires;
+        private BigDecimal montantFraisChirurgie;
+        private BigDecimal accessoire;
         private BigDecimal capital;
         private BigDecimal valeurVenale;
         private BigDecimal valeurNeuf;

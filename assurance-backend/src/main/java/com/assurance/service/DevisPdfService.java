@@ -245,11 +245,11 @@ public class DevisPdfService {
             table.addCell(valueCell(formatDate(vehicule.getDatePremiereCirculation()), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(pfOrPtc(vehicule), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(value(vehicule.getCarburant(), "").toUpperCase(Locale.ROOT), TextAlignment.CENTER, rowBackground));
-            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurNeuf()), TextAlignment.RIGHT, rowBackground));
-            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurVenale()), TextAlignment.RIGHT, rowBackground));
-            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurGlace()), TextAlignment.RIGHT, rowBackground));
+            table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurNeuf()), TextAlignment.CENTER, rowBackground));
+            table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurVenale()), TextAlignment.CENTER, rowBackground));
+            table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurGlace()), TextAlignment.CENTER, rowBackground));
             if (hasDcCapitalColumn) {
-                table.addCell(valueCell(formatMoneyOrEmpty(capitalFor(byCode.get("DC"))), TextAlignment.RIGHT, rowBackground));
+                table.addCell(valueCell(formatInsuredValueOrEmpty(capitalFor(byCode.get("DC"))), TextAlignment.CENTER, rowBackground));
             }
 
             for (String code : codes) {
@@ -779,6 +779,15 @@ public class DevisPdfService {
 
     private static String formatMoneyOrEmpty(BigDecimal value) {
         return value == null || value.compareTo(BigDecimal.ZERO) == 0 ? "" : formatMoney(value);
+    }
+
+    private static String formatInsuredValueOrEmpty(BigDecimal value) {
+        if (value == null || value.compareTo(BigDecimal.ZERO) == 0) {
+            return "";
+        }
+        DecimalFormat format = decimalFormat();
+        format.applyPattern("#,##0.00");
+        return format.format(value);
     }
 
     private static String formatMoney(BigDecimal value) {

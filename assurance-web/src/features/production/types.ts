@@ -887,6 +887,14 @@ export type QuittancePreview = {
     modeSelectionne?: string;
     sourceValeurSelectionnee?: string;
     formuleGarantiePersonneId?: string;
+    formule?: string;
+    montantDeces?: number;
+    montantInvalidite?: number;
+    montantFraisMedicaux?: number;
+    montantFraisHospitalisation?: number;
+    montantFraisFuneraires?: number;
+    montantFraisChirurgie?: number;
+    accessoire?: number;
     capital?: number;
     valeurVenale?: number;
     valeurNeuf?: number;

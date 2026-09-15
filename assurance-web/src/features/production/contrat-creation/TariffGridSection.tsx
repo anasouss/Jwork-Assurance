@@ -24,7 +24,13 @@ import { GrilleTarifaireDialog } from "../components/GrilleTarifaireDialog";
 import { SectionCard } from "../components/SectionCard";
 import { grilleTarifaireSchema } from "../schemas";
 import { money, text } from "../utils/format";
-import type { ReferenceOption, UpsertGrilleTarifaireRequest } from "../types";
+import type {
+  ContratSummary,
+  DraftTariffRecalculation,
+  QuittancePreview,
+  ReferenceOption,
+  UpsertGrilleTarifaireRequest,
+} from "../types";
 import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
 export function TariffGridSection({
@@ -49,6 +55,10 @@ export function TariffGridSection({
   const selectedGrille = filteredGrilles.find((grille) => grille.id === form.grilleTarifaireId) ?? null;
   const usageOptions = form.availableUsages;
   const allowedUsageIds = usageOptions.map((usage) => usage.id);
+  const recalculationPreview = form.tariffRecalculationPreviewQuery.data;
+  const showRecalculationAction = Boolean(
+    recalculationPreview?.recalculNecessaire || recalculationPreview?.blocages.length
+  );
 
   const lignes = useQuery({
     queryKey: ["lignes-grille", "contrat-summary", form.grilleTarifaireId],
@@ -149,18 +159,16 @@ export function TariffGridSection({
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
-          {form.draftId && (form.draftQuery.data?.garanties?.length ?? 0) > 0 ? (
+          {showRecalculationAction ? (
             <Button
               type="button"
               size="sm"
               variant="outline"
-              disabled={!selectedGrille || form.tariffRecalculationPreviewMutation.isPending}
-              onClick={() => form.tariffRecalculationPreviewMutation.mutate(undefined, {
-                onSuccess: () => setRecalculationDialogOpen(true),
-              })}
+              disabled={!selectedGrille}
+              onClick={() => setRecalculationDialogOpen(true)}
             >
-              <RefreshCw className={form.tariffRecalculationPreviewMutation.isPending ? "size-4 animate-spin" : "size-4"} />
-              Recalculer tous les véhicules
+              {recalculationPreview?.blocages.length ? <TriangleAlert className="size-4" /> : <RefreshCw className="size-4" />}
+              {recalculationPreview?.blocages.length ? "Vérifier les tarifs" : "Recalculer tous les véhicules"}
             </Button>
           ) : null}
           <Button
@@ -250,12 +258,12 @@ export function TariffGridSection({
       <TariffRecalculationDialog
         open={recalculationDialogOpen}
         onOpenChange={setRecalculationDialogOpen}
-        preview={form.tariffRecalculationPreviewMutation.data}
+        preview={recalculationPreview}
+        draft={form.draftQuery.data}
         applying={form.tariffRecalculationMutation.isPending}
         onApply={() => form.tariffRecalculationMutation.mutate(undefined, {
           onSuccess: () => {
             setRecalculationDialogOpen(false);
-            form.tariffRecalculationPreviewMutation.reset();
             toast.success("Tarifs recalculés pour tous les véhicules");
           },
         })}
@@ -276,7 +284,10 @@ export function TariffGridSection({
                 categoriesTransport={form.refs.categoriesTransport.data ?? []}
                 allowedUsageIds={allowedUsageIds}
                 queryScope={`flotte-${form.draftId ?? selectedGrille.id}`}
-                onSaved={() => setConfiguratorOpen(false)}
+                onSaved={() => {
+                  setConfiguratorOpen(false);
+                  void form.tariffRecalculationPreviewQuery.refetch();
+                }}
               />
             ) : null}
           </div>
@@ -290,19 +301,22 @@ function TariffRecalculationDialog({
   open,
   onOpenChange,
   preview,
+  draft,
   applying,
   onApply,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  preview?: import("../types").DraftTariffRecalculation;
+  preview?: DraftTariffRecalculation;
+  draft?: ContratSummary;
   applying: boolean;
   onApply: () => void;
 }) {
   const difference = (preview?.apres?.primeTotale ?? 0) - (preview?.avant?.primeTotale ?? 0);
+  const guaranteeChanges = tariffGuaranteeChanges(preview, draft);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Recalculer tous les véhicules</DialogTitle>
           <DialogDescription>
@@ -319,7 +333,7 @@ function TariffRecalculationDialog({
             </AlertDescription>
           </Alert>
         ) : (
-          <div className="grid grid-cols-3 gap-3 rounded-md border p-3 text-sm">
+          <div className="grid grid-cols-1 gap-3 rounded-md border p-3 text-sm sm:grid-cols-3">
             <TariffAmount label="Total actuel" value={preview?.avant?.primeTotale} />
             <TariffAmount label="Nouveau total" value={preview?.apres?.primeTotale} emphasized />
             <TariffAmount label="Écart" value={difference} emphasized={difference !== 0} />
@@ -330,9 +344,33 @@ function TariffRecalculationDialog({
           <p className="text-sm text-muted-foreground">Les tarifs enregistrés sont déjà à jour.</p>
         ) : null}
         {preview?.recalculNecessaire ? (
-          <p className="text-sm text-muted-foreground">
-            {preview.nombreGarantiesModifiees} garantie(s) seront actualisées. Cette opération ne modifie pas les assistances.
-          </p>
+          <div className="grid gap-2">
+            <p className="text-sm text-muted-foreground">
+              {preview.nombreGarantiesModifiees} garantie(s) seront actualisées. Cette opération ne modifie pas les assistances.
+            </p>
+            <div className="max-h-72 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Véhicule</TableHead>
+                    <TableHead>Garantie</TableHead>
+                    <TableHead>Modifications</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {guaranteeChanges.map((change) => (
+                    <TableRow key={change.key}>
+                      <TableCell className="whitespace-nowrap align-top font-medium">{change.target}</TableCell>
+                      <TableCell className="align-top">{change.guarantee}</TableCell>
+                      <TableCell className="min-w-[260px] align-top text-xs">
+                        {change.fields.map((field) => <div key={field}>{field}</div>)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         ) : null}
 
         <DialogFooter>
@@ -351,6 +389,114 @@ function TariffRecalculationDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+type TariffGuarantee = NonNullable<QuittancePreview["garanties"]>[number];
+
+function tariffGuaranteeChanges(preview?: DraftTariffRecalculation, draft?: ContratSummary) {
+  const before = new Map((preview?.avant?.garanties ?? []).map((item) => [tariffGuaranteeKey(item), item]));
+  return (preview?.apres?.garanties ?? []).flatMap((after) => {
+    const key = tariffGuaranteeKey(after);
+    const current = before.get(key);
+    const fields = changedTariffFields(current, after);
+    if (fields.length === 0) {
+      return [];
+    }
+    return [{
+      key,
+      target: tariffTargetLabel(after, draft),
+      guarantee: [after.code, after.libelle].filter(Boolean).join(" - ") || "Garantie",
+      fields,
+    }];
+  });
+}
+
+function tariffGuaranteeKey(guarantee: TariffGuarantee) {
+  return [
+    guarantee.vehiculeIndex == null ? "" : `v${guarantee.vehiculeIndex}`,
+    guarantee.remorqueIndex == null ? "" : `r${guarantee.remorqueIndex}`,
+    guarantee.garantieId ?? guarantee.code ?? "",
+  ].join(":");
+}
+
+function tariffTargetLabel(guarantee: TariffGuarantee, draft?: ContratSummary) {
+  if (guarantee.vehiculeIndex != null) {
+    const vehicle = draft?.vehicules?.[guarantee.vehiculeIndex];
+    const registration = vehicle?.immatriculation || `Véhicule ${guarantee.vehiculeIndex + 1}`;
+    return vehicle?.usageCode ? `${vehicle.usageCode} · ${registration}` : registration;
+  }
+  if (guarantee.remorqueIndex != null) {
+    const trailer = draft?.remorques?.[guarantee.remorqueIndex];
+    const registration = trailer?.immatriculation || `Remorque ${guarantee.remorqueIndex + 1}`;
+    return trailer?.usageCode ? `${trailer.usageCode} · ${registration}` : registration;
+  }
+  return "Contrat";
+}
+
+function changedTariffFields(before: TariffGuarantee | undefined, after: TariffGuarantee) {
+  if (!before) {
+    return ["Nouvelle tarification appliquée"];
+  }
+  const changes: string[] = [];
+  pushTextChange(changes, "Mode", before.modeSelectionne, after.modeSelectionne);
+  pushTextChange(changes, "Base", sourceLabel(before.sourceValeurSelectionnee), sourceLabel(after.sourceValeurSelectionnee));
+  pushTextChange(changes, "Formule", before.formule, after.formule);
+  pushAmountChange(changes, "Décès", before.montantDeces, after.montantDeces);
+  pushAmountChange(changes, "Invalidité", before.montantInvalidite, after.montantInvalidite);
+  pushAmountChange(changes, "Frais médicaux", before.montantFraisMedicaux, after.montantFraisMedicaux);
+  pushAmountChange(changes, "Hospitalisation", before.montantFraisHospitalisation, after.montantFraisHospitalisation);
+  pushAmountChange(changes, "Frais funéraires", before.montantFraisFuneraires, after.montantFraisFuneraires);
+  pushAmountChange(changes, "Chirurgie", before.montantFraisChirurgie, after.montantFraisChirurgie);
+  pushAmountChange(changes, "Accessoire", before.accessoire, after.accessoire);
+  pushAmountChange(changes, "Valeur vénale", before.valeurVenale, after.valeurVenale);
+  pushAmountChange(changes, "Valeur à neuf", before.valeurNeuf, after.valeurNeuf);
+  pushAmountChange(changes, "Valeur glace", before.valeurGlace, after.valeurGlace);
+  pushAmountChange(changes, "Capital", before.capital, after.capital);
+  pushPercentChange(changes, "Taux", before.taux, after.taux);
+  pushAmountChange(changes, "Prime", before.primeNette ?? before.primeAnnuelle, after.primeNette ?? after.primeAnnuelle);
+  pushPercentChange(changes, "Franchise", before.tauxFranchise, after.tauxFranchise);
+  pushAmountChange(changes, "Franchise minimale", before.franchiseMinimale, after.franchiseMinimale);
+  if (before.formuleGarantiePersonneId !== after.formuleGarantiePersonneId) {
+    changes.push("Formule tarifaire modifiée");
+  }
+  if (changes.length === 0 && before.ligneGrilleTarifaireId !== after.ligneGrilleTarifaireId) {
+    changes.push("Ligne tarifaire mise à jour");
+  }
+  return changes;
+}
+
+function pushTextChange(changes: string[], label: string, before?: string, after?: string) {
+  if ((before ?? "") !== (after ?? "")) {
+    changes.push(`${label} : ${before || "-"} → ${after || "-"}`);
+  }
+}
+
+function pushAmountChange(changes: string[], label: string, before?: number, after?: number) {
+  if (!sameNumber(before, after)) {
+    changes.push(`${label} : ${money(before)} → ${money(after)}`);
+  }
+}
+
+function pushPercentChange(changes: string[], label: string, before?: number, after?: number) {
+  if (!sameNumber(before, after)) {
+    changes.push(`${label} : ${percentValue(before)} → ${percentValue(after)}`);
+  }
+}
+
+function sameNumber(before?: number, after?: number) {
+  if (before == null || after == null) {
+    return before == null && after == null;
+  }
+  return Math.abs(before - after) < 0.000001;
+}
+
+function sourceLabel(source?: string) {
+  if (source === "VENALE") return "Valeur vénale";
+  if (source === "NEUF") return "Valeur à neuf";
+  if (source === "GLACE") return "Valeur glace";
+  if (source === "MANUELLE") return "Saisie manuelle";
+  if (source === "AUCUNE") return "Aucune";
+  return source ?? "";
 }
 
 function TariffAmount({ label, value, emphasized = false }: { label: string; value?: number | null; emphasized?: boolean }) {

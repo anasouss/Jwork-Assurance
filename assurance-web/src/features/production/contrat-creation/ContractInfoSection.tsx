@@ -283,12 +283,7 @@ export function ContractInfoSection({
               <Field label="Fractionnement">
                 <Select
                   value={form.fractionnement}
-                  onValueChange={(value) => {
-                    form.setFractionnement(value as CreateContratRequest["fractionnement"]);
-                    if (value !== "ANNUEL") {
-                      form.setEcheance(undefined);
-                    }
-                  }}
+                  onValueChange={(value) => form.setFractionnement(value as CreateContratRequest["fractionnement"])}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

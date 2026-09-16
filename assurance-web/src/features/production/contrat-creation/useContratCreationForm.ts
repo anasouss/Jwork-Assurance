@@ -258,7 +258,9 @@ export function useContratCreationForm(
     ? selectedConventionEcheance
     : echeance;
   const showContractEcheance = typeRenouvellement === "renouvelable"
-    && (typeContrat === "CONVENTION" ? conventionHasFixedEcheance : fractionnement === "ANNUEL");
+    && (typeContrat === "CONVENTION"
+      ? conventionHasFixedEcheance
+      : typeContrat === "FLOTTE" || fractionnement === "ANNUEL");
   const lockDateEcheance = showContractEcheance || conventionUsesPeriodicite;
 
   const lignesGrille = useQuery({
@@ -1302,14 +1304,14 @@ export function useContratCreationForm(
   }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement]);
 
   useEffect(() => {
-    if (showContractEcheance || conventionUsesPeriodicite || !dateEffet) {
+    if (typeContrat === "FLOTTE" || showContractEcheance || conventionUsesPeriodicite || !dateEffet) {
       return;
     }
     const computed = computeDateEcheanceFromMonths(dateEffet, monthsFromFractionnement(fractionnement));
     if (computed && computed !== dateEcheance) {
       setDateEcheance(computed);
     }
-  }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement, showContractEcheance]);
+  }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement, showContractEcheance, typeContrat]);
 
   return {
     typeContrat,

@@ -250,17 +250,16 @@ public class CalculGarantieService {
         if (tarif == null || tarif.getPrimeNette() == null) {
             return null;
         }
-        BigDecimal prime = tarifUsageAjustementService.resolvePrimeNette(
-                tarif,
-                resolveTarifReferenceDate(contrat, vehicule == null ? null : vehicule.getDateEffet())
-        );
-        if (prime == null) {
-            return null;
-        }
+        BigDecimal prime = tarif.getPrimeNette();
         BigDecimal nombrePlaces = parsePositiveDecimal(vehicule.getNombrePlaces());
         if (tarif.getPrimeParPlace() != null && nombrePlaces != null) {
             prime = prime.add(tarif.getPrimeParPlace().multiply(nombrePlaces));
         }
+        prime = tarifUsageAjustementService.resolveMontantAjuste(
+                tarif,
+                resolveTarifReferenceDate(contrat, vehicule.getDateEffet()),
+                prime
+        );
         prime = prime.multiply(resolveProrata(contrat, vehicule, null, garantie));
         prime = prime.multiply(resolveCrm(vehicule.getCrm()));
         prime = prime.multiply(resolveCoefficientSahara(contrat));

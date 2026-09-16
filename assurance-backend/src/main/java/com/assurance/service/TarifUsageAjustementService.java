@@ -88,14 +88,27 @@ public class TarifUsageAjustementService {
 
     @Transactional(readOnly = true)
     public BigDecimal resolvePrimeNette(TarifUsage tarif, LocalDate referenceDate) {
+        return resolveMontantAjuste(
+                tarif,
+                referenceDate,
+                tarif == null ? null : tarif.getPrimeNette()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal resolveMontantAjuste(
+            TarifUsage tarif,
+            LocalDate referenceDate,
+            BigDecimal montantInitial
+    ) {
         if (tarif == null || tarif.getId() == null) {
-            return tarif == null ? null : tarif.getPrimeNette();
+            return montantInitial;
         }
         LocalDate reference = referenceDate == null ? LocalDate.now() : referenceDate;
         return ligneRepository.findApplicable(tarif.getId(), reference, PageRequest.of(0, 1)).stream()
-                .map(LigneAjustementTarifUsage::getPrimeNetteAppliquee)
+                .map(line -> applyAdjustment(line.getAjustement(), montantInitial))
                 .findFirst()
-                .orElse(tarif.getPrimeNette());
+                .orElse(montantInitial);
     }
 
     @Transactional(readOnly = true)
@@ -188,6 +201,13 @@ public class TarifUsageAjustementService {
                     : initial.add(value);
         }
         return money(adjusted.max(BigDecimal.ZERO));
+    }
+
+    private BigDecimal applyAdjustment(AjustementTarifUsage adjustment, BigDecimal initial) {
+        if (adjustment == null || adjustment.getTypeOperation() == TypeOperationTarifUsage.REINITIALISATION) {
+            return money(initial);
+        }
+        return adjust(initial, adjustment.getTypeCalcul(), adjustment.getSens(), adjustment.getValeur());
     }
 
     private AjustementTarifUsageResponse toResponse(

@@ -1,18 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowLeftRight,
   Banknote,
-  CalendarClock,
-  CreditCard,
-  Landmark,
   Plus,
-  ReceiptText,
-  Repeat2,
   Trash2,
-  type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -44,7 +37,6 @@ type PaymentMethodDraft = {
   key: string;
   mode: ClientPaymentMode;
   montant: string;
-  dateInstrument: string;
   dateEcheance: string;
   referenceInstrument: string;
   banqueEmettrice: string;
@@ -54,15 +46,12 @@ type PaymentMethodDraft = {
 const paymentModes: Array<{
   value: ClientPaymentMode;
   label: string;
-  icon: LucideIcon;
 }> = [
-  { value: "ESPECES", label: "Espèces", icon: Banknote },
-  { value: "CHEQUE", label: "Chèque", icon: ReceiptText },
-  { value: "EFFET", label: "Effet", icon: CalendarClock },
-  { value: "VIREMENT", label: "Virement", icon: ArrowLeftRight },
-  { value: "VERSEMENT_BANCAIRE", label: "Versement", icon: Landmark },
-  { value: "CARTE", label: "Carte", icon: CreditCard },
-  { value: "PRELEVEMENT", label: "Prélèvement", icon: Repeat2 },
+  { value: "ESPECES", label: "Espèces" },
+  { value: "CHEQUE", label: "Chèque" },
+  { value: "EFFET", label: "Effet" },
+  { value: "VIREMENT", label: "Virement" },
+  { value: "VERSEMENT_BANCAIRE", label: "Versement" },
 ];
 
 export default function NouveauReglementClientPage() {
@@ -78,7 +67,6 @@ export default function NouveauReglementClientPage() {
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([newPaymentMethod()]);
-  const initializedAmount = useRef(false);
 
   const receivables = useQuery({
     queryKey: ["compta", "client-receivable-selection", selection],
@@ -101,14 +89,6 @@ export default function NouveauReglementClientPage() {
   const activeBankAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "BANQUE"
   );
-
-  useEffect(() => {
-    if (initializedAmount.current || selectedTotal <= 0) return;
-    initializedAmount.current = true;
-    setMethods((current) => current.map((method, index) => index === 0
-      ? { ...method, montant: money(selectedTotal) }
-      : method));
-  }, [selectedTotal]);
 
   const createPayment = useMutation({
     mutationFn: () => comptaApi.createClientPayment(buildRequest(
@@ -186,14 +166,22 @@ export default function NouveauReglementClientPage() {
         </Button>
       </header>
 
-      <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-4">
-        <SummaryCell label="Éléments" value={String(rows.length)} />
-        <SummaryCell label="Total sélectionné" value={money(selectedTotal)} />
-        <SummaryCell label="Montant du règlement" value={money(paymentTotal)} />
+      <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-3">
+        <SummaryCell
+          label="Total quittances"
+          value={money(selectedTotal)}
+          detail={itemCount(rows.length)}
+          tone="quittance"
+        />
+        <SummaryCell
+          label="Total des encaissements"
+          value={money(paymentTotal)}
+          tone="payment"
+        />
         <SummaryCell
           label={remainingAmount >= 0 ? "Solde restant" : "Dépassement"}
           value={money(Math.abs(remainingAmount))}
-          tone={remainingAmount < 0 ? "danger" : "default"}
+          tone={remainingAmount < 0 ? "danger" : "balance"}
         />
       </section>
 
@@ -239,16 +227,8 @@ export default function NouveauReglementClientPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 rounded-md border bg-card p-4">
-        <div className="grid max-w-64 gap-2">
-          <Label>Date du règlement</Label>
-          <DatePicker
-            date={dateReglement}
-            onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+      <section className="overflow-hidden rounded-md border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <h2 className="font-semibold">Moyens de règlement</h2>
           <Button
             type="button"
@@ -261,46 +241,65 @@ export default function NouveauReglementClientPage() {
           </Button>
         </div>
 
-        {methods.map((method, index) => (
-          <section key={method.key} className="grid gap-4 rounded-md border p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold">Moyen {index + 1}</h3>
-              {methods.length > 1 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  title="Supprimer ce moyen"
-                  onClick={() => setMethods((current) => current.filter(
-                    (item) => item.key !== method.key
-                  ))}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              ) : null}
-            </div>
+        <div className="grid gap-4 p-4">
+          <div className="grid max-w-64 gap-2">
+            <Label>Date du règlement</Label>
+            <DatePicker
+              date={dateReglement}
+              onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
+            />
+          </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-              {paymentModes.map(({ value, label, icon: Icon }) => {
-                const active = method.mode === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={active}
-                    className={active
-                      ? "flex h-16 items-center justify-center gap-2 rounded-md border border-amber-500 bg-amber-50 px-3 text-sm font-medium text-amber-950 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:text-amber-100"
-                      : "flex h-16 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground"}
-                    onClick={() => changeMethod(method, value)}
-                  >
-                    <Icon className="size-4 shrink-0" />
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="divide-y border-t">
+            {methods.map((method, index) => (
+              <section key={method.key} className="grid gap-4 py-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="grid min-w-56 gap-2">
+                    <Label htmlFor={`payment-mode-${method.key}`}>Mode de règlement {index + 1}</Label>
+                    <Select
+                      value={method.mode}
+                      onValueChange={(value) => changeMethod(method, value as ClientPaymentMode)}
+                    >
+                      <SelectTrigger id={`payment-mode-${method.key}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentModes.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {methods.length > 1 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Supprimer ce moyen"
+                      onClick={() => setMethods((current) => current.filter(
+                        (item) => item.key !== method.key
+                      ))}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  ) : null}
+                </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {requiresPaymentReference(method.mode) ? (
+                <div className="grid gap-2">
+                  <Label>Référence</Label>
+                  <Input
+                    value={method.referenceInstrument}
+                    onChange={(event) => updateMethod(
+                      method.key,
+                      { referenceInstrument: event.target.value }
+                    )}
+                  />
+                </div>
+              ) : null}
               <div className="grid gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <Label>Montant</Label>
@@ -332,15 +331,6 @@ export default function NouveauReglementClientPage() {
                   )}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>Date du moyen de paiement</Label>
-                <DatePicker
-                  date={method.dateInstrument}
-                  onSelect={(value) => updateMethod(method.key, {
-                    dateInstrument: toDateOnly(value) ?? "",
-                  })}
-                />
-              </div>
               {method.mode === "EFFET" ? (
                 <div className="grid gap-2">
                   <Label>Date d’échéance</Label>
@@ -365,16 +355,18 @@ export default function NouveauReglementClientPage() {
                 />
               ) : (
                 <>
-                  <div className="grid gap-2">
-                    <Label>Référence</Label>
-                    <Input
-                      value={method.referenceInstrument}
-                      onChange={(event) => updateMethod(
-                        method.key,
-                        { referenceInstrument: event.target.value }
-                      )}
-                    />
-                  </div>
+                  {!requiresPaymentReference(method.mode) ? (
+                    <div className="grid gap-2">
+                      <Label>Référence</Label>
+                      <Input
+                        value={method.referenceInstrument}
+                        onChange={(event) => updateMethod(
+                          method.key,
+                          { referenceInstrument: event.target.value }
+                        )}
+                      />
+                    </div>
+                  ) : null}
                   {requiresBankAccountAtEntry(method.mode) ? (
                     <AccountSelect
                       accounts={accounts.data ?? []}
@@ -423,16 +415,18 @@ export default function NouveauReglementClientPage() {
                 Aucun compte bancaire actif n’est disponible.
               </div>
             ) : null}
-          </section>
-        ))}
+              </section>
+            ))}
+          </div>
 
-        <div className="grid gap-2 border-t pt-4">
-          <Label>Notes</Label>
-          <Textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            className="min-h-24"
-          />
+          <div className="grid gap-2 border-t pt-4">
+            <Label>Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              className="min-h-24"
+            />
+          </div>
         </div>
       </section>
 
@@ -512,17 +506,22 @@ function AccountSelect(props: {
 function SummaryCell(props: {
   label: string;
   value: string;
-  tone?: "default" | "danger";
+  detail?: string;
+  tone: "quittance" | "payment" | "balance" | "danger";
 }) {
+  const toneClasses = {
+    quittance: "border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/15",
+    payment: "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/15",
+    balance: "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/15",
+    danger: "border-l-red-500 bg-red-50/50 dark:bg-red-950/15",
+  }[props.tone];
   return (
-    <div className="border-b px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+    <div className={`border-b border-l-4 px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 ${toneClasses}`}>
       <div className="text-xs uppercase text-muted-foreground">{props.label}</div>
-      <div className={props.tone === "danger"
-        ? "mt-1 font-semibold text-red-600"
-        : "mt-1 font-semibold"}
-      >
+      <div className={props.tone === "danger" ? "mt-1 text-lg font-semibold text-red-600" : "mt-1 text-lg font-semibold"}>
         {props.value}
       </div>
+      {props.detail ? <div className="mt-0.5 text-xs text-muted-foreground">{props.detail}</div> : null}
     </div>
   );
 }
@@ -568,7 +567,7 @@ function buildRequest(
     return {
       mode: method.mode,
       montant: numeric(method.montant),
-      dateInstrument: method.dateInstrument || dateReglement,
+      dateInstrument: dateReglement,
       dateEcheance: method.dateEcheance || undefined,
       referenceInstrument: method.referenceInstrument.trim() || undefined,
       banqueEmettrice: method.banqueEmettrice.trim() || undefined,
@@ -591,7 +590,6 @@ function newPaymentMethod(): PaymentMethodDraft {
     key: crypto.randomUUID(),
     mode: "ESPECES",
     montant: "",
-    dateInstrument: today,
     dateEcheance: "",
     referenceInstrument: "",
     banqueEmettrice: "",

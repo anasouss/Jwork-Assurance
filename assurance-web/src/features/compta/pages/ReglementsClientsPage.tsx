@@ -89,6 +89,16 @@ export default function ReglementsClientsPage() {
   const selectedRows = Object.values(selected);
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const payerKey = selectedRows[0] ? sourcePayerKey(selectedRows[0]) : null;
+  const pageRows = result?.rows ?? [];
+  const pagePayerKeys = new Set(pageRows.map(sourcePayerKey));
+  const selectablePageRows = payerKey
+    ? pageRows.filter((row) => sourcePayerKey(row) === payerKey)
+    : pagePayerKeys.size === 1 ? pageRows : [];
+  const selectedOnPage = selectablePageRows.filter(
+    (row) => Boolean(selected[receivableTargetKey(row)])
+  ).length;
+  const allPageSelected = selectablePageRows.length > 0
+    && selectedOnPage === selectablePageRows.length;
 
   function toggle(row: ClientReceivable, checked: boolean) {
     if (checked && payerKey && sourcePayerKey(row) !== payerKey) {
@@ -103,6 +113,23 @@ export default function ReglementsClientsPage() {
       } else {
         delete next[key];
       }
+      return next;
+    });
+  }
+
+  function togglePage(checked: boolean) {
+    if (checked && selectablePageRows.length === 0) {
+      toast.error("Les éléments visibles appartiennent à plusieurs payeurs");
+      return;
+    }
+    setSelected((current) => {
+      const next = { ...current };
+      const rows = checked ? selectablePageRows : pageRows;
+      rows.forEach((row) => {
+        const key = receivableTargetKey(row);
+        if (checked) next[key] = row;
+        else delete next[key];
+      });
       return next;
     });
   }
@@ -292,7 +319,17 @@ export default function ReglementsClientsPage() {
               <table className="w-full min-w-[1180px] text-sm">
                 <thead className="bg-orange-600 text-xs uppercase text-white">
                   <tr>
-                    <th className="w-12 px-3 py-3" />
+                    <th className="w-12 px-3 py-3 text-center">
+                      <Checkbox
+                        aria-label="Sélectionner les éléments de cette page"
+                        checked={allPageSelected
+                          ? true
+                          : selectedOnPage > 0 ? "indeterminate" : false}
+                        disabled={pageRows.length === 0 || selectablePageRows.length === 0}
+                        onCheckedChange={(value) => togglePage(value === true)}
+                        className="border-white data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-orange-600 data-[state=indeterminate]:border-white data-[state=indeterminate]:bg-white data-[state=indeterminate]:text-orange-600"
+                      />
+                    </th>
                     <SortableHeader label="Payeur" column="PAYER" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <SortableHeader label="Police" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <th className="px-3 py-3 text-left">Nature</th>

@@ -372,7 +372,7 @@ export default function RelevesFacturesPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px] text-sm">
+                <table className="w-full min-w-[1180px] border-collapse text-sm [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r [&_th:not(:last-child)]:border-white/35">
                   <thead className="border-y bg-amber-600 text-white">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left">

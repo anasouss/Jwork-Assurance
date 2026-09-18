@@ -130,7 +130,7 @@ public class ReleveClientPdfRenderer {
         top.addCell(brand);
 
         PdfFormXObject qrObject = new BarcodeQRCode(source.getNumero()).createFormXObject(ColorConstants.BLACK, pdf);
-        Image qr = new Image(qrObject).setWidth(96).setHeight(96)
+        Image qr = new Image(qrObject).setWidth(84).setHeight(84)
                 .setHorizontalAlignment(HorizontalAlignment.CENTER);
         top.addCell(borderless(new Cell()).add(qr).setTextAlignment(TextAlignment.CENTER));
         document.add(top);
@@ -155,7 +155,7 @@ public class ReleveClientPdfRenderer {
                 .setBorder(TABLE_BORDER)
                 .setPadding(3));
         Cell recipientDetails = new Cell()
-                .add(new Paragraph(address(source.getPayeurAdresse()))
+                .add(new Paragraph(address(source.getPayeurAdresse()).toUpperCase(Locale.FRENCH))
                         .setFontSize(9.5f)
                         .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))

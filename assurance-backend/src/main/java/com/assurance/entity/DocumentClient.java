@@ -99,6 +99,9 @@ public class DocumentClient extends AuditedEntity {
     @Column(name = "payeur_identifiant", length = 160)
     private String payeurIdentifiant;
 
+    @Column(name = "payeur_ice", length = 40)
+    private String payeurIce;
+
     @Column(name = "payeur_adresse", length = 500)
     private String payeurAdresse;
 

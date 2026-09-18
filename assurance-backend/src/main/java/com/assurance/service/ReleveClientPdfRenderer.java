@@ -1,13 +1,17 @@
 package com.assurance.service;
 
 import com.assurance.entity.Agence;
+import com.assurance.entity.Contrat;
+import com.assurance.entity.ContratClient;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.LigneDocumentClient;
 import com.assurance.enums.NatureElementFacturable;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeDocumentClient;
 import com.assurance.exception.BadRequestException;
+import com.assurance.repository.ContratClientRepository;
 import com.itextpdf.barcodes.BarcodeQRCode;
 import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.io.image.ImageDataFactory;
@@ -46,9 +50,12 @@ import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -65,6 +72,7 @@ public class ReleveClientPdfRenderer {
     private final AgencySignatureStorageService agencySignatureStorageService;
     private final FlottePolicePdfService flottePolicePdfService;
     private final DocumentClientLineLabelService lineLabelService;
+    private final ContratClientRepository contratClientRepository;
 
     public byte[] render(DocumentClient source, boolean avecSignature) throws Exception {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
@@ -146,7 +154,7 @@ public class ReleveClientPdfRenderer {
                 .setMargin(0))
                 .setBorder(TABLE_BORDER)
                 .setPadding(3));
-        recipient.addCell(new Cell()
+        Cell recipientDetails = new Cell()
                 .add(new Paragraph(address(source.getPayeurAdresse()))
                         .setFontSize(9.5f)
                         .setTextAlignment(TextAlignment.CENTER)
@@ -156,7 +164,18 @@ public class ReleveClientPdfRenderer {
                 .setBorderRight(TABLE_BORDER)
                 .setBorderBottom(TABLE_BORDER)
                 .setBorderLeft(TABLE_BORDER)
-                .setPaddings(8, 3, 4, 3));
+                .setPaddings(8, 3, 4, 3);
+        String payerIce = payerIce(source);
+        if (isInvoice(source) && payerIce != null) {
+            recipientDetails.add(new Paragraph()
+                    .add(new com.itextpdf.layout.element.Text("ICE : ").setFont(bold))
+                    .add(payerIce)
+                    .setFontSize(9.5f)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginTop(5)
+                    .setMarginBottom(0));
+        }
+        recipient.addCell(recipientDetails);
         document.add(recipient);
     }
 
@@ -202,7 +221,7 @@ public class ReleveClientPdfRenderer {
         subject.add(new com.itextpdf.layout.element.Text("Votre relevé de primes d'assurance").setFont(bold));
         document.add(subject);
 
-        document.add(new Paragraph("Chères Mesdames, Chers Messieurs,")
+        document.add(new Paragraph("Cher client,")
                 .setFontSize(10f)
                 .setMarginLeft(7)
                 .setMarginBottom(7));
@@ -262,7 +281,7 @@ public class ReleveClientPdfRenderer {
                 .setWidth(UnitValue.createPercentValue(100))
                 .setKeepTogether(false);
         addHeader(table, "L’assuré", tableHeader);
-        addHeader(table, "Police / référence", tableHeader);
+        addHeader(table, "Police", tableHeader);
         addHeader(table, "Du", tableHeader);
         addHeader(table, "Au", tableHeader);
         addHeader(table, "Prime Nette", tableHeader);
@@ -272,9 +291,17 @@ public class ReleveClientPdfRenderer {
         addHeader(table, "Reste à payer", tableHeader);
         addHeader(table, "Libellé", tableHeader);
 
+        Map<Long, String> subscriberNames = subscriberNames(source);
         source.getLignes().stream()
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
-                .forEach(line -> addStatementLine(table, source, line, bold, fleetAnnexes.get(line)));
+                .forEach(line -> addStatementLine(
+                        table,
+                        source,
+                        line,
+                        bold,
+                        fleetAnnexes.get(line),
+                        subscriberNames
+                ));
         document.add(table);
     }
 
@@ -288,7 +315,7 @@ public class ReleveClientPdfRenderer {
         Table table = new Table(new float[]{14, 8, 8, 22, 9, 8, 8, 10})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setKeepTogether(false);
-        addHeader(table, "N° Police / référence", tableHeader);
+        addHeader(table, "Police", tableHeader);
         addHeader(table, "Date effet", tableHeader);
         addHeader(table, "Date exp.", tableHeader);
         addHeader(table, "Nature", tableHeader);
@@ -324,10 +351,16 @@ public class ReleveClientPdfRenderer {
             DocumentClient source,
             LigneDocumentClient line,
             PdfFont bold,
-            Integer fleetAnnexNumber
+            Integer fleetAnnexNumber,
+            Map<Long, String> subscriberNames
     ) {
         BigDecimal balance = money(line.getDebit()).subtract(money(line.getCredit()));
-        addValue(table, source.getPayeurNom(), TextAlignment.LEFT, null);
+        Contrat contract = contract(line);
+        String subscriberName = contract == null ? null : subscriberNames.get(contract.getId());
+        String insuredName = subscriberName == null || subscriberName.isBlank()
+                ? source.getPayeurNom()
+                : subscriberName;
+        addValue(table, insuredName, TextAlignment.LEFT, null);
         addValue(table, statementReference(line), TextAlignment.CENTER, null);
         addValue(table, date(line.getDateOperation()), TextAlignment.CENTER, null);
         addValue(table, date(line.getDateEcheance()), TextAlignment.CENTER, null);
@@ -337,6 +370,40 @@ public class ReleveClientPdfRenderer {
         addValue(table, positiveAmount(line.getCredit()), TextAlignment.CENTER, null);
         addValue(table, amount(balance), TextAlignment.CENTER, bold);
         addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null);
+    }
+
+    private Map<Long, String> subscriberNames(DocumentClient source) {
+        Set<Long> contractIds = source.getLignes().stream()
+                .map(this::contract)
+                .filter(java.util.Objects::nonNull)
+                .map(Contrat::getId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (contractIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, ContratClient> subscribers = new HashMap<>();
+        for (ContratClient link : contratClientRepository.findByContratIdInAndRole(
+                contractIds,
+                RoleClientContrat.SOUSCRIPTEUR
+        )) {
+            Long contractId = link.getContrat().getId();
+            ContratClient current = subscribers.get(contractId);
+            if (current == null || Boolean.TRUE.equals(link.getPrincipalPourRole())) {
+                subscribers.put(contractId, link);
+            }
+        }
+        return subscribers.entrySet().stream()
+                .filter(entry -> entry.getValue().getClient() != null)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> value(entry.getValue().getClient().getNomAffichage())
+                ));
+    }
+
+    private Contrat contract(LigneDocumentClient line) {
+        return line.getElementFacturable() == null ? null : line.getElementFacturable().getContrat();
     }
 
     private Map<LigneDocumentClient, Integer> fleetAnnexes(DocumentClient source) {
@@ -422,7 +489,7 @@ public class ReleveClientPdfRenderer {
     }
 
     private void addValue(Table table, String text, TextAlignment alignment, PdfFont font) {
-        Paragraph paragraph = new Paragraph(value(text)).setFontSize(7.6f).setMargin(0);
+        Paragraph paragraph = new Paragraph(value(text)).setFontSize(7.2f).setMargin(0);
         if (font != null) {
             paragraph.setFont(font);
         }
@@ -661,6 +728,18 @@ public class ReleveClientPdfRenderer {
 
     private String value(String value) {
         return value == null || value.isBlank() ? "-" : value.trim();
+    }
+
+    private String payerIce(DocumentClient source) {
+        if (source.getPayeurIce() != null && !source.getPayeurIce().isBlank()) {
+            return source.getPayeurIce().trim();
+        }
+        if (source.getClientPayeur() == null
+                || source.getClientPayeur().getIce() == null
+                || source.getClientPayeur().getIce().isBlank()) {
+            return null;
+        }
+        return source.getClientPayeur().getIce().trim();
     }
 
     private Cell borderless(Cell cell) {

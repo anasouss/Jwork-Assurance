@@ -337,6 +337,7 @@ public class DocumentClientService {
                 .groupePayeur(payer.group())
                 .payeurNom(payer.name())
                 .payeurIdentifiant(payer.identifier())
+                .payeurIce(payer.ice())
                 .payeurAdresse(payer.address())
                 .totalDebit(ZERO)
                 .totalCredit(ZERO)
@@ -615,6 +616,7 @@ public class DocumentClientService {
                     group,
                     firstNonBlank(name, group.getLibelle(), "Groupe client"),
                     firstNonBlank(group.getCode(), treasury == null ? null : clientIdentifier(treasury)),
+                    treasury == null ? null : trimToNull(treasury.getIce()),
                     treasury == null ? null : clientAddress(treasury)
             );
         }
@@ -631,6 +633,7 @@ public class DocumentClientService {
                 null,
                 firstNonBlank(payer.getNomAffichage(), "Client"),
                 clientIdentifier(payer),
+                trimToNull(payer.getIce()),
                 clientAddress(payer)
         );
     }
@@ -932,6 +935,7 @@ public class DocumentClientService {
             GroupeClient group,
             String name,
             String identifier,
+            String ice,
             String address
     ) {
     }

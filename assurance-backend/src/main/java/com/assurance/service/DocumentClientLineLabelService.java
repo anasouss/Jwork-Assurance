@@ -60,7 +60,7 @@ public class DocumentClientLineLabelService {
                     .map(this::vehicleDescriptor)
                     .orElse("");
             if (!movementVehicle.isBlank()) {
-                return "Police automobile : " + movementVehicle;
+                return "Police Auto : " + movementVehicle;
             }
         }
         if (line.getElementFacturable() != null && line.getElementFacturable().getContrat() != null) {
@@ -70,10 +70,10 @@ public class DocumentClientLineLabelService {
                     .findFirst()
                     .map(this::vehicleDescriptor)
                     .filter(value -> !value.isBlank())
-                    .map(value -> "Police automobile : " + value)
-                    .orElse("Police automobile");
+                    .map(value -> "Police Auto : " + value)
+                    .orElse("Police Auto");
         }
-        return "Police automobile";
+        return "Police Auto";
     }
 
     private Long movementId(LigneDocumentClient line) {

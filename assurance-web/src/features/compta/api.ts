@@ -278,7 +278,9 @@ export const comptaApi = {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
     brancheId?: string;
+    compagnieId?: string;
     typeContrat?: TypeContrat;
+    documentState?: "SANS_DOCUMENT" | "RELEVE" | "FACTURE";
     dateDu?: string;
     dateAu?: string;
     search?: string;
@@ -300,6 +302,11 @@ export const comptaApi = {
         mouvementId: row.mouvementId == null ? null : String(row.mouvementId),
         payeurId: String(row.payeurId),
         souscripteurId: row.souscripteurId == null ? null : String(row.souscripteurId),
+        assureId: row.assureId == null ? null : String(row.assureId),
+        documents: (row.documents ?? []).map((document) => ({
+          ...document,
+          id: String(document.id),
+        })),
       })),
     };
   },

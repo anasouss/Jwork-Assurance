@@ -4,6 +4,7 @@ import com.assurance.entity.LigneDocumentClient;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeDocumentClient;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,6 +31,19 @@ public interface LigneDocumentClientRepository extends JpaRepository<LigneDocume
     List<Long> findElementFacturableIdsAlreadyIssued(
             @Param("elementIds") Collection<Long> elementIds,
             @Param("type") TypeDocumentClient type,
+            @Param("statut") StatutDocumentClient statut
+    );
+
+    @EntityGraph(attributePaths = "document")
+    @Query("""
+            select l
+            from LigneDocumentClient l
+            where l.elementFacturable.id in :elementIds
+              and l.document.statut = :statut
+            order by l.document.dateEmission desc, l.document.id desc
+            """)
+    List<LigneDocumentClient> findIssuedDocumentsByElementIds(
+            @Param("elementIds") Collection<Long> elementIds,
             @Param("statut") StatutDocumentClient statut
     );
 

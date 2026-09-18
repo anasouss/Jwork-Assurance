@@ -4,13 +4,16 @@ export type ReleveTab = "sources" | "documents";
 
 export type SourceFilters = {
   brancheId: string;
+  compagnieId: string;
   typeContrat: "ALL" | TypeContrat;
+  documentState: "ALL" | "SANS_DOCUMENT" | "RELEVE" | "FACTURE";
   dateDu: string;
   dateAu: string;
   search: string;
 };
 
 export type DocumentFilters = {
+  type: "ALL" | ClientDocumentType;
   statut: "ALL" | ClientDocumentStatus;
   dateDu: string;
   dateAu: string;
@@ -18,8 +21,7 @@ export type DocumentFilters = {
 };
 
 export type ReleveSearchState = {
-  operationType: ClientDocumentType;
-  payerScope: "ALL" | "CLIENT" | "GROUPE";
+  payerScope: "CLIENT" | "GROUPE";
   payerType: "CLIENT" | "GROUPE";
   payerId: string;
   tab: ReleveTab;
@@ -31,13 +33,16 @@ export type ReleveSearchState = {
 
 export const SOURCE_DEFAULTS: SourceFilters = {
   brancheId: "ALL",
+  compagnieId: "ALL",
   typeContrat: "ALL",
+  documentState: "ALL",
   dateDu: "",
   dateAu: "",
   search: "",
 };
 
 export const DOCUMENT_DEFAULTS: DocumentFilters = {
+  type: "ALL",
   statut: "ALL",
   dateDu: "",
   dateAu: "",
@@ -50,26 +55,28 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
   const payerId = params.get("payeurId") ?? "";
   const payerType = params.get("payeurType") === "GROUPE" ? "GROUPE" : "CLIENT";
   const requestedScope = params.get("cible");
-  const payerScope = requestedScope === "CLIENT" || requestedScope === "GROUPE"
-    ? requestedScope
-    : payerId
-      ? payerType
-      : "ALL";
+  const payerScope = requestedScope === "GROUPE" ? "GROUPE" : payerType;
   return {
-    operationType: params.get("operationType") === "FACTURE" ? "FACTURE" : "RELEVE",
     payerScope,
     payerType,
     payerId,
     tab: params.get("tab") === "documents" ? "documents" : "sources",
     sourceFilters: {
       brancheId: params.get("sourceBrancheId") ?? "ALL",
+      compagnieId: params.get("sourceCompagnieId") ?? "ALL",
       typeContrat: isContractType(sourceType) ? sourceType : "ALL",
+      documentState: isDocumentState(params.get("sourceDocumentState"))
+        ? params.get("sourceDocumentState") as SourceFilters["documentState"]
+        : "ALL",
       dateDu: validDate(params.get("sourceDateDu")),
       dateAu: validDate(params.get("sourceDateAu")),
       search: params.get("sourceSearch") ?? "",
     },
     sourcePage: pageFromParam(params.get("sourcePage")),
     documentFilters: {
+      type: params.get("documentType") === "RELEVE" || params.get("documentType") === "FACTURE"
+        ? params.get("documentType") as ClientDocumentType
+        : "ALL",
       statut: documentStatus === "EMIS" || documentStatus === "ANNULE" ? documentStatus : "ALL",
       dateDu: validDate(params.get("documentDateDu")),
       dateAu: validDate(params.get("documentDateAu")),
@@ -81,8 +88,7 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
 
 export function releveSearchParams(state: ReleveSearchState) {
   const params = new URLSearchParams();
-  if (state.operationType === "FACTURE") params.set("operationType", "FACTURE");
-  if (state.payerScope !== "ALL") params.set("cible", state.payerScope);
+  params.set("cible", state.payerScope);
   if (state.payerType === "GROUPE") params.set("payeurType", "GROUPE");
   if (state.payerId) params.set("payeurId", state.payerId);
   if (state.tab === "documents") params.set("tab", "documents");
@@ -93,11 +99,18 @@ export function releveSearchParams(state: ReleveSearchState) {
   if (state.sourceFilters.brancheId !== "ALL") {
     params.set("sourceBrancheId", state.sourceFilters.brancheId);
   }
+  if (state.sourceFilters.compagnieId !== "ALL") {
+    params.set("sourceCompagnieId", state.sourceFilters.compagnieId);
+  }
+  if (state.sourceFilters.documentState !== "ALL") {
+    params.set("sourceDocumentState", state.sourceFilters.documentState);
+  }
   if (state.sourceFilters.dateDu) params.set("sourceDateDu", state.sourceFilters.dateDu);
   if (state.sourceFilters.dateAu) params.set("sourceDateAu", state.sourceFilters.dateAu);
   if (state.sourceFilters.search.trim()) params.set("sourceSearch", state.sourceFilters.search.trim());
   if (state.sourcePage > 0) params.set("sourcePage", String(state.sourcePage + 1));
 
+  if (state.documentFilters.type !== "ALL") params.set("documentType", state.documentFilters.type);
   if (state.documentFilters.statut !== "ALL") params.set("documentStatut", state.documentFilters.statut);
   if (state.documentFilters.dateDu) params.set("documentDateDu", state.documentFilters.dateDu);
   if (state.documentFilters.dateAu) params.set("documentDateAu", state.documentFilters.dateAu);
@@ -108,6 +121,10 @@ export function releveSearchParams(state: ReleveSearchState) {
 
 function isContractType(value: string | null): value is TypeContrat {
   return value === "PARTICULIER" || value === "CONVENTION" || value === "FLOTTE";
+}
+
+function isDocumentState(value: string | null): value is SourceFilters["documentState"] {
+  return value === "SANS_DOCUMENT" || value === "RELEVE" || value === "FACTURE";
 }
 
 function validDate(value: string | null) {

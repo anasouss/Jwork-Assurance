@@ -49,12 +49,15 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               and e.actif = true
               and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
               and c.prospection = false
-              and not exists (
-                    select 1
-                    from LigneDocumentClient invoiceLine
-                    where invoiceLine.elementFacturable = e
-                      and invoiceLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
-                      and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              and (
+                    :includeInvoiced = true
+                    or not exists (
+                        select 1
+                        from LigneDocumentClient invoiceLine
+                        where invoiceLine.elementFacturable = e
+                          and invoiceLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+                          and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                    )
               )
               and coalesce((
                     select sum(paymentAllocation.montant)
@@ -68,8 +71,33 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
               )
               and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
+              and (
+                    :documentState is null
+                    or (
+                        :documentState = 'SANS_DOCUMENT'
+                        and not exists (
+                            select 1
+                            from LigneDocumentClient documentLine
+                            where documentLine.elementFacturable = e
+                              and documentLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                        )
+                    )
+                    or exists (
+                        select 1
+                        from LigneDocumentClient documentLine
+                        where documentLine.elementFacturable = e
+                          and documentLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                          and (
+                              (:documentState = 'RELEVE'
+                                  and documentLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.RELEVE)
+                              or (:documentState = 'FACTURE'
+                                  and documentLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE)
+                          )
+                    )
+              )
               and (:dateDu is null or e.dateDebut >= :dateDu)
               and (:dateAu is null or e.dateDebut <= :dateAu)
               and (
@@ -132,11 +160,10 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     or lower(coalesce(e.libelle, '')) like concat('%', :search, '%')
                     or exists (
                         select 1
-                        from LigneDocumentClient statementLine
-                        where statementLine.elementFacturable = e
-                          and statementLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.RELEVE
-                          and statementLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
-                          and lower(statementLine.document.numero) like concat('%', :search, '%')
+                        from LigneDocumentClient searchedDocumentLine
+                        where searchedDocumentLine.elementFacturable = e
+                          and searchedDocumentLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                          and lower(searchedDocumentLine.document.numero) like concat('%', :search, '%')
                     )
                     or lower(coalesce(pp.codeClient, '')) like concat('%', :search, '%')
                     or lower(coalesce(pp.raisonSociale, '')) like concat('%', :search, '%')
@@ -188,12 +215,15 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               and e.actif = true
               and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
               and c.prospection = false
-              and not exists (
-                    select 1
-                    from LigneDocumentClient invoiceLine
-                    where invoiceLine.elementFacturable = e
-                      and invoiceLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
-                      and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              and (
+                    :includeInvoiced = true
+                    or not exists (
+                        select 1
+                        from LigneDocumentClient invoiceLine
+                        where invoiceLine.elementFacturable = e
+                          and invoiceLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+                          and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                    )
               )
               and coalesce((
                     select sum(paymentAllocation.montant)
@@ -207,8 +237,33 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
               )
               and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
+              and (
+                    :documentState is null
+                    or (
+                        :documentState = 'SANS_DOCUMENT'
+                        and not exists (
+                            select 1
+                            from LigneDocumentClient documentLine
+                            where documentLine.elementFacturable = e
+                              and documentLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                        )
+                    )
+                    or exists (
+                        select 1
+                        from LigneDocumentClient documentLine
+                        where documentLine.elementFacturable = e
+                          and documentLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                          and (
+                              (:documentState = 'RELEVE'
+                                  and documentLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.RELEVE)
+                              or (:documentState = 'FACTURE'
+                                  and documentLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE)
+                          )
+                    )
+              )
               and (:dateDu is null or e.dateDebut >= :dateDu)
               and (:dateAu is null or e.dateDebut <= :dateAu)
               and (
@@ -271,11 +326,10 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     or lower(coalesce(e.libelle, '')) like concat('%', :search, '%')
                     or exists (
                         select 1
-                        from LigneDocumentClient statementLine
-                        where statementLine.elementFacturable = e
-                          and statementLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.RELEVE
-                          and statementLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
-                          and lower(statementLine.document.numero) like concat('%', :search, '%')
+                        from LigneDocumentClient searchedDocumentLine
+                        where searchedDocumentLine.elementFacturable = e
+                          and searchedDocumentLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                          and lower(searchedDocumentLine.document.numero) like concat('%', :search, '%')
                     )
                     or lower(coalesce(pp.codeClient, '')) like concat('%', :search, '%')
                     or lower(coalesce(pp.raisonSociale, '')) like concat('%', :search, '%')
@@ -320,7 +374,10 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
     Page<ElementFacturable> searchForClientDocuments(
             @Param("agenceId") Long agenceId,
             @Param("brancheId") Long brancheId,
+            @Param("compagnieId") Long compagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
+            @Param("documentState") String documentState,
+            @Param("includeInvoiced") boolean includeInvoiced,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("payeurType") String payeurType,

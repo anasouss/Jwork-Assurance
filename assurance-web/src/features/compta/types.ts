@@ -286,12 +286,19 @@ export type ClientDocumentSource = {
   payeurNom: string;
   souscripteurId?: string | null;
   souscripteurNom?: string | null;
+  assureId?: string | null;
+  assureNom?: string | null;
   primeNette: number;
   taxes: number;
   accessoires: number;
   montantTtc: number;
   dejaFacturee: boolean;
   facturable: boolean;
+  documents: Array<{
+    id: string;
+    type: ClientDocumentType;
+    numero: string;
+  }>;
 };
 
 export type PageInfo = {

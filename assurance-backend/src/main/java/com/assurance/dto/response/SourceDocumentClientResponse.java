@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Builder
@@ -30,10 +31,21 @@ public class SourceDocumentClientResponse {
     private String payeurNom;
     private Long souscripteurId;
     private String souscripteurNom;
+    private Long assureId;
+    private String assureNom;
     private BigDecimal primeNette;
     private BigDecimal taxes;
     private BigDecimal accessoires;
     private BigDecimal montantTtc;
     private boolean dejaFacturee;
     private boolean facturable;
+    private List<DocumentReference> documents;
+
+    @Getter
+    @Builder
+    public static class DocumentReference {
+        private Long id;
+        private com.assurance.enums.TypeDocumentClient type;
+        private String numero;
+    }
 }

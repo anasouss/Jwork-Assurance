@@ -294,6 +294,7 @@ export default function NouveauReglementClientPage() {
             type="button"
             size="sm"
             variant="outline"
+            className="border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100 hover:text-orange-900 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-200 dark:hover:bg-orange-950/50"
             onClick={addPaymentMethod}
           >
             <Plus className="size-4" />

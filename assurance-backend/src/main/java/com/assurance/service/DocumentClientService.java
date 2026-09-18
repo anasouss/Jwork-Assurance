@@ -58,6 +58,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -128,12 +129,34 @@ public class DocumentClientService {
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            Sort sort,
             int page,
             int size
     ) {
         return searchSources(
-                agenceId, payeurType, payeurId, brancheId, typeContrat,
-                dateDu, dateAu, search,
+                agenceId, payeurType, payeurId, brancheId, null, typeContrat, null,
+                dateDu, dateAu, search, false, sort, page, size
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public SourceDocumentClientPageResponse searchSources(
+            Long agenceId,
+            String payeurType,
+            Long payeurId,
+            Long brancheId,
+            Long compagnieId,
+            TypeContrat typeContrat,
+            String documentState,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search,
+            int page,
+            int size
+    ) {
+        return searchSources(
+                agenceId, payeurType, payeurId, brancheId, compagnieId, typeContrat, documentState,
+                dateDu, dateAu, search, true,
                 Sort.by(Sort.Direction.DESC, "dateDebut").and(Sort.by(Sort.Direction.DESC, "id")),
                 page, size
         );
@@ -145,21 +168,28 @@ public class DocumentClientService {
             String payeurType,
             Long payeurId,
             Long brancheId,
+            Long compagnieId,
             TypeContrat typeContrat,
+            String documentState,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            boolean includeInvoiced,
             Sort sort,
             int page,
             int size
     ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
+        String normalizedDocumentState = normalizeDocumentState(documentState);
         Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size), sort);
         Page<ElementFacturable> result = elementFacturableRepository.searchForClientDocuments(
                 agenceId,
                 brancheId,
+                compagnieId,
                 typeContrat,
+                normalizedDocumentState,
+                includeInvoiced,
                 dateDu,
                 dateAu,
                 payeurType,
@@ -174,6 +204,12 @@ public class DocumentClientService {
         Map<Long, Client> subscribers = loadSubscribersFromContracts(result.getContent().stream()
                 .map(ElementFacturable::getContrat)
                 .toList());
+        Map<Long, Client> insuredClients = loadClientsFromContracts(
+                result.getContent().stream().map(ElementFacturable::getContrat).toList(),
+                RoleClientContrat.PROPRIETAIRE
+        );
+        Map<Long, List<SourceDocumentClientResponse.DocumentReference>> documents =
+                loadDocumentReferences(pageIds);
         Set<Long> alreadyInvoiced = pageIds.isEmpty()
                 ? Set.of()
                 : new HashSet<>(ligneDocumentClientRepository.findElementFacturableIdsAlreadyIssued(
@@ -187,6 +223,8 @@ public class DocumentClientService {
                         source,
                         resolvePayer(source.element().getContrat(), subscribers),
                         subscribers.get(source.element().getContrat().getId()),
+                        insuredClients.get(source.element().getContrat().getId()),
+                        documents.getOrDefault(source.element().getId(), List.of()),
                         alreadyInvoiced
                 ))
                 .toList();
@@ -223,6 +261,12 @@ public class DocumentClientService {
         Map<Long, Client> subscribers = loadSubscribersFromContracts(elements.stream()
                 .map(ElementFacturable::getContrat)
                 .toList());
+        Map<Long, Client> insuredClients = loadClientsFromContracts(
+                elements.stream().map(ElementFacturable::getContrat).toList(),
+                RoleClientContrat.PROPRIETAIRE
+        );
+        Map<Long, List<SourceDocumentClientResponse.DocumentReference>> documents =
+                loadDocumentReferences(ids);
         Set<Long> alreadyInvoiced = new HashSet<>(
                 ligneDocumentClientRepository.findElementFacturableIdsAlreadyIssued(
                         ids,
@@ -236,6 +280,8 @@ public class DocumentClientService {
                         source,
                         resolvePayer(source.element().getContrat(), subscribers),
                         subscribers.get(source.element().getContrat().getId()),
+                        insuredClients.get(source.element().getContrat().getId()),
+                        documents.getOrDefault(source.element().getId(), List.of()),
                         alreadyInvoiced
                 ))
                 .collect(Collectors.toMap(
@@ -606,6 +652,13 @@ public class DocumentClientService {
     }
 
     private Map<Long, Client> loadSubscribersFromContracts(Collection<Contrat> contracts) {
+        return loadClientsFromContracts(contracts, RoleClientContrat.SOUSCRIPTEUR);
+    }
+
+    private Map<Long, Client> loadClientsFromContracts(
+            Collection<Contrat> contracts,
+            RoleClientContrat role
+    ) {
         Set<Long> contractIds = contracts.stream()
                 .map(Contrat::getId)
                 .collect(Collectors.toSet());
@@ -615,7 +668,7 @@ public class DocumentClientService {
         Map<Long, Client> result = new HashMap<>();
         for (ContratClient link : contratClientRepository.findByContratIdInAndRole(
                 contractIds,
-                RoleClientContrat.SOUSCRIPTEUR
+                role
         )) {
             Client current = result.get(link.getContrat().getId());
             if (current == null || Boolean.TRUE.equals(link.getPrincipalPourRole())) {
@@ -623,6 +676,42 @@ public class DocumentClientService {
             }
         }
         return result;
+    }
+
+    private Map<Long, List<SourceDocumentClientResponse.DocumentReference>> loadDocumentReferences(
+            Collection<Long> elementIds
+    ) {
+        if (elementIds.isEmpty()) {
+            return Map.of();
+        }
+        return ligneDocumentClientRepository.findIssuedDocumentsByElementIds(
+                        elementIds,
+                        StatutDocumentClient.EMIS
+                ).stream()
+                .collect(Collectors.groupingBy(
+                        line -> line.getElementFacturable().getId(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                line -> SourceDocumentClientResponse.DocumentReference.builder()
+                                        .id(line.getDocument().getId())
+                                        .type(line.getDocument().getTypeDocument())
+                                        .numero(line.getDocument().getNumero())
+                                        .build(),
+                                Collectors.toList()
+                        )
+                ));
+    }
+
+    private String normalizeDocumentState(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        normalized = normalized.toUpperCase(Locale.ROOT);
+        if (!Set.of("SANS_DOCUMENT", "RELEVE", "FACTURE").contains(normalized)) {
+            throw new BadRequestException("Filtre de document invalide");
+        }
+        return normalized;
     }
 
     private Payer resolvePayer(Contrat contract, Map<Long, Client> subscribers) {
@@ -665,6 +754,8 @@ public class DocumentClientService {
             BillableSource source,
             Payer payer,
             Client subscriber,
+            Client insuredClient,
+            List<SourceDocumentClientResponse.DocumentReference> documents,
             Set<Long> alreadyInvoiced
     ) {
         ElementFacturable element = source.element();
@@ -690,12 +781,19 @@ public class DocumentClientService {
                 .payeurNom(payer.name())
                 .souscripteurId(subscriber == null ? null : subscriber.getId())
                 .souscripteurNom(subscriber == null ? null : subscriber.getNomAffichage())
+                .assureId(insuredClient == null
+                        ? subscriber == null ? null : subscriber.getId()
+                        : insuredClient.getId())
+                .assureNom(insuredClient == null
+                        ? subscriber == null ? null : subscriber.getNomAffichage()
+                        : insuredClient.getNomAffichage())
                 .primeNette(money(element.getPrimeNette()))
                 .taxes(taxes(element))
                 .accessoires(accessories(element))
                 .montantTtc(ttc)
                 .dejaFacturee(alreadyInvoiced.contains(element.getId()))
                 .facturable(ttc.signum() > 0 && !alreadyInvoiced.contains(element.getId()))
+                .documents(documents)
                 .build();
     }
 

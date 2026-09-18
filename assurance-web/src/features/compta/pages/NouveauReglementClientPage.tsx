@@ -112,6 +112,7 @@ export default function NouveauReglementClientPage() {
   const rows = orderedRows;
   const selectedTotal = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
+  const allocatedAmounts = allocationByReceivable(rows, paymentTotal);
   const remainingAmount = round(selectedTotal - paymentTotal);
   const activeMethod = methods.find((method) => method.key === activeMethodKey) ?? methods[0];
   const activeCashAccounts = (accounts.data ?? []).filter(
@@ -246,42 +247,44 @@ export default function NouveauReglementClientPage() {
         collisionDetection={closestCenter}
         onDragEnd={reorderReceivables}
       >
-      <section className="overflow-hidden rounded-md border bg-card">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-orange-600 text-xs uppercase text-white">
-              <tr>
-                <th className="w-28 px-4 py-3 text-left">Priorité</th>
-                <th className="px-4 py-3 text-left">Police</th>
-                <th className="px-4 py-3 text-left">Nature</th>
-                <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-right">Solde ouvert</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              <SortableContext
-                items={rows.map(receivableTargetKey)}
-                strategy={verticalListSortingStrategy}
-              >
-                {rows.map((row, index) => (
-                  <SortableReceivableRow
-                    key={receivableTargetKey(row)}
-                    row={row}
-                    priority={index + 1}
-                  />
-                ))}
-              </SortableContext>
-              {receivables.isLoading ? (
+        <section className="overflow-hidden rounded-md border bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="bg-orange-600 text-xs uppercase text-white">
                 <tr>
-                  <td colSpan={5} className="h-24 text-center text-muted-foreground">
-                    Chargement...
-                  </td>
+                  <th className="w-28 px-4 py-3 text-left">Priorité</th>
+                  <th className="px-4 py-3 text-left">Police</th>
+                  <th className="px-4 py-3 text-left">Nature</th>
+                  <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-right">Solde ouvert</th>
+                  <th className="w-36 px-4 py-3 text-right">Affecté</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody className="divide-y">
+                <SortableContext
+                  items={rows.map(receivableTargetKey)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {rows.map((row, index) => (
+                    <SortableReceivableRow
+                      key={receivableTargetKey(row)}
+                      row={row}
+                      priority={index + 1}
+                      allocatedAmount={allocatedAmounts.get(receivableTargetKey(row)) ?? 0}
+                    />
+                  ))}
+                </SortableContext>
+                {receivables.isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="h-24 text-center text-muted-foreground">
+                      Chargement...
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </DndContext>
 
       <section className="overflow-hidden rounded-md border bg-card">
@@ -376,75 +379,8 @@ export default function NouveauReglementClientPage() {
                   ) : null}
                 </div>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {requiresPaymentReference(method.mode) ? (
-                <div className="grid gap-2">
-                  <Label>Référence</Label>
-                  <Input
-                    value={method.referenceInstrument}
-                    onChange={(event) => updateMethod(
-                      method.key,
-                      { referenceInstrument: event.target.value }
-                    )}
-                  />
-                </div>
-              ) : null}
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label>Montant</Label>
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto px-0 py-0 text-xs"
-                    onClick={() => {
-                      const otherTotal = methods.reduce(
-                        (sum, item) => item.key === method.key
-                          ? sum
-                          : sum + numeric(item.montant),
-                        0
-                      );
-                      updateMethod(method.key, {
-                        montant: money(round(Math.max(0, selectedTotal - otherTotal))),
-                      });
-                    }}
-                  >
-                    Affecter le solde
-                  </Button>
-                </div>
-                <Input
-                  inputMode="decimal"
-                  value={method.montant}
-                  onChange={(event) => updateMethod(
-                    method.key,
-                    { montant: event.target.value }
-                  )}
-                />
-              </div>
-              {method.mode === "EFFET" ? (
-                <div className="grid gap-2">
-                  <Label>Date d’échéance</Label>
-                  <DatePicker
-                    date={method.dateEcheance}
-                    onSelect={(value) => updateMethod(method.key, {
-                      dateEcheance: toDateOnly(value) ?? "",
-                    })}
-                  />
-                </div>
-              ) : null}
-              {method.mode === "ESPECES" ? (
-                <AccountSelect
-                  accounts={accounts.data ?? []}
-                  type="CAISSE"
-                  label="Caisse créditée"
-                  value={method.compteTresorerieId}
-                  onChange={(value) => updateMethod(
-                    method.key,
-                    { compteTresorerieId: value }
-                  )}
-                />
-              ) : (
-                <>
-                  {!requiresPaymentReference(method.mode) ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {requiresPaymentReference(method.mode) ? (
                     <div className="grid gap-2">
                       <Label>Référence</Label>
                       <Input
@@ -456,54 +392,121 @@ export default function NouveauReglementClientPage() {
                       />
                     </div>
                   ) : null}
-                  {requiresBankAccountAtEntry(method.mode) ? (
+                  <div className="grid gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Montant</Label>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto px-0 py-0 text-xs"
+                        onClick={() => {
+                          const otherTotal = methods.reduce(
+                            (sum, item) => item.key === method.key
+                              ? sum
+                              : sum + numeric(item.montant),
+                            0
+                          );
+                          updateMethod(method.key, {
+                            montant: money(round(Math.max(0, selectedTotal - otherTotal))),
+                          });
+                        }}
+                      >
+                        Affecter le solde
+                      </Button>
+                    </div>
+                    <Input
+                      inputMode="decimal"
+                      value={method.montant}
+                      onChange={(event) => updateMethod(
+                        method.key,
+                        { montant: event.target.value }
+                      )}
+                    />
+                  </div>
+                  {method.mode === "EFFET" ? (
+                    <div className="grid gap-2">
+                      <Label>Date d’échéance</Label>
+                      <DatePicker
+                        date={method.dateEcheance}
+                        onSelect={(value) => updateMethod(method.key, {
+                          dateEcheance: toDateOnly(value) ?? "",
+                        })}
+                      />
+                    </div>
+                  ) : null}
+                  {method.mode === "ESPECES" ? (
                     <AccountSelect
                       accounts={accounts.data ?? []}
-                      type="BANQUE"
-                      label="Compte bancaire crédité"
+                      type="CAISSE"
+                      label="Caisse créditée"
                       value={method.compteTresorerieId}
                       onChange={(value) => updateMethod(
                         method.key,
                         { compteTresorerieId: value }
                       )}
                     />
-                  ) : null}
-                  {showsOriginatingBank(method.mode) ? (
-                    <div className="grid gap-2">
-                      <Label>
-                        {method.mode === "CHEQUE" || method.mode === "EFFET"
-                          ? "Banque émettrice"
-                          : "Banque d’origine"}
-                      </Label>
-                      <Input
-                        value={method.banqueEmettrice}
-                        onChange={(event) => updateMethod(
-                          method.key,
-                          { banqueEmettrice: event.target.value }
-                        )}
-                      />
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </div>
+                  ) : (
+                    <>
+                      {!requiresPaymentReference(method.mode) ? (
+                        <div className="grid gap-2">
+                          <Label>Référence</Label>
+                          <Input
+                            value={method.referenceInstrument}
+                            onChange={(event) => updateMethod(
+                              method.key,
+                              { referenceInstrument: event.target.value }
+                            )}
+                          />
+                        </div>
+                      ) : null}
+                      {requiresBankAccountAtEntry(method.mode) ? (
+                        <AccountSelect
+                          accounts={accounts.data ?? []}
+                          type="BANQUE"
+                          label="Compte bancaire crédité"
+                          value={method.compteTresorerieId}
+                          onChange={(value) => updateMethod(
+                            method.key,
+                            { compteTresorerieId: value }
+                          )}
+                        />
+                      ) : null}
+                      {showsOriginatingBank(method.mode) ? (
+                        <div className="grid gap-2">
+                          <Label>
+                            {method.mode === "CHEQUE" || method.mode === "EFFET"
+                              ? "Banque émettrice"
+                              : "Banque d’origine"}
+                          </Label>
+                          <Input
+                            value={method.banqueEmettrice}
+                            onChange={(event) => updateMethod(
+                              method.key,
+                              { banqueEmettrice: event.target.value }
+                            )}
+                          />
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
 
-            {method.mode === "ESPECES"
-              && !accounts.isLoading
-              && activeCashAccounts.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                <AlertCircle className="size-4 shrink-0" />
-                Aucune caisse active n’est disponible.
-              </div>
-            ) : null}
-            {requiresBankAccountAtEntry(method.mode)
-              && !accounts.isLoading
-              && activeBankAccounts.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                <AlertCircle className="size-4 shrink-0" />
-                Aucun compte bancaire actif n’est disponible.
-              </div>
-            ) : null}
+                {method.mode === "ESPECES"
+                  && !accounts.isLoading
+                  && activeCashAccounts.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    <AlertCircle className="size-4 shrink-0" />
+                    Aucune caisse active n’est disponible.
+                  </div>
+                ) : null}
+                {requiresBankAccountAtEntry(method.mode)
+                  && !accounts.isLoading
+                  && activeBankAccounts.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    <AlertCircle className="size-4 shrink-0" />
+                    Aucun compte bancaire actif n’est disponible.
+                  </div>
+                ) : null}
               </section>
             ))}
           </div>
@@ -547,8 +550,11 @@ export default function NouveauReglementClientPage() {
 function SortableReceivableRow(props: {
   row: ClientReceivable;
   priority: number;
+  allocatedAmount: number;
 }) {
   const id = receivableTargetKey(props.row);
+  const isAllocated = props.allocatedAmount > 0.001;
+  const isFullyAllocated = props.allocatedAmount >= props.row.soldeOuvert - 0.001;
   const {
     attributes,
     listeners,
@@ -586,13 +592,28 @@ function SortableReceivableRow(props: {
       <td className="px-4 py-3 font-medium">{props.row.source.police || "-"}</td>
       <td className="px-4 py-3">
         <div className="font-medium">{props.row.source.mouvement}</div>
-        <div className="text-xs text-muted-foreground">
-          {props.row.source.reference || props.row.source.nature || "-"}
-        </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3">{date(props.row.source.dateEffet)}</td>
       <td className="px-4 py-3 text-right font-semibold tabular-nums">
         {money(props.row.soldeOuvert)}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className={isFullyAllocated
+          ? "font-semibold tabular-nums text-emerald-700 dark:text-emerald-300"
+          : isAllocated
+            ? "font-semibold tabular-nums text-amber-700 dark:text-amber-300"
+            : "tabular-nums text-muted-foreground"}
+        >
+          {money(props.allocatedAmount)}
+        </div>
+        <div className={isFullyAllocated
+          ? "text-xs font-medium text-emerald-700 dark:text-emerald-300"
+          : isAllocated
+            ? "text-xs font-medium text-amber-700 dark:text-amber-300"
+            : "text-xs text-muted-foreground"}
+        >
+          {isFullyAllocated ? "Soldé" : isAllocated ? "Partiel" : "En attente"}
+        </div>
       </td>
     </tr>
   );
@@ -732,6 +753,15 @@ function buildRequest(
     notes: notes.trim() || undefined,
     instruments,
   };
+}
+
+function allocationByReceivable(rows: ClientReceivable[], paymentTotal: number) {
+  let available = Math.max(0, round(paymentTotal));
+  return new Map(rows.map((row) => {
+    const allocated = round(Math.min(available, row.soldeOuvert));
+    available = round(available - allocated);
+    return [receivableTargetKey(row), allocated] as const;
+  }));
 }
 
 function newPaymentMethod(): PaymentMethodDraft {

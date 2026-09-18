@@ -696,6 +696,7 @@ public class DocumentClientService {
                                         .id(line.getDocument().getId())
                                         .type(line.getDocument().getTypeDocument())
                                         .numero(line.getDocument().getNumero())
+                                        .dateEmission(line.getDocument().getDateEmission())
                                         .build(),
                                 Collectors.toList()
                         )

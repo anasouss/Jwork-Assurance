@@ -298,6 +298,7 @@ export type ClientDocumentSource = {
     id: string;
     type: ClientDocumentType;
     numero: string;
+    dateEmission: string;
   }>;
 };
 

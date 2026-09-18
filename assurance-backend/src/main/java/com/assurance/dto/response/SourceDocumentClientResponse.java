@@ -47,5 +47,6 @@ public class SourceDocumentClientResponse {
         private Long id;
         private com.assurance.enums.TypeDocumentClient type;
         private String numero;
+        private LocalDate dateEmission;
     }
 }

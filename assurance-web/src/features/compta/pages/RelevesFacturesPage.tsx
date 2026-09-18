@@ -305,7 +305,11 @@ export default function RelevesFacturesPage() {
               Retour aux écritures
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => updateUrl({ tab: "documents", documentPage: 0 })}>
+            <Button
+              variant="outline"
+              className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50"
+              onClick={() => updateUrl({ tab: "documents", documentPage: 0 })}
+            >
               <FileText className="size-4" />
               Documents émis
             </Button>
@@ -1197,14 +1201,18 @@ function DocumentReferences(props: {
   return (
     <div className="grid justify-items-start gap-1">
       {props.documents.map((document) => (
-        <button
-          key={document.id}
-          type="button"
-          className="text-left text-xs font-medium text-amber-800 underline-offset-2 hover:underline dark:text-amber-300"
-          onClick={() => props.onOpen(document.id)}
-        >
-          {document.numero}
-        </button>
+        <div key={document.id} className="grid gap-0.5">
+          <button
+            type="button"
+            className="text-left text-xs font-medium text-amber-800 underline-offset-2 hover:underline dark:text-amber-300"
+            onClick={() => props.onOpen(document.id)}
+          >
+            {document.numero}
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {formatDate(document.dateEmission)}
+          </span>
+        </div>
       ))}
     </div>
   );

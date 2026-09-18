@@ -98,6 +98,17 @@ export function ContractInfoSection({
       }));
     }
     const loaded = payerClientsQuery.data?.items ?? [];
+    const persistedPayerId = String(form.draftQuery.data?.payeurPrimeClientId ?? "");
+    const persistedPayer = form.payeurPrimeClientId
+      && form.payeurPrimeClientId === persistedPayerId
+      && form.draftQuery.data?.payeurPrimeNom
+      ? [{
+          id: persistedPayerId,
+          nomAffichage: form.draftQuery.data.payeurPrimeNom,
+          rc: undefined,
+          cin: undefined,
+        }]
+      : [];
     const linked = form.clients
       .filter((client) => client.clientId)
       .map((client) => ({
@@ -108,13 +119,21 @@ export function ContractInfoSection({
         rc: client.client.rc,
         cin: client.client.cin,
       }));
-    const byId = new Map([...linked, ...loaded].map((client) => [client.id, client]));
+    const byId = new Map([...linked, ...persistedPayer, ...loaded].map((client) => [client.id, client]));
     return [...byId.values()].map((client) => ({
       value: client.id,
       label: client.nomAffichage ?? client.id,
       keywords: [client.rc, client.cin].filter(Boolean).join(" "),
     }));
-  }, [form.clients, form.typePayeurPrime, payerClientsQuery.data?.items, selectedGroup?.membres]);
+  }, [
+    form.clients,
+    form.draftQuery.data?.payeurPrimeClientId,
+    form.draftQuery.data?.payeurPrimeNom,
+    form.payeurPrimeClientId,
+    form.typePayeurPrime,
+    payerClientsQuery.data?.items,
+    selectedGroup?.membres,
+  ]);
 
   return (
     <SectionCard

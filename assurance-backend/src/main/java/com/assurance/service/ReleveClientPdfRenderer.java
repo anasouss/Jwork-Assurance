@@ -928,7 +928,7 @@ public class ReleveClientPdfRenderer {
             canvas.saveState()
                     .roundRectangle(box.getX(), box.getY(), box.getWidth(), box.getHeight(), radius)
                     .clip()
-                    .endPath();
+                    .newPath();
             super.draw(drawContext);
             canvas.restoreState();
 

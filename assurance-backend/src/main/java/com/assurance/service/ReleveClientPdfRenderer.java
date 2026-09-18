@@ -45,6 +45,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -73,6 +74,13 @@ public class ReleveClientPdfRenderer {
     private static final SolidBorder TABLE_BORDER = new SolidBorder(BRAND_BLUE, 0.65f);
     private static final SolidBorder BODY_BORDER = new SolidBorder(BORDER_COLOR, 0.4f);
     private static final float PAGE_MARGIN = 24f;
+    private static final String[] SMALL_NUMBERS = {
+            "zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
+            "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize"
+    };
+    private static final String[] TENS = {
+            "", "dix", "vingt", "trente", "quarante", "cinquante", "soixante"
+    };
 
     private final AgencyLogoStorageService agencyLogoStorageService;
     private final AgencySignatureStorageService agencySignatureStorageService;
@@ -101,8 +109,10 @@ public class ReleveClientPdfRenderer {
                 writeClientReference(document, source, bold);
             }
             writeDocumentLines(document, source, bold, bold, fleetAnnexes);
-            writeTotal(document, source, bold);
-            writePaymentText(document, source);
+            if (!isInvoice(source)) {
+                writeTotal(document, source, bold);
+            }
+            writePaymentText(document, source, bold);
             writeNotes(document, source, bold);
             if (avecSignature) {
                 writeSignature(document, source.getAgence());
@@ -121,12 +131,12 @@ public class ReleveClientPdfRenderer {
         Table top = new Table(new float[]{7.8f, 2.2f})
                 .setWidth(UnitValue.createPercentValue(100));
         Cell brand = borderless(new Cell())
-                .setHeight(100)
+                .setHeight(106)
                 .setVerticalAlignment(VerticalAlignment.TOP);
         byte[] logo = logoContent(source.getAgence());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(235, 90);
+            image.scaleToFit(250, 96);
             brand.add(image);
         } else {
             brand.add(new Paragraph(source.getAgence().getNom())
@@ -138,10 +148,11 @@ public class ReleveClientPdfRenderer {
 
         PdfFormXObject qrObject = new BarcodeQRCode(source.getNumero()).createFormXObject(ColorConstants.BLACK, pdf);
         Image qr = new Image(qrObject).setWidth(62).setHeight(62)
-                .setHorizontalAlignment(HorizontalAlignment.CENTER);
+                .setHorizontalAlignment(HorizontalAlignment.RIGHT);
         top.addCell(borderless(new Cell())
                 .add(qr)
-                .setTextAlignment(TextAlignment.CENTER));
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setVerticalAlignment(VerticalAlignment.TOP));
         document.add(top);
 
         document.add(new Paragraph(city(source.getAgence()) + " Le " + LONG_DATE_FORMAT.format(source.getDateEmission()))
@@ -201,26 +212,8 @@ public class ReleveClientPdfRenderer {
                     .setUnderline());
             invoiceNumber.add(new com.itextpdf.layout.element.Text(value(source.getNumero())).setFont(bold));
 
-            Table invoiceReference = new Table(new float[]{1, 1})
-                    .setWidth(UnitValue.createPercentValue(98))
-                    .setHorizontalAlignment(HorizontalAlignment.CENTER)
-                    .setMarginBottom(14);
-            invoiceReference.addCell(borderless(new Cell()).add(invoiceNumber));
-
-            Paragraph dueDate = new Paragraph()
-                    .setFontSize(10f)
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setMargin(0);
-            if (source.getDateEcheance() != null) {
-                dueDate.add(new com.itextpdf.layout.element.Text("Date d’échéance : ")
-                        .setFont(regular)
-                        .setUnderline());
-                dueDate.add(new com.itextpdf.layout.element.Text(
-                        LONG_DATE_FORMAT.format(source.getDateEcheance())
-                ).setFont(bold));
-            }
-            invoiceReference.addCell(borderless(new Cell()).add(dueDate));
-            document.add(invoiceReference);
+            invoiceNumber.setMarginBottom(14);
+            document.add(invoiceNumber);
             return;
         }
 
@@ -542,23 +535,152 @@ public class ReleveClientPdfRenderer {
         document.add(total);
     }
 
-    private void writePaymentText(Document document, DocumentClient source) {
-        String totalText = isInvoice(source)
-                ? "Le montant total de cette facture s'élève à "
-                : "Le montant total à régler s'élève à ";
-        document.add(new Paragraph(totalText + amount(source.getTotalDocument()) + " Dhs")
+    private void writePaymentText(Document document, DocumentClient source, PdfFont bold) {
+        if (isInvoice(source)) {
+            writeInvoiceClosing(document, source, bold);
+            return;
+        }
+        document.add(new Paragraph("Le montant total à régler s'élève à "
+                + amount(source.getTotalDocument()) + " Dhs")
                 .setFontSize(9.5f)
                 .setFontColor(BRAND_BLUE)
                 .setMarginLeft(0)
                 .setMarginTop(18)
                 .setMarginBottom(3));
-        String paymentText = isInvoice(source)
-                ? "Cette facture constitue un appel de prime et ne vaut pas preuve de règlement."
-                : "Dès réception de votre règlement, nous vous ferons parvenir la (les) quittance(s) correspondante(s).";
-        document.add(new Paragraph(paymentText)
+        document.add(new Paragraph(
+                "Dès réception de votre règlement, nous vous ferons parvenir la (les) quittance(s) correspondante(s)."
+        )
                 .setFontSize(9.5f)
                 .setMarginLeft(0)
                 .setMarginTop(0));
+    }
+
+    private void writeInvoiceClosing(Document document, DocumentClient source, PdfFont bold) {
+        Table closing = new Table(new float[]{3.8f, 1.3f})
+                .setWidth(UnitValue.createPercentValue(92))
+                .setHorizontalAlignment(HorizontalAlignment.CENTER)
+                .setMarginTop(14);
+        closing.addCell(new Cell()
+                .add(new Paragraph("ARRÊTÉE LA PRÉSENTE FACTURE À LA SOMME DE :")
+                        .setFont(bold)
+                        .setFontSize(8f)
+                        .setFontColor(ColorConstants.WHITE)
+                        .setMargin(0))
+                .setBackgroundColor(TABLE_HEADER_BLUE)
+                .setBorder(TABLE_BORDER)
+                .setPadding(5));
+        closing.addCell(new Cell()
+                .add(new Paragraph("Total TTC :\n" + amount(source.getTotalDocument()))
+                        .setFont(bold)
+                        .setFontSize(8f)
+                        .setFontColor(BRAND_BLUE)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setMargin(0))
+                .setBackgroundColor(LIGHT_BLUE)
+                .setBorder(TABLE_BORDER)
+                .setPadding(5));
+        closing.addCell(new Cell(1, 2)
+                .add(new Paragraph(amountInWords(source.getTotalDocument()))
+                        .setFont(bold)
+                        .setFontSize(8.5f)
+                        .setMargin(0))
+                .setMinHeight(38)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setBorder(TABLE_BORDER)
+                .setPadding(7));
+        document.add(closing);
+
+        document.add(new Paragraph(value(source.getAgence().getNom()).toUpperCase(Locale.FRENCH))
+                .setFont(bold)
+                .setFontSize(8.5f)
+                .setFontColor(BRAND_BLUE)
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setMarginTop(8)
+                .setMarginBottom(1));
+        document.add(new Paragraph(
+                city(source.getAgence()) + " Le, " + LONG_DATE_FORMAT.format(source.getDateEmission())
+        )
+                .setFontSize(8.5f)
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setMarginTop(0));
+    }
+
+    private String amountInWords(BigDecimal value) {
+        BigDecimal normalized = money(value).setScale(2, RoundingMode.HALF_UP).abs();
+        long dirhams = normalized.longValue();
+        int centimes = normalized.remainder(BigDecimal.ONE).movePointRight(2).intValue();
+        String sign = money(value).signum() < 0 ? "moins " : "";
+        return (sign + numberInWords(dirhams) + " dirhams et "
+                + numberInWords(centimes) + " centimes").toUpperCase(Locale.FRENCH);
+    }
+
+    private String numberInWords(long value) {
+        if (value < 0 || value > 999_999_999_999L) {
+            return Long.toString(value);
+        }
+        if (value < 1000) {
+            return underThousand((int) value);
+        }
+        long unit;
+        String singular;
+        String plural;
+        if (value >= 1_000_000_000L) {
+            unit = 1_000_000_000L;
+            singular = "milliard";
+            plural = "milliards";
+        } else if (value >= 1_000_000L) {
+            unit = 1_000_000L;
+            singular = "million";
+            plural = "millions";
+        } else {
+            unit = 1000L;
+            singular = "mille";
+            plural = "mille";
+        }
+        long count = value / unit;
+        long remainder = value % unit;
+        String prefix = unit == 1000L && count == 1 ? "" : numberInWords(count) + " ";
+        String result = prefix + (count > 1 ? plural : singular);
+        return remainder == 0 ? result : result + " " + numberInWords(remainder);
+    }
+
+    private String underThousand(int value) {
+        if (value < 100) {
+            return underHundred(value);
+        }
+        int hundreds = value / 100;
+        int remainder = value % 100;
+        String prefix = hundreds == 1 ? "cent" : SMALL_NUMBERS[hundreds] + " cent";
+        if (remainder == 0) {
+            return hundreds > 1 ? prefix + "s" : prefix;
+        }
+        return prefix + " " + underHundred(remainder);
+    }
+
+    private String underHundred(int value) {
+        if (value <= 16) {
+            return SMALL_NUMBERS[value];
+        }
+        if (value < 20) {
+            return "dix-" + SMALL_NUMBERS[value - 10];
+        }
+        if (value < 70) {
+            int tens = value / 10;
+            int units = value % 10;
+            if (units == 0) {
+                return TENS[tens];
+            }
+            return TENS[tens] + (units == 1 ? " et " : "-") + SMALL_NUMBERS[units];
+        }
+        if (value < 80) {
+            int remainder = value - 60;
+            return "soixante" + (remainder == 11 ? " et " : "-") + underHundred(remainder);
+        }
+        int remainder = value - 80;
+        if (remainder == 0) {
+            return "quatre-vingts";
+        }
+        return "quatre-vingt-" + underHundred(remainder);
     }
 
     private boolean isInvoice(DocumentClient source) {

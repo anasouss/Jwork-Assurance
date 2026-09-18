@@ -73,7 +73,6 @@ public class ReleveClientPdfRenderer {
     private static final DeviceRgb TABLE_HEADER_BLUE = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb LIGHT_BLUE = new DeviceRgb(232, 244, 250);
     private static final DeviceRgb SOFT_GRAY = new DeviceRgb(241, 244, 247);
-    private static final DeviceRgb INVOICE_LABEL_GRAY = new DeviceRgb(174, 181, 188);
     private static final DeviceRgb BORDER_COLOR = new DeviceRgb(157, 171, 184);
     private static final SolidBorder TABLE_BORDER = new SolidBorder(BRAND_BLUE, 0.65f);
     private static final SolidBorder BODY_BORDER = new SolidBorder(BORDER_COLOR, 0.4f);
@@ -135,12 +134,12 @@ public class ReleveClientPdfRenderer {
         Table top = new Table(new float[]{7.8f, 2.2f})
                 .setWidth(UnitValue.createPercentValue(100));
         Cell brand = borderless(new Cell())
-                .setHeight(106)
+                .setHeight(128)
                 .setVerticalAlignment(VerticalAlignment.TOP);
         byte[] logo = logoContent(source.getAgence());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(250, 96);
+            image.scaleToFit(310, 118);
             brand.add(image);
         } else {
             brand.add(new Paragraph(source.getAgence().getNom())
@@ -168,38 +167,38 @@ public class ReleveClientPdfRenderer {
                 .setMarginBottom(4));
 
         Table recipient = new Table(new float[]{1})
-                .setWidth(UnitValue.createPercentValue(49))
+                .setWidth(UnitValue.createPercentValue(46))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
                 .setMarginBottom(14);
         recipient.addCell(new Cell()
                 .add(new Paragraph(value(source.getPayeurNom()))
                 .setFont(bold)
-                .setFontSize(11f)
+                .setFontSize(9.5f)
                 .setFontColor(BRAND_BLUE)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMargin(0))
                 .setBorder(TABLE_BORDER)
                 .setBackgroundColor(LIGHT_BLUE)
-                .setPadding(5));
+                .setPadding(4));
         Cell recipientDetails = new Cell()
                 .add(new Paragraph(address(source.getPayeurAdresse()).toUpperCase(Locale.FRENCH))
-                        .setFontSize(9.5f)
+                        .setFontSize(8.5f)
                         .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))
-                .setMinHeight(38)
+                .setMinHeight(32)
                 .setBorderTop(Border.NO_BORDER)
                 .setBorderRight(TABLE_BORDER)
                 .setBorderBottom(TABLE_BORDER)
                 .setBorderLeft(TABLE_BORDER)
-                .setPaddings(7, 5, 5, 5);
+                .setPaddings(5, 4, 4, 4);
         String payerIce = payerIce(source);
         if (isInvoice(source) && payerIce != null) {
             recipientDetails.add(new Paragraph()
                     .add(new com.itextpdf.layout.element.Text("ICE : ").setFont(bold))
                     .add(payerIce)
-                    .setFontSize(9.5f)
+                    .setFontSize(8.5f)
                     .setTextAlignment(TextAlignment.CENTER)
-                    .setMarginTop(5)
+                    .setMarginTop(3)
                     .setMarginBottom(0));
         }
         recipient.addCell(recipientDetails);
@@ -566,22 +565,21 @@ public class ReleveClientPdfRenderer {
                 .add(new Paragraph("ARRÊTÉE LA PRÉSENTE FACTURE À LA SOMME DE :")
                         .setFont(bold)
                         .setFontSize(8.5f)
-                        .setFontColor(ColorConstants.WHITE)
+                        .setFontColor(BRAND_BLUE)
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .setBackgroundColor(INVOICE_LABEL_GRAY)
                 .setBorder(Border.NO_BORDER)
                 .setPadding(6));
         heading.addCell(new Cell()
                 .add(new Paragraph("Total TTC :")
                         .setFont(bold)
                         .setFontSize(8.5f)
-                        .setFontColor(BRAND_BLUE)
+                        .setFontColor(ColorConstants.WHITE)
                         .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .setBackgroundColor(LIGHT_BLUE)
-                .setBorder(Border.NO_BORDER)
+                .setBackgroundColor(TABLE_HEADER_BLUE)
+                .setBorder(TABLE_BORDER)
                 .setPadding(6));
         heading.addCell(new Cell()
                 .add(new Paragraph(amount(source.getTotalDocument()))
@@ -592,7 +590,7 @@ public class ReleveClientPdfRenderer {
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(LIGHT_BLUE)
-                .setBorder(Border.NO_BORDER)
+                .setBorder(TABLE_BORDER)
                 .setPadding(6));
 
         Cell content = new Cell()

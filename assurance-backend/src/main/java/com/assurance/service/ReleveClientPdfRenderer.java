@@ -906,6 +906,48 @@ public class ReleveClientPdfRenderer {
         return source.getClientPayeur().getIce().trim();
     }
 
+    private static final class RoundedCellRenderer extends CellRenderer {
+
+        private static final float LINE_WIDTH = 0.65f;
+        private final float radius;
+
+        private RoundedCellRenderer(Cell modelElement, float radius) {
+            super(modelElement);
+            this.radius = radius;
+        }
+
+        @Override
+        public IRenderer getNextRenderer() {
+            return new RoundedCellRenderer((Cell) modelElement, radius);
+        }
+
+        @Override
+        public void draw(DrawContext drawContext) {
+            Rectangle box = getOccupiedAreaBBox();
+            PdfCanvas canvas = drawContext.getCanvas();
+            canvas.saveState()
+                    .roundRectangle(box.getX(), box.getY(), box.getWidth(), box.getHeight(), radius)
+                    .clip()
+                    .endPath();
+            super.draw(drawContext);
+            canvas.restoreState();
+
+            float inset = LINE_WIDTH / 2;
+            canvas.saveState()
+                    .setStrokeColor(BRAND_BLUE)
+                    .setLineWidth(LINE_WIDTH)
+                    .roundRectangle(
+                            box.getX() + inset,
+                            box.getY() + inset,
+                            box.getWidth() - LINE_WIDTH,
+                            box.getHeight() - LINE_WIDTH,
+                            radius
+                    )
+                    .stroke()
+                    .restoreState();
+        }
+    }
+
     private Cell borderless(Cell cell) {
         return cell.setBorder(Border.NO_BORDER).setPadding(0);
     }

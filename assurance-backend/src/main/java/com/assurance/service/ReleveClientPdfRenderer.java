@@ -70,6 +70,7 @@ public class ReleveClientPdfRenderer {
     private static final DeviceRgb TABLE_HEADER_BLUE = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb LIGHT_BLUE = new DeviceRgb(232, 244, 250);
     private static final DeviceRgb SOFT_GRAY = new DeviceRgb(241, 244, 247);
+    private static final DeviceRgb INVOICE_LABEL_GRAY = new DeviceRgb(174, 181, 188);
     private static final DeviceRgb BORDER_COLOR = new DeviceRgb(157, 171, 184);
     private static final SolidBorder TABLE_BORDER = new SolidBorder(BRAND_BLUE, 0.65f);
     private static final SolidBorder BODY_BORDER = new SolidBorder(BORDER_COLOR, 0.4f);
@@ -556,33 +557,30 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeInvoiceClosing(Document document, DocumentClient source, PdfFont bold) {
-        Table closing = new Table(new float[]{3.6f, 0.9f, 1.05f})
-                .setWidth(UnitValue.createPercentValue(94))
-                .setHorizontalAlignment(HorizontalAlignment.CENTER)
-                .setKeepTogether(true)
-                .setMarginTop(12);
-        closing.addCell(new Cell()
+        Table heading = new Table(new float[]{3.6f, 0.9f, 1.05f})
+                .setWidth(UnitValue.createPercentValue(100));
+        heading.addCell(new Cell()
                 .add(new Paragraph("ARRÊTÉE LA PRÉSENTE FACTURE À LA SOMME DE :")
                         .setFont(bold)
                         .setFontSize(8.5f)
-                        .setFontColor(BRAND_BLUE)
+                        .setFontColor(ColorConstants.WHITE)
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .setBackgroundColor(SOFT_GRAY)
-                .setBorder(TABLE_BORDER)
+                .setBackgroundColor(INVOICE_LABEL_GRAY)
+                .setBorder(Border.NO_BORDER)
                 .setPadding(6));
-        closing.addCell(new Cell()
-                .add(new Paragraph("Total TTC")
+        heading.addCell(new Cell()
+                .add(new Paragraph("Total TTC :")
                         .setFont(bold)
                         .setFontSize(8.5f)
-                        .setFontColor(ColorConstants.WHITE)
+                        .setFontColor(BRAND_BLUE)
                         .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .setBackgroundColor(TABLE_HEADER_BLUE)
-                .setBorder(TABLE_BORDER)
+                .setBackgroundColor(LIGHT_BLUE)
+                .setBorder(Border.NO_BORDER)
                 .setPadding(6));
-        closing.addCell(new Cell()
+        heading.addCell(new Cell()
                 .add(new Paragraph(amount(source.getTotalDocument()))
                         .setFont(bold)
                         .setFontSize(8.5f)
@@ -591,16 +589,23 @@ public class ReleveClientPdfRenderer {
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(LIGHT_BLUE)
-                .setBorder(TABLE_BORDER)
+                .setBorder(Border.NO_BORDER)
                 .setPadding(6));
-        closing.addCell(new Cell(1, 3)
+
+        Cell content = new Cell()
+                .add(heading)
                 .add(new Paragraph(amountInWords(source.getTotalDocument()))
                         .setFont(bold)
                         .setFontSize(9f)
-                        .setMargin(0))
-                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                        .setMargins(13, 10, 13, 10))
                 .setBorder(TABLE_BORDER)
-                .setPadding(8));
+                .setPadding(0);
+        Table closing = new Table(new float[]{1})
+                .setWidth(UnitValue.createPercentValue(94))
+                .setHorizontalAlignment(HorizontalAlignment.CENTER)
+                .setKeepTogether(true)
+                .setMarginTop(12);
+        closing.addCell(content);
         document.add(closing);
 
         Paragraph issuer = new Paragraph()

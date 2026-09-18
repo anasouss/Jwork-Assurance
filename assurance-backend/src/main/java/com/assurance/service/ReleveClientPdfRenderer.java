@@ -556,7 +556,7 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeInvoiceClosing(Document document, DocumentClient source, PdfFont bold) {
-        Table closing = new Table(new float[]{3.6f, 1.5f})
+        Table closing = new Table(new float[]{3.6f, 0.9f, 1.05f})
                 .setWidth(UnitValue.createPercentValue(94))
                 .setHorizontalAlignment(HorizontalAlignment.CENTER)
                 .setKeepTogether(true)
@@ -565,14 +565,25 @@ public class ReleveClientPdfRenderer {
                 .add(new Paragraph("ARRÊTÉE LA PRÉSENTE FACTURE À LA SOMME DE :")
                         .setFont(bold)
                         .setFontSize(8.5f)
+                        .setFontColor(BRAND_BLUE)
+                        .setMargin(0))
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setBackgroundColor(SOFT_GRAY)
+                .setBorder(TABLE_BORDER)
+                .setPadding(6));
+        closing.addCell(new Cell()
+                .add(new Paragraph("Total TTC")
+                        .setFont(bold)
+                        .setFontSize(8.5f)
                         .setFontColor(ColorConstants.WHITE)
+                        .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(TABLE_HEADER_BLUE)
                 .setBorder(TABLE_BORDER)
                 .setPadding(6));
         closing.addCell(new Cell()
-                .add(new Paragraph("Total TTC :  " + amount(source.getTotalDocument()))
+                .add(new Paragraph(amount(source.getTotalDocument()))
                         .setFont(bold)
                         .setFontSize(8.5f)
                         .setFontColor(BRAND_BLUE)
@@ -582,7 +593,7 @@ public class ReleveClientPdfRenderer {
                 .setBackgroundColor(LIGHT_BLUE)
                 .setBorder(TABLE_BORDER)
                 .setPadding(6));
-        closing.addCell(new Cell(1, 2)
+        closing.addCell(new Cell(1, 3)
                 .add(new Paragraph(amountInWords(source.getTotalDocument()))
                         .setFont(bold)
                         .setFontSize(9f)

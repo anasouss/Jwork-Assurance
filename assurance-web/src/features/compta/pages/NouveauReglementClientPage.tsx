@@ -3,9 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowLeftRight,
   Banknote,
+  CalendarClock,
+  Landmark,
   Plus,
+  ReceiptText,
   Trash2,
+  type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -46,12 +51,13 @@ type PaymentMethodDraft = {
 const paymentModes: Array<{
   value: ClientPaymentMode;
   label: string;
+  icon: LucideIcon;
 }> = [
-  { value: "ESPECES", label: "Espèces" },
-  { value: "CHEQUE", label: "Chèque" },
-  { value: "EFFET", label: "Effet" },
-  { value: "VIREMENT", label: "Virement" },
-  { value: "VERSEMENT_BANCAIRE", label: "Versement" },
+  { value: "ESPECES", label: "Espèces", icon: Banknote },
+  { value: "CHEQUE", label: "Chèque", icon: ReceiptText },
+  { value: "EFFET", label: "Effet", icon: CalendarClock },
+  { value: "VIREMENT", label: "Virement", icon: ArrowLeftRight },
+  { value: "VERSEMENT_BANCAIRE", label: "Versement", icon: Landmark },
 ];
 
 export default function NouveauReglementClientPage() {
@@ -67,6 +73,7 @@ export default function NouveauReglementClientPage() {
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([newPaymentMethod()]);
+  const [activeMethodKey, setActiveMethodKey] = useState(methods[0].key);
 
   const receivables = useQuery({
     queryKey: ["compta", "client-receivable-selection", selection],
@@ -83,6 +90,7 @@ export default function NouveauReglementClientPage() {
   const selectedTotal = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const remainingAmount = round(selectedTotal - paymentTotal);
+  const activeMethod = methods.find((method) => method.key === activeMethodKey) ?? methods[0];
   const activeCashAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "CAISSE"
   );
@@ -133,6 +141,18 @@ export default function NouveauReglementClientPage() {
       referenceInstrument: "",
       banqueEmettrice: "",
     });
+  }
+
+  function addPaymentMethod() {
+    const method = newPaymentMethod();
+    setMethods((current) => [...current, method]);
+    setActiveMethodKey(method.key);
+  }
+
+  function removePaymentMethod(key: string) {
+    const remaining = methods.filter((method) => method.key !== key);
+    setMethods(remaining);
+    if (activeMethodKey === key) setActiveMethodKey(remaining[0].key);
   }
 
   if (!hasSelection) {
@@ -234,7 +254,7 @@ export default function NouveauReglementClientPage() {
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => setMethods((current) => [...current, newPaymentMethod()])}
+            onClick={addPaymentMethod}
           >
             <Plus className="size-4" />
             Ajouter un moyen
@@ -250,37 +270,68 @@ export default function NouveauReglementClientPage() {
             />
           </div>
 
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Mode de règlement</Label>
+              <span className="text-xs font-medium text-muted-foreground">
+                Moyen {methods.findIndex((method) => method.key === activeMethodKey) + 1}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+              {paymentModes.map(({ value, label, icon: Icon }) => {
+                const active = activeMethod?.mode === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={active}
+                    className={active
+                      ? "flex h-12 items-center justify-center gap-2 rounded-md border border-amber-500 bg-amber-50 px-3 text-sm font-medium text-amber-950 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:text-amber-100"
+                      : "flex h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground"}
+                    onClick={() => changeMethod(activeMethod, value)}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="divide-y border-t">
             {methods.map((method, index) => (
-              <section key={method.key} className="grid gap-4 py-4">
+              <section
+                key={method.key}
+                className={method.key === activeMethodKey
+                  ? "grid gap-4 bg-muted/35 px-3 py-4 transition-colors duration-150"
+                  : "grid gap-4 px-3 py-4 transition-colors duration-150"}
+              >
                 <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div className="grid min-w-56 gap-2">
-                    <Label htmlFor={`payment-mode-${method.key}`}>Mode de règlement {index + 1}</Label>
-                    <Select
-                      value={method.mode}
-                      onValueChange={(value) => changeMethod(method, value as ClientPaymentMode)}
+                  <button
+                    type="button"
+                    className="flex min-h-10 items-center gap-3 rounded-sm px-2 text-left hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => setActiveMethodKey(method.key)}
+                  >
+                    <span className={method.key === activeMethodKey
+                      ? "flex size-7 items-center justify-center rounded-sm bg-amber-500 text-xs font-semibold text-amber-950"
+                      : "flex size-7 items-center justify-center rounded-sm bg-muted text-xs font-semibold text-muted-foreground"}
                     >
-                      <SelectTrigger id={`payment-mode-${method.key}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {paymentModes.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      {index + 1}
+                    </span>
+                    <span className="grid gap-0.5">
+                      <span className="text-sm font-semibold">Moyen de règlement</span>
+                      <span className="text-xs text-muted-foreground">
+                        {paymentModes.find((option) => option.value === method.mode)?.label}
+                      </span>
+                    </span>
+                  </button>
                   {methods.length > 1 ? (
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       title="Supprimer ce moyen"
-                      onClick={() => setMethods((current) => current.filter(
-                        (item) => item.key !== method.key
-                      ))}
+                      onClick={() => removePaymentMethod(method.key)}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -509,16 +560,22 @@ function SummaryCell(props: {
   detail?: string;
   tone: "quittance" | "payment" | "balance" | "danger";
 }) {
-  const toneClasses = {
-    quittance: "border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/15",
-    payment: "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/15",
-    balance: "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/15",
-    danger: "border-l-red-500 bg-red-50/50 dark:bg-red-950/15",
+  const surfaceClasses = {
+    quittance: "bg-orange-50/50 dark:bg-orange-950/15",
+    payment: "bg-emerald-50/50 dark:bg-emerald-950/15",
+    balance: "bg-amber-50/50 dark:bg-amber-950/15",
+    danger: "bg-red-50/50 dark:bg-red-950/15",
+  }[props.tone];
+  const valueClasses = {
+    quittance: "text-orange-800 dark:text-orange-300",
+    payment: "text-emerald-800 dark:text-emerald-300",
+    balance: "text-amber-800 dark:text-amber-300",
+    danger: "text-red-700 dark:text-red-300",
   }[props.tone];
   return (
-    <div className={`border-b border-l-4 px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 ${toneClasses}`}>
+    <div className={`border-b px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 ${surfaceClasses}`}>
       <div className="text-xs uppercase text-muted-foreground">{props.label}</div>
-      <div className={props.tone === "danger" ? "mt-1 text-lg font-semibold text-red-600" : "mt-1 text-lg font-semibold"}>
+      <div className={`mt-1 text-lg font-semibold tabular-nums ${valueClasses}`}>
         {props.value}
       </div>
       {props.detail ? <div className="mt-0.5 text-xs text-muted-foreground">{props.detail}</div> : null}

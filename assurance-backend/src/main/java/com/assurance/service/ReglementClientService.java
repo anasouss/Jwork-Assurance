@@ -53,6 +53,7 @@ import com.assurance.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -106,6 +107,8 @@ public class ReglementClientService {
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            String sortBy,
+            String sortDirection,
             int page,
             int size
     ) {
@@ -118,6 +121,7 @@ public class ReglementClientService {
                 dateDu,
                 dateAu,
                 search,
+                receivableSort(sortBy, sortDirection, false),
                 page,
                 size
         );
@@ -156,6 +160,8 @@ public class ReglementClientService {
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            String sortBy,
+            String sortDirection,
             int page,
             int size
     ) {
@@ -168,7 +174,11 @@ public class ReglementClientService {
                 payeurType,
                 payeurId,
                 normalizeSearch(search),
-                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
+                PageRequest.of(
+                        Math.max(page, 0),
+                        Math.min(Math.max(size, 1), 100),
+                        receivableSort(sortBy, sortDirection, true)
+                )
         );
         List<Long> documentIds = result.getContent().stream()
                 .map(DocumentClient::getId)
@@ -201,6 +211,16 @@ public class ReglementClientService {
                         .build())
                 .rows(rows)
                 .build();
+    }
+
+    private Sort receivableSort(String sortBy, String sortDirection, boolean invoice) {
+        Sort.Direction direction = "ASC".equalsIgnoreCase(sortDirection)
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        String property = "TTC".equalsIgnoreCase(sortBy)
+                ? invoice ? "totalDocument" : "primeTotale"
+                : invoice ? "dateEmission" : "dateDebut";
+        return Sort.by(direction, property).and(Sort.by(Sort.Direction.DESC, "id"));
     }
 
     @Transactional(readOnly = true)

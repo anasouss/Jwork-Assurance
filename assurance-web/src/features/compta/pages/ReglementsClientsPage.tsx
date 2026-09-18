@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
@@ -17,7 +17,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
@@ -29,13 +28,12 @@ import {
 import { formatAccountingAmount } from "../format";
 import type {
   ClientReceivable,
-  TypeContrat,
+  ClientReceivablePage,
 } from "../types";
 
 const PAGE_SIZE = 25;
 
-type ReceivableKind = "DIRECT" | "INVOICE";
-type PayerScope = "ALL" | "CLIENT" | "GROUPE";
+type PayerScope = "CLIENT" | "GROUPE";
 type SortKey = "PAYER" | "POLICE" | "DATE" | "TTC" | "BALANCE";
 type SortDirection = "ASC" | "DESC";
 
@@ -45,18 +43,13 @@ export default function ReglementsClientsPage() {
     || permissions.includes("reglement-client:manage");
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
-  const [receivableKind, setReceivableKind] = useState<ReceivableKind>("DIRECT");
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [payerScope, setPayerScope] = useState<PayerScope>("ALL");
+  const [reference, setReference] = useState("");
+  const [appliedReference, setAppliedReference] = useState("");
+  const [payerScope, setPayerScope] = useState<PayerScope>("CLIENT");
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
-  const [brancheId, setBrancheId] = useState("ALL");
-  const [contractType, setContractType] = useState<"ALL" | TypeContrat>("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({
-    brancheId: "ALL",
-    contractType: "ALL" as "ALL" | TypeContrat,
     dateFrom: "",
     dateTo: "",
   });
@@ -65,53 +58,34 @@ export default function ReglementsClientsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("DESC");
 
   const payerSearch = usePayerSearch(
-    payerScope === "ALL" ? undefined : payerScope,
+    payerScope,
     selectedPayer
   );
-  const branches = useQuery({
-    queryKey: ["compta", "insurance-branches"],
-    queryFn: comptaApi.insuranceBranches,
-    enabled: receivableKind === "DIRECT",
-    staleTime: 60_000,
-  });
   const queryFilters = {
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
     dateDu: appliedFilters.dateFrom || undefined,
     dateAu: appliedFilters.dateTo || undefined,
-    search: appliedSearch || undefined,
-    page,
-    size: PAGE_SIZE,
+    search: appliedReference || undefined,
+    sortBy: sortKey === "TTC" ? "TTC" as const : "DATE" as const,
+    sortDirection,
   };
   const receivables = useQuery({
     queryKey: [
       "compta",
       "client-receivables",
-      receivableKind,
       selectedPayer,
-      appliedSearch,
+      appliedReference,
       appliedFilters,
+      sortKey,
+      sortDirection,
       page,
     ],
-    queryFn: () => receivableKind === "INVOICE"
-      ? comptaApi.clientInvoiceReceivables(queryFilters)
-      : comptaApi.clientReceivables({
-        ...queryFilters,
-        brancheId: appliedFilters.brancheId === "ALL"
-          ? undefined
-          : appliedFilters.brancheId,
-        typeContrat: appliedFilters.contractType === "ALL"
-          ? undefined
-          : appliedFilters.contractType,
-      }),
-    enabled: Boolean(selectedPayer || appliedSearch),
+    queryFn: () => loadCombinedReceivables(queryFilters, page, sortKey, sortDirection),
+    enabled: Boolean(selectedPayer || appliedReference),
   });
-  const showResults = Boolean(selectedPayer || appliedSearch);
+  const showResults = Boolean(selectedPayer || appliedReference);
   const result = showResults ? receivables.data : undefined;
-  const sortedRows = useMemo(
-    () => sortReceivables(result?.rows ?? [], sortKey, sortDirection),
-    [result?.rows, sortDirection, sortKey]
-  );
   const selectedRows = Object.values(selected);
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const payerKey = selectedRows[0] ? sourcePayerKey(selectedRows[0]) : null;
@@ -138,24 +112,20 @@ export default function ReglementsClientsPage() {
       toast.error("La date de début doit précéder la date de fin");
       return;
     }
-    setAppliedSearch(search.trim());
-    setAppliedFilters({ brancheId, contractType, dateFrom, dateTo });
+    setAppliedReference(reference.trim());
+    setAppliedFilters({ dateFrom, dateTo });
     setPage(0);
   }
 
   function resetFilters() {
-    setSearch("");
-    setAppliedSearch("");
-    setPayerScope("ALL");
+    setReference("");
+    setAppliedReference("");
+    setPayerScope("CLIENT");
     payerSearch.clearQuery();
     setSelectedPayer(undefined);
-    setBrancheId("ALL");
-    setContractType("ALL");
     setDateFrom("");
     setDateTo("");
     setAppliedFilters({
-      brancheId: "ALL",
-      contractType: "ALL",
       dateFrom: "",
       dateTo: "",
     });
@@ -174,6 +144,7 @@ export default function ReglementsClientsPage() {
       setSortKey(nextKey);
       setSortDirection(nextKey === "PAYER" || nextKey === "POLICE" ? "ASC" : "DESC");
     }
+    setPage(0);
   }
 
   return (
@@ -197,121 +168,68 @@ export default function ReglementsClientsPage() {
       </header>
 
       <section className="grid gap-4 rounded-md border bg-card p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <div className="grid gap-2">
-            <Label>Origine</Label>
-            <Select
-              value={receivableKind}
-              onValueChange={(value) => {
-                setReceivableKind(value as ReceivableKind);
-                setPage(0);
-              }}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DIRECT">Écritures directes</SelectItem>
-                <SelectItem value="INVOICE">Factures émises</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[220px_minmax(280px,1.4fr)_minmax(240px,1fr)_170px_170px_auto] xl:items-end">
           <div className="grid gap-2">
             <Label>Cible</Label>
-            <Select
-              value={payerScope}
-              onValueChange={(value) => {
-                setPayerScope(value as PayerScope);
-                payerSearch.clearQuery();
-                setSelectedPayer(undefined);
-                setPage(0);
-              }}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tous les payeurs</SelectItem>
-                <SelectItem value="CLIENT">Client</SelectItem>
-                <SelectItem value="GROUPE">Groupe</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2 md:col-span-1 xl:col-span-2">
-            <Label>{payerScope === "GROUPE" ? "Rechercher un groupe" : "Rechercher un client"}</Label>
-            {payerScope === "ALL" ? (
-              <div className="flex h-9 items-center rounded-md border bg-muted/35 px-3 text-sm text-muted-foreground">
-                Toutes les cibles
-              </div>
-            ) : (
-              <AutocompleteSelect
-                options={payerSearch.options}
-                value={selectedPayer?.type === payerScope ? selectedPayer.id : ""}
-                onValueChange={selectPayer}
-                onQueryChange={payerScope === "CLIENT" ? payerSearch.setQuery : undefined}
-                placeholder={payerScope === "CLIENT"
-                  ? "Nom, RC, CIN, ICE ou code"
-                  : "Code, groupe ou membre"}
-                emptyText={payerSearch.loading
-                  ? "Chargement..."
-                  : "Aucun résultat"}
-              />
-            )}
-          </div>
-          {receivableKind === "DIRECT" && (
-            <>
-              <div className="grid gap-2">
-                <Label>Branche</Label>
-                <Select value={brancheId} onValueChange={setBrancheId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Toutes</SelectItem>
-                    {(branches.data ?? []).map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Type de contrat</Label>
-                <Select
-                  value={contractType}
-                  onValueChange={(value) => setContractType(value as "ALL" | TypeContrat)}
+            <div className="grid grid-cols-2 rounded-md border border-slate-300 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
+              {(["CLIENT", "GROUPE"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`h-8 rounded-sm px-3 text-sm font-medium ${
+                    payerScope === mode
+                      ? "bg-amber-100 text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-700"
+                      : "text-slate-600 hover:bg-white/70 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
+                  }`}
+                  onClick={() => {
+                    setPayerScope(mode);
+                    payerSearch.clearQuery();
+                    setSelectedPayer(undefined);
+                    setPage(0);
+                  }}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Tous</SelectItem>
-                    <SelectItem value="PARTICULIER">Mono</SelectItem>
-                    <SelectItem value="CONVENTION">Convention</SelectItem>
-                    <SelectItem value="FLOTTE">Flotte</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
+                  {mode === "CLIENT" ? "Client" : "Groupe"}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid gap-2">
-            <Label>{receivableKind === "INVOICE" ? "Émission du" : "Date d’effet du"}</Label>
+            <Label>{payerScope === "GROUPE" ? "Rechercher un groupe" : "Rechercher un client"}</Label>
+            <AutocompleteSelect
+              options={payerSearch.options}
+              value={selectedPayer?.type === payerScope ? selectedPayer.id : ""}
+              onValueChange={selectPayer}
+              onQueryChange={payerScope === "CLIENT" ? payerSearch.setQuery : undefined}
+              placeholder={payerScope === "CLIENT"
+                ? "Nom, RC, CIN, ICE ou code"
+                : "Code, groupe ou membre"}
+              emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="receivable-reference">N° facture / relevé</Label>
+            <Input
+              id="receivable-reference"
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") applyFilters();
+              }}
+              placeholder="Numéro du document"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Date du</Label>
             <DatePicker
               date={dateFrom}
               onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")}
             />
           </div>
           <div className="grid gap-2">
-            <Label>{receivableKind === "INVOICE" ? "Émission au" : "Date d’effet au"}</Label>
+            <Label>Date au</Label>
             <DatePicker
               date={dateTo}
               onSelect={(value) => setDateTo(toDateOnly(value) ?? "")}
-            />
-          </div>
-        </div>
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-          <div className="grid min-w-72 flex-1 gap-2">
-            <Label htmlFor="receivable-search">N° facture, relevé, police ou assistance</Label>
-            <Input
-              id="receivable-search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  applyFilters();
-                }
-              }}
             />
           </div>
           <div className="flex items-end gap-2">
@@ -333,7 +251,7 @@ export default function ReglementsClientsPage() {
         {selectedRows.length > 0 && (
           <p className="text-sm text-muted-foreground">
             {selectedItemCount(selectedRows.length)}, pour {money(selectedTotal)}.
-            Vous pouvez changer l’origine pour compléter ce règlement avec la même cible.
+            La sélection reste limitée à une même cible.
           </p>
         )}
       </section>
@@ -344,7 +262,7 @@ export default function ReglementsClientsPage() {
                 <h2 className="font-semibold">Éléments à encaisser</h2>
                 <p className="text-sm text-muted-foreground">
                   {showResults
-                    ? `Solde ouvert de la page: ${money(result?.summary.soldeOuvert ?? 0)}`
+                    ? `Solde ouvert: ${money(result?.summary.soldeOuvert ?? 0)}`
                     : "Sélectionnez un client ou recherchez une référence."}
                 </p>
               </div>
@@ -388,7 +306,7 @@ export default function ReglementsClientsPage() {
                 </thead>
                 <tbody className="divide-y">
                   {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={10} rows={8} /> :
-                    sortedRows.map((row) => (
+                    (result?.rows ?? []).map((row) => (
                       <tr key={receivableTargetKey(row)} className="hover:bg-muted/30">
                         <td className="px-3 py-3 text-center">
                           <Checkbox
@@ -413,7 +331,7 @@ export default function ReglementsClientsPage() {
                   {!showResults && (
                     <tr>
                       <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
-                        Sélectionnez un client ou saisissez un numéro de facture, relevé, police ou assistance.
+                        Sélectionnez un client ou saisissez un numéro de facture ou de relevé.
                       </td>
                     </tr>
                   )}
@@ -497,6 +415,72 @@ function SortableHeader(props: {
   );
 }
 
+type ReceivableSearchFilters = {
+  payeurType?: "CLIENT" | "GROUPE";
+  payeurId?: string;
+  dateDu?: string;
+  dateAu?: string;
+  search?: string;
+  sortBy: "DATE" | "TTC";
+  sortDirection: SortDirection;
+};
+
+async function loadCombinedReceivables(
+  filters: ReceivableSearchFilters,
+  page: number,
+  sortKey: SortKey,
+  sortDirection: SortDirection
+): Promise<ClientReceivablePage> {
+  const [directRows, invoiceRows] = await Promise.all([
+    loadAllReceivables((nextPage, size) => comptaApi.clientReceivables({
+      ...filters,
+      page: nextPage,
+      size,
+    })),
+    loadAllReceivables((nextPage, size) => comptaApi.clientInvoiceReceivables({
+      ...filters,
+      page: nextPage,
+      size,
+    })),
+  ]);
+  const rows = sortReceivables([...directRows, ...invoiceRows], sortKey, sortDirection);
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  const start = page * PAGE_SIZE;
+  const visibleRows = rows.slice(start, start + PAGE_SIZE);
+
+  return {
+    summary: {
+      total: rows.length,
+      montantInitial: sumReceivables(rows, (row) => row.source.montantTtc),
+      montantConfirme: sumReceivables(rows, (row) => row.montantConfirme),
+      montantEnAttente: sumReceivables(rows, (row) => row.montantEnAttente),
+      soldeOuvert: sumReceivables(rows, (row) => row.soldeOuvert),
+    },
+    page: {
+      number: page,
+      size: PAGE_SIZE,
+      totalElements: rows.length,
+      totalPages,
+      first: page === 0,
+      last: totalPages === 0 || page >= totalPages - 1,
+    },
+    rows: visibleRows,
+  };
+}
+
+async function loadAllReceivables(
+  fetchPage: (page: number, size: number) => Promise<ClientReceivablePage>
+) {
+  const size = 100;
+  const first = await fetchPage(0, size);
+  if (first.page.totalPages <= 1) return first.rows;
+
+  const remaining = await Promise.all(
+    Array.from({ length: first.page.totalPages - 1 }, (_, index) => fetchPage(index + 1, size))
+  );
+  return [first, ...remaining].flatMap((result) => result.rows);
+}
+
 function sortReceivables(rows: ClientReceivable[], key: SortKey, direction: SortDirection) {
   const factor = direction === "ASC" ? 1 : -1;
   return [...rows].sort((left, right) => {
@@ -511,6 +495,10 @@ function sortReceivables(rows: ClientReceivable[], key: SortKey, direction: Sort
             : String(left.source.payeurNom ?? "").localeCompare(String(right.source.payeurNom ?? ""), "fr");
     return comparison * factor;
   });
+}
+
+function sumReceivables(rows: ClientReceivable[], value: (row: ClientReceivable) => number) {
+  return rows.reduce((sum, row) => sum + value(row), 0);
 }
 
 function sourcePayerKey(row: ClientReceivable) {

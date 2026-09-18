@@ -396,6 +396,8 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    sortBy?: "DATE" | "TTC";
+    sortDirection?: "ASC" | "DESC";
     page: number;
     size: number;
   }) {
@@ -410,6 +412,8 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    sortBy?: "DATE" | "TTC";
+    sortDirection?: "ASC" | "DESC";
     page: number;
     size: number;
   }) {

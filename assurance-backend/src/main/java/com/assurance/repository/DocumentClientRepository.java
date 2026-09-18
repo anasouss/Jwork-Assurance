@@ -83,7 +83,6 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                     or lower(d.payeurNom) like concat('%', :search, '%')
                     or lower(coalesce(d.payeurIdentifiant, '')) like concat('%', :search, '%')
               )
-            order by d.dateEmission desc, d.id desc
             """, countQuery = """
             select count(d.id)
             from DocumentClient d

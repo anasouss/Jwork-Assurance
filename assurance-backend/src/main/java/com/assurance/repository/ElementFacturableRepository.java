@@ -177,7 +177,6 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                           )
                     )
               )
-            order by e.dateDebut desc, e.id desc
             """, countQuery = """
             select count(e.id)
             from ElementFacturable e

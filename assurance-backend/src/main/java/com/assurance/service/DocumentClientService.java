@@ -46,6 +46,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -130,9 +131,31 @@ public class DocumentClientService {
             int page,
             int size
     ) {
+        return searchSources(
+                agenceId, payeurType, payeurId, brancheId, typeContrat,
+                dateDu, dateAu, search,
+                Sort.by(Sort.Direction.DESC, "dateDebut").and(Sort.by(Sort.Direction.DESC, "id")),
+                page, size
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public SourceDocumentClientPageResponse searchSources(
+            Long agenceId,
+            String payeurType,
+            Long payeurId,
+            Long brancheId,
+            TypeContrat typeContrat,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search,
+            Sort sort,
+            int page,
+            int size
+    ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
-        Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size));
+        Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size), sort);
         Page<ElementFacturable> result = elementFacturableRepository.searchForClientDocuments(
                 agenceId,
                 brancheId,

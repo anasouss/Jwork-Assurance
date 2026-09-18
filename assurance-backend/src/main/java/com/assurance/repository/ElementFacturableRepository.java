@@ -130,6 +130,14 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     or lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%')
                     or lower(coalesce(e.referenceSource, '')) like concat('%', :search, '%')
                     or lower(coalesce(e.libelle, '')) like concat('%', :search, '%')
+                    or exists (
+                        select 1
+                        from LigneDocumentClient statementLine
+                        where statementLine.elementFacturable = e
+                          and statementLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.RELEVE
+                          and statementLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                          and lower(statementLine.document.numero) like concat('%', :search, '%')
+                    )
                     or lower(coalesce(pp.codeClient, '')) like concat('%', :search, '%')
                     or lower(coalesce(pp.raisonSociale, '')) like concat('%', :search, '%')
                     or lower(coalesce(pp.nom, '')) like concat('%', :search, '%')
@@ -262,6 +270,14 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     or lower(coalesce(c.numeroPolice, '')) like concat('%', :search, '%')
                     or lower(coalesce(e.referenceSource, '')) like concat('%', :search, '%')
                     or lower(coalesce(e.libelle, '')) like concat('%', :search, '%')
+                    or exists (
+                        select 1
+                        from LigneDocumentClient statementLine
+                        where statementLine.elementFacturable = e
+                          and statementLine.document.typeDocument = com.assurance.enums.TypeDocumentClient.RELEVE
+                          and statementLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+                          and lower(statementLine.document.numero) like concat('%', :search, '%')
+                    )
                     or lower(coalesce(pp.codeClient, '')) like concat('%', :search, '%')
                     or lower(coalesce(pp.raisonSociale, '')) like concat('%', :search, '%')
                     or lower(coalesce(pp.nom, '')) like concat('%', :search, '%')

@@ -113,6 +113,8 @@ public class ReglementClientController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "DATE") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size
     ) {
@@ -121,6 +123,8 @@ public class ReglementClientController {
                 dateDu,
                 dateAu,
                 search,
+                sortBy,
+                sortDirection,
                 page,
                 size
         )));
@@ -177,6 +181,8 @@ public class ReglementClientController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "DATE") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size
     ) {
@@ -184,9 +190,11 @@ public class ReglementClientController {
                 TenantContext.getCurrentAgence(),
                 statut,
                 dateDu,
-                dateAu,
-                search,
-                page,
+                        dateAu,
+                        search,
+                        sortBy,
+                        sortDirection,
+                        page,
                 size
         )));
     }

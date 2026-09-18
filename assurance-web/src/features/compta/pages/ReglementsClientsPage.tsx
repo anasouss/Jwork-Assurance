@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
-  FileText,
   History,
-  ReceiptText,
+  ArrowDown,
+  ArrowUp,
   RotateCcw,
   Search,
 } from "lucide-react";
@@ -18,7 +18,6 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
@@ -37,6 +36,8 @@ const PAGE_SIZE = 25;
 
 type ReceivableKind = "DIRECT" | "INVOICE";
 type PayerScope = "ALL" | "CLIENT" | "GROUPE";
+type SortKey = "PAYER" | "POLICE" | "DATE" | "TTC" | "BALANCE";
+type SortDirection = "ASC" | "DESC";
 
 export default function ReglementsClientsPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
@@ -60,6 +61,8 @@ export default function ReglementsClientsPage() {
     dateTo: "",
   });
   const [selected, setSelected] = useState<Record<string, ClientReceivable>>({});
+  const [sortKey, setSortKey] = useState<SortKey>("DATE");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("DESC");
 
   const payerSearch = usePayerSearch(
     payerScope === "ALL" ? undefined : payerScope,
@@ -101,7 +104,14 @@ export default function ReglementsClientsPage() {
           ? undefined
           : appliedFilters.contractType,
       }),
+    enabled: Boolean(selectedPayer || appliedSearch),
   });
+  const showResults = Boolean(selectedPayer || appliedSearch);
+  const result = showResults ? receivables.data : undefined;
+  const sortedRows = useMemo(
+    () => sortReceivables(result?.rows ?? [], sortKey, sortDirection),
+    [result?.rows, sortDirection, sortKey]
+  );
   const selectedRows = Object.values(selected);
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const payerKey = selectedRows[0] ? sourcePayerKey(selectedRows[0]) : null;
@@ -157,6 +167,15 @@ export default function ReglementsClientsPage() {
     setPage(0);
   }
 
+  function changeSort(nextKey: SortKey) {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => current === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortKey(nextKey);
+      setSortDirection(nextKey === "PAYER" || nextKey === "POLICE" ? "ASC" : "DESC");
+    }
+  }
+
   return (
     <div className="grid gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -178,25 +197,23 @@ export default function ReglementsClientsPage() {
       </header>
 
       <section className="grid gap-4 rounded-md border bg-card p-4">
-        <Tabs
-          value={receivableKind}
-          onValueChange={(value) => {
-            setReceivableKind(value as ReceivableKind);
-            setPage(0);
-          }}
-        >
-          <TabsList aria-label="Origine des montants à encaisser">
-            <TabsTrigger value="DIRECT">
-              <ReceiptText className="size-4" />
-              Écritures directes
-            </TabsTrigger>
-            <TabsTrigger value="INVOICE">
-              <FileText className="size-4" />
-              Factures émises
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-2">
+            <Label>Origine</Label>
+            <Select
+              value={receivableKind}
+              onValueChange={(value) => {
+                setReceivableKind(value as ReceivableKind);
+                setPage(0);
+              }}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DIRECT">Écritures directes</SelectItem>
+                <SelectItem value="INVOICE">Factures émises</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid gap-2">
             <Label>Cible</Label>
             <Select
@@ -285,11 +302,7 @@ export default function ReglementsClientsPage() {
         </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
           <div className="grid min-w-72 flex-1 gap-2">
-            <Label htmlFor="receivable-search">
-              {receivableKind === "INVOICE"
-                ? "N° de facture"
-                : "Police, référence ou assistance"}
-            </Label>
+            <Label htmlFor="receivable-search">N° facture, relevé, police ou assistance</Label>
             <Input
               id="receivable-search"
               value={search}
@@ -320,7 +333,7 @@ export default function ReglementsClientsPage() {
         {selectedRows.length > 0 && (
           <p className="text-sm text-muted-foreground">
             {selectedItemCount(selectedRows.length)}, pour {money(selectedTotal)}.
-            Vous pouvez changer d’onglet pour compléter ce règlement avec la même cible.
+            Vous pouvez changer l’origine pour compléter ce règlement avec la même cible.
           </p>
         )}
       </section>
@@ -330,7 +343,9 @@ export default function ReglementsClientsPage() {
               <div>
                 <h2 className="font-semibold">Éléments à encaisser</h2>
                 <p className="text-sm text-muted-foreground">
-                  Solde ouvert de la page: {money(receivables.data?.summary.soldeOuvert ?? 0)}
+                  {showResults
+                    ? `Solde ouvert de la page: ${money(result?.summary.soldeOuvert ?? 0)}`
+                    : "Sélectionnez un client ou recherchez une référence."}
                 </p>
               </div>
               <Button
@@ -341,18 +356,18 @@ export default function ReglementsClientsPage() {
               </Button>
             </div>
             <div className="grid border-y bg-muted/25 sm:grid-cols-4">
-              <SummaryCell label="Éléments" value={String(receivables.data?.summary.total ?? 0)} />
+              <SummaryCell label="Éléments" value={String(result?.summary.total ?? 0)} />
               <SummaryCell
                 label="Montant initial"
-                value={money(receivables.data?.summary.montantInitial ?? 0)}
+                value={money(result?.summary.montantInitial ?? 0)}
               />
               <SummaryCell
                 label="Déjà confirmé"
-                value={money(receivables.data?.summary.montantConfirme ?? 0)}
+                value={money(result?.summary.montantConfirme ?? 0)}
               />
               <SummaryCell
                 label="En attente"
-                value={money(receivables.data?.summary.montantEnAttente ?? 0)}
+                value={money(result?.summary.montantEnAttente ?? 0)}
               />
             </div>
             <div className="overflow-x-auto">
@@ -360,20 +375,20 @@ export default function ReglementsClientsPage() {
                 <thead className="bg-orange-600 text-xs uppercase text-white">
                   <tr>
                     <th className="w-12 px-3 py-3" />
-                    <th className="px-3 py-3 text-left">Payeur</th>
-                    <th className="px-3 py-3 text-left">Police</th>
+                    <SortableHeader label="Payeur" column="PAYER" active={sortKey} direction={sortDirection} onSort={changeSort} />
+                    <SortableHeader label="Police" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <th className="px-3 py-3 text-left">Nature</th>
-                    <th className="px-3 py-3 text-left">Date</th>
-                    <th className="px-3 py-3 text-right">TTC</th>
+                    <SortableHeader label="Date" column="DATE" active={sortKey} direction={sortDirection} onSort={changeSort} />
+                    <SortableHeader label="TTC" column="TTC" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <th className="px-3 py-3 text-right">Confirmé</th>
                     <th className="px-3 py-3 text-right">En attente</th>
-                    <th className="px-3 py-3 text-right">Solde</th>
+                    <SortableHeader label="Solde" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <th className="px-3 py-3 text-center">Statut</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {receivables.isLoading ? <TableRowsSkeleton colSpan={10} rows={8} /> :
-                    (receivables.data?.rows ?? []).map((row) => (
+                  {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={10} rows={8} /> :
+                    sortedRows.map((row) => (
                       <tr key={receivableTargetKey(row)} className="hover:bg-muted/30">
                         <td className="px-3 py-3 text-center">
                           <Checkbox
@@ -395,7 +410,14 @@ export default function ReglementsClientsPage() {
                         <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} /></td>
                       </tr>
                     ))}
-                  {!receivables.isLoading && (receivables.data?.rows.length ?? 0) === 0 && (
+                  {!showResults && (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
+                        Sélectionnez un client ou saisissez un numéro de facture, relevé, police ou assistance.
+                      </td>
+                    </tr>
+                  )}
+                  {showResults && !receivables.isLoading && (result?.rows.length ?? 0) === 0 && (
                     <tr>
                       <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                         Aucun montant à encaisser ne correspond à la recherche.
@@ -405,11 +427,11 @@ export default function ReglementsClientsPage() {
                 </tbody>
               </table>
             </div>
-            {receivables.data && (
+            {showResults && result && (
               <ServerPagination
-                page={receivables.data.page.number}
-                totalPages={receivables.data.page.totalPages}
-                totalElements={receivables.data.page.totalElements}
+                page={result.page.number}
+                totalPages={result.page.totalPages}
+                totalElements={result.page.totalElements}
                 loading={receivables.isFetching}
                 onPageChange={setPage}
               />
@@ -449,6 +471,46 @@ function StatusBadge({ value }: { value: ClientReceivable["statut"] }) {
       {labels[value]}
     </Badge>
   );
+}
+
+function SortableHeader(props: {
+  label: string;
+  column: SortKey;
+  active: SortKey;
+  direction: SortDirection;
+  onSort: (column: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = props.active === props.column;
+  const Icon = active && props.direction === "ASC" ? ArrowUp : ArrowDown;
+  return (
+    <th className={`px-3 py-3 ${props.align === "right" ? "text-right" : "text-left"}`}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 font-semibold"
+        onClick={() => props.onSort(props.column)}
+      >
+        {props.label}
+        <Icon className={`size-3.5 ${active ? "opacity-100" : "opacity-45"}`} />
+      </button>
+    </th>
+  );
+}
+
+function sortReceivables(rows: ClientReceivable[], key: SortKey, direction: SortDirection) {
+  const factor = direction === "ASC" ? 1 : -1;
+  return [...rows].sort((left, right) => {
+    const comparison = key === "TTC"
+      ? left.source.montantTtc - right.source.montantTtc
+      : key === "BALANCE"
+        ? left.soldeOuvert - right.soldeOuvert
+        : key === "DATE"
+          ? String(left.source.dateEffet ?? "").localeCompare(String(right.source.dateEffet ?? ""))
+          : key === "POLICE"
+            ? String(left.source.police ?? "").localeCompare(String(right.source.police ?? ""), "fr", { numeric: true })
+            : String(left.source.payeurNom ?? "").localeCompare(String(right.source.payeurNom ?? ""), "fr");
+    return comparison * factor;
+  });
 }
 
 function sourcePayerKey(row: ClientReceivable) {

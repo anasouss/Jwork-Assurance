@@ -66,6 +66,7 @@ public class ReleveClientPdfRenderer {
     private static final DateTimeFormatter LONG_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DeviceRgb BRAND_BLUE = new DeviceRgb(17, 48, 78);
     private static final DeviceRgb ACCENT_BLUE = new DeviceRgb(0, 147, 211);
+    private static final DeviceRgb TABLE_HEADER_BLUE = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb LIGHT_BLUE = new DeviceRgb(232, 244, 250);
     private static final DeviceRgb SOFT_GRAY = new DeviceRgb(241, 244, 247);
     private static final DeviceRgb BORDER_COLOR = new DeviceRgb(157, 171, 184);
@@ -120,13 +121,12 @@ public class ReleveClientPdfRenderer {
         Table top = new Table(new float[]{7.8f, 2.2f})
                 .setWidth(UnitValue.createPercentValue(100));
         Cell brand = borderless(new Cell())
-                .setHeight(92)
-                .setVerticalAlignment(VerticalAlignment.TOP)
-                .setBorderBottom(new SolidBorder(ACCENT_BLUE, 1.4f));
+                .setHeight(100)
+                .setVerticalAlignment(VerticalAlignment.TOP);
         byte[] logo = logoContent(source.getAgence());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(205, 82);
+            image.scaleToFit(235, 90);
             brand.add(image);
         } else {
             brand.add(new Paragraph(source.getAgence().getNom())
@@ -141,8 +141,7 @@ public class ReleveClientPdfRenderer {
                 .setHorizontalAlignment(HorizontalAlignment.CENTER);
         top.addCell(borderless(new Cell())
                 .add(qr)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setBorderBottom(new SolidBorder(ACCENT_BLUE, 1.4f)));
+                .setTextAlignment(TextAlignment.CENTER));
         document.add(top);
 
         document.add(new Paragraph(city(source.getAgence()) + " Le " + LONG_DATE_FORMAT.format(source.getDateEmission()))
@@ -230,8 +229,6 @@ public class ReleveClientPdfRenderer {
                 .setFontColor(BRAND_BLUE)
                 .setMarginTop(0)
                 .setMarginLeft(0)
-                .setPaddingBottom(5)
-                .setBorderBottom(new SolidBorder(ACCENT_BLUE, 0.8f))
                 .setMarginBottom(16);
         subject.add(new com.itextpdf.layout.element.Text("Objet : ").setFont(regular).setUnderline());
         subject.add(new com.itextpdf.layout.element.Text("Votre relevé de primes d'assurance").setFont(bold));
@@ -499,7 +496,7 @@ public class ReleveClientPdfRenderer {
         table.addHeaderCell(new Cell()
                 .add(new Paragraph(text).setFont(font).setFontSize(7.5f).setMargin(0))
                 .setFontColor(ColorConstants.WHITE)
-                .setBackgroundColor(BRAND_BLUE)
+                .setBackgroundColor(TABLE_HEADER_BLUE)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(new SolidBorder(ColorConstants.WHITE, 0.35f))
@@ -533,7 +530,7 @@ public class ReleveClientPdfRenderer {
                         .setMargin(0))
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBorder(TABLE_BORDER)
-                .setBackgroundColor(BRAND_BLUE)
+                .setBackgroundColor(TABLE_HEADER_BLUE)
                 .setPadding(4));
         total.addCell(new Cell()
                 .add(new Paragraph(amount(source.getTotalDocument())).setFont(bold).setFontSize(8.5f).setMargin(0))

@@ -1,11 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   AlertCircle,
   ArrowLeft,
   ArrowLeftRight,
   Banknote,
   CalendarClock,
+  GripVertical,
   Landmark,
   Plus,
   ReceiptText,
@@ -74,6 +92,11 @@ export default function NouveauReglementClientPage() {
   const [notes, setNotes] = useState("");
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([newPaymentMethod()]);
   const [activeMethodKey, setActiveMethodKey] = useState(methods[0].key);
+  const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const receivables = useQuery({
     queryKey: ["compta", "client-receivable-selection", selection],
@@ -86,7 +109,7 @@ export default function NouveauReglementClientPage() {
     queryFn: comptaApi.treasuryAccounts,
   });
 
-  const rows = receivables.data ?? [];
+  const rows = orderedRows;
   const selectedTotal = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const remainingAmount = round(selectedTotal - paymentTotal);
@@ -97,6 +120,10 @@ export default function NouveauReglementClientPage() {
   const activeBankAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "BANQUE"
   );
+
+  useEffect(() => {
+    setOrderedRows(receivables.data ?? []);
+  }, [receivables.data]);
 
   const createPayment = useMutation({
     mutationFn: () => comptaApi.createClientPayment(buildRequest(
@@ -155,6 +182,15 @@ export default function NouveauReglementClientPage() {
     if (activeMethodKey === key) setActiveMethodKey(remaining[0].key);
   }
 
+  function reorderReceivables(event: DragEndEvent) {
+    if (!event.over || event.active.id === event.over.id) return;
+    setOrderedRows((current) => {
+      const from = current.findIndex((row) => receivableTargetKey(row) === event.active.id);
+      const to = current.findIndex((row) => receivableTargetKey(row) === event.over?.id);
+      return from < 0 || to < 0 ? current : arrayMove(current, from, to);
+    });
+  }
+
   if (!hasSelection) {
     return <InvalidSelection message="Aucun élément à encaisser n’a été sélectionné." />;
   }
@@ -205,14 +241,17 @@ export default function NouveauReglementClientPage() {
         />
       </section>
 
+      <DndContext
+        sensors={dragSensors}
+        collisionDetection={closestCenter}
+        onDragEnd={reorderReceivables}
+      >
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-4 py-3">
-          <h2 className="font-semibold">Éléments sélectionnés</h2>
-        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-muted/35 text-xs uppercase text-muted-foreground">
+            <thead className="bg-orange-600 text-xs uppercase text-white">
               <tr>
+                <th className="w-28 px-4 py-3 text-left">Priorité</th>
                 <th className="px-4 py-3 text-left">Police</th>
                 <th className="px-4 py-3 text-left">Nature</th>
                 <th className="px-4 py-3 text-left">Date</th>
@@ -220,24 +259,21 @@ export default function NouveauReglementClientPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rows.map((row) => (
-                <tr key={receivableTargetKey(row)}>
-                  <td className="px-4 py-3 font-medium">{row.source.police || "-"}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{row.source.mouvement}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {row.source.reference || row.source.nature || "-"}
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">{date(row.source.dateEffet)}</td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {money(row.soldeOuvert)}
-                  </td>
-                </tr>
-              ))}
+              <SortableContext
+                items={rows.map(receivableTargetKey)}
+                strategy={verticalListSortingStrategy}
+              >
+                {rows.map((row, index) => (
+                  <SortableReceivableRow
+                    key={receivableTargetKey(row)}
+                    row={row}
+                    priority={index + 1}
+                  />
+                ))}
+              </SortableContext>
               {receivables.isLoading ? (
                 <tr>
-                  <td colSpan={4} className="h-24 text-center text-muted-foreground">
+                  <td colSpan={5} className="h-24 text-center text-muted-foreground">
                     Chargement...
                   </td>
                 </tr>
@@ -246,9 +282,10 @@ export default function NouveauReglementClientPage() {
           </table>
         </div>
       </section>
+      </DndContext>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
           <h2 className="font-semibold">Moyens de règlement</h2>
           <Button
             type="button"
@@ -261,7 +298,7 @@ export default function NouveauReglementClientPage() {
           </Button>
         </div>
 
-        <div className="grid gap-4 p-4">
+        <div className="grid gap-4 bg-muted/10 p-4">
           <div className="grid max-w-64 gap-2">
             <Label>Date du règlement</Label>
             <DatePicker
@@ -330,6 +367,7 @@ export default function NouveauReglementClientPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       title="Supprimer ce moyen"
                       onClick={() => removePaymentMethod(method.key)}
                     >
@@ -503,6 +541,60 @@ export default function NouveauReglementClientPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function SortableReceivableRow(props: {
+  row: ClientReceivable;
+  priority: number;
+}) {
+  const id = receivableTargetKey(props.row);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging
+        ? "relative z-10 bg-amber-50 shadow-md dark:bg-amber-950/30"
+        : "odd:bg-background even:bg-muted/20 hover:bg-amber-50/40 dark:hover:bg-amber-950/10"}
+    >
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="flex size-9 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`Déplacer la quittance en priorité ${props.priority}`}
+            title="Modifier la priorité"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-4" />
+          </button>
+          <span className="w-5 text-center text-sm font-semibold tabular-nums">
+            {props.priority}
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3 font-medium">{props.row.source.police || "-"}</td>
+      <td className="px-4 py-3">
+        <div className="font-medium">{props.row.source.mouvement}</div>
+        <div className="text-xs text-muted-foreground">
+          {props.row.source.reference || props.row.source.nature || "-"}
+        </div>
+      </td>
+      <td className="whitespace-nowrap px-4 py-3">{date(props.row.source.dateEffet)}</td>
+      <td className="px-4 py-3 text-right font-semibold tabular-nums">
+        {money(props.row.soldeOuvert)}
+      </td>
+    </tr>
   );
 }
 

@@ -556,53 +556,54 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeInvoiceClosing(Document document, DocumentClient source, PdfFont bold) {
-        Table closing = new Table(new float[]{3.8f, 1.3f})
-                .setWidth(UnitValue.createPercentValue(92))
+        Table closing = new Table(new float[]{3.6f, 1.5f})
+                .setWidth(UnitValue.createPercentValue(94))
                 .setHorizontalAlignment(HorizontalAlignment.CENTER)
-                .setMarginTop(14);
+                .setKeepTogether(true)
+                .setMarginTop(12);
         closing.addCell(new Cell()
                 .add(new Paragraph("ARRÊTÉE LA PRÉSENTE FACTURE À LA SOMME DE :")
                         .setFont(bold)
-                        .setFontSize(8f)
+                        .setFontSize(8.5f)
                         .setFontColor(ColorConstants.WHITE)
                         .setMargin(0))
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(TABLE_HEADER_BLUE)
                 .setBorder(TABLE_BORDER)
-                .setPadding(5));
+                .setPadding(6));
         closing.addCell(new Cell()
-                .add(new Paragraph("Total TTC :\n" + amount(source.getTotalDocument()))
+                .add(new Paragraph("Total TTC :  " + amount(source.getTotalDocument()))
                         .setFont(bold)
-                        .setFontSize(8f)
+                        .setFontSize(8.5f)
                         .setFontColor(BRAND_BLUE)
                         .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(LIGHT_BLUE)
                 .setBorder(TABLE_BORDER)
-                .setPadding(5));
+                .setPadding(6));
         closing.addCell(new Cell(1, 2)
                 .add(new Paragraph(amountInWords(source.getTotalDocument()))
                         .setFont(bold)
-                        .setFontSize(8.5f)
+                        .setFontSize(9f)
                         .setMargin(0))
-                .setMinHeight(38)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(TABLE_BORDER)
-                .setPadding(7));
+                .setPadding(8));
         document.add(closing);
 
-        document.add(new Paragraph(value(source.getAgence().getNom()).toUpperCase(Locale.FRENCH))
+        Paragraph issuer = new Paragraph()
                 .setFont(bold)
                 .setFontSize(8.5f)
                 .setFontColor(BRAND_BLUE)
                 .setTextAlignment(TextAlignment.RIGHT)
-                .setMarginTop(8)
-                .setMarginBottom(1));
-        document.add(new Paragraph(
-                city(source.getAgence()) + " Le, " + LONG_DATE_FORMAT.format(source.getDateEmission())
-        )
-                .setFontSize(8.5f)
-                .setTextAlignment(TextAlignment.RIGHT)
-                .setMarginTop(0));
+                .setMarginTop(7)
+                .setMarginBottom(0);
+        issuer.add(value(source.getAgence().getNom()).toUpperCase(Locale.FRENCH));
+        issuer.add(new com.itextpdf.layout.element.Text("\n"
+                + city(source.getAgence()) + " Le, " + LONG_DATE_FORMAT.format(source.getDateEmission()))
+                .setFontSize(8.5f));
+        document.add(issuer);
     }
 
     private String amountInWords(BigDecimal value) {

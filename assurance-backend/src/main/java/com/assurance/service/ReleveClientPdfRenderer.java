@@ -39,6 +39,9 @@ import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
 import com.itextpdf.layout.property.VerticalAlignment;
+import com.itextpdf.layout.renderer.CellRenderer;
+import com.itextpdf.layout.renderer.DrawContext;
+import com.itextpdf.layout.renderer.IRenderer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -598,8 +601,9 @@ public class ReleveClientPdfRenderer {
                         .setFont(bold)
                         .setFontSize(9f)
                         .setMargins(13, 10, 13, 10))
-                .setBorder(TABLE_BORDER)
+                .setBorder(Border.NO_BORDER)
                 .setPadding(0);
+        content.setNextRenderer(new RoundedCellRenderer(content, 8f));
         Table closing = new Table(new float[]{1})
                 .setWidth(UnitValue.createPercentValue(94))
                 .setHorizontalAlignment(HorizontalAlignment.CENTER)

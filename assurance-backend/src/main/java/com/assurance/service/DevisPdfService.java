@@ -335,11 +335,16 @@ public class DevisPdfService {
             return false;
         }
 
-        document.add(new Paragraph(toRoman(sectionIndex) + ". Les franchises").setBold().setFontSize(11));
+        document.add(new Paragraph(toRoman(sectionIndex) + ". Les franchises")
+                .setBold()
+                .setFontSize(11)
+                .setKeepWithNext(true));
         float[] widths = new float[1 + usages.size()];
         Arrays.fill(widths, 1.0f);
         widths[0] = 1.5f;
-        Table table = new Table(widths).setWidth(UnitValue.createPercentValue(35));
+        Table table = new Table(widths)
+                .setWidth(UnitValue.createPercentValue(35))
+                .setKeepTogether(true);
         table.addCell(headerCell("Garanties", 1, 1));
         for (Usage usage : usages) {
             String code = value(usage.getCode(), usage.getLibelle());

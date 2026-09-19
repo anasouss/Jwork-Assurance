@@ -30,7 +30,7 @@ export function moneyAmount(value?: number | null) {
   return new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value ?? 0);
+  }).format(value ?? 0).replace(/[\u00a0\u202f]/g, " ");
 }
 
 export function money(value: unknown) {

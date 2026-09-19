@@ -15,13 +15,9 @@ import type { SinistreSummary } from "@/features/sinistre/types";
 import { useAuthStore } from "@/store/auth-store";
 import { clientApi } from "../api/clients";
 import type { ClientCrm } from "../types";
+import { moneyAmount } from "../utils/format";
 
 type PortfolioContract = ClientCrm["contrats"][number];
-
-const moneyFormatter = new Intl.NumberFormat("fr-MA", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 export default function ClientPortfolioPage() {
   const { clientId = "" } = useParams();
@@ -375,5 +371,5 @@ function formatDate(value?: string | null) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
-function money(value?: number | null) { return moneyFormatter.format(Number(value || 0)); }
+function money(value?: number | null) { return moneyAmount(Number(value || 0)); }
 function normalize(value?: string | null) { return String(value || "").trim().toUpperCase(); }

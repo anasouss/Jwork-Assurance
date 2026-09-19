@@ -254,6 +254,7 @@ public class ComptaController {
     public ResponseEntity<ApiResponse<SourceDocumentClientPageResponse>> sourcesDocumentsClients(
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) Long contratId,
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) TypeContrat typeContrat,
@@ -268,6 +269,7 @@ public class ComptaController {
                 TenantContext.getCurrentAgence(),
                 payeurType,
                 payeurId,
+                contratId,
                 brancheId,
                 compagnieId,
                 typeContrat,

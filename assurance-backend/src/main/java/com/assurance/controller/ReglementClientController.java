@@ -43,6 +43,7 @@ public class ReglementClientController {
     public ResponseEntity<ApiResponse<CreanceClientPageResponse>> receivables(
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) Long contratId,
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false)
@@ -59,6 +60,7 @@ public class ReglementClientController {
                 TenantContext.getCurrentAgence(),
                 payeurType,
                 payeurId,
+                contratId,
                 brancheId,
                 typeContrat,
                 dateDu,

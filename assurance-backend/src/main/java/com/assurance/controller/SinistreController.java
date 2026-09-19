@@ -73,6 +73,8 @@ public class SinistreController {
     public ResponseEntity<ApiResponse<PagedResponse<SinistreSummaryResponse>>> list(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) Long contratId,
+            @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) StatutSinistre statut,
             @RequestParam(required = false) NatureSinistre nature,
             @RequestParam(required = false) LocalDate dateDu,
@@ -84,6 +86,8 @@ public class SinistreController {
                 TenantContext.getCurrentAgence(),
                 query,
                 clientId,
+                contratId,
+                brancheId,
                 statut,
                 nature,
                 dateDu,

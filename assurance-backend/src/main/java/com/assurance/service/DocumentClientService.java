@@ -136,7 +136,7 @@ public class DocumentClientService {
             int size
     ) {
         return searchSources(
-                agenceId, payeurType, payeurId, brancheId, null, typeContrat, null,
+                agenceId, payeurType, payeurId, null, brancheId, null, typeContrat, null,
                 dateDu, dateAu, search, false, sort, page, size
         );
     }
@@ -157,7 +157,7 @@ public class DocumentClientService {
             int size
     ) {
         return searchSources(
-                agenceId, payeurType, payeurId, brancheId, compagnieId, typeContrat, documentState,
+                agenceId, payeurType, payeurId, null, brancheId, compagnieId, typeContrat, documentState,
                 dateDu, dateAu, search, true,
                 Sort.by(Sort.Direction.DESC, "dateDebut").and(Sort.by(Sort.Direction.DESC, "id")),
                 page, size
@@ -169,6 +169,31 @@ public class DocumentClientService {
             Long agenceId,
             String payeurType,
             Long payeurId,
+            Long contratId,
+            Long brancheId,
+            Long compagnieId,
+            TypeContrat typeContrat,
+            String documentState,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search,
+            int page,
+            int size
+    ) {
+        return searchSources(
+                agenceId, payeurType, payeurId, contratId, brancheId, compagnieId, typeContrat, documentState,
+                dateDu, dateAu, search, true,
+                Sort.by(Sort.Direction.DESC, "dateDebut").and(Sort.by(Sort.Direction.DESC, "id")),
+                page, size
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public SourceDocumentClientPageResponse searchSources(
+            Long agenceId,
+            String payeurType,
+            Long payeurId,
+            Long contratId,
             Long brancheId,
             Long compagnieId,
             TypeContrat typeContrat,
@@ -188,6 +213,7 @@ public class DocumentClientService {
         Page<ElementFacturable> result = elementFacturableRepository.searchForClientDocuments(
                 agenceId,
                 brancheId,
+                contratId,
                 compagnieId,
                 typeContrat,
                 normalizedDocumentState,

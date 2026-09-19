@@ -531,6 +531,9 @@ export type ClientCrm = {
     numeroPolice?: string | null;
     typeContrat?: string | null;
     statut?: string | null;
+    brancheAssuranceId?: string | null;
+    brancheAssuranceCode?: string | null;
+    brancheAssuranceLibelle?: string | null;
     dateEffet?: string | null;
     dateEcheance?: string | null;
     compagnie?: string | null;

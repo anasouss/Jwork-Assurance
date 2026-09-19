@@ -71,6 +71,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
               )
               and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:contratId is null or c.id = :contratId)
               and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
@@ -374,6 +375,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
     Page<ElementFacturable> searchForClientDocuments(
             @Param("agenceId") Long agenceId,
             @Param("brancheId") Long brancheId,
+            @Param("contratId") Long contratId,
             @Param("compagnieId") Long compagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("documentState") String documentState,

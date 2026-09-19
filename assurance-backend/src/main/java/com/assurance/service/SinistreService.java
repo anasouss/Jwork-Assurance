@@ -130,6 +130,8 @@ public class SinistreService {
             Long agenceId,
             String query,
             Long clientId,
+            Long contratId,
+            Long brancheId,
             StatutSinistre statut,
             com.assurance.enums.NatureSinistre nature,
             LocalDate dateDu,
@@ -140,7 +142,7 @@ public class SinistreService {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Page<Sinistre> result = sinistreRepository.findAll(
-                specification(agenceId, query, clientId, statut, nature, dateDu, dateAu),
+                specification(agenceId, query, clientId, contratId, brancheId, statut, nature, dateDu, dateAu),
                 PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"))
         );
         return PagedResponse.<SinistreSummaryResponse>builder()
@@ -343,6 +345,8 @@ public class SinistreService {
             Long agenceId,
             String query,
             Long clientId,
+            Long contratId,
+            Long brancheId,
             StatutSinistre statut,
             com.assurance.enums.NatureSinistre nature,
             LocalDate dateDu,
@@ -353,6 +357,12 @@ public class SinistreService {
             predicates.add(builder.equal(root.get("agence").get("id"), agenceId));
             if (clientId != null) {
                 predicates.add(builder.equal(root.get("client").get("id"), clientId));
+            }
+            if (contratId != null) {
+                predicates.add(builder.equal(root.get("contrat").get("id"), contratId));
+            }
+            if (brancheId != null) {
+                predicates.add(builder.equal(root.get("contrat").get("brancheAssurance").get("id"), brancheId));
             }
             if (statut != null) {
                 predicates.add(builder.equal(root.get("statut"), statut));

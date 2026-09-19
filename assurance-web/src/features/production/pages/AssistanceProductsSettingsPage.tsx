@@ -27,9 +27,9 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SortIcon } from "@/components/ui/sort-icon";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { compareTableValues, nextTableSort } from "@/lib/table-sort";
 import { toDateOnly } from "../date";
 import { assistanceProductApi } from "../api/assistance-products";
 import { referenceApi } from "../api/references";
@@ -45,6 +45,7 @@ const ALL = "__all__";
 const NONE = "__none__";
 type ProductSortKey = "PRODUCT" | "COMPANY" | "TYPE" | "CATEGORY" | "USAGES" | "HT" | "TTC" | "PERIOD" | "ACTIVE";
 type ProductSortDirection = "asc" | "desc";
+type TariffSortColumn = "PERIOD" | "HT" | "TTC";
 
 export default function AssistanceProductsSettingsPage() {
   const queryClient = useQueryClient();
@@ -59,6 +60,7 @@ export default function AssistanceProductsSettingsPage() {
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [productPayload, setProductPayload] = useState<UpsertProduitAssistanceRequest>(emptyProduct(""));
   const [tarifProduct, setTarifProduct] = useState<ReferenceOption | null>(null);
+  const [tariffSort, setTariffSort] = useState<{ column: TariffSortColumn; direction: ProductSortDirection }>({ column: "PERIOD", direction: "desc" });
   const [editingTarif, setEditingTarif] = useState<ReferenceOption | null>(null);
   const [tarifPayload, setTarifPayload] = useState<UpsertTarifProduitAssistanceRequest>(emptyTarif());
 
@@ -135,6 +137,12 @@ export default function AssistanceProductsSettingsPage() {
       return productSort.direction === "asc" ? comparison : -comparison;
     });
   }, [productSearch, productSort, products.data, selectedCompanyId]);
+
+  const sortedTariffs = useMemo(() => [...(tarifs.data ?? [])].sort((left, right) => compareTableValues(
+    tariffSortValue(left, tariffSort.column),
+    tariffSortValue(right, tariffSort.column),
+    tariffSort.direction,
+  )), [tariffSort, tarifs.data]);
 
   function sortProducts(key: ProductSortKey) {
     setProductSort((current) => ({
@@ -407,14 +415,14 @@ export default function AssistanceProductsSettingsPage() {
             <Table>
               <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
                 <TableRow className="hover:bg-amber-600">
-                  <TableHead>Période</TableHead>
-                  <TableHead className="text-right">Montant HT</TableHead>
-                  <TableHead className="text-right">Montant TTC</TableHead>
+                  <SortableTableHead column="PERIOD" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))}>Période</SortableTableHead>
+                  <SortableTableHead column="HT" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))} align="right">Montant HT</SortableTableHead>
+                  <SortableTableHead column="TTC" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))} align="right">Montant TTC</SortableTableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(tarifs.data ?? []).map((tarif) => (
+                {sortedTariffs.map((tarif) => (
                   <TableRow key={tarif.id}>
                     <TableCell>{periodLabelFromDates(refString(tarif, "dateDebut"), refString(tarif, "dateFin"))}</TableCell>
                     <TableCell className="text-right">{money(refNumber(tarif, "montantHt"))}</TableCell>
@@ -642,24 +650,16 @@ function SortableProductHead({
   onSort: (column: ProductSortKey) => void;
   align?: "left" | "right";
 }) {
-  const active = sort.key === column;
   return (
-    <TableHead
-      aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
-      className={align === "right" ? "text-right" : undefined}
+    <SortableTableHead
+      column={column}
+      activeColumn={sort.key}
+      direction={sort.direction}
+      onSort={onSort}
+      align={align}
     >
-      <button
-        type="button"
-        className={cn(
-          "inline-flex items-center font-semibold transition-colors hover:text-white/80",
-          align === "right" && "w-full justify-end"
-        )}
-        onClick={() => onSort(column)}
-      >
-        {label}
-        <SortIcon isActive={active} direction={sort.direction} />
-      </button>
-    </TableHead>
+      {label}
+    </SortableTableHead>
   );
 }
 
@@ -680,6 +680,14 @@ function productSortValue(product: ReferenceOption, key: ProductSortKey): string
 function compareProductValues(left: string | number, right: string | number) {
   if (typeof left === "number" && typeof right === "number") return left - right;
   return String(left).localeCompare(String(right), "fr", { numeric: true, sensitivity: "base" });
+}
+
+function tariffSortValue(tariff: ReferenceOption, column: TariffSortColumn) {
+  switch (column) {
+    case "PERIOD": return refString(tariff, "dateDebut");
+    case "HT": return refNumber(tariff, "montantHt");
+    case "TTC": return refNumber(tariff, "montantTtc");
+  }
 }
 
 function periodLabel(product: ReferenceOption) {

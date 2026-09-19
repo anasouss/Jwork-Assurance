@@ -21,8 +21,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +35,7 @@ public class ContactCompagnieService {
     @Transactional(readOnly = true)
     public PagedResponse<ContactCompagnieResponse> list(Long agenceId, String query, Long compagnieId,
                                                         ServiceContactCompagnie service, Boolean actif,
+                                                        String sortBy, Sort.Direction sortDirection,
                                                         int page, int size) {
         if (agenceId == null) {
             return PagedResponse.<ContactCompagnieResponse>builder()
@@ -48,10 +49,7 @@ public class ContactCompagnieService {
         PageRequest pageable = PageRequest.of(
                 Math.max(page, 0),
                 Math.min(Math.max(size, 1), 100),
-                Sort.by("compagnieAssurance.nom").ascending()
-                        .and(Sort.by("principal").descending())
-                        .and(Sort.by("nom").ascending())
-                        .and(Sort.by("prenom").ascending())
+                contactSort(sortBy, sortDirection)
         );
         Page<ContactCompagnie> result = contactRepository.search(
                 agenceId, compagnieId, service, actif, searchTerm(query), pageable);
@@ -59,6 +57,23 @@ public class ContactCompagnieService {
                 .items(result.getContent().stream().map(this::toResponse).toList())
                 .page(PageMetadata.from(result))
                 .build();
+    }
+
+    private Sort contactSort(String sortBy, Sort.Direction direction) {
+        Sort.Direction safeDirection = direction == null ? Sort.Direction.ASC : direction;
+        String property = switch (sortBy == null ? "" : sortBy.trim().toUpperCase()) {
+            case "CONTACT" -> "nom";
+            case "SERVICE" -> "service";
+            case "PHONE" -> "telephoneMobile";
+            case "EMAIL" -> "email";
+            case "PRINCIPAL" -> "principal";
+            case "STATUS" -> "actif";
+            default -> "compagnieAssurance.nom";
+        };
+        return Sort.by(safeDirection, property)
+                .and(Sort.by(Sort.Direction.ASC, "nom"))
+                .and(Sort.by(Sort.Direction.ASC, "prenom"))
+                .and(Sort.by(Sort.Direction.ASC, "id"));
     }
 
     @Transactional

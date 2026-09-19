@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { compareTableValues, nextTableSort } from "@/lib/table-sort";
 import { useAuthStore } from "@/store/auth-store";
 import { pricingApi } from "../api/pricing";
 import { referenceApi } from "../api/references";
@@ -21,6 +23,7 @@ import type {
 } from "../types";
 
 const ALL = "__all__";
+type PricingGridSortColumn = "grid" | "company" | "conventions" | "usages" | "configuration" | "status";
 
 type Filters = {
   query: string;
@@ -44,6 +47,7 @@ export default function CompaniesPricingGridsPage() {
   const canManage = permissions.includes("referentiel:manage");
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [sort, setSort] = useState<{ column: PricingGridSortColumn; direction: TableSortDirection }>({ column: "grid", direction: "asc" });
   const [editing, setEditing] = useState<GrilleTarifaireCatalogueItem | null>(null);
   const [configuring, setConfiguring] = useState<GrilleTarifaireCatalogueItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -86,6 +90,12 @@ export default function CompaniesPricingGridsPage() {
     queryKey: ["referentiel", "grilles-tarifaires", "catalogue", catalogueParams],
     queryFn: () => referenceApi.pricingGridCatalogue(catalogueParams),
   });
+
+  const sortedCatalogue = useMemo(() => [...(catalogue.data ?? [])].sort((left, right) => compareTableValues(
+    pricingGridSortValue(left, sort.column),
+    pricingGridSortValue(right, sort.column),
+    sort.direction,
+  )), [catalogue.data, sort]);
 
   const conventionOptions = useMemo(() => (conventions.data ?? []).filter((convention) => (
     draftFilters.compagnieId === ALL
@@ -206,17 +216,17 @@ export default function CompaniesPricingGridsPage() {
           <Table>
             <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
               <TableRow className="hover:bg-amber-600">
-                <TableHead>Grille</TableHead>
-                <TableHead>Compagnie</TableHead>
-                <TableHead>Conventions</TableHead>
-                <TableHead>Usages configurés</TableHead>
-                <TableHead>Configuration</TableHead>
-                <TableHead>Statut</TableHead>
+                <SortableTableHead column="grid" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Grille</SortableTableHead>
+                <SortableTableHead column="company" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Compagnie</SortableTableHead>
+                <SortableTableHead column="conventions" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Conventions</SortableTableHead>
+                <SortableTableHead column="usages" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Usages configurés</SortableTableHead>
+                <SortableTableHead column="configuration" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Configuration</SortableTableHead>
+                <SortableTableHead column="status" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Statut</SortableTableHead>
                 {canManage ? <TableHead className="w-20 text-right">Actions</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(catalogue.data ?? []).map((grille) => (
+              {sortedCatalogue.map((grille) => (
                 <TableRow key={grille.id}>
                   <TableCell className="min-w-56">
                     <div className="font-medium">{grille.libelle}</div>
@@ -310,6 +320,17 @@ function ReferenceList({ values, empty }: { values: string[]; empty: string }) {
 
 function optionalFilter(value: string) {
   return value === ALL ? undefined : value;
+}
+
+function pricingGridSortValue(grille: GrilleTarifaireCatalogueItem, column: PricingGridSortColumn) {
+  switch (column) {
+    case "grid": return grille.libelle;
+    case "company": return grille.compagnieAssuranceLibelle;
+    case "conventions": return grille.conventions.map((convention) => convention.libelle).join(" ");
+    case "usages": return grille.usages.map((usage) => usage.libelle).join(" ");
+    case "configuration": return grille.nombreLignes;
+    case "status": return grille.actif;
+  }
 }
 
 function toReferenceOption(grille: GrilleTarifaireCatalogueItem): ReferenceOption {

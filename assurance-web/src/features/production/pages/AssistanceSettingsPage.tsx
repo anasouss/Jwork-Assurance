@@ -15,16 +15,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { compareTableValues, nextTableSort } from "@/lib/table-sort";
 import { assistanceProductApi } from "../api/assistance-products";
 import { referenceApi } from "../api/references";
 import { Field } from "../components/Field";
 import type { ReferenceOption, UpsertCompagnieAssistanceRequest } from "../types";
 
+type AssistanceCompanySortColumn = "code" | "company" | "phone" | "email" | "active";
+
 export default function AssistanceSettingsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [companySearch, setCompanySearch] = useState("");
+  const [sort, setSort] = useState<{ column: AssistanceCompanySortColumn; direction: TableSortDirection }>({ column: "company", direction: "asc" });
   const [editingCompany, setEditingCompany] = useState<ReferenceOption | null>(null);
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const [companyPayload, setCompanyPayload] = useState<UpsertCompagnieAssistanceRequest>(emptyCompany());
@@ -42,12 +47,17 @@ export default function AssistanceSettingsPage() {
 
   const filteredCompanies = useMemo(() => {
     const term = companySearch.trim().toLowerCase();
-    return (companies.data ?? []).filter((company) => {
+    const result = (companies.data ?? []).filter((company) => {
       if (!term) return true;
       return [company.code, company.libelle, refString(company, "email"), refString(company, "telephone")]
         .some((value) => String(value ?? "").toLowerCase().includes(term));
     });
-  }, [companies.data, companySearch]);
+    return result.sort((left, right) => compareTableValues(
+      assistanceCompanySortValue(left, sort.column),
+      assistanceCompanySortValue(right, sort.column),
+      sort.direction,
+    ));
+  }, [companies.data, companySearch, sort]);
 
   const saveCompany = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertCompagnieAssistanceRequest }) =>
@@ -106,11 +116,11 @@ export default function AssistanceSettingsPage() {
           <Table>
             <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
               <TableRow className="hover:bg-amber-600">
-                <TableHead>Code</TableHead>
-                <TableHead>Compagnie</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Actif</TableHead>
+                <SortableTableHead column="code" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Code</SortableTableHead>
+                <SortableTableHead column="company" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Compagnie</SortableTableHead>
+                <SortableTableHead column="phone" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Téléphone</SortableTableHead>
+                <SortableTableHead column="email" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Email</SortableTableHead>
+                <SortableTableHead column="active" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Actif</SortableTableHead>
                 <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -233,6 +243,16 @@ function submitCompany(
 function refString(item: ReferenceOption | Record<string, unknown>, key: string) {
   const value = item[key];
   return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
+function assistanceCompanySortValue(company: ReferenceOption, column: AssistanceCompanySortColumn) {
+  switch (column) {
+    case "code": return company.code;
+    case "company": return company.libelle;
+    case "phone": return refString(company, "telephone");
+    case "email": return refString(company, "email");
+    case "active": return company.actif !== false;
+  }
 }
 
 function cleanOptional(value?: string) {

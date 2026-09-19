@@ -19,7 +19,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { compareTableValues, nextTableSort } from "@/lib/table-sort";
 import { pricingApi } from "../api/pricing";
 import { referenceApi } from "../api/references";
 import { referenceAdminApi } from "../api/reference-admin";
@@ -30,12 +32,14 @@ import type { ReferenceOption, UpsertConventionRequest, UpsertGrilleTarifaireReq
 
 const ALL_COMPANIES = "__all__";
 const NONE = "__none__";
+type ConventionSortColumn = "code" | "convention" | "company" | "category" | "grid" | "usages" | "dueDate" | "frequency";
 
 export default function CompaniesConventionsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [compagnieId, setCompagnieIdState] = useState(searchParams.get("compagnieId") || ALL_COMPANIES);
+  const [sort, setSort] = useState<{ column: ConventionSortColumn; direction: TableSortDirection }>({ column: "code", direction: "asc" });
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [configuring, setConfiguring] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -104,7 +108,7 @@ export default function CompaniesConventionsPage() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return (conventions.data ?? []).filter((convention) => {
+    const result = (conventions.data ?? []).filter((convention) => {
       if (compagnieId !== ALL_COMPANIES && conventionField(convention, "compagnieAssuranceId") !== compagnieId) {
         return false;
       }
@@ -119,7 +123,12 @@ export default function CompaniesConventionsPage() {
         conventionField(convention, "fractionnement"),
       ].some((value) => String(value ?? "").toLowerCase().includes(term));
     });
-  }, [compagnieId, conventions.data, search]);
+    return result.sort((left, right) => compareTableValues(
+      conventionSortValue(left, sort.column),
+      conventionSortValue(right, sort.column),
+      sort.direction,
+    ));
+  }, [compagnieId, conventions.data, search, sort]);
 
   const configuredGrille = configuring ? conventionGrille(configuring) : null;
 
@@ -193,14 +202,14 @@ export default function CompaniesConventionsPage() {
           <Table>
             <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
               <TableRow className="hover:bg-amber-600">
-                <TableHead>Code</TableHead>
-                <TableHead>Convention</TableHead>
-                <TableHead>Compagnie</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Grille</TableHead>
-                <TableHead>Usages</TableHead>
-                <TableHead>Échéance</TableHead>
-                <TableHead>Fractionnement</TableHead>
+                <SortableTableHead column="code" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Code</SortableTableHead>
+                <SortableTableHead column="convention" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Convention</SortableTableHead>
+                <SortableTableHead column="company" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Compagnie</SortableTableHead>
+                <SortableTableHead column="category" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Catégorie</SortableTableHead>
+                <SortableTableHead column="grid" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Grille</SortableTableHead>
+                <SortableTableHead column="usages" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Usages</SortableTableHead>
+                <SortableTableHead column="dueDate" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Échéance</SortableTableHead>
+                <SortableTableHead column="frequency" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Fractionnement</SortableTableHead>
                 <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -534,4 +543,17 @@ function formatEcheance(convention: ReferenceOption) {
     return echeance || "-";
   }
   return "Date à date";
+}
+
+function conventionSortValue(convention: ReferenceOption, column: ConventionSortColumn) {
+  switch (column) {
+    case "code": return convention.code;
+    case "convention": return convention.libelle;
+    case "company": return conventionField(convention, "compagnieAssuranceLibelle");
+    case "category": return conventionField(convention, "categorieClientLibelle");
+    case "grid": return conventionField(convention, "grilleTarifaireLibelle");
+    case "usages": return referenceStringArray(convention, "usageLibelles").join(" ");
+    case "dueDate": return conventionField(convention, "echeance");
+    case "frequency": return conventionField(convention, "fractionnement");
+  }
 }

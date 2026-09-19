@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { nextTableSort } from "@/lib/table-sort";
 import { useAuthStore } from "@/store/auth-store";
 import { companyContactsApi } from "../api/company-contacts";
 import { referenceApi } from "../api/references";
@@ -28,6 +30,7 @@ import { Field } from "../components/Field";
 const PAGE_SIZE = 25;
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 type ContactFilters = { q: string; compagnieId: string; service: string; status: StatusFilter };
+type ContactSortColumn = "CONTACT" | "COMPANY" | "SERVICE" | "PHONE" | "EMAIL" | "PRINCIPAL" | "STATUS";
 
 export default function CompanyContactsPage() {
   const queryClient = useQueryClient();
@@ -36,6 +39,7 @@ export default function CompanyContactsPage() {
   const [filters, setFilters] = useState<ContactFilters>(initial.filters);
   const [appliedFilters, setAppliedFilters] = useState<ContactFilters>(initial.filters);
   const [page, setPage] = useState(initial.page);
+  const [sort, setSort] = useState<{ column: ContactSortColumn; direction: TableSortDirection }>(initial.sort);
   const [editing, setEditing] = useState<CompanyContact | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusTarget, setStatusTarget] = useState<CompanyContact | null>(null);
@@ -52,9 +56,11 @@ export default function CompanyContactsPage() {
     compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
     service: appliedFilters.service === "ALL" ? undefined : appliedFilters.service as CompanyContactService,
     actif: appliedFilters.status === "ALL" ? undefined : appliedFilters.status === "ACTIVE",
+    sortBy: sort.column,
+    sortDirection: sort.direction.toUpperCase() as "ASC" | "DESC",
     page,
     size: PAGE_SIZE,
-  }), [appliedFilters, page]);
+  }), [appliedFilters, page, sort]);
   const contacts = useQuery({
     queryKey: ["company-contacts", listParams],
     queryFn: () => companyContactsApi.list(listParams),
@@ -88,12 +94,19 @@ export default function CompanyContactsPage() {
   function applyFilters(next: ContactFilters) {
     setAppliedFilters(next);
     setPage(0);
-    setSearchParams(paramsFromState(next, 0), { replace: true });
+    setSearchParams(paramsFromState(next, 0, sort), { replace: true });
   }
 
   function goToPage(nextPage: number) {
     setPage(nextPage);
-    setSearchParams(paramsFromState(appliedFilters, nextPage), { replace: true });
+    setSearchParams(paramsFromState(appliedFilters, nextPage, sort), { replace: true });
+  }
+
+  function changeSort(column: ContactSortColumn) {
+    const next = nextTableSort(sort, column);
+    setSort(next);
+    setPage(0);
+    setSearchParams(paramsFromState(appliedFilters, 0, next), { replace: true });
   }
 
   function reset() {
@@ -177,9 +190,14 @@ export default function CompanyContactsPage() {
               <Table>
                 <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
                   <TableRow className="hover:bg-amber-600">
-                    <TableHead>Contact</TableHead><TableHead>Compagnie</TableHead><TableHead>Service</TableHead>
-                    <TableHead>Téléphones</TableHead><TableHead>E-mail</TableHead><TableHead>Principal</TableHead>
-                    <TableHead>Statut</TableHead><TableHead className="w-20 text-right">Actions</TableHead>
+                    <SortableTableHead column="CONTACT" activeColumn={sort.column} direction={sort.direction} onSort={changeSort}>Contact</SortableTableHead>
+                    <SortableTableHead column="COMPANY" activeColumn={sort.column} direction={sort.direction} onSort={changeSort}>Compagnie</SortableTableHead>
+                    <SortableTableHead column="SERVICE" activeColumn={sort.column} direction={sort.direction} onSort={changeSort}>Service</SortableTableHead>
+                    <SortableTableHead column="PHONE" activeColumn={sort.column} direction={sort.direction} onSort={changeSort}>Téléphones</SortableTableHead>
+                    <SortableTableHead column="EMAIL" activeColumn={sort.column} direction={sort.direction} onSort={changeSort}>E-mail</SortableTableHead>
+                    <SortableTableHead column="PRINCIPAL" activeColumn={sort.column} direction={sort.direction} onSort={changeSort}>Principal</SortableTableHead>
+                    <SortableTableHead column="STATUS" activeColumn={sort.column} direction={sort.direction} onSort={changeSort}>Statut</SortableTableHead>
+                    <TableHead className="w-20 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -270,6 +288,10 @@ function fullName(contact: CompanyContact) {
 function stateFromParams(params: URLSearchParams) {
   const rawStatus = params.get("statut");
   const status: StatusFilter = rawStatus === "ALL" || rawStatus === "INACTIVE" ? rawStatus : "ACTIVE";
+  const rawSort = params.get("tri") as ContactSortColumn | null;
+  const column: ContactSortColumn = rawSort && ["CONTACT", "COMPANY", "SERVICE", "PHONE", "EMAIL", "PRINCIPAL", "STATUS"].includes(rawSort)
+    ? rawSort
+    : "COMPANY";
   return {
     filters: {
       q: params.get("q") ?? "",
@@ -278,15 +300,25 @@ function stateFromParams(params: URLSearchParams) {
       status,
     },
     page: Math.max(0, Number.parseInt(params.get("page") ?? "0", 10) || 0),
+    sort: {
+      column,
+      direction: params.get("ordre") === "desc" ? "desc" as const : "asc" as const,
+    },
   };
 }
 
-function paramsFromState(filters: ContactFilters, page: number) {
+function paramsFromState(
+  filters: ContactFilters,
+  page: number,
+  sort: { column: ContactSortColumn; direction: TableSortDirection },
+) {
   const params = new URLSearchParams();
   if (filters.q.trim()) params.set("q", filters.q.trim());
   if (filters.compagnieId !== "ALL") params.set("compagnieId", filters.compagnieId);
   if (filters.service !== "ALL") params.set("service", filters.service);
   if (filters.status !== "ACTIVE") params.set("statut", filters.status);
   if (page > 0) params.set("page", String(page));
+  if (sort.column !== "COMPANY") params.set("tri", sort.column);
+  if (sort.direction !== "asc") params.set("ordre", sort.direction);
   return params;
 }

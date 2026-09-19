@@ -4,7 +4,16 @@ import type { CompanyContact, CompanyContactPage, CompanyContactService, UpsertC
 import { unwrapApiResponse as unwrap } from "./response";
 
 export const companyContactsApi = {
-  async list(params: { q?: string; compagnieId?: string; service?: CompanyContactService; actif?: boolean; page: number; size: number }): Promise<CompanyContactPage> {
+  async list(params: {
+    q?: string;
+    compagnieId?: string;
+    service?: CompanyContactService;
+    actif?: boolean;
+    sortBy: "CONTACT" | "COMPANY" | "SERVICE" | "PHONE" | "EMAIL" | "PRINCIPAL" | "STATUS";
+    sortDirection: "ASC" | "DESC";
+    page: number;
+    size: number;
+  }): Promise<CompanyContactPage> {
     return unwrap(await apiFetch<ApiResponse<CompanyContactPage>>(
       `/api/v1/compagnies-assurance/contacts${buildQueryString(params)}`,
     ));

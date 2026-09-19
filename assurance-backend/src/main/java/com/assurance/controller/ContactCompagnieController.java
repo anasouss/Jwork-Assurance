@@ -10,6 +10,7 @@ import com.assurance.security.TenantContext;
 import com.assurance.service.ContactCompagnieService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,11 +37,14 @@ public class ContactCompagnieController {
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) ServiceContactCompagnie service,
             @RequestParam(required = false) Boolean actif,
+            @RequestParam(defaultValue = "COMPANY") String sortBy,
+            @RequestParam(defaultValue = "ASC") Sort.Direction sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size
     ) {
         return ResponseEntity.ok(ApiResponse.success(contactService.list(
-                TenantContext.getCurrentAgence(), q, compagnieId, service, actif, page, size)));
+                TenantContext.getCurrentAgence(), q, compagnieId, service, actif,
+                sortBy, sortDirection, page, size)));
     }
 
     @PostMapping("/{compagnieId}/contacts")

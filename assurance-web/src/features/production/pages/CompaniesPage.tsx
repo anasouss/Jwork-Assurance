@@ -16,13 +16,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { compareTableValues, nextTableSort } from "@/lib/table-sort";
 import { referenceApi } from "../api/references";
 import { referenceAdminApi } from "../api/reference-admin";
 import { Field } from "../components/Field";
 import { compagnieAssuranceSchema } from "../schemas";
 import type { ReferenceOption, UpsertCompagnieAssuranceRequest } from "../types";
 import { useAuthStore } from "@/store/auth-store";
+
+type CompanySortColumn = "code" | "company" | "order" | "city" | "phone" | "rc" | "ice" | "attestation" | "greenCard" | "dossier" | "active";
 
 export default function CompaniesPage() {
   const queryClient = useQueryClient();
@@ -36,6 +40,7 @@ export default function CompaniesPage() {
   });
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  const [sort, setSort] = useState<{ column: CompanySortColumn; direction: TableSortDirection }>({ column: "order", direction: "asc" });
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertCompagnieAssuranceRequest>(emptyCompany());
@@ -49,7 +54,7 @@ export default function CompaniesPage() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return (compagnies.data ?? []).filter((compagnie) => {
+    const result = (compagnies.data ?? []).filter((compagnie) => {
       const active = compagnie.actif !== false;
       if (status === "active" && !active) return false;
       if (status === "inactive" && active) return false;
@@ -63,7 +68,12 @@ export default function CompaniesPage() {
         companyField(compagnie, "prefixeDossier"),
       ].some((value) => String(value ?? "").toLowerCase().includes(term));
     });
-  }, [compagnies.data, search, status]);
+    return result.sort((left, right) => compareTableValues(
+      companySortValue(left, sort.column),
+      companySortValue(right, sort.column),
+      sort.direction,
+    ));
+  }, [compagnies.data, search, sort, status]);
 
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertCompagnieAssuranceRequest }) =>
@@ -120,17 +130,17 @@ export default function CompaniesPage() {
           <Table>
             <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
               <TableRow className="hover:bg-amber-600">
-                <TableHead>Code</TableHead>
-                <TableHead>Compagnie</TableHead>
-                <TableHead className="text-right">Ordre</TableHead>
-                <TableHead>Ville</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead>RC</TableHead>
-                <TableHead>ICE</TableHead>
-                <TableHead>Préfixe attestation</TableHead>
-                <TableHead>Préfixe carte verte</TableHead>
-                <TableHead>Préfixe dossier</TableHead>
-                <TableHead>Actif</TableHead>
+                <SortableTableHead column="code" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Code</SortableTableHead>
+                <SortableTableHead column="company" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Compagnie</SortableTableHead>
+                <SortableTableHead column="order" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))} align="right">Ordre</SortableTableHead>
+                <SortableTableHead column="city" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Ville</SortableTableHead>
+                <SortableTableHead column="phone" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Téléphone</SortableTableHead>
+                <SortableTableHead column="rc" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>RC</SortableTableHead>
+                <SortableTableHead column="ice" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>ICE</SortableTableHead>
+                <SortableTableHead column="attestation" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Préfixe attestation</SortableTableHead>
+                <SortableTableHead column="greenCard" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Préfixe carte verte</SortableTableHead>
+                <SortableTableHead column="dossier" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Préfixe dossier</SortableTableHead>
+                <SortableTableHead column="active" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Actif</SortableTableHead>
                 <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -306,6 +316,22 @@ function companyNumber(compagnie: ReferenceOption, key: string) {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
+}
+
+function companySortValue(compagnie: ReferenceOption, column: CompanySortColumn) {
+  switch (column) {
+    case "code": return compagnie.code;
+    case "company": return compagnie.libelle;
+    case "order": return companyNumber(compagnie, "ordreAffichage");
+    case "city": return companyField(compagnie, "ville");
+    case "phone": return companyField(compagnie, "telephone");
+    case "rc": return companyField(compagnie, "rc");
+    case "ice": return companyField(compagnie, "ice");
+    case "attestation": return companyField(compagnie, "prefixeAttestation");
+    case "greenCard": return companyField(compagnie, "prefixeCarteVerte");
+    case "dossier": return companyField(compagnie, "prefixeDossier");
+    case "active": return compagnie.actif !== false;
+  }
 }
 
 function cleanCompanyPayload(payload: UpsertCompagnieAssuranceRequest): UpsertCompagnieAssuranceRequest {

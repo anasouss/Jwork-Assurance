@@ -116,7 +116,7 @@ export default function ClientPortfolioPage() {
   }
 
   return (
-    <div className="grid min-w-0 gap-4">
+    <div className="mx-auto grid w-full max-w-[1600px] min-w-0 gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-3 mb-1">
@@ -138,7 +138,10 @@ export default function ClientPortfolioPage() {
         </div>
       </header>
 
-      <ClientIdentity portfolio={portfolio} />
+      <PortfolioRow
+        main={<ClientIdentity portfolio={portfolio} />}
+        documents={<ClientDocumentsSection client={client} />}
+      />
 
       {selectedContract ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -147,22 +150,29 @@ export default function ClientPortfolioPage() {
         </div>
       ) : null}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="grid min-w-0 gap-4">
-          <ProductionSection contracts={filteredContracts} selectedContractId={selectedContractId} onSelectContract={setSelectedContractId} />
-          <AccountingSection allowed={canViewReceivables} loading={receivablesQuery.isLoading} rows={receivablesQuery.data?.rows ?? []} summary={receivablesQuery.data?.summary} accountingUrl={accountingUrl} />
-          <ClaimsSection allowed={canViewClaims} loading={claimsQuery.isLoading} rows={claimsQuery.data?.items ?? []} />
-        </div>
-        <DocumentsSection
-          contracts={activeContractId ? filteredContracts.filter((contract) => contract.id === activeContractId) : filteredContracts}
+      <PortfolioRow
+        main={<ProductionSection contracts={filteredContracts} selectedContractId={selectedContractId} onSelectContract={setSelectedContractId} />}
+        documents={<ProductionDocumentsSection contracts={activeContractId ? filteredContracts.filter((contract) => contract.id === activeContractId) : filteredContracts} />}
+      />
+      <PortfolioRow
+        main={<AccountingSection allowed={canViewReceivables} loading={receivablesQuery.isLoading} rows={receivablesQuery.data?.rows ?? []} summary={receivablesQuery.data?.summary} accountingUrl={accountingUrl} />}
+        documents={<AccountingDocumentsSection
           rows={sourcesQuery.data?.rows ?? []}
           loading={sourcesQuery.isLoading}
           allowed={canViewDocuments}
           accountingUrl={accountingUrl}
-        />
-      </div>
+        />}
+      />
+      <PortfolioRow
+        main={<ClaimsSection allowed={canViewClaims} loading={claimsQuery.isLoading} rows={claimsQuery.data?.items ?? []} />}
+        documents={<ClaimsDocumentsSection rows={claimsQuery.data?.items ?? []} loading={claimsQuery.isLoading} allowed={canViewClaims} />}
+      />
     </div>
   );
+}
+
+function PortfolioRow({ main, documents }: { main: ReactNode; documents: ReactNode }) {
+  return <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">{main}{documents}</div>;
 }
 
 function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
@@ -235,17 +245,60 @@ function ClaimsSection({ allowed, loading, rows }: { allowed: boolean; loading: 
   );
 }
 
-function DocumentsSection({ contracts, rows, loading, allowed, accountingUrl }: { contracts: PortfolioContract[]; rows: ClientDocumentSource[]; loading: boolean; allowed: boolean; accountingUrl: string }) {
+function ClientDocumentsSection({ client }: { client: ClientCrm["client"] }) {
+  const references = [
+    client.cin ? { label: "CIN", value: client.cin } : null,
+    client.numeroPermis ? { label: "Permis", value: client.numeroPermis } : null,
+    client.rc ? { label: "RC", value: client.rc } : null,
+    client.ice ? { label: "ICE", value: client.ice } : null,
+  ].filter((reference): reference is { label: string; value: string } => reference !== null);
+  return (
+    <DocumentPanel title="Documents client" description="Références d'identité." tone="blue">
+      {references.length ? <div className="divide-y">{references.map((reference) => <div key={reference.label} className="py-2.5"><p className="text-xs font-medium uppercase text-muted-foreground">{reference.label}</p><p className="mt-0.5 text-sm font-semibold">{reference.value}</p></div>)}</div> : <DocumentEmpty text="Aucune référence enregistrée." />}
+    </DocumentPanel>
+  );
+}
+
+function ProductionDocumentsSection({ contracts }: { contracts: PortfolioContract[] }) {
+  return (
+    <DocumentPanel title="Documents production" description="Pièces jointes des contrats." tone="emerald">
+      {contracts.length ? <div className="divide-y">{contracts.map((contract) => <Link key={contract.id} to={`/app/production/contrats/${contract.id}/pieces-jointes`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-emerald-700"><span className="min-w-0"><span className="block truncate font-medium">{contract.numeroPolice || contract.numeroDossier || `#${contract.id}`}</span><span className="block truncate text-xs text-muted-foreground">{contract.brancheAssuranceLibelle || "Contrat"}</span></span><ArrowRight className="size-4 shrink-0" /></Link>)}</div> : <DocumentEmpty text="Aucun contrat dans ce périmètre." />}
+    </DocumentPanel>
+  );
+}
+
+function AccountingDocumentsSection({ rows, loading, allowed, accountingUrl }: { rows: ClientDocumentSource[]; loading: boolean; allowed: boolean; accountingUrl: string }) {
   const documents = uniqueDocuments(rows);
   return (
-    <aside className="overflow-hidden rounded-lg border border-border/70 bg-card xl:sticky xl:top-4">
-      <SectionHeader icon={<FileText className="size-4" />} title="Documents" description="Pièces du périmètre sélectionné." tone="amber" />
-      <div className="border-b px-4 py-3"><div className="mb-2 flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">Documents comptables</h3>{allowed ? <Button asChild size="sm" variant="ghost"><Link to={accountingUrl}>Gérer</Link></Button> : null}</div>
-        {!allowed ? <p className="text-sm text-muted-foreground">Accès comptable non autorisé.</p> : loading ? <div className="grid gap-2"><Skeleton className="h-12" /><Skeleton className="h-12" /></div> : documents.length ? <div className="divide-y">{documents.slice(0, 10).map((document) => <div key={document.id} className="flex items-center justify-between gap-3 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-medium">{document.numero}</p><p className="text-xs text-muted-foreground">{document.type === "FACTURE" ? "Facture" : "Relevé"} · {formatDate(document.dateEmission)}</p></div><Badge variant="secondary">{document.type === "FACTURE" ? "FC" : "RL"}</Badge></div>)}</div> : <p className="text-sm text-muted-foreground">Aucun document émis.</p>}
+    <DocumentPanel title="Documents comptables" description="Factures et relevés émis." tone="amber" action={allowed ? <Button asChild size="sm" variant="ghost"><Link to={accountingUrl}>Gérer</Link></Button> : undefined}>
+      {!allowed ? <DocumentEmpty text="Accès comptable non autorisé." /> : loading ? <div className="grid gap-2"><Skeleton className="h-12" /><Skeleton className="h-12" /></div> : documents.length ? <div className="divide-y">{documents.slice(0, 10).map((document) => <div key={document.id} className="flex items-center justify-between gap-3 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-medium">{document.numero}</p><p className="text-xs text-muted-foreground">{document.type === "FACTURE" ? "Facture" : "Relevé"} · {formatDate(document.dateEmission)}</p></div><Badge variant="secondary">{document.type === "FACTURE" ? "FC" : "RL"}</Badge></div>)}</div> : <DocumentEmpty text="Aucun document émis." />}
+    </DocumentPanel>
+  );
+}
+
+function ClaimsDocumentsSection({ rows, loading, allowed }: { rows: SinistreSummary[]; loading: boolean; allowed: boolean }) {
+  return (
+    <DocumentPanel title="Documents sinistres" description="Pièces des dossiers sinistre." tone="red">
+      {!allowed ? <DocumentEmpty text="Accès aux sinistres non autorisé." /> : loading ? <div className="grid gap-2"><Skeleton className="h-12" /><Skeleton className="h-12" /></div> : rows.length ? <div className="divide-y">{rows.slice(0, 10).map((claim) => <Link key={claim.id} to={`/app/sinistre/dossiers/${claim.id}`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-red-700"><span className="min-w-0"><span className="block truncate font-medium">{claim.numeroSinistre}</span><span className="block truncate text-xs text-muted-foreground">{natureLabels[claim.nature]} · {formatDate(claim.dateSinistre)}</span></span><ArrowRight className="size-4 shrink-0" /></Link>)}</div> : <DocumentEmpty text="Aucun dossier sinistre." />}
+    </DocumentPanel>
+  );
+}
+
+function DocumentPanel({ title, description, tone, action, children }: { title: string; description: string; tone: "blue" | "emerald" | "amber" | "red"; action?: ReactNode; children: ReactNode }) {
+  const color = { blue: "bg-sky-700", emerald: "bg-emerald-700", amber: "bg-amber-600", red: "bg-red-700" }[tone];
+  return (
+    <aside className="overflow-hidden rounded-lg border border-border/70 bg-card">
+      <div className="flex items-center justify-between gap-2 border-b px-4 py-4">
+        <div className="flex min-w-0 items-center gap-3"><div className={`flex size-8 shrink-0 items-center justify-center rounded-md text-white ${color}`}><FileText className="size-4" /></div><div className="min-w-0"><h2 className="truncate font-semibold">{title}</h2><p className="truncate text-sm text-muted-foreground">{description}</p></div></div>
+        {action}
       </div>
-      <div className="px-4 py-3"><h3 className="mb-2 text-sm font-semibold">Pièces contractuelles</h3>{contracts.length ? <div className="divide-y">{contracts.map((contract) => <Link key={contract.id} to={`/app/production/contrats/${contract.id}/pieces-jointes`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-emerald-700"><span className="min-w-0"><span className="block truncate font-medium">{contract.numeroPolice || contract.numeroDossier || `#${contract.id}`}</span><span className="block truncate text-xs text-muted-foreground">{contract.brancheAssuranceLibelle || "Contrat"}</span></span><ArrowRight className="size-4 shrink-0" /></Link>)}</div> : <p className="text-sm text-muted-foreground">Aucun contrat dans ce périmètre.</p>}</div>
+      <div className="px-4 py-3">{children}</div>
     </aside>
   );
+}
+
+function DocumentEmpty({ text }: { text: string }) {
+  return <p className="py-2 text-sm text-muted-foreground">{text}</p>;
 }
 
 function SectionHeader({ icon, title, description, tone, action }: { icon: ReactNode; title: string; description: string; tone: "emerald" | "cyan" | "red" | "amber"; action?: ReactNode }) {

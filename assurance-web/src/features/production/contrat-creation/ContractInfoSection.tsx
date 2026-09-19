@@ -465,6 +465,11 @@ export function ContractInfoSection({
                   const type = value as TypePayeurPrime;
                   form.setTypePayeurPrime(type);
                   form.setPayeurPrimeClientId("");
+                  if (type === "TRESORERIE_GROUPE") {
+                    form.setModeFacturation("CONSOLIDEE_GROUPE");
+                  } else if (!selectedGroup) {
+                    form.setModeFacturation("DIRECTE");
+                  }
                 }}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -498,20 +503,20 @@ export function ContractInfoSection({
                 />
               </Field>
             ) : null}
-            <Field label="Facturation" required error={form.validationErrors.groupeFacturationId}>
-              <Select
-                value={form.modeFacturation}
-                onValueChange={(value) => form.setModeFacturation(value as ModeFacturationContrat)}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DIRECTE">Directe au payeur</SelectItem>
-                  {selectedGroup ? (
+            {selectedGroup && form.typePayeurPrime !== "TRESORERIE_GROUPE" ? (
+              <Field label="Mode de facturation" required error={form.validationErrors.groupeFacturationId}>
+                <Select
+                  value={form.modeFacturation}
+                  onValueChange={(value) => form.setModeFacturation(value as ModeFacturationContrat)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DIRECTE">Directe au payeur</SelectItem>
                     <SelectItem value="CONSOLIDEE_GROUPE">Consolidée au groupe</SelectItem>
-                  ) : null}
-                </SelectContent>
-              </Select>
-            </Field>
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
           </>
         ) : null}
       </div>

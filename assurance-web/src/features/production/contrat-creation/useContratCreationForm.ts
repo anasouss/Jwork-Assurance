@@ -377,6 +377,11 @@ export function useContratCreationForm(
     : "AUTOMATIQUE_GRILLE";
   const contractUsageFallback = typeContrat === "FLOTTE" ? "" : usageId;
   const isConventionInvoice = typeContrat === "CONVENTION" && modeReglement === "facture";
+  const effectiveModeFacturation: ModeFacturationContrat = isConventionInvoice || !groupeFacturationId
+    ? "DIRECTE"
+    : typePayeurPrime === "TRESORERIE_GROUPE"
+      ? "CONSOLIDEE_GROUPE"
+      : modeFacturation;
 
   const request = useMemo<CreateContratRequest>(() => ({
     typeContrat,
@@ -400,7 +405,7 @@ export function useContratCreationForm(
       ? emptyToUndefined(payeurPrimeClientId)
       : undefined,
     groupeFacturationId: isConventionInvoice ? undefined : emptyToUndefined(groupeFacturationId),
-    modeFacturation: isConventionInvoice ? "DIRECTE" : modeFacturation,
+    modeFacturation: effectiveModeFacturation,
     fractionnement,
     modeSaisieGaranties,
     saisiePrimeNette: typeContrat === "PARTICULIER" ? saisiePrimeNette : false,
@@ -483,6 +488,7 @@ export function useContratCreationForm(
     modeTermeRenouvellement,
     modeReglement,
     isConventionInvoice,
+    effectiveModeFacturation,
     numeroBonCommande,
     montantBulletin,
     typePayeurPrime,
@@ -774,7 +780,7 @@ export function useContratCreationForm(
     if (!isConventionInvoice && (typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
       nextErrors.payeurPrimeClientId = "Payeur obligatoire.";
     }
-    if (!isConventionInvoice && modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
+    if (!isConventionInvoice && effectiveModeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
       nextErrors.groupeFacturationId = "Groupe de facturation obligatoire.";
     }
     const today = dateOnly(new Date());
@@ -965,7 +971,7 @@ export function useContratCreationForm(
       if (!isConventionInvoice && (typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
         nextErrors.payeurPrimeClientId = "Payeur obligatoire.";
       }
-      if (!isConventionInvoice && modeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
+      if (!isConventionInvoice && effectiveModeFacturation === "CONSOLIDEE_GROUPE" && !groupeFacturationId) {
         nextErrors.groupeFacturationId = "Groupe de facturation obligatoire.";
       }
       if (typeContrat === "CONVENTION") {

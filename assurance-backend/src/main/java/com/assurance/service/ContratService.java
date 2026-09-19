@@ -1819,6 +1819,9 @@ public class ContratService {
                     ? ModeFacturationContrat.CONSOLIDEE_GROUPE
                     : ModeFacturationContrat.DIRECTE;
         }
+        if (typePayeur == TypePayeurPrime.TRESORERIE_GROUPE) {
+            modeFacturation = ModeFacturationContrat.CONSOLIDEE_GROUPE;
+        }
         if (modeFacturation == ModeFacturationContrat.CONSOLIDEE_GROUPE && groupe == null) {
             throw new BadRequestException("Un groupe est obligatoire pour la facturation consolidee");
         }

@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { compareTableValues, nextTableSort } from "@/lib/table-sort";
+import { cn } from "@/lib/utils";
 import { toDateOnly } from "../date";
 import { assistanceProductApi } from "../api/assistance-products";
 import { referenceApi } from "../api/references";

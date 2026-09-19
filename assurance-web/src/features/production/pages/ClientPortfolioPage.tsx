@@ -26,7 +26,7 @@ const moneyFormatter = new Intl.NumberFormat("fr-MA", {
 export default function ClientPortfolioPage() {
   const { clientId = "" } = useParams();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canViewAccounting = permissions.includes("quittance:view") || permissions.includes("reglement-client:view");
+  const canViewDocuments = permissions.includes("quittance:view");
   const canViewReceivables = permissions.includes("reglement-client:view");
   const canViewClaims = ["sinistre:view", "sinistre:manage", "sinistre:finance"].some((permission) => permissions.includes(permission));
   const [branchId, setBranchId] = useState("ALL");
@@ -75,7 +75,7 @@ export default function ClientPortfolioPage() {
   const sourcesQuery = useQuery({
     queryKey: ["production", "client-portfolio", "documents", sourceParams],
     queryFn: () => comptaApi.searchClientDocumentSources(sourceParams),
-    enabled: Boolean(clientId) && canViewAccounting,
+    enabled: Boolean(clientId) && canViewDocuments,
   });
   const receivablesQuery = useQuery({
     queryKey: ["production", "client-portfolio", "receivables", receivableParams],
@@ -150,14 +150,14 @@ export default function ClientPortfolioPage() {
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="grid min-w-0 gap-4">
           <ProductionSection contracts={filteredContracts} selectedContractId={selectedContractId} onSelectContract={setSelectedContractId} />
-          <AccountingSection allowed={canViewAccounting} loading={receivablesQuery.isLoading} rows={receivablesQuery.data?.rows ?? []} summary={receivablesQuery.data?.summary} accountingUrl={accountingUrl} />
+          <AccountingSection allowed={canViewReceivables} loading={receivablesQuery.isLoading} rows={receivablesQuery.data?.rows ?? []} summary={receivablesQuery.data?.summary} accountingUrl={accountingUrl} />
           <ClaimsSection allowed={canViewClaims} loading={claimsQuery.isLoading} rows={claimsQuery.data?.items ?? []} />
         </div>
         <DocumentsSection
           contracts={activeContractId ? filteredContracts.filter((contract) => contract.id === activeContractId) : filteredContracts}
           rows={sourcesQuery.data?.rows ?? []}
           loading={sourcesQuery.isLoading}
-          allowed={canViewAccounting}
+          allowed={canViewDocuments}
           accountingUrl={accountingUrl}
         />
       </div>

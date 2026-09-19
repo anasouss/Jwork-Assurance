@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
   Building2,
+  Download,
   Eye,
   FileDown,
   FilePlus2,
@@ -53,6 +54,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
+import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { RelevePdfOptionsDialog } from "../components/RelevePdfOptionsDialog";
@@ -95,6 +97,7 @@ export default function RelevesFacturesPage() {
   const [detailId, setDetailId] = useState<string>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
   const [deleteTarget, setDeleteTarget] = useState<ClientDocument>();
+  const [exporting, setExporting] = useState(false);
   const payerScope = urlState.payerScope;
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
   const payerSearch = usePayerSearch(payerScope, selectedPayer);
@@ -288,6 +291,29 @@ export default function RelevesFacturesPage() {
     updateUrl({ documentFilters: DOCUMENT_DEFAULTS, documentPage: 0 });
   }
 
+  async function exportSources() {
+    if (!sources.data?.page.totalElements || exporting) return;
+    setExporting(true);
+    try {
+      const blob = await comptaApi.exportClientDocumentSources({
+        payeurType: sourceParams.payeurType,
+        payeurId: sourceParams.payeurId,
+        brancheId: sourceParams.brancheId,
+        compagnieId: sourceParams.compagnieId,
+        typeContrat: sourceParams.typeContrat,
+        documentState: sourceParams.documentState,
+        dateDu: sourceParams.dateDu,
+        dateAu: sourceParams.dateAu,
+        search: sourceParams.search,
+      });
+      downloadBlob(blob, `releves-factures-${toDateOnly(new Date())}.xlsx`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export Excel impossible");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="grid min-w-0 gap-4 overflow-x-hidden">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -350,12 +376,24 @@ export default function RelevesFacturesPage() {
                     : "Sélectionnez les écritures du même payeur à inclure dans un document."}
                 </p>
               </div>
-              {canIssue ? (
-                <Button disabled={!selectedRows.length} onClick={() => setIssueOpen(true)}>
-                  <FilePlus2 className="size-4" />
-                  Créer un document{selectedRows.length ? ` (${selectedRows.length})` : ""}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  disabled={!sources.data?.page.totalElements || sources.isLoading || exporting}
+                  onClick={() => void exportSources()}
+                >
+                  <Download className="size-4" />
+                  {exporting ? "Export..." : "Exporter Excel"}
                 </Button>
-              ) : null}
+                {canIssue ? (
+                  <Button disabled={!selectedRows.length} onClick={() => setIssueOpen(true)}>
+                    <FilePlus2 className="size-4" />
+                    Créer un document{selectedRows.length ? ` (${selectedRows.length})` : ""}
+                  </Button>
+                ) : null}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">

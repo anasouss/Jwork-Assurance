@@ -28,6 +28,7 @@ import com.assurance.enums.StatutEcheanceFacturationConvention;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AffectationQuittanceService;
 import com.assurance.service.DocumentClientPdfService;
+import com.assurance.service.DocumentClientExportService;
 import com.assurance.service.DocumentClientService;
 import com.assurance.service.FacturationConventionService;
 import com.assurance.service.ElementFacturableService;
@@ -60,6 +61,7 @@ public class ComptaController {
     private final ElementFacturableService elementFacturableService;
     private final AffectationQuittanceService affectationQuittanceService;
     private final DocumentClientService documentClientService;
+    private final DocumentClientExportService documentClientExportService;
     private final FacturationConventionService facturationConventionService;
     private final DocumentClientPdfService documentClientPdfService;
 
@@ -276,6 +278,42 @@ public class ComptaController {
                 page,
                 size
         )));
+    }
+
+    @GetMapping("/documents-clients/sources/export")
+    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    public ResponseEntity<byte[]> exportSourcesDocumentsClients(
+            @RequestParam(required = false) String payeurType,
+            @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) Long brancheId,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(required = false) String documentState,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) String search
+    ) {
+        byte[] file = documentClientExportService.exportSources(
+                TenantContext.getCurrentAgence(),
+                payeurType,
+                payeurId,
+                brancheId,
+                compagnieId,
+                typeContrat,
+                documentState,
+                dateDu,
+                dateAu,
+                search
+        );
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=releves-factures-" + LocalDate.now() + ".xlsx"
+                )
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ))
+                .body(file);
     }
 
     @GetMapping("/facturation-conventions/echeances")

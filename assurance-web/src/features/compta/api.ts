@@ -311,6 +311,22 @@ export const comptaApi = {
     };
   },
 
+  async exportClientDocumentSources(params: {
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
+    brancheId?: string;
+    compagnieId?: string;
+    typeContrat?: TypeContrat;
+    documentState?: "SANS_DOCUMENT" | "RELEVE" | "FACTURE";
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+  }) {
+    return apiFetchBlob(
+      `/api/v1/compta/documents-clients/sources/export${buildQueryString(params)}`
+    );
+  },
+
   async searchClientDocuments(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;

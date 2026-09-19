@@ -97,9 +97,30 @@ export function ContratFormLayout({
     }
     return form.availableUsages.filter((usage) => configuredUsageIds.has(usage.id));
   }, [form.availableUsages, form.formulesPersonne.data, form.grilleTarifaireId, form.lignesGrille.data, order]);
+  const flotteVehicleUsages = useMemo(
+    () => flotteTargetUsages.filter((usage) => !isRemorqueUsage(usage)),
+    [flotteTargetUsages]
+  );
+  const configuredFlotteRemorqueUsages = useMemo(
+    () => flotteTargetUsages.filter(isRemorqueUsage),
+    [flotteTargetUsages]
+  );
+  const flotteRemorqueUsages = configuredFlotteRemorqueUsages.length > 0
+    ? configuredFlotteRemorqueUsages
+    : form.availableUsages.filter(isRemorqueUsage);
+  const showFlotteRemorques = allowRemorques
+    && (configuredFlotteRemorqueUsages.length > 0 || form.remorques.length > 0);
   const workflowSections = useMemo<ContratSectionKey[]>(() => {
     if (order === "flotte") {
-      return ["souscripteur", "proprietaire", "contrat", "grille", "flotteTargets", "remorque", "quittances"];
+      return [
+        "souscripteur",
+        "proprietaire",
+        "contrat",
+        "grille",
+        "flotteTargets",
+        ...(showFlotteRemorques ? (["remorque"] as ContratSectionKey[]) : []),
+        "quittances",
+      ];
     }
     return [
       "souscripteur",
@@ -110,7 +131,7 @@ export function ContratFormLayout({
       "garanties",
       "quittances",
     ];
-  }, [allowRemorques, order]);
+  }, [allowRemorques, order, showFlotteRemorques]);
   const [activeSection, setActiveSection] = useState<ContratSectionKey>("souscripteur");
   const souscripteurGroupeId = form.clients.find((client) => client.role === "SOUSCRIPTEUR")?.groupeClientId ?? "";
   const souscripteurGroupe = useMemo(
@@ -291,7 +312,8 @@ export function ContratFormLayout({
       setSelectedGaranties={form.setGaranties}
       lignes={form.lignesGrille.data ?? []}
       formulesPersonne={form.formulesPersonne.data ?? []}
-      usages={flotteTargetUsages}
+      usages={flotteVehicleUsages}
+      remorqueUsages={flotteRemorqueUsages}
       compagnies={form.refs.compagnies.data ?? []}
       compagnieAssuranceId={form.compagnieAssuranceId}
       marques={form.refs.marques.data ?? []}
@@ -322,6 +344,7 @@ export function ContratFormLayout({
       controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
       lockContractDates={form.renewalMode}
       maxRemorques={maxRemorques}
+      showRemorqueSection={showFlotteRemorques}
       errors={form.validationErrors}
       openSection={activeSection}
       onSectionOpenChange={handleSectionOpenChange}
@@ -488,4 +511,8 @@ export function ContratFormLayout({
 
     </div>
   );
+}
+
+function isRemorqueUsage(usage: { code?: string | null }) {
+  return usage.code?.trim().toUpperCase() === "REMORQUE";
 }

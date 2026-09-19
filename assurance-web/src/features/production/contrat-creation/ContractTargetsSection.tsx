@@ -56,6 +56,7 @@ export type ContractTargetsSectionProps = {
   lignes: ReferenceOption[];
   formulesPersonne: ReferenceOption[];
   usages: ReferenceOption[];
+  remorqueUsages?: ReferenceOption[];
   compagnies?: ReferenceOption[];
   compagnieAssuranceId?: string | null;
   marques: ReferenceOption[];
@@ -119,6 +120,7 @@ export function ContractTargetsSection({
   lignes,
   formulesPersonne,
   usages,
+  remorqueUsages,
   compagnies = [],
   compagnieAssuranceId,
   marques,
@@ -212,6 +214,7 @@ export function ContractTargetsSection({
     [garanties]
   );
   const canAddRemorque = maxRemorques == null || remorques.length < maxRemorques;
+  const availableRemorqueUsages = remorqueUsages ?? usages;
   const normalizedPricingMode = normalizePricingMode(pricingMode);
   const vehiculeTargets = targets.filter((target) => target.kind === "vehicule");
   const remorqueTargets = targets.filter((target) => target.kind === "remorque");
@@ -629,7 +632,7 @@ export function ContractTargetsSection({
                     index={activeRemorqueTarget.index}
                     remorque={remorques[activeRemorqueTarget.index]}
                     setRemorques={setRemorques}
-                    usages={usages}
+                    usages={availableRemorqueUsages}
                     compagnies={compagnies}
                     compagnieAssuranceId={compagnieAssuranceId}
                     marques={marques}
@@ -682,7 +685,7 @@ export function ContractTargetsSection({
                   locked={lockedGaranties}
                   lignes={lignes}
                   formulesPersonne={formulesPersonne}
-                  usages={usages}
+                  usages={availableRemorqueUsages}
                   compagniesAssistance={compagniesAssistance}
                   produitsAssistance={produitsAssistance}
                   assistance={assistances[targetKey(activeRemorqueTarget)] ?? { enabled: false }}

@@ -479,6 +479,13 @@ export const comptaApi = {
     )));
   },
 
+  async createInvoiceFromClientPayment(id: string) {
+    return normalizeClientDocument(unwrap(await apiFetch<ApiResponse<ClientDocument>>(
+      `/api/v1/compta/reglements-clients/${id}/facture`,
+      { method: "POST" }
+    )));
+  },
+
   async cancelClientPayment(id: string, motif: string) {
     return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
       `/api/v1/compta/reglements-clients/${id}/annulation`,

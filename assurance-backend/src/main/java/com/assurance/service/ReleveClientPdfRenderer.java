@@ -99,6 +99,7 @@ public class ReleveClientPdfRenderer {
 
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+            PdfFont italic = PdfFontFactory.createFont(StandardFonts.HELVETICA_OBLIQUE);
             pdf.addEventHandler(
                     PdfDocumentEvent.END_PAGE,
                     event -> writeFooter((PdfDocumentEvent) event, source, regular, bold)
@@ -115,10 +116,13 @@ public class ReleveClientPdfRenderer {
             if (!isInvoice(source)) {
                 writeTotal(document, source, bold);
             }
-            writePaymentText(document, source, bold);
+            writePaymentText(document, source, bold, italic);
+            if (avecSignature && isInvoice(source)) {
+                writeSignature(document, source.getAgence(), true);
+            }
             writeNotes(document, source, bold);
-            if (avecSignature) {
-                writeSignature(document, source.getAgence());
+            if (avecSignature && !isInvoice(source)) {
+                writeSignature(document, source.getAgence(), false);
             }
             if (source.getStatut() == StatutDocumentClient.ANNULE) {
                 writeCancellation(document, source, bold);
@@ -538,9 +542,9 @@ public class ReleveClientPdfRenderer {
         document.add(total);
     }
 
-    private void writePaymentText(Document document, DocumentClient source, PdfFont bold) {
+    private void writePaymentText(Document document, DocumentClient source, PdfFont bold, PdfFont italic) {
         if (isInvoice(source)) {
-            writeInvoiceClosing(document, source, bold);
+            writeInvoiceClosing(document, source, bold, italic);
             return;
         }
         document.add(new Paragraph("Le montant total à régler s'élève à "
@@ -558,7 +562,7 @@ public class ReleveClientPdfRenderer {
                 .setMarginTop(0));
     }
 
-    private void writeInvoiceClosing(Document document, DocumentClient source, PdfFont bold) {
+    private void writeInvoiceClosing(Document document, DocumentClient source, PdfFont bold, PdfFont italic) {
         Table heading = new Table(new float[]{3.6f, 0.9f, 1.05f})
                 .setWidth(UnitValue.createPercentValue(100));
         heading.addCell(new Cell()
@@ -611,16 +615,20 @@ public class ReleveClientPdfRenderer {
         document.add(closing);
 
         Paragraph issuer = new Paragraph()
-                .setFont(bold)
-                .setFontSize(8.5f)
                 .setFontColor(BRAND_BLUE)
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setMarginTop(7)
                 .setMarginBottom(0);
-        issuer.add(value(source.getAgence().getNom()).toUpperCase(Locale.FRENCH));
+        issuer.add(new com.itextpdf.layout.element.Text(
+                value(source.getAgence().getNom()).toUpperCase(Locale.FRENCH))
+                .setFont(bold)
+                .setFontSize(8.25f));
+        String agencyCity = city(source.getAgence());
         issuer.add(new com.itextpdf.layout.element.Text("\n"
-                + city(source.getAgence()) + " Le, " + LONG_DATE_FORMAT.format(source.getDateEmission()))
-                .setFontSize(8.5f));
+                + (agencyCity.isBlank() ? "" : agencyCity + ", ")
+                + "le " + LONG_DATE_FORMAT.format(source.getDateEmission()))
+                .setFont(italic)
+                .setFontSize(8f));
         document.add(issuer);
     }
 
@@ -725,7 +733,7 @@ public class ReleveClientPdfRenderer {
                 .setMarginTop(0));
     }
 
-    private void writeSignature(Document document, Agence agence) {
+    private void writeSignature(Document document, Agence agence, boolean invoice) {
         byte[] content = agencySignatureStorageService.loadBytesIfPresent(agence.getSignatureCheminStockage());
         if (content == null || content.length == 0) {
             throw new BadRequestException("Aucune signature n’est configurée pour cette agence");
@@ -736,8 +744,8 @@ public class ReleveClientPdfRenderer {
         Table container = new Table(new float[]{1})
                 .setWidth(UnitValue.createPercentValue(32))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
-                .setMarginRight(30)
-                .setMarginTop(8);
+                .setMarginRight(invoice ? 0 : 30)
+                .setMarginTop(invoice ? 3 : 8);
         container.addCell(borderless(new Cell()).add(signature).setTextAlignment(TextAlignment.RIGHT));
         document.add(container);
     }

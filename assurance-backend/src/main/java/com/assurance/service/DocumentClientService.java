@@ -54,6 +54,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -361,6 +362,26 @@ public class DocumentClientService {
 
     @Transactional
     public DocumentClientResponse create(Long agenceId, CreerDocumentClientRequest request) {
+        return create(agenceId, request, false, false);
+    }
+
+    @Transactional
+    public DocumentClientResponse createInvoiceFromDirectPayment(
+            Long agenceId,
+            Collection<Long> elementFacturableIds
+    ) {
+        CreerDocumentClientRequest request = new CreerDocumentClientRequest();
+        request.setTypeDocument(TypeDocumentClient.FACTURE);
+        request.setElementFacturableIds(new ArrayList<>(elementFacturableIds));
+        return create(agenceId, request, true, true);
+    }
+
+    private DocumentClientResponse create(
+            Long agenceId,
+            CreerDocumentClientRequest request,
+            boolean allowActiveDirectPayments,
+            boolean useProposedDueDate
+    ) {
         List<Long> requestedIds = request.getElementFacturableIds().stream()
                 .filter(Objects::nonNull)
                 .distinct()
@@ -393,7 +414,7 @@ public class DocumentClientService {
         }
 
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
-            validateInvoiceSources(sources);
+            validateInvoiceSources(sources, allowActiveDirectPayments);
         }
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
@@ -406,8 +427,12 @@ public class DocumentClientService {
                         payer.group(),
                         emissionDate
                 );
+        LocalDate invoiceDueDate = request.getDateEcheance();
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE && paymentCondition.configured()) {
-            validateInvoiceDueDate(request.getDateEcheance(), emissionDate, paymentCondition.days());
+            if (useProposedDueDate) {
+                invoiceDueDate = emissionDate.plusDays(paymentCondition.days());
+            }
+            validateInvoiceDueDate(invoiceDueDate, emissionDate, paymentCondition.days());
         } else if (request.getTypeDocument() == TypeDocumentClient.FACTURE
                 && request.getDateEcheance() != null) {
             throw new BadRequestException(
@@ -424,7 +449,7 @@ public class DocumentClientService {
                 .periodeFin(documentPeriod.end())
                 .dateEcheance(request.getTypeDocument() == TypeDocumentClient.FACTURE
                         && paymentCondition.configured()
-                        ? request.getDateEcheance()
+                        ? invoiceDueDate
                         : null)
                 .delaiPaiementJours(request.getTypeDocument() == TypeDocumentClient.FACTURE
                         ? paymentCondition.days()
@@ -583,7 +608,10 @@ public class DocumentClientService {
         }
     }
 
-    private void validateInvoiceSources(List<BillableSource> sources) {
+    private void validateInvoiceSources(
+            List<BillableSource> sources,
+            boolean allowActiveDirectPayments
+    ) {
         if (sources.stream().anyMatch(source -> money(source.element().getPrimeTotale()).signum() <= 0)) {
             throw new BadRequestException("Une facture ne peut contenir que des écritures débitrices");
         }
@@ -596,7 +624,7 @@ public class DocumentClientService {
         if (!alreadyInvoiced.isEmpty()) {
             throw new BadRequestException("Une ou plusieurs écritures figurent déjà sur une facture émise");
         }
-        if (affectationReglementClientRepository.existsActiveByElementFacturableIds(
+        if (!allowActiveDirectPayments && affectationReglementClientRepository.existsActiveByElementFacturableIds(
                 sources.stream().map(source -> source.element().getId()).toList(),
                 Set.of(
                         StatutAffectationReglement.EN_ATTENTE,

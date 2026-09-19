@@ -7,6 +7,7 @@ import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CreanceClientPageResponse;
+import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientResponse;
@@ -155,6 +156,20 @@ public class ReglementClientController {
                 TenantContext.getCurrentUser(),
                 request
         ), "Règlement client enregistré"));
+    }
+
+    @PostMapping("/{paymentId}/facture")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<DocumentClientResponse>> createInvoice(
+            @PathVariable Long paymentId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                reglementClientService.createInvoiceFromPayment(
+                        TenantContext.getCurrentAgence(),
+                        paymentId
+                ),
+                "Facture émise"
+        ));
     }
 
     @PostMapping("/{paymentId}/annulation")

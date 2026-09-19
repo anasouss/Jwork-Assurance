@@ -2,7 +2,10 @@ package com.assurance.repository;
 
 import com.assurance.entity.AffectationReglementClient;
 import com.assurance.enums.StatutAffectationReglement;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -49,6 +52,44 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
               and allocation.statut in :statuts
             """)
     boolean existsActiveByElementFacturableIds(
+            @Param("elementIds") Collection<Long> elementIds,
+            @Param("statuts") Set<StatutAffectationReglement> statuts
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "instrument",
+            "instrument.reglement",
+            "elementFacturable"
+    })
+    @Query("""
+            select allocation
+            from AffectationReglementClient allocation
+            where allocation.elementFacturable.id in :elementIds
+              and allocation.instrument.reglement.agence.id = :agenceId
+              and allocation.instrument.reglement.id = :paymentId
+              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.statut in :statuts
+            """)
+    List<AffectationReglementClient> findActiveDirectByPaymentAndElementIdsForUpdate(
+            @Param("agenceId") Long agenceId,
+            @Param("paymentId") Long paymentId,
+            @Param("elementIds") Collection<Long> elementIds,
+            @Param("statuts") Set<StatutAffectationReglement> statuts
+    );
+
+    @Query("""
+            select count(allocation) > 0
+            from AffectationReglementClient allocation
+            where allocation.elementFacturable.id in :elementIds
+              and allocation.instrument.reglement.agence.id = :agenceId
+              and allocation.instrument.reglement.id <> :paymentId
+              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.statut in :statuts
+            """)
+    boolean existsActiveDirectByElementIdsFromOtherPayment(
+            @Param("agenceId") Long agenceId,
+            @Param("paymentId") Long paymentId,
             @Param("elementIds") Collection<Long> elementIds,
             @Param("statuts") Set<StatutAffectationReglement> statuts
     );

@@ -6,6 +6,7 @@ import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.response.CreanceClientPageResponse;
+import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientResponse;
@@ -64,6 +65,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -260,6 +262,100 @@ public class ReglementClientService {
     @Transactional(readOnly = true)
     public ReglementClientResponse detail(Long agenceId, Long paymentId) {
         return toResponse(findPayment(agenceId, paymentId));
+    }
+
+    @Transactional
+    public DocumentClientResponse createInvoiceFromPayment(Long agenceId, Long paymentId) {
+        ReglementClient payment = reglementRepository.findByIdAndAgenceIdForUpdate(paymentId, agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
+        if (payment.getStatut() != StatutReglementClient.VALIDE) {
+            throw new BadRequestException("Seul un règlement valide peut être facturé");
+        }
+
+        Set<StatutAffectationReglement> activeStatuses = Set.of(
+                StatutAffectationReglement.EN_ATTENTE,
+                StatutAffectationReglement.CONFIRMEE
+        );
+        List<Long> elementIds = payment.getInstruments().stream()
+                .flatMap(instrument -> instrument.getAffectations().stream())
+                .filter(allocation -> allocation.getElementFacturable() != null)
+                .filter(allocation -> activeStatuses.contains(allocation.getStatut()))
+                .map(allocation -> allocation.getElementFacturable().getId())
+                .distinct()
+                .toList();
+        if (elementIds.isEmpty()) {
+            throw new BadRequestException(
+                    "Ce règlement ne contient aucune écriture directe à facturer"
+            );
+        }
+
+        List<ElementFacturable> lockedElements = elementRepository
+                .findClientDocumentSourcesForUpdate(agenceId, elementIds);
+        if (lockedElements.size() != elementIds.size()) {
+            throw new BadRequestException("Une ou plusieurs écritures ne sont plus facturables");
+        }
+        if (allocationRepository.existsActiveDirectByElementIdsFromOtherPayment(
+                agenceId,
+                paymentId,
+                elementIds,
+                activeStatuses
+        )) {
+            throw new BadRequestException(
+                    "Une écriture est répartie sur plusieurs règlements. "
+                            + "La facture ne peut pas être créée depuis un seul règlement"
+            );
+        }
+        List<AffectationReglementClient> directAllocations = allocationRepository
+                .findActiveDirectByPaymentAndElementIdsForUpdate(
+                        agenceId,
+                        paymentId,
+                        elementIds,
+                        activeStatuses
+                );
+        if (directAllocations.isEmpty()) {
+            throw new BadRequestException("Les écritures ne sont plus réglées directement");
+        }
+
+        DocumentClientResponse invoice = documentClientService.createInvoiceFromDirectPayment(
+                agenceId,
+                elementIds
+        );
+        DocumentClient document = documentClientRepository.findByAgenceIdAndId(agenceId, invoice.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Document client", invoice.getId()));
+
+        Map<InstrumentReglementClient, List<AffectationReglementClient>> byInstrument =
+                directAllocations.stream().collect(Collectors.groupingBy(
+                        AffectationReglementClient::getInstrument,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+        List<AffectationReglementClient> invoiceAllocations = new ArrayList<>();
+        byInstrument.forEach((instrument, allocations) -> {
+            StatutAffectationReglement status = allocations.stream()
+                    .anyMatch(allocation -> allocation.getStatut()
+                            == StatutAffectationReglement.CONFIRMEE)
+                    ? StatutAffectationReglement.CONFIRMEE
+                    : StatutAffectationReglement.EN_ATTENTE;
+            BigDecimal amount = allocations.stream()
+                    .map(AffectationReglementClient::getMontant)
+                    .map(this::money)
+                    .reduce(ZERO, BigDecimal::add);
+            allocations.forEach(allocation -> allocation.setStatut(
+                    StatutAffectationReglement.ANNULEE
+            ));
+            AffectationReglementClient invoiceAllocation = AffectationReglementClient.builder()
+                    .instrument(instrument)
+                    .documentClient(document)
+                    .montant(amount)
+                    .statut(status)
+                    .build();
+            instrument.getAffectations().add(invoiceAllocation);
+            invoiceAllocations.add(invoiceAllocation);
+        });
+        allocationRepository.saveAll(directAllocations);
+        allocationRepository.saveAll(invoiceAllocations);
+        recalculatePaymentFlags(elementIds, List.of(document.getId()));
+        return documentClientService.detail(agenceId, document.getId());
     }
 
     @Transactional(readOnly = true)

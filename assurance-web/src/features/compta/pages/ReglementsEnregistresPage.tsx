@@ -5,7 +5,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import { ReceiptText, RotateCcw, Search, XCircle } from "lucide-react";
+import { FileText, ReceiptText, RotateCcw, Search, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
+import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import {
@@ -71,6 +72,8 @@ const MODE_LABELS: Record<ClientPaymentMode, string> = {
 export default function ReglementsEnregistresPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
+  const canIssueInvoice = permissions.includes("quittance:create")
+    || permissions.includes("quittance:manage");
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -78,6 +81,7 @@ export default function ReglementsEnregistresPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
+  const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
@@ -107,6 +111,28 @@ export default function ReglementsEnregistresPage() {
     },
     onError: (error) => toast.error(
       error instanceof Error ? error.message : "Annulation impossible"
+    ),
+  });
+
+  const createInvoice = useMutation({
+    mutationFn: () => comptaApi.createInvoiceFromClientPayment(paymentToInvoice!.id),
+    onSuccess: async (invoice) => {
+      setPaymentToInvoice(undefined);
+      toast.success(`Facture ${invoice.numero} émise`);
+      await invalidateAccountingQueries(queryClient);
+      try {
+        const pdf = await comptaApi.clientDocumentPdf(invoice.id);
+        downloadBlob(pdf, `${invoice.numero}.pdf`);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "La facture est créée, mais son PDF n'a pas pu être téléchargé"
+        );
+      }
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Création de la facture impossible"
     ),
   });
 
@@ -272,17 +298,33 @@ export default function ReglementsEnregistresPage() {
                       {payment.statut === "VALIDE" ? "Validé" : "Annulé"}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {payment.statut === "VALIDE" && canManage ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Annuler le règlement"
-                        onClick={() => setPaymentToCancel(payment)}
-                      >
-                        <XCircle className="size-4 text-red-600" />
-                      </Button>
-                    ) : "-"}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      {payment.statut === "VALIDE"
+                        && canIssueInvoice
+                        && hasDirectActiveAllocations(payment) && (
+                        <Button
+                          size="sm"
+                          onClick={() => setPaymentToInvoice(payment)}
+                        >
+                          <FileText className="size-4" />
+                          Créer la facture
+                        </Button>
+                      )}
+                      {payment.statut === "VALIDE" && canManage && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Annuler le règlement"
+                          onClick={() => setPaymentToCancel(payment)}
+                        >
+                          <XCircle className="size-4 text-red-600" />
+                        </Button>
+                      )}
+                      {!(payment.statut === "VALIDE" && (
+                        canManage || (canIssueInvoice && hasDirectActiveAllocations(payment))
+                      )) && "-"}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -306,6 +348,48 @@ export default function ReglementsEnregistresPage() {
           />
         )}
       </section>
+
+      <Dialog
+        open={Boolean(paymentToInvoice)}
+        onOpenChange={(open) => {
+          if (!open && !createInvoice.isPending) setPaymentToInvoice(undefined);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Créer la facture</DialogTitle>
+            <DialogDescription>
+              Une facture client standard sera émise à partir des écritures réglées directement.
+              Le règlement existant lui sera automatiquement affecté.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="font-semibold">{paymentToInvoice?.numero}</div>
+            <div className="mt-1 flex justify-between gap-4 text-muted-foreground">
+              <span>{paymentToInvoice?.payeurNom}</span>
+              <span className="font-semibold text-foreground">
+                {formatAccountingAmount(paymentToInvoice?.montantTotal)}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={createInvoice.isPending}
+              onClick={() => setPaymentToInvoice(undefined)}
+            >
+              Annuler
+            </Button>
+            <Button
+              disabled={createInvoice.isPending}
+              onClick={() => createInvoice.mutate()}
+            >
+              <FileText className="size-4" />
+              Émettre et télécharger
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(paymentToCancel)}
@@ -556,12 +640,21 @@ function formatDate(value?: string | null) {
   return value ? value.split("-").reverse().join("/") : "-";
 }
 
+function hasDirectActiveAllocations(payment: ClientPayment) {
+  return payment.instruments.some((instrument) => instrument.affectations.some(
+    (allocation) => Boolean(allocation.elementFacturableId)
+      && allocation.statut !== "ANNULEE"
+  ));
+}
+
 async function invalidateAccountingQueries(
   queryClient: QueryClient
 ) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
     queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
+    queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
+    queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
     queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
     queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
   ]);

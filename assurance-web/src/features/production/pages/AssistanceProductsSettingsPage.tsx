@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SortIcon } from "@/components/ui/sort-icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { toDateOnly } from "../date";
@@ -42,12 +43,18 @@ import type {
 
 const ALL = "__all__";
 const NONE = "__none__";
+type ProductSortKey = "PRODUCT" | "COMPANY" | "TYPE" | "CATEGORY" | "USAGES" | "HT" | "TTC" | "PERIOD" | "ACTIVE";
+type ProductSortDirection = "asc" | "desc";
 
 export default function AssistanceProductsSettingsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [productSearch, setProductSearch] = useState("");
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("compagnieId") || ALL);
+  const [productSort, setProductSort] = useState<{ key: ProductSortKey; direction: ProductSortDirection }>({
+    key: "PRODUCT",
+    direction: "asc",
+  });
   const [editingProduct, setEditingProduct] = useState<ReferenceOption | null>(null);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [productPayload, setProductPayload] = useState<UpsertProduitAssistanceRequest>(emptyProduct(""));
@@ -108,7 +115,7 @@ export default function AssistanceProductsSettingsPage() {
 
   const filteredProducts = useMemo(() => {
     const term = productSearch.trim().toLowerCase();
-    return (products.data ?? []).filter((product) => {
+    const filtered = (products.data ?? []).filter((product) => {
       if (selectedCompanyId !== ALL && refString(product, "compagnieAssistanceId") !== selectedCompanyId) return false;
       if (!term) return true;
       return [
@@ -120,7 +127,21 @@ export default function AssistanceProductsSettingsPage() {
         refArray(product, "usageCodes").join(" "),
       ].some((value) => String(value ?? "").toLowerCase().includes(term));
     });
-  }, [productSearch, products.data, selectedCompanyId]);
+    return filtered.sort((left, right) => {
+      const comparison = compareProductValues(
+        productSortValue(left, productSort.key),
+        productSortValue(right, productSort.key)
+      );
+      return productSort.direction === "asc" ? comparison : -comparison;
+    });
+  }, [productSearch, productSort, products.data, selectedCompanyId]);
+
+  function sortProducts(key: ProductSortKey) {
+    setProductSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  }
 
   const productUsages = useMemo(
     () => usagesForCategory(usages.data ?? [], categories.data ?? [], productPayload.categorieClientId),
@@ -214,15 +235,15 @@ export default function AssistanceProductsSettingsPage() {
           <Table>
             <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
               <TableRow className="hover:bg-amber-600">
-                <TableHead>Produit</TableHead>
-                <TableHead>Compagnie</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Usages</TableHead>
-                <TableHead className="text-right">HT</TableHead>
-                <TableHead className="text-right">TTC</TableHead>
-                <TableHead>Période</TableHead>
-                <TableHead>Actif</TableHead>
+                <SortableProductHead label="Produit" column="PRODUCT" sort={productSort} onSort={sortProducts} />
+                <SortableProductHead label="Compagnie" column="COMPANY" sort={productSort} onSort={sortProducts} />
+                <SortableProductHead label="Type" column="TYPE" sort={productSort} onSort={sortProducts} />
+                <SortableProductHead label="Catégorie" column="CATEGORY" sort={productSort} onSort={sortProducts} />
+                <SortableProductHead label="Usages" column="USAGES" sort={productSort} onSort={sortProducts} />
+                <SortableProductHead label="HT" column="HT" sort={productSort} onSort={sortProducts} align="right" />
+                <SortableProductHead label="TTC" column="TTC" sort={productSort} onSort={sortProducts} align="right" />
+                <SortableProductHead label="Période" column="PERIOD" sort={productSort} onSort={sortProducts} />
+                <SortableProductHead label="Actif" column="ACTIVE" sort={productSort} onSort={sortProducts} />
                 <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -606,6 +627,59 @@ function cleanOptional(value?: string) {
 function money(value?: number) {
   if (value == null || Number.isNaN(value)) return "-";
   return new Intl.NumberFormat("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
+
+function SortableProductHead({
+  label,
+  column,
+  sort,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  column: ProductSortKey;
+  sort: { key: ProductSortKey; direction: ProductSortDirection };
+  onSort: (column: ProductSortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === column;
+  return (
+    <TableHead
+      aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
+      className={align === "right" ? "text-right" : undefined}
+    >
+      <button
+        type="button"
+        className={cn(
+          "inline-flex items-center font-semibold transition-colors hover:text-white/80",
+          align === "right" && "w-full justify-end"
+        )}
+        onClick={() => onSort(column)}
+      >
+        {label}
+        <SortIcon isActive={active} direction={sort.direction} />
+      </button>
+    </TableHead>
+  );
+}
+
+function productSortValue(product: ReferenceOption, key: ProductSortKey): string | number {
+  switch (key) {
+    case "PRODUCT": return product.libelle;
+    case "COMPANY": return refString(product, "compagnieAssistanceLibelle");
+    case "TYPE": return refString(product, "type");
+    case "CATEGORY": return refString(product, "categorieClientLibelle");
+    case "USAGES": return refArray(product, "usageCodes").join(" ");
+    case "HT": return refNumber(product, "montantHt") ?? Number.NEGATIVE_INFINITY;
+    case "TTC": return refNumber(product, "montantTtc") ?? Number.NEGATIVE_INFINITY;
+    case "PERIOD": return refString(product, "dateDebutTarif");
+    case "ACTIVE": return product.actif === false ? 0 : 1;
+  }
+}
+
+function compareProductValues(left: string | number, right: string | number) {
+  if (typeof left === "number" && typeof right === "number") return left - right;
+  return String(left).localeCompare(String(right), "fr", { numeric: true, sensitivity: "base" });
 }
 
 function periodLabel(product: ReferenceOption) {

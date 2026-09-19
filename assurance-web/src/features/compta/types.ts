@@ -387,9 +387,9 @@ export type CreateClientDocumentRequest = {
 
 export type ClientDocumentDueDateProposal = {
   dateEmission: string;
-  delaiJours: number;
-  dateEcheanceProposee: string;
-  origine: "DEFAUT_60_JOURS" | "CONDITION_CLIENT" | "CONDITION_GROUPE";
+  delaiJours?: number | null;
+  dateEcheanceProposee?: string | null;
+  origine?: "DEFAUT_60_JOURS" | "CONDITION_CLIENT" | "CONDITION_GROUPE" | null;
   conditionPaiementId?: string | null;
   dateFinCondition?: string | null;
   justificatifPresent: boolean;

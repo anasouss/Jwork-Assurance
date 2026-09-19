@@ -37,7 +37,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConditionPaiementClientService {
 
-    public static final int DEFAULT_DAYS = 60;
     private static final Set<Integer> ALLOWED_DAYS = Set.of(30, 60, 90, 120, 180);
     private static final long MAX_FILE_SIZE = 30L * 1024L * 1024L;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -130,8 +129,8 @@ public class ConditionPaiementClientService {
             }
         }
         return new ResolvedCondition(
-                DEFAULT_DAYS,
-                OrigineDelaiPaiement.DEFAUT_60_JOURS,
+                null,
+                null,
                 null,
                 null,
                 false,
@@ -319,13 +318,16 @@ public class ConditionPaiementClientService {
     }
 
     public record ResolvedCondition(
-            int days,
+            Integer days,
             OrigineDelaiPaiement origin,
             Long conditionId,
             LocalDate conditionEndDate,
             boolean evidencePresent,
             ConditionPaiementClient condition
     ) {
+        public boolean configured() {
+            return condition != null;
+        }
     }
 
     public record DownloadedFile(Resource resource, MediaType mediaType, String fileName) {

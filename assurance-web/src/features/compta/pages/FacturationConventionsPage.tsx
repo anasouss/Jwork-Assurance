@@ -93,6 +93,7 @@ export default function FacturationConventionsPage() {
   const maximumDueDate = dueDateProposal.data?.dateEcheanceProposee
     ? parseLocalDate(dueDateProposal.data.dateEcheanceProposee)
     : undefined;
+  const hasPaymentCondition = dueDateProposal.data?.delaiJours != null;
 
   useEffect(() => {
     if (!issueOpen) return;
@@ -108,7 +109,7 @@ export default function FacturationConventionsPage() {
   const issue = useMutation({
     mutationFn: () => comptaApi.createConventionInvoice({
       echeanceIds: selectedIds,
-      dateEcheance: dueDate || undefined,
+      dateEcheance: hasPaymentCondition ? dueDate || undefined : undefined,
       notes: notes.trim() || undefined,
     }),
     onSuccess: async (document) => {
@@ -372,25 +373,29 @@ export default function FacturationConventionsPage() {
           </DialogHeader>
           <div className="grid gap-4">
             <div className="grid gap-1.5">
-              <Label>Date limite de paiement</Label>
-              <DatePicker
-                date={dueDate || undefined}
-                minDate={today}
-                maxDate={maximumDueDate}
-                onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
-              />
               {dueDateProposal.isLoading ? (
                 <p className="text-xs text-muted-foreground">Calcul de l’échéance applicable...</p>
               ) : dueDateProposal.isError ? (
                 <p className="text-xs text-destructive">Impossible de déterminer le délai applicable.</p>
-              ) : dueDateProposal.data ? (
-                <p className="text-xs text-muted-foreground">
-                  {dueDateProposal.data.origine === "DEFAUT_60_JOURS"
-                    ? "Délai par défaut"
-                    : dueDateProposal.data.origine === "CONDITION_GROUPE"
+              ) : hasPaymentCondition && dueDateProposal.data ? (
+                <>
+                  <Label>Date limite de paiement</Label>
+                  <DatePicker
+                    date={dueDate || undefined}
+                    minDate={today}
+                    maxDate={maximumDueDate}
+                    onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {dueDateProposal.data.origine === "CONDITION_GROUPE"
                       ? "Condition du groupe"
                       : "Condition du client"}
-                  {` : ${dueDateProposal.data.delaiJours} jours maximum.`}
+                    {` : ${dueDateProposal.data.delaiJours} jours maximum.`}
+                  </p>
+                </>
+              ) : dueDateProposal.data ? (
+                <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                  Aucune condition de paiement active pour ce payeur. La facture sera émise sans date d’échéance.
                 </p>
               ) : null}
             </div>
@@ -408,7 +413,10 @@ export default function FacturationConventionsPage() {
             <Button type="button" variant="outline" onClick={() => setIssueOpen(false)}>Annuler</Button>
             <Button
               type="button"
-              disabled={issue.isPending || !dueDate || dueDateProposal.isLoading || dueDateProposal.isError}
+              disabled={issue.isPending
+                || dueDateProposal.isLoading
+                || dueDateProposal.isError
+                || (hasPaymentCondition && !dueDate)}
               onClick={() => issue.mutate()}
             >
               {issue.isPending ? "Émission..." : "Émettre la facture"}

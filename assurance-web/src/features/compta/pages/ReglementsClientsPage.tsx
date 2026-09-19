@@ -3,8 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
   History,
-  ArrowDown,
-  ArrowUp,
   RotateCcw,
   Search,
 } from "lucide-react";
@@ -17,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SortIcon } from "@/components/ui/sort-icon";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
@@ -437,16 +436,23 @@ function SortableHeader(props: {
   align?: "left" | "right";
 }) {
   const active = props.active === props.column;
-  const Icon = active && props.direction === "ASC" ? ArrowUp : ArrowDown;
   return (
-    <th className={`px-3 py-3 ${props.align === "right" ? "text-right" : "text-left"}`}>
+    <th
+      aria-sort={active ? (props.direction === "ASC" ? "ascending" : "descending") : "none"}
+      className={`px-3 py-3 ${props.align === "right" ? "text-right" : "text-left"}`}
+    >
       <button
         type="button"
-        className="inline-flex items-center gap-1 font-semibold"
+        className={`inline-flex items-center font-semibold transition-colors hover:text-white/80 ${
+          props.align === "right" ? "w-full justify-end" : ""
+        }`}
         onClick={() => props.onSort(props.column)}
       >
         {props.label}
-        <Icon className={`size-3.5 ${active ? "opacity-100" : "opacity-45"}`} />
+        <SortIcon
+          isActive={active}
+          direction={props.direction === "ASC" ? "asc" : "desc"}
+        />
       </button>
     </th>
   );

@@ -91,7 +91,9 @@ public class FacturationConventionService {
         return PropositionEcheanceDocumentClientResponse.builder()
                 .dateEmission(emissionDate)
                 .delaiJours(condition.days())
-                .dateEcheanceProposee(emissionDate.plusDays(condition.days()))
+                .dateEcheanceProposee(condition.configured()
+                        ? emissionDate.plusDays(condition.days())
+                        : null)
                 .origine(condition.origin())
                 .conditionPaiementId(condition.conditionId())
                 .dateFinCondition(condition.conditionEndDate())
@@ -223,10 +225,17 @@ public class FacturationConventionService {
                 payer.group(),
                 emissionDate
         );
-        LocalDate dueDate = request.getDateEcheance() == null
-                ? emissionDate.plusDays(paymentCondition.days())
-                : request.getDateEcheance();
-        validateInvoiceDueDate(dueDate, emissionDate, paymentCondition.days());
+        LocalDate dueDate = null;
+        if (paymentCondition.configured()) {
+            dueDate = request.getDateEcheance() == null
+                    ? emissionDate.plusDays(paymentCondition.days())
+                    : request.getDateEcheance();
+            validateInvoiceDueDate(dueDate, emissionDate, paymentCondition.days());
+        } else if (request.getDateEcheance() != null) {
+            throw new BadRequestException(
+                    "Aucune condition de paiement active n'autorise une date d'échéance pour ce payeur"
+            );
+        }
         DocumentClient document = DocumentClient.builder()
                 .agence(agence)
                 .typeDocument(TypeDocumentClient.FACTURE)

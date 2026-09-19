@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowDownAZ,
   Download,
   Eye,
   FilePenLine,
@@ -26,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SortIcon } from "@/components/ui/sort-icon";
 import { cn } from "@/lib/utils";
 import { downloadBlob } from "@/lib/download";
 import { contractKeys, referenceKeys } from "@/lib/query-keys";
@@ -355,10 +355,17 @@ export default function EcheancesPage() {
 function SortableTh({ label, column, sort, onSort }: { label: string; column: SortKey; sort: { key: SortKey; direction: "asc" | "desc" }; onSort: (column: SortKey) => void }) {
   const active = sort.key === column;
   return (
-    <th className="px-3 py-3 text-left font-bold">
-      <button type="button" className="inline-flex items-center gap-1" onClick={() => onSort(column)}>
+    <th
+      aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
+      className="px-3 py-3 text-left font-bold"
+    >
+      <button
+        type="button"
+        className="inline-flex items-center transition-colors hover:text-white/80"
+        onClick={() => onSort(column)}
+      >
         {label}
-        <ArrowDownAZ className={cn("size-3 opacity-45", active && "opacity-100", active && sort.direction === "desc" && "rotate-180")} />
+        <SortIcon isActive={active} direction={sort.direction} />
       </button>
     </th>
   );

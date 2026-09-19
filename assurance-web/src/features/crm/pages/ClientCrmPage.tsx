@@ -1053,36 +1053,39 @@ function PaymentConditionDialog({
   clientId: string;
   onSaved: () => Promise<void>;
 }) {
-  const initialStartDate = toDateOnly(new Date()) ?? "";
-  const [days, setDays] = useState("60");
-  const [type, setType] = useState<ClientPaymentCondition["typeJustification"]>("POLITIQUE_AGENCE");
-  const [startDate, setStartDate] = useState(initialStartDate);
-  const [endDate, setEndDate] = useState(defaultPaymentConditionEnd(initialStartDate));
+  const [days, setDays] = useState("");
+  const [type, setType] = useState<ClientPaymentCondition["typeJustification"] | "">("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [comment, setComment] = useState("");
   const [file, setFile] = useState<File>();
 
   useEffect(() => {
     if (!open) return;
-    setDays("60");
-    setType("POLITIQUE_AGENCE");
-    const nextStartDate = toDateOnly(new Date()) ?? "";
-    setStartDate(nextStartDate);
-    setEndDate(defaultPaymentConditionEnd(nextStartDate));
+    setDays("");
+    setType("");
+    setStartDate("");
+    setEndDate("");
     setComment("");
     setFile(undefined);
   }, [open]);
 
   const save = useMutation({
-    mutationFn: () => clientApi.createPaymentCondition({
-      payeurType: "CLIENT",
-      payeurId: clientId,
-      delaiJours: Number(days),
-      typeJustification: type,
-      dateDebut: startDate,
-      dateFin: endDate || undefined,
-      commentaire: comment.trim() || undefined,
-      justificatif: file,
-    }),
+    mutationFn: () => {
+      if (!days || !type || !startDate) {
+        throw new Error("Renseignez le délai, le fondement et la date de début");
+      }
+      return clientApi.createPaymentCondition({
+        payeurType: "CLIENT",
+        payeurId: clientId,
+        delaiJours: Number(days),
+        typeJustification: type,
+        dateDebut: startDate,
+        dateFin: endDate || undefined,
+        commentaire: comment.trim() || undefined,
+        justificatif: file,
+      });
+    },
     onSuccess: async () => {
       await onSaved();
       toast.success("Condition de paiement enregistrée");
@@ -1097,7 +1100,8 @@ function PaymentConditionDialog({
         <DialogHeader>
           <DialogTitle>Nouvelle condition de paiement</DialogTitle>
           <DialogDescription>
-            La version précédente reste dans l’historique. Le justificatif est facultatif.
+            Cette condition s’appliquera uniquement à ce client après enregistrement.
+            La version précédente reste dans l’historique.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -1109,10 +1113,10 @@ function PaymentConditionDialog({
               } else if (value === "90" || value === "120") {
                 setType("ACCORD_CONTRACTUEL");
               } else if (type === "DEROGATION_SECTORIELLE") {
-                setType("POLITIQUE_AGENCE");
+                setType("");
               }
             }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Choisir un délai" /></SelectTrigger>
               <SelectContent>
                 {[30, 60, 90, 120, 180].map((value) => (
                   <SelectItem key={value} value={String(value)}>{value} jours</SelectItem>
@@ -1122,7 +1126,7 @@ function PaymentConditionDialog({
           </FieldLabel>
           <FieldLabel label="Fondement *">
             <Select value={type} onValueChange={(value) => setType(value as ClientPaymentCondition["typeJustification"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Choisir un fondement" /></SelectTrigger>
               <SelectContent>
                 <SelectItem
                   value="POLITIQUE_AGENCE"
@@ -1142,11 +1146,7 @@ function PaymentConditionDialog({
           <FieldLabel label="Valable à partir du *">
             <DatePicker
               date={startDate}
-              onSelect={(date) => {
-                const nextStartDate = toDateOnly(date) ?? "";
-                setStartDate(nextStartDate);
-                setEndDate(defaultPaymentConditionEnd(nextStartDate));
-              }}
+              onSelect={(date) => setStartDate(toDateOnly(date) ?? "")}
             />
           </FieldLabel>
           <FieldLabel label="Valable jusqu’au">
@@ -1179,7 +1179,7 @@ function PaymentConditionDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
             type="button"
-            disabled={!startDate || save.isPending}
+            disabled={!days || !type || !startDate || save.isPending}
             onClick={() => save.mutate()}
           >
             {save.isPending ? "Enregistrement..." : "Enregistrer"}
@@ -1716,14 +1716,6 @@ function dateLabel(value?: string | null) {
   if (!value) return "-";
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
-}
-
-function defaultPaymentConditionEnd(startDate: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startDate);
-  if (!match) return "";
-  const endDate = new Date(Number(match[1]) + 1, Number(match[2]) - 1, Number(match[3]));
-  endDate.setDate(endDate.getDate() - 1);
-  return toDateOnly(endDate) ?? "";
 }
 
 function label(value?: string | null) {

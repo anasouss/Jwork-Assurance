@@ -225,9 +225,8 @@ export default function NouveauReglementClientPage() {
 
       <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-3">
         <SummaryCell
-          label="Total quittances"
-          value={money(selectedTotal)}
-          detail={itemCount(rows.length)}
+          label="Total des éléments"
+          value={String(rows.length)}
           tone="quittance"
         />
         <SummaryCell
@@ -350,18 +349,18 @@ export default function NouveauReglementClientPage() {
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <button
                     type="button"
-                    className="flex min-h-10 items-center gap-3 rounded-sm px-2 text-left hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-11 items-center gap-3 rounded-md px-2.5 text-left hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => setActiveMethodKey(method.key)}
                   >
                     <span className={method.key === activeMethodKey
-                      ? "flex size-7 items-center justify-center rounded-sm bg-amber-500 text-xs font-semibold text-amber-950"
-                      : "flex size-7 items-center justify-center rounded-sm bg-muted text-xs font-semibold text-muted-foreground"}
+                      ? "flex size-7 items-center justify-center rounded-sm border border-orange-600 bg-orange-500 text-xs font-bold text-white shadow-sm"
+                      : "flex size-7 items-center justify-center rounded-sm border border-slate-300 bg-slate-100 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"}
                     >
                       {index + 1}
                     </span>
                     <span className="grid gap-0.5">
-                      <span className="text-sm font-semibold">Moyen de règlement</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-sm font-bold text-foreground">Moyen de règlement</span>
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
                         {paymentModes.find((option) => option.value === method.mode)?.label}
                       </span>
                     </span>

@@ -111,7 +111,9 @@ public class DocumentClientService {
         return PropositionEcheanceDocumentClientResponse.builder()
                 .dateEmission(emissionDate)
                 .delaiJours(condition.days())
-                .dateEcheanceProposee(emissionDate.plusDays(condition.days()))
+                .dateEcheanceProposee(condition.configured()
+                        ? emissionDate.plusDays(condition.days())
+                        : null)
                 .origine(condition.origin())
                 .conditionPaiementId(condition.conditionId())
                 .dateFinCondition(condition.conditionEndDate())
@@ -333,7 +335,6 @@ public class DocumentClientService {
 
     @Transactional
     public DocumentClientResponse create(Long agenceId, CreerDocumentClientRequest request) {
-        validateRequest(request);
         List<Long> requestedIds = request.getElementFacturableIds().stream()
                 .filter(Objects::nonNull)
                 .distinct()
@@ -379,8 +380,13 @@ public class DocumentClientService {
                         payer.group(),
                         emissionDate
                 );
-        if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
+        if (request.getTypeDocument() == TypeDocumentClient.FACTURE && paymentCondition.configured()) {
             validateInvoiceDueDate(request.getDateEcheance(), emissionDate, paymentCondition.days());
+        } else if (request.getTypeDocument() == TypeDocumentClient.FACTURE
+                && request.getDateEcheance() != null) {
+            throw new BadRequestException(
+                    "Aucune condition de paiement active n'autorise une date d'échéance pour ce payeur"
+            );
         }
         DocumentClient document = DocumentClient.builder()
                 .agence(agence)
@@ -391,6 +397,7 @@ public class DocumentClientService {
                 .periodeDebut(documentPeriod.start())
                 .periodeFin(documentPeriod.end())
                 .dateEcheance(request.getTypeDocument() == TypeDocumentClient.FACTURE
+                        && paymentCondition.configured()
                         ? request.getDateEcheance()
                         : null)
                 .delaiPaiementJours(request.getTypeDocument() == TypeDocumentClient.FACTURE
@@ -509,15 +516,10 @@ public class DocumentClientService {
         ));
     }
 
-    private void validateRequest(CreerDocumentClientRequest request) {
-        if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
-            if (request.getDateEcheance() == null) {
-                throw new BadRequestException("La date d'échéance est obligatoire pour une facture");
-            }
-        }
-    }
-
     private void validateInvoiceDueDate(LocalDate dueDate, LocalDate emissionDate, int maximumDays) {
+        if (dueDate == null) {
+            throw new BadRequestException("La date d'échéance est obligatoire lorsque le payeur a une condition de paiement");
+        }
         if (dueDate.isBefore(emissionDate)) {
             throw new BadRequestException("La date d'échéance ne peut pas être antérieure à la date d'émission");
         }

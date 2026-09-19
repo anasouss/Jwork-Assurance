@@ -769,6 +769,7 @@ function IssueDialog(props: {
   const maximumDueDate = dueDateProposal.data?.dateEcheanceProposee
     ? parseLocalDate(dueDateProposal.data.dateEcheanceProposee)
     : undefined;
+  const hasPaymentCondition = dueDateProposal.data?.delaiJours != null;
 
   useEffect(() => {
     if (!props.open || !props.rows.length) return;
@@ -789,7 +790,7 @@ function IssueDialog(props: {
     mutationFn: () => comptaApi.createClientDocument({
       typeDocument: type,
       elementFacturableIds: sourceIds,
-      dateEcheance: type === "FACTURE" ? dueDate : undefined,
+      dateEcheance: type === "FACTURE" && hasPaymentCondition ? dueDate : undefined,
       notes: notes.trim() || undefined,
     }),
     onSuccess: async (document) => {
@@ -803,7 +804,10 @@ function IssueDialog(props: {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Émission impossible"),
   });
   const invalid = type === "FACTURE"
-    && (!dueDate || !invoiceEligible || dueDateProposal.isLoading || dueDateProposal.isError);
+    && (!invoiceEligible
+      || dueDateProposal.isLoading
+      || dueDateProposal.isError
+      || (hasPaymentCondition && !dueDate));
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -844,35 +848,36 @@ function IssueDialog(props: {
           ) : null}
           {type === "FACTURE" ? (
             <div className="max-w-sm">
-              <FilterField label="Échéance de paiement *">
-                <DatePicker
-                  date={dueDate}
-                  onSelect={(date) => {
-                    setDueDate(toDateOnly(date) ?? "");
-                    setDueDateInitialized(true);
-                  }}
-                  minDate={today}
-                  maxDate={maximumDueDate}
-                />
-              </FilterField>
               {dueDateProposal.isLoading ? (
                 <p className="mt-1 text-xs text-muted-foreground">Calcul de l’échéance applicable...</p>
               ) : dueDateProposal.isError ? (
                 <p className="mt-1 text-xs text-destructive">
                   Impossible de déterminer le délai applicable. Réessayez avant d’émettre la facture.
                 </p>
-              ) : dueDateProposal.data ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {dueDateProposal.data.origine === "DEFAUT_60_JOURS"
-                    ? "Délai par défaut"
-                    : dueDateProposal.data.origine === "CONDITION_GROUPE"
+              ) : hasPaymentCondition && dueDateProposal.data ? (
+                <>
+                  <FilterField label="Échéance de paiement *">
+                    <DatePicker
+                      date={dueDate}
+                      onSelect={(date) => {
+                        setDueDate(toDateOnly(date) ?? "");
+                        setDueDateInitialized(true);
+                      }}
+                      minDate={today}
+                      maxDate={maximumDueDate}
+                    />
+                  </FilterField>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {dueDateProposal.data.origine === "CONDITION_GROUPE"
                       ? "Condition du groupe"
                       : "Condition du client"}
-                  {` : ${dueDateProposal.data.delaiJours} jours maximum.`}
-                  {!dueDateProposal.data.justificatifPresent
-                    && dueDateProposal.data.origine !== "DEFAUT_60_JOURS"
-                    ? " Justificatif non joint."
-                    : ""}
+                    {` : ${dueDateProposal.data.delaiJours} jours maximum.`}
+                    {!dueDateProposal.data.justificatifPresent ? " Justificatif non joint." : ""}
+                  </p>
+                </>
+              ) : dueDateProposal.data ? (
+                <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                  Aucune condition de paiement active pour ce payeur. La facture sera émise sans date d’échéance.
                 </p>
               ) : null}
             </div>

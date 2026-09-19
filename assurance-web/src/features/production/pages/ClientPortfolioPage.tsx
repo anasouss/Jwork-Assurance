@@ -44,7 +44,7 @@ export default function ClientPortfolioPage() {
     return (
       <div className="grid gap-4">
         <Button asChild variant="outline" className="w-fit">
-          <Link to="/app/production/portefeuille-clients"><ArrowLeft className="size-4" />Retour</Link>
+          <Link to="/app/production"><ArrowLeft className="size-4" />Retour à la production</Link>
         </Button>
         <section className="rounded-lg border border-red-200 bg-red-50 px-5 py-8 text-sm text-red-800">
           Impossible de charger le portefeuille de ce client.
@@ -61,9 +61,9 @@ export default function ClientPortfolioPage() {
       <header>
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-3 mb-1">
-            <Link to="/app/production/portefeuille-clients">
+            <Link to="/app/production">
               <ArrowLeft className="size-4" />
-              Portefeuille clients
+              Production
             </Link>
           </Button>
           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</p>

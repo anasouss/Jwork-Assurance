@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
+import { ClientPortfolioPickerDialog } from "../components/ClientPortfolioPickerDialog";
 import { toDateOnly } from "../date";
 
 type ProductionAction = {
@@ -29,13 +30,14 @@ type ProductionAction = {
   permission: string;
   primary?: boolean;
   disabled?: boolean;
-  modal?: "echeances";
+  modal?: "echeances" | "portfolio";
 };
 
 export default function ProductionDashboardPage() {
   const navigate = useNavigate();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const [echeanceDialogOpen, setEcheanceDialogOpen] = useState(false);
+  const [portfolioDialogOpen, setPortfolioDialogOpen] = useState(false);
   const [echeanceFilters, setEcheanceFilters] = useState<{ dateDu?: string; dateAu?: string }>({});
 
   const allActions: ProductionAction[] = [
@@ -43,7 +45,7 @@ export default function ProductionDashboardPage() {
     { title: "Liste des dossiers", icon: List, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Gestion des échéances", icon: CalendarDays, permission: "contrat:view", modal: "echeances" },
     { title: "Registre de production", icon: FileText, href: "/app/production/contrats", permission: "contrat:view" },
-    { title: "Portefeuille client", icon: Users, href: "/app/production/portefeuille-clients", permission: "client:view" },
+    { title: "Portefeuille client", icon: Users, permission: "client:view", modal: "portfolio" },
     { title: "Prospection", icon: Target, href: "/app/production/prospection", permission: "contrat:view" },
     { title: "Gestion du stock", icon: Archive, href: "/app/production/attestations-stock", permission: "contrat:view" },
   ];
@@ -112,6 +114,14 @@ export default function ProductionDashboardPage() {
               );
             }
 
+            if (item.modal === "portfolio") {
+              return (
+                <button key={item.title} type="button" className={className} onClick={() => setPortfolioDialogOpen(true)}>
+                  {content}
+                </button>
+              );
+            }
+
             return (
               <Link key={item.title} to={item.href ?? "#"} className={className}>
                 {content}
@@ -158,6 +168,15 @@ export default function ProductionDashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ClientPortfolioPickerDialog
+        open={portfolioDialogOpen}
+        onOpenChange={setPortfolioDialogOpen}
+        onSelect={(clientId) => {
+          setPortfolioDialogOpen(false);
+          navigate(`/app/production/portefeuille-clients/${clientId}`);
+        }}
+      />
     </div>
   );
 }

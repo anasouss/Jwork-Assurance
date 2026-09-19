@@ -108,7 +108,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "production/portefeuille-clients",
-        lazy: lazyRoute(() => import("@/features/production/pages/ClientPortfolioSearchPage")),
+        element: <Navigate to="/app/production" replace />,
       },
       {
         path: "production/portefeuille-clients/:clientId",

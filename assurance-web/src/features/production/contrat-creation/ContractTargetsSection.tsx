@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { Calculator, Check, ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowRight, Calculator, Check, ChevronDown, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,6 +102,7 @@ export type ContractTargetsSectionProps = {
   singleRemorqueLayout?: boolean;
   showVehicleSection?: boolean;
   showRemorqueSection?: boolean;
+  separateGuaranteeNavigation?: boolean;
   vehicleSectionTitle?: string;
   remorqueSectionTitle?: string;
   guaranteeLayout?: "tariff" | "particulier";
@@ -166,6 +167,7 @@ export function ContractTargetsSection({
   singleRemorqueLayout = false,
   showVehicleSection = true,
   showRemorqueSection = true,
+  separateGuaranteeNavigation = false,
   vehicleSectionTitle = "Véhicules",
   remorqueSectionTitle = "Remorques",
   guaranteeLayout = "tariff",
@@ -506,21 +508,38 @@ export function ContractTargetsSection({
                 onOpenChange={() => setActiveTargetPart("garanties")}
                 headerAction={garantiesExtraAction}
                 action={
-                  <Button
-                    type="button"
-                    disabled={previewing || saving}
-                    onClick={() => {
-                      saveTargetSection(
-                        activeVehiculeTarget,
-                        "garanties",
-                        "Garanties véhicule",
-                        () => advanceAfterVehiculeGaranties(activeVehiculeTarget)
-                      );
-                    }}
-                  >
-                    {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : targetActionText.garanties}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      disabled={previewing || saving}
+                      onClick={() => {
+                        saveTargetSection(
+                          activeVehiculeTarget,
+                          "garanties",
+                          "Garanties véhicule",
+                          separateGuaranteeNavigation
+                            ? undefined
+                            : () => advanceAfterVehiculeGaranties(activeVehiculeTarget)
+                        );
+                      }}
+                    >
+                      {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      {saving ? "Enregistrement..." : previewing ? "Calcul..." : targetActionText.garanties}
+                    </Button>
+                    {separateGuaranteeNavigation ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={previewing || saving}
+                        aria-label="Continuer"
+                        title="Continuer"
+                        onClick={() => advanceAfterVehiculeGaranties(activeVehiculeTarget)}
+                      >
+                        <ArrowRight className="size-4" />
+                      </Button>
+                    ) : null}
+                  </div>
                 }
               >
                 <TargetGuaranteesTable
@@ -659,21 +678,38 @@ export function ContractTargetsSection({
                 badge={`${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length} garantie${selectedGaranties.filter((item) => sameTarget(item, activeRemorqueTarget)).length > 1 ? "s" : ""}`}
                 headerAction={garantiesExtraAction}
                 action={
-                  <Button
-                    type="button"
-                    disabled={previewing || saving}
-                    onClick={() => {
-                      saveTargetSection(
-                        activeRemorqueTarget,
-                        "garanties",
-                        "Garanties remorque",
-                        () => advanceAfterRemorqueGaranties(activeRemorqueTarget)
-                      );
-                    }}
-                  >
-                    {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    {saving ? "Enregistrement..." : previewing ? "Calcul..." : targetActionText.garanties}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      disabled={previewing || saving}
+                      onClick={() => {
+                        saveTargetSection(
+                          activeRemorqueTarget,
+                          "garanties",
+                          "Garanties remorque",
+                          separateGuaranteeNavigation
+                            ? undefined
+                            : () => advanceAfterRemorqueGaranties(activeRemorqueTarget)
+                        );
+                      }}
+                    >
+                      {previewing || saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      {saving ? "Enregistrement..." : previewing ? "Calcul..." : targetActionText.garanties}
+                    </Button>
+                    {separateGuaranteeNavigation ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={previewing || saving}
+                        aria-label="Continuer"
+                        title="Continuer"
+                        onClick={() => advanceAfterRemorqueGaranties(activeRemorqueTarget)}
+                      >
+                        <ArrowRight className="size-4" />
+                      </Button>
+                    ) : null}
+                  </div>
                 }
               >
                 <TargetGuaranteesTable

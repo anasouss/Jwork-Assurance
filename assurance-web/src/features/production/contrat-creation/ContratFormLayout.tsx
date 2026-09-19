@@ -345,6 +345,7 @@ export function ContratFormLayout({
       lockContractDates={form.renewalMode}
       maxRemorques={maxRemorques}
       showRemorqueSection={showFlotteRemorques}
+      separateGuaranteeNavigation
       errors={form.validationErrors}
       openSection={activeSection}
       onSectionOpenChange={handleSectionOpenChange}

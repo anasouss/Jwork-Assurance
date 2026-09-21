@@ -247,9 +247,6 @@ export type ConventionBillingInstallment = {
   taxes: number;
   accessoires: number;
   montantTtc: number;
-  dejaFacturee: boolean;
-  reglementDirectActif: boolean;
-  facturable: boolean;
 };
 
 export type ConventionBillingPage = {
@@ -348,6 +345,9 @@ export type ClientDocumentLine = {
   taxes: number;
   accessoires: number;
   montantTtc: number;
+  dejaFacturee: boolean;
+  reglementDirectActif: boolean;
+  facturable: boolean;
 };
 
 export type ClientDocument = {

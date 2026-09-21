@@ -372,49 +372,51 @@ export default function RelevesFacturesPage() {
           />
           <Card className="min-w-0 shadow-none">
             <CardHeader className="gap-3 pb-3">
-              <div className="grid min-w-0 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 xl:grid-cols-4">
-                <SourceSummaryMetric
-                  label="Solde impayé"
-                  value={sources.data?.summary.soldeImpaye}
-                  icon={<WalletCards className="size-4" />}
-                  tone="amber"
-                />
-                <SourceSummaryMetric
-                  label="Montant facturé"
-                  value={sources.data?.summary.montantFacture}
-                  icon={<FileCheck2 className="size-4" />}
-                  tone="blue"
-                />
-                <SourceSummaryMetric
-                  label="Impayé facturé"
-                  value={sources.data?.summary.impayeFacture}
-                  icon={<CircleAlert className="size-4" />}
-                  tone="red"
-                />
-                <SourceSummaryMetric
-                  label="Impayé non facturé"
-                  value={sources.data?.summary.impayeNonFacture}
-                  icon={<FileClock className="size-4" />}
-                  tone="orange"
-                />
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  disabled={!sources.data?.page.totalElements || sources.isLoading || exporting}
-                  onClick={() => void exportSources()}
-                >
-                  <Download className="size-4" />
-                  {exporting ? "Export..." : "Exporter Excel"}
-                </Button>
-                {canIssue ? (
-                  <Button disabled={!selectedRows.length} onClick={() => setIssueOpen(true)}>
-                    <FilePlus2 className="size-4" />
-                    Créer un document{selectedRows.length ? ` (${selectedRows.length})` : ""}
+              <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
+                <div className="grid min-w-0 flex-1 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
+                  <SourceSummaryMetric
+                    label="Solde impayé"
+                    value={sources.data?.summary.soldeImpaye}
+                    icon={<WalletCards className="size-4" />}
+                    tone="amber"
+                  />
+                  <SourceSummaryMetric
+                    label="Montant facturé"
+                    value={sources.data?.summary.montantFacture}
+                    icon={<FileCheck2 className="size-4" />}
+                    tone="blue"
+                  />
+                  <SourceSummaryMetric
+                    label="Impayé facturé"
+                    value={sources.data?.summary.impayeFacture}
+                    icon={<CircleAlert className="size-4" />}
+                    tone="red"
+                  />
+                  <SourceSummaryMetric
+                    label="Impayé non facturé"
+                    value={sources.data?.summary.impayeNonFacture}
+                    icon={<FileClock className="size-4" />}
+                    tone="orange"
+                  />
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    disabled={!sources.data?.page.totalElements || sources.isLoading || exporting}
+                    onClick={() => void exportSources()}
+                  >
+                    <Download className="size-4" />
+                    {exporting ? "Export..." : "Exporter Excel"}
                   </Button>
-                ) : null}
+                  {canIssue ? (
+                    <Button disabled={!selectedRows.length} onClick={() => setIssueOpen(true)}>
+                      <FilePlus2 className="size-4" />
+                      Créer un document{selectedRows.length ? ` (${selectedRows.length})` : ""}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">

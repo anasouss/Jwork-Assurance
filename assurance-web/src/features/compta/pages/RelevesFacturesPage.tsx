@@ -12,6 +12,7 @@ import {
   FileDown,
   FilePlus2,
   FileText,
+  MoreHorizontal,
   ReceiptText,
   RotateCcw,
   Search,
@@ -39,6 +40,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   FilterField as SharedFilterField,
   ServerPagination,
@@ -791,33 +799,20 @@ function DocumentTable(props: {
                       : <Badge variant="destructive">Annulé</Badge>}
                   </td>
                   <td className="px-3 py-3">
-                    <div className="flex justify-center gap-1">
-                      <Button variant="ghost" size="icon" title="Voir le détail" onClick={() => props.onDetail(document.id)}>
-                        <Eye className="size-4" />
-                      </Button>
-                      <PdfButton document={document} />
-                      {props.onInvoice
-                        && document.typeDocument === "RELEVE"
-                        && document.statut === "EMIS" ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Créer une facture depuis ce relevé"
-                          onClick={() => props.onInvoice?.(document.id)}
-                        >
-                          <ReceiptText className="size-4 text-amber-700" />
-                        </Button>
-                      ) : null}
-                      {props.onCancel && document.statut === "EMIS" ? (
-                        <Button variant="ghost" size="icon" title="Rectifier le document" onClick={() => props.onCancel?.(document)}>
-                          <Ban className="size-4 text-destructive" />
-                        </Button>
-                      ) : null}
-                      {props.onDelete ? (
-                        <Button variant="ghost" size="icon" title="Supprimer le document" onClick={() => props.onDelete?.(document)}>
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      ) : null}
+                    <div className="flex justify-center">
+                      <DocumentActionsMenu
+                        document={document}
+                        onDetail={() => props.onDetail(document.id)}
+                        onInvoice={props.onInvoice
+                          && document.typeDocument === "RELEVE"
+                          && document.statut === "EMIS"
+                          ? () => props.onInvoice?.(document.id)
+                          : undefined}
+                        onCancel={props.onCancel && document.statut === "EMIS"
+                          ? () => props.onCancel?.(document)
+                          : undefined}
+                        onDelete={props.onDelete ? () => props.onDelete?.(document) : undefined}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -828,6 +823,65 @@ function DocumentTable(props: {
         <PageFooter page={props.page} onPrevious={props.onPrevious} onNext={props.onNext} />
       </CardContent>
     </Card>
+  );
+}
+
+function DocumentActionsMenu(props: {
+  document: ClientDocument;
+  onDetail: () => void;
+  onInvoice?: () => void;
+  onCancel?: () => void;
+  onDelete?: () => void;
+}) {
+  const pdf = useDocumentPdfPreview(props.document);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" title="Actions" aria-label={`Actions pour ${props.document.numero}`}>
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-56">
+          <DropdownMenuItem onSelect={props.onDetail}>
+            <Eye className="size-4" />
+            Voir le détail
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
+            <FileDown className="size-4" />
+            {pdf.loading ? "Ouverture..." : "Prévisualiser le PDF"}
+          </DropdownMenuItem>
+          {props.onInvoice ? (
+            <DropdownMenuItem onSelect={props.onInvoice}>
+              <ReceiptText className="size-4" />
+              Créer une facture
+            </DropdownMenuItem>
+          ) : null}
+          {props.onCancel || props.onDelete ? <DropdownMenuSeparator /> : null}
+          {props.onCancel ? (
+            <DropdownMenuItem onSelect={props.onCancel}>
+              <Ban className="size-4" />
+              Rectifier le document
+            </DropdownMenuItem>
+          ) : null}
+          {props.onDelete ? (
+            <DropdownMenuItem variant="destructive" onSelect={props.onDelete}>
+              <Trash2 className="size-4" />
+              Supprimer le document
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {props.document.typeDocument === "RELEVE" ? (
+        <RelevePdfOptionsDialog
+          open={pdf.optionsOpen}
+          loading={pdf.loading}
+          signatureAvailable={props.document.signatureDisponible}
+          onOpenChange={pdf.setOptionsOpen}
+          onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1476,7 +1530,7 @@ function DeleteDocumentDialog(props: { target?: ClientDocument; onClose: () => v
   );
 }
 
-function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
+function useDocumentPdfPreview(document: ClientDocument) {
   const [loading, setLoading] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
 
@@ -1489,7 +1543,7 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
     previewWindow.opener = null;
     setLoading(true);
     try {
-      const blob = await comptaApi.clientDocumentPdf(props.document.id, withSignature);
+      const blob = await comptaApi.clientDocumentPdf(document.id, withSignature);
       const url = URL.createObjectURL(blob);
       previewWindow.location.href = url;
       setOptionsOpen(false);
@@ -1502,33 +1556,39 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
     }
   }
 
-  function handleClick() {
-    if (props.document.typeDocument === "RELEVE") {
+  function open() {
+    if (document.typeDocument === "RELEVE") {
       setOptionsOpen(true);
       return;
     }
     void preview(false);
   }
 
+  return { loading, open, optionsOpen, preview, setOptionsOpen };
+}
+
+function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
+  const pdf = useDocumentPdfPreview(props.document);
+
   return (
     <>
       <Button
         variant="ghost"
         size={props.withLabel ? "default" : "icon"}
-        onClick={handleClick}
-        disabled={loading}
+        onClick={pdf.open}
+        disabled={pdf.loading}
         title="Prévisualiser le PDF"
       >
         <FileDown className="size-4" />
-        {props.withLabel ? (loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
+        {props.withLabel ? (pdf.loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
       </Button>
       {props.document.typeDocument === "RELEVE" ? (
         <RelevePdfOptionsDialog
-          open={optionsOpen}
-          loading={loading}
+          open={pdf.optionsOpen}
+          loading={pdf.loading}
           signatureAvailable={props.document.signatureDisponible}
-          onOpenChange={setOptionsOpen}
-          onOpenPdf={(withSignature) => void preview(withSignature)}
+          onOpenChange={pdf.setOptionsOpen}
+          onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
         />
       ) : null}
     </>

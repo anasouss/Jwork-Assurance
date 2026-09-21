@@ -37,6 +37,7 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -192,9 +193,11 @@ public class DevisPdfService {
             boolean hasDcCapitalColumn
     ) {
         List<String> codes = garantieCodes.isEmpty() ? List.of("-") : garantieCodes;
+        boolean showInsuredSeats = vehicules.stream().anyMatch(this::isSchoolTransportVehicle);
         int valuesColumnsCount = hasDcCapitalColumn ? 4 : 3;
         int guaranteeColumnsCount = Math.max(1, codes.size());
-        int totalColumns = 7 + valuesColumnsCount + guaranteeColumnsCount;
+        int totalColumns = 7 + (showInsuredSeats ? 1 : 0)
+                + valuesColumnsCount + guaranteeColumnsCount;
         float[] widths = new float[totalColumns];
         for (int i = 0; i < totalColumns; i++) {
             widths[i] = 1.0f;
@@ -213,6 +216,9 @@ public class DevisPdfService {
         table.addCell(headerCell("N°\nd'immatric", 2, 1));
         table.addCell(headerCell("Date de\nMC", 2, 1));
         table.addCell(headerCell("PF/PTC", 2, 1));
+        if (showInsuredSeats) {
+            table.addCell(headerCell("Nbre\nPlaces", 2, 1));
+        }
         table.addCell(headerCell("ENERGIE", 2, 1));
         table.addCell(headerCell("VALEURS", 1, valuesColumnsCount));
         table.addCell(headerCell("GARANTIES A ASSURER", 1, guaranteeColumnsCount).setBackgroundColor(GUARANTEE_GROUP_BG));
@@ -244,6 +250,9 @@ public class DevisPdfService {
             table.addCell(valueCell(value(vehicule.getImmatriculation(), ""), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(formatDate(vehicule.getDatePremiereCirculation()), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(pfOrPtc(vehicule), TextAlignment.CENTER, rowBackground));
+            if (showInsuredSeats) {
+                table.addCell(valueCell(value(vehicule.getNombrePlaces(), ""), TextAlignment.CENTER, rowBackground));
+            }
             table.addCell(valueCell(value(vehicule.getCarburant(), "").toUpperCase(Locale.ROOT), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurNeuf()), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurVenale()), TextAlignment.CENTER, rowBackground));
@@ -655,6 +664,22 @@ public class DevisPdfService {
 
     private String usageLabel(Vehicule vehicule) {
         return vehicule == null ? "" : usageLabel(vehicule.getContrat(), vehicule.getUsage());
+    }
+
+    private boolean isSchoolTransportVehicle(Vehicule vehicule) {
+        if (vehicule == null || vehicule.getUsage() == null) {
+            return false;
+        }
+        String code = normalizeUsage(vehicule.getUsage().getCode());
+        String label = normalizeUsage(vehicule.getUsage().getLibelle());
+        return "TRSDECOLIERS".equals(code) || "TRANSPORTDECOLIERS".equals(label);
+    }
+
+    private String normalizeUsage(String rawValue) {
+        return Normalizer.normalize(value(rawValue, ""), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^A-Za-z0-9]", "")
+                .toUpperCase(Locale.ROOT);
     }
 
     private String usageLabel(Contrat contrat, Usage usage) {

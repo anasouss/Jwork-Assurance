@@ -672,7 +672,8 @@ public class DevisPdfService {
         }
         String code = normalizeUsage(vehicule.getUsage().getCode());
         String label = normalizeUsage(vehicule.getUsage().getLibelle());
-        return "TRSDECOLIERS".equals(code) || "TRANSPORTDECOLIERS".equals(label);
+        return Set.of("TRSECOLIERS", "TRSDECOLIERS").contains(code)
+                || "TRANSPORTDECOLIERS".equals(label);
     }
 
     private String normalizeUsage(String rawValue) {

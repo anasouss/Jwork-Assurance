@@ -433,11 +433,8 @@ public class DocumentClientService {
                 invoiceDueDate = emissionDate.plusDays(paymentCondition.days());
             }
             validateInvoiceDueDate(invoiceDueDate, emissionDate, paymentCondition.days());
-        } else if (request.getTypeDocument() == TypeDocumentClient.FACTURE
-                && request.getDateEcheance() != null) {
-            throw new BadRequestException(
-                    "Aucune condition de paiement active n'autorise une date d'échéance pour ce payeur"
-            );
+        } else if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
+            validateOptionalInvoiceDueDate(invoiceDueDate, emissionDate);
         }
         DocumentClient document = DocumentClient.builder()
                 .agence(agence)
@@ -448,7 +445,6 @@ public class DocumentClientService {
                 .periodeDebut(documentPeriod.start())
                 .periodeFin(documentPeriod.end())
                 .dateEcheance(request.getTypeDocument() == TypeDocumentClient.FACTURE
-                        && paymentCondition.configured()
                         ? invoiceDueDate
                         : null)
                 .delaiPaiementJours(request.getTypeDocument() == TypeDocumentClient.FACTURE
@@ -579,6 +575,12 @@ public class DocumentClientService {
             throw new BadRequestException(
                     "La date d'échéance dépasse le délai de paiement applicable de " + maximumDays + " jours"
             );
+        }
+    }
+
+    private void validateOptionalInvoiceDueDate(LocalDate dueDate, LocalDate emissionDate) {
+        if (dueDate != null && dueDate.isBefore(emissionDate)) {
+            throw new BadRequestException("La date d'échéance ne peut pas être antérieure à la date d'émission");
         }
     }
 

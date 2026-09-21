@@ -4,8 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
   Building2,
+  CircleAlert,
   Download,
   Eye,
+  FileCheck2,
+  FileClock,
   FileDown,
   FilePlus2,
   FileText,
@@ -14,6 +17,7 @@ import {
   Search,
   Trash2,
   Users,
+  WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -367,16 +371,34 @@ export default function RelevesFacturesPage() {
             onReset={resetSourceFilters}
           />
           <Card className="min-w-0 shadow-none">
-            <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
-              <div>
-                <CardTitle className="text-base">Écritures disponibles</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {selectedRows.length
-                    ? `${selectedRows.length} écriture(s) sélectionnée(s).`
-                    : "Sélectionnez les écritures du même payeur à inclure dans un document."}
-                </p>
+            <CardHeader className="gap-3 pb-3">
+              <div className="grid min-w-0 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 xl:grid-cols-4">
+                <SourceSummaryMetric
+                  label="Solde impayé"
+                  value={sources.data?.summary.soldeImpaye}
+                  icon={<WalletCards className="size-4" />}
+                  tone="amber"
+                />
+                <SourceSummaryMetric
+                  label="Montant facturé"
+                  value={sources.data?.summary.montantFacture}
+                  icon={<FileCheck2 className="size-4" />}
+                  tone="blue"
+                />
+                <SourceSummaryMetric
+                  label="Impayé facturé"
+                  value={sources.data?.summary.impayeFacture}
+                  icon={<CircleAlert className="size-4" />}
+                  tone="red"
+                />
+                <SourceSummaryMetric
+                  label="Impayé non facturé"
+                  value={sources.data?.summary.impayeNonFacture}
+                  icon={<FileClock className="size-4" />}
+                  tone="orange"
+                />
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">
                 <Button
                   type="button"
                   size="sm"
@@ -1275,6 +1297,50 @@ function Header(props: { children?: ReactNode; align?: "left" | "right" | "cente
 
 function MoneyCell({ value, strong }: { value: number; strong?: boolean }) {
   return <td className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${strong ? "font-semibold" : ""}`}>{formatAmount(value)}</td>;
+}
+
+function SourceSummaryMetric(props: {
+  label: string;
+  value?: number;
+  icon: ReactNode;
+  tone: "amber" | "blue" | "red" | "orange";
+}) {
+  const tones = {
+    amber: {
+      icon: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+      value: "text-amber-800 dark:text-amber-300",
+    },
+    blue: {
+      icon: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
+      value: "text-sky-800 dark:text-sky-300",
+    },
+    red: {
+      icon: "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300",
+      value: "text-red-800 dark:text-red-300",
+    },
+    orange: {
+      icon: "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300",
+      value: "text-orange-800 dark:text-orange-300",
+    },
+  };
+  const tone = tones[props.tone];
+  return (
+    <div className="flex min-w-0 items-center gap-3 bg-background p-3">
+      <div className={`flex size-9 shrink-0 items-center justify-center rounded-md ${tone.icon}`}>
+        {props.icon}
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-muted-foreground">{props.label}</div>
+        {props.value == null ? (
+          <Skeleton className="mt-1 h-6 w-24" />
+        ) : (
+          <div className={`mt-0.5 whitespace-nowrap text-lg font-semibold tabular-nums ${tone.value}`}>
+            {formatAmount(props.value)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function SummaryLine({ label, value, strong }: { label: string; value: number; strong?: boolean }) {

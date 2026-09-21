@@ -128,6 +128,7 @@ public class ReglementClientService {
                 dateAu,
                 search,
                 false,
+                false,
                 receivableSort(sortBy, sortDirection, false),
                 page,
                 size

@@ -19,6 +19,7 @@ import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +63,7 @@ public class DocumentClientExportService {
                     agenceId,
                     payeurType,
                     payeurId,
+                    null,
                     brancheId,
                     compagnieId,
                     typeContrat,
@@ -69,6 +71,10 @@ public class DocumentClientExportService {
                     dateDu,
                     dateAu,
                     search,
+                    true,
+                    false,
+                    Sort.by(Sort.Direction.DESC, "dateDebut")
+                            .and(Sort.by(Sort.Direction.DESC, "id")),
                     page,
                     EXPORT_PAGE_SIZE
             );

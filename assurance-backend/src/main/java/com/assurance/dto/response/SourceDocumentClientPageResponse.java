@@ -3,6 +3,7 @@ package com.assurance.dto.response;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
@@ -16,6 +17,10 @@ public class SourceDocumentClientPageResponse {
     @Builder
     public static class Summary {
         private long total;
+        private BigDecimal soldeImpaye;
+        private BigDecimal montantFacture;
+        private BigDecimal impayeFacture;
+        private BigDecimal impayeNonFacture;
     }
 
     @Getter

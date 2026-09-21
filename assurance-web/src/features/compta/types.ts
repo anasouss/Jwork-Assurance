@@ -314,6 +314,10 @@ export type PageInfo = {
 export type ClientDocumentSourcePage = {
   summary: {
     total: number;
+    soldeImpaye: number;
+    montantFacture: number;
+    impayeFacture: number;
+    impayeNonFacture: number;
   };
   page: PageInfo;
   rows: ClientDocumentSource[];

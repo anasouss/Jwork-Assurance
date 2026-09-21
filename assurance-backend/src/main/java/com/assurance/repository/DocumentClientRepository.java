@@ -143,6 +143,24 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             select distinct d
             from DocumentClient d
             where d.agence.id = :agenceId
+              and d.id = :documentId
+            """)
+    Optional<DocumentClient> findByAgenceIdAndIdForUpdate(
+            @Param("agenceId") Long agenceId,
+            @Param("documentId") Long documentId
+    );
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "clientPayeur",
+            "groupePayeur",
+            "lignes",
+            "lignes.elementFacturable"
+    })
+    @Query("""
+            select distinct d
+            from DocumentClient d
+            where d.agence.id = :agenceId
               and d.id in :documentIds
               and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
               and d.statut = com.assurance.enums.StatutDocumentClient.EMIS

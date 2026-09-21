@@ -18,6 +18,7 @@ import type {
   ConventionBillingStatus,
   CreateConventionInvoiceRequest,
   CreateClientDocumentRequest,
+  CreateInvoiceFromStatementRequest,
   ClientPayment,
   ClientPaymentPage,
   ClientReceivable,
@@ -364,6 +365,20 @@ export const comptaApi = {
           method: "POST",
           body: JSON.stringify(request),
         })
+      )
+    );
+  },
+
+  async createInvoiceFromStatement(statementId: string, request: CreateInvoiceFromStatementRequest) {
+    return normalizeClientDocument(
+      unwrap(
+        await apiFetch<ApiResponse<ClientDocument>>(
+          `/api/v1/compta/documents-clients/${statementId}/facture`,
+          {
+            method: "POST",
+            body: JSON.stringify(request),
+          }
+        )
       )
     );
   },

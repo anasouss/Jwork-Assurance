@@ -64,5 +64,8 @@ public class DocumentClientResponse {
         private BigDecimal taxes;
         private BigDecimal accessoires;
         private BigDecimal montantTtc;
+        private boolean dejaFacturee;
+        private boolean reglementDirectActif;
+        private boolean facturable;
     }
 }

@@ -247,6 +247,9 @@ export type ConventionBillingInstallment = {
   taxes: number;
   accessoires: number;
   montantTtc: number;
+  dejaFacturee: boolean;
+  reglementDirectActif: boolean;
+  facturable: boolean;
 };
 
 export type ConventionBillingPage = {
@@ -388,6 +391,8 @@ export type CreateClientDocumentRequest = {
   dateEcheance?: string;
   notes?: string;
 };
+
+export type CreateInvoiceFromStatementRequest = Omit<CreateClientDocumentRequest, "typeDocument">;
 
 export type ClientDocumentDueDateProposal = {
   dateEmission: string;

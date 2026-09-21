@@ -99,6 +99,7 @@ export default function RelevesFacturesPage() {
   const [selected, setSelected] = useState<Record<string, ClientDocumentSource>>({});
   const [issueOpen, setIssueOpen] = useState(false);
   const [detailId, setDetailId] = useState<string>();
+  const [invoiceFromStatementId, setInvoiceFromStatementId] = useState<string>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
   const [deleteTarget, setDeleteTarget] = useState<ClientDocument>();
   const [exporting, setExporting] = useState(false);
@@ -523,6 +524,7 @@ export default function RelevesFacturesPage() {
             onPrevious={() => updateUrl({ documentPage: Math.max(0, urlState.documentPage - 1) })}
             onNext={() => updateUrl({ documentPage: urlState.documentPage + 1 })}
             onDetail={setDetailId}
+            onInvoice={canIssue ? setInvoiceFromStatementId : undefined}
             onCancel={canIssue ? setCancelTarget : undefined}
             onDelete={canDelete ? setDeleteTarget : undefined}
           />
@@ -539,7 +541,22 @@ export default function RelevesFacturesPage() {
           updateUrl({ tab: "sources", sourcePage: 0, documentPage: 0 });
         }}
       />
-      <DocumentDetailDialog id={detailId} onOpenChange={(open) => !open && setDetailId(undefined)} />
+      <DocumentDetailDialog
+        id={detailId}
+        onOpenChange={(open) => !open && setDetailId(undefined)}
+        onInvoice={canIssue ? (documentId) => {
+          setDetailId(undefined);
+          setInvoiceFromStatementId(documentId);
+        } : undefined}
+      />
+      <StatementInvoiceDialog
+        statementId={invoiceFromStatementId}
+        onOpenChange={(open) => !open && setInvoiceFromStatementId(undefined)}
+        onIssued={(invoice) => {
+          setInvoiceFromStatementId(undefined);
+          setDetailId(invoice.id);
+        }}
+      />
       <CancelDocumentDialog
         target={cancelTarget}
         onClose={() => setCancelTarget(undefined)}
@@ -727,6 +744,7 @@ function DocumentTable(props: {
   onPrevious: () => void;
   onNext: () => void;
   onDetail: (id: string) => void;
+  onInvoice?: (id: string) => void;
   onCancel?: (document: ClientDocument) => void;
   onDelete?: (document: ClientDocument) => void;
 }) {
@@ -778,6 +796,18 @@ function DocumentTable(props: {
                         <Eye className="size-4" />
                       </Button>
                       <PdfButton document={document} />
+                      {props.onInvoice
+                        && document.typeDocument === "RELEVE"
+                        && document.statut === "EMIS" ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Créer une facture depuis ce relevé"
+                          onClick={() => props.onInvoice?.(document.id)}
+                        >
+                          <ReceiptText className="size-4 text-amber-700" />
+                        </Button>
+                      ) : null}
                       {props.onCancel && document.statut === "EMIS" ? (
                         <Button variant="ghost" size="icon" title="Rectifier le document" onClick={() => props.onCancel?.(document)}>
                           <Ban className="size-4 text-destructive" />
@@ -988,7 +1018,11 @@ function IssueDialog(props: {
   );
 }
 
-function DocumentDetailDialog(props: { id?: string; onOpenChange: (open: boolean) => void }) {
+function DocumentDetailDialog(props: {
+  id?: string;
+  onOpenChange: (open: boolean) => void;
+  onInvoice?: (documentId: string) => void;
+}) {
   const detail = useQuery({
     queryKey: ["compta", "client-document", props.id],
     queryFn: () => comptaApi.clientDocument(props.id as string),
@@ -1059,8 +1093,279 @@ function DocumentDetailDialog(props: { id?: string; onOpenChange: (open: boolean
           </div>
         ) : null}
         <DialogFooter>
+          {document
+            && props.onInvoice
+            && document.typeDocument === "RELEVE"
+            && document.statut === "EMIS" ? (
+            <Button onClick={() => props.onInvoice?.(document.id)}>
+              <ReceiptText className="size-4" />
+              Créer une facture
+            </Button>
+          ) : null}
           {document ? <PdfButton document={document} withLabel /> : null}
           <Button variant="outline" onClick={() => props.onOpenChange(false)}>Fermer</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StatementInvoiceDialog(props: {
+  statementId?: string;
+  onOpenChange: (open: boolean) => void;
+  onIssued: (invoice: ClientDocument) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [dueDate, setDueDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const detail = useQuery({
+    queryKey: ["compta", "client-document", props.statementId],
+    queryFn: () => comptaApi.clientDocument(props.statementId as string),
+    enabled: Boolean(props.statementId),
+  });
+  const statement = detail.data;
+  const eligibleLines = useMemo(
+    () => (statement?.lignes ?? []).filter(
+      (line) => Boolean(line.elementFacturableId) && line.facturable
+    ),
+    [statement?.lignes]
+  );
+  useEffect(() => {
+    if (!props.statementId) return;
+    setSelected(Object.fromEntries(
+      eligibleLines.map((line) => [line.elementFacturableId as string, true])
+    ));
+    setDueDate("");
+    setNotes("");
+  }, [props.statementId, eligibleLines]);
+
+  const selectedLines = eligibleLines.filter(
+    (line) => line.elementFacturableId && selected[line.elementFacturableId]
+  );
+  const selectedIds = selectedLines.map((line) => line.elementFacturableId as string);
+  const selectedKey = selectedIds.join(",");
+  const allEligibleSelected = eligibleLines.length > 0
+    && selectedLines.length === eligibleLines.length;
+  const dueDateProposal = useQuery({
+    queryKey: ["compta", "client-document-due-date", selectedIds],
+    queryFn: () => comptaApi.proposeClientDocumentDueDate(selectedIds),
+    enabled: Boolean(props.statementId) && selectedIds.length > 0,
+  });
+  const today = useMemo(() => startOfLocalDay(new Date()), []);
+  const maximumDueDate = dueDateProposal.data?.dateEcheanceProposee
+    ? parseLocalDate(dueDateProposal.data.dateEcheanceProposee)
+    : undefined;
+  const hasPaymentCondition = dueDateProposal.data?.delaiJours != null;
+  const selectedTotal = selectedLines.reduce((sum, line) => sum + line.montantTtc, 0);
+
+  useEffect(() => {
+    setDueDate("");
+  }, [selectedKey]);
+
+  const issue = useMutation({
+    mutationFn: () => comptaApi.createInvoiceFromStatement(props.statementId as string, {
+      elementFacturableIds: selectedIds,
+      dateEcheance: dueDate || undefined,
+      notes: notes.trim() || undefined,
+    }),
+    onSuccess: async (invoice) => {
+      toast.success(`Facture ${invoice.numero} émise.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-document"] }),
+      ]);
+      props.onIssued(invoice);
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Émission de la facture impossible"
+    ),
+  });
+  const invalid = !selectedIds.length
+    || dueDateProposal.isLoading
+    || dueDateProposal.isError
+    || (hasPaymentCondition && !dueDate);
+  const validStatement = statement?.typeDocument === "RELEVE" && statement.statut === "EMIS";
+
+  function toggleAll(checked: boolean) {
+    setSelected(Object.fromEntries(
+      eligibleLines.map((line) => [line.elementFacturableId as string, checked])
+    ));
+  }
+
+  return (
+    <Dialog open={Boolean(props.statementId)} onOpenChange={props.onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>
+            {statement ? `Facturer le relevé ${statement.numero}` : "Préparation de la facture"}
+          </DialogTitle>
+          <DialogDescription>
+            Sélectionnez uniquement les écritures à reprendre dans la facture.
+          </DialogDescription>
+        </DialogHeader>
+
+        {detail.isLoading ? (
+          <div className="grid gap-3">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-56" />
+          </div>
+        ) : null}
+
+        {detail.isError ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            Impossible de charger le relevé.
+          </div>
+        ) : null}
+
+        {statement && !validStatement ? (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            Seul un relevé émis peut servir à préparer une facture.
+          </div>
+        ) : null}
+
+        {statement && validStatement ? (
+          <div className="grid gap-4">
+            <div className="grid gap-3 rounded-md border bg-muted/20 p-3 sm:grid-cols-3">
+              <Info label="Payeur" value={statement.payeurNom} />
+              <Info label="Période" value={`${formatDate(statement.periodeDebut)} au ${formatDate(statement.periodeFin)}`} />
+              <Info label="Sélection" value={`${selectedLines.length} sur ${statement.lignes.length} écriture(s)`} />
+            </div>
+
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full min-w-[940px] text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="w-12 px-3 py-3 text-left">
+                      <Checkbox
+                        checked={allEligibleSelected
+                          ? true
+                          : selectedLines.length > 0
+                            ? "indeterminate"
+                            : false}
+                        disabled={!eligibleLines.length}
+                        onCheckedChange={(checked) => toggleAll(checked === true)}
+                        aria-label="Sélectionner toutes les écritures facturables"
+                      />
+                    </th>
+                    <Header>Police / référence</Header>
+                    <Header>Mouvement</Header>
+                    <Header>Date</Header>
+                    <Header>État</Header>
+                    <Header align="right">Prime nette</Header>
+                    <Header align="right">Taxes et frais</Header>
+                    <Header align="right">TTC</Header>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statement.lignes.map((line) => {
+                    const lineId = line.elementFacturableId;
+                    const disabled = !lineId || !line.facturable;
+                    return (
+                      <tr key={line.id} className={`border-t ${disabled ? "bg-muted/25 text-muted-foreground" : "hover:bg-muted/20"}`}>
+                        <td className="px-3 py-3">
+                          <Checkbox
+                            checked={Boolean(lineId && selected[lineId])}
+                            disabled={disabled}
+                            onCheckedChange={(checked) => {
+                              if (!lineId) return;
+                              setSelected((current) => ({ ...current, [lineId]: checked === true }));
+                            }}
+                            aria-label={`Sélectionner ${line.numeroPolice || line.numeroQuittance || line.mouvement}`}
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="font-medium">{line.numeroPolice || line.numeroQuittance || "-"}</div>
+                          {line.nature === "ASSISTANCE" ? (
+                            <div className="text-xs text-muted-foreground">Contrat d'assistance</div>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-3">{line.mouvement}</td>
+                        <td className="whitespace-nowrap px-3 py-3">{formatDate(line.dateOperation)}</td>
+                        <td className="px-3 py-3">
+                          {line.dejaFacturee ? (
+                            <Badge variant="outline">Déjà facturée</Badge>
+                          ) : line.reglementDirectActif ? (
+                            <Badge variant="outline">Règlement existant</Badge>
+                          ) : line.facturable ? (
+                            <Badge className="bg-emerald-100 text-emerald-800">Disponible</Badge>
+                          ) : (
+                            <Badge variant="outline">Non facturable</Badge>
+                          )}
+                        </td>
+                        <MoneyCell value={line.primeNette} />
+                        <MoneyCell value={taxesAndFees(line)} />
+                        <MoneyCell value={line.montantTtc} strong />
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {!eligibleLines.length ? (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                Ce relevé ne contient plus aucune écriture facturable.
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="grid content-start gap-4">
+                <FilterField label="Notes">
+                  <Textarea
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    maxLength={1000}
+                  />
+                </FilterField>
+                {selectedIds.length ? (
+                  <div className="max-w-sm">
+                    {dueDateProposal.isLoading ? (
+                      <p className="text-xs text-muted-foreground">Calcul de l’échéance applicable...</p>
+                    ) : dueDateProposal.isError ? (
+                      <p className="text-xs text-destructive">
+                        Impossible de déterminer le délai applicable.
+                      </p>
+                    ) : (
+                      <>
+                        <FilterField label={`Échéance de paiement${hasPaymentCondition ? " *" : ""}`}>
+                          <DatePicker
+                            date={dueDate}
+                            onSelect={(date) => setDueDate(toDateOnly(date) ?? "")}
+                            minDate={today}
+                            maxDate={hasPaymentCondition ? maximumDueDate : undefined}
+                          />
+                        </FilterField>
+                        {hasPaymentCondition ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {`Délai applicable : ${dueDateProposal.data?.delaiJours} jours maximum.`}
+                          </p>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+              <div className="self-end rounded-md border">
+                <div className="flex items-center justify-between border-b px-4 py-3">
+                  <span>Écritures sélectionnées</span>
+                  <span className="font-semibold tabular-nums">{selectedLines.length}</span>
+                </div>
+                <SummaryLine label="Total à facturer" value={selectedTotal} strong />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => props.onOpenChange(false)}>Annuler</Button>
+          {validStatement ? (
+            <Button disabled={invalid || issue.isPending} onClick={() => issue.mutate()}>
+              <ReceiptText className="size-4" />
+              {issue.isPending ? "Émission..." : "Émettre la facture"}
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

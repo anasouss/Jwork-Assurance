@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.CreerDocumentClientRequest;
+import com.assurance.dto.request.CreerFactureDepuisReleveRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
 import com.assurance.dto.request.PropositionEcheanceDocumentClientRequest;
 import com.assurance.dto.response.DocumentClientPageResponse;
@@ -508,6 +509,43 @@ public class DocumentClientService {
     }
 
     @Transactional
+    public DocumentClientResponse createInvoiceFromStatement(
+            Long agenceId,
+            Long statementId,
+            CreerFactureDepuisReleveRequest request
+    ) {
+        DocumentClient statement = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, statementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document client", statementId));
+        if (statement.getTypeDocument() != TypeDocumentClient.RELEVE
+                || statement.getStatut() != StatutDocumentClient.EMIS) {
+            throw new BadRequestException("Seul un relevé émis peut servir à préparer une facture");
+        }
+
+        List<Long> requestedIds = request.getElementFacturableIds().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (requestedIds.isEmpty()) {
+            throw new BadRequestException("Sélectionnez au moins une écriture du relevé");
+        }
+        Set<Long> statementElementIds = statement.getLignes().stream()
+                .map(LigneDocumentClient::getElementFacturable)
+                .filter(Objects::nonNull)
+                .map(ElementFacturable::getId)
+                .collect(Collectors.toSet());
+        if (!statementElementIds.containsAll(requestedIds)) {
+            throw new BadRequestException("Une ou plusieurs écritures ne font pas partie de ce relevé");
+        }
+
+        CreerDocumentClientRequest invoiceRequest = new CreerDocumentClientRequest();
+        invoiceRequest.setTypeDocument(TypeDocumentClient.FACTURE);
+        invoiceRequest.setElementFacturableIds(requestedIds);
+        invoiceRequest.setDateEcheance(request.getDateEcheance());
+        invoiceRequest.setNotes(request.getNotes());
+        return create(agenceId, invoiceRequest, false, false);
+    }
+
+    @Transactional
     public DocumentClientResponse createInvoiceFromDirectPayment(
             Long agenceId,
             Collection<Long> elementFacturableIds
@@ -999,9 +1037,26 @@ public class DocumentClientService {
     }
 
     private DocumentClientResponse toResponse(DocumentClient document, boolean includeLines) {
-        List<DocumentClientResponse.Ligne> lines = includeLines
+        List<LigneDocumentClient> documentLines = includeLines
                 ? document.getLignes().stream()
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
+                .toList()
+                : List.of();
+        List<Long> elementIds = documentLines.stream()
+                .map(LigneDocumentClient::getElementFacturable)
+                .filter(Objects::nonNull)
+                .map(ElementFacturable::getId)
+                .distinct()
+                .toList();
+        Set<Long> alreadyInvoiced = elementIds.isEmpty()
+                ? Set.of()
+                : new HashSet<>(ligneDocumentClientRepository.findElementFacturableIdsAlreadyIssued(
+                        elementIds,
+                        TypeDocumentClient.FACTURE,
+                        StatutDocumentClient.EMIS
+                ));
+        Set<Long> elementsWithDirectPayment = loadActiveAllocationTotalsByElement(elementIds).keySet();
+        List<DocumentClientResponse.Ligne> lines = documentLines.stream()
                 .map(line -> DocumentClientResponse.Ligne.builder()
                         .id(line.getId())
                         .quittanceId(line.getQuittance() == null ? null : line.getQuittance().getId())
@@ -1037,9 +1092,16 @@ public class DocumentClientService {
                         .taxes(line.getTaxes())
                         .accessoires(line.getAccessoires())
                         .montantTtc(line.getMontantTtc())
+                        .dejaFacturee(line.getElementFacturable() != null
+                                && alreadyInvoiced.contains(line.getElementFacturable().getId()))
+                        .reglementDirectActif(line.getElementFacturable() != null
+                                && elementsWithDirectPayment.contains(line.getElementFacturable().getId()))
+                        .facturable(line.getElementFacturable() != null
+                                && money(line.getMontantTtc()).signum() > 0
+                                && !alreadyInvoiced.contains(line.getElementFacturable().getId())
+                                && !elementsWithDirectPayment.contains(line.getElementFacturable().getId()))
                         .build())
-                .toList()
-                : List.of();
+                .toList();
         return DocumentClientResponse.builder()
                 .id(document.getId())
                 .typeDocument(document.getTypeDocument())

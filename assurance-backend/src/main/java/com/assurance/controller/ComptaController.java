@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.CreerDocumentClientRequest;
 import com.assurance.dto.request.CreerFactureConventionRequest;
+import com.assurance.dto.request.CreerFactureDepuisReleveRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
 import com.assurance.dto.request.EnregistrerAffectationQuittanceRequest;
 import com.assurance.dto.request.EnregistrerLotAffectationQuittanceRequest;
@@ -395,6 +396,22 @@ public class ComptaController {
                 request.getTypeDocument() == TypeDocumentClient.RELEVE
                         ? "Relevé émis"
                         : "Facture émise"
+        ));
+    }
+
+    @PostMapping("/documents-clients/{documentId}/facture")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<DocumentClientResponse>> creerFactureDepuisReleve(
+            @PathVariable Long documentId,
+            @Valid @RequestBody CreerFactureDepuisReleveRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                documentClientService.createInvoiceFromStatement(
+                        TenantContext.getCurrentAgence(),
+                        documentId,
+                        request
+                ),
+                "Facture émise depuis le relevé"
         ));
     }
 

@@ -29,6 +29,7 @@ import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
+import com.itextpdf.layout.property.VerticalAlignment;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -207,7 +208,7 @@ public class DevisPdfService {
         widths[2] = 1.5f;
         widths[3] = 1.2f;
         widths[4] = 1.0f;
-        widths[5] = 1.0f;
+        widths[5] = showInsuredSeats ? 0.8f : 1.0f;
         widths[totalColumns - 1] = 1.4f;
 
         Table table = new Table(widths).setWidth(UnitValue.createPercentValue(100));
@@ -217,7 +218,7 @@ public class DevisPdfService {
         table.addCell(headerCell("Date de\nMC", 2, 1));
         table.addCell(headerCell("PF/PTC", 2, 1));
         if (showInsuredSeats) {
-            table.addCell(headerCell("Nbre\nPlaces", 2, 1));
+            table.addCell(stackedHeaderCell("Nbre", "Places", 2, 1));
         }
         table.addCell(headerCell("ENERGIE", 2, 1));
         table.addCell(headerCell("VALEURS", 1, valuesColumnsCount));
@@ -735,6 +736,18 @@ public class DevisPdfService {
         return new Cell(rowSpan, colSpan)
                 .add(new Paragraph(safe(text)).setBold())
                 .setTextAlignment(TextAlignment.CENTER)
+                .setFontSize(8.5f)
+                .setBackgroundColor(TABLE_HEADER_BG)
+                .setBorder(new SolidBorder(TABLE_BORDER, 1))
+                .setPadding(3);
+    }
+
+    private Cell stackedHeaderCell(String firstLine, String secondLine, int rowSpan, int colSpan) {
+        return new Cell(rowSpan, colSpan)
+                .add(new Paragraph(safe(firstLine)).setBold().setMargin(0))
+                .add(new Paragraph(safe(secondLine)).setBold().setMargin(0))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setFontSize(8.5f)
                 .setBackgroundColor(TABLE_HEADER_BG)
                 .setBorder(new SolidBorder(TABLE_BORDER, 1))

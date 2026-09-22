@@ -46,6 +46,7 @@ import { clientApi } from "@/features/production/api/clients";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
+import { formatMoney } from "@/features/production/utils/format";
 import { downloadBlob } from "@/lib/download";
 import { comptaApi } from "@/features/compta/api";
 import type { ClientDocument } from "@/features/compta/types";
@@ -1709,7 +1710,7 @@ function Field({
 }
 
 function money(value?: number | null) {
-  return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD" }).format(value ?? 0);
+  return formatMoney(value);
 }
 
 function dateLabel(value?: string | null) {

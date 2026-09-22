@@ -25,7 +25,6 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
               and (:search is null
                    or lower(r.numero) like concat('%', :search, '%')
                    or lower(r.payeurNom) like concat('%', :search, '%'))
-            order by r.dateReglement desc, r.id desc
             """)
     Page<ReglementClient> search(
             @Param("agenceId") Long agenceId,

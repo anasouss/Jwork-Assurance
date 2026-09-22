@@ -263,6 +263,8 @@ public class ComptaController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "dateDebut") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size
     ) {
@@ -278,6 +280,8 @@ public class ComptaController {
                 dateDu,
                 dateAu,
                 search,
+                sortBy,
+                sortDirection,
                 page,
                 size
         )));
@@ -294,7 +298,9 @@ public class ComptaController {
             @RequestParam(required = false) String documentState,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
-            @RequestParam(required = false) String search
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "dateDebut") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection
     ) {
         byte[] file = documentClientExportService.exportSources(
                 TenantContext.getCurrentAgence(),
@@ -306,7 +312,9 @@ public class ComptaController {
                 documentState,
                 dateDu,
                 dateAu,
-                search
+                search,
+                sortBy,
+                sortDirection
         );
         return ResponseEntity.ok()
                 .header(
@@ -369,6 +377,8 @@ public class ComptaController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "dateEmission") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size
     ) {
@@ -381,6 +391,8 @@ public class ComptaController {
                 dateDu,
                 dateAu,
                 search,
+                sortBy,
+                sortDirection,
                 page,
                 size
         )));

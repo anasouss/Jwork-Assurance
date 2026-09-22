@@ -237,6 +237,8 @@ public class ReglementClientService {
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            String sortBy,
+            String sortDirection,
             int page,
             int size
     ) {
@@ -245,7 +247,12 @@ public class ReglementClientService {
                 dateDu,
                 dateAu,
                 normalizeSearch(search),
-                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                        Sort.by("asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC,
+                                switch (sortBy) {
+                                    case "numero", "payeurNom", "montantTotal", "statut" -> sortBy;
+                                    default -> "dateReglement";
+                                }).and(Sort.by(Sort.Direction.DESC, "id")))
         );
         return ReglementClientPageResponse.builder()
                 .page(SourceDocumentClientPageResponse.PageInfo.builder()

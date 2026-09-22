@@ -203,6 +203,35 @@ public class DocumentClientService {
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            String sortBy,
+            String sortDirection,
+            int page,
+            int size
+    ) {
+        String property = switch (sortBy) {
+            case "primeTotale", "dateDebut" -> sortBy;
+            default -> "dateDebut";
+        };
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection)
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return searchSources(agenceId, payeurType, payeurId, contratId, brancheId, compagnieId,
+                typeContrat, documentState, dateDu, dateAu, search, true, true,
+                Sort.by(direction, property).and(Sort.by(Sort.Direction.DESC, "id")), page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public SourceDocumentClientPageResponse searchSources(
+            Long agenceId,
+            String payeurType,
+            Long payeurId,
+            Long contratId,
+            Long brancheId,
+            Long compagnieId,
+            TypeContrat typeContrat,
+            String documentState,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search,
             boolean includeInvoiced,
             boolean includeSummary,
             Sort sort,
@@ -473,6 +502,8 @@ public class DocumentClientService {
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            String sortBy,
+            String sortDirection,
             int page,
             int size
     ) {
@@ -487,7 +518,12 @@ public class DocumentClientService {
                 payeurType,
                 payeurId,
                 normalizeSearch(search),
-                PageRequest.of(normalizePage(page), normalizeSize(size))
+                PageRequest.of(normalizePage(page), normalizeSize(size),
+                        Sort.by("asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC,
+                                switch (sortBy) {
+                                    case "numero", "totalDocument", "statut" -> sortBy;
+                                    default -> "dateEmission";
+                                }).and(Sort.by(Sort.Direction.DESC, "id")))
         );
         return DocumentClientPageResponse.builder()
                 .summary(DocumentClientPageResponse.Summary.builder()

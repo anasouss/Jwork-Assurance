@@ -27,8 +27,12 @@ export type ReleveSearchState = {
   tab: ReleveTab;
   sourceFilters: SourceFilters;
   sourcePage: number;
+  sourceSortBy: "dateDebut" | "primeTotale";
+  sourceSortDirection: "asc" | "desc";
   documentFilters: DocumentFilters;
   documentPage: number;
+  documentSortBy: "dateEmission" | "numero" | "totalDocument" | "statut";
+  documentSortDirection: "asc" | "desc";
 };
 
 export const SOURCE_DEFAULTS: SourceFilters = {
@@ -73,6 +77,8 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
       search: params.get("sourceSearch") ?? "",
     },
     sourcePage: pageFromParam(params.get("sourcePage")),
+    sourceSortBy: params.get("sourceSortBy") === "primeTotale" ? "primeTotale" : "dateDebut",
+    sourceSortDirection: params.get("sourceSortDirection") === "asc" ? "asc" : "desc",
     documentFilters: {
       type: params.get("documentType") === "RELEVE" || params.get("documentType") === "FACTURE"
         ? params.get("documentType") as ClientDocumentType
@@ -83,6 +89,9 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
       search: params.get("documentSearch") ?? "",
     },
     documentPage: pageFromParam(params.get("documentPage")),
+    documentSortBy: isDocumentSortBy(params.get("documentSortBy"))
+      ? params.get("documentSortBy") as ReleveSearchState["documentSortBy"] : "dateEmission",
+    documentSortDirection: params.get("documentSortDirection") === "asc" ? "asc" : "desc",
   };
 }
 
@@ -109,6 +118,8 @@ export function releveSearchParams(state: ReleveSearchState) {
   if (state.sourceFilters.dateAu) params.set("sourceDateAu", state.sourceFilters.dateAu);
   if (state.sourceFilters.search.trim()) params.set("sourceSearch", state.sourceFilters.search.trim());
   if (state.sourcePage > 0) params.set("sourcePage", String(state.sourcePage + 1));
+  if (state.sourceSortBy !== "dateDebut") params.set("sourceSortBy", state.sourceSortBy);
+  if (state.sourceSortDirection !== "desc") params.set("sourceSortDirection", state.sourceSortDirection);
 
   if (state.documentFilters.type !== "ALL") params.set("documentType", state.documentFilters.type);
   if (state.documentFilters.statut !== "ALL") params.set("documentStatut", state.documentFilters.statut);
@@ -116,7 +127,13 @@ export function releveSearchParams(state: ReleveSearchState) {
   if (state.documentFilters.dateAu) params.set("documentDateAu", state.documentFilters.dateAu);
   if (state.documentFilters.search.trim()) params.set("documentSearch", state.documentFilters.search.trim());
   if (state.documentPage > 0) params.set("documentPage", String(state.documentPage + 1));
+  if (state.documentSortBy !== "dateEmission") params.set("documentSortBy", state.documentSortBy);
+  if (state.documentSortDirection !== "desc") params.set("documentSortDirection", state.documentSortDirection);
   return params;
+}
+
+function isDocumentSortBy(value: string | null): value is ReleveSearchState["documentSortBy"] {
+  return value === "dateEmission" || value === "numero" || value === "totalDocument" || value === "statut";
 }
 
 function isContractType(value: string | null): value is TypeContrat {

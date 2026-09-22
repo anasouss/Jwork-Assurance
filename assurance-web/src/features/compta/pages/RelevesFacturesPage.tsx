@@ -63,6 +63,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SortIcon } from "@/components/ui/sort-icon";
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
@@ -149,9 +150,11 @@ export default function RelevesFacturesPage() {
     dateDu: urlState.sourceFilters.dateDu || undefined,
     dateAu: urlState.sourceFilters.dateAu || undefined,
     search: urlState.sourceFilters.search.trim() || undefined,
+    sortBy: urlState.sourceSortBy,
+    sortDirection: urlState.sourceSortDirection,
     page: urlState.sourcePage,
     size: PAGE_SIZE,
-  }), [selectedPayer, urlState.sourceFilters, urlState.sourcePage]);
+  }), [selectedPayer, urlState.sourceFilters, urlState.sourcePage, urlState.sourceSortBy, urlState.sourceSortDirection]);
   const documentParams = useMemo(() => ({
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
@@ -160,9 +163,11 @@ export default function RelevesFacturesPage() {
     dateDu: urlState.documentFilters.dateDu || undefined,
     dateAu: urlState.documentFilters.dateAu || undefined,
     search: urlState.documentFilters.search.trim() || undefined,
+    sortBy: urlState.documentSortBy,
+    sortDirection: urlState.documentSortDirection,
     page: urlState.documentPage,
     size: PAGE_SIZE,
-  }), [selectedPayer, urlState.documentFilters, urlState.documentPage]);
+  }), [selectedPayer, urlState.documentFilters, urlState.documentPage, urlState.documentSortBy, urlState.documentSortDirection]);
 
   const sources = useQuery({
     queryKey: ["compta", "client-document-sources", sourceParams],
@@ -180,6 +185,18 @@ export default function RelevesFacturesPage() {
 
   function updateUrl(patch: Partial<ReleveSearchState>) {
     setSearchParams(releveSearchParams({ ...urlState, ...patch }), { replace: true });
+  }
+
+  function sortSources(column: ReleveSearchState["sourceSortBy"]) {
+    updateUrl({ sourceSortBy: column,
+      sourceSortDirection: urlState.sourceSortBy === column && urlState.sourceSortDirection === "desc" ? "asc" : "desc",
+      sourcePage: 0 });
+  }
+
+  function sortDocuments(column: ReleveSearchState["documentSortBy"]) {
+    updateUrl({ documentSortBy: column,
+      documentSortDirection: urlState.documentSortBy === column && urlState.documentSortDirection === "desc" ? "asc" : "desc",
+      documentPage: 0 });
   }
 
   function changePayer(payer?: PayerSelection, scope: PayerScope = payer?.type ?? payerScope) {
@@ -318,6 +335,8 @@ export default function RelevesFacturesPage() {
         dateDu: sourceParams.dateDu,
         dateAu: sourceParams.dateAu,
         search: sourceParams.search,
+        sortBy: sourceParams.sortBy,
+        sortDirection: sourceParams.sortDirection,
       });
       downloadBlob(blob, `releves-factures-${toDateOnly(new Date())}.xlsx`);
     } catch (error) {
@@ -450,10 +469,10 @@ export default function RelevesFacturesPage() {
                       <Header>Police</Header>
                       <Header>Mouvement</Header>
                       <Header>Compagnie</Header>
-                      <Header>Date d'effet</Header>
+                      <SortHeader column="dateDebut" activeColumn={urlState.sourceSortBy} direction={urlState.sourceSortDirection} onSort={sortSources}>Date d'effet</SortHeader>
                       <Header align="right">Prime nette</Header>
                       <Header align="right">Taxes et frais</Header>
-                      <Header align="right">TTC</Header>
+                      <SortHeader column="primeTotale" activeColumn={urlState.sourceSortBy} direction={urlState.sourceSortDirection} onSort={sortSources} align="right">TTC</SortHeader>
                       <Header>FC/RL</Header>
                       <Header>Référence document</Header>
                       <Header align="center">Détail</Header>
@@ -526,6 +545,9 @@ export default function RelevesFacturesPage() {
             onReset={resetDocumentFilters}
           />
           <DocumentTable
+            sortBy={urlState.documentSortBy}
+            sortDirection={urlState.documentSortDirection}
+            onSort={sortDocuments}
             loading={documents.isLoading}
             rows={documents.data?.rows ?? []}
             page={documents.data?.page}
@@ -746,6 +768,9 @@ function DocumentSearch(props: {
 }
 
 function DocumentTable(props: {
+  sortBy: ReleveSearchState["documentSortBy"];
+  sortDirection: "asc" | "desc";
+  onSort: (column: ReleveSearchState["documentSortBy"]) => void;
   loading: boolean;
   rows: ClientDocument[];
   page?: { number: number; totalElements: number; totalPages: number; first: boolean; last: boolean };
@@ -766,12 +791,12 @@ function DocumentTable(props: {
           <table className="w-full min-w-[900px] text-sm">
             <thead className="border-y bg-amber-600 text-white">
               <tr>
-                <Header>N° document</Header>
+                <SortHeader column="numero" activeColumn={props.sortBy} direction={props.sortDirection} onSort={props.onSort}>N° document</SortHeader>
                 <Header>Type</Header>
-                <Header>Émission</Header>
+                <SortHeader column="dateEmission" activeColumn={props.sortBy} direction={props.sortDirection} onSort={props.onSort}>Émission</SortHeader>
                 <Header>Période</Header>
-                <Header align="right">Montant</Header>
-                <Header>Statut</Header>
+                <SortHeader column="totalDocument" activeColumn={props.sortBy} direction={props.sortDirection} onSort={props.onSort} align="right">Montant</SortHeader>
+                <SortHeader column="statut" activeColumn={props.sortBy} direction={props.sortDirection} onSort={props.onSort}>Statut</SortHeader>
                 <Header align="center">Actions</Header>
               </tr>
             </thead>
@@ -1660,6 +1685,31 @@ function SearchActions(props: { onApply: () => void; onReset: () => void }) {
 function Header(props: { children?: ReactNode; align?: "left" | "right" | "center" }) {
   const alignment = props.align === "right" ? "text-right" : props.align === "center" ? "text-center" : "text-left";
   return <th className={`whitespace-nowrap px-3 py-3 text-xs font-semibold uppercase ${alignment}`}>{props.children}</th>;
+}
+
+function SortHeader<T extends string>(props: {
+  children: ReactNode;
+  column: T;
+  activeColumn: T;
+  direction: "asc" | "desc";
+  onSort: (column: T) => void;
+  align?: "left" | "right";
+}) {
+  const active = props.column === props.activeColumn;
+  return (
+    <th
+      aria-sort={active ? props.direction === "asc" ? "ascending" : "descending" : "none"}
+      className="whitespace-nowrap px-3 py-3 text-xs font-semibold uppercase"
+    >
+      <button
+        type="button"
+        className={`inline-flex w-full items-center gap-1 hover:text-white/80 ${props.align === "right" ? "justify-end" : "justify-start"}`}
+        onClick={() => props.onSort(props.column)}
+      >
+        {props.children}<SortIcon isActive={active} direction={props.direction} />
+      </button>
+    </th>
+  );
 }
 
 function MoneyCell({ value, strong }: { value: number; strong?: boolean }) {

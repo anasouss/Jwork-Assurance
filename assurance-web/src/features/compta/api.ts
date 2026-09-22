@@ -286,6 +286,8 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    sortBy?: "dateDebut" | "primeTotale";
+    sortDirection?: "asc" | "desc";
     page: number;
     size: number;
   }) {
@@ -323,6 +325,8 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    sortBy?: "dateDebut" | "primeTotale";
+    sortDirection?: "asc" | "desc";
   }) {
     return apiFetchBlob(
       `/api/v1/compta/documents-clients/sources/export${buildQueryString(params)}`
@@ -337,6 +341,8 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    sortBy?: "dateEmission" | "numero" | "totalDocument" | "statut";
+    sortDirection?: "asc" | "desc";
     page: number;
     size: number;
   }) {
@@ -479,6 +485,8 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    sortBy?: "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
+    sortDirection?: "asc" | "desc";
     page: number;
     size: number;
   }) {

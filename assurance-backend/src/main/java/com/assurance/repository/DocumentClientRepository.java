@@ -40,7 +40,6 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                     or lower(d.payeurNom) like concat('%', :search, '%')
                     or lower(coalesce(d.payeurIdentifiant, '')) like concat('%', :search, '%')
               )
-            order by d.dateEmission desc, d.id desc
             """)
     Page<DocumentClient> search(
             @Param("agenceId") Long agenceId,

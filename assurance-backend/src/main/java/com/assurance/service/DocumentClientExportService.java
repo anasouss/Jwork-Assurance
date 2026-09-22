@@ -53,8 +53,14 @@ public class DocumentClientExportService {
             String documentState,
             LocalDate dateDu,
             LocalDate dateAu,
-            String search
+            String search,
+            String sortBy,
+            String sortDirection
     ) {
+        String sortProperty = "primeTotale".equals(sortBy) ? "primeTotale" : "dateDebut";
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection)
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort sort = Sort.by(direction, sortProperty).and(Sort.by(Sort.Direction.DESC, "id"));
         List<SourceDocumentClientResponse> rows = new ArrayList<>();
         int page = 0;
         SourceDocumentClientPageResponse result;
@@ -73,8 +79,7 @@ public class DocumentClientExportService {
                     search,
                     true,
                     false,
-                    Sort.by(Sort.Direction.DESC, "dateDebut")
-                            .and(Sort.by(Sort.Direction.DESC, "id")),
+                    sort,
                     page,
                     EXPORT_PAGE_SIZE
             );

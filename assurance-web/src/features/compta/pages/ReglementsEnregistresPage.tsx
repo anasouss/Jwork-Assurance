@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   useMutation,
   useQuery,
@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { SortIcon } from "@/components/ui/sort-icon";
 import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
@@ -49,6 +50,7 @@ import type {
 
 const PAGE_SIZE = 25;
 const TODAY = new Date().toISOString().slice(0, 10);
+type PaymentSortBy = "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
 
 type InstrumentDraft = {
   mode: ClientPaymentMode;
@@ -76,6 +78,8 @@ export default function ReglementsEnregistresPage() {
     || permissions.includes("quittance:manage");
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
+  const [sortBy, setSortBy] = useState<PaymentSortBy>("dateReglement");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -87,11 +91,13 @@ export default function ReglementsEnregistresPage() {
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
 
   const payments = useQuery({
-    queryKey: ["compta", "client-payments", appliedSearch, dateFrom, dateTo, page],
+    queryKey: ["compta", "client-payments", appliedSearch, dateFrom, dateTo, sortBy, sortDirection, page],
     queryFn: () => comptaApi.clientPayments({
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
       dateAu: dateTo || undefined,
+      sortBy,
+      sortDirection,
       page,
       size: PAGE_SIZE,
     }),
@@ -171,6 +177,14 @@ export default function ReglementsEnregistresPage() {
     setAppliedSearch("");
     setDateFrom("");
     setDateTo("");
+    setSortBy("dateReglement");
+    setSortDirection("desc");
+    setPage(0);
+  }
+
+  function changeSort(column: PaymentSortBy) {
+    setSortDirection(sortBy === column && sortDirection === "desc" ? "asc" : "desc");
+    setSortBy(column);
     setPage(0);
   }
 
@@ -251,12 +265,12 @@ export default function ReglementsEnregistresPage() {
           <table className="w-full min-w-[1000px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white">
               <tr>
-                <th className="px-4 py-3 text-left">N° règlement</th>
-                <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-left">Payeur</th>
-                <th className="px-4 py-3 text-right">Montant</th>
+                <PaymentSortHeader column="numero" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>N° règlement</PaymentSortHeader>
+                <PaymentSortHeader column="dateReglement" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Date</PaymentSortHeader>
+                <PaymentSortHeader column="payeurNom" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Payeur</PaymentSortHeader>
+                <PaymentSortHeader column="montantTotal" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="right">Montant</PaymentSortHeader>
                 <th className="px-4 py-3 text-left">Moyens</th>
-                <th className="px-4 py-3 text-center">Statut</th>
+                <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Statut</PaymentSortHeader>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -638,6 +652,28 @@ function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
 
 function formatDate(value?: string | null) {
   return value ? value.split("-").reverse().join("/") : "-";
+}
+
+function PaymentSortHeader(props: {
+  children: ReactNode;
+  column: PaymentSortBy;
+  activeColumn: PaymentSortBy;
+  direction: "asc" | "desc";
+  onSort: (column: PaymentSortBy) => void;
+  align?: "right" | "center";
+}) {
+  const active = props.column === props.activeColumn;
+  return (
+    <th aria-sort={active ? props.direction === "asc" ? "ascending" : "descending" : "none"} className="px-4 py-3">
+      <button
+        type="button"
+        onClick={() => props.onSort(props.column)}
+        className={`inline-flex w-full items-center gap-1 hover:text-white/80 ${props.align === "right" ? "justify-end" : props.align === "center" ? "justify-center" : "justify-start"}`}
+      >
+        {props.children}<SortIcon isActive={active} direction={props.direction} />
+      </button>
+    </th>
+  );
 }
 
 function hasDirectActiveAllocations(payment: ClientPayment) {

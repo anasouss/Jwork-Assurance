@@ -139,7 +139,7 @@ public class DocumentClientService {
     ) {
         return searchSources(
                 agenceId, payeurType, payeurId, null, brancheId, null, typeContrat, null,
-                dateDu, dateAu, search, false, false, sort, page, size
+                dateDu, dateAu, search, false, false, sort, page, size, null
         );
     }
 
@@ -162,7 +162,7 @@ public class DocumentClientService {
                 agenceId, payeurType, payeurId, null, brancheId, compagnieId, typeContrat, documentState,
                 dateDu, dateAu, search, true, true,
                 Sort.by(Sort.Direction.DESC, "dateDebut").and(Sort.by(Sort.Direction.DESC, "id")),
-                page, size
+                page, size, null
         );
     }
 
@@ -186,7 +186,7 @@ public class DocumentClientService {
                 agenceId, payeurType, payeurId, contratId, brancheId, compagnieId, typeContrat, documentState,
                 dateDu, dateAu, search, true, true,
                 Sort.by(Sort.Direction.DESC, "dateDebut").and(Sort.by(Sort.Direction.DESC, "id")),
-                page, size
+                page, size, null
         );
     }
 
@@ -195,6 +195,7 @@ public class DocumentClientService {
             Long agenceId,
             String payeurType,
             Long payeurId,
+            Long souscripteurId,
             Long contratId,
             Long brancheId,
             Long compagnieId,
@@ -216,7 +217,7 @@ public class DocumentClientService {
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
         return searchSources(agenceId, payeurType, payeurId, contratId, brancheId, compagnieId,
                 typeContrat, documentState, dateDu, dateAu, search, true, true,
-                Sort.by(direction, property).and(Sort.by(Sort.Direction.DESC, "id")), page, size);
+                Sort.by(direction, property).and(Sort.by(Sort.Direction.DESC, "id")), page, size, souscripteurId);
     }
 
     @Transactional(readOnly = true)
@@ -236,17 +237,20 @@ public class DocumentClientService {
             boolean includeSummary,
             Sort sort,
             int page,
-            int size
+            int size,
+            Long souscripteurId
     ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         String normalizedDocumentState = normalizeDocumentState(documentState);
         String normalizedSearch = normalizeSearch(search);
         Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size), sort);
+        // The public souscripteurId filter matches CRM portfolio membership, including payer and linked roles.
         Page<ElementFacturable> result = elementFacturableRepository.searchForClientDocuments(
                 agenceId,
                 brancheId,
                 contratId,
+                souscripteurId,
                 compagnieId,
                 typeContrat,
                 normalizedDocumentState,
@@ -294,6 +298,7 @@ public class DocumentClientService {
                         agenceId,
                         brancheId,
                         contratId,
+                        souscripteurId,
                         compagnieId,
                         typeContrat,
                         normalizedDocumentState,
@@ -319,6 +324,7 @@ public class DocumentClientService {
             Long agenceId,
             Long brancheId,
             Long contratId,
+            Long souscripteurId,
             Long compagnieId,
             TypeContrat typeContrat,
             String documentState,
@@ -340,6 +346,7 @@ public class DocumentClientService {
                     agenceId,
                     brancheId,
                     contratId,
+                    souscripteurId,
                     compagnieId,
                     typeContrat,
                     documentState,
@@ -497,6 +504,9 @@ public class DocumentClientService {
             Long agenceId,
             String payeurType,
             Long payeurId,
+            Long souscripteurId,
+            Long contratId,
+            Long brancheId,
             TypeDocumentClient type,
             StatutDocumentClient statut,
             LocalDate dateDu,
@@ -517,6 +527,9 @@ public class DocumentClientService {
                 dateAu,
                 payeurType,
                 payeurId,
+                souscripteurId,
+                contratId,
+                brancheId,
                 normalizeSearch(search),
                 PageRequest.of(normalizePage(page), normalizeSize(size),
                         Sort.by("asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC,

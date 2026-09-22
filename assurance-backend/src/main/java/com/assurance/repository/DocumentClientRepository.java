@@ -34,6 +34,23 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                     (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
                     or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
               ))
+              and ((:clientPortefeuilleId is null and :contratId is null and :brancheId is null) or exists (
+                    select 1 from LigneDocumentClient documentLine
+                    join documentLine.elementFacturable element
+                    join element.contrat contract
+                    left join contract.payeurPrime portfolioPayer
+                    where documentLine.document = d
+                      and element.agence.id = :agenceId
+                      and (:contratId is null or contract.id = :contratId)
+                      and (:brancheId is null or contract.brancheAssurance.id = :brancheId)
+                      and (:clientPortefeuilleId is null
+                            or portfolioPayer.id = :clientPortefeuilleId
+                            or exists (
+                                select 1 from ContratClient portfolioCc
+                                where portfolioCc.contrat = contract
+                                  and portfolioCc.client.id = :clientPortefeuilleId
+                            ))
+              ))
               and (
                     :search is null
                     or lower(d.numero) like concat('%', :search, '%')
@@ -49,6 +66,9 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             @Param("dateAu") LocalDate dateAu,
             @Param("payeurType") String payeurType,
             @Param("payeurId") Long payeurId,
+            @Param("clientPortefeuilleId") Long clientPortefeuilleId,
+            @Param("contratId") Long contratId,
+            @Param("brancheId") Long brancheId,
             @Param("search") String search,
             Pageable pageable
     );

@@ -47,6 +47,8 @@ public class DocumentClientExportService {
             Long agenceId,
             String payeurType,
             Long payeurId,
+            Long souscripteurId,
+            Long contratId,
             Long brancheId,
             Long compagnieId,
             TypeContrat typeContrat,
@@ -69,7 +71,7 @@ public class DocumentClientExportService {
                     agenceId,
                     payeurType,
                     payeurId,
-                    null,
+                    contratId,
                     brancheId,
                     compagnieId,
                     typeContrat,
@@ -81,7 +83,8 @@ public class DocumentClientExportService {
                     false,
                     sort,
                     page,
-                    EXPORT_PAGE_SIZE
+                    EXPORT_PAGE_SIZE,
+                    souscripteurId
             );
             rows.addAll(result.getRows());
             page++;

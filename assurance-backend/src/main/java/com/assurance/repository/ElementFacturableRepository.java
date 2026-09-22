@@ -72,6 +72,11 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               )
               and (:brancheId is null or c.brancheAssurance.id = :brancheId)
               and (:contratId is null or c.id = :contratId)
+              and (:clientPortefeuilleId is null or pp.id = :clientPortefeuilleId or exists (
+                    select 1 from ContratClient portfolioCc
+                    where portfolioCc.contrat = c
+                      and portfolioCc.client.id = :clientPortefeuilleId
+              ))
               and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
@@ -239,6 +244,11 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               )
               and (:brancheId is null or c.brancheAssurance.id = :brancheId)
               and (:contratId is null or c.id = :contratId)
+              and (:clientPortefeuilleId is null or pp.id = :clientPortefeuilleId or exists (
+                    select 1 from ContratClient portfolioCc
+                    where portfolioCc.contrat = c
+                      and portfolioCc.client.id = :clientPortefeuilleId
+              ))
               and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
@@ -377,6 +387,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
             @Param("agenceId") Long agenceId,
             @Param("brancheId") Long brancheId,
             @Param("contratId") Long contratId,
+            @Param("clientPortefeuilleId") Long clientPortefeuilleId,
             @Param("compagnieId") Long compagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("documentState") String documentState,

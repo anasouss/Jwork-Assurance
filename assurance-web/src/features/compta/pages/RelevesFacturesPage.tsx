@@ -141,6 +141,8 @@ export default function RelevesFacturesPage() {
   const sourceParams = useMemo(() => ({
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
+    souscripteurId: urlState.souscripteurId || undefined,
+    contratId: urlState.contratId || undefined,
     brancheId: urlState.sourceFilters.brancheId === "ALL" ? undefined : urlState.sourceFilters.brancheId,
     compagnieId: urlState.sourceFilters.compagnieId === "ALL" ? undefined : urlState.sourceFilters.compagnieId,
     typeContrat: urlState.sourceFilters.typeContrat === "ALL" ? undefined : urlState.sourceFilters.typeContrat,
@@ -154,10 +156,13 @@ export default function RelevesFacturesPage() {
     sortDirection: urlState.sourceSortDirection,
     page: urlState.sourcePage,
     size: PAGE_SIZE,
-  }), [selectedPayer, urlState.sourceFilters, urlState.sourcePage, urlState.sourceSortBy, urlState.sourceSortDirection]);
+  }), [selectedPayer, urlState.souscripteurId, urlState.contratId, urlState.sourceFilters, urlState.sourcePage, urlState.sourceSortBy, urlState.sourceSortDirection]);
   const documentParams = useMemo(() => ({
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
+    souscripteurId: urlState.souscripteurId || undefined,
+    contratId: urlState.contratId || undefined,
+    brancheId: urlState.sourceFilters.brancheId === "ALL" ? undefined : urlState.sourceFilters.brancheId,
     type: urlState.documentFilters.type === "ALL" ? undefined : urlState.documentFilters.type,
     statut: urlState.documentFilters.statut === "ALL" ? undefined : urlState.documentFilters.statut,
     dateDu: urlState.documentFilters.dateDu || undefined,
@@ -167,7 +172,7 @@ export default function RelevesFacturesPage() {
     sortDirection: urlState.documentSortDirection,
     page: urlState.documentPage,
     size: PAGE_SIZE,
-  }), [selectedPayer, urlState.documentFilters, urlState.documentPage, urlState.documentSortBy, urlState.documentSortDirection]);
+  }), [selectedPayer, urlState.souscripteurId, urlState.contratId, urlState.sourceFilters.brancheId, urlState.documentFilters, urlState.documentPage, urlState.documentSortBy, urlState.documentSortDirection]);
 
   const sources = useQuery({
     queryKey: ["compta", "client-document-sources", sourceParams],
@@ -206,6 +211,8 @@ export default function RelevesFacturesPage() {
       payerScope: scope,
       payerType: scope === "GROUPE" ? "GROUPE" : "CLIENT",
       payerId: payer?.id ?? "",
+      souscripteurId: "",
+      contratId: "",
       sourcePage: 0,
       documentPage: 0,
     });
@@ -328,6 +335,8 @@ export default function RelevesFacturesPage() {
       const blob = await comptaApi.exportClientDocumentSources({
         payeurType: sourceParams.payeurType,
         payeurId: sourceParams.payeurId,
+        souscripteurId: sourceParams.souscripteurId,
+        contratId: sourceParams.contratId,
         brancheId: sourceParams.brancheId,
         compagnieId: sourceParams.compagnieId,
         typeContrat: sourceParams.typeContrat,
@@ -377,6 +386,16 @@ export default function RelevesFacturesPage() {
           </Button>
         </div>
       </div>
+
+      {urlState.souscripteurId ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+          <span>Écritures du portefeuille client{urlState.contratId ? " · contrat sélectionné" : ""}</span>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" variant="ghost"><Link to={`/app/production/portefeuille-clients/${urlState.souscripteurId}`}>Retour au portefeuille</Link></Button>
+            <Button size="sm" variant="ghost" onClick={() => updateUrl({ souscripteurId: "", contratId: "", sourcePage: 0, documentPage: 0 })}>Tout afficher</Button>
+          </div>
+        </div>
+      ) : null}
 
       {urlState.tab === "sources" ? (
         <>

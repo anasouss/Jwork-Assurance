@@ -37,19 +37,24 @@ type Filters = {
   dateDu: string;
   dateAu: string;
 };
+type PortfolioScope = { clientId: string; contratId: string; brancheId: string };
 
 export default function SinistreListPage() {
   const [params, setParams] = useSearchParams();
-  const initial = useMemo(() => readState(params), []);
+  const [initial] = useState(() => readState(params));
   const [filters, setFilters] = useState(initial.filters);
   const [applied, setApplied] = useState(initial.filters);
   const [page, setPage] = useState(initial.page);
+  const [scope, setScope] = useState(initial.scope);
   const canCreate = useAuthStore(
     (state) => state.user?.permissions?.includes("sinistre:create") ?? false,
   );
   const request = useMemo(
     () => ({
       query: applied.query.trim() || undefined,
+      clientId: scope.clientId || undefined,
+      contratId: scope.contratId || undefined,
+      brancheId: scope.brancheId || undefined,
       statut:
         applied.statut === "ALL"
           ? undefined
@@ -63,7 +68,7 @@ export default function SinistreListPage() {
       page,
       size: PAGE_SIZE,
     }),
-    [applied, page],
+    [applied, page, scope],
   );
   const list = useQuery({
     queryKey: sinistreKeys.list(request),
@@ -74,7 +79,7 @@ export default function SinistreListPage() {
   function apply(next: Filters) {
     setApplied(next);
     setPage(0);
-    setParams(writeState(next, 0), { replace: true });
+    setParams(writeState(next, 0, scope), { replace: true });
   }
   function reset() {
     const next = emptyFilters();
@@ -83,7 +88,7 @@ export default function SinistreListPage() {
   }
   function changePage(next: number) {
     setPage(next);
-    setParams(writeState(applied, next), { replace: true });
+    setParams(writeState(applied, next, scope), { replace: true });
   }
 
   return (
@@ -107,6 +112,20 @@ export default function SinistreListPage() {
           </Button>
         ) : null}
       </div>
+      {scope.clientId ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm dark:border-sky-900 dark:bg-sky-950/30">
+          <span>Dossiers du portefeuille client{scope.contratId ? " · contrat sélectionné" : ""}</span>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" variant="ghost"><Link to={`/app/production/portefeuille-clients/${scope.clientId}`}>Retour au portefeuille</Link></Button>
+            <Button size="sm" variant="ghost" onClick={() => {
+              const next = { clientId: "", contratId: "", brancheId: "" };
+              setScope(next);
+              setPage(0);
+              setParams(writeState(applied, 0, next), { replace: true });
+            }}>Tout afficher</Button>
+          </div>
+        </div>
+      ) : null}
       <Card className="shadow-none">
         <CardContent className="pt-6">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_210px_210px_180px_180px_auto]">
@@ -305,6 +324,11 @@ function emptyFilters(): Filters {
 function readState(params: URLSearchParams) {
   return {
     page: Math.max(0, Number(params.get("page") || 0)),
+    scope: {
+      clientId: params.get("clientId") || "",
+      contratId: params.get("contratId") || "",
+      brancheId: params.get("brancheId") || "",
+    },
     filters: {
       query: params.get("q") || "",
       statut: params.get("statut") || "ALL",
@@ -314,8 +338,11 @@ function readState(params: URLSearchParams) {
     },
   };
 }
-function writeState(filters: Filters, page: number) {
+function writeState(filters: Filters, page: number, scope: PortfolioScope) {
   const params = new URLSearchParams();
+  if (scope.clientId) params.set("clientId", scope.clientId);
+  if (scope.contratId) params.set("contratId", scope.contratId);
+  if (scope.brancheId) params.set("brancheId", scope.brancheId);
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (filters.statut !== "ALL") params.set("statut", filters.statut);
   if (filters.nature !== "ALL") params.set("nature", filters.nature);

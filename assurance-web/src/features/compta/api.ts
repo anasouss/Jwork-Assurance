@@ -278,6 +278,7 @@ export const comptaApi = {
   async searchClientDocumentSources(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
+    souscripteurId?: string;
     contratId?: string;
     brancheId?: string;
     compagnieId?: string;
@@ -318,6 +319,8 @@ export const comptaApi = {
   async exportClientDocumentSources(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
+    souscripteurId?: string;
+    contratId?: string;
     brancheId?: string;
     compagnieId?: string;
     typeContrat?: TypeContrat;
@@ -336,6 +339,9 @@ export const comptaApi = {
   async searchClientDocuments(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
+    souscripteurId?: string;
+    contratId?: string;
+    brancheId?: string;
     type?: ClientDocumentType;
     statut?: ClientDocumentStatus;
     dateDu?: string;
@@ -436,6 +442,7 @@ export const comptaApi = {
   async clientReceivables(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
+    souscripteurId?: string;
     contratId?: string;
     brancheId?: string;
     typeContrat?: TypeContrat;

@@ -104,6 +104,7 @@ public class ReglementClientService {
             Long agenceId,
             String payeurType,
             Long payeurId,
+            Long souscripteurId,
             Long contratId,
             Long brancheId,
             TypeContrat typeContrat,
@@ -131,7 +132,8 @@ public class ReglementClientService {
                 false,
                 receivableSort(sortBy, sortDirection, false),
                 page,
-                size
+                size,
+                souscripteurId
         );
         List<Long> elementIds = sources.getRows().stream()
                 .map(SourceDocumentClientResponse::getElementFacturableId)

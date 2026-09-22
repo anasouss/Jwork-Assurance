@@ -21,6 +21,8 @@ export type DocumentFilters = {
 };
 
 export type ReleveSearchState = {
+  souscripteurId: string;
+  contratId: string;
   payerScope: "CLIENT" | "GROUPE";
   payerType: "CLIENT" | "GROUPE";
   payerId: string;
@@ -61,6 +63,8 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
   const requestedScope = params.get("cible");
   const payerScope = requestedScope === "GROUPE" ? "GROUPE" : payerType;
   return {
+    souscripteurId: params.get("souscripteurId") ?? "",
+    contratId: params.get("contratId") ?? "",
     payerScope,
     payerType,
     payerId,
@@ -97,6 +101,8 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
 
 export function releveSearchParams(state: ReleveSearchState) {
   const params = new URLSearchParams();
+  if (state.souscripteurId) params.set("souscripteurId", state.souscripteurId);
+  if (state.contratId) params.set("contratId", state.contratId);
   params.set("cible", state.payerScope);
   if (state.payerType === "GROUPE") params.set("payeurType", "GROUPE");
   if (state.payerId) params.set("payeurId", state.payerId);

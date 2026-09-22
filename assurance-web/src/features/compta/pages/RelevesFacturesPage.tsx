@@ -873,19 +873,22 @@ function DocumentActionsMenu(props: {
             Voir le détail
           </DropdownMenuItem>
           <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
-            <FileDown className="size-4" />
+            <FileDown className="size-4 text-sky-700 dark:text-sky-400" />
             {pdf.loading ? "Ouverture..." : "Prévisualiser le PDF"}
           </DropdownMenuItem>
           {props.onInvoice ? (
-            <DropdownMenuItem onSelect={props.onInvoice}>
-              <ReceiptText className="size-4" />
+            <DropdownMenuItem
+              className="bg-emerald-50 font-medium text-emerald-900 focus:bg-emerald-100 focus:text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-200 dark:focus:bg-emerald-950/60 dark:focus:text-emerald-100"
+              onSelect={props.onInvoice}
+            >
+              <ReceiptText className="size-4 text-emerald-700 dark:text-emerald-400" />
               Créer une facture
             </DropdownMenuItem>
           ) : null}
           {props.onCancel || props.onDelete ? <DropdownMenuSeparator /> : null}
           {props.onCancel ? (
             <DropdownMenuItem onSelect={props.onCancel}>
-              <Ban className="size-4" />
+              <Ban className="size-4 text-amber-700 dark:text-amber-400" />
               Rectifier le document
             </DropdownMenuItem>
           ) : null}

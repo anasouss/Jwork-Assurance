@@ -27,6 +27,8 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
                     or lower(coalesce(client.raisonSociale, '')) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.nom, '')) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.prenom, '')) like lower(concat('%', :query, '%'))
+                    or lower(concat(coalesce(client.prenom, ''), ' ', coalesce(client.nom, ''))) like lower(concat('%', :query, '%'))
+                    or lower(concat(coalesce(client.nom, ''), ' ', coalesce(client.prenom, ''))) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.codeClient, '')) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.cin, '')) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.rc, '')) like lower(concat('%', :query, '%'))

@@ -28,6 +28,7 @@ import {
   Plus,
   ReceiptText,
   Trash2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -82,7 +83,7 @@ export default function NouveauReglementClientPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canCreate = permissions.includes("reglement-client:create")
     || permissions.includes("reglement-client:manage");
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const selection = selectionFromParams(searchParams);
@@ -192,6 +193,25 @@ export default function NouveauReglementClientPage() {
     });
   }
 
+  function removeReceivable(row: ClientReceivable) {
+    if (rows.length === 1) {
+      navigate("/app/compta/reglements", { replace: true });
+      return;
+    }
+
+    const parameter = row.source.documentClientId ? "document" : "element";
+    const id = row.source.documentClientId ?? row.source.elementFacturableId;
+    const nextParams = new URLSearchParams(searchParams);
+    const remainingIds = nextParams.getAll(parameter).filter((value) => value !== id);
+    nextParams.delete(parameter);
+    remainingIds.forEach((value) => nextParams.append(parameter, value));
+
+    setOrderedRows((current) => current.filter(
+      (currentRow) => receivableTargetKey(currentRow) !== receivableTargetKey(row)
+    ));
+    setSearchParams(nextParams, { replace: true });
+  }
+
   if (!hasSelection) {
     return <InvalidSelection message="Aucun élément à encaisser n’a été sélectionné." />;
   }
@@ -257,6 +277,9 @@ export default function NouveauReglementClientPage() {
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-right">Solde ouvert</th>
                   <th className="w-36 px-4 py-3 text-right">Affecté</th>
+                  <th className="w-14 px-2 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -270,12 +293,13 @@ export default function NouveauReglementClientPage() {
                       row={row}
                       priority={index + 1}
                       allocatedAmount={allocatedAmounts.get(receivableTargetKey(row)) ?? 0}
+                      onRemove={() => removeReceivable(row)}
                     />
                   ))}
                 </SortableContext>
                 {receivables.isLoading ? (
                   <tr>
-                    <td colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <td colSpan={7} className="h-24 text-center text-muted-foreground">
                       Chargement...
                     </td>
                   </tr>
@@ -551,6 +575,7 @@ function SortableReceivableRow(props: {
   row: ClientReceivable;
   priority: number;
   allocatedAmount: number;
+  onRemove: () => void;
 }) {
   const id = receivableTargetKey(props.row);
   const isAllocated = props.allocatedAmount > 0.001;
@@ -614,6 +639,19 @@ function SortableReceivableRow(props: {
         >
           {isFullyAllocated ? "Soldé" : isAllocated ? "Partiel" : "En attente"}
         </div>
+      </td>
+      <td className="px-2 py-3 text-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+          aria-label={`Retirer ${props.row.source.mouvement} du règlement`}
+          title="Retirer du règlement"
+          onClick={props.onRemove}
+        >
+          <X className="size-4" />
+        </Button>
       </td>
     </tr>
   );

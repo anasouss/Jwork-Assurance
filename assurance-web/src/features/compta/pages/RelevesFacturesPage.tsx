@@ -537,7 +537,11 @@ export default function RelevesFacturesPage() {
                         </td>
                         <td className="px-3 py-3 text-center">
                           <Button asChild variant="ghost" size="icon" title="Voir le contrat">
-                            <Link to={`/app/production/contrats/${row.contratId}${row.mouvementId ? `?mouvementId=${row.mouvementId}` : ""}`}>
+                            <Link
+                              to={`/app/production/contrats/${row.contratId}${row.mouvementId ? `?mouvementId=${row.mouvementId}` : ""}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               <Eye className="size-4" />
                             </Link>
                           </Button>

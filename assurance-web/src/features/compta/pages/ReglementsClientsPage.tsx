@@ -354,7 +354,6 @@ export default function ReglementsClientsPage() {
                         <td className="px-3 py-3"><strong>{row.source.police || "-"}</strong></td>
                         <td className="px-3 py-3">
                           <strong>{row.source.mouvement}</strong>
-                          <div className="text-xs text-muted-foreground">{row.source.reference || row.source.nature}</div>
                         </td>
                         <td className="px-3 py-3">{date(row.source.dateEffet)}</td>
                         <td className="px-3 py-3 text-right">{money(row.source.montantTtc)}</td>

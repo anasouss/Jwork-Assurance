@@ -7,6 +7,7 @@ import type {
   EcheanceAutomobileResponse,
   FinancialHistoryRecalculation,
   PagedResponse,
+  ProductionRegisterResponse,
   TypeContrat,
 } from "../types";
 
@@ -35,12 +36,42 @@ export type ProspectionListParams = {
   size?: number;
 };
 
+export type ProductionRegisterParams = {
+  typeDate: "EFFET" | "VALIDATION";
+  dateDu: string;
+  dateAu: string;
+  brancheId?: string;
+  compagnieId?: string;
+  categorie?: string;
+  typeContrat?: TypeContrat;
+  statut?: "VALIDE" | "ANNULE";
+  search?: string;
+  sortBy?: string;
+  sortDirection?: "asc" | "desc";
+  page?: number;
+  size?: number;
+};
+
 export const contractApi = {
   async listContrats(params: ContractListParams = {}) {
     return unwrap(
       await apiFetch<ApiResponse<PagedResponse<ContratListGroup>>>(
         `/api/v1/contrats${buildQueryString(params)}`
       )
+    );
+  },
+
+  async searchProductionRegister(params: ProductionRegisterParams) {
+    return unwrap(
+      await apiFetch<ApiResponse<ProductionRegisterResponse>>(
+        `/api/v1/contrats/registre-production${buildQueryString(params)}`
+      )
+    );
+  },
+
+  async exportProductionRegister(params: ProductionRegisterParams) {
+    return apiFetchBlob(
+      `/api/v1/contrats/registre-production/export${buildQueryString(params)}`
     );
   },
 

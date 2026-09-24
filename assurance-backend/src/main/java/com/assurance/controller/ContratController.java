@@ -6,6 +6,7 @@ import com.assurance.dto.request.FinalizeRenouvellementRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
 import com.assurance.dto.request.DevisPdfFilterRequest;
 import com.assurance.dto.request.MouvementContratRequest;
+import com.assurance.dto.request.RegistreProductionFilter;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.ApiResponse;
@@ -22,6 +23,9 @@ import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.dto.response.RecalculHistoriqueFinancierResponse;
 import com.assurance.dto.response.RecalculTarifsBrouillonResponse;
+import com.assurance.dto.response.RegistreProductionResponse;
+import com.assurance.enums.CategorieMouvementContrat;
+import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
@@ -34,6 +38,7 @@ import com.assurance.service.FlottePolicePdfService;
 import com.assurance.service.PreTermeFlottePdfService;
 import com.assurance.service.EcheanceProductionService;
 import com.assurance.service.MouvementContratService;
+import com.assurance.service.RegistreProductionService;
 import com.assurance.service.HistoriqueFinancierRecalculService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -70,6 +75,7 @@ public class ContratController {
     private final MouvementContratService mouvementContratService;
     private final EcheanceProductionService echeanceProductionService;
     private final HistoriqueFinancierRecalculService historiqueFinancierRecalculService;
+    private final RegistreProductionService registreProductionService;
 
     @PostMapping
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
@@ -233,6 +239,86 @@ public class ContratController {
                 page,
                 size
         )));
+    }
+
+    @GetMapping("/registre-production")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
+    public ResponseEntity<ApiResponse<RegistreProductionResponse>> registreProduction(
+            @RequestParam(defaultValue = "EFFET") String typeDate,
+            @RequestParam LocalDate dateDu,
+            @RequestParam LocalDate dateAu,
+            @RequestParam(required = false) Long brancheId,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) CategorieMouvementContrat categorie,
+            @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(required = false) StatutMouvementContrat statut,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "DATE") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "25") Integer size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(registreProductionService.search(
+                TenantContext.getCurrentAgence(),
+                registreFilter(typeDate, dateDu, dateAu, brancheId, compagnieId, categorie,
+                        typeContrat, statut, search, sortBy, sortDirection),
+                page,
+                size
+        )));
+    }
+
+    @GetMapping("/registre-production/export")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
+    public ResponseEntity<byte[]> exportRegistreProduction(
+            @RequestParam(defaultValue = "EFFET") String typeDate,
+            @RequestParam LocalDate dateDu,
+            @RequestParam LocalDate dateAu,
+            @RequestParam(required = false) Long brancheId,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) CategorieMouvementContrat categorie,
+            @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(required = false) StatutMouvementContrat statut,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "DATE") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection
+    ) {
+        byte[] content = registreProductionService.export(
+                TenantContext.getCurrentAgence(),
+                registreFilter(typeDate, dateDu, dateAu, brancheId, compagnieId, categorie,
+                        typeContrat, statut, search, sortBy, sortDirection)
+        );
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=registre-production.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
+    }
+
+    private RegistreProductionFilter registreFilter(
+            String typeDate,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            Long brancheId,
+            Long compagnieId,
+            CategorieMouvementContrat categorie,
+            TypeContrat typeContrat,
+            StatutMouvementContrat statut,
+            String search,
+            String sortBy,
+            String sortDirection
+    ) {
+        return RegistreProductionFilter.builder()
+                .typeDate(typeDate)
+                .dateDu(dateDu)
+                .dateAu(dateAu)
+                .brancheId(brancheId)
+                .compagnieId(compagnieId)
+                .categorie(categorie)
+                .typeContrat(typeContrat)
+                .statut(statut)
+                .search(search)
+                .sortBy(sortBy)
+                .sortDirection(sortDirection)
+                .build();
     }
 
     @GetMapping("/prospections")

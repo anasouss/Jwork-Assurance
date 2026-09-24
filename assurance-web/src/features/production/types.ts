@@ -521,6 +521,45 @@ export type PagedResponse<T> = {
   page: PageMetadata;
 };
 
+export type ProductionRegisterRow = {
+  mouvementId: string;
+  contratId: string;
+  numeroDossier?: string | null;
+  numeroPolice?: string | null;
+  numeroMouvement?: string | null;
+  mouvementCode?: string | null;
+  mouvementLibelle: string;
+  categorie: "AFFAIRE_NOUVELLE" | "AVENANT" | "RENOUVELLEMENT" | "DOCUMENT" | "SERVICE";
+  statut: "VALIDE" | "ANNULE";
+  typeContrat: TypeContrat;
+  dateEffet?: string | null;
+  dateValidation?: string | null;
+  souscripteur?: string | null;
+  assure?: string | null;
+  branche?: string | null;
+  compagnie?: string | null;
+  primeNette: number;
+  taxesEtFrais: number;
+  primeTotale: number;
+  assistanceTtc: number;
+};
+
+export type ProductionRegisterResponse = {
+  items: ProductionRegisterRow[];
+  page: PageMetadata;
+  totaux: {
+    mouvements: number;
+    annules: number;
+    affairesNouvelles: number;
+    avenants: number;
+    renouvellements: number;
+    primeNette: number;
+    taxesEtFrais: number;
+    primeTotale: number;
+    assistanceTtc: number;
+  };
+};
+
 export type ClientCrm = {
   client: ClientResponse;
   acquisition?: AcquisitionClient | null;

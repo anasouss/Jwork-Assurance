@@ -14,6 +14,7 @@ export const contractKeys = {
   details: () => [...contractKeys.all, "detail"] as const,
   detail: (id: string, params?: QueryParams) => [...contractKeys.details(), id, params ?? {}] as const,
   dueDates: (params?: QueryParams) => [...contractKeys.all, "due-dates", params ?? {}] as const,
+  productionRegister: (params?: QueryParams) => [...contractKeys.all, "production-register", params ?? {}] as const,
 };
 
 export const accountingKeys = {

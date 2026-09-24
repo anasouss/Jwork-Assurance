@@ -44,7 +44,7 @@ export default function ProductionDashboardPage() {
     { title: "Ajouter un dossier", icon: FilePlus2, href: "/app/production/ajouter-dossier", permission: "contrat:create", primary: true },
     { title: "Liste des dossiers", icon: List, href: "/app/production/contrats", permission: "contrat:view" },
     { title: "Gestion des échéances", icon: CalendarDays, permission: "contrat:view", modal: "echeances" },
-    { title: "Registre de production", icon: FileText, href: "/app/production/contrats", permission: "contrat:view" },
+    { title: "Registre de production", icon: FileText, href: "/app/production/registre", permission: "contrat:view" },
     { title: "Portefeuille client", icon: Users, permission: "client:view", modal: "portfolio" },
     { title: "Prospection", icon: Target, href: "/app/production/prospection", permission: "contrat:view" },
     { title: "Gestion du stock", icon: Archive, href: "/app/production/attestations-stock", permission: "contrat:view" },

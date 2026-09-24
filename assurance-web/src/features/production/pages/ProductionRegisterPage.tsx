@@ -122,7 +122,7 @@ export default function ProductionRegisterPage() {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1600px] gap-4">
+    <div className="grid w-full min-w-0 gap-4">
       <header>
         <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</div>
         <h1 className="mt-1 text-xl font-semibold">Registre de production</h1>
@@ -196,18 +196,18 @@ export default function ProductionRegisterPage() {
       </Card>
 
       <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-9">
-        <Metric label="Mouvements" value={String(totals?.mouvements ?? 0)} />
-        <Metric label="Annulés" value={String(totals?.annules ?? 0)} />
-        <Metric label="Affaires nouvelles" value={String(totals?.affairesNouvelles ?? 0)} />
-        <Metric label="Avenants" value={String(totals?.avenants ?? 0)} />
-        <Metric label="Renouvellements" value={String(totals?.renouvellements ?? 0)} />
-        <Metric label="Prime nette" value={moneyAmount(totals?.primeNette)} money />
-        <Metric label="Taxes et frais" value={moneyAmount(totals?.taxesEtFrais)} money />
-        <Metric label="TTC assurance" value={moneyAmount(totals?.primeTotale)} money />
-        <Metric label="TTC assistance" value={moneyAmount(totals?.assistanceTtc)} money />
+        <Metric label="Mouvements" value={String(totals?.mouvements ?? 0)} tone="blue" />
+        <Metric label="Annulés" value={String(totals?.annules ?? 0)} tone="red" />
+        <Metric label="Affaires nouvelles" value={String(totals?.affairesNouvelles ?? 0)} tone="green" />
+        <Metric label="Avenants" value={String(totals?.avenants ?? 0)} tone="amber" />
+        <Metric label="Renouvellements" value={String(totals?.renouvellements ?? 0)} tone="cyan" />
+        <Metric label="Prime nette" value={moneyAmount(totals?.primeNette)} money tone="blue" />
+        <Metric label="Taxes et frais" value={moneyAmount(totals?.taxesEtFrais)} money tone="amber" />
+        <Metric label="TTC assurance" value={moneyAmount(totals?.primeTotale)} money tone="green" />
+        <Metric label="TTC assistance" value={moneyAmount(totals?.assistanceTtc)} money tone="cyan" />
       </section>
 
-      <Card className="overflow-hidden border-border/70 shadow-none">
+      <Card className="min-w-0 overflow-hidden border-border/70 shadow-none">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div>
             <h2 className="font-semibold">Mouvements de production</h2>
@@ -219,7 +219,7 @@ export default function ProductionRegisterPage() {
         </div>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1900px]">
+            <Table className="min-w-[1800px] text-[13px]">
               <TableHeader className="bg-emerald-700 text-white">
                 <TableRow className="hover:bg-emerald-700">
                   <SortableTableHead column="DATE_VALIDATION" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Validation</SortableTableHead>
@@ -286,8 +286,15 @@ function ReferenceSelect({ label, value, allLabel, items, onChange }: { label: s
   return <FilterField label={label} tone="emerald"><Select value={value} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">{allLabel}</SelectItem>{items.map((item) => <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>)}</SelectContent></Select></FilterField>;
 }
 
-function Metric({ label, value, money = false }: { label: string; value: string; money?: boolean }) {
-  return <div className="min-w-0 border-b border-r px-4 py-3 last:border-r-0"><div className="truncate text-[11px] font-medium uppercase text-muted-foreground">{label}</div><div className="mt-1 truncate text-base font-semibold tabular-nums">{value}{money ? " MAD" : ""}</div></div>;
+function Metric({ label, value, money = false, tone }: { label: string; value: string; money?: boolean; tone: "blue" | "red" | "green" | "amber" | "cyan" }) {
+  const styles = {
+    blue: "border-t-blue-500 bg-blue-50/40 text-blue-800 dark:bg-blue-950/15 dark:text-blue-300",
+    red: "border-t-red-500 bg-red-50/40 text-red-700 dark:bg-red-950/15 dark:text-red-300",
+    green: "border-t-emerald-500 bg-emerald-50/40 text-emerald-800 dark:bg-emerald-950/15 dark:text-emerald-300",
+    amber: "border-t-amber-500 bg-amber-50/40 text-amber-800 dark:bg-amber-950/15 dark:text-amber-300",
+    cyan: "border-t-cyan-500 bg-cyan-50/40 text-cyan-800 dark:bg-cyan-950/15 dark:text-cyan-300",
+  };
+  return <div className={`min-w-0 border-b border-r border-t-2 px-4 py-3 last:border-r-0 ${styles[tone]}`}><div className="truncate text-[11px] font-medium uppercase text-muted-foreground">{label}</div><div className="mt-1 truncate text-base font-semibold tabular-nums">{value}{money ? " MAD" : ""}</div></div>;
 }
 
 function defaultFilters(): RegisterFilters {

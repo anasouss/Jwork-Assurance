@@ -66,7 +66,7 @@ public class RegistreProductionService {
         validate(filter);
         Page<MouvementContrat> result = findPage(agenceId, filter, page, Math.min(Math.max(size, 1), 100));
         List<RegistreProductionResponse.Ligne> rows = mapRows(result.getContent());
-        Object[] values = mouvementContratRepository.summarizeRegistre(
+        MouvementContratRepository.RegistreProductionTotals values = mouvementContratRepository.summarizeRegistre(
                 agenceId, filter.getTypeDate(), filter.getDateDu(), filter.getDateAu(),
                 filter.getBrancheId(), filter.getCompagnieId(), filter.getCategorie(),
                 filter.getTypeContrat(), filter.getStatut(), normalizedSearch(filter.getSearch())
@@ -168,16 +168,19 @@ public class RegistreProductionService {
                 .map(ContratClient::getClient).findFirst().orElse(null);
     }
 
-    private RegistreProductionResponse.Totaux toTotals(Object[] values, BigDecimal assistanceTtc) {
+    private RegistreProductionResponse.Totaux toTotals(
+            MouvementContratRepository.RegistreProductionTotals values,
+            BigDecimal assistanceTtc
+    ) {
         return RegistreProductionResponse.Totaux.builder()
-                .mouvements(number(values, 0).longValue())
-                .annules(number(values, 1).longValue())
-                .affairesNouvelles(number(values, 2).longValue())
-                .avenants(number(values, 3).longValue())
-                .renouvellements(number(values, 4).longValue())
-                .primeNette(decimal(values, 5))
-                .taxesEtFrais(decimal(values, 6))
-                .primeTotale(decimal(values, 7))
+                .mouvements(value(values.getMouvements()))
+                .annules(value(values.getAnnules()))
+                .affairesNouvelles(value(values.getAffairesNouvelles()))
+                .avenants(value(values.getAvenants()))
+                .renouvellements(value(values.getRenouvellements()))
+                .primeNette(money(values.getPrimeNette()))
+                .taxesEtFrais(money(values.getTaxesEtFrais()))
+                .primeTotale(money(values.getPrimeTotale()))
                 .assistanceTtc(money(assistanceTtc))
                 .build();
     }
@@ -303,13 +306,8 @@ public class RegistreProductionService {
                 .add(money(movement.getAccessoire())).add(money(movement.getCnpac()));
     }
 
-    private Number number(Object[] values, int index) {
-        return values != null && values.length > index && values[index] instanceof Number number ? number : 0;
-    }
-
-    private BigDecimal decimal(Object[] values, int index) {
-        Number number = number(values, index);
-        return number instanceof BigDecimal decimal ? decimal : BigDecimal.valueOf(number.doubleValue());
+    private long value(Long value) {
+        return value == null ? 0L : value;
     }
 
     private BigDecimal money(BigDecimal value) {

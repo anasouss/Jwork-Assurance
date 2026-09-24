@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -57,17 +58,17 @@ public interface MouvementContratRepository extends JpaRepository<MouvementContr
     );
 
     @Query("""
-            select count(m),
-                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.ANNULE then 1 else 0 end), 0),
-                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE and m.typeMouvement.categorie = com.assurance.enums.CategorieMouvementContrat.AFFAIRE_NOUVELLE then 1 else 0 end), 0),
-                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE and m.typeMouvement.categorie = com.assurance.enums.CategorieMouvementContrat.AVENANT then 1 else 0 end), 0),
-                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE and m.typeMouvement.categorie = com.assurance.enums.CategorieMouvementContrat.RENOUVELLEMENT then 1 else 0 end), 0),
-                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.primeNette, 0) else 0 end), 0),
-                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.taxe, 0) + coalesce(m.taxeParafiscale, 0) + coalesce(m.accessoire, 0) + coalesce(m.cnpac, 0) else 0 end), 0),
-                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.primeTotale, 0) else 0 end), 0)
+            select count(m) as mouvements,
+                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.ANNULE then 1 else 0 end), 0) as annules,
+                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE and m.typeMouvement.categorie = com.assurance.enums.CategorieMouvementContrat.AFFAIRE_NOUVELLE then 1 else 0 end), 0) as affairesNouvelles,
+                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE and m.typeMouvement.categorie = com.assurance.enums.CategorieMouvementContrat.AVENANT then 1 else 0 end), 0) as avenants,
+                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE and m.typeMouvement.categorie = com.assurance.enums.CategorieMouvementContrat.RENOUVELLEMENT then 1 else 0 end), 0) as renouvellements,
+                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.primeNette, 0) else 0 end), 0) as primeNette,
+                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.taxe, 0) + coalesce(m.taxeParafiscale, 0) + coalesce(m.accessoire, 0) + coalesce(m.cnpac, 0) else 0 end), 0) as taxesEtFrais,
+                   coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.primeTotale, 0) else 0 end), 0) as primeTotale
             from MouvementContrat m
             """ + "where " + REGISTRE_FILTER)
-    Object[] summarizeRegistre(
+    RegistreProductionTotals summarizeRegistre(
             @Param("agenceId") Long agenceId,
             @Param("typeDate") String typeDate,
             @Param("dateDu") LocalDate dateDu,
@@ -79,6 +80,24 @@ public interface MouvementContratRepository extends JpaRepository<MouvementContr
             @Param("statut") StatutMouvementContrat statut,
             @Param("search") String search
     );
+
+    interface RegistreProductionTotals {
+        Long getMouvements();
+
+        Long getAnnules();
+
+        Long getAffairesNouvelles();
+
+        Long getAvenants();
+
+        Long getRenouvellements();
+
+        BigDecimal getPrimeNette();
+
+        BigDecimal getTaxesEtFrais();
+
+        BigDecimal getPrimeTotale();
+    }
 
     long countByAgenceIdAndStatutAndDateEffetBetween(
             Long agenceId,

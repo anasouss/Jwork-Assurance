@@ -66,7 +66,7 @@ public interface MouvementContratRepository extends JpaRepository<MouvementContr
                    coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.taxe, 0) + coalesce(m.taxeParafiscale, 0) + coalesce(m.accessoire, 0) + coalesce(m.cnpac, 0) else 0 end), 0),
                    coalesce(sum(case when m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE then coalesce(m.primeTotale, 0) else 0 end), 0)
             from MouvementContrat m
-            where """ + REGISTRE_FILTER)
+            """ + "where " + REGISTRE_FILTER)
     Object[] summarizeRegistre(
             @Param("agenceId") Long agenceId,
             @Param("typeDate") String typeDate,

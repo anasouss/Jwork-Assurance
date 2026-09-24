@@ -1009,7 +1009,7 @@ function IssueDialog(props: {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <div className="grid max-w-md grid-cols-2 rounded-md border bg-muted p-1">
+          <div className="grid max-w-md grid-cols-2 rounded-md border bg-slate-100/80 p-1 dark:bg-slate-900/60">
             {([
               { value: "RELEVE" as const, label: "Relevé", Icon: FileText },
               { value: "FACTURE" as const, label: "Facture", Icon: ReceiptText },
@@ -1020,7 +1020,7 @@ function IssueDialog(props: {
                 className={`flex h-10 items-center justify-center gap-2 rounded-sm px-3 text-sm font-medium ${
                   type === value
                     ? "bg-amber-100 text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-700"
-                    : "text-muted-foreground hover:bg-background hover:text-foreground"
+                    : "bg-background/60 text-slate-600 hover:bg-slate-200/70 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                 }`}
                 onClick={() => setType(value)}
               >
@@ -1067,7 +1067,7 @@ function IssueDialog(props: {
           ) : null}
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[760px] text-sm">
-              <thead className="bg-muted">
+              <thead className="bg-slate-100/90 text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
                 <tr>
                   <Header>Police / référence</Header>
                   <Header>Mouvement</Header>
@@ -1101,9 +1101,14 @@ function IssueDialog(props: {
               <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} />
             </FilterField>
             <div className="rounded-md border">
-              <SummaryLine label="Total débit" value={debit} />
-              {type === "RELEVE" ? <SummaryLine label="Total crédit" value={credit} /> : null}
-              <SummaryLine label={type === "RELEVE" ? "Solde" : "Total à payer"} value={debit - credit} strong />
+              <SummaryLine label="Total débit" value={debit} tone="debit" />
+              {type === "RELEVE" ? <SummaryLine label="Total crédit" value={credit} tone="credit" /> : null}
+              <SummaryLine
+                label={type === "RELEVE" ? "Solde" : "Total à payer"}
+                value={debit - credit}
+                tone="balance"
+                strong
+              />
             </div>
           </div>
         </div>
@@ -1786,9 +1791,25 @@ function SourceSummaryMetric(props: {
   );
 }
 
-function SummaryLine({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
+function SummaryLine({
+  label,
+  value,
+  strong,
+  tone = "default",
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  tone?: "default" | "debit" | "credit" | "balance";
+}) {
+  const toneClasses = {
+    default: "",
+    debit: "bg-sky-50/80 text-sky-950 dark:bg-sky-950/25 dark:text-sky-100",
+    credit: "bg-emerald-50/80 text-emerald-950 dark:bg-emerald-950/25 dark:text-emerald-100",
+    balance: "bg-amber-50/80 text-amber-950 dark:bg-amber-950/25 dark:text-amber-100",
+  }[tone];
   return (
-    <div className={`flex items-center justify-between border-b px-4 py-3 last:border-b-0 ${strong ? "font-semibold" : ""}`}>
+    <div className={`flex items-center justify-between border-b px-4 py-3 last:border-b-0 ${toneClasses} ${strong ? "font-semibold" : ""}`}>
       <span>{label}</span><span className="tabular-nums">{formatMoney(value)}</span>
     </div>
   );

@@ -219,19 +219,18 @@ export default function ProductionRegisterPage() {
         </div>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1800px] text-[13px]">
+            <Table className="min-w-[1680px] text-[13px]">
               <TableHeader className="bg-emerald-700 text-white">
                 <TableRow className="hover:bg-emerald-700">
+                  <SortableTableHead column="POLICE" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Police</SortableTableHead>
+                  <SortableTableHead column="DOSSIER" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Dossier</SortableTableHead>
+                  <TableHead className="text-white">Souscripteur / assuré</TableHead>
+                  <SortableTableHead column="MOUVEMENT" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Nature</SortableTableHead>
                   <SortableTableHead column="DATE_VALIDATION" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Validation</SortableTableHead>
                   <SortableTableHead column="DATE_EFFET" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Effet</SortableTableHead>
-                  <SortableTableHead column="DOSSIER" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Dossier</SortableTableHead>
-                  <SortableTableHead column="POLICE" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Police</SortableTableHead>
-                  <SortableTableHead column="MOUVEMENT" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Mouvement</SortableTableHead>
-                  <TableHead className="text-white">Souscripteur / assuré</TableHead>
-                  <TableHead className="text-white">Branche</TableHead>
                   <SortableTableHead column="COMPAGNIE" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} className="text-white">Compagnie</SortableTableHead>
+                  <TableHead className="text-white">Branche</TableHead>
                   <TableHead className="text-white">Contrat</TableHead>
-                  <TableHead className="text-white">Catégorie</TableHead>
                   <SortableTableHead column="PRIME_NETTE" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} align="right" className="text-white">Prime nette</SortableTableHead>
                   <TableHead className="text-right text-white">Taxes et frais</TableHead>
                   <SortableTableHead column="TTC" activeColumn={sort.column} direction={sort.direction} onSort={changeSort} align="right" className="text-white">TTC assurance</SortableTableHead>
@@ -241,9 +240,9 @@ export default function ProductionRegisterPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {register.isLoading ? <TableRowsSkeleton rows={8} colSpan={16} /> : null}
-                {register.isError ? <TableRow><TableCell colSpan={16} className="h-24 text-center text-red-600">Impossible de charger le registre de production.</TableCell></TableRow> : null}
-                {!register.isLoading && !register.isError && !rows.length ? <TableRow><TableCell colSpan={16} className="h-24 text-center text-muted-foreground">Aucun mouvement ne correspond aux filtres.</TableCell></TableRow> : null}
+                {register.isLoading ? <TableRowsSkeleton rows={8} colSpan={15} /> : null}
+                {register.isError ? <TableRow><TableCell colSpan={15} className="h-24 text-center text-red-600">Impossible de charger le registre de production.</TableCell></TableRow> : null}
+                {!register.isLoading && !register.isError && !rows.length ? <TableRow><TableCell colSpan={15} className="h-24 text-center text-muted-foreground">Aucun mouvement ne correspond aux filtres.</TableCell></TableRow> : null}
                 {!register.isLoading && !register.isError ? rows.map((row) => <RegisterRow key={row.mouvementId} row={row} />) : null}
               </TableBody>
             </Table>
@@ -258,16 +257,18 @@ export default function ProductionRegisterPage() {
 function RegisterRow({ row }: { row: ProductionRegisterRow }) {
   return (
     <TableRow className={row.statut === "ANNULE" ? "bg-red-50/50 text-muted-foreground dark:bg-red-950/10" : undefined}>
+      <TableCell>{row.numeroPolice || "-"}</TableCell>
+      <TableCell className="font-medium">{row.numeroDossier || "-"}</TableCell>
+      <TableCell><div>{row.souscripteur || "-"}</div>{row.assure && row.assure !== row.souscripteur ? <div className="text-xs text-muted-foreground">Assuré : {row.assure}</div> : null}</TableCell>
+      <TableCell>
+        <div className="font-medium">{row.mouvementLibelle}</div>
+        {row.numeroMouvement ? <div className="text-xs text-muted-foreground">Mvt n° {row.numeroMouvement}</div> : row.mouvementCode ? <div className="text-xs text-muted-foreground">{row.mouvementCode}</div> : null}
+      </TableCell>
       <TableCell>{formatDate(row.dateValidation)}</TableCell>
       <TableCell>{formatDate(row.dateEffet)}</TableCell>
-      <TableCell className="font-medium">{row.numeroDossier || "-"}</TableCell>
-      <TableCell>{row.numeroPolice || "-"}</TableCell>
-      <TableCell><div className="font-medium">{row.mouvementLibelle}</div><div className="text-xs text-muted-foreground">{row.numeroMouvement || row.mouvementCode || "-"}</div></TableCell>
-      <TableCell><div>{row.souscripteur || "-"}</div>{row.assure && row.assure !== row.souscripteur ? <div className="text-xs text-muted-foreground">Assuré : {row.assure}</div> : null}</TableCell>
-      <TableCell>{row.branche || "-"}</TableCell>
       <TableCell>{row.compagnie || "-"}</TableCell>
+      <TableCell>{row.branche || "-"}</TableCell>
       <TableCell>{contractTypeLabel(row.typeContrat)}</TableCell>
-      <TableCell>{categoryLabel(row.categorie)}</TableCell>
       <TableCell className="text-right tabular-nums">{moneyAmount(row.primeNette)}</TableCell>
       <TableCell className="text-right tabular-nums">{moneyAmount(row.taxesEtFrais)}</TableCell>
       <TableCell className="text-right font-semibold tabular-nums">{moneyAmount(row.primeTotale)}</TableCell>
@@ -358,10 +359,6 @@ function formatDate(value?: string | null) {
 
 function contractTypeLabel(value: TypeContrat) {
   return value === "PARTICULIER" ? "Mono" : value === "FLOTTE" ? "Flotte" : "Convention";
-}
-
-function categoryLabel(value: ProductionRegisterRow["categorie"]) {
-  return { AFFAIRE_NOUVELLE: "Affaire nouvelle", AVENANT: "Avenant", RENOUVELLEMENT: "Renouvellement", DOCUMENT: "Document", SERVICE: "Service" }[value];
 }
 
 function readPage(value: string | null) {

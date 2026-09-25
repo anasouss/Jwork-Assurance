@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, Search, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, LoaderCircle, Search, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -118,6 +118,15 @@ export default function SinistreDeclarationPage() {
     setVehiculeId(value);
     setGuaranteeIds([]);
   }
+  function runContractSearch() {
+    const term = search.trim();
+    if (term.length < 2) return;
+    if (term === appliedSearch) {
+      void contracts.refetch();
+      return;
+    }
+    setAppliedSearch(term);
+  }
   function submit(declarer: boolean) {
     if (!contract || !dateSinistre || !dateDeclaration || !selectedVehicle) {
       toast.error("Sélectionnez le contrat, les dates et le véhicule couvert");
@@ -150,24 +159,31 @@ export default function SinistreDeclarationPage() {
         </p>
       </div>
 
-      <Section title="1. Rechercher le contrat">
-        <div className="flex max-w-2xl gap-2">
+      <Section
+        number="1"
+        title="Rechercher le contrat"
+        description="Identifiez le contrat actif concerné par le sinistre."
+        icon={Search}
+        tone="sky"
+      >
+        <div className="flex max-w-3xl gap-2">
           <Input
             value={search}
             placeholder="N° police, dossier, assuré ou immatriculation"
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && search.trim().length >= 2)
-                setAppliedSearch(search.trim());
+                runContractSearch();
             }}
           />
           <Button
             size="icon"
             aria-label="Rechercher"
-            onClick={() => setAppliedSearch(search.trim())}
-            disabled={search.trim().length < 2}
+            title={contracts.isFetching ? "Recherche en cours" : "Rechercher"}
+            onClick={runContractSearch}
+            disabled={search.trim().length < 2 || contracts.isFetching}
           >
-            <Search className="size-4" />
+            {contracts.isFetching ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
           </Button>
         </div>
         {contract ? (
@@ -183,7 +199,21 @@ export default function SinistreDeclarationPage() {
             </AlertDescription>
           </Alert>
         ) : null}
-        {!contract && appliedSearch ? (
+        {!contract && appliedSearch && contracts.isFetching ? (
+          <div className="mt-4 flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+            <LoaderCircle className="size-4 animate-spin" />
+            Recherche des contrats actifs...
+          </div>
+        ) : null}
+        {!contract && appliedSearch && contracts.isError ? (
+          <Alert variant="destructive" className="mt-4">
+            <AlertTitle>Recherche impossible</AlertTitle>
+            <AlertDescription>
+              {contracts.error instanceof Error ? contracts.error.message : "Les contrats n'ont pas pu être chargés."}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {!contract && appliedSearch && !contracts.isFetching && !contracts.isError ? (
           <div className="mt-4 divide-y rounded-md border">
             {contractItems.map((item) => (
               <button
@@ -204,7 +234,7 @@ export default function SinistreDeclarationPage() {
                 <Check className="size-4 text-muted-foreground" />
               </button>
             ))}
-            {!contracts.isLoading && contractItems.length === 0 ? (
+            {contractItems.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">
                 Aucun contrat actif trouvé.
               </p>
@@ -225,7 +255,13 @@ export default function SinistreDeclarationPage() {
         ) : null}
       </Section>
 
-      <Section title="2. Événement">
+      <Section
+        number="2"
+        title="Événement"
+        description="Renseignez la date, le lieu et les circonstances exactes."
+        icon={CalendarDays}
+        tone="violet"
+      >
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Field label="Date du sinistre *">
             <DatePicker
@@ -297,11 +333,23 @@ export default function SinistreDeclarationPage() {
         </div>
       </Section>
 
-      <Section title="3. Couverture impliquée">
+      <Section
+        number="3"
+        title="Couverture impliquée"
+        description="La couverture applicable est calculée à la date du sinistre."
+        icon={ShieldCheck}
+        tone="emerald"
+      >
         {!contract || !dateSinistre ? (
           <p className="text-sm text-muted-foreground">
             Sélectionnez un contrat et la date du sinistre.
           </p>
+        ) : null}
+        {coverage.isFetching ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" />
+            Vérification de la couverture...
+          </div>
         ) : null}
         {coverage.isError ? (
           <Alert variant="destructive">
@@ -389,9 +437,11 @@ export default function SinistreDeclarationPage() {
           disabled={create.isPending}
           onClick={() => submit(false)}
         >
+          {create.isPending && create.variables === false ? <LoaderCircle className="size-4 animate-spin" /> : null}
           Enregistrer en brouillon
         </Button>
         <Button disabled={create.isPending} onClick={() => submit(true)}>
+          {create.isPending && create.variables === true ? <LoaderCircle className="size-4 animate-spin" /> : null}
           Créer et déclarer
         </Button>
       </div>
@@ -400,16 +450,37 @@ export default function SinistreDeclarationPage() {
 }
 
 function Section({
+  number,
   title,
+  description,
+  icon: Icon,
+  tone,
   children,
 }: {
+  number: string;
   title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: "sky" | "violet" | "emerald";
   children: React.ReactNode;
 }) {
+  const tones = {
+    sky: "border-sky-200 bg-sky-50/60 text-sky-800 dark:border-sky-900 dark:bg-sky-950/20 dark:text-sky-200",
+    violet: "border-violet-200 bg-violet-50/60 text-violet-800 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-200",
+    emerald: "border-emerald-200 bg-emerald-50/60 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200",
+  }[tone];
   return (
-    <section className="rounded-md border bg-card p-5">
-      <h2 className="mb-4 text-base font-semibold">{title}</h2>
-      {children}
+    <section className="overflow-hidden rounded-md border bg-card">
+      <div className={`flex items-center gap-3 border-b px-5 py-4 ${tones}`}>
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-background/80 shadow-sm">
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold"><span className="mr-1.5">{number}.</span>{title}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }

@@ -248,7 +248,7 @@ export default function AgencyDashboardPage() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.65fr)]">
-        <DashboardPanel title="Production par catégorie" description="Montant TTC validé sur la période.">
+        <DashboardPanel title="Production par branche" description="Montant TTC validé sur la période.">
           <CategoryChart rows={data.productionParCategorie} />
         </DashboardPanel>
         <WorkQueue data={data} permissions={permissions} />
@@ -271,15 +271,21 @@ function Metric({
   accent: "emerald" | "blue" | "violet" | "amber";
 }) {
   const accentClass = {
-    emerald: "border-t-emerald-500",
-    blue: "border-t-blue-500",
-    violet: "border-t-violet-500",
-    amber: "border-t-amber-500",
+    emerald: "border-t-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/15",
+    blue: "border-t-blue-500 bg-blue-50/50 dark:bg-blue-950/15",
+    violet: "border-t-violet-500 bg-violet-50/50 dark:bg-violet-950/15",
+    amber: "border-t-amber-500 bg-amber-50/50 dark:bg-amber-950/15",
+  }[accent];
+  const valueClass = {
+    emerald: "text-emerald-800 dark:text-emerald-300",
+    blue: "text-blue-800 dark:text-blue-300",
+    violet: "text-violet-800 dark:text-violet-300",
+    amber: "text-amber-800 dark:text-amber-300",
   }[accent];
   return (
     <div className={cn("min-w-0 border-t-2 p-5 sm:[&:not(:nth-child(odd))]:border-l xl:[&:not(:first-child)]:border-l", accentClass)}>
       <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
-      <p className="mt-2 truncate text-2xl font-semibold tabular-nums">{value}</p>
+      <p className={cn("mt-2 truncate text-2xl font-semibold tabular-nums", valueClass)}>{value}</p>
       <p className="mt-1 truncate text-xs text-muted-foreground" title={detail}>{detail}</p>
     </div>
   );
@@ -453,7 +459,7 @@ function RecentActivity({ rows, canView }: { rows: DashboardRecentActivity[]; ca
         </div>
         {canView ? (
           <Button asChild variant="outline" size="sm">
-            <Link to="/app/production/contrats">
+            <Link to="/app/production/registre">
               Voir la liste
               <ArrowRight className="size-4" />
             </Link>
@@ -462,14 +468,15 @@ function RecentActivity({ rows, canView }: { rows: DashboardRecentActivity[]; ca
       </div>
       {rows.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+          <table className="w-full min-w-[940px] text-sm">
+            <thead className="bg-emerald-50/70 text-left text-xs uppercase text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-200">
               <tr>
-                <th className="px-5 py-3 font-semibold">Dossier</th>
-                <th className="px-4 py-3 font-semibold">Mouvement</th>
+                <th className="px-5 py-3 font-semibold">Police</th>
+                <th className="px-4 py-3 font-semibold">Dossier</th>
+                <th className="px-4 py-3 font-semibold">Nature</th>
                 <th className="px-4 py-3 font-semibold">Compagnie</th>
                 <th className="px-4 py-3 font-semibold">Date d'effet</th>
-                <th className="px-4 py-3 text-right font-semibold">Total</th>
+                <th className="px-4 py-3 text-right font-semibold">TTC</th>
                 <th className="w-12 px-4 py-3" />
               </tr>
             </thead>
@@ -477,12 +484,12 @@ function RecentActivity({ rows, canView }: { rows: DashboardRecentActivity[]; ca
               {rows.map((row) => (
                 <tr key={row.mouvementId} className="hover:bg-muted/30">
                   <td className="px-5 py-3">
-                    <div className="font-semibold">{row.numeroDossier || `Contrat #${row.contratId}`}</div>
-                    <div className="text-xs text-muted-foreground">{row.numeroPolice || row.typeContrat}</div>
+                    <div className="font-semibold">{row.numeroPolice || "-"}</div>
+                    <div className="text-xs text-muted-foreground">{row.typeContrat}</div>
                   </td>
+                  <td className="px-4 py-3 font-medium">{row.numeroDossier || `Contrat #${row.contratId}`}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium">{row.mouvement}</div>
-                    <div className="text-xs text-muted-foreground">{row.codeMouvement}</div>
                   </td>
                   <td className="max-w-64 truncate px-4 py-3">{row.compagnie || "-"}</td>
                   <td className="whitespace-nowrap px-4 py-3">{formatDate(row.dateEffet)}</td>

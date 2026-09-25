@@ -11,6 +11,7 @@ import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientResponse;
+import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.security.TenantContext;
@@ -203,6 +204,7 @@ public class ReglementClientController {
     @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> instruments(
             @RequestParam(defaultValue = "EN_ATTENTE") StatutInstrumentReglement statut,
+            @RequestParam(required = false) ModeReglementClient mode,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false)
@@ -214,6 +216,7 @@ public class ReglementClientController {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.searchInstruments(
                 TenantContext.getCurrentAgence(),
                 statut,
+                mode,
                 dateDu,
                 dateAu,
                 search,

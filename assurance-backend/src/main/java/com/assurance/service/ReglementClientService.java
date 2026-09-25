@@ -848,6 +848,7 @@ public class ReglementClientService {
     public InstrumentReglementPageResponse searchInstruments(
             Long agenceId,
             StatutInstrumentReglement status,
+            ModeReglementClient mode,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
@@ -860,10 +861,14 @@ public class ReglementClientService {
         Page<InstrumentReglementClient> result = instrumentRepository.searchByStatus(
                 agenceId,
                 status,
+                mode,
                 dateDu,
                 dateAu,
                 search == null || search.isBlank() ? null : search.trim(),
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
+        );
+        Map<Long, LigneBordereauRemise> remittanceLines = activeRemittanceLines(
+                result.getContent().stream().map(InstrumentReglementClient::getId).toList()
         );
         return InstrumentReglementPageResponse.builder()
                 .page(SourceDocumentClientPageResponse.PageInfo.builder()
@@ -874,12 +879,24 @@ public class ReglementClientService {
                         .first(result.isFirst())
                         .last(result.isLast())
                         .build())
-                .rows(result.getContent().stream().map(this::toInstrumentRegisterResponse).toList())
+                .rows(result.getContent().stream()
+                        .map(instrument -> toInstrumentRegisterResponse(
+                                instrument,
+                                remittanceLines.get(instrument.getId())
+                        ))
+                        .toList())
                 .build();
     }
 
     public ReglementClientResponse.Instrument toInstrumentRegisterResponse(
             InstrumentReglementClient instrument
+    ) {
+        return toInstrumentRegisterResponse(instrument, null);
+    }
+
+    private ReglementClientResponse.Instrument toInstrumentRegisterResponse(
+            InstrumentReglementClient instrument,
+            LigneBordereauRemise remittanceLine
     ) {
         return ReglementClientResponse.Instrument.builder()
                 .id(instrument.getId())
@@ -899,8 +916,34 @@ public class ReglementClientService {
                         ? null : instrument.getCompteTresorerie().getId())
                 .compteTresorerie(instrument.getCompteTresorerie() == null
                         ? null : instrument.getCompteTresorerie().getLibelle())
+                .bordereauRemiseId(remittanceLine == null
+                        ? null : remittanceLine.getBordereau().getId())
+                .numeroBordereauRemise(remittanceLine == null
+                        ? null : remittanceLine.getBordereau().getNumero())
+                .statutBordereauRemise(remittanceLine == null
+                        ? null : remittanceLine.getBordereau().getStatut())
                 .affectations(List.of())
                 .build();
+    }
+
+    private Map<Long, LigneBordereauRemise> activeRemittanceLines(List<Long> instrumentIds) {
+        if (instrumentIds.isEmpty()) {
+            return Map.of();
+        }
+        return remittanceLineRepository.findActiveByInstrumentIds(
+                        instrumentIds,
+                        Set.of(
+                                StatutBordereauRemise.BROUILLON,
+                                StatutBordereauRemise.DEPOSE,
+                                StatutBordereauRemise.PARTIELLEMENT_TRAITE
+                        )
+                ).stream()
+                .collect(Collectors.toMap(
+                        line -> line.getInstrument().getId(),
+                        Function.identity(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
     }
 
     private InstrumentReglementClient buildInstrument(

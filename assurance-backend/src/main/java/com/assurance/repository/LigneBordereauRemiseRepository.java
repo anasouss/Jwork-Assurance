@@ -41,6 +41,19 @@ public interface LigneBordereauRemiseRepository extends JpaRepository<LigneBorde
     @Query("""
             select l
             from LigneBordereauRemise l
+            where l.instrument.id in :instrumentIds
+              and l.bordereau.statut in :statuts
+            order by l.id desc
+            """)
+    List<LigneBordereauRemise> findActiveByInstrumentIds(
+            @Param("instrumentIds") Collection<Long> instrumentIds,
+            @Param("statuts") Collection<StatutBordereauRemise> statuts
+    );
+
+    @EntityGraph(attributePaths = {"bordereau", "instrument"})
+    @Query("""
+            select l
+            from LigneBordereauRemise l
             where l.instrument.id = :instrumentId
               and l.bordereau.statut <> com.assurance.enums.StatutBordereauRemise.ANNULE
               and l.statut <> com.assurance.enums.StatutLigneBordereauRemise.PREPAREE

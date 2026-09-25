@@ -537,6 +537,7 @@ export const comptaApi = {
 
   async paymentInstruments(params: {
     statut: PaymentInstrument["statut"];
+    mode?: PaymentInstrument["mode"];
     dateDu?: string;
     dateAu?: string;
     search?: string;
@@ -1145,6 +1146,9 @@ function normalizePaymentInstrument(instrument: PaymentInstrument): PaymentInstr
     compteTresorerieId: instrument.compteTresorerieId == null
       ? null
       : String(instrument.compteTresorerieId),
+    bordereauRemiseId: instrument.bordereauRemiseId == null
+      ? null
+      : String(instrument.bordereauRemiseId),
     affectations: instrument.affectations.map((allocation) => ({
       ...allocation,
       id: String(allocation.id),

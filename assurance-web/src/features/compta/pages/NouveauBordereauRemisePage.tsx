@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -21,10 +21,12 @@ type InstrumentSlipType = Exclude<RemittanceSlipType, "VERSEMENT_ESPECES">;
 
 export default function NouveauBordereauRemisePage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
-  const [type, setType] = useState<InstrumentSlipType>("CHEQUE");
+  const requestedType = searchParams.get("type");
+  const [type, setType] = useState<InstrumentSlipType>(requestedType === "EFFET" ? "EFFET" : "CHEQUE");
   const [destinationId, setDestinationId] = useState("");
   const [slipDate, setSlipDate] = useState(TODAY);
   const [bankReference, setBankReference] = useState("");
@@ -104,7 +106,9 @@ export default function NouveauBordereauRemisePage() {
         <div className="border-b px-4 py-3"><h2 className="font-semibold">Paramètres du bordereau</h2></div>
         <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-[190px_260px_180px_1fr]">
           <div className="grid gap-2"><Label>Type d’instrument</Label><Select value={type} onValueChange={(value) => {
-            setType(value as InstrumentSlipType);
+            const nextType = value as InstrumentSlipType;
+            setType(nextType);
+            setSearchParams({ type: nextType }, { replace: true });
             setSelectedIds([]);
             setPage(0);
           }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="CHEQUE">Chèques</SelectItem><SelectItem value="EFFET">Effets</SelectItem></SelectContent></Select></div>

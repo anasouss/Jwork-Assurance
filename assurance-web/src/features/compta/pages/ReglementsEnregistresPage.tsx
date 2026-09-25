@@ -6,7 +6,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { FileText, ReceiptText, RotateCcw, Search, XCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +72,8 @@ const MODE_LABELS: Record<ClientPaymentMode, string> = {
 };
 
 export default function ReglementsEnregistresPage() {
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search")?.trim() ?? "";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
   const canIssueInvoice = permissions.includes("quittance:create")
@@ -80,8 +82,8 @@ export default function ReglementsEnregistresPage() {
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<PaymentSortBy>("dateReglement");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
+  const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();

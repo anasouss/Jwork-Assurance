@@ -216,7 +216,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "compta/tresorerie/instruments",
-        element: <Navigate to="/app/compta/tresorerie/bordereaux-remise" replace />,
+        element: <Navigate to="/app/compta/tresorerie/encaissements-en-attente" replace />,
+      },
+      {
+        path: "compta/tresorerie/encaissements-en-attente",
+        lazy: lazyRoute(() => import("@/features/compta/pages/EncaissementsEnAttentePage")),
       },
       {
         path: "compta/tresorerie/bordereaux-remise",

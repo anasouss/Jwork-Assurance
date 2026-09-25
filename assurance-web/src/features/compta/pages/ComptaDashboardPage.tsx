@@ -4,6 +4,7 @@ import {
   Building2,
   FileCheck2,
   FileText,
+  Hourglass,
   Landmark,
   ReceiptText,
   Scale,
@@ -62,9 +63,21 @@ const groups: ComptaGroup[] = [
     title: "Trésorerie",
     actions: [
       {
+        title: "Encaissements en attente",
+        icon: Hourglass,
+        href: "/app/compta/tresorerie/encaissements-en-attente",
+        permission: "tresorerie:view",
+      },
+      {
         title: "Bordereaux de remise",
         icon: ScrollText,
         href: "/app/compta/tresorerie/bordereaux-remise",
+        permission: "tresorerie:view",
+      },
+      {
+        title: "Rapprochement bancaire",
+        icon: FileCheck2,
+        href: "/app/compta/tresorerie/rapprochement-bancaire",
         permission: "tresorerie:view",
       },
       {

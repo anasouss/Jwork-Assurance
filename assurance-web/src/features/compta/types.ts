@@ -467,6 +467,9 @@ export type PaymentInstrument = {
   motifStatut?: string | null;
   compteTresorerieId?: string | null;
   compteTresorerie?: string | null;
+  bordereauRemiseId?: string | null;
+  numeroBordereauRemise?: string | null;
+  statutBordereauRemise?: RemittanceSlipStatus | null;
   affectations: PaymentAllocation[];
 };
 

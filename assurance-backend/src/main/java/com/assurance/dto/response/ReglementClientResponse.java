@@ -4,6 +4,7 @@ import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
+import com.assurance.enums.StatutBordereauRemise;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -45,6 +46,9 @@ public class ReglementClientResponse {
         private String motifStatut;
         private Long compteTresorerieId;
         private String compteTresorerie;
+        private Long bordereauRemiseId;
+        private String numeroBordereauRemise;
+        private StatutBordereauRemise statutBordereauRemise;
         private List<Affectation> affectations;
     }
 

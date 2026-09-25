@@ -102,6 +102,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             where instrument.agence.id = :agenceId
               and instrument.statut = :statut
               and instrument.mode <> com.assurance.enums.ModeReglementClient.ESPECES
+              and (:mode is null or instrument.mode = :mode)
               and (
                     :dateDu is null
                     or (:statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
@@ -133,6 +134,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
     Page<InstrumentReglementClient> searchByStatus(
             @Param("agenceId") Long agenceId,
             @Param("statut") StatutInstrumentReglement statut,
+            @Param("mode") ModeReglementClient mode,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("search") String search,

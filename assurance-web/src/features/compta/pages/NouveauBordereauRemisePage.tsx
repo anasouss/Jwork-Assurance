@@ -12,12 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
+import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import type { RemittanceSlipType } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
-
-type InstrumentSlipType = Exclude<RemittanceSlipType, "VERSEMENT_ESPECES">;
 
 export default function NouveauBordereauRemisePage() {
   const navigate = useNavigate();
@@ -26,8 +25,16 @@ export default function NouveauBordereauRemisePage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
   const requestedType = searchParams.get("type");
-  const [type, setType] = useState<InstrumentSlipType>(requestedType === "EFFET" ? "EFFET" : "CHEQUE");
+  const initialType: RemittanceSlipType | "" =
+    requestedType === "CHEQUE"
+      || requestedType === "EFFET"
+      || requestedType === "VERSEMENT_ESPECES"
+      ? requestedType
+      : "";
+  const [type, setType] = useState<RemittanceSlipType | "">(initialType);
+  const [sourceId, setSourceId] = useState("");
   const [destinationId, setDestinationId] = useState("");
+  const [cashAmount, setCashAmount] = useState<number>();
   const [slipDate, setSlipDate] = useState(TODAY);
   const [bankReference, setBankReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -45,16 +52,18 @@ export default function NouveauBordereauRemisePage() {
   const eligible = useQuery({
     queryKey: ["compta", "treasury", "remittance-eligible", type, appliedSearch, dateFrom, dateTo, page],
     queryFn: () => comptaApi.eligibleRemittanceInstruments({
-      type,
+      type: type === "EFFET" ? "EFFET" : "CHEQUE",
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
       dateAu: dateTo || undefined,
       page,
       size: TREASURY_PAGE_SIZE,
     }),
+    enabled: type === "CHEQUE" || type === "EFFET",
   });
 
   const bankAccounts = (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "BANQUE");
+  const cashAccounts = (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "CAISSE");
   const rows = eligible.data?.rows ?? [];
   const selectedTotal = useMemo(() => rows
     .filter((row) => selectedIds.includes(row.id))
@@ -62,17 +71,36 @@ export default function NouveauBordereauRemisePage() {
   const allPageSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id));
 
   const createSlip = useMutation({
-    mutationFn: () => comptaApi.createRemittanceSlip({
-      type,
-      dateBordereau: slipDate,
-      compteDestinationId: destinationId,
-      referenceBancaire: bankReference.trim() || undefined,
-      notes: notes.trim() || undefined,
-      instrumentIds: selectedIds,
-    }),
+    mutationFn: () => {
+      if (!type) {
+        throw new Error("Choisissez un type de remise");
+      }
+      return type === "VERSEMENT_ESPECES"
+        ? comptaApi.createCashRemittance({
+            type,
+            dateBordereau: slipDate,
+            compteSourceId: sourceId,
+            compteDestinationId: destinationId,
+            montantEspeces: cashAmount,
+            referenceBancaire: bankReference.trim() || undefined,
+            notes: notes.trim() || undefined,
+            instrumentIds: [],
+          })
+        : comptaApi.createRemittanceSlip({
+            type,
+            dateBordereau: slipDate,
+            compteDestinationId: destinationId,
+            referenceBancaire: bankReference.trim() || undefined,
+            notes: notes.trim() || undefined,
+            instrumentIds: selectedIds,
+          });
+    },
     onSuccess: async (created) => {
       toast.success(`${created.numero} créé`);
-      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
+      ]);
       navigate(`/app/compta/tresorerie/bordereaux-remise/${created.id}`);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
@@ -98,35 +126,46 @@ export default function NouveauBordereauRemisePage() {
       <header>
         <Button asChild variant="ghost" className="mb-2 -ml-3"><Link to="/app/compta/tresorerie/bordereaux-remise"><ArrowLeft className="size-4" /> Retour aux bordereaux</Link></Button>
         <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-        <h1 className="mt-1 text-xl font-semibold">Préparer un bordereau</h1>
-        <p className="text-sm text-muted-foreground">Sélectionnez des instruments du même type et leur compte bancaire de destination.</p>
+        <h1 className="mt-1 text-xl font-semibold">Préparer une remise</h1>
+        <p className="text-sm text-muted-foreground">Remises bancaires de chèques, effets et espèces.</p>
       </header>
 
       <section className="rounded-md border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Paramètres du bordereau</h2></div>
-        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-[190px_260px_180px_1fr]">
-          <div className="grid gap-2"><Label>Type d’instrument</Label><Select value={type} onValueChange={(value) => {
-            const nextType = value as InstrumentSlipType;
+        <div className="border-b px-4 py-3"><h2 className="font-semibold">Type de remise</h2></div>
+        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-[240px_1fr]">
+          <div className="grid gap-2"><Label>Type de remise</Label><Select value={type} onValueChange={(value) => {
+            const nextType = value as RemittanceSlipType;
             setType(nextType);
             setSearchParams({ type: nextType }, { replace: true });
             setSelectedIds([]);
             setPage(0);
-          }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="CHEQUE">Chèques</SelectItem><SelectItem value="EFFET">Effets</SelectItem></SelectContent></Select></div>
-          <div className="grid gap-2"><Label>Compte bancaire de destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger><SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>
-          <div className="grid gap-2"><Label>Date du bordereau</Label><DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} /></div>
-          <div className="grid gap-2"><Label htmlFor="bank-reference">Référence bancaire</Label><Input id="bank-reference" value={bankReference} onChange={(event) => setBankReference(event.target.value)} /></div>
-          <div className="grid gap-2 md:col-span-2 xl:col-span-4"><Label htmlFor="slip-notes">Notes</Label><Textarea id="slip-notes" className="min-h-20" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
+          }}><SelectTrigger><SelectValue placeholder="Choisir un type" /></SelectTrigger><SelectContent><SelectItem value="CHEQUE">Chèques</SelectItem><SelectItem value="EFFET">Effets</SelectItem><SelectItem value="VERSEMENT_ESPECES">Versement d’espèces</SelectItem></SelectContent></Select></div>
+          <div className="self-end pb-2 text-sm text-muted-foreground">
+            {type === "VERSEMENT_ESPECES" ? "Versement d’une caisse vers un compte bancaire." : type ? "Regroupement d’instruments à remettre à la banque." : null}
+          </div>
         </div>
       </section>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[1fr_190px_190px_auto]">
+      {type && <section className="rounded-md border bg-card">
+        <div className="border-b px-4 py-3"><h2 className="font-semibold">Détails de la remise</h2></div>
+        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
+          {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label>Caisse source</Label><Select value={sourceId} onValueChange={setSourceId}><SelectTrigger><SelectValue placeholder="Choisir une caisse" /></SelectTrigger><SelectContent>{cashAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>}
+          <div className="grid gap-2"><Label>Compte bancaire de destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger><SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>
+          {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label htmlFor="cash-amount">Montant</Label><MoneyInput id="cash-amount" value={cashAmount} onValueChange={setCashAmount} /></div>}
+          <div className="grid gap-2"><Label>{type === "VERSEMENT_ESPECES" ? "Date de versement" : "Date du bordereau"}</Label><DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} /></div>
+          <div className="grid gap-2"><Label htmlFor="bank-reference">Référence bancaire</Label><Input id="bank-reference" value={bankReference} onChange={(event) => setBankReference(event.target.value)} /></div>
+          <div className="grid gap-2 md:col-span-2 xl:col-span-4"><Label htmlFor="slip-notes">Notes</Label><Textarea id="slip-notes" className="min-h-20" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
+        </div>
+      </section>}
+
+      {(type === "CHEQUE" || type === "EFFET") && <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[1fr_190px_190px_auto]">
         <div className="grid gap-2"><Label htmlFor="instrument-search">Payeur, règlement, banque ou référence</Label><Input id="instrument-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
         <div className="grid gap-2"><Label>Échéance du</Label><DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} /></div>
         <div className="grid gap-2"><Label>Échéance au</Label><DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} /></div>
         <div className="flex items-end gap-2"><Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button><Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button></div>
-      </section>
+      </section>}
 
-      <section className="overflow-hidden rounded-md border bg-card">
+      {(type === "CHEQUE" || type === "EFFET") && <section className="overflow-hidden rounded-md border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div><h2 className="font-semibold">Instruments disponibles</h2><p className="text-sm text-muted-foreground">{selectedIds.length} sélectionné(s) · {formatTreasuryMoney(selectedTotal)}</p></div>
           <Button disabled={!canManage || !selectedIds.length || !destinationId || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}><Plus className="size-4" /> Créer le bordereau</Button>
@@ -151,7 +190,11 @@ export default function NouveauBordereauRemisePage() {
           </tbody>
         </table></div>
         {eligible.data && <ServerPagination page={eligible.data.page.number} totalPages={eligible.data.page.totalPages} totalElements={eligible.data.page.totalElements} loading={eligible.isFetching} onPageChange={(nextPage) => { setPage(nextPage); setSelectedIds([]); }} />}
-      </section>
+      </section>}
+
+      {type === "VERSEMENT_ESPECES" && <div className="flex justify-end border-t pt-4">
+        <Button disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}><Plus className="size-4" /> Enregistrer le versement</Button>
+      </div>}
     </div>
   );
 }

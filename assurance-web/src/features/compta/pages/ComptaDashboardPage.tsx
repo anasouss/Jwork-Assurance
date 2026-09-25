@@ -74,12 +74,12 @@ const groups: ComptaGroup[] = [
         href: "/app/compta/tresorerie/bordereaux-remise",
         permission: "tresorerie:view",
       },
-      {
-        title: "Rapprochement bancaire",
-        icon: FileCheck2,
-        href: "/app/compta/tresorerie/rapprochement-bancaire",
-        permission: "tresorerie:view",
-      },
+      // {
+      //   title: "Rapprochement bancaire",
+      //   icon: FileCheck2,
+      //   href: "/app/compta/tresorerie/rapprochement-bancaire",
+      //   permission: "tresorerie:view",
+      // },
       {
         title: "Journal de trésorerie",
         icon: Landmark,

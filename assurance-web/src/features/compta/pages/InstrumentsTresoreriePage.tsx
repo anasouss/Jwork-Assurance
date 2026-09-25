@@ -1,22 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Banknote, Eye, Landmark, Plus, RotateCcw, Search } from "lucide-react";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { Eye, Plus, RotateCcw, Search } from "lucide-react";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toDateOnly } from "@/features/production/date";
-import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import type { RemittanceSlipStatus, RemittanceSlipType } from "../types";
-import { formatTreasuryDate, formatTreasuryMoney, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
+import { formatTreasuryDate, formatTreasuryMoney, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type TypeFilter = RemittanceSlipType | "ALL";
 type StatusFilter = RemittanceSlipStatus | "ALL";
@@ -38,7 +35,6 @@ const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
 export default function InstrumentsTresoreriePage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
-  const queryClient = useQueryClient();
   const [type, setType] = useState<TypeFilter>("ALL");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -46,17 +42,6 @@ export default function InstrumentsTresoreriePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
-  const [cashOpen, setCashOpen] = useState(false);
-  const [cashSourceId, setCashSourceId] = useState("");
-  const [cashDestinationId, setCashDestinationId] = useState("");
-  const [cashAmount, setCashAmount] = useState<number>();
-  const [cashDate, setCashDate] = useState(TODAY);
-  const [cashReference, setCashReference] = useState("");
-
-  const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
-  });
   const slips = useQuery({
     queryKey: ["compta", "treasury", "remittance-slips", type, status, appliedSearch, dateFrom, dateTo, page],
     queryFn: () => comptaApi.remittanceSlips({
@@ -68,30 +53,6 @@ export default function InstrumentsTresoreriePage() {
       page,
       size: TREASURY_PAGE_SIZE,
     }),
-  });
-
-  const bankAccounts = (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "BANQUE");
-  const cashAccounts = (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "CAISSE");
-
-  const createCashSlip = useMutation({
-    mutationFn: () => comptaApi.createCashRemittance({
-      type: "VERSEMENT_ESPECES",
-      dateBordereau: cashDate,
-      compteSourceId: cashSourceId,
-      compteDestinationId: cashDestinationId,
-      montantEspeces: cashAmount,
-      referenceBancaire: cashReference.trim() || undefined,
-      instrumentIds: [],
-    }),
-    onSuccess: async (created) => {
-      toast.success(`${created.numero} enregistré`);
-      closeCashDialog();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
-      ]);
-    },
-    onError: showError,
   });
 
   function applyFilters() {
@@ -109,14 +70,6 @@ export default function InstrumentsTresoreriePage() {
     setPage(0);
   }
 
-  function closeCashDialog() {
-    setCashOpen(false);
-    setCashSourceId("");
-    setCashDestinationId("");
-    setCashAmount(undefined);
-    setCashReference("");
-  }
-
   return (
     <div className="grid gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -125,14 +78,9 @@ export default function InstrumentsTresoreriePage() {
           <h1 className="mt-1 text-xl font-semibold">Bordereaux de remise</h1>
           <p className="text-sm text-muted-foreground">Suivi des remises de chèques, effets et versements d’espèces.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setCashOpen(true)} disabled={!canManage}>
-            <Banknote className="size-4" /> Versement d’espèces
-          </Button>
-          {canManage ? <Button asChild>
-            <Link to="/app/compta/tresorerie/bordereaux-remise/nouveau"><Plus className="size-4" /> Nouveau bordereau</Link>
-          </Button> : <Button disabled><Plus className="size-4" /> Nouveau bordereau</Button>}
-        </div>
+        {canManage ? <Button asChild>
+          <Link to="/app/compta/tresorerie/bordereaux-remise/nouveau"><Plus className="size-4" /> Nouvelle remise</Link>
+        </Button> : <Button disabled><Plus className="size-4" /> Nouvelle remise</Button>}
       </header>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[190px_210px_1fr_170px_170px_auto]">
@@ -178,18 +126,6 @@ export default function InstrumentsTresoreriePage() {
         {slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={setPage} />}
       </section>
 
-      <Dialog open={cashOpen} onOpenChange={(open) => open ? setCashOpen(true) : closeCashDialog()}>
-        <DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle>Versement d’espèces</DialogTitle><DialogDescription>Transférez un montant d’une caisse vers un compte bancaire.</DialogDescription></DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2"><Label>Caisse source</Label><Select value={cashSourceId} onValueChange={setCashSourceId}><SelectTrigger><SelectValue placeholder="Choisir une caisse" /></SelectTrigger><SelectContent>{cashAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>
-            <div className="grid gap-2"><Label>Compte bancaire</Label><Select value={cashDestinationId} onValueChange={setCashDestinationId}><SelectTrigger><SelectValue placeholder="Choisir une banque" /></SelectTrigger><SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>
-            <div className="grid gap-2"><Label htmlFor="cash-amount">Montant</Label><MoneyInput id="cash-amount" value={cashAmount} onValueChange={setCashAmount} /></div>
-            <div className="grid gap-2"><Label>Date de versement</Label><DatePicker date={cashDate} onSelect={(value) => setCashDate(toDateOnly(value) ?? "")} /></div>
-            <div className="grid gap-2 sm:col-span-2"><Label htmlFor="cash-reference">Référence bancaire</Label><Input id="cash-reference" value={cashReference} onChange={(event) => setCashReference(event.target.value)} /></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={closeCashDialog}>Annuler</Button><Button onClick={() => createCashSlip.mutate()} disabled={!cashSourceId || !cashDestinationId || !cashAmount || cashAmount <= 0 || createCashSlip.isPending}><Landmark className="size-4" /> Enregistrer le versement</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -203,8 +139,4 @@ function StatusBadge({ status }: { status: RemittanceSlipStatus }) {
     ANNULE: "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-200",
   }[status];
   return <Badge className={className}>{STATUS_LABELS[status]}</Badge>;
-}
-
-function showError(error: unknown) {
-  toast.error(error instanceof Error ? error.message : "Opération impossible");
 }

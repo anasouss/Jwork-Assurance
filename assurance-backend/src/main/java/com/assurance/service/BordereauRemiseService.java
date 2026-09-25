@@ -158,6 +158,21 @@ public class BordereauRemiseService {
     }
 
     @Transactional
+    public BordereauRemiseResponse createCashDeposit(
+            Long agenceId,
+            CreerBordereauRemiseRequest request
+    ) {
+        if (request.getType() != TypeBordereauRemise.VERSEMENT_ESPECES) {
+            throw new BadRequestException("Ce point d'entrée est réservé aux versements d'espèces");
+        }
+        BordereauRemiseResponse created = create(agenceId, request);
+        DeposerBordereauRemiseRequest depositRequest = new DeposerBordereauRemiseRequest();
+        depositRequest.setDateDepot(request.getDateBordereau());
+        depositRequest.setReferenceBancaire(request.getReferenceBancaire());
+        return deposit(agenceId, created.getId(), depositRequest);
+    }
+
+    @Transactional
     public BordereauRemiseResponse deposit(
             Long agenceId,
             Long id,

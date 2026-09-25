@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Ban, CheckCircle2, Landmark, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -32,7 +32,6 @@ const LINE_STATUS_LABELS = {
 
 export default function BordereauRemiseDetailPage() {
   const { bordereauId = "" } = useParams();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
@@ -115,7 +114,7 @@ export default function BordereauRemiseDetailPage() {
     <div className="grid gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Button variant="ghost" className="mb-2 -ml-3" onClick={() => navigate(-1)}><ArrowLeft className="size-4" /> Retour</Button>
+          <Button asChild variant="ghost" className="mb-2 -ml-3"><Link to="/app/compta/tresorerie/bordereaux-remise"><ArrowLeft className="size-4" /> Retour aux bordereaux</Link></Button>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
           <h1 className="mt-1 text-xl font-semibold">{data.numero}</h1>
           <p className="text-sm text-muted-foreground">

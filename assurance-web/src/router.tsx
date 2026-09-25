@@ -223,6 +223,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/InstrumentsTresoreriePage")),
       },
       {
+        path: "compta/tresorerie/bordereaux-remise/nouveau",
+        lazy: lazyRoute(() => import("@/features/compta/pages/NouveauBordereauRemisePage")),
+      },
+      {
         path: "compta/tresorerie/bordereaux-remise/:bordereauId",
         lazy: lazyRoute(() => import("@/features/compta/pages/BordereauRemiseDetailPage")),
       },

@@ -101,6 +101,17 @@ public class BordereauRemiseController {
         ), "Bordereau de remise créé"));
     }
 
+    @PostMapping("/versements-especes")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    public ResponseEntity<ApiResponse<BordereauRemiseResponse>> createCashDeposit(
+            @Valid @RequestBody CreerBordereauRemiseRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.createCashDeposit(
+                TenantContext.getCurrentAgence(),
+                request
+        ), "Versement d'espèces enregistré"));
+    }
+
     @PostMapping("/{id}/depot")
     @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> deposit(

@@ -619,6 +619,13 @@ export const comptaApi = {
     )));
   },
 
+  async createCashRemittance(request: CreateRemittanceSlipRequest) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      "/api/v1/compta/tresorerie/bordereaux-remise/versements-especes",
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
   async depositRemittanceSlip(id: string, request: {
     dateDepot: string;
     referenceBancaire?: string;

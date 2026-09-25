@@ -1,22 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
+  Eye,
   History,
   RotateCcw,
   Search,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SortIcon } from "@/components/ui/sort-icon";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
@@ -41,25 +52,89 @@ export default function ReglementsClientsPage() {
   const canCreate = permissions.includes("reglement-client:create")
     || permissions.includes("reglement-client:manage");
   const navigate = useNavigate();
-  const [page, setPage] = useState(0);
-  const [reference, setReference] = useState("");
-  const [appliedReference, setAppliedReference] = useState("");
-  const [payerScope, setPayerScope] = useState<PayerScope>("CLIENT");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedPayerId = searchParams.get("payeurId") || "";
+  const requestedPayerType: PayerScope = searchParams.get("cible") === "GROUPE"
+    ? "GROUPE"
+    : "CLIENT";
+  const [page, setPage] = useState(() => urlPage(searchParams.get("page")));
+  const [reference, setReference] = useState(() => searchParams.get("search") || "");
+  const [appliedReference, setAppliedReference] = useState(() => searchParams.get("search") || "");
+  const [payerScope, setPayerScope] = useState<PayerScope>(requestedPayerType);
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => searchParams.get("dateDu") || "");
+  const [dateTo, setDateTo] = useState(() => searchParams.get("dateAu") || "");
   const [appliedFilters, setAppliedFilters] = useState({
-    dateFrom: "",
-    dateTo: "",
+    dateFrom: searchParams.get("dateDu") || "",
+    dateTo: searchParams.get("dateAu") || "",
   });
   const [selected, setSelected] = useState<Record<string, ClientReceivable>>({});
-  const [sortKey, setSortKey] = useState<SortKey>("DATE");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("DESC");
+  const [sortKey, setSortKey] = useState<SortKey>(() => urlSortKey(searchParams.get("tri")));
+  const [sortDirection, setSortDirection] = useState<SortDirection>(
+    () => searchParams.get("ordre") === "ASC" ? "ASC" : "DESC"
+  );
+  const [detailDocumentId, setDetailDocumentId] = useState<string>();
+  useEffect(() => {
+    setPage(urlPage(searchParams.get("page")));
+    setReference(searchParams.get("search") || "");
+    setAppliedReference(searchParams.get("search") || "");
+    setPayerScope(searchParams.get("cible") === "GROUPE" ? "GROUPE" : "CLIENT");
+    setDateFrom(searchParams.get("dateDu") || "");
+    setDateTo(searchParams.get("dateAu") || "");
+    setAppliedFilters({
+      dateFrom: searchParams.get("dateDu") || "",
+      dateTo: searchParams.get("dateAu") || "",
+    });
+    setSortKey(urlSortKey(searchParams.get("tri")));
+    setSortDirection(searchParams.get("ordre") === "ASC" ? "ASC" : "DESC");
+    if (!searchParams.get("payeurId")) setSelectedPayer(undefined);
+  }, [searchParams]);
 
   const payerSearch = usePayerSearch(
     payerScope,
     selectedPayer
   );
+  const requestedClient = useQuery({
+    queryKey: ["crm-client", requestedPayerId],
+    queryFn: () => clientApi.getClientCrm(requestedPayerId),
+    enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (!requestedPayerId) return;
+    if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
+    if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
+      const client = requestedClient.data.client;
+      setSelectedPayer({
+        type: "CLIENT",
+        id: client.id,
+        name: client.nomAffichage || "Client",
+        identifier: client.codeClient || client.rc || client.cin || client.ice || "",
+        groupName: client.groupe?.libelle || undefined,
+      });
+      return;
+    }
+    if (requestedPayerType === "GROUPE") {
+      const group = payerSearch.groups.find((item) => item.id === requestedPayerId);
+      if (!group) return;
+      setSelectedPayer({
+        type: "GROUPE",
+        id: group.id,
+        name: group.libelle,
+        identifier: group.code,
+        treasuryName: group.clientTresorerieNom || undefined,
+        memberCount: group.membres.length,
+      });
+    }
+  }, [
+    payerSearch.groups,
+    requestedClient.data,
+    requestedPayerId,
+    requestedPayerType,
+    selectedPayer?.id,
+    selectedPayer?.type,
+  ]);
   const queryFilters = {
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
@@ -138,9 +213,16 @@ export default function ReglementsClientsPage() {
       toast.error("La date de début doit précéder la date de fin");
       return;
     }
-    setAppliedReference(reference.trim());
+    const nextReference = reference.trim();
+    setAppliedReference(nextReference);
     setAppliedFilters({ dateFrom, dateTo });
     setPage(0);
+    updateUrl({
+      search: nextReference,
+      dateDu: dateFrom,
+      dateAu: dateTo,
+      page: undefined,
+    });
   }
 
   function resetFilters() {
@@ -156,11 +238,20 @@ export default function ReglementsClientsPage() {
       dateTo: "",
     });
     setPage(0);
+    setSelected({});
+    setSearchParams(new URLSearchParams(), { replace: true });
   }
 
   function selectPayer(value: string) {
-    setSelectedPayer(payerSearch.resolve(value));
+    const payer = payerSearch.resolve(value);
+    setSelectedPayer(payer);
+    setSelected({});
     setPage(0);
+    updateUrl({
+      cible: payerScope,
+      payeurId: payer?.id,
+      page: undefined,
+    });
   }
 
   function changeSort(nextKey: SortKey) {
@@ -171,6 +262,24 @@ export default function ReglementsClientsPage() {
       setSortDirection(nextKey === "PAYER" || nextKey === "POLICE" ? "ASC" : "DESC");
     }
     setPage(0);
+    const nextDirection = sortKey === nextKey
+      ? sortDirection === "ASC" ? "DESC" : "ASC"
+      : nextKey === "PAYER" || nextKey === "POLICE" ? "ASC" : "DESC";
+    updateUrl({ tri: nextKey, ordre: nextDirection, page: undefined });
+  }
+
+  function updateUrl(patch: Record<string, string | number | undefined>) {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patch).forEach(([key, value]) => {
+      if (value == null || value === "") next.delete(key);
+      else next.set(key, String(value));
+    });
+    setSearchParams(next, { replace: true });
+  }
+
+  function changePage(nextPage: number) {
+    setPage(nextPage);
+    updateUrl({ page: nextPage > 0 ? nextPage : undefined });
   }
 
   return (
@@ -211,7 +320,9 @@ export default function ReglementsClientsPage() {
                     setPayerScope(mode);
                     payerSearch.clearQuery();
                     setSelectedPayer(undefined);
+                    setSelected({});
                     setPage(0);
+                    updateUrl({ cible: mode, payeurId: undefined, page: undefined });
                   }}
                 >
                   {mode === "CLIENT" ? "Client" : "Groupe"}
@@ -337,10 +448,11 @@ export default function ReglementsClientsPage() {
                     <SortableHeader label="TTC" column="TTC" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <SortableHeader label="Solde" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <th className="px-3 py-3 text-center">Statut</th>
+                    <th className="w-16 px-3 py-3 text-center">Détail</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={9} rows={8} /> :
+                  {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={10} rows={8} /> :
                     (result?.rows ?? []).map((row) => (
                       <tr key={receivableTargetKey(row)} className="hover:bg-muted/30">
                         <td className="px-3 py-3 text-center">
@@ -359,18 +471,34 @@ export default function ReglementsClientsPage() {
                         <td className="px-3 py-3 text-right">{money(row.source.montantTtc)}</td>
                         <td className="px-3 py-3 text-right font-semibold">{money(row.soldeOuvert)}</td>
                         <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} /></td>
+                        <td className="px-2 py-2 text-center">
+                          {row.source.documentClientId ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Voir les lignes de la facture"
+                              aria-label={`Voir le détail de ${row.source.reference || "la facture"}`}
+                              onClick={() => setDetailDocumentId(row.source.documentClientId ?? undefined)}
+                            >
+                              <Eye className="size-4" />
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   {!showResults && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                      <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                         Sélectionnez un client ou saisissez un numéro de facture ou de relevé.
                       </td>
                     </tr>
                   )}
                   {showResults && !receivables.isLoading && (result?.rows.length ?? 0) === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                      <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                         Aucun montant à encaisser ne correspond à la recherche.
                       </td>
                     </tr>
@@ -384,11 +512,99 @@ export default function ReglementsClientsPage() {
                 totalPages={result.page.totalPages}
                 totalElements={result.page.totalElements}
                 loading={receivables.isFetching}
-                onPageChange={setPage}
+                onPageChange={changePage}
               />
             )}
       </section>
 
+      <InvoiceDetailDialog
+        id={detailDocumentId}
+        onOpenChange={(open) => !open && setDetailDocumentId(undefined)}
+      />
+
+    </div>
+  );
+}
+
+function InvoiceDetailDialog(props: {
+  id?: string;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const detail = useQuery({
+    queryKey: ["compta", "client-document", props.id],
+    queryFn: () => comptaApi.clientDocument(props.id as string),
+    enabled: Boolean(props.id),
+  });
+  const document = detail.data;
+
+  return (
+    <Dialog open={Boolean(props.id)} onOpenChange={props.onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>{document?.numero ?? "Détail de la facture"}</DialogTitle>
+          <DialogDescription>
+            {document
+              ? `${document.payeurNom} · ${document.lignes.length} ligne${document.lignes.length > 1 ? "s" : ""}`
+              : "Chargement des lignes de la facture."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {detail.isLoading ? (
+          <div className="grid gap-3">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-40" />
+          </div>
+        ) : null}
+
+        {document ? (
+          <div className="grid gap-3">
+            <div className="grid rounded-md border sm:grid-cols-3">
+              <InvoiceInfo label="Date" value={date(document.dateEmission)} />
+              <InvoiceInfo label="Montant" value={money(document.totalDocument)} />
+              <InvoiceInfo label="Statut" value={document.statut} />
+            </div>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Référence</th>
+                    <th className="px-3 py-2 text-left">Police</th>
+                    <th className="px-3 py-2 text-left">Nature</th>
+                    <th className="px-3 py-2 text-left">Date</th>
+                    <th className="px-3 py-2 text-right">TTC</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {document.lignes.map((line) => (
+                    <tr key={line.id}>
+                      <td className="px-3 py-2 font-medium">{line.numeroQuittance || "-"}</td>
+                      <td className="px-3 py-2">{line.numeroPolice || "-"}</td>
+                      <td className="px-3 py-2">{line.mouvement || "-"}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{date(line.dateOperation)}</td>
+                      <td className="px-3 py-2 text-right font-medium tabular-nums">
+                        {money(line.montantTtc)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => props.onOpenChange(false)}>Fermer</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InvoiceInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+      <div className="text-xs uppercase text-muted-foreground">{label}</div>
+      <div className="mt-1 font-semibold">{value}</div>
     </div>
   );
 }
@@ -565,6 +781,20 @@ function date(value?: string | null) {
 
 function selectedItemCount(count: number) {
   return count === 1 ? "1 élément sélectionné" : `${count} éléments sélectionnés`;
+}
+
+function urlPage(value: string | null) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function urlSortKey(value: string | null): SortKey {
+  return value === "PAYER"
+    || value === "POLICE"
+    || value === "TTC"
+    || value === "BALANCE"
+    ? value
+    : "DATE";
 }
 
 function paymentPath(rows: ClientReceivable[]) {

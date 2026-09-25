@@ -399,50 +399,21 @@ export default function NouveauReglementClientPage() {
           {visibleMethods.length > 0 ? (
             <div className="divide-y border-t">
               {visibleMethods.map((method, index) => (
-                <section key={method.key} className="grid gap-4 px-3 py-4">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div className="flex min-h-11 items-center gap-3 px-2.5">
-                    <span className="flex size-7 items-center justify-center rounded-sm border border-orange-600 bg-orange-500 text-xs font-bold text-white shadow-sm">
-                      {index + 1}
-                    </span>
-                    <span className="grid gap-0.5">
-                      <span className="text-sm font-bold text-foreground">
+                <section key={method.key} className="grid gap-3 px-3 py-3">
+                  <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(150px,0.65fr)_repeat(4,minmax(0,1fr))_auto]">
+                    <div className="flex h-10 items-center gap-2.5 xl:self-end">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border border-orange-600 bg-orange-500 text-xs font-bold text-white shadow-sm">
+                        {index + 1}
+                      </span>
+                      <span className="truncate text-sm font-bold text-foreground">
                         {paymentModes.find((option) => option.value === method.mode)?.label}
                         {" "}
                         {index + 1}
                       </span>
-                      <span className="text-xs text-muted-foreground">Moyen de règlement</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {index === visibleMethods.length - 1 ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-orange-300 text-orange-800 hover:bg-orange-50 hover:text-orange-900 dark:border-orange-800 dark:text-orange-200 dark:hover:bg-orange-950/30"
-                        onClick={() => addPaymentMethod(method.mode)}
-                      >
-                        <Plus className="size-4" />
-                        Ajouter
-                      </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      title="Supprimer ce moyen"
-                      onClick={() => removePaymentMethod(method.key)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </div>
+                    </div>
 
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   {requiresPaymentReference(method.mode) ? (
-                    <div className="grid gap-2">
+                    <div className="grid gap-1.5">
                       <Label>Référence</Label>
                       <Input
                         value={method.referenceInstrument}
@@ -453,7 +424,7 @@ export default function NouveauReglementClientPage() {
                       />
                     </div>
                   ) : null}
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <Label>Montant</Label>
                       <Button
@@ -484,7 +455,7 @@ export default function NouveauReglementClientPage() {
                     />
                   </div>
                   {method.mode === "EFFET" || method.mode === "CHEQUE" ? (
-                    <div className="grid gap-2">
+                    <div className="grid gap-1.5">
                       <Label>Date d’échéance</Label>
                       <DatePicker
                         date={method.dateEcheance}
@@ -508,7 +479,7 @@ export default function NouveauReglementClientPage() {
                   ) : (
                     <>
                       {!requiresPaymentReference(method.mode) ? (
-                        <div className="grid gap-2">
+                        <div className="grid gap-1.5">
                           <Label>Référence</Label>
                           <Input
                             value={method.referenceInstrument}
@@ -532,7 +503,7 @@ export default function NouveauReglementClientPage() {
                         />
                       ) : null}
                       {showsOriginatingBank(method.mode) ? (
-                        <div className="grid gap-2">
+                        <div className="grid gap-1.5">
                           <Label>
                             {method.mode === "CHEQUE" || method.mode === "EFFET"
                               ? "Banque émettrice"
@@ -549,24 +520,49 @@ export default function NouveauReglementClientPage() {
                       ) : null}
                     </>
                   )}
-                </div>
 
-                {method.mode === "ESPECES"
-                  && !accounts.isLoading
-                  && activeCashAccounts.length === 0 ? (
-                  <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                    <AlertCircle className="size-4 shrink-0" />
-                    Aucune caisse active n’est disponible.
+                    <div className="flex h-10 items-center justify-end gap-1 md:col-span-2 xl:col-span-1 xl:col-start-6">
+                      {index === visibleMethods.length - 1 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-orange-300 text-orange-800 hover:bg-orange-50 hover:text-orange-900 dark:border-orange-800 dark:text-orange-200 dark:hover:bg-orange-950/30"
+                          onClick={() => addPaymentMethod(method.mode)}
+                        >
+                          <Plus className="size-4" />
+                          Ajouter
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        title="Supprimer ce moyen"
+                        onClick={() => removePaymentMethod(method.key)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
-                ) : null}
-                {requiresBankAccountAtEntry(method.mode)
-                  && !accounts.isLoading
-                  && activeBankAccounts.length === 0 ? (
-                  <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                    <AlertCircle className="size-4 shrink-0" />
-                    Aucun compte bancaire actif n’est disponible.
-                  </div>
-                ) : null}
+
+                  {method.mode === "ESPECES"
+                    && !accounts.isLoading
+                    && activeCashAccounts.length === 0 ? (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                      <AlertCircle className="size-4 shrink-0" />
+                      Aucune caisse active n’est disponible.
+                    </div>
+                  ) : null}
+                  {requiresBankAccountAtEntry(method.mode)
+                    && !accounts.isLoading
+                    && activeBankAccounts.length === 0 ? (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                      <AlertCircle className="size-4 shrink-0" />
+                      Aucun compte bancaire actif n’est disponible.
+                    </div>
+                  ) : null}
                 </section>
               ))}
             </div>

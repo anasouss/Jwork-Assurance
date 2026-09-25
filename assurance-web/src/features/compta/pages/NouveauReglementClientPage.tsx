@@ -23,6 +23,8 @@ import {
   ArrowLeftRight,
   Banknote,
   CalendarClock,
+  Check,
+  ChevronsUpDown,
   GripVertical,
   Landmark,
   Plus,
@@ -34,10 +36,20 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
@@ -93,6 +105,7 @@ export default function NouveauReglementClientPage() {
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([]);
+  const [activePaymentMode, setActivePaymentMode] = useState<ClientPaymentMode | null>(null);
   const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
   const [excludedTargetKeys, setExcludedTargetKeys] = useState<Set<string>>(new Set());
   const dragSensors = useSensors(
@@ -122,12 +135,29 @@ export default function NouveauReglementClientPage() {
   const activeBankAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "BANQUE"
   );
+  const selectedPaymentModes = paymentModes.filter((option) =>
+    methods.some((method) => method.mode === option.value)
+  );
+  const visiblePaymentMode = selectedPaymentModes.length === 1
+    ? selectedPaymentModes[0]?.value ?? null
+    : activePaymentMode;
+  const visibleMethods = visiblePaymentMode == null
+    ? []
+    : methods.filter((method) => method.mode === visiblePaymentMode);
 
   useEffect(() => {
     setOrderedRows((receivables.data ?? []).filter(
       (row) => !excludedTargetKeys.has(receivableTargetKey(row))
     ));
   }, [receivables.data, excludedTargetKeys]);
+
+  useEffect(() => {
+    if (methods.length === 0) {
+      setActivePaymentMode(null);
+    } else if (!methods.some((method) => method.mode === activePaymentMode)) {
+      setActivePaymentMode(methods[0].mode);
+    }
+  }, [activePaymentMode, methods]);
 
   const createPayment = useMutation({
     mutationFn: () => comptaApi.createClientPayment(buildRequest(
@@ -183,6 +213,7 @@ export default function NouveauReglementClientPage() {
       return;
     }
     addPaymentMethod(mode);
+    setActivePaymentMode(mode);
   }
 
   function removePaymentMethod(key: string) {
@@ -334,40 +365,40 @@ export default function NouveauReglementClientPage() {
         </div>
 
         <div className="grid gap-4 bg-muted/10 p-4">
-          <div className="grid max-w-64 gap-2">
-            <Label>Date d’encaissement</Label>
-            <DatePicker
-              date={dateReglement}
-              onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
+          <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Date d’encaissement</Label>
+              <DatePicker
+                date={dateReglement}
+                onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
+              />
+            </div>
+
+            <PaymentModesMultiSelect
+              selectedModes={selectedPaymentModes.map((option) => option.value)}
+              onToggle={togglePaymentMode}
             />
           </div>
 
-          <div className="grid gap-2">
-            <Label>Modes de règlement</Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-              {paymentModes.map(({ value, label, icon: Icon }) => {
-                const selected = methods.some((method) => method.mode === value);
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={selected}
-                    className={selected
-                      ? "flex h-12 items-center justify-center gap-2 rounded-md border border-amber-500 bg-amber-50 px-3 text-sm font-medium text-amber-950 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:text-amber-100"
-                      : "flex h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground"}
-                    onClick={() => togglePaymentMode(value)}
-                  >
-                    <Icon className="size-4 shrink-0" />
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {selectedPaymentModes.length > 1 && activePaymentMode ? (
+            <Tabs
+              value={activePaymentMode}
+              onValueChange={(value) => setActivePaymentMode(value as ClientPaymentMode)}
+            >
+              <TabsList className="flex h-auto w-full gap-1">
+                {selectedPaymentModes.map(({ value, label, icon: Icon }) => (
+                  <TabsTrigger key={value} value={value} className="h-10">
+                    <Icon className="size-4" />
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          ) : null}
 
-          {methods.length > 0 ? (
+          {visibleMethods.length > 0 ? (
             <div className="divide-y border-t">
-              {methods.map((method, index) => (
+              {visibleMethods.map((method, index) => (
                 <section key={method.key} className="grid gap-4 px-3 py-4">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="flex min-h-11 items-center gap-3 px-2.5">
@@ -378,14 +409,13 @@ export default function NouveauReglementClientPage() {
                       <span className="text-sm font-bold text-foreground">
                         {paymentModes.find((option) => option.value === method.mode)?.label}
                         {" "}
-                        {methods.slice(0, index + 1)
-                          .filter((item) => item.mode === method.mode).length}
+                        {index + 1}
                       </span>
                       <span className="text-xs text-muted-foreground">Moyen de règlement</span>
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {methods.map((item) => item.mode).lastIndexOf(method.mode) === index ? (
+                    {index === visibleMethods.length - 1 ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -683,6 +713,58 @@ function InvalidSelection({ message }: { message: string }) {
           <Link to="/app/compta/reglements">Retour aux montants à encaisser</Link>
         </Button>
       </div>
+    </div>
+  );
+}
+
+function PaymentModesMultiSelect(props: {
+  selectedModes: ClientPaymentMode[];
+  onToggle: (mode: ClientPaymentMode) => void;
+}) {
+  const selectedOptions = paymentModes.filter((option) =>
+    props.selectedModes.includes(option.value)
+  );
+  const label = selectedOptions.length === 0
+    ? "Sélectionner les modes"
+    : selectedOptions.length === 1
+      ? selectedOptions[0]?.label ?? "Sélectionner les modes"
+      : `${selectedOptions.length} modes sélectionnés`;
+
+  return (
+    <div className="grid gap-2">
+      <Label>Modes de règlement</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" className="h-11 justify-between font-normal">
+            <span className="truncate">{label}</span>
+            <ChevronsUpDown className="size-4 text-muted-foreground" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+          <Command>
+            <CommandInput placeholder="Rechercher un mode..." />
+            <CommandList>
+              <CommandEmpty>Aucun mode trouvé.</CommandEmpty>
+              <CommandGroup>
+                {paymentModes.map(({ value, label: optionLabel, icon: Icon }) => {
+                  const selected = props.selectedModes.includes(value);
+                  return (
+                    <CommandItem
+                      key={value}
+                      value={optionLabel}
+                      onSelect={() => props.onToggle(value)}
+                    >
+                      <Check className={selected ? "size-4 opacity-100" : "size-4 opacity-0"} />
+                      <Icon className="size-4 text-muted-foreground" />
+                      <span>{optionLabel}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, CircleDollarSign, Eye, FileText, FolderOpen, Landmark, Phone, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
 import { natureLabels, statusLabels } from "@/features/sinistre/format";
 import type { SinistreSummary } from "@/features/sinistre/types";
 import { useAuthStore } from "@/store/auth-store";
+import { attachmentApi } from "../api/attachments";
 import { clientApi } from "../api/clients";
 import type { ClientCrm } from "../types";
 import { moneyAmount } from "../utils/format";
@@ -150,7 +151,7 @@ export default function ClientPortfolioPage() {
 
       <PortfolioRow
         main={<ClientIdentity portfolio={portfolio} />}
-        documents={<ClientDocumentsSection client={client} />}
+        documents={<ClientDocumentsSection contracts={contracts} />}
       />
 
       {selectedContract ? (
@@ -315,7 +316,6 @@ function ProductionSection({
               <TableHead className="text-white">Police / dossier</TableHead>
               <TableHead className="text-white">Compagnie</TableHead>
               <TableHead className="text-white">Date de souscription</TableHead>
-              <TableHead className="text-right text-white">Prime totale</TableHead>
               <TableHead className="text-white">Statut</TableHead>
               <TableHead className="w-28 text-right text-white">Action</TableHead>
             </TableRow>
@@ -338,7 +338,6 @@ function ProductionSection({
                 </TableCell>
                 <TableCell>{contract.compagnie || "-"}</TableCell>
                 <TableCell>{formatDate(contract.dateSouscription)}</TableCell>
-                <TableCell className="text-right font-semibold">{money(contract.primeTotale)}</TableCell>
                 <TableCell><ContractStatus status={contract.statut} dateEcheance={contract.dateEcheance} /></TableCell>
                 <TableCell className="text-right">
                   <Button asChild size="sm" variant="outline" onClick={(event) => event.stopPropagation()}>
@@ -380,6 +379,13 @@ function AccountingSection({
   companyAccountingUrl: string;
 }) {
   const clientStatus = accountingClientStatus(summary);
+  const accountingDifference = (summary?.soldeOuvert ?? 0) - (companySummary?.netCompagnie ?? 0);
+  const showDifference = canViewClient
+    && canViewCompany
+    && !clientLoading
+    && !clientError
+    && !companyLoading
+    && !companyError;
   return (
     <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
       <SectionHeader
@@ -387,6 +393,12 @@ function AccountingSection({
         title="Comptabilité"
         description="Situation générale des encaissements client et des règlements compagnie."
         tone="cyan"
+        action={showDifference ? (
+          <div className="text-right">
+            <p className="text-xs uppercase text-muted-foreground">Écart client - compagnie</p>
+            <p className="mt-0.5 font-semibold">{money(accountingDifference)}</p>
+          </div>
+        ) : undefined}
       />
       {!canViewClient && !canViewCompany ? (
         <EmptySection icon={<CircleDollarSign className="size-6" />} text="Vous n'avez pas l'autorisation de consulter la comptabilité." />
@@ -399,11 +411,7 @@ function AccountingSection({
             loading={clientLoading}
             error={clientError}
             status={clientStatus}
-            metrics={[
-              { label: "Montant dû", value: money(summary?.montantInitial) },
-              { label: "Encaissé", value: money(summary?.montantConfirme) },
-              { label: "Solde", value: money(summary?.soldeOuvert), emphasis: true },
-            ]}
+            metric={{ label: "Reste à encaisser", value: money(summary?.soldeOuvert) }}
             pending={summary?.montantEnAttente ? `${money(summary.montantEnAttente)} en attente de confirmation` : undefined}
             detailsUrl={clientAccountingUrl}
           />
@@ -414,11 +422,7 @@ function AccountingSection({
             loading={companyLoading}
             error={companyError}
             status={companyAccountingStatus(companySummary?.statut)}
-            metrics={[
-              { label: "Net compagnie", value: money(companySummary?.netCompagnie), emphasis: true },
-              { label: "Quittances", value: String(companySummary?.quittances ?? 0) },
-              { label: "Bordereaux", value: String(companySummary?.bordereaux ?? 0) },
-            ]}
+            metric={{ label: "Net compagnie", value: money(companySummary?.netCompagnie) }}
             detailsUrl={companyAccountingUrl}
           />
         </div>
@@ -434,7 +438,7 @@ function AccountingFlow({
   loading,
   error,
   status,
-  metrics,
+  metric,
   pending,
   detailsUrl,
 }: {
@@ -444,7 +448,7 @@ function AccountingFlow({
   loading: boolean;
   error: boolean;
   status: AccountingStatus;
-  metrics: Array<{ label: string; value: string; emphasis?: boolean }>;
+  metric: { label: string; value: string };
   pending?: string;
   detailsUrl: string;
 }) {
@@ -463,13 +467,9 @@ function AccountingFlow({
         <div className="flex items-center gap-2 font-semibold">{icon}{title}</div>
         <AccountingStatusBadge status={status} />
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-4">
-        {metrics.map((metric) => (
-          <div key={metric.label} className="min-w-0">
-            <p className="text-xs uppercase text-muted-foreground">{metric.label}</p>
-            <p className={`mt-1 truncate text-sm ${metric.emphasis ? "font-semibold" : "font-medium"}`}>{metric.value}</p>
-          </div>
-        ))}
+      <div className="mt-4 min-w-0">
+        <p className="text-xs uppercase text-muted-foreground">{metric.label}</p>
+        <p className="mt-1 truncate text-lg font-semibold">{metric.value}</p>
       </div>
       <div className="mt-4 flex min-h-8 flex-wrap items-center justify-between gap-2 border-t pt-3">
         <p className="text-xs text-muted-foreground">{pending}</p>
@@ -538,26 +538,52 @@ function ClaimsSection({ allowed, loading, error, rows, totalElements, claimsUrl
   );
 }
 
-function ClientDocumentsSection({ client }: { client: ClientCrm["client"] }) {
-  const references = [
-    client.cin ? { label: "CIN", value: client.cin } : null,
-    client.numeroPermis ? { label: "Permis", value: client.numeroPermis } : null,
-    client.rc ? { label: "RC", value: client.rc } : null,
-    client.ice ? { label: "ICE", value: client.ice } : null,
-  ].filter((reference): reference is { label: string; value: string } => reference !== null);
+function ClientDocumentsSection({ contracts }: { contracts: PortfolioContract[] }) {
+  const documentQueries = useQueries({
+    queries: contracts.map((contract) => ({
+      queryKey: ["production", "client-portfolio", "client-documents", contract.id],
+      queryFn: () => attachmentApi.getContratPiecesJointes(contract.id),
+      staleTime: 60_000,
+    })),
+  });
+  const documents = documentQueries.flatMap((query) => {
+    if (!query.data) return [];
+    const clientTypeIds = new Set(
+      query.data.types.filter((type) => Boolean(type.typeClient)).map((type) => type.id),
+    );
+    return query.data.pieces
+      .filter((piece) => piece.typePieceJointeId && clientTypeIds.has(piece.typePieceJointeId))
+      .map((piece) => ({
+        ...piece,
+        contractReference: query.data?.numeroPolice || query.data?.numeroDossier || `#${piece.contratId}`,
+      }));
+  });
+  const loading = documentQueries.some((query) => query.isLoading);
+  const error = documentQueries.some((query) => query.isError);
   return (
-    <DocumentPanel title="Références client" description="Identifiants enregistrés." tone="blue">
-      {references.length ? (
+    <DocumentPanel title="Documents client" description="Pièces d'identité et justificatifs." tone="blue">
+      {loading ? (
+        <div className="grid gap-2 py-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+      ) : error ? (
+        <DocumentEmpty text="Impossible de charger les documents client." />
+      ) : documents.length ? (
         <div className="divide-y">
-          {references.map((reference) => (
-            <div key={reference.label} className="py-2.5">
-              <p className="text-xs font-medium uppercase text-muted-foreground">{reference.label}</p>
-              <p className="mt-0.5 text-sm font-semibold">{reference.value}</p>
-            </div>
+          {documents.map((document) => (
+            <Link
+              key={`${document.contratId}-${document.id}`}
+              to={`/app/production/contrats/${document.contratId}/pieces-jointes`}
+              className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-blue-700"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{document.typePieceJointeLibelle || document.nomFichier}</span>
+                <span className="block truncate text-xs text-muted-foreground">{document.contractReference} · {document.nomFichier}</span>
+              </span>
+              <ArrowRight className="size-4 shrink-0" />
+            </Link>
           ))}
         </div>
       ) : (
-        <DocumentEmpty text="Aucune référence enregistrée." />
+        <DocumentEmpty text="Aucun document client enregistré." />
       )}
     </DocumentPanel>
   );

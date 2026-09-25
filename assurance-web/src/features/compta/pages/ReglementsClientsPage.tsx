@@ -315,7 +315,7 @@ export default function ReglementsClientsPage() {
               />
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] text-sm">
+              <table className="w-full min-w-[1080px] text-sm">
                 <thead className="bg-orange-600 text-xs uppercase text-white">
                   <tr>
                     <th className="w-12 px-3 py-3 text-center">
@@ -330,18 +330,17 @@ export default function ReglementsClientsPage() {
                       />
                     </th>
                     <SortableHeader label="Payeur" column="PAYER" active={sortKey} direction={sortDirection} onSort={changeSort} />
+                    <th className="px-3 py-3 text-left">Référence</th>
                     <SortableHeader label="Police" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <th className="px-3 py-3 text-left">Nature</th>
                     <SortableHeader label="Date" column="DATE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <SortableHeader label="TTC" column="TTC" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
-                    <th className="px-3 py-3 text-right">Confirmé</th>
-                    <th className="px-3 py-3 text-right">En attente</th>
                     <SortableHeader label="Solde" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <th className="px-3 py-3 text-center">Statut</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={10} rows={8} /> :
+                  {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={9} rows={8} /> :
                     (result?.rows ?? []).map((row) => (
                       <tr key={receivableTargetKey(row)} className="hover:bg-muted/30">
                         <td className="px-3 py-3 text-center">
@@ -351,28 +350,27 @@ export default function ReglementsClientsPage() {
                           />
                         </td>
                         <td className="px-3 py-3"><strong>{row.source.payeurNom}</strong></td>
+                        <td className="px-3 py-3 font-medium">{row.source.reference || "-"}</td>
                         <td className="px-3 py-3"><strong>{row.source.police || "-"}</strong></td>
                         <td className="px-3 py-3">
                           <strong>{row.source.mouvement}</strong>
                         </td>
                         <td className="px-3 py-3">{date(row.source.dateEffet)}</td>
                         <td className="px-3 py-3 text-right">{money(row.source.montantTtc)}</td>
-                        <td className="px-3 py-3 text-right">{money(row.montantConfirme)}</td>
-                        <td className="px-3 py-3 text-right">{money(row.montantEnAttente)}</td>
                         <td className="px-3 py-3 text-right font-semibold">{money(row.soldeOuvert)}</td>
                         <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} /></td>
                       </tr>
                     ))}
                   {!showResults && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
+                      <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
                         Sélectionnez un client ou saisissez un numéro de facture ou de relevé.
                       </td>
                     </tr>
                   )}
                   {showResults && !receivables.isLoading && (result?.rows.length ?? 0) === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
+                      <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
                         Aucun montant à encaisser ne correspond à la recherche.
                       </td>
                     </tr>

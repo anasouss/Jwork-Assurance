@@ -39,6 +39,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
@@ -438,13 +439,12 @@ export default function NouveauReglementClientPage() {
                         Affecter le solde
                       </Button>
                     </div>
-                    <Input
-                      inputMode="decimal"
-                      value={method.montant}
-                      onChange={(event) => updateMethod(
-                        method.key,
-                        { montant: event.target.value }
-                      )}
+                    <MoneyInput
+                      className="text-right tabular-nums"
+                      value={method.montant ? numeric(method.montant) : undefined}
+                      onValueChange={(value) => updateMethod(method.key, {
+                        montant: value == null ? "" : String(value),
+                      })}
                     />
                   </div>
                   {method.mode === "EFFET" ? (

@@ -269,10 +269,11 @@ export default function NouveauReglementClientPage() {
       >
         <section className="overflow-hidden rounded-md border bg-card">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead className="bg-orange-600 text-xs uppercase text-white">
                 <tr>
                   <th className="w-28 px-4 py-3 text-left">Priorité</th>
+                  <th className="px-4 py-3 text-left">Référence</th>
                   <th className="px-4 py-3 text-left">Police</th>
                   <th className="px-4 py-3 text-left">Nature</th>
                   <th className="px-4 py-3 text-left">Date</th>
@@ -300,7 +301,7 @@ export default function NouveauReglementClientPage() {
                 </SortableContext>
                 {receivables.isLoading ? (
                   <tr>
-                    <td colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <td colSpan={8} className="h-24 text-center text-muted-foreground">
                       Chargement...
                     </td>
                   </tr>
@@ -578,6 +579,18 @@ function SortableReceivableRow(props: {
   onRemove: () => void;
 }) {
   const id = receivableTargetKey(props.row);
+  const documentId = props.row.source.documentClientId;
+  const documentQuery = useQuery({
+    queryKey: ["compta", "client-document", documentId],
+    queryFn: () => comptaApi.clientDocument(documentId!),
+    enabled: Boolean(documentId),
+    staleTime: 60_000,
+  });
+  const documentLines = documentQuery.data?.lignes ?? [];
+  const documentPolicies = [...new Set(documentLines.map((line) => line.numeroPolice).filter(Boolean))];
+  const police = documentPolicies.length
+    ? documentPolicies.join(", ")
+    : props.row.source.police || "-";
   const isAllocated = props.allocatedAmount > 0.001;
   const isFullyAllocated = props.allocatedAmount >= props.row.soldeOuvert - 0.001;
   const {
@@ -614,9 +627,19 @@ function SortableReceivableRow(props: {
           </span>
         </div>
       </td>
-      <td className="px-4 py-3 font-medium">{props.row.source.police || "-"}</td>
+      <td className="px-4 py-3 font-medium">{props.row.source.reference || "-"}</td>
+      <td className="px-4 py-3 font-medium">{police}</td>
       <td className="px-4 py-3">
         <div className="font-medium">{props.row.source.mouvement}</div>
+        {documentId ? (
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {documentQuery.isLoading
+              ? "Chargement du détail..."
+              : documentLines.length
+                ? `${documentLines.length} ligne(s) dans le document`
+                : "Document sans ligne détaillée"}
+          </div>
+        ) : null}
       </td>
       <td className="whitespace-nowrap px-4 py-3">{date(props.row.source.dateEffet)}</td>
       <td className="px-4 py-3 text-right font-semibold tabular-nums">

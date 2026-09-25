@@ -135,18 +135,11 @@ export default function ClientPortfolioPage() {
   return (
     <div className="mx-auto grid w-full max-w-[1600px] min-w-0 gap-4">
       <header>
-        <div>
-          <Button asChild variant="ghost" size="sm" className="-ml-3 mb-1">
-            <Link to="/app/production">
-              <ArrowLeft className="size-4" />Production
-            </Link>
-          </Button>
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Informations client</p>
-          <h1 className="mt-1 text-xl font-semibold">
-            {client.nomAffichage || client.raisonSociale || client.nom || "Client"}
-            {client.codeClient ? <span className="font-medium text-muted-foreground"> - {client.codeClient}</span> : null}
-          </h1>
-        </div>
+        <Button asChild variant="ghost" size="sm" className="-ml-3">
+          <Link to="/app/production">
+            <ArrowLeft className="size-4" />Production
+          </Link>
+        </Button>
       </header>
 
       <PortfolioRow
@@ -248,22 +241,34 @@ function PortfolioRow({ main, documents }: { main: ReactNode; documents: ReactNo
 
 function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
   const client = portfolio.client;
-  const identifier = clientIdentifier(client);
+  const clientName = client.nomAffichage || client.raisonSociale || client.nom || "Client";
+  const clientSummary = client.codeClient
+    ? `${clientName} - ${client.codeClient}`
+    : clientName;
   return (
     <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
+      <SectionHeader
+        icon={<UserRound className="size-4" />}
+        title="Informations client"
+        description={clientSummary}
+        tone="emerald"
+      />
       <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-4">
-        {identifier ? <InfoCell label={identifier.label} value={identifier.value} /> : null}
+        <InfoCell
+          className="md:col-span-2"
+          label="Adresse"
+          value={[client.adresse, client.ville].filter(Boolean).join(", ")}
+        />
         <InfoCell
           label="Téléphone"
           value={client.telephone || client.telephones?.find((item) => item.principal)?.numero}
           icon={<Phone className="size-3.5" />}
         />
         <InfoCell label="E-mail" value={client.email} />
+        <InfoCell label="CIN" value={client.cin} />
+        <InfoCell label="RC" value={client.rc} />
+        <InfoCell label="ICE" value={client.ice} />
         <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
-      </div>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-5 py-3 text-sm">
-        <span className="font-medium uppercase text-muted-foreground">Adresse :</span>
-        <span className="font-medium">{[client.adresse, client.ville].filter(Boolean).join(", ") || "-"}</span>
       </div>
     </section>
   );
@@ -773,9 +778,19 @@ function SectionHeader({ icon, title, description, tone, action }: { icon: React
   );
 }
 
-function InfoCell({ label, value, icon }: { label: string; value?: string | null; icon?: ReactNode }) {
+function InfoCell({
+  label,
+  value,
+  icon,
+  className = "",
+}: {
+  label: string;
+  value?: string | null;
+  icon?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 bg-card px-5 py-4 text-sm">
+    <div className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 bg-card px-5 py-4 text-sm ${className}`}>
       <span className="font-medium uppercase text-muted-foreground">{label} :</span>
       <span className="flex min-h-5 min-w-0 items-center gap-1.5 font-medium break-words">
         {icon}{value || "-"}
@@ -848,13 +863,6 @@ function uniqueBranches(contracts: PortfolioContract[]) {
 
 function selectRowFromKeyboard(event: KeyboardEvent<HTMLTableRowElement>, select: () => void) {
   if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); }
-}
-
-function clientIdentifier(client: ClientCrm["client"]) {
-  if (client.ice) return { label: "ICE", value: client.ice };
-  if (client.rc) return { label: "RC", value: client.rc };
-  if (client.cin) return { label: "CIN", value: client.cin };
-  return null;
 }
 
 function contractStatusLabel(status?: string | null, expired = false) {

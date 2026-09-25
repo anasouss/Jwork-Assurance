@@ -1142,20 +1142,42 @@ function DocumentDetailDialog(props: {
   return (
     <Dialog open={Boolean(props.id)} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
-        <DialogHeader>
-          <DialogTitle>{document?.numero ?? "Chargement du document"}</DialogTitle>
-          <DialogDescription>
-            {document ? `${document.typeDocument === "RELEVE" ? "Relevé" : "Facture"} · ${document.payeurNom}` : ""}
-          </DialogDescription>
+        <DialogHeader className="pr-8">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                {document?.typeDocument === "RELEVE"
+                  ? <FileText className="size-5" />
+                  : <ReceiptText className="size-5" />}
+              </div>
+              <div className="min-w-0 text-left">
+                <DialogTitle>{document?.numero ?? "Chargement du document"}</DialogTitle>
+                <DialogDescription className="mt-1">
+                  {document
+                    ? `${document.typeDocument === "RELEVE" ? "Relevé" : "Facture"} · ${document.payeurNom}`
+                    : ""}
+                </DialogDescription>
+              </div>
+            </div>
+            {document ? (
+              document.statut === "EMIS" ? (
+                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300">
+                  Émis
+                </Badge>
+              ) : (
+                <Badge variant="destructive">Annulé</Badge>
+              )
+            ) : null}
+          </div>
         </DialogHeader>
         {detail.isLoading ? <div className="grid gap-3"><Skeleton className="h-20" /><Skeleton className="h-56" /></div> : null}
         {document ? (
           <div className="grid gap-4">
-            <div className="grid gap-3 rounded-md border p-4 md:grid-cols-4">
-              <Info label="Payeur" value={document.payeurNom} />
-              <Info label="Identifiant" value={document.payeurIdentifiant || "-"} />
-              <Info label="Période" value={`${formatDate(document.periodeDebut)} au ${formatDate(document.periodeFin)}`} />
-              <Info label="Montant" value={formatMoney(document.totalDocument)} />
+            <div className="grid overflow-hidden rounded-md border bg-muted/10 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x">
+              <DocumentInfo label="Payeur" value={document.payeurNom} />
+              <DocumentInfo label="Identifiant" value={document.payeurIdentifiant || "-"} />
+              <DocumentInfo label="Période" value={`${formatDate(document.periodeDebut)} au ${formatDate(document.periodeFin)}`} />
+              <DocumentInfo label="Montant" value={formatMoney(document.totalDocument)} tone="amount" />
             </div>
             {document.statut === "ANNULE" ? (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
@@ -1163,9 +1185,9 @@ function DocumentDetailDialog(props: {
                 <div className="mt-1 text-sm">{document.motifAnnulation || "-"}</div>
               </div>
             ) : null}
-            <div className="overflow-x-auto rounded-md border">
+            <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800">
               <table className="w-full min-w-[900px] text-sm">
-                <thead className="bg-muted">
+                <thead className="border-b bg-slate-100/80 text-xs uppercase text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                   <tr>
                     <Header>Date</Header>
                     <Header>Police / référence</Header>
@@ -1178,7 +1200,7 @@ function DocumentDetailDialog(props: {
                 </thead>
                 <tbody>
                   {document.lignes.map((line) => (
-                    <tr key={line.id} className="border-t">
+                    <tr key={line.id} className="border-t hover:bg-muted/25">
                       <td className="px-3 py-2">{formatDate(line.dateOperation)}</td>
                       <td className="px-3 py-2">
                         <div>
@@ -1190,7 +1212,16 @@ function DocumentDetailDialog(props: {
                           <div className="text-xs text-muted-foreground">{line.numeroQuittance}</div>
                         ) : null}
                       </td>
-                      <td className="px-3 py-2">{line.mouvement}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-medium">{line.mouvement}</div>
+                        <div className={`mt-0.5 text-xs font-medium ${
+                          line.nature === "ASSISTANCE"
+                            ? "text-sky-700 dark:text-sky-300"
+                            : "text-emerald-700 dark:text-emerald-300"
+                        }`}>
+                          {line.nature === "ASSISTANCE" ? "Assistance" : "Assurance"}
+                        </div>
+                      </td>
                       <MoneyCell value={line.primeNette} />
                       <MoneyCell value={taxesAndFees(line)} />
                       <MoneyCell value={line.debit} />
@@ -1817,6 +1848,27 @@ function SummaryLine({
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div><div className="text-xs uppercase text-muted-foreground">{label}</div><div className="mt-1 font-medium">{value}</div></div>;
+}
+
+function DocumentInfo(props: {
+  label: string;
+  value: string;
+  tone?: "default" | "amount";
+}) {
+  return (
+    <div className={props.tone === "amount"
+      ? "border-b bg-amber-50/70 px-4 py-3 last:border-b-0 sm:border-b lg:border-b-0 dark:bg-amber-950/20"
+      : "border-b px-4 py-3 last:border-b-0 sm:border-b lg:border-b-0"}
+    >
+      <div className="text-xs uppercase text-muted-foreground">{props.label}</div>
+      <div className={props.tone === "amount"
+        ? "mt-1 font-semibold tabular-nums text-amber-800 dark:text-amber-300"
+        : "mt-1 font-medium"}
+      >
+        {props.value}
+      </div>
+    </div>
+  );
 }
 
 function LoadingRows({ columns }: { columns: number }) {

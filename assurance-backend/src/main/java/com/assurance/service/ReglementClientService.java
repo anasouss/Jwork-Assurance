@@ -22,6 +22,7 @@ import com.assurance.entity.DocumentClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.GroupeClient;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.LigneReleveBancaire;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.entity.Quittance;
@@ -47,6 +48,7 @@ import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.DocumentClientRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
+import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.SequenceReglementClientRepository;
@@ -65,6 +67,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -92,6 +95,7 @@ public class ReglementClientService {
     private final AffectationReglementClientRepository allocationRepository;
     private final ReglementClientRepository reglementRepository;
     private final InstrumentReglementClientRepository instrumentRepository;
+    private final LigneDocumentClientRepository documentLineRepository;
     private final SequenceReglementClientRepository sequenceRepository;
     private final QuittanceRepository quittanceRepository;
     private final ContratClientRepository contratClientRepository;
@@ -396,7 +400,6 @@ public class ReglementClientService {
                 .collect(Collectors.toMap(DocumentClient::getId, Function.identity()));
 
         Map<Long, AllocationAmounts> directAmounts = loadAllocationAmounts(elementIds);
-        Map<Long, AllocationAmounts> documentAmounts = loadDocumentAllocationAmounts(documentIds);
         List<CreanceClientPageResponse.Ligne> rows = new ArrayList<>();
         directSources.stream()
                 .map(source -> toReceivable(
@@ -407,15 +410,23 @@ public class ReglementClientService {
                         )
                 ))
                 .forEach(rows::add);
-        documentIds.stream()
-                .map(documentsById::get)
-                .map(document -> toReceivable(
-                        toInvoiceSource(document),
-                        documentAmounts.getOrDefault(document.getId(), AllocationAmounts.empty())
-                ))
-                .forEach(rows::add);
+        documentIds.stream().map(documentsById::get).forEach(document -> {
+            Map<Long, AllocationAmounts> lineAmounts = invoiceLineAllocationAmounts(document);
+            document.getLignes().stream()
+                    .sorted(java.util.Comparator.comparing(LigneDocumentClient::getOrdre))
+                    .map(line -> toReceivable(
+                            toInvoiceLineSource(document, line),
+                            lineAmounts.getOrDefault(
+                                    line.getElementFacturable().getId(),
+                                    AllocationAmounts.empty()
+                            )
+                    ))
+                    .filter(row -> row.getSoldeOuvert().signum() > 0)
+                    .forEach(rows::add);
+        });
 
-        if (rows.stream().anyMatch(row -> row.getSoldeOuvert().signum() <= 0)) {
+        if (rows.isEmpty()
+                || rows.stream().anyMatch(row -> row.getSoldeOuvert().signum() <= 0)) {
             throw new BadRequestException(
                     "Une ou plusieurs créances ne présentent plus de solde disponible"
             );
@@ -448,6 +459,13 @@ public class ReglementClientService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        List<Long> directElementIds = requestedInstruments.stream()
+                .flatMap(instrument -> instrument.getAffectations().stream())
+                .filter(allocation -> allocation.getElementFacturableId() != null
+                        && allocation.getDocumentClientId() == null)
+                .map(CreerReglementClientRequest.Affectation::getElementFacturableId)
+                .distinct()
+                .toList();
         if (elementIds.isEmpty() && documentIds.isEmpty()) {
             throw new BadRequestException("Affectez au moins une créance au règlement");
         }
@@ -458,7 +476,8 @@ public class ReglementClientService {
         if (elements.size() != elementIds.size()) {
             throw new BadRequestException("Une ou plusieurs créances sont introuvables ou annulées");
         }
-        if (!elementIds.isEmpty() && !documentClientService.findIssuedInvoiceElementIds(elementIds).isEmpty()) {
+        if (!directElementIds.isEmpty()
+                && !documentClientService.findIssuedInvoiceElementIds(directElementIds).isEmpty()) {
             throw new BadRequestException(
                     "Une ou plusieurs créances figurent désormais sur une facture émise"
             );
@@ -483,9 +502,34 @@ public class ReglementClientService {
                 loadDocumentAllocationAmounts(documentIds);
         Map<Long, BigDecimal> requestedByElement = requestedAmountsByElement(requestedInstruments);
         Map<Long, BigDecimal> requestedByDocument = requestedAmountsByDocument(requestedInstruments);
+        Map<Long, Long> invoiceDocumentByElement = requestedInstruments.stream()
+                .flatMap(instrument -> instrument.getAffectations().stream())
+                .filter(allocation -> allocation.getElementFacturableId() != null
+                        && allocation.getDocumentClientId() != null)
+                .collect(Collectors.toMap(
+                        CreerReglementClientRequest.Affectation::getElementFacturableId,
+                        CreerReglementClientRequest.Affectation::getDocumentClientId,
+                        (first, second) -> first
+                ));
+        Map<Long, Map<Long, AllocationAmounts>> invoiceLineAmounts = documentIds.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        documentId -> invoiceLineAllocationAmounts(documentsById.get(documentId))
+                ));
         requestedByElement.forEach((elementId, requestedAmount) -> {
-            BigDecimal total = money(elementsById.get(elementId).getPrimeTotale());
-            AllocationAmounts current = existingAmounts.getOrDefault(elementId, AllocationAmounts.empty());
+            Long invoiceDocumentId = invoiceDocumentByElement.get(elementId);
+            BigDecimal total = invoiceDocumentId == null
+                    ? money(elementsById.get(elementId).getPrimeTotale())
+                    : documentsById.get(invoiceDocumentId).getLignes().stream()
+                            .filter(line -> line.getElementFacturable().getId().equals(elementId))
+                            .map(LigneDocumentClient::getMontantTtc)
+                            .map(this::money)
+                            .findFirst()
+                            .orElseThrow();
+            AllocationAmounts current = invoiceDocumentId == null
+                    ? existingAmounts.getOrDefault(elementId, AllocationAmounts.empty())
+                    : invoiceLineAmounts.get(invoiceDocumentId)
+                            .getOrDefault(elementId, AllocationAmounts.empty());
             BigDecimal available = total.subtract(current.confirmed()).subtract(current.pending());
             if (requestedAmount.compareTo(available) > 0) {
                 throw new BadRequestException("Le montant affecté dépasse le solde de la créance " + elementId);
@@ -511,9 +555,11 @@ public class ReglementClientService {
         Utilisateur user = utilisateurRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
         BigDecimal totalPayment = sumInstruments(requestedInstruments);
-        BigDecimal totalAllocated = requestedByElement.values().stream()
-                .reduce(ZERO, BigDecimal::add)
-                .add(requestedByDocument.values().stream().reduce(ZERO, BigDecimal::add));
+        BigDecimal totalAllocated = requestedInstruments.stream()
+                .flatMap(instrument -> instrument.getAffectations().stream())
+                .map(CreerReglementClientRequest.Affectation::getMontant)
+                .map(this::money)
+                .reduce(ZERO, BigDecimal::add);
         if (totalAllocated.compareTo(totalPayment) > 0) {
             throw new BadRequestException("Le montant affecté dépasse le total des moyens de règlement");
         }
@@ -1065,9 +1111,9 @@ public class ReglementClientService {
             for (CreerReglementClientRequest.Affectation allocation : instrument.getAffectations()) {
                 boolean hasElement = allocation.getElementFacturableId() != null;
                 boolean hasDocument = allocation.getDocumentClientId() != null;
-                if (hasElement == hasDocument) {
+                if (!hasElement && !hasDocument) {
                     throw new BadRequestException(
-                            "Une affectation doit cibler une créance directe ou une facture"
+                            "Une affectation doit cibler une créance"
                     );
                 }
                 if (hasElement && !elements.containsKey(allocation.getElementFacturableId())) {
@@ -1080,11 +1126,27 @@ public class ReglementClientService {
                             "Facture introuvable: " + allocation.getDocumentClientId()
                     );
                 }
+                if (hasElement && hasDocument) {
+                    DocumentClient document = documents.get(allocation.getDocumentClientId());
+                    boolean belongsToDocument = document.getLignes().stream()
+                            .anyMatch(line -> line.getElementFacturable().getId()
+                                    .equals(allocation.getElementFacturableId()));
+                    if (!belongsToDocument) {
+                        throw new BadRequestException(
+                                "La ligne sélectionnée n'appartient pas à cette facture"
+                        );
+                    }
+                }
             }
         }
     }
 
     private String allocationTargetKey(CreerReglementClientRequest.Affectation allocation) {
+        if (allocation.getElementFacturableId() != null
+                && allocation.getDocumentClientId() != null) {
+            return "L:" + allocation.getDocumentClientId()
+                    + ":" + allocation.getElementFacturableId();
+        }
         if (allocation.getElementFacturableId() != null) {
             return "E:" + allocation.getElementFacturableId();
         }
@@ -1250,7 +1312,26 @@ public class ReglementClientService {
             return Map.of();
         }
         Map<Long, AllocationAmounts> result = new HashMap<>();
-        for (Object[] row : allocationRepository.sumByDocumentIds(documentIds)) {
+        mergeAllocationRows(result, allocationRepository.sumByDocumentIds(documentIds));
+        return result;
+    }
+
+    private Map<Long, AllocationAmounts> loadParentDocumentAllocationAmounts(
+            Collection<Long> documentIds
+    ) {
+        if (documentIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, AllocationAmounts> result = new HashMap<>();
+        mergeAllocationRows(result, allocationRepository.sumParentByDocumentIds(documentIds));
+        return result;
+    }
+
+    private void mergeAllocationRows(
+            Map<Long, AllocationAmounts> result,
+            List<Object[]> rows
+    ) {
+        for (Object[] row : rows) {
             Long documentId = (Long) row[0];
             StatutAffectationReglement status = (StatutAffectationReglement) row[1];
             BigDecimal amount = money((BigDecimal) row[2]);
@@ -1262,7 +1343,46 @@ public class ReglementClientService {
                     ? new AllocationAmounts(current.confirmed().add(amount), current.pending())
                     : new AllocationAmounts(current.confirmed(), current.pending().add(amount)));
         }
+    }
+
+    private Map<Long, AllocationAmounts> invoiceLineAllocationAmounts(DocumentClient document) {
+        List<LigneDocumentClient> lines = document.getLignes().stream()
+                .sorted(java.util.Comparator.comparing(LigneDocumentClient::getOrdre))
+                .toList();
+        List<Long> elementIds = lines.stream()
+                .map(line -> line.getElementFacturable().getId())
+                .toList();
+        Map<Long, AllocationAmounts> result = new HashMap<>(loadAllocationAmounts(elementIds));
+        AllocationAmounts parent = loadParentDocumentAllocationAmounts(List.of(document.getId()))
+                .getOrDefault(document.getId(), AllocationAmounts.empty());
+        distributeParentAmount(lines, result, parent.confirmed(), true);
+        distributeParentAmount(lines, result, parent.pending(), false);
         return result;
+    }
+
+    private void distributeParentAmount(
+            List<LigneDocumentClient> lines,
+            Map<Long, AllocationAmounts> amounts,
+            BigDecimal amount,
+            boolean confirmed
+    ) {
+        BigDecimal remaining = money(amount);
+        for (LigneDocumentClient line : lines) {
+            if (remaining.signum() <= 0) {
+                return;
+            }
+            Long elementId = line.getElementFacturable().getId();
+            AllocationAmounts current = amounts.getOrDefault(elementId, AllocationAmounts.empty());
+            BigDecimal capacity = money(line.getMontantTtc())
+                    .subtract(current.confirmed())
+                    .subtract(current.pending())
+                    .max(ZERO);
+            BigDecimal assigned = remaining.min(capacity);
+            amounts.put(elementId, confirmed
+                    ? new AllocationAmounts(current.confirmed().add(assigned), current.pending())
+                    : new AllocationAmounts(current.confirmed(), current.pending().add(assigned)));
+            remaining = remaining.subtract(assigned);
+        }
     }
 
     private SourceDocumentClientResponse toInvoiceSource(DocumentClient document) {
@@ -1284,6 +1404,42 @@ public class ReglementClientService {
                 .accessoires(ZERO)
                 .montantTtc(money(document.getTotalDocument()))
                 .facturable(true)
+                .build();
+    }
+
+    private SourceDocumentClientResponse toInvoiceLineSource(
+            DocumentClient document,
+            LigneDocumentClient line
+    ) {
+        String payerType = document.getGroupePayeur() == null ? "CLIENT" : "GROUPE";
+        Long payerId = document.getGroupePayeur() == null
+                ? document.getClientPayeur().getId()
+                : document.getGroupePayeur().getId();
+        return SourceDocumentClientResponse.builder()
+                .elementFacturableId(line.getElementFacturable().getId())
+                .documentClientId(document.getId())
+                .nature(line.getElementFacturable().getNature())
+                .quittanceId(line.getQuittance() == null ? null : line.getQuittance().getId())
+                .contratId(line.getElementFacturable().getContrat().getId())
+                .mouvementId(line.getElementFacturable().getMouvementContrat() == null
+                        ? null : line.getElementFacturable().getMouvementContrat().getId())
+                .dossier(line.getNumeroDossier())
+                .police(line.getNumeroPolice())
+                .typeContrat(line.getElementFacturable().getContrat().getTypeContrat())
+                .mouvement(line.getMouvement())
+                .reference(document.getNumero())
+                .compagnie(line.getCompagnie())
+                .dateEffet(line.getDateOperation())
+                .dateEcheance(line.getDateEcheance())
+                .payeurType(payerType)
+                .payeurId(payerId)
+                .payeurNom(document.getPayeurNom())
+                .primeNette(money(line.getPrimeNette()))
+                .taxes(money(line.getTaxes()))
+                .accessoires(money(line.getAccessoires()))
+                .montantTtc(money(line.getMontantTtc()))
+                .dejaFacturee(true)
+                .facturable(false)
                 .build();
     }
 
@@ -1349,22 +1505,33 @@ public class ReglementClientService {
             Collection<Long> documentIds
     ) {
         recalculateQuittancePaymentFlags(elementIds);
-        if (documentIds.isEmpty()) {
+        Set<Long> affectedDocumentIds = new HashSet<>(documentIds);
+        if (!elementIds.isEmpty()) {
+            documentLineRepository.findIssuedDocumentsByElementIds(
+                            elementIds,
+                            StatutDocumentClient.EMIS
+                    ).stream()
+                    .filter(line -> line.getDocument().getTypeDocument()
+                            == TypeDocumentClient.FACTURE)
+                    .map(line -> line.getDocument().getId())
+                    .forEach(affectedDocumentIds::add);
+        }
+        if (affectedDocumentIds.isEmpty()) {
             return;
         }
-        Map<Long, AllocationAmounts> amounts = loadDocumentAllocationAmounts(documentIds);
-        List<DocumentClient> documents = documentClientRepository.findAllById(documentIds);
+        List<DocumentClient> documents = documentClientRepository.findAllById(affectedDocumentIds);
         Map<Long, Boolean> paidByElement = new HashMap<>();
         for (DocumentClient document : documents) {
-            BigDecimal confirmed = amounts.getOrDefault(
-                    document.getId(),
-                    AllocationAmounts.empty()
-            ).confirmed();
-            boolean paid = confirmed.compareTo(money(document.getTotalDocument())) >= 0;
-            document.getLignes().stream()
-                    .map(line -> line.getElementFacturable())
-                    .filter(Objects::nonNull)
-                    .forEach(element -> paidByElement.merge(element.getId(), paid, Boolean::logicalOr));
+            Map<Long, AllocationAmounts> lineAmounts = invoiceLineAllocationAmounts(document);
+            document.getLignes().forEach(line -> {
+                Long elementId = line.getElementFacturable().getId();
+                BigDecimal confirmed = lineAmounts.getOrDefault(
+                        elementId,
+                        AllocationAmounts.empty()
+                ).confirmed();
+                boolean paid = confirmed.compareTo(money(line.getMontantTtc())) >= 0;
+                paidByElement.merge(elementId, paid, Boolean::logicalOr);
+            });
         }
         if (paidByElement.isEmpty()) {
             return;

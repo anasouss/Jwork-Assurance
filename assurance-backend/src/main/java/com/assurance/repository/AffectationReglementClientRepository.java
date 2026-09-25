@@ -35,6 +35,17 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             """)
     List<Object[]> sumByDocumentIds(@Param("documentIds") Collection<Long> documentIds);
 
+    @Query("""
+            select a.documentClient.id, a.statut, sum(a.montant)
+            from AffectationReglementClient a
+            where a.documentClient.id in :documentIds
+              and a.elementFacturable is null
+              and a.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and a.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
+            group by a.documentClient.id, a.statut
+            """)
+    List<Object[]> sumParentByDocumentIds(@Param("documentIds") Collection<Long> documentIds);
+
     List<AffectationReglementClient> findByInstrumentId(Long instrumentId);
 
     long countByElementFacturableIdAndStatut(Long elementId, StatutAffectationReglement statut);

@@ -94,6 +94,7 @@ export default function NouveauReglementClientPage() {
   const [notes, setNotes] = useState("");
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([]);
   const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
+  const [excludedTargetKeys, setExcludedTargetKeys] = useState<Set<string>>(new Set());
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -123,8 +124,10 @@ export default function NouveauReglementClientPage() {
   );
 
   useEffect(() => {
-    setOrderedRows(receivables.data ?? []);
-  }, [receivables.data]);
+    setOrderedRows((receivables.data ?? []).filter(
+      (row) => !excludedTargetKeys.has(receivableTargetKey(row))
+    ));
+  }, [receivables.data, excludedTargetKeys]);
 
   const createPayment = useMutation({
     mutationFn: () => comptaApi.createClientPayment(buildRequest(
@@ -198,6 +201,18 @@ export default function NouveauReglementClientPage() {
   function removeReceivable(row: ClientReceivable) {
     if (rows.length === 1) {
       navigate("/app/compta/reglements", { replace: true });
+      return;
+    }
+
+    if (row.source.documentClientId && row.source.elementFacturableId) {
+      setExcludedTargetKeys((current) => {
+        const next = new Set(current);
+        next.add(receivableTargetKey(row));
+        return next;
+      });
+      setOrderedRows((current) => current.filter(
+        (item) => receivableTargetKey(item) !== receivableTargetKey(row)
+      ));
       return;
     }
 
@@ -570,18 +585,6 @@ function SortableReceivableRow(props: {
   onRemove: () => void;
 }) {
   const id = receivableTargetKey(props.row);
-  const documentId = props.row.source.documentClientId;
-  const documentQuery = useQuery({
-    queryKey: ["compta", "client-document", documentId],
-    queryFn: () => comptaApi.clientDocument(documentId!),
-    enabled: Boolean(documentId),
-    staleTime: 60_000,
-  });
-  const documentLines = documentQuery.data?.lignes ?? [];
-  const documentPolicies = [...new Set(documentLines.map((line) => line.numeroPolice).filter(Boolean))];
-  const police = documentPolicies.length
-    ? documentPolicies.join(", ")
-    : props.row.source.police || "-";
   const isAllocated = props.allocatedAmount > 0.001;
   const isFullyAllocated = props.allocatedAmount >= props.row.soldeOuvert - 0.001;
   const {
@@ -619,16 +622,12 @@ function SortableReceivableRow(props: {
         </div>
       </td>
       <td className="px-4 py-3 font-medium">{props.row.source.reference || "-"}</td>
-      <td className="px-4 py-3 font-medium">{police}</td>
+      <td className="px-4 py-3 font-medium">{props.row.source.police || "-"}</td>
       <td className="px-4 py-3">
         <div className="font-medium">{props.row.source.mouvement}</div>
-        {documentId ? (
+        {props.row.source.documentClientId ? (
           <div className="mt-0.5 text-xs text-muted-foreground">
-            {documentQuery.isLoading
-              ? "Chargement du détail..."
-              : documentLines.length
-                ? `${documentLines.length} ligne(s) dans le document`
-                : "Document sans ligne détaillée"}
+            Ligne de facture
           </div>
         ) : null}
       </td>
@@ -853,6 +852,9 @@ function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[]) {
 }
 
 function receivableTargetKey(row: ClientReceivable) {
+  if (row.source.documentClientId && row.source.elementFacturableId) {
+    return `L:${row.source.documentClientId}:${row.source.elementFacturableId}`;
+  }
   if (row.source.documentClientId) return `D:${row.source.documentClientId}`;
   if (row.source.elementFacturableId) return `E:${row.source.elementFacturableId}`;
   throw new Error("Créance sans cible de règlement");

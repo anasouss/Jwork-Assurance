@@ -28,8 +28,12 @@ import java.math.BigDecimal;
                         columnNames = {"instrument_id", "element_facturable_id"}
                 ),
                 @UniqueConstraint(
-                        name = "uk_affectation_reglement_instrument_document",
-                        columnNames = {"instrument_id", "document_client_id"}
+                        name = "uk_affectation_reglement_instrument_document_element",
+                        columnNames = {
+                                "instrument_id",
+                                "document_client_id",
+                                "element_facturable_id"
+                        }
                 )
         },
         indexes = {

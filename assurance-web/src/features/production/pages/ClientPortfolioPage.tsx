@@ -122,7 +122,7 @@ export default function ClientPortfolioPage() {
 
   return (
     <div className="mx-auto grid w-full max-w-[1600px] min-w-0 gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header>
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-3 mb-1">
             <Link to="/app/production">
@@ -132,18 +132,6 @@ export default function ClientPortfolioPage() {
           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Portefeuille client</p>
           <h1 className="mt-1 text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom || "Client"}</h1>
           <p className="text-sm text-muted-foreground">Vue consolidée de la production, de la comptabilité et des sinistres.</p>
-        </div>
-        <div className="w-full sm:w-72">
-          <label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">Branche</label>
-          <Select value={branchId} onValueChange={changeBranch}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Toutes les branches</SelectItem>
-              {branches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>{branch.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </header>
 
@@ -169,6 +157,9 @@ export default function ClientPortfolioPage() {
         main={(
           <ProductionSection
             contracts={filteredContracts}
+            branches={branches}
+            branchId={branchId}
+            onBranchChange={changeBranch}
             selectedContractId={selectedContractId}
             onSelectContract={setSelectedContractId}
           />
@@ -251,29 +242,40 @@ function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
           <p className="text-sm text-muted-foreground">Identité et coordonnées du souscripteur.</p>
         </div>
       </div>
-      <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-5">
         <InfoCell label="Code client" value={client.codeClient} />
-        <InfoCell label="Type" value={client.typeClient === "PERSONNE_MORALE" ? "Personne morale" : "Personne physique"} />
         <InfoCell label="Identifiant" value={clientIdentifier(client)} />
-        <InfoCell label="Catégorie" value={client.categorieClientLibelle} />
         <InfoCell
           label="Téléphone"
           value={client.telephone || client.telephones?.find((item) => item.principal)?.numero}
           icon={<Phone className="size-3.5" />}
         />
         <InfoCell label="E-mail" value={client.email} />
-        <InfoCell label="Ville" value={client.ville} />
         <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
       </div>
       <div className="px-5 py-4">
         <p className="text-xs font-medium uppercase text-muted-foreground">Adresse</p>
-        <p className="mt-1 text-sm font-medium">{client.adresse || "-"}</p>
+        <p className="mt-1 text-sm font-medium">{[client.adresse, client.ville].filter(Boolean).join(", ") || "-"}</p>
       </div>
     </section>
   );
 }
 
-function ProductionSection({ contracts, selectedContractId, onSelectContract }: { contracts: PortfolioContract[]; selectedContractId: string; onSelectContract: (id: string) => void }) {
+function ProductionSection({
+  contracts,
+  branches,
+  branchId,
+  onBranchChange,
+  selectedContractId,
+  onSelectContract,
+}: {
+  contracts: PortfolioContract[];
+  branches: Array<{ id: string; label: string }>;
+  branchId: string;
+  onBranchChange: (id: string) => void;
+  selectedContractId: string;
+  onSelectContract: (id: string) => void;
+}) {
   const totalPremium = contracts.reduce((sum, contract) => sum + Number(contract.primeTotale || 0), 0);
   return (
     <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
@@ -287,7 +289,22 @@ function ProductionSection({ contracts, selectedContractId, onSelectContract }: 
         <Table>
           <TableHeader className="bg-emerald-700 text-white">
             <TableRow className="hover:bg-emerald-700">
-              <TableHead className="px-4 text-white">Branche</TableHead>
+              <TableHead className="w-52 px-3 text-white">
+                <Select value={branchId} onValueChange={onBranchChange}>
+                  <SelectTrigger
+                    aria-label="Filtrer par branche"
+                    className="h-8 border-emerald-500 bg-emerald-800 px-2 text-white hover:bg-emerald-900 focus:ring-white/70"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Toutes les branches</SelectItem>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>{branch.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead className="text-white">Police / dossier</TableHead>
               <TableHead className="text-white">Compagnie</TableHead>
               <TableHead className="text-white">Date de souscription</TableHead>

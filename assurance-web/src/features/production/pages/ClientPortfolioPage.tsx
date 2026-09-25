@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Building2, CircleDollarSign, Eye, FileText, FolderOpen, Landmark, Phone, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleDollarSign, Eye, FileText, FolderOpen, Landmark, Phone, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -140,11 +140,11 @@ export default function ClientPortfolioPage() {
               <ArrowLeft className="size-4" />Production
             </Link>
           </Button>
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Portefeuille client</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom || "Client"}</h1>
-            <Badge variant="outline" className="font-medium">Code client : {client.codeClient}</Badge>
-          </div>
+          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Informations client</p>
+          <h1 className="mt-1 text-xl font-semibold">
+            {client.nomAffichage || client.raisonSociale || client.nom || "Client"}
+            {client.codeClient ? <span className="font-medium text-muted-foreground"> - {client.codeClient}</span> : null}
+          </h1>
         </div>
       </header>
 
@@ -247,31 +247,24 @@ function PortfolioRow({ main, documents }: { main: ReactNode; documents: ReactNo
 
 function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
   const client = portfolio.client;
+  const identifier = clientIdentifier(client);
   return (
-    <div className="grid gap-2">
-      <div className="flex items-center gap-2">
-        <div className="flex size-7 items-center justify-center rounded-md bg-emerald-700 text-white">
-          {client.typeClient === "PERSONNE_MORALE" ? <Building2 className="size-4" /> : <UserRound className="size-4" />}
-        </div>
-        <h2 className="font-semibold">Informations client</h2>
+    <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
+      <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-4">
+        {identifier ? <InfoCell label={identifier.label} value={identifier.value} /> : null}
+        <InfoCell
+          label="Téléphone"
+          value={client.telephone || client.telephones?.find((item) => item.principal)?.numero}
+          icon={<Phone className="size-3.5" />}
+        />
+        <InfoCell label="E-mail" value={client.email} />
+        <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
       </div>
-      <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
-        <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-4">
-          <InfoCell label="Identifiant" value={clientIdentifier(client)} />
-          <InfoCell
-            label="Téléphone"
-            value={client.telephone || client.telephones?.find((item) => item.principal)?.numero}
-            icon={<Phone className="size-3.5" />}
-          />
-          <InfoCell label="E-mail" value={client.email} />
-          <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-5 py-3 text-sm">
-          <span className="font-medium uppercase text-muted-foreground">Adresse :</span>
-          <span className="font-medium">{[client.adresse, client.ville].filter(Boolean).join(", ") || "-"}</span>
-        </div>
-      </section>
-    </div>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-5 py-3 text-sm">
+        <span className="font-medium uppercase text-muted-foreground">Adresse :</span>
+        <span className="font-medium">{[client.adresse, client.ville].filter(Boolean).join(", ") || "-"}</span>
+      </div>
+    </section>
   );
 }
 
@@ -756,11 +749,11 @@ function SectionHeader({ icon, title, description, tone, action }: { icon: React
 
 function InfoCell({ label, value, icon }: { label: string; value?: string | null; icon?: ReactNode }) {
   return (
-    <div className="min-w-0 bg-card px-5 py-4">
-      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
-      <p className="mt-1 flex min-h-5 items-center gap-1.5 text-sm font-medium break-words">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 bg-card px-5 py-4 text-sm">
+      <span className="font-medium uppercase text-muted-foreground">{label} :</span>
+      <span className="flex min-h-5 min-w-0 items-center gap-1.5 font-medium break-words">
         {icon}{value || "-"}
-      </p>
+      </span>
     </div>
   );
 }
@@ -832,10 +825,10 @@ function selectRowFromKeyboard(event: KeyboardEvent<HTMLTableRowElement>, select
 }
 
 function clientIdentifier(client: ClientCrm["client"]) {
-  if (client.ice) return `ICE ${client.ice}`;
-  if (client.rc) return `RC ${client.rc}`;
-  if (client.cin) return `CIN ${client.cin}`;
-  return "-";
+  if (client.ice) return { label: "ICE", value: client.ice };
+  if (client.rc) return { label: "RC", value: client.rc };
+  if (client.cin) return { label: "CIN", value: client.cin };
+  return null;
 }
 
 function contractStatusLabel(status?: string | null, expired = false) {

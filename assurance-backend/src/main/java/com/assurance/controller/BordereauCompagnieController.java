@@ -10,6 +10,7 @@ import com.assurance.dto.request.TransmettreBordereauCompagnieRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.BordereauCompagniePageResponse;
 import com.assurance.dto.response.BordereauCompagnieResponse;
+import com.assurance.dto.response.ComptabiliteCompagniePortefeuilleResponse;
 import com.assurance.dto.response.ReglementCompagnieResponse;
 import com.assurance.dto.response.SourceBordereauCompagnieResponse;
 import com.assurance.enums.BaseBordereauCompagnie;
@@ -85,6 +86,21 @@ public class BordereauCompagnieController {
                 search,
                 page,
                 size
+        )));
+    }
+
+    @GetMapping("/portefeuille-client")
+    @PreAuthorize("hasAuthority('PERM_bordereau-compagnie:view')")
+    public ResponseEntity<ApiResponse<ComptabiliteCompagniePortefeuilleResponse>> portfolioSummary(
+            @RequestParam Long clientId,
+            @RequestParam(required = false) Long contratId,
+            @RequestParam(required = false) Long brancheId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(bordereauService.portfolioSummary(
+                TenantContext.getCurrentAgence(),
+                clientId,
+                contratId,
+                brancheId
         )));
     }
 

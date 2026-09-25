@@ -28,6 +28,7 @@ import type {
   CompanyBordereauPage,
   CompanyBordereauSource,
   CompanyBordereauStatus,
+  CompanyPortfolioAccountingSummary,
   CompanyPayment,
   CreateCompanyPaymentRequest,
   CreateClientPaymentRequest,
@@ -596,6 +597,16 @@ export const comptaApi = {
       await apiFetch<ApiResponse<CompanyBordereauPage>>(
         `/api/v1/compta/bordereaux-compagnies${buildQueryString(params)}`
       )
+    ));
+  },
+
+  async companyPortfolioSummary(params: {
+    clientId: string;
+    contratId?: string;
+    brancheId?: string;
+  }) {
+    return unwrap(await apiFetch<ApiResponse<CompanyPortfolioAccountingSummary>>(
+      `/api/v1/compta/bordereaux-compagnies/portefeuille-client${buildQueryString(params)}`
     ));
   },
 

@@ -7,6 +7,7 @@ import com.assurance.dto.request.RapprocherBordereauCompagnieRequest;
 import com.assurance.dto.request.TransmettreBordereauCompagnieRequest;
 import com.assurance.dto.response.BordereauCompagniePageResponse;
 import com.assurance.dto.response.BordereauCompagnieResponse;
+import com.assurance.dto.response.ComptabiliteCompagniePortefeuilleResponse;
 import com.assurance.dto.response.SourceBordereauCompagnieResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.entity.AffectationQuittanceCompagnie;
@@ -49,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 
 @Service
@@ -132,6 +134,69 @@ public class BordereauCompagnieService {
                         .last(result.isLast())
                         .build())
                 .rows(rows)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ComptabiliteCompagniePortefeuilleResponse portfolioSummary(
+            Long agenceId,
+            Long clientId,
+            Long contratId,
+            Long brancheId
+    ) {
+        List<AffectationQuittanceCompagnie> sources = sourceRepository.findForClientPortfolio(
+                agenceId,
+                clientId,
+                contratId,
+                brancheId
+        );
+        if (sources.isEmpty()) {
+            return ComptabiliteCompagniePortefeuilleResponse.builder()
+                    .quittances(0)
+                    .bordereaux(0)
+                    .netCompagnie(ZERO)
+                    .statut("AUCUNE")
+                    .build();
+        }
+
+        List<LigneBordereauCompagnie> lines = ligneRepository.findActiveByAffectationIds(
+                sources.stream().map(AffectationQuittanceCompagnie::getId).toList()
+        );
+        Set<Long> bordereauIds = lines.stream()
+                .map(line -> line.getBordereau().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, AllocationAmounts> allocations = loadAllocationAmounts(bordereauIds);
+        boolean hasConfirmed = bordereauIds.stream()
+                .map(id -> allocations.getOrDefault(id, AllocationAmounts.empty()).confirmed())
+                .anyMatch(amount -> amount.signum() > 0);
+        boolean hasPending = bordereauIds.stream()
+                .map(id -> allocations.getOrDefault(id, AllocationAmounts.empty()).pending())
+                .anyMatch(amount -> amount.signum() > 0);
+        boolean allAssigned = lines.size() == sources.size();
+        boolean allPaid = allAssigned && lines.stream().allMatch(line -> {
+            BordereauCompagnie bordereau = line.getBordereau();
+            BigDecimal confirmed = allocations.getOrDefault(
+                    bordereau.getId(),
+                    AllocationAmounts.empty()
+            ).confirmed();
+            return confirmed.compareTo(money(bordereau.getNetCompagnie())) >= 0;
+        });
+
+        String status = allPaid
+                ? "REGLE"
+                : hasConfirmed
+                        ? "PARTIELLEMENT_REGLE"
+                        : hasPending
+                                ? "EN_ATTENTE"
+                                : allAssigned ? "NON_REGLE" : "A_BORDEREAUTER";
+        return ComptabiliteCompagniePortefeuilleResponse.builder()
+                .quittances(sources.size())
+                .bordereaux(bordereauIds.size())
+                .netCompagnie(sources.stream()
+                        .map(AffectationQuittanceCompagnie::getNetCompagnie)
+                        .map(this::money)
+                        .reduce(ZERO, BigDecimal::add))
+                .statut(status)
                 .build();
     }
 

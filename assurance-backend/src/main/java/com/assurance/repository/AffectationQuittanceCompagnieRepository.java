@@ -67,6 +67,31 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
             @Param("dateAu") LocalDate dateAu
     );
 
+    @EntityGraph(attributePaths = {"compagnieAssurance", "quittance", "quittance.contrat"})
+    @Query("""
+            select distinct a
+            from AffectationQuittanceCompagnie a
+            where a.agence.id = :agenceId
+              and (:contratId is null or a.quittance.contrat.id = :contratId)
+              and (:brancheId is null or a.quittance.contrat.brancheAssurance.id = :brancheId)
+              and (
+                    a.quittance.contrat.payeurPrime.id = :clientId
+                    or exists (
+                          select cc.id
+                          from ContratClient cc
+                          where cc.contrat = a.quittance.contrat
+                            and cc.client.id = :clientId
+                    )
+              )
+            order by a.dateEffet asc, a.id asc
+            """)
+    List<AffectationQuittanceCompagnie> findForClientPortfolio(
+            @Param("agenceId") Long agenceId,
+            @Param("clientId") Long clientId,
+            @Param("contratId") Long contratId,
+            @Param("brancheId") Long brancheId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {
             "compagnieAssurance",

@@ -886,6 +886,13 @@ export type CompanyBordereauPage = {
   rows: CompanyBordereau[];
 };
 
+export type CompanyPortfolioAccountingSummary = {
+  quittances: number;
+  bordereaux: number;
+  netCompagnie: number;
+  statut: "AUCUNE" | "A_BORDEREAUTER" | "NON_REGLE" | "EN_ATTENTE" | "PARTIELLEMENT_REGLE" | "REGLE";
+};
+
 export type UpsertCompanyBordereauRequest = {
   compagnieId?: string;
   baseBordereau?: CompanyBordereauBase;

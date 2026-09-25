@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Building2, CircleDollarSign, Eye, FileText, FolderOpen, Phone, ReceiptText, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, CircleDollarSign, Eye, FileText, FolderOpen, Landmark, Phone, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { comptaApi } from "@/features/compta/api";
-import type { ClientDocument, ClientReceivable } from "@/features/compta/types";
+import type { ClientDocument, CompanyPortfolioAccountingSummary } from "@/features/compta/types";
 import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
 import { natureLabels, statusLabels } from "@/features/sinistre/format";
 import type { SinistreSummary } from "@/features/sinistre/types";
@@ -19,6 +19,7 @@ import type { ClientCrm } from "../types";
 import { moneyAmount } from "../utils/format";
 
 type PortfolioContract = ClientCrm["contrats"][number];
+type AccountingStatus = { label: string; tone: "emerald" | "amber" | "red" | "blue" | "slate" };
 const EMPTY_CONTRACTS: PortfolioContract[] = [];
 
 export default function ClientPortfolioPage() {
@@ -26,6 +27,7 @@ export default function ClientPortfolioPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canViewDocuments = permissions.includes("quittance:view");
   const canViewReceivables = permissions.includes("reglement-client:view");
+  const canViewCompanyAccounting = permissions.includes("bordereau-compagnie:view");
   const canViewClaims = ["sinistre:view", "sinistre:manage", "sinistre:finance"].some((permission) => permissions.includes(permission));
   const [branchId, setBranchId] = useState("ALL");
   const [selectedContractId, setSelectedContractId] = useState("ALL");
@@ -78,6 +80,15 @@ export default function ClientPortfolioPage() {
     queryKey: ["production", "client-portfolio", "receivables", receivableParams],
     queryFn: () => comptaApi.clientReceivables(receivableParams),
     enabled: Boolean(clientId) && canViewReceivables,
+  });
+  const companyAccountingQuery = useQuery({
+    queryKey: ["production", "client-portfolio", "company-accounting", clientId, activeContractId, activeBranchId],
+    queryFn: () => comptaApi.companyPortfolioSummary({
+      clientId,
+      contratId: activeContractId,
+      brancheId: activeBranchId,
+    }),
+    enabled: Boolean(clientId) && canViewCompanyAccounting,
   });
   const claimsQuery = useQuery({
     queryKey: sinistreKeys.list(claimsParams),
@@ -175,13 +186,16 @@ export default function ClientPortfolioPage() {
       <PortfolioRow
         main={(
           <AccountingSection
-            allowed={canViewReceivables}
-            loading={receivablesQuery.isLoading}
-            error={receivablesQuery.isError}
-            rows={receivablesQuery.data?.rows ?? []}
+            canViewClient={canViewReceivables}
+            canViewCompany={canViewCompanyAccounting}
+            clientLoading={receivablesQuery.isLoading}
+            clientError={receivablesQuery.isError}
+            companyLoading={companyAccountingQuery.isLoading}
+            companyError={companyAccountingQuery.isError}
             summary={receivablesQuery.data?.summary}
-            totalElements={receivablesQuery.data?.page.totalElements ?? 0}
-            accountingUrl={accountingUrl}
+            companySummary={companyAccountingQuery.data}
+            clientAccountingUrl={accountingUrl}
+            companyAccountingUrl="/app/compta/bordereaux-compagnies"
           />
         )}
         documents={(
@@ -349,61 +363,128 @@ function ProductionSection({
   );
 }
 
-function AccountingSection({ allowed, loading, error, rows, summary, totalElements, accountingUrl }: { allowed: boolean; loading: boolean; error: boolean; rows: ClientReceivable[]; summary?: { total: number; montantInitial: number; montantConfirme: number; montantEnAttente: number; soldeOuvert: number }; totalElements: number; accountingUrl: string }) {
+function AccountingSection({
+  canViewClient,
+  canViewCompany,
+  clientLoading,
+  clientError,
+  companyLoading,
+  companyError,
+  summary,
+  companySummary,
+  clientAccountingUrl,
+  companyAccountingUrl,
+}: {
+  canViewClient: boolean;
+  canViewCompany: boolean;
+  clientLoading: boolean;
+  clientError: boolean;
+  companyLoading: boolean;
+  companyError: boolean;
+  summary?: { total: number; montantInitial: number; montantConfirme: number; montantEnAttente: number; soldeOuvert: number };
+  companySummary?: CompanyPortfolioAccountingSummary;
+  clientAccountingUrl: string;
+  companyAccountingUrl: string;
+}) {
+  const clientStatus = accountingClientStatus(summary);
   return (
     <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
       <SectionHeader
         icon={<CircleDollarSign className="size-4" />}
         title="Comptabilité"
-        description="Créances directes du périmètre sélectionné."
+        description="Situation générale des encaissements client et des règlements compagnie."
         tone="cyan"
-        action={allowed ? (
-          <Button asChild size="sm" variant="outline">
-            <Link to={accountingUrl}>Ouvrir la comptabilité<ArrowRight className="size-4" /></Link>
-          </Button>
-        ) : undefined}
       />
-      {!allowed ? (
+      {!canViewClient && !canViewCompany ? (
         <EmptySection icon={<CircleDollarSign className="size-6" />} text="Vous n'avez pas l'autorisation de consulter la comptabilité." />
-      ) : loading ? (
-        <SectionSkeleton />
-      ) : error ? (
-        <EmptySection icon={<CircleDollarSign className="size-6" />} text="Impossible de charger la comptabilité." />
       ) : (
-        <>
-          <div className="grid gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-4">
-            <Indicator label="Éléments" value={String(totalElements)} tone="blue" />
-            <Indicator label="Montant initial" value={money(summary?.montantInitial)} tone="emerald" />
-            <Indicator label="Montant réglé" value={money(summary?.montantConfirme)} tone="cyan" />
-            <Indicator label="Solde ouvert" value={money(summary?.soldeOuvert)} tone="amber" />
-          </div>
-          {totalElements > rows.length ? (
-            <p className="border-b px-5 py-2 text-xs text-muted-foreground">
-              Montants calculés sur les {rows.length} premières écritures.
-            </p>
-          ) : null}
-          {rows.length ? (
-            <div className="divide-y">
-              {rows.slice(0, 8).map((row) => (
-                <ReceivableRow
-                  key={row.source.elementFacturableId || `${row.source.contratId}-${row.source.reference}`}
-                  row={row}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptySection icon={<ReceiptText className="size-6" />} text="Aucune créance ouverte pour ce périmètre." compact />
-          )}
-          {totalElements > 8 ? (
-            <div className="border-t px-5 py-2 text-right">
-              <Link className="text-sm font-medium text-cyan-800 hover:underline" to={accountingUrl}>
-                Voir toutes les écritures
-              </Link>
-            </div>
-          ) : null}
-        </>
+        <div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0">
+          <AccountingFlow
+            title="Encaissements client"
+            icon={<UserRound className="size-4" />}
+            allowed={canViewClient}
+            loading={clientLoading}
+            error={clientError}
+            status={clientStatus}
+            metrics={[
+              { label: "Montant dû", value: money(summary?.montantInitial) },
+              { label: "Encaissé", value: money(summary?.montantConfirme) },
+              { label: "Solde", value: money(summary?.soldeOuvert), emphasis: true },
+            ]}
+            pending={summary?.montantEnAttente ? `${money(summary.montantEnAttente)} en attente de confirmation` : undefined}
+            detailsUrl={clientAccountingUrl}
+          />
+          <AccountingFlow
+            title="Règlements compagnie"
+            icon={<Landmark className="size-4" />}
+            allowed={canViewCompany}
+            loading={companyLoading}
+            error={companyError}
+            status={companyAccountingStatus(companySummary?.statut)}
+            metrics={[
+              { label: "Net compagnie", value: money(companySummary?.netCompagnie), emphasis: true },
+              { label: "Quittances", value: String(companySummary?.quittances ?? 0) },
+              { label: "Bordereaux", value: String(companySummary?.bordereaux ?? 0) },
+            ]}
+            detailsUrl={companyAccountingUrl}
+          />
+        </div>
       )}
     </section>
+  );
+}
+
+function AccountingFlow({
+  title,
+  icon,
+  allowed,
+  loading,
+  error,
+  status,
+  metrics,
+  pending,
+  detailsUrl,
+}: {
+  title: string;
+  icon: ReactNode;
+  allowed: boolean;
+  loading: boolean;
+  error: boolean;
+  status: AccountingStatus;
+  metrics: Array<{ label: string; value: string; emphasis?: boolean }>;
+  pending?: string;
+  detailsUrl: string;
+}) {
+  if (!allowed) {
+    return <div className="px-5 py-8 text-sm text-muted-foreground">Accès non autorisé.</div>;
+  }
+  if (loading) {
+    return <div className="grid gap-2 px-5 py-5"><Skeleton className="h-8 w-48" /><Skeleton className="h-12 w-full" /></div>;
+  }
+  if (error) {
+    return <div className="px-5 py-8 text-sm text-red-700">Impossible de charger cette situation comptable.</div>;
+  }
+  return (
+    <div className="min-w-0 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 font-semibold">{icon}{title}</div>
+        <AccountingStatusBadge status={status} />
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-4">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="min-w-0">
+            <p className="text-xs uppercase text-muted-foreground">{metric.label}</p>
+            <p className={`mt-1 truncate text-sm ${metric.emphasis ? "font-semibold" : "font-medium"}`}>{metric.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex min-h-8 flex-wrap items-center justify-between gap-2 border-t pt-3">
+        <p className="text-xs text-muted-foreground">{pending}</p>
+        <Button asChild size="sm" variant="outline">
+          <Link to={detailsUrl}>Détails<ArrowRight className="size-4" /></Link>
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -673,25 +754,6 @@ function SectionHeader({ icon, title, description, tone, action }: { icon: React
   );
 }
 
-function ReceivableRow({ row }: { row: ClientReceivable }) {
-  return (
-    <div className="grid gap-2 px-5 py-3 sm:grid-cols-[1fr_160px_140px] sm:items-center">
-      <div>
-        <p className="font-medium">{row.source.mouvement || row.source.nature || "Écriture"}</p>
-        <p className="text-xs text-muted-foreground">{row.source.police || row.source.dossier || "Sans référence"}</p>
-      </div>
-      <div className="text-sm">
-        <span className="text-muted-foreground">TTC </span>
-        <strong>{money(row.source.montantTtc)}</strong>
-      </div>
-      <div className="text-right text-sm">
-        <span className="text-muted-foreground">Solde </span>
-        <strong className="text-amber-700">{money(row.soldeOuvert)}</strong>
-      </div>
-    </div>
-  );
-}
-
 function InfoCell({ label, value, icon }: { label: string; value?: string | null; icon?: ReactNode }) {
   return (
     <div className="min-w-0 bg-card px-5 py-4">
@@ -701,11 +763,6 @@ function InfoCell({ label, value, icon }: { label: string; value?: string | null
       </p>
     </div>
   );
-}
-
-function Indicator({ label, value, tone }: { label: string; value: string; tone: "emerald" | "blue" | "cyan" | "amber" }) {
-  const color = { emerald: "text-emerald-800", blue: "text-sky-800", cyan: "text-cyan-800", amber: "text-amber-800" }[tone];
-  return <div className="bg-card px-5 py-3"><p className="text-xs font-medium uppercase text-muted-foreground">{label}</p><p className={`mt-1 text-lg font-semibold ${color}`}>{value}</p></div>;
 }
 
 function EmptySection({ icon, text, compact = false }: { icon: ReactNode; text: string; compact?: boolean }) {
@@ -728,6 +785,36 @@ function ContractStatus({ status, dateEcheance }: { status?: string | null; date
         ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
         : "bg-slate-100 text-slate-700 hover:bg-slate-100";
   return <Badge className={className}>{contractStatusLabel(status, expired)}</Badge>;
+}
+
+function AccountingStatusBadge({ status }: { status: AccountingStatus }) {
+  const className = {
+    emerald: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+    amber: "bg-amber-100 text-amber-800 hover:bg-amber-100",
+    red: "bg-red-100 text-red-800 hover:bg-red-100",
+    blue: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+    slate: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+  }[status.tone];
+  return <Badge className={className}>{status.label}</Badge>;
+}
+
+function accountingClientStatus(summary?: { montantInitial: number; montantConfirme: number; montantEnAttente: number; soldeOuvert: number }): AccountingStatus {
+  if (!summary || summary.montantInitial <= 0) return { label: "À jour", tone: "emerald" };
+  if (summary.soldeOuvert <= 0) return { label: "Payé", tone: "emerald" };
+  if (summary.montantConfirme > 0) return { label: "Partiel", tone: "amber" };
+  if (summary.montantEnAttente > 0) return { label: "En attente", tone: "blue" };
+  return { label: "Impayé", tone: "red" };
+}
+
+function companyAccountingStatus(status?: CompanyPortfolioAccountingSummary["statut"]): AccountingStatus {
+  switch (status) {
+    case "REGLE": return { label: "Réglé", tone: "emerald" };
+    case "PARTIELLEMENT_REGLE": return { label: "Partiel", tone: "amber" };
+    case "EN_ATTENTE": return { label: "En attente", tone: "blue" };
+    case "NON_REGLE": return { label: "Non réglé", tone: "red" };
+    case "A_BORDEREAUTER": return { label: "À bordereauter", tone: "amber" };
+    default: return { label: "Aucune écriture", tone: "slate" };
+  }
 }
 
 function PortfolioSkeleton() {

@@ -68,8 +68,6 @@ type PaymentMethodDraft = {
   compteTresorerieId: string;
 };
 
-type PaymentStructure = "SINGLE" | "MULTIPLE";
-
 const paymentModes: Array<{
   value: ClientPaymentMode;
   label: string;
@@ -94,9 +92,7 @@ export default function NouveauReglementClientPage() {
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
-  const [paymentStructure, setPaymentStructure] = useState<PaymentStructure | null>(null);
-  const [methods, setMethods] = useState<PaymentMethodDraft[]>([newPaymentMethod()]);
-  const [activeMethodKey, setActiveMethodKey] = useState(methods[0].key);
+  const [methods, setMethods] = useState<PaymentMethodDraft[]>([]);
   const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -119,7 +115,6 @@ export default function NouveauReglementClientPage() {
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const allocatedAmounts = allocationByReceivable(rows, paymentTotal);
   const remainingAmount = round(selectedTotal - paymentTotal);
-  const activeMethod = methods.find((method) => method.key === activeMethodKey) ?? methods[0];
   const activeCashAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "CAISSE"
   );
@@ -153,9 +148,9 @@ export default function NouveauReglementClientPage() {
   });
 
   const canSubmit = canCreate
-    && paymentStructure !== null
     && Boolean(dateReglement)
     && rows.length > 0
+    && methods.length > 0
     && paymentTotal > 0
     && paymentTotal <= selectedTotal + 0.001
     && methods.every((method) => methodValid(method, accounts.data ?? []));
@@ -166,36 +161,29 @@ export default function NouveauReglementClientPage() {
       : method));
   }
 
-  function changeMethod(method: PaymentMethodDraft, mode: ClientPaymentMode) {
-    if (method.mode === mode) return;
-    updateMethod(method.key, {
-      mode,
-      compteTresorerieId: "",
-      dateEcheance: "",
-      referenceInstrument: "",
-      banqueEmettrice: "",
+  function addPaymentMethod(mode: ClientPaymentMode) {
+    const method = newPaymentMethod(mode);
+    setMethods((current) => {
+      const lastModeIndex = current.map((item) => item.mode).lastIndexOf(mode);
+      if (lastModeIndex < 0) return [...current, method];
+      return [
+        ...current.slice(0, lastModeIndex + 1),
+        method,
+        ...current.slice(lastModeIndex + 1),
+      ];
     });
   }
 
-  function addPaymentMethod() {
-    const method = newPaymentMethod();
-    setMethods((current) => [...current, method]);
-    setActiveMethodKey(method.key);
-  }
-
-  function selectPaymentStructure(structure: PaymentStructure) {
-    if (structure === "SINGLE" && methods.length > 1) {
-      const firstMethod = methods[0];
-      setMethods([firstMethod]);
-      setActiveMethodKey(firstMethod.key);
+  function togglePaymentMode(mode: ClientPaymentMode) {
+    if (methods.some((method) => method.mode === mode)) {
+      setMethods((current) => current.filter((method) => method.mode !== mode));
+      return;
     }
-    setPaymentStructure(structure);
+    addPaymentMethod(mode);
   }
 
   function removePaymentMethod(key: string) {
-    const remaining = methods.filter((method) => method.key !== key);
-    setMethods(remaining);
-    if (activeMethodKey === key) setActiveMethodKey(remaining[0].key);
+    setMethods((current) => current.filter((method) => method.key !== key));
   }
 
   function reorderReceivables(event: DragEndEvent) {
@@ -331,61 +319,28 @@ export default function NouveauReglementClientPage() {
         </div>
 
         <div className="grid gap-4 bg-muted/10 p-4">
-          <div className="grid gap-2">
-            <Label>Nombre de moyens de règlement</Label>
-            <div className="grid max-w-lg grid-cols-2 rounded-md border bg-background p-1">
-              <button
-                type="button"
-                aria-pressed={paymentStructure === "SINGLE"}
-                className={paymentStructure === "SINGLE"
-                  ? "h-9 rounded-sm bg-orange-500 px-3 text-sm font-medium text-white shadow-sm"
-                  : "h-9 rounded-sm px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"}
-                onClick={() => selectPaymentStructure("SINGLE")}
-              >
-                Un seul moyen
-              </button>
-              <button
-                type="button"
-                aria-pressed={paymentStructure === "MULTIPLE"}
-                className={paymentStructure === "MULTIPLE"
-                  ? "h-9 rounded-sm bg-orange-500 px-3 text-sm font-medium text-white shadow-sm"
-                  : "h-9 rounded-sm px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"}
-                onClick={() => selectPaymentStructure("MULTIPLE")}
-              >
-                Plusieurs moyens
-              </button>
-            </div>
+          <div className="grid max-w-64 gap-2">
+            <Label>Date d’encaissement</Label>
+            <DatePicker
+              date={dateReglement}
+              onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
+            />
           </div>
 
-          {paymentStructure ? (
-            <>
-              <div className="grid max-w-64 gap-2">
-                <Label>Date d’encaissement</Label>
-                <DatePicker
-                  date={dateReglement}
-                  onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
-                />
-              </div>
-
-              <div className="grid gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <Label>Mode de règlement</Label>
-              <span className="text-xs font-medium text-muted-foreground">
-                Moyen {methods.findIndex((method) => method.key === activeMethodKey) + 1}
-              </span>
-            </div>
+          <div className="grid gap-2">
+            <Label>Modes de règlement</Label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
               {paymentModes.map(({ value, label, icon: Icon }) => {
-                const active = activeMethod?.mode === value;
+                const selected = methods.some((method) => method.mode === value);
                 return (
                   <button
                     key={value}
                     type="button"
-                    aria-pressed={active}
-                    className={active
+                    aria-pressed={selected}
+                    className={selected
                       ? "flex h-12 items-center justify-center gap-2 rounded-md border border-amber-500 bg-amber-50 px-3 text-sm font-medium text-amber-950 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:text-amber-100"
                       : "flex h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground"}
-                    onClick={() => changeMethod(activeMethod, value)}
+                    onClick={() => togglePaymentMode(value)}
                   >
                     <Icon className="size-4 shrink-0" />
                     <span>{label}</span>
@@ -393,36 +348,40 @@ export default function NouveauReglementClientPage() {
                 );
               })}
             </div>
-              </div>
+          </div>
 
-              <div className="divide-y border-t">
-            {methods.map((method, index) => (
-              <section
-                key={method.key}
-                className={method.key === activeMethodKey
-                  ? "grid gap-4 bg-muted/35 px-3 py-4 transition-colors duration-150"
-                  : "grid gap-4 px-3 py-4 transition-colors duration-150"}
-              >
+          {methods.length > 0 ? (
+            <div className="divide-y border-t">
+              {methods.map((method, index) => (
+                <section key={method.key} className="grid gap-4 px-3 py-4">
                 <div className="flex flex-wrap items-end justify-between gap-3">
-                  <button
-                    type="button"
-                    className="flex min-h-11 items-center gap-3 rounded-md px-2.5 text-left hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={() => setActiveMethodKey(method.key)}
-                  >
-                    <span className={method.key === activeMethodKey
-                      ? "flex size-7 items-center justify-center rounded-sm border border-orange-600 bg-orange-500 text-xs font-bold text-white shadow-sm"
-                      : "flex size-7 items-center justify-center rounded-sm border border-slate-300 bg-slate-100 text-xs font-bold text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"}
-                    >
+                  <div className="flex min-h-11 items-center gap-3 px-2.5">
+                    <span className="flex size-7 items-center justify-center rounded-sm border border-orange-600 bg-orange-500 text-xs font-bold text-white shadow-sm">
                       {index + 1}
                     </span>
                     <span className="grid gap-0.5">
-                      <span className="text-sm font-bold text-foreground">Moyen de règlement</span>
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      <span className="text-sm font-bold text-foreground">
                         {paymentModes.find((option) => option.value === method.mode)?.label}
+                        {" "}
+                        {methods.slice(0, index + 1)
+                          .filter((item) => item.mode === method.mode).length}
                       </span>
+                      <span className="text-xs text-muted-foreground">Moyen de règlement</span>
                     </span>
-                  </button>
-                  {methods.length > 1 ? (
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {methods.map((item) => item.mode).lastIndexOf(method.mode) === index ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-orange-300 text-orange-800 hover:bg-orange-50 hover:text-orange-900 dark:border-orange-800 dark:text-orange-200 dark:hover:bg-orange-950/30"
+                        onClick={() => addPaymentMethod(method.mode)}
+                      >
+                        <Plus className="size-4" />
+                        Ajouter
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       variant="ghost"
@@ -433,7 +392,7 @@ export default function NouveauReglementClientPage() {
                     >
                       <Trash2 className="size-4" />
                     </Button>
-                  ) : null}
+                  </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -563,34 +522,19 @@ export default function NouveauReglementClientPage() {
                     Aucun compte bancaire actif n’est disponible.
                   </div>
                 ) : null}
-              </section>
-            ))}
-                {paymentStructure === "MULTIPLE" ? (
-                  <div className="flex justify-end px-3 py-3">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100 hover:text-orange-900 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-200 dark:hover:bg-orange-950/50"
-                      onClick={addPaymentMethod}
-                    >
-                      <Plus className="size-4" />
-                      Ajouter un moyen
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="grid gap-2 border-t pt-4">
-                <Label>Notes</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  className="min-h-24"
-                />
-              </div>
-            </>
+                </section>
+              ))}
+            </div>
           ) : null}
+
+          <div className="grid gap-2 border-t pt-4">
+            <Label>Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              className="min-h-24"
+            />
+          </div>
         </div>
       </section>
 
@@ -872,10 +816,10 @@ function allocationByReceivable(rows: ClientReceivable[], paymentTotal: number) 
   }));
 }
 
-function newPaymentMethod(): PaymentMethodDraft {
+function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
   return {
     key: crypto.randomUUID(),
-    mode: "ESPECES",
+    mode,
     montant: "",
     dateEcheance: "",
     referenceInstrument: "",

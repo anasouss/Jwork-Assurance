@@ -1037,8 +1037,10 @@ public class ReglementClientService {
                 && (request.getReferenceInstrument() == null || request.getReferenceInstrument().isBlank())) {
             throw new BadRequestException("La référence du moyen de règlement est obligatoire");
         }
-        if (request.getMode() == ModeReglementClient.EFFET && request.getDateEcheance() == null) {
-            throw new BadRequestException("L'échéance de l'effet est obligatoire");
+        if (Set.of(ModeReglementClient.CHEQUE, ModeReglementClient.EFFET)
+                .contains(request.getMode())
+                && request.getDateEcheance() == null) {
+            throw new BadRequestException("La date d'échéance est obligatoire");
         }
     }
 

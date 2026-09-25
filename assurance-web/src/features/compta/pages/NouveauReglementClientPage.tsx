@@ -68,6 +68,8 @@ type PaymentMethodDraft = {
   compteTresorerieId: string;
 };
 
+type PaymentStructure = "SINGLE" | "MULTIPLE";
+
 const paymentModes: Array<{
   value: ClientPaymentMode;
   label: string;
@@ -92,6 +94,7 @@ export default function NouveauReglementClientPage() {
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
+  const [paymentStructure, setPaymentStructure] = useState<PaymentStructure | null>(null);
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([newPaymentMethod()]);
   const [activeMethodKey, setActiveMethodKey] = useState(methods[0].key);
   const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
@@ -150,6 +153,7 @@ export default function NouveauReglementClientPage() {
   });
 
   const canSubmit = canCreate
+    && paymentStructure !== null
     && Boolean(dateReglement)
     && rows.length > 0
     && paymentTotal > 0
@@ -177,6 +181,15 @@ export default function NouveauReglementClientPage() {
     const method = newPaymentMethod();
     setMethods((current) => [...current, method]);
     setActiveMethodKey(method.key);
+  }
+
+  function selectPaymentStructure(structure: PaymentStructure) {
+    if (structure === "SINGLE" && methods.length > 1) {
+      const firstMethod = methods[0];
+      setMethods([firstMethod]);
+      setActiveMethodKey(firstMethod.key);
+    }
+    setPaymentStructure(structure);
   }
 
   function removePaymentMethod(key: string) {
@@ -313,30 +326,48 @@ export default function NouveauReglementClientPage() {
       </DndContext>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
+        <div className="border-b bg-muted/30 px-4 py-3">
           <h2 className="font-semibold">Moyens de règlement</h2>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100 hover:text-orange-900 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-200 dark:hover:bg-orange-950/50"
-            onClick={addPaymentMethod}
-          >
-            <Plus className="size-4" />
-            Ajouter un moyen
-          </Button>
         </div>
 
         <div className="grid gap-4 bg-muted/10 p-4">
-          <div className="grid max-w-64 gap-2">
-            <Label>Date du règlement</Label>
-            <DatePicker
-              date={dateReglement}
-              onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
-            />
+          <div className="grid gap-2">
+            <Label>Nombre de moyens de règlement</Label>
+            <div className="grid max-w-lg grid-cols-2 rounded-md border bg-background p-1">
+              <button
+                type="button"
+                aria-pressed={paymentStructure === "SINGLE"}
+                className={paymentStructure === "SINGLE"
+                  ? "h-9 rounded-sm bg-orange-500 px-3 text-sm font-medium text-white shadow-sm"
+                  : "h-9 rounded-sm px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"}
+                onClick={() => selectPaymentStructure("SINGLE")}
+              >
+                Un seul moyen
+              </button>
+              <button
+                type="button"
+                aria-pressed={paymentStructure === "MULTIPLE"}
+                className={paymentStructure === "MULTIPLE"
+                  ? "h-9 rounded-sm bg-orange-500 px-3 text-sm font-medium text-white shadow-sm"
+                  : "h-9 rounded-sm px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"}
+                onClick={() => selectPaymentStructure("MULTIPLE")}
+              >
+                Plusieurs moyens
+              </button>
+            </div>
           </div>
 
-          <div className="grid gap-2">
+          {paymentStructure ? (
+            <>
+              <div className="grid max-w-64 gap-2">
+                <Label>Date d’encaissement</Label>
+                <DatePicker
+                  date={dateReglement}
+                  onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
+                />
+              </div>
+
+              <div className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
               <Label>Mode de règlement</Label>
               <span className="text-xs font-medium text-muted-foreground">
@@ -362,9 +393,9 @@ export default function NouveauReglementClientPage() {
                 );
               })}
             </div>
-          </div>
+              </div>
 
-          <div className="divide-y border-t">
+              <div className="divide-y border-t">
             {methods.map((method, index) => (
               <section
                 key={method.key}
@@ -448,7 +479,7 @@ export default function NouveauReglementClientPage() {
                       })}
                     />
                   </div>
-                  {method.mode === "EFFET" ? (
+                  {method.mode === "EFFET" || method.mode === "CHEQUE" ? (
                     <div className="grid gap-2">
                       <Label>Date d’échéance</Label>
                       <DatePicker
@@ -534,16 +565,32 @@ export default function NouveauReglementClientPage() {
                 ) : null}
               </section>
             ))}
-          </div>
+                {paymentStructure === "MULTIPLE" ? (
+                  <div className="flex justify-end px-3 py-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100 hover:text-orange-900 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-200 dark:hover:bg-orange-950/50"
+                      onClick={addPaymentMethod}
+                    >
+                      <Plus className="size-4" />
+                      Ajouter un moyen
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
 
-          <div className="grid gap-2 border-t pt-4">
-            <Label>Notes</Label>
-            <Textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              className="min-h-24"
-            />
-          </div>
+              <div className="grid gap-2 border-t pt-4">
+                <Label>Notes</Label>
+                <Textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  className="min-h-24"
+                />
+              </div>
+            </>
+          ) : null}
         </div>
       </section>
 
@@ -856,7 +903,9 @@ function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[]) {
   }
   if (requiresPaymentReference(method.mode)
     && !method.referenceInstrument.trim()) return false;
-  return method.mode !== "EFFET" || Boolean(method.dateEcheance);
+  if ((method.mode === "CHEQUE" || method.mode === "EFFET")
+    && !method.dateEcheance) return false;
+  return true;
 }
 
 function receivableTargetKey(row: ClientReceivable) {

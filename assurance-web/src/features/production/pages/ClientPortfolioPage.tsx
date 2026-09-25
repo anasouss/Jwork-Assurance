@@ -287,10 +287,10 @@ function ProductionSection({ contracts, selectedContractId, onSelectContract }: 
         <Table>
           <TableHeader className="bg-emerald-700 text-white">
             <TableRow className="hover:bg-emerald-700">
-              <TableHead className="px-4 text-white">Police / dossier</TableHead>
-              <TableHead className="text-white">Branche</TableHead>
+              <TableHead className="px-4 text-white">Branche</TableHead>
+              <TableHead className="text-white">Police / dossier</TableHead>
               <TableHead className="text-white">Compagnie</TableHead>
-              <TableHead className="text-white">Période</TableHead>
+              <TableHead className="text-white">Date de souscription</TableHead>
               <TableHead className="text-right text-white">Prime totale</TableHead>
               <TableHead className="text-white">Statut</TableHead>
               <TableHead className="w-28 text-right text-white">Action</TableHead>
@@ -307,21 +307,18 @@ function ProductionSection({ contracts, selectedContractId, onSelectContract }: 
                 onClick={() => onSelectContract(contract.id)}
                 onKeyDown={(event) => selectRowFromKeyboard(event, () => onSelectContract(contract.id))}
               >
-                <TableCell className="px-4">
+                <TableCell className="px-4 font-medium">{contract.brancheAssuranceLibelle || contract.brancheAssuranceCode || "-"}</TableCell>
+                <TableCell>
                   <div className="font-medium">{contract.numeroPolice || "Sans numéro de police"}</div>
                   <div className="text-xs text-muted-foreground">{contract.numeroDossier || `#${contract.id}`}</div>
                 </TableCell>
-                <TableCell>{contract.brancheAssuranceLibelle || contract.brancheAssuranceCode || "-"}</TableCell>
                 <TableCell>{contract.compagnie || "-"}</TableCell>
-                <TableCell>
-                  <div>{formatDate(contract.dateEffet)}</div>
-                  <div className="text-xs text-muted-foreground">au {formatDate(contract.dateEcheance)}</div>
-                </TableCell>
+                <TableCell>{formatDate(contract.dateSouscription)}</TableCell>
                 <TableCell className="text-right font-semibold">{money(contract.primeTotale)}</TableCell>
-                <TableCell><ContractStatus status={contract.statut} /></TableCell>
+                <TableCell><ContractStatus status={contract.statut} dateEcheance={contract.dateEcheance} /></TableCell>
                 <TableCell className="text-right">
                   <Button asChild size="sm" variant="outline" onClick={(event) => event.stopPropagation()}>
-                    <Link to={`/app/production/contrats/${contract.id}`}>
+                    <Link to={`/app/production/contrats?contratId=${contract.id}`}>
                       Détails<ArrowRight className="size-4" />
                     </Link>
                   </Button>
@@ -702,10 +699,18 @@ function SectionSkeleton() {
   return <div className="grid gap-2 p-5"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div>;
 }
 
-function ContractStatus({ status }: { status?: string | null }) {
+function ContractStatus({ status, dateEcheance }: { status?: string | null; dateEcheance?: string | null }) {
   const normalized = normalize(status);
-  const className = normalized === "ACTIVE" ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : normalized.includes("RESIL") || normalized.includes("ANNU") ? "bg-red-100 text-red-800 hover:bg-red-100" : "bg-slate-100 text-slate-700 hover:bg-slate-100";
-  return <Badge className={className}>{contractStatusLabel(status)}</Badge>;
+  const expired = normalized === "EXPIRED" || normalized === "RENEWED" || isPastDate(dateEcheance);
+  const terminated = normalized === "CANCELLED" || normalized.includes("RESIL") || normalized.includes("ANNU");
+  const className = terminated
+    ? "bg-red-100 text-red-800 hover:bg-red-100"
+    : expired
+      ? "bg-amber-100 text-amber-800 hover:bg-amber-100"
+      : normalized === "ACTIVE"
+        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+        : "bg-slate-100 text-slate-700 hover:bg-slate-100";
+  return <Badge className={className}>{contractStatusLabel(status, expired)}</Badge>;
 }
 
 function PortfolioSkeleton() {
@@ -729,13 +734,21 @@ function clientIdentifier(client: ClientCrm["client"]) {
   return "-";
 }
 
-function contractStatusLabel(status?: string | null) {
+function contractStatusLabel(status?: string | null, expired = false) {
   const normalized = normalize(status);
-  if (normalized === "ACTIVE") return "Actif";
+  if (normalized === "CANCELLED" || normalized.includes("RESIL") || normalized.includes("ANNU")) return "Résilié";
+  if (expired) return "Échu";
+  if (normalized === "ACTIVE") return "En vigueur";
+  if (normalized === "SUSPENDED") return "Suspendu";
   if (normalized.includes("BROUILLON")) return "Brouillon";
-  if (normalized.includes("RESIL")) return "Résilié";
-  if (normalized.includes("ANNU")) return "Annulé";
   return status || "-";
+}
+
+function isPastDate(value?: string | null) {
+  if (!value) return false;
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return value.slice(0, 10) < today;
 }
 
 function formatDate(value?: string | null) {

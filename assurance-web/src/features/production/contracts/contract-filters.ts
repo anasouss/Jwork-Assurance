@@ -9,6 +9,7 @@ export type ContractFilters = {
   compagnieId: "ALL" | string;
   numeroPolice: string;
   clientId: string;
+  contratId: string;
 };
 
 export const DEFAULT_CONTRACT_FILTERS: ContractFilters = {
@@ -18,6 +19,7 @@ export const DEFAULT_CONTRACT_FILTERS: ContractFilters = {
   compagnieId: "ALL",
   numeroPolice: "",
   clientId: "",
+  contratId: "",
 };
 
 export function contractFiltersFromSearchParams(searchParams: URLSearchParams): ContractFilters {
@@ -34,6 +36,7 @@ export function contractFiltersFromSearchParams(searchParams: URLSearchParams): 
     compagnieId: searchParams.get("compagnieId") ?? "ALL",
     numeroPolice: searchParams.get("numeroPolice") ?? "",
     clientId: searchParams.get("clientId") ?? "",
+    contratId: searchParams.get("contratId") ?? "",
   };
 }
 
@@ -47,6 +50,7 @@ export function contractFiltersToSearchParams(filters: ContractFilters) {
   if (filters.compagnieId !== "ALL") params.set("compagnieId", filters.compagnieId);
   if (filters.numeroPolice.trim()) params.set("numeroPolice", filters.numeroPolice.trim());
   if (filters.clientId) params.set("clientId", filters.clientId);
+  if (filters.contratId) params.set("contratId", filters.contratId);
   return params;
 }
 

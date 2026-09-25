@@ -22,6 +22,7 @@ export type ContractListParams = {
   compagnieId?: string;
   numeroPolice?: string;
   clientId?: string;
+  contratId?: string;
   page?: number;
   size?: number;
 };

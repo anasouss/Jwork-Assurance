@@ -22,6 +22,7 @@ describe("contract filter URL state", () => {
       compagnieId: "4",
       numeroPolice: "  P-42 ",
       clientId: "9",
+      contratId: "27",
     });
 
     expect(contractFiltersFromSearchParams(params)).toEqual({
@@ -33,6 +34,7 @@ describe("contract filter URL state", () => {
       compagnieId: "4",
       numeroPolice: "P-42",
       clientId: "9",
+      contratId: "27",
     });
   });
 

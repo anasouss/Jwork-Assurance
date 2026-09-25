@@ -62,9 +62,11 @@ public class ContratSearchService {
             Long compagnieId,
             String numeroPolice,
             Long clientId,
+            Long contratId,
             Integer page,
             Integer size
     ) {
+        Long currentContractId = resolveCurrentContractId(agenceId, contratId);
         Page<Long> leafIds = contratRepository.searchCurrentContractIds(
                 agenceId,
                 typeContrat,
@@ -75,6 +77,7 @@ public class ContratSearchService {
                 compagnieId,
                 normalize(numeroPolice),
                 clientId,
+                currentContractId,
                 pageRequest(page, size)
         );
         Map<Long, Contrat> contractsById = loadRenewalChains(agenceId, leafIds.getContent());
@@ -83,6 +86,29 @@ public class ContratSearchService {
                 .items(groups)
                 .page(PageMetadata.from(leafIds))
                 .build();
+    }
+
+    private Long resolveCurrentContractId(Long agenceId, Long contratId) {
+        if (contratId == null) {
+            return null;
+        }
+        List<Contrat> matches = contratRepository.findByAgenceIdAndIdIn(agenceId, List.of(contratId));
+        if (matches.isEmpty()) {
+            return contratId;
+        }
+        Contrat current = matches.get(0);
+        Set<Long> visited = new LinkedHashSet<>();
+        while (visited.add(current.getId())) {
+            List<Contrat> renewals = contratRepository.findByAgenceIdAndContratOrigineIdIn(
+                    agenceId,
+                    List.of(current.getId())
+            );
+            if (renewals.isEmpty()) {
+                return current.getId();
+            }
+            current = renewals.get(0);
+        }
+        return current.getId();
     }
 
     @Transactional(readOnly = true)

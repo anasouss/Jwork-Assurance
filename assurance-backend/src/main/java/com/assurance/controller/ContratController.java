@@ -223,6 +223,7 @@ public class ContratController {
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) String numeroPolice,
             @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) Long contratId,
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "25") Integer size
     ) {
@@ -236,6 +237,7 @@ public class ContratController {
                 compagnieId,
                 numeroPolice,
                 clientId,
+                contratId,
                 page,
                 size
         )));

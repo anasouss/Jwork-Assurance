@@ -106,6 +106,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
               )
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (:compagnieId is null or compagnie.id = :compagnieId)
+              and (:contratId is null or c.id = :contratId)
               and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
                     select 1 from ContratClient cc
@@ -153,6 +154,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
               )
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (:compagnieId is null or compagnie.id = :compagnieId)
+              and (:contratId is null or c.id = :contratId)
               and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
                     select 1 from ContratClient cc
@@ -194,6 +196,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             @Param("compagnieId") Long compagnieId,
             @Param("numeroPolice") String numeroPolice,
             @Param("clientId") Long clientId,
+            @Param("contratId") Long contratId,
             Pageable pageable
     );
 

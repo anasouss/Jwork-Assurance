@@ -51,6 +51,7 @@ class ContratRepositorySearchTest {
                 null,
                 null,
                 null,
+                null,
                 PageRequest.of(0, 25)
         );
 
@@ -95,6 +96,7 @@ class ContratRepositorySearchTest {
                 "client",
                 -1L,
                 "police",
+                -1L,
                 -1L,
                 PageRequest.of(0, 25)
         );

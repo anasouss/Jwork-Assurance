@@ -28,6 +28,7 @@ public class ClientCrmResponse {
         private Long brancheAssuranceId;
         private String brancheAssuranceCode;
         private String brancheAssuranceLibelle;
+        private LocalDate dateSouscription;
         private LocalDate dateEffet;
         private LocalDate dateEcheance;
         private String compagnie;

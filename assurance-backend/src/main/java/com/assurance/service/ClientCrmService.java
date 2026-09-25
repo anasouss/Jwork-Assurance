@@ -6,6 +6,7 @@ import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.Quittance;
+import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.exception.ResourceNotFoundException;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +93,7 @@ public class ClientCrmService {
         BigDecimal impaye = BigDecimal.ZERO;
         List<ClientCrmResponse.ContratView> contractViews = new java.util.ArrayList<>();
         for (Contrat contrat : contrats) {
+            List<MouvementContrat> contractMovements = mouvementsByContrat.getOrDefault(contrat.getId(), List.of());
             List<Quittance> quittances = quittanceRepository
                     .findByContratIdAndGlobaleTrueOrderByCreatedAtAsc(contrat.getId()).stream()
                     .filter(this::isAccountingQuittance)
@@ -125,6 +128,7 @@ public class ClientCrmService {
                     .brancheAssuranceId(contrat.getBrancheAssurance() == null ? null : contrat.getBrancheAssurance().getId())
                     .brancheAssuranceCode(contrat.getBrancheAssurance() == null ? null : contrat.getBrancheAssurance().getCode())
                     .brancheAssuranceLibelle(contrat.getBrancheAssurance() == null ? null : contrat.getBrancheAssurance().getLibelle())
+                    .dateSouscription(subscriptionDate(contractMovements))
                     .dateEffet(contrat.getDateEffet())
                     .dateEcheance(contrat.getDateEcheance())
                     .compagnie(contrat.getCompagnieAssurance() == null ? null : contrat.getCompagnieAssurance().getNom())
@@ -133,7 +137,7 @@ public class ClientCrmService {
                     .payeurPrimeNom(contrat.getPayeurPrime() == null ? null : contrat.getPayeurPrime().getNomAffichage())
                     .modeFacturation(contrat.getModeFacturation() == null ? "DIRECTE" : contrat.getModeFacturation().name())
                     .primeTotale(primeTotale)
-                    .mouvements(mouvementsByContrat.getOrDefault(contrat.getId(), List.of()).stream()
+                    .mouvements(contractMovements.stream()
                             .filter(mouvement -> mouvement.getStatut() != StatutMouvementContrat.ANNULE)
                             .map(this::toMouvementView)
                             .toList())
@@ -147,6 +151,17 @@ public class ClientCrmService {
                 .totalQuittances(total)
                 .totalImpayes(impaye)
                 .build();
+    }
+
+    private LocalDate subscriptionDate(List<MouvementContrat> movements) {
+        return movements.stream()
+                .filter(movement -> movement.getStatut() == StatutMouvementContrat.VALIDE)
+                .filter(movement -> movement.getTypeMouvement() != null)
+                .filter(movement -> movement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.AFFAIRE_NOUVELLE)
+                .map(MouvementContrat::getDateValidation)
+                .filter(java.util.Objects::nonNull)
+                .min(LocalDate::compareTo)
+                .orElse(null);
     }
 
     private ClientCrmResponse.MouvementView toMouvementView(MouvementContrat mouvement) {

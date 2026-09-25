@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
@@ -66,7 +66,10 @@ export default function ContratsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [initialFilters] = useState<ContractFilters>(() => contractFiltersFromSearchParams(searchParams));
   const [page, setPage] = useState(() => contractPageFromSearchParams(searchParams));
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const contratId = searchParams.get("contratId");
+    return contratId ? { [contratId]: true } : {};
+  });
   const [filters, setFilters] = useState<ContractFilters>(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState<ContractFilters>(initialFilters);
   const canCreateContrat = useAuthStore((state) => state.user?.permissions?.includes("contrat:create") ?? false);
@@ -79,6 +82,7 @@ export default function ContratsPage() {
     compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
     numeroPolice: appliedFilters.numeroPolice.trim() || undefined,
     clientId: appliedFilters.clientId || undefined,
+    contratId: appliedFilters.contratId || undefined,
     page,
     size: 25,
   }), [appliedFilters, page]);
@@ -100,6 +104,20 @@ export default function ContratsPage() {
     })),
     [contrats.data?.items]
   );
+  useEffect(() => {
+    if (!appliedFilters.contratId || !contrats.data?.items.length) return;
+    setExpanded((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const group of contrats.data.items) {
+        if (!next[group.key]) {
+          next[group.key] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [appliedFilters.contratId, contrats.data?.items]);
   const applyFilters = (next: ContractFilters) => {
     setPage(0);
     setAppliedFilters(next);

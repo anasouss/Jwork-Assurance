@@ -141,8 +141,10 @@ export default function ClientPortfolioPage() {
             </Link>
           </Button>
           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Portefeuille client</p>
-          <h1 className="mt-1 text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom || "Client"}</h1>
-          <p className="text-sm text-muted-foreground">Vue consolidée de la production, de la comptabilité et des sinistres.</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom || "Client"}</h1>
+            <Badge variant="outline" className="font-medium">Code client : {client.codeClient}</Badge>
+          </div>
         </div>
       </header>
 
@@ -246,32 +248,30 @@ function PortfolioRow({ main, documents }: { main: ReactNode; documents: ReactNo
 function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
   const client = portfolio.client;
   return (
-    <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
-      <div className="flex items-center gap-3 border-b bg-emerald-50 px-5 py-4 dark:bg-emerald-950/30">
-        <div className="flex size-9 items-center justify-center rounded-md bg-emerald-700 text-white">
+    <div className="grid gap-2">
+      <div className="flex items-center gap-2">
+        <div className="flex size-7 items-center justify-center rounded-md bg-emerald-700 text-white">
           {client.typeClient === "PERSONNE_MORALE" ? <Building2 className="size-4" /> : <UserRound className="size-4" />}
         </div>
-        <div>
-          <h2 className="font-semibold">Informations client</h2>
-          <p className="text-sm text-muted-foreground">Identité et coordonnées du souscripteur.</p>
+        <h2 className="font-semibold">Informations client</h2>
+      </div>
+      <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
+        <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-4">
+          <InfoCell label="Identifiant" value={clientIdentifier(client)} />
+          <InfoCell
+            label="Téléphone"
+            value={client.telephone || client.telephones?.find((item) => item.principal)?.numero}
+            icon={<Phone className="size-3.5" />}
+          />
+          <InfoCell label="E-mail" value={client.email} />
+          <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
         </div>
-      </div>
-      <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-5">
-        <InfoCell label="Code client" value={client.codeClient} />
-        <InfoCell label="Identifiant" value={clientIdentifier(client)} />
-        <InfoCell
-          label="Téléphone"
-          value={client.telephone || client.telephones?.find((item) => item.principal)?.numero}
-          icon={<Phone className="size-3.5" />}
-        />
-        <InfoCell label="E-mail" value={client.email} />
-        <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
-      </div>
-      <div className="px-5 py-4">
-        <p className="text-xs font-medium uppercase text-muted-foreground">Adresse</p>
-        <p className="mt-1 text-sm font-medium">{[client.adresse, client.ville].filter(Boolean).join(", ") || "-"}</p>
-      </div>
-    </section>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-5 py-3 text-sm">
+          <span className="font-medium uppercase text-muted-foreground">Adresse :</span>
+          <span className="font-medium">{[client.adresse, client.ville].filter(Boolean).join(", ") || "-"}</span>
+        </div>
+      </section>
+    </div>
   );
 }
 

@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LifeBuoy,
   ReceiptText,
+  ScrollText,
   Settings,
   ShieldCheck,
   Truck,
@@ -79,7 +80,9 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
   { module: "compta", title: "Relevés et factures", url: "/app/compta/releves-factures", icon: FileText, permission: "quittance:view" },
   { module: "compta", title: "Facturation conventions", url: "/app/compta/facturation-conventions", icon: ReceiptText, permission: "quittance:view" },
+  { module: "compta", title: "Bordereaux de remise", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText, permission: "tresorerie:view" },
   { module: "compta", title: "Bordereaux compagnies", url: "/app/compta/bordereaux-compagnies", icon: Building2, permission: "bordereau-compagnie:view" },
+  { module: "compta", title: "Paramètres", url: "/app/compta/parametres", icon: Settings, permission: "tresorerie:view" },
   { module: "admin", title: "Utilisateurs & rôles", url: "/app/admin", icon: UserCog, exact: true, permission: "user:view" },
 ];
 

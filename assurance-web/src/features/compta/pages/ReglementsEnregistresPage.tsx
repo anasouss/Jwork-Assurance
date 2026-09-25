@@ -606,6 +606,7 @@ function AccountSelect({
 function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }) {
   const labels: Record<PaymentInstrument["statut"], string> = {
     EN_ATTENTE: "En attente",
+    REMIS_EN_BANQUE: "Remis en banque",
     CONFIRME: "Confirmé",
     REJETE: "Rejeté",
     REMPLACE: "Remplacé",

@@ -155,6 +155,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/ComptaDashboardPage")),
       },
       {
+        path: "compta/parametres",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ComptaSettingsPage")),
+      },
+      {
         path: "compta/quittances",
         lazy: lazyRoute(() => import("@/features/compta/pages/QuittanceAffectationPage")),
       },
@@ -212,7 +216,15 @@ export const router = createBrowserRouter([
       },
       {
         path: "compta/tresorerie/instruments",
+        element: <Navigate to="/app/compta/tresorerie/bordereaux-remise" replace />,
+      },
+      {
+        path: "compta/tresorerie/bordereaux-remise",
         lazy: lazyRoute(() => import("@/features/compta/pages/InstrumentsTresoreriePage")),
+      },
+      {
+        path: "compta/tresorerie/bordereaux-remise/:bordereauId",
+        lazy: lazyRoute(() => import("@/features/compta/pages/BordereauRemiseDetailPage")),
       },
       {
         path: "compta/tresorerie/journal",

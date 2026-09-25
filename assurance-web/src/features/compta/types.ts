@@ -414,7 +414,12 @@ export type ClientPaymentMode =
   | "PRELEVEMENT";
 
 export type ClientPaymentStatus = "VALIDE" | "ANNULE";
-export type PaymentInstrumentStatus = "EN_ATTENTE" | "CONFIRME" | "REJETE" | "REMPLACE";
+export type PaymentInstrumentStatus =
+  | "EN_ATTENTE"
+  | "REMIS_EN_BANQUE"
+  | "CONFIRME"
+  | "REJETE"
+  | "REMPLACE";
 export type PaymentAllocationStatus = "EN_ATTENTE" | "CONFIRMEE" | "ANNULEE";
 export type TreasuryAccountType = "CAISSE" | "BANQUE";
 
@@ -468,6 +473,68 @@ export type PaymentInstrument = {
 export type PaymentInstrumentPage = {
   page: PageInfo;
   rows: PaymentInstrument[];
+};
+
+export type RemittanceSlipType = "CHEQUE" | "EFFET" | "VERSEMENT_ESPECES";
+export type RemittanceSlipStatus =
+  | "BROUILLON"
+  | "DEPOSE"
+  | "PARTIELLEMENT_TRAITE"
+  | "CLOTURE"
+  | "ANNULE";
+export type RemittanceSlipLineStatus = "PREPAREE" | "REMISE" | "ENCAISSEE" | "REJETEE";
+
+export type RemittanceSlipLine = {
+  id: string;
+  instrumentId: string;
+  reglementId: string;
+  numeroReglement: string;
+  payeur: string;
+  mode: ClientPaymentMode;
+  referenceInstrument?: string | null;
+  banqueEmettrice?: string | null;
+  dateReception?: string | null;
+  dateEcheance?: string | null;
+  montant: number;
+  statut: RemittanceSlipLineStatus;
+  dateTraitement?: string | null;
+  motifRejet?: string | null;
+};
+
+export type RemittanceSlip = {
+  id: string;
+  numero: string;
+  type: RemittanceSlipType;
+  statut: RemittanceSlipStatus;
+  dateBordereau: string;
+  dateDepot?: string | null;
+  compteDestinationId: string;
+  compteDestination: string;
+  compteSourceId?: string | null;
+  compteSource?: string | null;
+  montantTotal: number;
+  referenceBancaire?: string | null;
+  notes?: string | null;
+  operationTresorerieId?: string | null;
+  nombreLignes: number;
+  createdAt: string;
+  lignes: RemittanceSlipLine[];
+};
+
+export type RemittanceSlipPage = {
+  page: PageInfo;
+  rows: RemittanceSlip[];
+};
+
+export type CreateRemittanceSlipRequest = {
+  type: RemittanceSlipType;
+  dateBordereau: string;
+  compteDestinationId: string;
+  compteSourceId?: string;
+  montantEspeces?: number;
+  referenceBancaire?: string;
+  notes?: string;
+  instrumentIds: string[];
 };
 
 export type ClientPayment = {

@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import {
   Archive,
-  Banknote,
   Building2,
   FileCheck2,
   FileText,
@@ -63,15 +62,9 @@ const groups: ComptaGroup[] = [
     title: "Trésorerie",
     actions: [
       {
-        title: "Caisses et banques",
-        icon: Banknote,
-        href: "/app/compta/tresorerie/comptes",
-        permission: "tresorerie:view",
-      },
-      {
-        title: "Suivi des encaissements",
+        title: "Bordereaux de remise",
         icon: ScrollText,
-        href: "/app/compta/tresorerie/instruments",
+        href: "/app/compta/tresorerie/bordereaux-remise",
         permission: "tresorerie:view",
       },
       {

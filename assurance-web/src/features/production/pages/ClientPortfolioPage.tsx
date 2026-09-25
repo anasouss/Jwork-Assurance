@@ -265,9 +265,14 @@ function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
           icon={<Phone className="size-3.5" />}
         />
         <InfoCell label="E-mail" value={client.email} />
-        <InfoCell label="CIN" value={client.cin} />
-        <InfoCell label="RC" value={client.rc} />
-        <InfoCell label="ICE" value={client.ice} />
+        {client.typeClient === "PERSONNE_PHYSIQUE" ? (
+          <InfoCell label="CIN" value={client.cin} />
+        ) : (
+          <>
+            <InfoCell label="RC" value={client.rc} />
+            <InfoCell label="ICE" value={client.ice} />
+          </>
+        )}
         <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
       </div>
     </section>

@@ -42,6 +42,11 @@ import type {
   TypeContrat,
   PaymentInstrument,
   PaymentInstrumentPage,
+  RemittanceSlip,
+  RemittanceSlipPage,
+  RemittanceSlipStatus,
+  RemittanceSlipType,
+  CreateRemittanceSlipRequest,
   ReplacePaymentInstrumentRequest,
   TreasuryAccount,
   TreasuryAccountAssignment,
@@ -572,6 +577,83 @@ export const comptaApi = {
     )));
   },
 
+  async eligibleRemittanceInstruments(params: {
+    type?: Exclude<RemittanceSlipType, "VERSEMENT_ESPECES">;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<PaymentInstrumentPage>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/instruments-eligibles${buildQueryString(params)}`
+    ));
+    return { ...result, rows: result.rows.map(normalizePaymentInstrument) };
+  },
+
+  async remittanceSlips(params: {
+    type?: RemittanceSlipType;
+    statut?: RemittanceSlipStatus;
+    dateDu?: string;
+    dateAu?: string;
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<RemittanceSlipPage>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise${buildQueryString(params)}`
+    ));
+    return { ...result, rows: result.rows.map(normalizeRemittanceSlip) };
+  },
+
+  async remittanceSlip(id: string) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}`
+    )));
+  },
+
+  async createRemittanceSlip(request: CreateRemittanceSlipRequest) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      "/api/v1/compta/tresorerie/bordereaux-remise",
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async depositRemittanceSlip(id: string, request: {
+    dateDepot: string;
+    referenceBancaire?: string;
+  }) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}/depot`,
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async settleRemittanceLine(id: string, lineId: string, dateOperation: string) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}/lignes/${lineId}/encaissement`,
+      { method: "POST", body: JSON.stringify({ dateOperation }) }
+    )));
+  },
+
+  async rejectRemittanceLine(
+    id: string,
+    lineId: string,
+    request: { dateOperation: string; motif: string }
+  ) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}/lignes/${lineId}/rejet`,
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async cancelRemittanceSlip(id: string) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}/annulation`,
+      { method: "POST" }
+    )));
+  },
+
   async companyBordereauSources(params: {
     compagnieId?: string;
     base: CompanyBordereauBase;
@@ -1065,6 +1147,24 @@ function normalizePaymentInstrument(instrument: PaymentInstrument): PaymentInstr
       documentClientId: allocation.documentClientId == null
         ? null
         : String(allocation.documentClientId),
+    })),
+  };
+}
+
+function normalizeRemittanceSlip(slip: RemittanceSlip): RemittanceSlip {
+  return {
+    ...slip,
+    id: String(slip.id),
+    compteDestinationId: String(slip.compteDestinationId),
+    compteSourceId: slip.compteSourceId == null ? null : String(slip.compteSourceId),
+    operationTresorerieId: slip.operationTresorerieId == null
+      ? null
+      : String(slip.operationTresorerieId),
+    lignes: (slip.lignes ?? []).map((line) => ({
+      ...line,
+      id: String(line.id),
+      instrumentId: String(line.instrumentId),
+      reglementId: String(line.reglementId),
     })),
   };
 }

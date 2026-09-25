@@ -15,6 +15,7 @@ import com.assurance.entity.ProfilImportReleveBancaire;
 import com.assurance.entity.RapprochementBancaire;
 import com.assurance.enums.FormatReleveBancaire;
 import com.assurance.enums.StatutImportReleveBancaire;
+import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutLigneReleveBancaire;
 import com.assurance.enums.StatutRapprochementBancaire;
@@ -242,10 +243,18 @@ public class ReleveBancaireService {
         List<LigneReleveBancaire> lines = lineRepository
                 .findByImportReleveIdOrderByNumeroLigneAsc(importId);
         List<InstrumentReglementClient> pending = instrumentRepository
-                .findByAgenceIdAndStatutOrderByDateEcheanceAscIdAsc(
+                .findByAgenceIdAndStatutInOrderByDateEcheanceAscIdAsc(
                         agenceId,
-                        StatutInstrumentReglement.EN_ATTENTE
-                );
+                        Set.of(
+                                StatutInstrumentReglement.EN_ATTENTE,
+                                StatutInstrumentReglement.REMIS_EN_BANQUE
+                        )
+                ).stream()
+                .filter(instrument -> instrument.getStatut()
+                        == StatutInstrumentReglement.REMIS_EN_BANQUE
+                        || (instrument.getMode() != ModeReglementClient.CHEQUE
+                            && instrument.getMode() != ModeReglementClient.EFFET))
+                .toList();
         return detailResponse(imported, lines, pending);
     }
 
@@ -675,8 +684,16 @@ public class ReleveBancaireService {
             InstrumentReglementClient instrument,
             CompteTresorerie account
     ) {
-        if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE) {
-            throw new BadRequestException("Le moyen de règlement n’est plus en attente");
+        if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
+                && instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE) {
+            throw new BadRequestException("Le moyen de règlement n’est plus en attente d'encaissement");
+        }
+        if ((instrument.getMode() == ModeReglementClient.CHEQUE
+                || instrument.getMode() == ModeReglementClient.EFFET)
+                && instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE) {
+            throw new BadRequestException(
+                    "Le chèque ou l'effet doit d'abord être déposé dans un bordereau de remise"
+            );
         }
         if (instrument.getCompteTresorerie() != null
                 && !account.getId().equals(instrument.getCompteTresorerie().getId())) {

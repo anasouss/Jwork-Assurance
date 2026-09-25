@@ -24,6 +24,8 @@ import com.assurance.entity.GroupeClient;
 import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.LigneReleveBancaire;
+import com.assurance.entity.LigneBordereauRemise;
+import com.assurance.entity.BordereauRemise;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.entity.Quittance;
 import com.assurance.entity.ReglementClient;
@@ -35,6 +37,8 @@ import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.StatutInstrumentReglement;
+import com.assurance.enums.StatutBordereauRemise;
+import com.assurance.enums.StatutLigneBordereauRemise;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.TypeCompteTresorerie;
 import com.assurance.enums.TypeContrat;
@@ -49,6 +53,8 @@ import com.assurance.repository.DocumentClientRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
+import com.assurance.repository.LigneBordereauRemiseRepository;
+import com.assurance.repository.BordereauRemiseRepository;
 import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.SequenceReglementClientRepository;
@@ -102,6 +108,8 @@ public class ReglementClientService {
     private final AgenceRepository agenceRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieService tresorerieService;
+    private final LigneBordereauRemiseRepository remittanceLineRepository;
+    private final BordereauRemiseRepository remittanceRepository;
 
     @Transactional(readOnly = true)
     public CreanceClientPageResponse searchReceivables(
@@ -615,7 +623,10 @@ public class ReglementClientService {
             Long instrumentId,
             ChangerStatutInstrumentReglementRequest request
     ) {
-        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceId(instrumentId, agenceId)
+        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(
+                        instrumentId,
+                        agenceId
+                )
                 .orElseThrow(() -> new ResourceNotFoundException("Instrument de règlement", instrumentId));
         if (instrument.getReglement().getStatut() == StatutReglementClient.ANNULE) {
             throw new BadRequestException("Le règlement est annulé");
@@ -623,8 +634,20 @@ public class ReglementClientService {
         LocalDate operationDate = request.getDateOperation() == null ? LocalDate.now() : request.getDateOperation();
         if (request.getStatut() == StatutInstrumentReglement.CONFIRME) {
             confirmInstrument(agenceId, instrument, request.getCompteTresorerieId(), operationDate);
+            updateRemittanceLine(
+                    instrument,
+                    StatutLigneBordereauRemise.ENCAISSEE,
+                    operationDate,
+                    null
+            );
         } else if (request.getStatut() == StatutInstrumentReglement.REJETE) {
             rejectInstrument(instrument, request.getMotif(), operationDate);
+            updateRemittanceLine(
+                    instrument,
+                    StatutLigneBordereauRemise.REJETEE,
+                    operationDate,
+                    request.getMotif() == null ? null : request.getMotif().trim()
+            );
         } else {
             throw new BadRequestException("Cette transition de statut n'est pas autorisée");
         }
@@ -656,6 +679,15 @@ public class ReglementClientService {
         if (payment.getStatut() == StatutReglementClient.ANNULE) {
             return toResponse(payment);
         }
+        if (payment.getInstruments().stream().anyMatch(instrument ->
+                instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE)) {
+            throw new BadRequestException(
+                    "Un moyen de règlement est déjà remis en banque. Traitez d'abord son bordereau"
+            );
+        }
+        payment.getInstruments().stream()
+                .filter(instrument -> instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE)
+                .forEach(this::ensureNotReservedByDraftRemittance);
         LocalDate operationDate = LocalDate.now();
         List<Long> elementIds = new ArrayList<>();
         List<Long> documentIds = new ArrayList<>();
@@ -797,10 +829,17 @@ public class ReglementClientService {
 
     @Transactional(readOnly = true)
     public List<ReglementClientResponse.Instrument> pendingInstruments(Long agenceId) {
-        return instrumentRepository.findByAgenceIdAndStatutOrderByDateEcheanceAscIdAsc(
+        return instrumentRepository.findByAgenceIdAndStatutInOrderByDateEcheanceAscIdAsc(
                         agenceId,
-                        StatutInstrumentReglement.EN_ATTENTE
+                        Set.of(
+                                StatutInstrumentReglement.EN_ATTENTE,
+                                StatutInstrumentReglement.REMIS_EN_BANQUE
+                        )
                 ).stream()
+                .filter(instrument -> instrument.getStatut()
+                        == StatutInstrumentReglement.REMIS_EN_BANQUE
+                        || (instrument.getMode() != ModeReglementClient.CHEQUE
+                            && instrument.getMode() != ModeReglementClient.EFFET))
                 .map(this::toInstrumentResponse)
                 .toList();
     }
@@ -839,7 +878,7 @@ public class ReglementClientService {
                 .build();
     }
 
-    private ReglementClientResponse.Instrument toInstrumentRegisterResponse(
+    public ReglementClientResponse.Instrument toInstrumentRegisterResponse(
             InstrumentReglementClient instrument
     ) {
         return ReglementClientResponse.Instrument.builder()
@@ -996,6 +1035,12 @@ public class ReglementClientService {
         instrument.setDateStatut(operationDate);
         instrument.setMotifStatut("Confirmé par rapprochement bancaire");
         instrumentRepository.save(instrument);
+        updateRemittanceLine(
+                instrument,
+                StatutLigneBordereauRemise.ENCAISSEE,
+                operationDate,
+                null
+        );
         refreshUnallocatedAmount(instrument.getReglement());
         recalculatePaymentFlags(
                 instrument.getAffectations().stream()
@@ -1030,8 +1075,18 @@ public class ReglementClientService {
             LocalDate operationDate,
             LigneReleveBancaire bankStatementLine
     ) {
-        if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE) {
-            throw new BadRequestException("Seul un instrument en attente peut être confirmé");
+        if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
+                && instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE) {
+            throw new BadRequestException("Seul un instrument en attente ou remis peut être confirmé");
+        }
+        if (instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE) {
+            ensureNotReservedByDraftRemittance(instrument);
+            if (instrument.getMode() == ModeReglementClient.CHEQUE
+                    || instrument.getMode() == ModeReglementClient.EFFET) {
+                throw new BadRequestException(
+                        "Déposez d'abord le chèque ou l'effet dans un bordereau de remise"
+                );
+            }
         }
         if (accountId == null && instrument.getCompteTresorerie() == null) {
             throw new BadRequestException("Sélectionnez le compte bancaire ou la caisse créditée");
@@ -1039,6 +1094,13 @@ public class ReglementClientService {
         CompteTresorerie account = accountId == null
                 ? instrument.getCompteTresorerie()
                 : tresorerieService.findAccount(agenceId, accountId);
+        if (instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
+                && instrument.getCompteTresorerie() != null
+                && !instrument.getCompteTresorerie().getId().equals(account.getId())) {
+            throw new BadRequestException(
+                    "L'instrument doit être encaissé sur le compte du bordereau de remise"
+            );
+        }
         TypeCompteTresorerie expectedType = instrument.getMode() == ModeReglementClient.ESPECES
                 ? TypeCompteTresorerie.CAISSE : TypeCompteTresorerie.BANQUE;
         if (account.getTypeCompte() != expectedType || !Boolean.TRUE.equals(account.getActif())) {
@@ -1063,11 +1125,15 @@ public class ReglementClientService {
             LocalDate operationDate
     ) {
         if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
+                && instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE
                 && instrument.getStatut() != StatutInstrumentReglement.CONFIRME) {
             throw new BadRequestException("Cet instrument ne peut pas être rejeté");
         }
         if (reason == null || reason.isBlank()) {
             throw new BadRequestException("Le motif du rejet est obligatoire");
+        }
+        if (instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE) {
+            ensureNotReservedByDraftRemittance(instrument);
         }
         if (instrument.getStatut() == StatutInstrumentReglement.CONFIRME) {
             tresorerieService.reverseInstrumentEntry(instrument, reason.trim(), operationDate);
@@ -1075,6 +1141,183 @@ public class ReglementClientService {
         instrument.setStatut(StatutInstrumentReglement.REJETE);
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.ANNULEE));
+    }
+
+    @Transactional
+    public void markInstrumentRemitted(
+            Long agenceId,
+            Long instrumentId,
+            Long accountId,
+            LocalDate operationDate
+    ) {
+        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(
+                        instrumentId,
+                        agenceId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Instrument de règlement",
+                        instrumentId
+                ));
+        if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE) {
+            throw new BadRequestException("Seul un instrument en attente peut être remis en banque");
+        }
+        if (instrument.getMode() != ModeReglementClient.CHEQUE
+                && instrument.getMode() != ModeReglementClient.EFFET) {
+            throw new BadRequestException("Seuls les chèques et effets utilisent un bordereau de remise");
+        }
+        CompteTresorerie account = tresorerieService.findAccount(agenceId, accountId);
+        if (account.getTypeCompte() != TypeCompteTresorerie.BANQUE
+                || !Boolean.TRUE.equals(account.getActif())) {
+            throw new BadRequestException("Le compte bancaire de destination est invalide ou inactif");
+        }
+        instrument.setCompteTresorerie(account);
+        instrument.setStatut(StatutInstrumentReglement.REMIS_EN_BANQUE);
+        instrument.setDateStatut(operationDate);
+        instrument.setMotifStatut("Remis en banque");
+        instrumentRepository.save(instrument);
+    }
+
+    @Transactional
+    public MouvementTresorerie confirmInstrumentFromRemittance(
+            Long agenceId,
+            Long instrumentId,
+            Long accountId,
+            LocalDate operationDate
+    ) {
+        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(
+                        instrumentId,
+                        agenceId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Instrument de règlement",
+                        instrumentId
+                ));
+        if (instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE) {
+            throw new BadRequestException("L'instrument doit être remis en banque avant encaissement");
+        }
+        MouvementTresorerie movement = confirmInstrument(
+                agenceId,
+                instrument,
+                accountId,
+                operationDate
+        );
+        instrument.setDateStatut(operationDate);
+        instrument.setMotifStatut("Encaissé depuis le bordereau de remise");
+        instrumentRepository.save(instrument);
+        updateRemittanceLine(
+                instrument,
+                StatutLigneBordereauRemise.ENCAISSEE,
+                operationDate,
+                null
+        );
+        refreshAfterInstrumentTransition(instrument);
+        return movement;
+    }
+
+    @Transactional
+    public void rejectInstrumentFromRemittance(
+            Long agenceId,
+            Long instrumentId,
+            String reason,
+            LocalDate operationDate
+    ) {
+        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(
+                        instrumentId,
+                        agenceId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Instrument de règlement",
+                        instrumentId
+                ));
+        if (instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE
+                && instrument.getStatut() != StatutInstrumentReglement.CONFIRME) {
+            throw new BadRequestException("L'instrument n'est pas remis ou encaissé");
+        }
+        rejectInstrument(instrument, reason, operationDate);
+        instrument.setDateStatut(operationDate);
+        instrument.setMotifStatut(reason.trim());
+        instrumentRepository.save(instrument);
+        updateRemittanceLine(
+                instrument,
+                StatutLigneBordereauRemise.REJETEE,
+                operationDate,
+                reason.trim()
+        );
+        refreshAfterInstrumentTransition(instrument);
+    }
+
+    private void updateRemittanceLine(
+            InstrumentReglementClient instrument,
+            StatutLigneBordereauRemise status,
+            LocalDate operationDate,
+            String reason
+    ) {
+        List<LigneBordereauRemise> activeLines = remittanceLineRepository.findActiveByInstrumentId(
+                instrument.getId(),
+                Set.of(
+                        StatutBordereauRemise.DEPOSE,
+                        StatutBordereauRemise.PARTIELLEMENT_TRAITE
+                )
+        );
+        if (activeLines.size() > 1) {
+            throw new BadRequestException("L'instrument appartient à plusieurs bordereaux actifs");
+        }
+        List<LigneBordereauRemise> candidateLines = activeLines.isEmpty()
+                ? remittanceLineRepository.findHistoryByInstrumentId(instrument.getId())
+                : activeLines;
+        if (candidateLines.isEmpty()) {
+            return;
+        }
+        LigneBordereauRemise line = candidateLines.get(0);
+        line.setStatut(status);
+        line.setDateTraitement(operationDate);
+        line.setMotifRejet(reason);
+        remittanceLineRepository.save(line);
+        recomputeRemittanceStatus(line.getBordereau());
+    }
+
+    private void ensureNotReservedByDraftRemittance(InstrumentReglementClient instrument) {
+        if (!remittanceLineRepository.findActiveByInstrumentId(
+                instrument.getId(),
+                Set.of(StatutBordereauRemise.BROUILLON)
+        ).isEmpty()) {
+            throw new BadRequestException(
+                    "L'instrument est réservé par un bordereau brouillon. Déposez ou annulez ce bordereau"
+            );
+        }
+    }
+
+    private void recomputeRemittanceStatus(BordereauRemise remittance) {
+        long settled = remittance.getLignes().stream()
+                .filter(line -> line.getStatut() == StatutLigneBordereauRemise.ENCAISSEE
+                        || line.getStatut() == StatutLigneBordereauRemise.REJETEE)
+                .count();
+        if (settled == remittance.getLignes().size()) {
+            remittance.setStatut(StatutBordereauRemise.CLOTURE);
+        } else if (settled > 0) {
+            remittance.setStatut(StatutBordereauRemise.PARTIELLEMENT_TRAITE);
+        } else {
+            remittance.setStatut(StatutBordereauRemise.DEPOSE);
+        }
+        remittanceRepository.save(remittance);
+    }
+
+    private void refreshAfterInstrumentTransition(InstrumentReglementClient instrument) {
+        refreshUnallocatedAmount(instrument.getReglement());
+        recalculatePaymentFlags(
+                instrument.getAffectations().stream()
+                        .map(AffectationReglementClient::getElementFacturable)
+                        .filter(Objects::nonNull)
+                        .map(ElementFacturable::getId)
+                        .distinct()
+                        .toList(),
+                instrument.getAffectations().stream()
+                        .map(AffectationReglementClient::getDocumentClient)
+                        .filter(Objects::nonNull)
+                        .map(DocumentClient::getId)
+                        .distinct()
+                        .toList()
+        );
     }
 
     private void validateInstrumentReference(CreerReglementClientRequest.Instrument request) {

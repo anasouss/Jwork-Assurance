@@ -87,7 +87,11 @@ export function releveSearchStateFromParams(params: URLSearchParams): ReleveSear
       type: params.get("documentType") === "RELEVE" || params.get("documentType") === "FACTURE"
         ? params.get("documentType") as ClientDocumentType
         : "ALL",
-      statut: documentStatus === "EMIS" || documentStatus === "ANNULE" ? documentStatus : "ALL",
+      statut: documentStatus === "EMIS"
+        || documentStatus === "REMPLACE"
+        || documentStatus === "ANNULE"
+        ? documentStatus
+        : "ALL",
       dateDu: validDate(params.get("documentDateDu")),
       dateAu: validDate(params.get("documentDateAu")),
       search: params.get("documentSearch") ?? "",

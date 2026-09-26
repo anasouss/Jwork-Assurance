@@ -35,6 +35,13 @@ public class DocumentClientResponse {
     private BigDecimal totalCredit;
     private BigDecimal totalDocument;
     private String notes;
+    private Integer versionDocument;
+    private Long documentOrigineId;
+    private String numeroDocumentOrigine;
+    private Long documentRemplacementId;
+    private String numeroDocumentRemplacement;
+    private LocalDateTime dateRemplacement;
+    private String motifRemplacement;
     private LocalDateTime dateAnnulation;
     private String motifAnnulation;
     private boolean signatureDisponible;

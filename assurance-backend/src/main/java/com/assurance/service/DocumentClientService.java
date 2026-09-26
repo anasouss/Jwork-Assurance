@@ -3,6 +3,7 @@ package com.assurance.service;
 import com.assurance.dto.request.CreerDocumentClientRequest;
 import com.assurance.dto.request.CreerFactureDepuisReleveRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
+import com.assurance.dto.request.ModifierDocumentClientRequest;
 import com.assurance.dto.request.PropositionEcheanceDocumentClientRequest;
 import com.assurance.dto.response.DocumentClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
@@ -554,7 +555,7 @@ public class DocumentClientService {
 
     @Transactional
     public DocumentClientResponse create(Long agenceId, CreerDocumentClientRequest request) {
-        return create(agenceId, request, false, false);
+        return create(agenceId, request, false, false, null);
     }
 
     @Transactional
@@ -591,7 +592,7 @@ public class DocumentClientService {
         invoiceRequest.setElementFacturableIds(requestedIds);
         invoiceRequest.setDateEcheance(request.getDateEcheance());
         invoiceRequest.setNotes(request.getNotes());
-        return create(agenceId, invoiceRequest, false, false);
+        return create(agenceId, invoiceRequest, false, false, null);
     }
 
     @Transactional
@@ -602,14 +603,15 @@ public class DocumentClientService {
         CreerDocumentClientRequest request = new CreerDocumentClientRequest();
         request.setTypeDocument(TypeDocumentClient.FACTURE);
         request.setElementFacturableIds(new ArrayList<>(elementFacturableIds));
-        return create(agenceId, request, true, true);
+        return create(agenceId, request, true, true, null);
     }
 
     private DocumentClientResponse create(
             Long agenceId,
             CreerDocumentClientRequest request,
             boolean allowActiveDirectPayments,
-            boolean useProposedDueDate
+            boolean useProposedDueDate,
+            DocumentClient documentOrigine
     ) {
         List<Long> requestedIds = request.getElementFacturableIds().stream()
                 .filter(Objects::nonNull)
@@ -640,6 +642,9 @@ public class DocumentClientService {
         String payerKey = payers.get(0).key();
         if (payers.stream().anyMatch(payer -> !payer.key().equals(payerKey))) {
             throw new BadRequestException("Les écritures sélectionnées doivent appartenir au même payeur");
+        }
+        if (documentOrigine != null && !payerKey.equals(documentPayerKey(documentOrigine))) {
+            throw new BadRequestException("Le document corrigé doit conserver le même payeur");
         }
 
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
@@ -695,6 +700,10 @@ public class DocumentClientService {
                 .totalCredit(ZERO)
                 .totalDocument(ZERO)
                 .notes(trimToNull(request.getNotes()))
+                .versionDocument(documentOrigine == null
+                        ? 1
+                        : Objects.requireNonNullElse(documentOrigine.getVersionDocument(), 1) + 1)
+                .documentOrigine(documentOrigine)
                 .build();
 
         List<BillableSource> orderedSources = sources.stream()
@@ -739,39 +748,56 @@ public class DocumentClientService {
     }
 
     @Transactional
+    public DocumentClientResponse revise(
+            Long agenceId,
+            Long documentId,
+            ModifierDocumentClientRequest request
+    ) {
+        DocumentClient original = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
+        if (original.getStatut() != StatutDocumentClient.EMIS) {
+            throw new BadRequestException("Seul le document émis le plus récent peut être modifié");
+        }
+        if (original.getLignes().stream()
+                .anyMatch(line -> line.getEcheanceFacturationConvention() != null)) {
+            throw new BadRequestException(
+                    "Une facture de convention doit être annulée puis recomposée depuis la facturation des conventions"
+            );
+        }
+        ensureNoActiveInvoicePayments(original);
+
+        CreerDocumentClientRequest replacementRequest = new CreerDocumentClientRequest();
+        replacementRequest.setTypeDocument(original.getTypeDocument());
+        replacementRequest.setElementFacturableIds(request.getElementFacturableIds());
+        replacementRequest.setDateEcheance(request.getDateEcheance());
+        replacementRequest.setNotes(request.getNotes());
+
+        original.setStatut(StatutDocumentClient.REMPLACE);
+        original.setDateRemplacement(LocalDateTime.now());
+        original.setMotifRemplacement(request.getMotif().trim());
+        releaseConventionSchedules(original);
+        documentClientRepository.saveAndFlush(original);
+
+        return create(agenceId, replacementRequest, false, false, original);
+    }
+
+    @Transactional
     public DocumentClientResponse cancel(
             Long agenceId,
             Long documentId,
             AnnulerDocumentClientRequest request
     ) {
-        DocumentClient document = findDocument(agenceId, documentId);
-        if (document.getStatut() == StatutDocumentClient.ANNULE) {
-            throw new BadRequestException("Ce document est déjà annulé");
+        DocumentClient document = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
+        if (document.getStatut() != StatutDocumentClient.EMIS) {
+            throw new BadRequestException("Seul un document émis peut être annulé");
         }
-        if (document.getTypeDocument() == TypeDocumentClient.FACTURE
-                && affectationReglementClientRepository.existsByDocumentClientIdAndStatutIn(
-                        documentId,
-                        Set.of(
-                                StatutAffectationReglement.EN_ATTENTE,
-                                StatutAffectationReglement.CONFIRMEE
-                        )
-                )) {
-            throw new BadRequestException(
-                    "Cette facture contient des règlements actifs. Annulez d'abord les règlements concernés"
-            );
-        }
+        ensureNoActiveInvoicePayments(document);
         document.setStatut(StatutDocumentClient.ANNULE);
         document.setDateAnnulation(LocalDateTime.now());
         document.setMotifAnnulation(request.getMotif().trim());
         releaseConventionSchedules(document);
         return toResponse(documentClientRepository.save(document), true);
-    }
-
-    @Transactional
-    public void delete(Long agenceId, Long documentId) {
-        DocumentClient document = findDocument(agenceId, documentId);
-        releaseConventionSchedules(document);
-        documentClientRepository.delete(document);
     }
 
     @Transactional(readOnly = true)
@@ -1174,12 +1200,48 @@ public class DocumentClientService {
                 .totalCredit(document.getTotalCredit())
                 .totalDocument(document.getTotalDocument())
                 .notes(document.getNotes())
+                .versionDocument(document.getVersionDocument())
+                .documentOrigineId(document.getDocumentOrigine() == null
+                        ? null : document.getDocumentOrigine().getId())
+                .numeroDocumentOrigine(document.getDocumentOrigine() == null
+                        ? null : document.getDocumentOrigine().getNumero())
+                .documentRemplacementId(document.getDocumentRemplacement() == null
+                        ? null : document.getDocumentRemplacement().getId())
+                .numeroDocumentRemplacement(document.getDocumentRemplacement() == null
+                        ? null : document.getDocumentRemplacement().getNumero())
+                .dateRemplacement(document.getDateRemplacement())
+                .motifRemplacement(document.getMotifRemplacement())
                 .dateAnnulation(document.getDateAnnulation())
                 .motifAnnulation(document.getMotifAnnulation())
                 .signatureDisponible(document.getAgence().getSignatureCheminStockage() != null
                         && !document.getAgence().getSignatureCheminStockage().isBlank())
                 .lignes(lines)
                 .build();
+    }
+
+    private void ensureNoActiveInvoicePayments(DocumentClient document) {
+        if (document.getTypeDocument() == TypeDocumentClient.FACTURE
+                && affectationReglementClientRepository.existsByDocumentClientIdAndStatutIn(
+                        document.getId(),
+                        Set.of(
+                                StatutAffectationReglement.EN_ATTENTE,
+                                StatutAffectationReglement.CONFIRMEE
+                        )
+                )) {
+            throw new BadRequestException(
+                    "Cette facture contient des règlements actifs. Annulez d'abord les règlements concernés"
+            );
+        }
+    }
+
+    private String documentPayerKey(DocumentClient document) {
+        if (document.getGroupePayeur() != null) {
+            return "GROUPE:" + document.getGroupePayeur().getId();
+        }
+        if (document.getClientPayeur() != null) {
+            return "CLIENT:" + document.getClientPayeur().getId();
+        }
+        throw new BadRequestException("Le payeur du document d'origine est introuvable");
     }
 
     private void releaseConventionSchedules(DocumentClient document) {

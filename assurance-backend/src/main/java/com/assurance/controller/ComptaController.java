@@ -6,6 +6,7 @@ import com.assurance.dto.request.CreerFactureDepuisReleveRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
 import com.assurance.dto.request.EnregistrerAffectationQuittanceRequest;
 import com.assurance.dto.request.EnregistrerLotAffectationQuittanceRequest;
+import com.assurance.dto.request.ModifierDocumentClientRequest;
 import com.assurance.dto.request.UpsertRegleAffectationQuittanceRequest;
 import com.assurance.dto.request.PropositionEcheanceDocumentClientRequest;
 import com.assurance.dto.request.PropositionEcheanceFactureConventionRequest;
@@ -469,11 +470,16 @@ public class ComptaController {
         ));
     }
 
-    @DeleteMapping("/documents-clients/{documentId}")
-    @PreAuthorize("hasAuthority('PERM_quittance:manage')")
-    public ResponseEntity<ApiResponse<Void>> supprimerDocumentClient(@PathVariable Long documentId) {
-        documentClientService.delete(TenantContext.getCurrentAgence(), documentId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Document supprimé"));
+    @PostMapping("/documents-clients/{documentId}/revision")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<DocumentClientResponse>> modifierDocumentClient(
+            @PathVariable Long documentId,
+            @Valid @RequestBody ModifierDocumentClientRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                documentClientService.revise(TenantContext.getCurrentAgence(), documentId, request),
+                "Nouvelle version du document émise"
+        ));
     }
 
     @GetMapping("/documents-clients/{documentId}/pdf")

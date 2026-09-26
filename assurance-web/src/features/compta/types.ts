@@ -213,7 +213,7 @@ export type ReferenceOption = {
 };
 
 export type ClientDocumentType = "RELEVE" | "FACTURE";
-export type ClientDocumentStatus = "EMIS" | "ANNULE";
+export type ClientDocumentStatus = "EMIS" | "REMPLACE" | "ANNULE";
 export type BillableElementNature =
   | "CONTRAT"
   | "MOUVEMENT_CONTRAT"
@@ -371,6 +371,13 @@ export type ClientDocument = {
   totalCredit: number;
   totalDocument: number;
   notes?: string | null;
+  versionDocument: number;
+  documentOrigineId?: string | null;
+  numeroDocumentOrigine?: string | null;
+  documentRemplacementId?: string | null;
+  numeroDocumentRemplacement?: string | null;
+  dateRemplacement?: string | null;
+  motifRemplacement?: string | null;
   dateAnnulation?: string | null;
   motifAnnulation?: string | null;
   signatureDisponible: boolean;
@@ -390,6 +397,10 @@ export type CreateClientDocumentRequest = {
   elementFacturableIds: string[];
   dateEcheance?: string;
   notes?: string;
+};
+
+export type ReviseClientDocumentRequest = Omit<CreateClientDocumentRequest, "typeDocument"> & {
+  motif: string;
 };
 
 export type CreateInvoiceFromStatementRequest = Omit<CreateClientDocumentRequest, "typeDocument">;

@@ -13,6 +13,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -116,6 +117,23 @@ public class DocumentClient extends AuditedEntity {
 
     @Column(length = 1000)
     private String notes;
+
+    @Column(name = "version_document", nullable = false)
+    @Builder.Default
+    private Integer versionDocument = 1;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "document_origine_id", unique = true)
+    private DocumentClient documentOrigine;
+
+    @OneToOne(mappedBy = "documentOrigine", fetch = FetchType.LAZY)
+    private DocumentClient documentRemplacement;
+
+    @Column(name = "date_remplacement")
+    private LocalDateTime dateRemplacement;
+
+    @Column(name = "motif_remplacement", length = 500)
+    private String motifRemplacement;
 
     @Column(name = "date_annulation")
     private LocalDateTime dateAnnulation;

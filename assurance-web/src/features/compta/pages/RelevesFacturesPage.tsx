@@ -13,10 +13,10 @@ import {
   FilePlus2,
   FileText,
   MoreHorizontal,
+  Pencil,
   ReceiptText,
   RotateCcw,
   Search,
-  Trash2,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -102,15 +102,14 @@ export default function RelevesFacturesPage() {
   const requestedPayerId = urlState.payerId;
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
-  const canDelete = permissions.includes("quittance:manage");
   const [sourceFilters, setSourceFilters] = useState(urlState.sourceFilters);
   const [documentFilters, setDocumentFilters] = useState(urlState.documentFilters);
   const [selected, setSelected] = useState<Record<string, ClientDocumentSource>>({});
   const [issueOpen, setIssueOpen] = useState(false);
   const [detailId, setDetailId] = useState<string>();
   const [invoiceFromStatementId, setInvoiceFromStatementId] = useState<string>();
+  const [revisionTarget, setRevisionTarget] = useState<ClientDocument>();
   const [cancelTarget, setCancelTarget] = useState<ClientDocument>();
-  const [deleteTarget, setDeleteTarget] = useState<ClientDocument>();
   const [exporting, setExporting] = useState(false);
   const payerScope = urlState.payerScope;
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
@@ -578,8 +577,8 @@ export default function RelevesFacturesPage() {
             onNext={() => updateUrl({ documentPage: urlState.documentPage + 1 })}
             onDetail={setDetailId}
             onInvoice={canIssue ? setInvoiceFromStatementId : undefined}
+            onRevise={canIssue ? setRevisionTarget : undefined}
             onCancel={canIssue ? setCancelTarget : undefined}
-            onDelete={canDelete ? setDeleteTarget : undefined}
           />
         </div>
       )}
@@ -597,6 +596,7 @@ export default function RelevesFacturesPage() {
       <DocumentDetailDialog
         id={detailId}
         onOpenChange={(open) => !open && setDetailId(undefined)}
+        onNavigate={setDetailId}
         onInvoice={canIssue ? (documentId) => {
           setDetailId(undefined);
           setInvoiceFromStatementId(documentId);
@@ -610,12 +610,20 @@ export default function RelevesFacturesPage() {
           setDetailId(invoice.id);
         }}
       />
+      <RevisionDocumentDialog
+        target={revisionTarget}
+        onClose={() => setRevisionTarget(undefined)}
+        onRevised={(replacement) => {
+          setRevisionTarget(undefined);
+          setDetailId(replacement.id);
+          updateUrl({ tab: "documents", documentPage: 0 });
+        }}
+      />
       <CancelDocumentDialog
         target={cancelTarget}
         onClose={() => setCancelTarget(undefined)}
         onCancelled={() => updateUrl({ tab: "sources", sourcePage: 0, documentPage: 0 })}
       />
-      <DeleteDocumentDialog target={deleteTarget} onClose={() => setDeleteTarget(undefined)} />
     </div>
   );
 }
@@ -771,6 +779,7 @@ function DocumentSearch(props: {
             <SelectContent>
               <SelectItem value="ALL">Tous</SelectItem>
               <SelectItem value="EMIS">Émis</SelectItem>
+              <SelectItem value="REMPLACE">Remplacé</SelectItem>
               <SelectItem value="ANNULE">Annulé</SelectItem>
             </SelectContent>
           </Select>
@@ -801,8 +810,8 @@ function DocumentTable(props: {
   onNext: () => void;
   onDetail: (id: string) => void;
   onInvoice?: (id: string) => void;
+  onRevise?: (document: ClientDocument) => void;
   onCancel?: (document: ClientDocument) => void;
-  onDelete?: (document: ClientDocument) => void;
 }) {
   return (
     <Card className="min-w-0 shadow-none">
@@ -842,9 +851,13 @@ function DocumentTable(props: {
                   </td>
                   <MoneyCell value={document.totalDocument} strong />
                   <td className="px-3 py-3">
-                    {document.statut === "EMIS"
-                      ? <Badge className="bg-emerald-100 text-emerald-800">Émis</Badge>
-                      : <Badge variant="destructive">Annulé</Badge>}
+                    {document.statut === "EMIS" ? (
+                      <Badge className="bg-emerald-100 text-emerald-800">Émis</Badge>
+                    ) : document.statut === "REMPLACE" ? (
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Remplacé</Badge>
+                    ) : (
+                      <Badge variant="destructive">Annulé</Badge>
+                    )}
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex justify-center">
@@ -856,10 +869,12 @@ function DocumentTable(props: {
                           && document.statut === "EMIS"
                           ? () => props.onInvoice?.(document.id)
                           : undefined}
+                        onRevise={props.onRevise && document.statut === "EMIS"
+                          ? () => props.onRevise?.(document)
+                          : undefined}
                         onCancel={props.onCancel && document.statut === "EMIS"
                           ? () => props.onCancel?.(document)
                           : undefined}
-                        onDelete={props.onDelete ? () => props.onDelete?.(document) : undefined}
                       />
                     </div>
                   </td>
@@ -878,8 +893,8 @@ function DocumentActionsMenu(props: {
   document: ClientDocument;
   onDetail: () => void;
   onInvoice?: () => void;
+  onRevise?: () => void;
   onCancel?: () => void;
-  onDelete?: () => void;
 }) {
   const pdf = useDocumentPdfPreview(props.document);
   return (
@@ -908,17 +923,17 @@ function DocumentActionsMenu(props: {
               Créer une facture
             </DropdownMenuItem>
           ) : null}
-          {props.onCancel || props.onDelete ? <DropdownMenuSeparator /> : null}
+          {props.onRevise || props.onCancel ? <DropdownMenuSeparator /> : null}
+          {props.onRevise ? (
+            <DropdownMenuItem onSelect={props.onRevise}>
+              <Pencil className="size-4 text-blue-700 dark:text-blue-400" />
+              Modifier
+            </DropdownMenuItem>
+          ) : null}
           {props.onCancel ? (
             <DropdownMenuItem onSelect={props.onCancel}>
               <Ban className="size-4 text-amber-700 dark:text-amber-400" />
-              Rectifier le document
-            </DropdownMenuItem>
-          ) : null}
-          {props.onDelete ? (
-            <DropdownMenuItem variant="destructive" onSelect={props.onDelete}>
-              <Trash2 className="size-4" />
-              Supprimer le document
+              Annuler le document
             </DropdownMenuItem>
           ) : null}
         </DropdownMenuContent>
@@ -1131,6 +1146,7 @@ function IssueDialog(props: {
 function DocumentDetailDialog(props: {
   id?: string;
   onOpenChange: (open: boolean) => void;
+  onNavigate: (documentId: string) => void;
   onInvoice?: (documentId: string) => void;
 }) {
   const detail = useQuery({
@@ -1164,6 +1180,10 @@ function DocumentDetailDialog(props: {
                 <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300">
                   Émis
                 </Badge>
+              ) : document.statut === "REMPLACE" ? (
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-300">
+                  Remplacé
+                </Badge>
               ) : (
                 <Badge variant="destructive">Annulé</Badge>
               )
@@ -1183,6 +1203,35 @@ function DocumentDetailDialog(props: {
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
                 <div className="font-medium text-destructive">Document annulé</div>
                 <div className="mt-1 text-sm">{document.motifAnnulation || "-"}</div>
+              </div>
+            ) : null}
+            {document.statut === "REMPLACE" ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+                <div>
+                  <div className="font-medium text-blue-900 dark:text-blue-200">Document remplacé</div>
+                  <div className="mt-1 text-sm text-blue-800 dark:text-blue-300">{document.motifRemplacement || "Une nouvelle version a été émise."}</div>
+                </div>
+                {document.documentRemplacementId ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => props.onNavigate(document.documentRemplacementId as string)}
+                  >
+                    Version suivante : {document.numeroDocumentRemplacement}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            {document.documentOrigineId ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/20 px-4 py-3 text-sm">
+                <span>Version {document.versionDocument} · remplace {document.numeroDocumentOrigine}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => props.onNavigate(document.documentOrigineId as string)}
+                >
+                  Voir la version précédente
+                </Button>
               </div>
             ) : null}
             <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800">
@@ -1513,6 +1562,212 @@ function StatementInvoiceDialog(props: {
   );
 }
 
+function RevisionDocumentDialog(props: {
+  target?: ClientDocument;
+  onClose: () => void;
+  onRevised: (replacement: ClientDocument) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [knownSources, setKnownSources] = useState<Record<string, ClientDocumentSource>>({});
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [reason, setReason] = useState("");
+  const detail = useQuery({
+    queryKey: ["compta", "client-document", props.target?.id],
+    queryFn: () => comptaApi.clientDocument(props.target?.id as string),
+    enabled: Boolean(props.target),
+  });
+  const document = detail.data;
+  const payerType = document?.groupePayeurId ? "GROUPE" : "CLIENT";
+  const payerId = document?.groupePayeurId ?? document?.clientPayeurId;
+  const sources = useQuery({
+    queryKey: ["compta", "client-document-revision-sources", payerType, payerId, appliedSearch],
+    queryFn: () => comptaApi.searchClientDocumentSources({
+      payeurType: payerType as "CLIENT" | "GROUPE",
+      payeurId: payerId as string,
+      search: appliedSearch || undefined,
+      sortBy: "dateDebut",
+      sortDirection: "desc",
+      page: 0,
+      size: 100,
+    }),
+    enabled: Boolean(document && payerId),
+  });
+
+  useEffect(() => {
+    if (!document) return;
+    setSelected(Object.fromEntries(
+      document.lignes
+        .map((line) => line.elementFacturableId)
+        .filter((id): id is string => Boolean(id))
+        .map((id) => [id, true])
+    ));
+    setKnownSources({});
+    setSearch("");
+    setAppliedSearch("");
+    setDueDate(document.dateEcheance ?? "");
+    setNotes(document.notes ?? "");
+    setReason("");
+  }, [document]);
+
+  useEffect(() => {
+    if (!sources.data?.rows.length) return;
+    setKnownSources((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        sources.data.rows
+          .filter((row) => row.elementFacturableId)
+          .map((row) => [row.elementFacturableId as string, row])
+      ),
+    }));
+  }, [sources.data]);
+
+  const currentIds = new Set(
+    (document?.lignes ?? [])
+      .map((line) => line.elementFacturableId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const visibleCandidateMap = new Map<string, ClientDocumentSource>();
+  Object.values(knownSources)
+    .filter((row) => row.elementFacturableId && selected[row.elementFacturableId])
+    .forEach((row) => visibleCandidateMap.set(row.elementFacturableId as string, row));
+  (sources.data?.rows ?? [])
+    .filter((row) => row.elementFacturableId)
+    .forEach((row) => visibleCandidateMap.set(row.elementFacturableId as string, row));
+  const candidates = Array.from(visibleCandidateMap.values()).filter((row) => {
+    if (!row.elementFacturableId || currentIds.has(row.elementFacturableId)) return false;
+    return document?.typeDocument === "RELEVE" || row.facturable;
+  });
+  const selectedIds = Object.entries(selected)
+    .filter(([, checked]) => checked)
+    .map(([id]) => id);
+  const currentLineById = new Map(
+    (document?.lignes ?? [])
+      .filter((line) => line.elementFacturableId)
+      .map((line) => [line.elementFacturableId as string, line])
+  );
+  const selectedTotal = selectedIds.reduce((total, id) => (
+    total + (currentLineById.get(id)?.montantTtc ?? knownSources[id]?.montantTtc ?? 0)
+  ), 0);
+  const isConventionInvoice = Boolean(document?.lignes.some(
+    (line) => line.echeanceFacturationConventionId
+  ));
+
+  const revise = useMutation({
+    mutationFn: () => comptaApi.reviseClientDocument(props.target?.id as string, {
+      elementFacturableIds: selectedIds,
+      dateEcheance: document?.typeDocument === "FACTURE" && dueDate ? dueDate : undefined,
+      notes: notes.trim() || undefined,
+      motif: reason.trim(),
+    }),
+    onSuccess: async (replacement) => {
+      toast.success(`${replacement.numero} émis en remplacement de ${props.target?.numero}.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-document"] }),
+      ]);
+      props.onRevised(replacement);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Modification impossible"),
+  });
+
+  return (
+    <Dialog open={Boolean(props.target)} onOpenChange={(open) => !open && props.onClose()}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Modifier {props.target?.numero}</DialogTitle>
+          <DialogDescription>
+            Une nouvelle référence sera émise. Le document actuel restera dans l’historique.
+          </DialogDescription>
+        </DialogHeader>
+
+        {detail.isLoading ? <div className="grid gap-3"><Skeleton className="h-20" /><Skeleton className="h-56" /></div> : null}
+        {document ? <div className="grid gap-4">
+          {isConventionInvoice ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              Cette facture provient d’échéances de convention. Annulez-la puis recomposez-la depuis la facturation des conventions afin de conserver les prorata et les périodes.
+            </div>
+          ) : null}
+          <div className="grid gap-3 rounded-md border bg-muted/20 p-3 sm:grid-cols-3">
+            <Info label="Document" value={`${document.numero} · version ${document.versionDocument}`} />
+            <Info label="Payeur" value={document.payeurNom} />
+            <Info label="Nouveau total" value={formatMoney(selectedTotal)} />
+          </div>
+
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-slate-100/90 dark:bg-slate-900/70"><tr>
+                <th className="w-12 px-3 py-3" />
+                <Header>Écritures actuelles</Header><Header>Mouvement</Header><Header>Date</Header><Header align="right">TTC</Header>
+              </tr></thead>
+              <tbody>
+                {document.lignes.map((line) => {
+                  const id = line.elementFacturableId;
+                  return <tr key={line.id} className="border-t">
+                    <td className="px-3 py-3"><Checkbox checked={Boolean(id && selected[id])} disabled={!id} onCheckedChange={(checked) => id && setSelected((current) => ({ ...current, [id]: checked === true }))} aria-label={`Conserver ${line.numeroPolice || line.numeroQuittance || line.mouvement}`} /></td>
+                    <td className="px-3 py-3 font-medium">{line.numeroPolice || line.numeroQuittance || "-"}</td>
+                    <td className="px-3 py-3">{line.mouvement}</td>
+                    <td className="px-3 py-3">{formatDate(line.dateOperation)}</td>
+                    <MoneyCell value={line.montantTtc} strong />
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid gap-3 border-t pt-4">
+            <div className="flex flex-wrap items-end gap-2">
+              <FilterField label="Ajouter des écritures">
+                <Input className="w-full sm:w-96" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && setAppliedSearch(search.trim())} placeholder="Police, dossier, mouvement ou référence" />
+              </FilterField>
+              <Button size="icon" title="Rechercher" onClick={() => setAppliedSearch(search.trim())}><Search className="size-4" /></Button>
+            </div>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="bg-slate-100/90 dark:bg-slate-900/70"><tr>
+                  <th className="w-12 px-3 py-3" />
+                  <Header>Police / référence</Header><Header>Mouvement</Header><Header>Date</Header><Header align="right">TTC</Header>
+                </tr></thead>
+                <tbody>
+                  {sources.isLoading ? <TableRowsSkeleton colSpan={5} rows={3} /> : candidates.map((row) => {
+                    const id = row.elementFacturableId as string;
+                    return <tr key={id} className="border-t">
+                      <td className="px-3 py-3"><Checkbox checked={Boolean(selected[id])} onCheckedChange={(checked) => setSelected((current) => ({ ...current, [id]: checked === true }))} aria-label={`Ajouter ${row.police || row.reference || row.mouvement}`} /></td>
+                      <td className="px-3 py-3 font-medium">{row.police || row.reference || "-"}</td>
+                      <td className="px-3 py-3">{row.mouvement}</td>
+                      <td className="px-3 py-3">{formatDate(row.dateEffet)}</td>
+                      <MoneyCell value={row.montantTtc} strong />
+                    </tr>;
+                  })}
+                  {!sources.isLoading && !candidates.length ? <tr><td colSpan={5} className="h-20 text-center text-muted-foreground">Aucune autre écriture éligible.</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t pt-4 md:grid-cols-2">
+            <FilterField label="Motif de modification *"><Textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} /></FilterField>
+            <FilterField label="Notes"><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} /></FilterField>
+            {document.typeDocument === "FACTURE" ? <div className="max-w-sm"><FilterField label="Échéance de paiement"><DatePicker date={dueDate} onSelect={(date) => setDueDate(toDateOnly(date) ?? "")} /></FilterField></div> : null}
+          </div>
+        </div> : null}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={props.onClose}>Annuler</Button>
+          <Button disabled={!document || isConventionInvoice || !selectedIds.length || !reason.trim() || revise.isPending} onClick={() => revise.mutate()}>
+            <Pencil className="size-4" />
+            {revise.isPending ? "Émission..." : "Émettre la nouvelle version"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CancelDocumentDialog(props: {
   target?: ClientDocument;
   onClose: () => void;
@@ -1542,7 +1797,7 @@ function CancelDocumentDialog(props: {
     <AlertDialog open={Boolean(props.target)} onOpenChange={(open) => !open && props.onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Rectifier {props.target?.numero} ?</AlertDialogTitle>
+          <AlertDialogTitle>Annuler {props.target?.numero} ?</AlertDialogTitle>
           <AlertDialogDescription>
             Le document émis restera inchangé dans l'historique avec le statut annulé. Ses écritures
             redeviendront disponibles pour composer et émettre un nouveau document.
@@ -1566,50 +1821,7 @@ function CancelDocumentDialog(props: {
               cancel.mutate();
             }}
           >
-            {cancel.isPending ? "Annulation..." : "Annuler et recomposer"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function DeleteDocumentDialog(props: { target?: ClientDocument; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const remove = useMutation({
-    mutationFn: () => comptaApi.deleteClientDocument(props.target?.id as string),
-    onSuccess: async () => {
-      toast.success("Document supprimé.");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
-      ]);
-      props.onClose();
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Suppression impossible"),
-  });
-
-  return (
-    <AlertDialog open={Boolean(props.target)} onOpenChange={(open) => !open && props.onClose()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Supprimer {props.target?.numero} ?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Cette suppression est définitive. Les écritures liées redeviendront disponibles pour un nouveau document.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Fermer</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-destructive text-destructive-foreground"
-            disabled={remove.isPending}
-            onClick={(event) => {
-              event.preventDefault();
-              remove.mutate();
-            }}
-          >
-            <Trash2 className="size-4" />
-            {remove.isPending ? "Suppression..." : "Supprimer définitivement"}
+            {cancel.isPending ? "Annulation..." : "Annuler le document"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

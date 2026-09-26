@@ -20,7 +20,9 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
 
     @EntityGraph(attributePaths = {
             "clientPayeur",
-            "groupePayeur"
+            "groupePayeur",
+            "documentOrigine",
+            "documentRemplacement"
     })
     @Query("""
             select distinct d
@@ -143,6 +145,8 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             "clientPayeur",
             "clientPayeur.ville",
             "groupePayeur",
+            "documentOrigine",
+            "documentRemplacement",
             "lignes",
             "lignes.quittance",
             "lignes.elementFacturable",
@@ -155,8 +159,11 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
     @EntityGraph(attributePaths = {
             "clientPayeur",
             "groupePayeur",
+            "documentOrigine",
+            "documentRemplacement",
             "lignes",
-            "lignes.elementFacturable"
+            "lignes.elementFacturable",
+            "lignes.echeanceFacturationConvention"
     })
     @Query("""
             select distinct d

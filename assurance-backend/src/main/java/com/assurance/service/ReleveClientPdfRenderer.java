@@ -126,6 +126,8 @@ public class ReleveClientPdfRenderer {
             }
             if (source.getStatut() == StatutDocumentClient.ANNULE) {
                 writeCancellation(document, source, bold);
+            } else if (source.getStatut() == StatutDocumentClient.REMPLACE) {
+                writeReplacement(document, source, bold);
             }
             writeFleetAnnexes(document, source, fleetAnnexes);
 
@@ -755,6 +757,17 @@ public class ReleveClientPdfRenderer {
         document.add(new Paragraph("DOCUMENT ANNULÉ" + reason)
                 .setFont(bold)
                 .setFontColor(ColorConstants.RED)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setMarginTop(12));
+    }
+
+    private void writeReplacement(Document document, DocumentClient source, PdfFont bold) {
+        String replacement = source.getDocumentRemplacement() == null
+                ? ""
+                : " - remplacé par " + source.getDocumentRemplacement().getNumero();
+        document.add(new Paragraph("DOCUMENT REMPLACÉ" + replacement)
+                .setFont(bold)
+                .setFontColor(new DeviceRgb(37, 99, 235))
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMarginTop(12));
     }

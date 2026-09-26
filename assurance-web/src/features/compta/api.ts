@@ -48,6 +48,7 @@ import type {
   RemittanceSlipType,
   CreateRemittanceSlipRequest,
   ReplacePaymentInstrumentRequest,
+  ReviseClientDocumentRequest,
   TreasuryAccount,
   TreasuryAccountAssignment,
   TreasuryAccessLevel,
@@ -433,10 +434,18 @@ export const comptaApi = {
     );
   },
 
-  async deleteClientDocument(id: string) {
-    await apiFetch<ApiResponse<null>>(`/api/v1/compta/documents-clients/${id}`, {
-      method: "DELETE",
-    });
+  async reviseClientDocument(id: string, request: ReviseClientDocumentRequest) {
+    return normalizeClientDocument(
+      unwrap(
+        await apiFetch<ApiResponse<ClientDocument>>(
+          `/api/v1/compta/documents-clients/${id}/revision`,
+          {
+            method: "POST",
+            body: JSON.stringify(request),
+          }
+        )
+      )
+    );
   },
 
   async clientDocumentPdf(id: string, avecSignature = false) {
@@ -1078,6 +1087,12 @@ function normalizeClientDocument(document: ClientDocument): ClientDocument {
       : String(document.conditionPaiementClientId),
     clientPayeurId: document.clientPayeurId == null ? null : String(document.clientPayeurId),
     groupePayeurId: document.groupePayeurId == null ? null : String(document.groupePayeurId),
+    documentOrigineId: document.documentOrigineId == null
+      ? null
+      : String(document.documentOrigineId),
+    documentRemplacementId: document.documentRemplacementId == null
+      ? null
+      : String(document.documentRemplacementId),
     lignes: (document.lignes ?? []).map((line) => ({
       ...line,
       id: String(line.id),

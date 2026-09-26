@@ -10,10 +10,13 @@ import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.enums.StatutBordereauRemise;
 import com.assurance.enums.TypeBordereauRemise;
 import com.assurance.security.TenantContext;
+import com.assurance.service.BordereauRemisePdfService;
 import com.assurance.service.BordereauRemiseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +35,7 @@ import java.time.LocalDate;
 public class BordereauRemiseController {
 
     private final BordereauRemiseService bordereauRemiseService;
+    private final BordereauRemisePdfService bordereauRemisePdfService;
 
     @GetMapping("/instruments-eligibles")
     @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
@@ -88,6 +92,21 @@ public class BordereauRemiseController {
                 TenantContext.getCurrentAgence(),
                 id
         )));
+    }
+
+    @GetMapping("/{id}/pdf")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<byte[]> pdf(@PathVariable Long id) {
+        BordereauRemiseResponse detail = bordereauRemiseService.detail(
+                TenantContext.getCurrentAgence(),
+                id
+        );
+        byte[] pdf = bordereauRemisePdfService.generate(TenantContext.getCurrentAgence(), id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=" + detail.getNumero() + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @PostMapping

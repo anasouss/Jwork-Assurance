@@ -597,6 +597,14 @@ export default function RelevesFacturesPage() {
         id={detailId}
         onOpenChange={(open) => !open && setDetailId(undefined)}
         onNavigate={setDetailId}
+        onRevise={canIssue ? (document) => {
+          setDetailId(undefined);
+          setRevisionTarget(document);
+        } : undefined}
+        onCancel={canIssue ? (document) => {
+          setDetailId(undefined);
+          setCancelTarget(document);
+        } : undefined}
         onInvoice={canIssue ? (documentId) => {
           setDetailId(undefined);
           setInvoiceFromStatementId(documentId);
@@ -1147,6 +1155,8 @@ function DocumentDetailDialog(props: {
   id?: string;
   onOpenChange: (open: boolean) => void;
   onNavigate: (documentId: string) => void;
+  onRevise?: (document: ClientDocument) => void;
+  onCancel?: (document: ClientDocument) => void;
   onInvoice?: (documentId: string) => void;
 }) {
   const detail = useQuery({
@@ -1155,6 +1165,9 @@ function DocumentDetailDialog(props: {
     enabled: Boolean(props.id),
   });
   const document = detail.data;
+  const isConventionInvoice = Boolean(document?.lignes.some(
+    (line) => line.echeanceFacturationConventionId
+  ));
   return (
     <Dialog open={Boolean(props.id)} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
@@ -1283,6 +1296,25 @@ function DocumentDetailDialog(props: {
           </div>
         ) : null}
         <DialogFooter>
+          {document
+            && props.onRevise
+            && document.statut === "EMIS"
+            && !isConventionInvoice ? (
+            <Button variant="outline" onClick={() => props.onRevise?.(document)}>
+              <Pencil className="size-4" />
+              Modifier
+            </Button>
+          ) : null}
+          {document && props.onCancel && document.statut === "EMIS" ? (
+            <Button
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={() => props.onCancel?.(document)}
+            >
+              <Ban className="size-4" />
+              Annuler
+            </Button>
+          ) : null}
           {document
             && props.onInvoice
             && document.typeDocument === "RELEVE"

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Ban, CheckCircle2, Landmark, Send } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, FileDown, Landmark, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -42,6 +42,7 @@ export default function BordereauRemiseDetailPage() {
   const [lineAction, setLineAction] = useState<"SETTLE" | "REJECT">("SETTLE");
   const [operationDate, setOperationDate] = useState(TODAY);
   const [reason, setReason] = useState("");
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const slip = useQuery({
     queryKey: ["compta", "treasury", "remittance-slip", bordereauId],
@@ -100,6 +101,27 @@ export default function BordereauRemiseDetailPage() {
     setReason("");
   }
 
+  async function previewPdf() {
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      return;
+    }
+    previewWindow.opener = null;
+    setPdfLoading(true);
+    try {
+      const blob = await comptaApi.remittanceSlipPdf(bordereauId);
+      const url = URL.createObjectURL(blob);
+      previewWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      previewWindow.close();
+      showError(error);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   if (slip.isLoading) {
     return <div className="py-16 text-center text-sm text-muted-foreground">Chargement du bordereau…</div>;
   }
@@ -122,6 +144,10 @@ export default function BordereauRemiseDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" disabled={pdfLoading} onClick={previewPdf}>
+            <FileDown className="size-4" />
+            {pdfLoading ? "Génération..." : "Prévisualiser le PDF"}
+          </Button>
           {data.statut === "BROUILLON" && <>
             <Button variant="outline" disabled={!canManage || cancel.isPending} onClick={() => cancel.mutate()}>Annuler</Button>
             <Button disabled={!canManage} onClick={() => {

@@ -622,6 +622,10 @@ export const comptaApi = {
     )));
   },
 
+  async remittanceSlipPdf(id: string) {
+    return apiFetchBlob(`/api/v1/compta/tresorerie/bordereaux-remise/${id}/pdf`);
+  },
+
   async createRemittanceSlip(request: CreateRemittanceSlipRequest) {
     return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
       "/api/v1/compta/tresorerie/bordereaux-remise",

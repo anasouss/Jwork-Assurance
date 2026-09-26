@@ -70,7 +70,7 @@ import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
-import { RelevePdfOptionsDialog } from "../components/RelevePdfOptionsDialog";
+import { DocumentPdfOptionsDialog } from "../components/DocumentPdfOptionsDialog";
 import {
   usePayerSearch,
   type PayerSelection,
@@ -946,15 +946,14 @@ function DocumentActionsMenu(props: {
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      {props.document.typeDocument === "RELEVE" ? (
-        <RelevePdfOptionsDialog
-          open={pdf.optionsOpen}
-          loading={pdf.loading}
-          signatureAvailable={props.document.signatureDisponible}
-          onOpenChange={pdf.setOptionsOpen}
-          onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
-        />
-      ) : null}
+      <DocumentPdfOptionsDialog
+        open={pdf.optionsOpen}
+        loading={pdf.loading}
+        documentType={props.document.typeDocument}
+        signatureAvailable={props.document.signatureDisponible}
+        onOpenChange={pdf.setOptionsOpen}
+        onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
+      />
     </>
   );
 }
@@ -1888,11 +1887,7 @@ function useDocumentPdfPreview(document: ClientDocument) {
   }
 
   function open() {
-    if (document.typeDocument === "RELEVE") {
-      setOptionsOpen(true);
-      return;
-    }
-    void preview(false);
+    setOptionsOpen(true);
   }
 
   return { loading, open, optionsOpen, preview, setOptionsOpen };
@@ -1913,15 +1908,14 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
         <FileDown className="size-4" />
         {props.withLabel ? (pdf.loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
       </Button>
-      {props.document.typeDocument === "RELEVE" ? (
-        <RelevePdfOptionsDialog
-          open={pdf.optionsOpen}
-          loading={pdf.loading}
-          signatureAvailable={props.document.signatureDisponible}
-          onOpenChange={pdf.setOptionsOpen}
-          onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
-        />
-      ) : null}
+      <DocumentPdfOptionsDialog
+        open={pdf.optionsOpen}
+        loading={pdf.loading}
+        documentType={props.document.typeDocument}
+        signatureAvailable={props.document.signatureDisponible}
+        onOpenChange={pdf.setOptionsOpen}
+        onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
+      />
     </>
   );
 }

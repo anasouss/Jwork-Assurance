@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Plus, RotateCcw, Search } from "lucide-react";
+import { ArrowLeft, Banknote, FileClock, Plus, ReceiptText, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -121,6 +121,15 @@ export default function NouveauBordereauRemisePage() {
     setSelectedIds([]);
   }
 
+  function changeType(nextType: RemittanceSlipType) {
+    setType(nextType);
+    setSearchParams({ type: nextType }, { replace: true });
+    setSelectedIds([]);
+    setPage(0);
+  }
+
+  const instrumentType = type === "CHEQUE" || type === "EFFET";
+
   return (
     <div className="grid gap-5">
       <header>
@@ -130,71 +139,75 @@ export default function NouveauBordereauRemisePage() {
         <p className="text-sm text-muted-foreground">Remises bancaires de chèques, effets et espèces.</p>
       </header>
 
-      <section className="rounded-md border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Type de remise</h2></div>
-        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-[240px_1fr]">
-          <div className="grid gap-2"><Label>Type de remise</Label><Select value={type} onValueChange={(value) => {
-            const nextType = value as RemittanceSlipType;
-            setType(nextType);
-            setSearchParams({ type: nextType }, { replace: true });
-            setSelectedIds([]);
-            setPage(0);
-          }}><SelectTrigger><SelectValue placeholder="Choisir un type" /></SelectTrigger><SelectContent><SelectItem value="CHEQUE">Chèques</SelectItem><SelectItem value="EFFET">Effets</SelectItem><SelectItem value="VERSEMENT_ESPECES">Versement d’espèces</SelectItem></SelectContent></Select></div>
-          <div className="self-end pb-2 text-sm text-muted-foreground">
-            {type === "VERSEMENT_ESPECES" ? "Versement d’une caisse vers un compte bancaire." : type ? "Regroupement d’instruments à remettre à la banque." : null}
+      <section className="overflow-hidden rounded-md border bg-card">
+        <div className="border-b bg-muted/20 p-4">
+          <Label className="mb-2 block">Type de remise</Label>
+          <div className="grid max-w-3xl gap-2 sm:grid-cols-3">
+            <Button type="button" variant="outline" className={type === "CHEQUE" ? "h-11 justify-start border-sky-500 bg-sky-50 text-sky-800 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-200" : "h-11 justify-start"} onClick={() => changeType("CHEQUE")}>
+              <ReceiptText className="size-4" /> Chèques
+            </Button>
+            <Button type="button" variant="outline" className={type === "EFFET" ? "h-11 justify-start border-violet-500 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/40 dark:text-violet-200" : "h-11 justify-start"} onClick={() => changeType("EFFET")}>
+              <FileClock className="size-4" /> Effets
+            </Button>
+            <Button type="button" variant="outline" className={type === "VERSEMENT_ESPECES" ? "h-11 justify-start border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200" : "h-11 justify-start"} onClick={() => changeType("VERSEMENT_ESPECES")}>
+              <Banknote className="size-4" /> Versement d’espèces
+            </Button>
           </div>
         </div>
+
+        {type && <div className="border-b p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <span className={type === "CHEQUE" ? "h-5 w-1 rounded-sm bg-sky-500" : type === "EFFET" ? "h-5 w-1 rounded-sm bg-violet-500" : "h-5 w-1 rounded-sm bg-emerald-500"} />
+            <h2 className="font-semibold">Détails de la remise</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label>Caisse source</Label><Select value={sourceId} onValueChange={setSourceId}><SelectTrigger><SelectValue placeholder="Choisir une caisse" /></SelectTrigger><SelectContent>{cashAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>}
+            <div className="grid gap-2"><Label>Compte bancaire de destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger><SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>
+            {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label htmlFor="cash-amount">Montant</Label><MoneyInput id="cash-amount" value={cashAmount} onValueChange={setCashAmount} /></div>}
+            <div className="grid gap-2"><Label>{type === "VERSEMENT_ESPECES" ? "Date de versement" : "Date du bordereau"}</Label><DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} /></div>
+            <div className="grid gap-2"><Label htmlFor="bank-reference">Référence bancaire</Label><Input id="bank-reference" value={bankReference} onChange={(event) => setBankReference(event.target.value)} /></div>
+            <div className="grid gap-2 md:col-span-2 xl:col-span-4"><Label htmlFor="slip-notes">Notes</Label><Textarea id="slip-notes" className="min-h-16" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
+          </div>
+        </div>}
+
+        {instrumentType && <div className="grid gap-3 border-b bg-muted/20 p-4 xl:grid-cols-[1fr_190px_190px_auto]">
+          <div className="grid gap-2"><Label htmlFor="instrument-search">Payeur, règlement, banque ou référence</Label><Input id="instrument-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
+          <div className="grid gap-2"><Label>Échéance du</Label><DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} /></div>
+          <div className="grid gap-2"><Label>Échéance au</Label><DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} /></div>
+          <div className="flex items-end gap-2"><Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button><Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button></div>
+        </div>}
+
+        {instrumentType && <>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+            <div><h2 className="font-semibold">Instruments disponibles</h2><p className="text-sm text-muted-foreground">{selectedIds.length} sélectionné(s) · {formatTreasuryMoney(selectedTotal)}</p></div>
+            <Button className={type === "CHEQUE" ? "bg-sky-700 text-white hover:bg-sky-800" : "bg-violet-700 text-white hover:bg-violet-800"} disabled={!canManage || !selectedIds.length || !destinationId || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}><Plus className="size-4" /> Créer le bordereau</Button>
+          </div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-sm">
+            <thead className={type === "CHEQUE" ? "bg-sky-700 text-xs uppercase text-white" : "bg-violet-700 text-xs uppercase text-white"}><tr>
+              <th className="w-12 px-4 py-3 text-center"><Checkbox checked={allPageSelected} onCheckedChange={(checked) => setSelectedIds(checked ? rows.map((row) => row.id) : [])} aria-label="Sélectionner la page" /></th>
+              <th className="px-4 py-3 text-left">Référence</th><th className="px-4 py-3 text-left">Payeur</th>
+              <th className="px-4 py-3 text-left">Règlement</th><th className="px-4 py-3 text-left">Mode</th>
+              <th className="px-4 py-3 text-left">Reçu le</th><th className="px-4 py-3 text-left">Échéance</th>
+              <th className="px-4 py-3 text-left">Banque émettrice</th><th className="px-4 py-3 text-right">Montant</th>
+            </tr></thead>
+            <tbody className="divide-y">
+              {eligible.isLoading ? <TableRowsSkeleton colSpan={9} rows={6} /> : rows.map((instrument) => <tr key={instrument.id} className="hover:bg-muted/30">
+                <td className="px-4 py-3 text-center"><Checkbox checked={selectedIds.includes(instrument.id)} onCheckedChange={(checked) => setSelectedIds(checked ? [...selectedIds, instrument.id] : selectedIds.filter((id) => id !== instrument.id))} aria-label={`Sélectionner ${instrument.referenceInstrument ?? instrument.numeroReglement}`} /></td>
+                <td className="px-4 py-3 font-semibold">{instrument.referenceInstrument || "-"}</td><td className="px-4 py-3">{instrument.payeurNom}</td>
+                <td className="px-4 py-3">{instrument.numeroReglement}</td><td className="px-4 py-3">{paymentModeLabel(instrument.mode)}</td>
+                <td className="px-4 py-3">{formatTreasuryDate(instrument.dateInstrument)}</td><td className="px-4 py-3">{formatTreasuryDate(instrument.dateEcheance)}</td>
+                <td className="px-4 py-3">{instrument.banqueEmettrice || "-"}</td><td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(instrument.montant)}</td>
+              </tr>)}
+              {!eligible.isLoading && rows.length === 0 && <tr><td colSpan={9} className="px-4 py-14 text-center text-muted-foreground">Aucun instrument disponible pour ces critères.</td></tr>}
+            </tbody>
+          </table></div>
+          {eligible.data && <ServerPagination page={eligible.data.page.number} totalPages={eligible.data.page.totalPages} totalElements={eligible.data.page.totalElements} loading={eligible.isFetching} onPageChange={(nextPage) => { setPage(nextPage); setSelectedIds([]); }} />}
+        </>}
+
+        {type === "VERSEMENT_ESPECES" && <div className="flex justify-end bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
+          <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}><Banknote className="size-4" /> Enregistrer le versement</Button>
+        </div>}
       </section>
-
-      {type && <section className="rounded-md border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Détails de la remise</h2></div>
-        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
-          {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label>Caisse source</Label><Select value={sourceId} onValueChange={setSourceId}><SelectTrigger><SelectValue placeholder="Choisir une caisse" /></SelectTrigger><SelectContent>{cashAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>}
-          <div className="grid gap-2"><Label>Compte bancaire de destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger><SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>
-          {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label htmlFor="cash-amount">Montant</Label><MoneyInput id="cash-amount" value={cashAmount} onValueChange={setCashAmount} /></div>}
-          <div className="grid gap-2"><Label>{type === "VERSEMENT_ESPECES" ? "Date de versement" : "Date du bordereau"}</Label><DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} /></div>
-          <div className="grid gap-2"><Label htmlFor="bank-reference">Référence bancaire</Label><Input id="bank-reference" value={bankReference} onChange={(event) => setBankReference(event.target.value)} /></div>
-          <div className="grid gap-2 md:col-span-2 xl:col-span-4"><Label htmlFor="slip-notes">Notes</Label><Textarea id="slip-notes" className="min-h-20" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
-        </div>
-      </section>}
-
-      {(type === "CHEQUE" || type === "EFFET") && <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[1fr_190px_190px_auto]">
-        <div className="grid gap-2"><Label htmlFor="instrument-search">Payeur, règlement, banque ou référence</Label><Input id="instrument-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
-        <div className="grid gap-2"><Label>Échéance du</Label><DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} /></div>
-        <div className="grid gap-2"><Label>Échéance au</Label><DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} /></div>
-        <div className="flex items-end gap-2"><Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button><Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button></div>
-      </section>}
-
-      {(type === "CHEQUE" || type === "EFFET") && <section className="overflow-hidden rounded-md border bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-          <div><h2 className="font-semibold">Instruments disponibles</h2><p className="text-sm text-muted-foreground">{selectedIds.length} sélectionné(s) · {formatTreasuryMoney(selectedTotal)}</p></div>
-          <Button disabled={!canManage || !selectedIds.length || !destinationId || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}><Plus className="size-4" /> Créer le bordereau</Button>
-        </div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-sm">
-          <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
-            <th className="w-12 px-4 py-3 text-center"><Checkbox checked={allPageSelected} onCheckedChange={(checked) => setSelectedIds(checked ? rows.map((row) => row.id) : [])} aria-label="Sélectionner la page" /></th>
-            <th className="px-4 py-3 text-left">Référence</th><th className="px-4 py-3 text-left">Payeur</th>
-            <th className="px-4 py-3 text-left">Règlement</th><th className="px-4 py-3 text-left">Mode</th>
-            <th className="px-4 py-3 text-left">Reçu le</th><th className="px-4 py-3 text-left">Échéance</th>
-            <th className="px-4 py-3 text-left">Banque émettrice</th><th className="px-4 py-3 text-right">Montant</th>
-          </tr></thead>
-          <tbody className="divide-y">
-            {eligible.isLoading ? <TableRowsSkeleton colSpan={9} rows={6} /> : rows.map((instrument) => <tr key={instrument.id} className="hover:bg-muted/30">
-              <td className="px-4 py-3 text-center"><Checkbox checked={selectedIds.includes(instrument.id)} onCheckedChange={(checked) => setSelectedIds(checked ? [...selectedIds, instrument.id] : selectedIds.filter((id) => id !== instrument.id))} aria-label={`Sélectionner ${instrument.referenceInstrument ?? instrument.numeroReglement}`} /></td>
-              <td className="px-4 py-3 font-semibold">{instrument.referenceInstrument || "-"}</td><td className="px-4 py-3">{instrument.payeurNom}</td>
-              <td className="px-4 py-3">{instrument.numeroReglement}</td><td className="px-4 py-3">{paymentModeLabel(instrument.mode)}</td>
-              <td className="px-4 py-3">{formatTreasuryDate(instrument.dateInstrument)}</td><td className="px-4 py-3">{formatTreasuryDate(instrument.dateEcheance)}</td>
-              <td className="px-4 py-3">{instrument.banqueEmettrice || "-"}</td><td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(instrument.montant)}</td>
-            </tr>)}
-            {!eligible.isLoading && rows.length === 0 && <tr><td colSpan={9} className="px-4 py-14 text-center text-muted-foreground">Aucun instrument disponible pour ces critères.</td></tr>}
-          </tbody>
-        </table></div>
-        {eligible.data && <ServerPagination page={eligible.data.page.number} totalPages={eligible.data.page.totalPages} totalElements={eligible.data.page.totalElements} loading={eligible.isFetching} onPageChange={(nextPage) => { setPage(nextPage); setSelectedIds([]); }} />}
-      </section>}
-
-      {type === "VERSEMENT_ESPECES" && <div className="flex justify-end border-t pt-4">
-        <Button disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}><Plus className="size-4" /> Enregistrer le versement</Button>
-      </div>}
     </div>
   );
 }

@@ -79,8 +79,8 @@ export default function InstrumentsTresoreriePage() {
           <p className="text-sm text-muted-foreground">Suivi des remises de chèques, effets et versements d’espèces.</p>
         </div>
         {canManage ? <Button asChild>
-          <Link to="/app/compta/tresorerie/bordereaux-remise/nouveau"><Plus className="size-4" /> Nouvelle remise</Link>
-        </Button> : <Button disabled><Plus className="size-4" /> Nouvelle remise</Button>}
+          <Link to="/app/compta/tresorerie/bordereaux-remise/nouveau"><Plus className="size-4" /> Nouveau bordereau</Link>
+        </Button> : <Button disabled><Plus className="size-4" /> Nouveau bordereau</Button>}
       </header>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[190px_210px_1fr_170px_170px_auto]">

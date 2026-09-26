@@ -73,7 +73,7 @@ export default function NouveauBordereauRemisePage() {
   const createSlip = useMutation({
     mutationFn: () => {
       if (!type) {
-        throw new Error("Choisissez un type de remise");
+        throw new Error("Choisissez un type de bordereau");
       }
       return type === "VERSEMENT_ESPECES"
         ? comptaApi.createCashRemittance({
@@ -135,13 +135,13 @@ export default function NouveauBordereauRemisePage() {
       <header>
         <Button asChild variant="ghost" className="mb-2 -ml-3"><Link to="/app/compta/tresorerie/bordereaux-remise"><ArrowLeft className="size-4" /> Retour aux bordereaux</Link></Button>
         <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-        <h1 className="mt-1 text-xl font-semibold">Préparer une remise</h1>
-        <p className="text-sm text-muted-foreground">Remises bancaires de chèques, effets et espèces.</p>
+        <h1 className="mt-1 text-xl font-semibold">Nouveau bordereau</h1>
+        <p className="text-sm text-muted-foreground">Bordereaux de chèques, d’effets et de versement d’espèces.</p>
       </header>
 
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="border-b bg-muted/20 p-4">
-          <Label className="mb-2 block">Type de remise</Label>
+          <Label className="mb-2 block">Type de bordereau</Label>
           <div className="grid max-w-3xl gap-2 sm:grid-cols-3">
             <Button type="button" variant="outline" className={type === "CHEQUE" ? "h-11 justify-start border-sky-500 bg-sky-50 text-sky-800 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-200" : "h-11 justify-start"} onClick={() => changeType("CHEQUE")}>
               <ReceiptText className="size-4" /> Chèques
@@ -158,7 +158,7 @@ export default function NouveauBordereauRemisePage() {
         {type && <div className="border-b p-4">
           <div className="mb-3 flex items-center gap-2">
             <span className={type === "CHEQUE" ? "h-5 w-1 rounded-sm bg-sky-500" : type === "EFFET" ? "h-5 w-1 rounded-sm bg-violet-500" : "h-5 w-1 rounded-sm bg-emerald-500"} />
-            <h2 className="font-semibold">Détails de la remise</h2>
+            <h2 className="font-semibold">Détails du bordereau</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label>Caisse source</Label><Select value={sourceId} onValueChange={setSourceId}><SelectTrigger><SelectValue placeholder="Choisir une caisse" /></SelectTrigger><SelectContent>{cashAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>}

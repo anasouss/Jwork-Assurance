@@ -619,7 +619,7 @@ public class ReleveClientPdfRenderer {
         Paragraph issuer = new Paragraph()
                 .setFontColor(BRAND_BLUE)
                 .setTextAlignment(TextAlignment.RIGHT)
-                .setMarginTop(28)
+                .setMarginTop(48)
                 .setMarginBottom(0);
         issuer.add(new com.itextpdf.layout.element.Text(
                 value(source.getAgence().getNom()).toUpperCase(Locale.FRENCH))

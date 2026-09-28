@@ -10,7 +10,6 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { useAuthStore } from "@/store/auth-store";
@@ -132,43 +131,44 @@ export default function NouveauBordereauRemisePage() {
 
   return (
     <div className="grid gap-5">
-      <header>
-        <Button asChild variant="ghost" className="mb-2 -ml-3"><Link to="/app/compta/tresorerie/bordereaux-remise"><ArrowLeft className="size-4" /> Retour aux bordereaux</Link></Button>
-        <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-        <h1 className="mt-1 text-xl font-semibold">Nouveau bordereau</h1>
-        <p className="text-sm text-muted-foreground">Bordereaux de chèques, d’effets et de versement d’espèces.</p>
-      </header>
-
-      <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b bg-muted/20 p-4">
-          <Label className="mb-2 block">Type de bordereau</Label>
-          <div className="grid max-w-3xl gap-2 sm:grid-cols-3">
-            <Button type="button" variant="outline" className={type === "CHEQUE" ? "h-11 justify-start border-sky-500 bg-sky-50 text-sky-800 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-200" : "h-11 justify-start"} onClick={() => changeType("CHEQUE")}>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Button asChild variant="ghost" className="mb-2 -ml-3"><Link to="/app/compta/tresorerie/bordereaux-remise"><ArrowLeft className="size-4" /> Retour aux bordereaux</Link></Button>
+          <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
+          <h1 className="mt-1 text-xl font-semibold">Nouveau bordereau</h1>
+          <p className="text-sm text-muted-foreground">Préparez une remise bancaire ou un versement d’espèces.</p>
+        </div>
+        <div className="w-full lg:w-auto">
+          <Label className="mb-1.5 block text-xs uppercase text-muted-foreground">Type de bordereau</Label>
+          <div className="grid grid-cols-1 gap-1 rounded-md border bg-muted/20 p-1 sm:grid-cols-3 lg:min-w-[620px]">
+            <Button type="button" size="sm" variant="ghost" className={type === "CHEQUE" ? "justify-start bg-sky-100 text-sky-900 shadow-sm hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-100" : "justify-start"} onClick={() => changeType("CHEQUE")}>
               <ReceiptText className="size-4" /> Chèques
             </Button>
-            <Button type="button" variant="outline" className={type === "EFFET" ? "h-11 justify-start border-violet-500 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/40 dark:text-violet-200" : "h-11 justify-start"} onClick={() => changeType("EFFET")}>
+            <Button type="button" size="sm" variant="ghost" className={type === "EFFET" ? "justify-start bg-violet-100 text-violet-900 shadow-sm hover:bg-violet-100 dark:bg-violet-950/60 dark:text-violet-100" : "justify-start"} onClick={() => changeType("EFFET")}>
               <FileClock className="size-4" /> Effets
             </Button>
-            <Button type="button" variant="outline" className={type === "VERSEMENT_ESPECES" ? "h-11 justify-start border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200" : "h-11 justify-start"} onClick={() => changeType("VERSEMENT_ESPECES")}>
+            <Button type="button" size="sm" variant="ghost" className={type === "VERSEMENT_ESPECES" ? "justify-start bg-emerald-100 text-emerald-900 shadow-sm hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-100" : "justify-start"} onClick={() => changeType("VERSEMENT_ESPECES")}>
               <Banknote className="size-4" /> Versement d’espèces
             </Button>
           </div>
         </div>
+      </header>
 
-        {type && <div className="border-b p-4">
+      {type ? <section className="overflow-hidden rounded-md border bg-card">
+        <div className="border-b p-4">
           <div className="mb-3 flex items-center gap-2">
             <span className={type === "CHEQUE" ? "h-5 w-1 rounded-sm bg-sky-500" : type === "EFFET" ? "h-5 w-1 rounded-sm bg-violet-500" : "h-5 w-1 rounded-sm bg-emerald-500"} />
             <h2 className="font-semibold">Détails du bordereau</h2>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className={`grid gap-3 md:grid-cols-2 ${type === "VERSEMENT_ESPECES" ? "xl:grid-cols-3 2xl:grid-cols-6" : "xl:grid-cols-4"}`}>
             {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label>Caisse source</Label><Select value={sourceId} onValueChange={setSourceId}><SelectTrigger><SelectValue placeholder="Choisir une caisse" /></SelectTrigger><SelectContent>{cashAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>}
             <div className="grid gap-2"><Label>Compte bancaire de destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger><SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent></Select></div>
             {type === "VERSEMENT_ESPECES" && <div className="grid gap-2"><Label htmlFor="cash-amount">Montant</Label><MoneyInput id="cash-amount" value={cashAmount} onValueChange={setCashAmount} /></div>}
             <div className="grid gap-2"><Label>{type === "VERSEMENT_ESPECES" ? "Date de versement" : "Date du bordereau"}</Label><DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} /></div>
             <div className="grid gap-2"><Label htmlFor="bank-reference">Référence bancaire</Label><Input id="bank-reference" value={bankReference} onChange={(event) => setBankReference(event.target.value)} /></div>
-            <div className="grid gap-2 md:col-span-2 xl:col-span-4"><Label htmlFor="slip-notes">Notes</Label><Textarea id="slip-notes" className="min-h-16" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
+            <div className="grid gap-2"><Label htmlFor="slip-notes">Notes <span className="font-normal text-muted-foreground">(facultatif)</span></Label><Input id="slip-notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
           </div>
-        </div>}
+        </div>
 
         {instrumentType && <div className="grid gap-3 border-b bg-muted/20 p-4 xl:grid-cols-[1fr_190px_190px_auto]">
           <div className="grid gap-2"><Label htmlFor="instrument-search">Payeur, règlement, banque ou référence</Label><Input id="instrument-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
@@ -207,7 +207,7 @@ export default function NouveauBordereauRemisePage() {
         {type === "VERSEMENT_ESPECES" && <div className="flex justify-end bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
           <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}><Banknote className="size-4" /> Enregistrer le versement</Button>
         </div>}
-      </section>
+      </section> : null}
     </div>
   );
 }

@@ -7,6 +7,8 @@ import com.assurance.dto.response.PageMetadata;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.SinistreDetailResponse;
 import com.assurance.dto.response.SinistreSummaryResponse;
+import com.assurance.dto.response.SinistreDoublonResponse;
+import com.assurance.dto.response.SinistreGestionnaireResponse;
 import com.assurance.entity.MouvementGarantie;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreCouverture;
@@ -59,6 +61,41 @@ public class SinistreService {
     private final SinistreReadinessService readinessService;
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
+
+    @Transactional(readOnly = true)
+    public List<SinistreDoublonResponse> findPossibleDuplicates(
+            Long agenceId,
+            Long contratId,
+            Long vehiculeId,
+            LocalDate dateSinistre
+    ) {
+        return sinistreRepository.findPossibleDuplicates(
+                        agenceId,
+                        contratId,
+                        vehiculeId,
+                        dateSinistre
+                ).stream()
+                .map(item -> SinistreDoublonResponse.builder()
+                        .id(item.getId())
+                        .numeroSinistre(item.getNumeroSinistre())
+                        .nature(item.getNature())
+                        .statut(item.getStatut())
+                        .dateSinistre(item.getDateSinistre())
+                        .build())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SinistreGestionnaireResponse> listManagers(Long agenceId) {
+        return utilisateurRepository.findByAgenceIdOrderByNomAscPrenomAsc(agenceId)
+                .stream()
+                .filter(user -> Boolean.TRUE.equals(user.getActif()))
+                .map(user -> SinistreGestionnaireResponse.builder()
+                        .id(user.getId())
+                        .nom(user.getFullName())
+                        .build())
+                .toList();
+    }
 
     @Transactional
     public SinistreDetailResponse create(
@@ -161,7 +198,7 @@ public class SinistreService {
         Utilisateur acteur = resolveCurrentUser(agenceId, utilisateurId);
         Sinistre sinistre = resolve(agenceId, id);
         if (!workflowService.isEditable(sinistre.getStatut())) {
-            throw new BadRequestException("Un sinistre clôturé ou annulé doit être rouvert avant modification");
+            throw new BadRequestException("Le sinistre doit être rouvert avant modification");
         }
         sinistre.setReferenceCompagnie(trimToNull(request.getReferenceCompagnie()));
         sinistre.setVille(resolveVille(request.getVilleId()));
@@ -170,7 +207,18 @@ public class SinistreService {
         sinistre.setNumeroPv(trimToNull(request.getNumeroPv()));
         sinistre.setTauxResponsabilite(request.getTauxResponsabilite());
         sinistre.setNotes(trimToNull(request.getNotes()));
-        sinistre.setGestionnaire(resolveGestionnaire(agenceId, request.getGestionnaireId()));
+        if (request.getGestionnaireId() != null) {
+            sinistre.setGestionnaire(resolveGestionnaire(agenceId, request.getGestionnaireId()));
+        }
+        String nextAction = trimToNull(request.getProchaineAction());
+        if (request.getDateEcheanceAction() != null && nextAction == null) {
+            throw new BadRequestException("Renseignez la prochaine action associée à l'échéance");
+        }
+        if (nextAction != null && sinistre.getGestionnaire() == null) {
+            throw new BadRequestException("Affectez un gestionnaire avant de planifier une action");
+        }
+        sinistre.setProchaineAction(nextAction);
+        sinistre.setDateEcheanceAction(request.getDateEcheanceAction());
         sinistreRepository.save(sinistre);
         evenementService.record(
                 sinistre,

@@ -20,7 +20,9 @@ public interface SinistreOperationRepository extends JpaRepository<SinistreOpera
             "contrepartieClient",
             "contrepartiePartie",
             "contrepartieExpert",
-            "contrepartieGarage"
+            "contrepartieGarage",
+            "compteTresorerie",
+            "operationTresorerie"
     })
     List<SinistreOperation> findBySinistreIdOrderByDateOperationDescCreatedAtDesc(Long sinistreId);
 

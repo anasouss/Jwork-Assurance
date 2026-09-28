@@ -15,9 +15,11 @@ import com.assurance.entity.SessionCaisse;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.NatureMouvementTresorerie;
 import com.assurance.enums.NiveauAccesCompteTresorerie;
+import com.assurance.enums.ModeReglementSinistre;
 import com.assurance.enums.SensMouvementTresorerie;
 import com.assurance.enums.StatutOperationTresorerie;
 import com.assurance.enums.TypeOperationTresorerie;
+import com.assurance.enums.TypeOperationSinistre;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
@@ -178,6 +180,54 @@ public class OperationTresorerieService {
     }
 
     @Transactional
+    public OperationTresorerie createClaimMovement(
+            Long agenceId,
+            Long compteId,
+            TypeOperationSinistre claimType,
+            ModeReglementSinistre paymentMode,
+            BigDecimal value,
+            LocalDate operationDate,
+            String reference,
+            String claimNumber,
+            String counterparty
+    ) {
+        CompteTresorerie account = requireActiveAccount(agenceId, compteId);
+        accessService.requireAccess(agenceId, account.getId(), NiveauAccesCompteTresorerie.GESTION);
+        validateClaimAccount(account, paymentMode);
+        BigDecimal amount = positiveMoney(value);
+        SensMouvementTresorerie direction = claimType == TypeOperationSinistre.RECOURS
+                ? SensMouvementTresorerie.ENTREE
+                : SensMouvementTresorerie.SORTIE;
+        if (direction == SensMouvementTresorerie.SORTIE) {
+            requireSufficientBalance(account, amount);
+        }
+        String reason = "Sinistre " + claimNumber + " - " + claimType + " - " + counterparty;
+        OperationTresorerie operation = buildOperation(
+                agenceId,
+                TypeOperationTresorerie.SINISTRE,
+                direction == SensMouvementTresorerie.SORTIE ? account : null,
+                direction == SensMouvementTresorerie.ENTREE ? account : null,
+                null,
+                amount,
+                operationDate,
+                operationDate,
+                reference,
+                reason,
+                null
+        );
+        operation = operationRepository.save(operation);
+        mouvementRepository.save(buildMovement(
+                operation,
+                account,
+                direction,
+                sessionService.requireOpenSession(agenceId, account),
+                reason,
+                null
+        ));
+        return operation;
+    }
+
+    @Transactional
     public OperationTresorerieResponse cancel(
             Long agenceId,
             Long operationId,
@@ -190,10 +240,11 @@ public class OperationTresorerieService {
             throw new BadRequestException("Cette opération est déjà annulée");
         }
         if (original.getTypeOperation() == TypeOperationTresorerie.ANNULATION_TRANSFERT
-                || original.getTypeOperation() == TypeOperationTresorerie.ANNULATION_AJUSTEMENT) {
+                || original.getTypeOperation() == TypeOperationTresorerie.ANNULATION_AJUSTEMENT
+                || original.getTypeOperation() == TypeOperationTresorerie.ANNULATION_SINISTRE) {
             throw new BadRequestException("Une écriture d'annulation ne peut pas être annulée");
         }
-        requireSupervisor(agenceId, original);
+        requireCancellationAccess(agenceId, original);
         List<MouvementTresorerie> originalMovements = mouvementRepository
                 .findByAgenceIdAndOperationTresorerieIdOrderByIdAsc(agenceId, operationId);
         for (MouvementTresorerie movement : originalMovements) {
@@ -202,9 +253,11 @@ public class OperationTresorerieService {
             }
         }
 
-        TypeOperationTresorerie reversalType = original.getTypeOperation() == TypeOperationTresorerie.TRANSFERT
-                ? TypeOperationTresorerie.ANNULATION_TRANSFERT
-                : TypeOperationTresorerie.ANNULATION_AJUSTEMENT;
+        TypeOperationTresorerie reversalType = switch (original.getTypeOperation()) {
+            case TRANSFERT -> TypeOperationTresorerie.ANNULATION_TRANSFERT;
+            case SINISTRE -> TypeOperationTresorerie.ANNULATION_SINISTRE;
+            default -> TypeOperationTresorerie.ANNULATION_AJUSTEMENT;
+        };
         OperationTresorerie reversal = buildOperation(
                 agenceId,
                 reversalType,
@@ -286,10 +339,7 @@ public class OperationTresorerieService {
                 .compteTresorerie(account)
                 .operationTresorerie(operation)
                 .sessionCaisse(session)
-                .nature(operation.getTypeOperation() == TypeOperationTresorerie.AJUSTEMENT
-                        || operation.getTypeOperation() == TypeOperationTresorerie.ANNULATION_AJUSTEMENT
-                        ? NatureMouvementTresorerie.AJUSTEMENT
-                        : NatureMouvementTresorerie.TRANSFERT)
+                .nature(movementNature(operation.getTypeOperation()))
                 .sens(direction)
                 .dateOperation(operation.getDateOperation())
                 .dateValeur(operation.getDateValeur())
@@ -314,6 +364,48 @@ public class OperationTresorerieService {
                     operation.getCompteDestination().getId(),
                     NiveauAccesCompteTresorerie.SUPERVISION
             );
+        }
+    }
+
+    private void requireCancellationAccess(Long agenceId, OperationTresorerie operation) {
+        if (operation.getTypeOperation() != TypeOperationTresorerie.SINISTRE) {
+            requireSupervisor(agenceId, operation);
+            return;
+        }
+        if (operation.getCompteSource() != null) {
+            accessService.requireAccess(
+                    agenceId,
+                    operation.getCompteSource().getId(),
+                    NiveauAccesCompteTresorerie.GESTION
+            );
+        }
+        if (operation.getCompteDestination() != null) {
+            accessService.requireAccess(
+                    agenceId,
+                    operation.getCompteDestination().getId(),
+                    NiveauAccesCompteTresorerie.GESTION
+            );
+        }
+    }
+
+    private NatureMouvementTresorerie movementNature(TypeOperationTresorerie type) {
+        return switch (type) {
+            case AJUSTEMENT, ANNULATION_AJUSTEMENT -> NatureMouvementTresorerie.AJUSTEMENT;
+            case SINISTRE -> NatureMouvementTresorerie.SINISTRE;
+            case ANNULATION_SINISTRE -> NatureMouvementTresorerie.ANNULATION_SINISTRE;
+            default -> NatureMouvementTresorerie.TRANSFERT;
+        };
+    }
+
+    private void validateClaimAccount(CompteTresorerie account, ModeReglementSinistre paymentMode) {
+        if (paymentMode == ModeReglementSinistre.ESPECES
+                && account.getTypeCompte() != com.assurance.enums.TypeCompteTresorerie.CAISSE) {
+            throw new BadRequestException("Un règlement en espèces doit utiliser une caisse");
+        }
+        if ((paymentMode == ModeReglementSinistre.VIREMENT
+                || paymentMode == ModeReglementSinistre.CHEQUE)
+                && account.getTypeCompte() != com.assurance.enums.TypeCompteTresorerie.BANQUE) {
+            throw new BadRequestException("Ce moyen de règlement doit utiliser un compte bancaire");
         }
     }
 

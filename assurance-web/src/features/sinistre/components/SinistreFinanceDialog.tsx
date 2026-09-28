@@ -21,7 +21,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type {
   ModeReglementSinistre,
+  CircuitFinancierSinistre,
   SinistreDetail,
+  SinistreTreasuryAccount,
   TypeContrepartieSinistre,
   TypeOperation,
 } from "../types";
@@ -32,6 +34,7 @@ export function SinistreFinanceDialog({
   open,
   mode,
   dossier,
+  treasuryAccounts,
   saving,
   onOpenChange,
   onSubmit,
@@ -39,6 +42,7 @@ export function SinistreFinanceDialog({
   open: boolean;
   mode: FinanceDialogMode;
   dossier: SinistreDetail;
+  treasuryAccounts: SinistreTreasuryAccount[];
   saving: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (request: object) => void;
@@ -53,6 +57,9 @@ export function SinistreFinanceDialog({
   const [freeCounterpartyReason, setFreeCounterpartyReason] = useState("");
   const [modeReglement, setModeReglement] =
     useState<ModeReglementSinistre>("VIREMENT");
+  const [compteTresorerieId, setCompteTresorerieId] = useState("");
+  const [circuitFinancier, setCircuitFinancier] =
+    useState<CircuitFinancierSinistre>("DIRECT_COMPAGNIE");
 
   const counterpartyOptions = useMemo(
     () => buildCounterpartyOptions(dossier),
@@ -71,6 +78,8 @@ export function SinistreFinanceDialog({
       setFreeCounterpartyName("");
       setFreeCounterpartyReason("");
       setModeReglement("VIREMENT");
+      setCompteTresorerieId("");
+      setCircuitFinancier("DIRECT_COMPAGNIE");
     }
   }, [open, mode]);
 
@@ -79,6 +88,17 @@ export function SinistreFinanceDialog({
   const freeCounterpartyValid =
     selectedCounterparty.type !== "AUTRE" ||
     Boolean(freeCounterpartyName.trim() && freeCounterpartyReason.trim());
+  const compatibleAccounts = treasuryAccounts.filter((account) =>
+    modeReglement === "ESPECES"
+      ? account.typeCompte === "CAISSE"
+      : modeReglement === "VIREMENT" || modeReglement === "CHEQUE"
+        ? account.typeCompte === "BANQUE"
+        : true,
+  );
+  const accountRequired =
+    mode === "OPERATION" &&
+    circuitFinancier === "TRESORERIE_AGENCE" &&
+    modeReglement !== "COMPENSATION";
   const valid = Boolean(
     date &&
       Number(montant) > 0 &&
@@ -86,6 +106,7 @@ export function SinistreFinanceDialog({
       (mode !== "OPERATION" ||
         (counterpartyValue &&
           modeReglement &&
+          (!accountRequired || compteTresorerieId) &&
           freeCounterpartyValid &&
           (!referenceRequired || reference.trim()))),
   );
@@ -186,9 +207,13 @@ export function SinistreFinanceDialog({
               <Field label="Moyen de paiement *">
                 <Select
                   value={modeReglement}
-                  onValueChange={(value) =>
-                    setModeReglement(value as ModeReglementSinistre)
-                  }
+                  onValueChange={(value) => {
+                    setModeReglement(value as ModeReglementSinistre);
+                    setCompteTresorerieId("");
+                    if (value === "COMPENSATION") {
+                      setCircuitFinancier("DIRECT_COMPAGNIE");
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -202,6 +227,23 @@ export function SinistreFinanceDialog({
                   </SelectContent>
                 </Select>
               </Field>
+              <Field label="Circuit financier *">
+                <Select
+                  value={circuitFinancier}
+                  onValueChange={(value) => {
+                    setCircuitFinancier(value as CircuitFinancierSinistre);
+                    setCompteTresorerieId("");
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DIRECT_COMPAGNIE">Paiement direct compagnie</SelectItem>
+                    {modeReglement !== "COMPENSATION" ? (
+                      <SelectItem value="TRESORERIE_AGENCE">Via la trésorerie de l’agence</SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </Field>
               <Field label={`Référence${referenceRequired ? " *" : ""}`}>
                 <Input
                   value={reference}
@@ -209,6 +251,25 @@ export function SinistreFinanceDialog({
                   onChange={(event) => setReference(event.target.value)}
                 />
               </Field>
+              {accountRequired ? (
+                <Field label="Compte de trésorerie *">
+                  <Select
+                    value={compteTresorerieId}
+                    onValueChange={setCompteTresorerieId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un compte" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {compatibleAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.code} - {account.libelle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : null}
             </>
           ) : null}
           <div className="sm:col-span-2">
@@ -251,6 +312,9 @@ export function SinistreFinanceDialog({
                           ? freeCounterpartyReason.trim()
                           : undefined,
                       modeReglement,
+                      circuitFinancier,
+                      compteTresorerieId:
+                        accountRequired ? compteTresorerieId : undefined,
                       notes: motif.trim() || undefined,
                     },
               )

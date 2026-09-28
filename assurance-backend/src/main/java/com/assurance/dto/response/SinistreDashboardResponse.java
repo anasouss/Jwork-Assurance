@@ -13,6 +13,7 @@ public class SinistreDashboardResponse {
     private long declaresCeMois;
     private long enExpertise;
     private long enAttenteReglement;
+    private long actionsEnRetard;
     private BigDecimal provisionsOuvertes;
     private BigDecimal reglementsAnnee;
     private BigDecimal recoursAnnee;

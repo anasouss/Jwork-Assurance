@@ -223,7 +223,7 @@ export default function SinistreListPage() {
       <Card className="shadow-none">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1180px]">
+            <Table className="min-w-[1320px]">
               <TableHeader className="bg-sky-700 text-white [&_th]:text-white">
                 <TableRow className="hover:bg-sky-700">
                   <TableHead>N° sinistre</TableHead>
@@ -235,12 +235,13 @@ export default function SinistreListPage() {
                   <TableHead>Immatriculation</TableHead>
                   <TableHead>Provision</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead>Suivi</TableHead>
                   <TableHead className="w-20 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {list.isLoading ? (
-                  <TableRowsSkeleton rows={7} colSpan={10} />
+                  <TableRowsSkeleton rows={7} colSpan={11} />
                 ) : null}
                 {(list.data?.items ?? []).map((item) => (
                   <TableRow key={item.id}>
@@ -265,6 +266,14 @@ export default function SinistreListPage() {
                     <TableCell>
                       <SinistreStatusBadge statut={item.statut} />
                     </TableCell>
+                    <TableCell>
+                      <div>{item.prochaineAction || "-"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {[item.gestionnaire, item.dateEcheanceAction ? formatDate(item.dateEcheanceAction) : null]
+                          .filter(Boolean)
+                          .join(" · ") || "-"}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button asChild variant="ghost" size="icon">
                         <Link
@@ -280,7 +289,7 @@ export default function SinistreListPage() {
                 {!list.isLoading && (list.data?.items.length ?? 0) === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={11}
                       className="py-10 text-center text-muted-foreground"
                     >
                       Aucun dossier ne correspond aux critères.

@@ -1,9 +1,13 @@
 package com.assurance.service;
 
 import com.assurance.entity.ProvisionSinistre;
+import com.assurance.entity.Agence;
+import com.assurance.entity.ExigenceDocumentSinistre;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreGarantie;
 import com.assurance.enums.DecisionCouvertureSinistre;
+import com.assurance.enums.NatureSinistre;
+import com.assurance.enums.TypeDocumentSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.enums.TypeOperationSinistre;
 import com.assurance.repository.MissionExpertiseRepository;
@@ -28,13 +32,16 @@ class SinistreReadinessServiceTest {
     private final SinistreOperationRepository operations = mock(SinistreOperationRepository.class);
     private final SinistreDocumentRepository documents = mock(SinistreDocumentRepository.class);
     private final ProvisionSinistreRepository provisions = mock(ProvisionSinistreRepository.class);
+    private final SinistreDocumentRequirementService documentRequirements =
+            mock(SinistreDocumentRequirementService.class);
     private final SinistreReadinessService service = new SinistreReadinessService(
             new SinistreWorkflowService(),
             guarantees,
             missions,
             operations,
             documents,
-            provisions
+            provisions,
+            documentRequirements
     );
 
     @Test
@@ -87,9 +94,31 @@ class SinistreReadinessServiceTest {
                 .containsExactlyInAnyOrder(StatutSinistre.CLOTURE, StatutSinistre.ROUVERT);
     }
 
+    @Test
+    void transmissionIsBlockedWhenARequiredDocumentIsMissing() {
+        Sinistre claim = claim(12L, StatutSinistre.DECLARE);
+        when(guarantees.findBySinistreIdOrderBySnapshotCode(12L))
+                .thenReturn(List.of(acceptedGuarantee("1000.00")));
+        when(documents.findBySinistreIdOrderByCreatedAtDesc(12L)).thenReturn(List.of());
+        when(documentRequirements.applicable(1L, NatureSinistre.ACCIDENT)).thenReturn(List.of(
+                ExigenceDocumentSinistre.builder()
+                        .typeDocument(TypeDocumentSinistre.DECLARATION)
+                        .libelle("Déclaration de sinistre")
+                        .obligatoire(true)
+                        .build()
+        ));
+
+        assertThat(service.blockers(claim, StatutSinistre.TRANSMIS_COMPAGNIE))
+                .contains("Ajoutez le document obligatoire : Déclaration de sinistre");
+    }
+
     private Sinistre claim(Long id, StatutSinistre status) {
+        Agence agency = new Agence();
+        agency.setId(1L);
         Sinistre claim = Sinistre.builder()
+                .agence(agency)
                 .statut(status)
+                .nature(NatureSinistre.ACCIDENT)
                 .circonstances("Collision")
                 .build();
         claim.setId(id);

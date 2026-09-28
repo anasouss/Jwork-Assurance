@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FilePlus2,
   FileX2,
+  Pencil,
   Plus,
   Save,
   Trash2,
@@ -84,6 +85,7 @@ export default function SinistreDetailPage() {
   const canFinance = permissions.includes("sinistre:finance");
   const [transitionOpen, setTransitionOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
+  const [editingParty, setEditingParty] = useState<SinistreDetail["parties"][number] | null>(null);
   const [financeMode, setFinanceMode] = useState<FinanceDialogMode | null>(
     null,
   );
@@ -115,6 +117,16 @@ export default function SinistreDetailPage() {
     queryKey: sinistreKeys.garages(false),
     queryFn: () => sinistreApi.garages(false),
     enabled: canManage,
+  });
+  const managers = useQuery({
+    queryKey: sinistreKeys.managers(),
+    queryFn: sinistreApi.managers,
+    enabled: canManage,
+  });
+  const treasuryAccounts = useQuery({
+    queryKey: sinistreKeys.treasuryAccounts(),
+    queryFn: sinistreApi.treasuryAccounts,
+    enabled: canFinance,
   });
 
   const accept = (result: SinistreDetail, message: string) => {
@@ -153,10 +165,14 @@ export default function SinistreDetailPage() {
     onError: fail,
   });
   const party = useMutation({
-    mutationFn: (request: object) => sinistreApi.addParty(sinistreId, request),
+    mutationFn: (request: object) =>
+      editingParty
+        ? sinistreApi.updateParty(sinistreId, editingParty.id, request)
+        : sinistreApi.addParty(sinistreId, request),
     onSuccess: (result) => {
       setPartyOpen(false);
-      accept(result, "Partie ajoutée");
+      setEditingParty(null);
+      accept(result, editingParty ? "Partie mise à jour" : "Partie ajoutée");
     },
     onError: fail,
   });
@@ -203,11 +219,13 @@ export default function SinistreDetailPage() {
       type,
       commentaire,
       file,
+      metadata,
     }: {
       type: TypeDocument;
       commentaire: string;
       file: File;
-    }) => sinistreApi.uploadDocument(sinistreId, type, commentaire, file),
+      metadata: Record<string, string>;
+    }) => sinistreApi.uploadDocument(sinistreId, type, commentaire, file, metadata),
     onSuccess: (result) => {
       setDocumentOpen(false);
       accept(result, "Document déposé");
@@ -259,7 +277,10 @@ export default function SinistreDetailPage() {
       </div>
     );
   const dossier = detail.data;
-  const locked = dossier.statut === "CLOTURE" || dossier.statut === "ANNULE";
+  const locked =
+    dossier.statut === "CLOTURE" ||
+    dossier.statut === "ANNULE" ||
+    dossier.statut === "REJETE";
   const cancelledIds = new Set(
     dossier.operations
       .filter((item) => item.type === "ANNULATION" && item.operationAnnuleeId)
@@ -324,6 +345,7 @@ export default function SinistreDetailPage() {
           <GeneralSection
             dossier={dossier}
             cities={cities.data ?? []}
+            managers={managers.data ?? []}
             editable={canManage && !locked}
             saving={update.isPending}
             onSave={(request) => update.mutate(request)}
@@ -341,7 +363,7 @@ export default function SinistreDetailPage() {
               title="Parties impliquées"
               action={
                 canManage && !locked ? (
-                  <Button size="sm" onClick={() => setPartyOpen(true)}>
+                  <Button size="sm" onClick={() => { setEditingParty(null); setPartyOpen(true); }}>
                     <Plus className="size-4" />
                     Ajouter
                   </Button>
@@ -376,14 +398,14 @@ export default function SinistreDetailPage() {
                       </TableCell>
                       <TableCell>
                         {canManage && !locked ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Retirer"
-                            onClick={() => removeParty.mutate(item.id)}
-                          >
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" aria-label="Modifier" onClick={() => { setEditingParty(item); setPartyOpen(true); }}>
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label="Retirer" onClick={() => removeParty.mutate(item.id)}>
+                              <Trash2 className="size-4 text-destructive" />
+                            </Button>
+                          </div>
                         ) : null}
                       </TableCell>
                     </TableRow>
@@ -492,14 +514,34 @@ export default function SinistreDetailPage() {
                 ) : null
               }
             />
+            {dossier.workflow.documentsRequis.length > 0 ? (
+              <div className="flex flex-wrap gap-2 border-b px-4 py-3">
+                {dossier.workflow.documentsRequis.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-2 rounded border px-2.5 py-1.5 text-sm ${
+                      item.valide
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : item.recu
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-border bg-muted/40 text-muted-foreground"
+                    }`}
+                  >
+                    {item.valide ? <CircleCheck className="size-4" /> : <CircleAlert className="size-4" />}
+                    <span>{item.libelle}</span>
+                    {item.obligatoire ? <span className="text-xs">Obligatoire</span> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Document</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Déposé par</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Référence / émetteur</TableHead>
+                    <TableHead>Date / montant</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead className="w-40">Actions</TableHead>
                   </TableRow>
@@ -511,8 +553,14 @@ export default function SinistreDetailPage() {
                         {item.nomFichier}
                       </TableCell>
                       <TableCell>{documentTypeLabels[item.type]}</TableCell>
-                      <TableCell>{item.deposePar}</TableCell>
-                      <TableCell>{formatDate(item.createdAt)}</TableCell>
+                      <TableCell>
+                        <div>{item.reference || "-"}</div>
+                        <div className="text-xs text-muted-foreground">{item.emetteur || item.garantie || item.missionExpertise || "-"}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div>{formatDate(item.dateDocument || item.createdAt)}</div>
+                        <div className="text-xs tabular-nums text-muted-foreground">{item.montant == null ? "-" : formatMoney(item.montant)}</div>
+                      </TableCell>
                       <TableCell>{item.statut}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -682,9 +730,21 @@ export default function SinistreDetailPage() {
                         {operationFlow(item)}
                       </TableCell>
                       <TableCell>
-                        {[paymentModeLabel(item.modeReglement), item.reference]
-                          .filter(Boolean)
-                          .join(" · ") || "-"}
+                        <div>
+                          {[paymentModeLabel(item.modeReglement), item.reference]
+                            .filter(Boolean)
+                            .join(" · ") || "-"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {[item.compteTresorerie, item.numeroOperationTresorerie]
+                            .filter(Boolean)
+                            .join(" · ") ||
+                            (item.circuitFinancier === "DIRECT_COMPAGNIE"
+                              ? "Paiement direct compagnie"
+                              : item.modeReglement === "COMPENSATION"
+                                ? "Sans mouvement de trésorerie"
+                                : "-")}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatMoney(item.montant)}
@@ -764,13 +824,15 @@ export default function SinistreDetailPage() {
       <SinistrePartyDialog
         open={partyOpen}
         saving={party.isPending}
-        onOpenChange={setPartyOpen}
+        party={editingParty}
+        onOpenChange={(open) => { setPartyOpen(open); if (!open) setEditingParty(null); }}
         onSubmit={(request) => party.mutate(request)}
       />
       <SinistreFinanceDialog
         open={financeMode !== null}
         mode={financeMode ?? "PROVISION"}
         dossier={dossier}
+        treasuryAccounts={treasuryAccounts.data ?? []}
         saving={finance.isPending}
         onOpenChange={(open) => {
           if (!open) setFinanceMode(null);
@@ -782,9 +844,10 @@ export default function SinistreDetailPage() {
       <SinistreDocumentDialog
         open={documentOpen}
         saving={document.isPending}
+        dossier={dossier}
         onOpenChange={setDocumentOpen}
-        onSubmit={(type, commentaire, file) =>
-          document.mutate({ type, commentaire, file })
+        onSubmit={(type, commentaire, file, metadata) =>
+          document.mutate({ type, commentaire, file, metadata })
         }
       />
       <SinistreMissionDialog
@@ -860,12 +923,14 @@ function SectionHeader({
 function GeneralSection({
   dossier,
   cities,
+  managers,
   editable,
   saving,
   onSave,
 }: {
   dossier: SinistreDetail;
   cities: Array<{ id: string; libelle: string }>;
+  managers: Array<{ id: string; nom: string }>;
   editable: boolean;
   saving: boolean;
   onSave: (request: object) => void;
@@ -878,6 +943,9 @@ function GeneralSection({
     numeroPv: "",
     tauxResponsabilite: "",
     notes: "",
+    gestionnaireId: "",
+    prochaineAction: "",
+    dateEcheanceAction: "",
   });
   useEffect(
     () =>
@@ -892,6 +960,9 @@ function GeneralSection({
             ? ""
             : String(dossier.tauxResponsabilite),
         notes: dossier.notes || "",
+        gestionnaireId: dossier.gestionnaireId || "",
+        prochaineAction: dossier.prochaineAction || "",
+        dateEcheanceAction: dossier.dateEcheanceAction || "",
       }),
     [dossier],
   );
@@ -918,6 +989,9 @@ function GeneralSection({
                     ? Number(form.tauxResponsabilite)
                     : undefined,
                   notes: form.notes.trim() || undefined,
+                  gestionnaireId: form.gestionnaireId || dossier.gestionnaireId,
+                  prochaineAction: form.prochaineAction.trim() || undefined,
+                  dateEcheanceAction: form.dateEcheanceAction || undefined,
                 })
               }
             >
@@ -963,6 +1037,42 @@ function GeneralSection({
               }
             />
           </Field>
+          <Field label="Gestionnaire">
+            <Select
+              disabled={!editable}
+              value={form.gestionnaireId}
+              onValueChange={(value) => update("gestionnaireId", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner" />
+              </SelectTrigger>
+              <SelectContent>
+                {managers.map((manager) => (
+                  <SelectItem key={manager.id} value={manager.id}>
+                    {manager.nom}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Échéance de l’action">
+            <Input
+              disabled={!editable}
+              type="date"
+              value={form.dateEcheanceAction}
+              onChange={(event) => update("dateEcheanceAction", event.target.value)}
+            />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Prochaine action">
+              <Input
+                disabled={!editable}
+                maxLength={500}
+                value={form.prochaineAction}
+                onChange={(event) => update("prochaineAction", event.target.value)}
+              />
+            </Field>
+          </div>
           <div className="sm:col-span-2">
             <Field label="Lieu">
               <Input

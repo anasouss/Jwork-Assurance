@@ -11,6 +11,7 @@ import com.assurance.enums.TypeEvenementSinistre;
 import com.assurance.enums.TypeOperationSinistre;
 import com.assurance.enums.TypePartieSinistre;
 import com.assurance.enums.TypeContrepartieSinistre;
+import com.assurance.enums.CircuitFinancierSinistre;
 import lombok.Builder;
 import lombok.Data;
 
@@ -43,6 +44,8 @@ public class SinistreDetailResponse {
     private String notes;
     private Long gestionnaireId;
     private String gestionnaire;
+    private String prochaineAction;
+    private LocalDate dateEcheanceAction;
     private Couverture couverture;
     private Totaux totaux;
     private List<Garantie> garanties;
@@ -92,6 +95,18 @@ public class SinistreDetailResponse {
         private List<Transition> transitions;
         private int documentsRecus;
         private int documentsRejetes;
+        private List<DocumentRequis> documentsRequis;
+
+        @Data
+        @Builder
+        public static class DocumentRequis {
+            private Long id;
+            private TypeDocumentSinistre type;
+            private String libelle;
+            private boolean obligatoire;
+            private boolean recu;
+            private boolean valide;
+        }
 
         @Data
         @Builder
@@ -144,6 +159,16 @@ public class SinistreDetailResponse {
         private String nomFichier;
         private String contentType;
         private long tailleOctets;
+        private LocalDate dateDocument;
+        private String reference;
+        private BigDecimal montant;
+        private String emetteur;
+        private Long sinistreGarantieId;
+        private String garantie;
+        private Long missionExpertiseId;
+        private String missionExpertise;
+        private Long garageId;
+        private String garage;
         private String commentaire;
         private String deposePar;
         private String validePar;
@@ -196,6 +221,11 @@ public class SinistreDetailResponse {
         /** @deprecated Use contrepartie. Kept for API compatibility. */
         private String beneficiaire;
         private ModeReglementSinistre modeReglement;
+        private CircuitFinancierSinistre circuitFinancier;
+        private Long compteTresorerieId;
+        private String compteTresorerie;
+        private Long operationTresorerieId;
+        private String numeroOperationTresorerie;
         private String notes;
         private Long operationAnnuleeId;
         private String saisiePar;

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { TypePartie } from "../types";
+import type { SinistreDetail, TypePartie } from "../types";
 
 const LABELS: Record<TypePartie, string> = {
   CONDUCTEUR: "Conducteur",
@@ -31,11 +31,13 @@ const LABELS: Record<TypePartie, string> = {
 export function SinistrePartyDialog({
   open,
   saving,
+  party,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
   saving: boolean;
+  party?: SinistreDetail["parties"][number] | null;
   onOpenChange: (open: boolean) => void;
   onSubmit: (request: object) => void;
 }) {
@@ -53,24 +55,24 @@ export function SinistrePartyDialog({
   useEffect(() => {
     if (open)
       setForm({
-        type: "ADVERSAIRE",
-        nom: "",
-        telephone: "",
-        cin: "",
-        numeroPermis: "",
-        immatriculation: "",
-        compagnieAdverse: "",
-        numeroPoliceAdverse: "",
-        notes: "",
+        type: party?.type ?? "ADVERSAIRE",
+        nom: party?.nom ?? "",
+        telephone: party?.telephone ?? "",
+        cin: party?.cin ?? "",
+        numeroPermis: party?.numeroPermis ?? "",
+        immatriculation: party?.immatriculation ?? "",
+        compagnieAdverse: party?.compagnieAdverse ?? "",
+        numeroPoliceAdverse: party?.numeroPoliceAdverse ?? "",
+        notes: party?.notes ?? "",
       });
-  }, [open]);
+  }, [open, party]);
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Ajouter une partie impliquée</DialogTitle>
+          <DialogTitle>{party ? "Modifier la partie impliquée" : "Ajouter une partie impliquée"}</DialogTitle>
           <DialogDescription>
             Conducteur, adversaire, passager, victime ou bénéficiaire lié au sinistre.
           </DialogDescription>
@@ -160,7 +162,7 @@ export function SinistrePartyDialog({
             disabled={!form.nom.trim() || saving}
             onClick={() => onSubmit(clean(form))}
           >
-            Ajouter
+            {party ? "Enregistrer" : "Ajouter"}
           </Button>
         </DialogFooter>
       </DialogContent>

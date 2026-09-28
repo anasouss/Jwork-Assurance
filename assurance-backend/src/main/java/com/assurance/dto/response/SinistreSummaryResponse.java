@@ -25,6 +25,8 @@ public class SinistreSummaryResponse {
     private String assure;
     private String immatriculation;
     private String gestionnaire;
+    private String prochaineAction;
+    private LocalDate dateEcheanceAction;
     private BigDecimal provisionCourante;
     private BigDecimal totalRegle;
     private BigDecimal totalRecours;

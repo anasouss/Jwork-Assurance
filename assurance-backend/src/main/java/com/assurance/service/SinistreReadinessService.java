@@ -33,6 +33,7 @@ public class SinistreReadinessService {
     private final SinistreOperationRepository operationRepository;
     private final SinistreDocumentRepository documentRepository;
     private final ProvisionSinistreRepository provisionRepository;
+    private final SinistreDocumentRequirementService documentRequirementService;
 
     public List<TransitionReadiness> transitions(Sinistre sinistre) {
         ReadinessContext context = loadContext(sinistre.getId());
@@ -63,6 +64,17 @@ public class SinistreReadinessService {
         }
 
         if (target == StatutSinistre.TRANSMIS_COMPAGNIE) {
+            documentRequirementService.applicable(
+                    sinistre.getAgence().getId(),
+                    sinistre.getNature()
+            ).stream()
+                    .filter(requirement -> requirement.isObligatoire())
+                    .filter(requirement -> context.documents().stream().noneMatch(document ->
+                            document.getType() == requirement.getTypeDocument()
+                                    && document.getStatut() != StatutDocumentSinistre.REJETE))
+                    .forEach(requirement -> blockers.add(
+                            "Ajoutez le document obligatoire : " + requirement.getLibelle()
+                    ));
             long documentsAwaitingReview = context.documents().stream()
                     .filter(document -> document.getStatut() == StatutDocumentSinistre.RECU)
                     .count();

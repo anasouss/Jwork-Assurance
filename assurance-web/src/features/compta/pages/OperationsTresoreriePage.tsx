@@ -424,8 +424,10 @@ function operationTypeLabel(type: TreasuryOperation["typeOperation"]) {
   const labels: Record<TreasuryOperation["typeOperation"], string> = {
     TRANSFERT: "Transfert",
     AJUSTEMENT: "Correction",
+    SINISTRE: "Opération de sinistre",
     ANNULATION_TRANSFERT: "Annulation de transfert",
     ANNULATION_AJUSTEMENT: "Annulation de correction",
+    ANNULATION_SINISTRE: "Annulation d’opération de sinistre",
   };
   return labels[type];
 }

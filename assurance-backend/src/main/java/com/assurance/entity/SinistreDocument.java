@@ -17,6 +17,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -63,6 +65,30 @@ public class SinistreDocument extends BaseEntity {
 
     @Column(name = "date_validation")
     private LocalDateTime dateValidation;
+
+    @Column(name = "date_document")
+    private LocalDate dateDocument;
+
+    @Column(length = 120)
+    private String reference;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal montant;
+
+    @Column(length = 180)
+    private String emetteur;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sinistre_garantie_id")
+    private SinistreGarantie sinistreGarantie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mission_expertise_id")
+    private MissionExpertise missionExpertise;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "garage_id")
+    private GarageSinistre garage;
 
     @Column(length = 500)
     private String commentaire;

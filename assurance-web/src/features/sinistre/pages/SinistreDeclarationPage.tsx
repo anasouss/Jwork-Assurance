@@ -79,6 +79,15 @@ export default function SinistreDeclarationPage() {
     (coverage.data?.vehicules.length === 1
       ? coverage.data.vehicules[0]
       : undefined);
+  const duplicates = useQuery({
+    queryKey:
+      contract && selectedVehicle && dateSinistre
+        ? sinistreKeys.duplicates(contract.id, selectedVehicle.id, dateSinistre)
+        : ["sinistres", "duplicates", "idle"],
+    queryFn: () =>
+      sinistreApi.duplicates(contract!.id, selectedVehicle!.id, dateSinistre),
+    enabled: Boolean(contract && selectedVehicle && dateSinistre),
+  });
 
   const create = useMutation({
     mutationFn: (declarer: boolean) =>
@@ -158,6 +167,18 @@ export default function SinistreDeclarationPage() {
           La couverture est déterminée à la date exacte du sinistre.
         </p>
       </div>
+      {(duplicates.data?.length ?? 0) > 0 ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">Un sinistre existe déjà pour ce contrat, ce véhicule et cette date.</p>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+            {duplicates.data!.map((item) => (
+              <Link key={item.id} className="underline underline-offset-2" to={`/app/sinistre/dossiers/${item.id}`}>
+                {item.numeroSinistre} · {natureLabels[item.nature]}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <Section
         number="1"

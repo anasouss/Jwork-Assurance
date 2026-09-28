@@ -3,6 +3,7 @@ package com.assurance.dto.request;
 import com.assurance.enums.ModeReglementSinistre;
 import com.assurance.enums.TypeContrepartieSinistre;
 import com.assurance.enums.TypeOperationSinistre;
+import com.assurance.enums.CircuitFinancierSinistre;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -40,6 +41,10 @@ public class AddSinistreOperationRequest {
 
     @NotNull
     private ModeReglementSinistre modeReglement;
+
+    private Long compteTresorerieId;
+
+    private CircuitFinancierSinistre circuitFinancier;
 
     @Size(max = 500)
     private String notes;

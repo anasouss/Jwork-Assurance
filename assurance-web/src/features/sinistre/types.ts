@@ -34,6 +34,7 @@ export type TypePartie =
   | "VICTIME"
   | "BENEFICIAIRE";
 export type TypeOperation = "REGLEMENT" | "RECOURS" | "FRAIS" | "ANNULATION";
+export type CircuitFinancierSinistre = "DIRECT_COMPAGNIE" | "TRESORERIE_AGENCE";
 export type ModeReglementSinistre =
   | "VIREMENT"
   | "CHEQUE"
@@ -86,6 +87,8 @@ export type SinistreSummary = {
   assure?: string | null;
   immatriculation?: string | null;
   gestionnaire?: string | null;
+  prochaineAction?: string | null;
+  dateEcheanceAction?: string | null;
   provisionCourante: number;
   totalRegle: number;
   totalRecours: number;
@@ -97,6 +100,7 @@ export type SinistreDashboard = {
   declaresCeMois: number;
   enExpertise: number;
   enAttenteReglement: number;
+  actionsEnRetard: number;
   provisionsOuvertes: number;
   reglementsAnnee: number;
   recoursAnnee: number;
@@ -148,6 +152,8 @@ export type SinistreDetail = SinistreSummary & {
   tauxResponsabilite?: number | null;
   notes?: string | null;
   gestionnaireId?: string | null;
+  prochaineAction?: string | null;
+  dateEcheanceAction?: string | null;
   couverture: {
     contratId: string;
     mouvementId: string;
@@ -208,6 +214,16 @@ export type SinistreDetail = SinistreSummary & {
     nomFichier: string;
     contentType?: string | null;
     tailleOctets: number;
+    dateDocument?: string | null;
+    reference?: string | null;
+    montant?: number | null;
+    emetteur?: string | null;
+    sinistreGarantieId?: string | null;
+    garantie?: string | null;
+    missionExpertiseId?: string | null;
+    missionExpertise?: string | null;
+    garageId?: string | null;
+    garage?: string | null;
     commentaire?: string | null;
     deposePar: string;
     validePar?: string | null;
@@ -256,6 +272,11 @@ export type SinistreDetail = SinistreSummary & {
     justificationContrepartieLibre?: string | null;
     beneficiaire?: string | null;
     modeReglement?: ModeReglementSinistre | null;
+    circuitFinancier?: CircuitFinancierSinistre | null;
+    compteTresorerieId?: string | null;
+    compteTresorerie?: string | null;
+    operationTresorerieId?: string | null;
+    numeroOperationTresorerie?: string | null;
     notes?: string | null;
     operationAnnuleeId?: string | null;
     saisiePar: string;
@@ -278,7 +299,37 @@ export type SinistreDetail = SinistreSummary & {
     }>;
     documentsRecus: number;
     documentsRejetes: number;
+    documentsRequis: Array<{
+      id: string;
+      type: TypeDocument;
+      libelle: string;
+      obligatoire: boolean;
+      recu: boolean;
+      valide: boolean;
+    }>;
   };
+};
+
+export type SinistreGestionnaire = {
+  id: string;
+  nom: string;
+};
+
+export type SinistreTreasuryAccount = {
+  id: string;
+  code: string;
+  libelle: string;
+  typeCompte: "CAISSE" | "BANQUE";
+  devise: string;
+  soldeCourant: number;
+};
+
+export type SinistreDuplicate = {
+  id: string;
+  numeroSinistre: string;
+  nature: NatureSinistre;
+  statut: StatutSinistre;
+  dateSinistre: string;
 };
 
 export type Intervenant = {

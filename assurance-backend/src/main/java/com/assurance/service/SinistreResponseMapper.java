@@ -40,6 +40,7 @@ public class SinistreResponseMapper {
     private final MissionExpertiseRepository missionRepository;
     private final ProvisionSinistreRepository provisionRepository;
     private final SinistreOperationRepository operationRepository;
+    private final SinistreDocumentRequirementService documentRequirementService;
     private final SinistreEvenementRepository evenementRepository;
     private final SinistreReadinessService readinessService;
 
@@ -64,6 +65,8 @@ public class SinistreResponseMapper {
                 .assure(couverture.getAssure())
                 .immatriculation(couverture.getImmatriculation())
                 .gestionnaire(fullName(sinistre.getGestionnaire()))
+                .prochaineAction(sinistre.getProchaineAction())
+                .dateEcheanceAction(sinistre.getDateEcheanceAction())
                 .provisionCourante(totaux.provision())
                 .totalRegle(totaux.reglements())
                 .totalRecours(totaux.recours())
@@ -111,6 +114,8 @@ public class SinistreResponseMapper {
                 .notes(sinistre.getNotes())
                 .gestionnaireId(sinistre.getGestionnaire() == null ? null : sinistre.getGestionnaire().getId())
                 .gestionnaire(fullName(sinistre.getGestionnaire()))
+                .prochaineAction(sinistre.getProchaineAction())
+                .dateEcheanceAction(sinistre.getDateEcheanceAction())
                 .couverture(toCoverage(sinistre, couverture))
                 .totaux(SinistreDetailResponse.Totaux.builder()
                         .provisionCourante(totaux.provision())
@@ -149,6 +154,23 @@ public class SinistreResponseMapper {
                 .documentsRejetes((int) documents.stream()
                         .filter(item -> item.getStatut() == com.assurance.enums.StatutDocumentSinistre.REJETE)
                         .count())
+                .documentsRequis(documentRequirementService.applicable(
+                                sinistre.getAgence().getId(),
+                                sinistre.getNature()
+                        ).stream()
+                        .map(requirement -> SinistreDetailResponse.Workflow.DocumentRequis.builder()
+                                .id(requirement.getId())
+                                .type(requirement.getTypeDocument())
+                                .libelle(requirement.getLibelle())
+                                .obligatoire(requirement.isObligatoire())
+                                .recu(documents.stream().anyMatch(document ->
+                                        document.getType() == requirement.getTypeDocument()
+                                                && document.getStatut() != com.assurance.enums.StatutDocumentSinistre.REJETE))
+                                .valide(documents.stream().anyMatch(document ->
+                                        document.getType() == requirement.getTypeDocument()
+                                                && document.getStatut() == com.assurance.enums.StatutDocumentSinistre.VALIDE))
+                                .build())
+                        .toList())
                 .build();
     }
 
@@ -232,6 +254,16 @@ public class SinistreResponseMapper {
                 .nomFichier(item.getNomFichier())
                 .contentType(item.getContentType())
                 .tailleOctets(item.getTailleOctets())
+                .dateDocument(item.getDateDocument())
+                .reference(item.getReference())
+                .montant(item.getMontant())
+                .emetteur(item.getEmetteur())
+                .sinistreGarantieId(item.getSinistreGarantie() == null ? null : item.getSinistreGarantie().getId())
+                .garantie(item.getSinistreGarantie() == null ? null : item.getSinistreGarantie().getSnapshotLibelle())
+                .missionExpertiseId(item.getMissionExpertise() == null ? null : item.getMissionExpertise().getId())
+                .missionExpertise(item.getMissionExpertise() == null ? null : item.getMissionExpertise().getReferenceMission())
+                .garageId(item.getGarage() == null ? null : item.getGarage().getId())
+                .garage(item.getGarage() == null ? null : item.getGarage().getRaisonSociale())
                 .commentaire(item.getCommentaire())
                 .deposePar(fullName(item.getDeposePar()))
                 .validePar(fullName(item.getValidePar()))
@@ -288,6 +320,11 @@ public class SinistreResponseMapper {
                 .justificationContrepartieLibre(item.getJustificationContrepartieLibre())
                 .beneficiaire(counterparty)
                 .modeReglement(item.getModeReglement())
+                .circuitFinancier(item.getCircuitFinancier())
+                .compteTresorerieId(item.getCompteTresorerie() == null ? null : item.getCompteTresorerie().getId())
+                .compteTresorerie(item.getCompteTresorerie() == null ? null : item.getCompteTresorerie().getLibelle())
+                .operationTresorerieId(item.getOperationTresorerie() == null ? null : item.getOperationTresorerie().getId())
+                .numeroOperationTresorerie(item.getOperationTresorerie() == null ? null : item.getOperationTresorerie().getNumero())
                 .notes(item.getNotes())
                 .operationAnnuleeId(item.getOperationAnnulee() == null ? null : item.getOperationAnnulee().getId())
                 .saisiePar(fullName(item.getSaisiPar()))

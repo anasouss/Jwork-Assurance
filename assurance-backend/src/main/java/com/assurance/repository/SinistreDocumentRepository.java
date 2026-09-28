@@ -9,7 +9,13 @@ import java.util.Optional;
 
 public interface SinistreDocumentRepository extends JpaRepository<SinistreDocument, Long> {
 
-    @EntityGraph(attributePaths = {"deposePar", "validePar"})
+    @EntityGraph(attributePaths = {
+            "deposePar",
+            "validePar",
+            "sinistreGarantie",
+            "missionExpertise",
+            "garage"
+    })
     List<SinistreDocument> findBySinistreIdOrderByCreatedAtDesc(Long sinistreId);
 
     Optional<SinistreDocument> findByIdAndSinistreId(Long id, Long sinistreId);

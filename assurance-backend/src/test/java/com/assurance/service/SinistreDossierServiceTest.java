@@ -6,8 +6,11 @@ import com.assurance.entity.Client;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreOperation;
+import com.assurance.entity.CompteTresorerie;
+import com.assurance.entity.OperationTresorerie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeReglementSinistre;
+import com.assurance.enums.CircuitFinancierSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.enums.TypeContrepartieSinistre;
 import com.assurance.enums.TypeOperationSinistre;
@@ -48,6 +51,7 @@ class SinistreDossierServiceTest {
     private final SinistreReadinessService readiness = mock(SinistreReadinessService.class);
     private final SinistreEvenementService events = mock(SinistreEvenementService.class);
     private final SinistreResponseMapper mapper = mock(SinistreResponseMapper.class);
+    private final OperationTresorerieService treasuryOperations = mock(OperationTresorerieService.class);
 
     private final SinistreDossierService service = new SinistreDossierService(
             claims,
@@ -62,7 +66,8 @@ class SinistreDossierServiceTest {
             workflow,
             readiness,
             events,
-            mapper
+            mapper,
+            treasuryOperations
     );
 
     private Sinistre claim;
@@ -114,6 +119,8 @@ class SinistreDossierServiceTest {
         assertThat(saved.getContrepartieClient()).isSameAs(claim.getClient());
         assertThat(saved.getContrepartieNomSnapshot()).isEqualTo("Nadia Laguir");
         assertThat(saved.getModeReglement()).isEqualTo(ModeReglementSinistre.VIREMENT);
+        assertThat(saved.getCircuitFinancier()).isEqualTo(CircuitFinancierSinistre.DIRECT_COMPAGNIE);
+        assertThat(saved.getOperationTresorerie()).isNull();
     }
 
     @Test
@@ -124,6 +131,37 @@ class SinistreDossierServiceTest {
         assertThatThrownBy(() -> service.addOperation(1L, 7L, 35L, request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("référence est obligatoire");
+    }
+
+    @Test
+    void agencyTreasuryCircuitLinksTheAuthoritativeTreasuryOperation() {
+        AddSinistreOperationRequest request = operationRequest();
+        request.setCircuitFinancier(CircuitFinancierSinistre.TRESORERIE_AGENCE);
+        request.setCompteTresorerieId(91L);
+        CompteTresorerie account = CompteTresorerie.builder().libelle("Banque principale").build();
+        account.setId(91L);
+        OperationTresorerie treasuryOperation = OperationTresorerie.builder()
+                .compteSource(account)
+                .numero("TR-001-2026-000001")
+                .build();
+        when(treasuryOperations.createClaimMovement(
+                1L,
+                91L,
+                TypeOperationSinistre.REGLEMENT,
+                ModeReglementSinistre.VIREMENT,
+                new BigDecimal("250.00"),
+                request.getDateOperation(),
+                request.getReference(),
+                claim.getNumeroSinistre(),
+                "Nadia Laguir"
+        )).thenReturn(treasuryOperation);
+
+        service.addOperation(1L, 7L, 35L, request);
+
+        ArgumentCaptor<SinistreOperation> captor = ArgumentCaptor.forClass(SinistreOperation.class);
+        verify(operations).save(captor.capture());
+        assertThat(captor.getValue().getCompteTresorerie()).isSameAs(account);
+        assertThat(captor.getValue().getOperationTresorerie()).isSameAs(treasuryOperation);
     }
 
     private AddSinistreOperationRequest operationRequest() {

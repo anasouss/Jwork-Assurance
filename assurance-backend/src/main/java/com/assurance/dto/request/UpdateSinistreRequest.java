@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 public class UpdateSinistreRequest {
@@ -32,4 +33,9 @@ public class UpdateSinistreRequest {
     private String notes;
 
     private Long gestionnaireId;
+
+    @Size(max = 500)
+    private String prochaineAction;
+
+    private LocalDate dateEcheanceAction;
 }

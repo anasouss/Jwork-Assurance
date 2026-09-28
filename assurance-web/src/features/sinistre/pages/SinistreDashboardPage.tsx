@@ -7,6 +7,7 @@ import {
   FolderOpen,
   RotateCcw,
   Scale,
+  TriangleAlert,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,9 +42,9 @@ export default function SinistreDashboardPage() {
           icon: FolderOpen,
         },
         {
-          label: "Déclarés ce mois",
-          value: dashboard.data.declaresCeMois,
-          icon: FilePlus2,
+          label: "Actions en retard",
+          value: dashboard.data.actionsEnRetard,
+          icon: TriangleAlert,
         },
         {
           label: "En expertise",
@@ -135,7 +136,7 @@ export default function SinistreDashboardPage() {
                   <TableHead>Nature</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Compagnie</TableHead>
-                  <TableHead>Provision</TableHead>
+                  <TableHead>Prochaine action</TableHead>
                   <TableHead>Statut</TableHead>
                 </TableRow>
               </TableHeader>
@@ -157,7 +158,14 @@ export default function SinistreDashboardPage() {
                     <TableCell>{natureLabels[item.nature]}</TableCell>
                     <TableCell>{formatDate(item.dateSinistre)}</TableCell>
                     <TableCell>{item.compagnie || "-"}</TableCell>
-                    <TableCell>{formatMoney(item.provisionCourante)}</TableCell>
+                    <TableCell>
+                      <div>{item.prochaineAction || "-"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {item.dateEcheanceAction
+                          ? `Échéance ${formatDate(item.dateEcheanceAction)}`
+                          : "-"}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <SinistreStatusBadge statut={item.statut} />
                     </TableCell>

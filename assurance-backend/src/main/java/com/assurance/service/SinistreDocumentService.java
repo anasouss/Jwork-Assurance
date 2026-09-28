@@ -3,6 +3,7 @@ package com.assurance.service;
 import com.assurance.dto.response.SinistreDetailResponse;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreDocument;
+import com.assurance.entity.SinistreGarantie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.StatutDocumentSinistre;
 import com.assurance.enums.TypeDocumentSinistre;
@@ -10,6 +11,9 @@ import com.assurance.enums.TypeEvenementSinistre;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.SinistreDocumentRepository;
+import com.assurance.repository.SinistreGarantieRepository;
+import com.assurance.repository.MissionExpertiseRepository;
+import com.assurance.repository.GarageSinistreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -21,10 +25,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +49,9 @@ public class SinistreDocumentService {
     );
 
     private final SinistreDocumentRepository documentRepository;
+    private final SinistreGarantieRepository garantieRepository;
+    private final MissionExpertiseRepository missionRepository;
+    private final GarageSinistreRepository garageRepository;
     private final SinistreService sinistreService;
     private final SinistreWorkflowService workflowService;
     private final SinistreEvenementService evenementService;
@@ -55,6 +64,13 @@ public class SinistreDocumentService {
             Long utilisateurId,
             Long sinistreId,
             TypeDocumentSinistre type,
+            LocalDate dateDocument,
+            String reference,
+            BigDecimal montant,
+            String emetteur,
+            Long sinistreGarantieId,
+            Long missionExpertiseId,
+            Long garageId,
             String commentaire,
             MultipartFile file
     ) {
@@ -62,6 +78,25 @@ public class SinistreDocumentService {
         assertEditable(sinistre);
         Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
         validateFile(file);
+        validateMetadata(type, dateDocument, reference, montant, emetteur, missionExpertiseId);
+        SinistreGarantie garantie = sinistreGarantieId == null ? null : garantieRepository
+                .findByIdAndSinistreId(sinistreGarantieId, sinistreId)
+                .orElseThrow(() -> new BadRequestException("La garantie ne fait pas partie de ce sinistre"));
+        var mission = missionExpertiseId == null ? null : missionRepository
+                .findByIdAndSinistreId(missionExpertiseId, sinistreId)
+                .orElseThrow(() -> new BadRequestException("La mission ne fait pas partie de ce sinistre"));
+        var garage = garageId == null ? null : garageRepository.findByIdAndAgenceId(garageId, agenceId)
+                .orElseThrow(() -> new BadRequestException("Garage introuvable"));
+        if (garage == null && mission != null) {
+            garage = mission.getGarage();
+        }
+        if (garage != null && !missionRepository.existsBySinistreIdAndGarageId(sinistreId, garage.getId())) {
+            throw new BadRequestException("Le garage n'est lié à aucune mission de ce sinistre");
+        }
+        if (mission != null && garage != null
+                && (mission.getGarage() == null || !garage.getId().equals(mission.getGarage().getId()))) {
+            throw new BadRequestException("Le garage ne correspond pas à la mission sélectionnée");
+        }
         StoredDocument stored = store(agenceId, sinistreId, file);
         deleteOnRollback(stored.path());
         documentRepository.save(SinistreDocument.builder()
@@ -73,6 +108,13 @@ public class SinistreDocumentService {
                 .contentType(stored.contentType())
                 .cheminStockage(stored.storageKey())
                 .tailleOctets(stored.size())
+                .dateDocument(dateDocument)
+                .reference(trimToNull(reference))
+                .montant(montant)
+                .emetteur(trimToNull(emetteur))
+                .sinistreGarantie(garantie)
+                .missionExpertise(mission)
+                .garage(garage)
                 .commentaire(trimToNull(commentaire))
                 .build());
         evenementService.record(
@@ -180,6 +222,40 @@ public class SinistreDocumentService {
         String contentType = normalizeContentType(file.getContentType());
         if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
             throw new BadRequestException("Format de fichier non autorisé");
+        }
+    }
+
+    private void validateMetadata(
+            TypeDocumentSinistre type,
+            LocalDate dateDocument,
+            String reference,
+            BigDecimal montant,
+            String emetteur,
+            Long missionExpertiseId
+    ) {
+        if (dateDocument != null && dateDocument.isAfter(LocalDate.now())) {
+            throw new BadRequestException("La date du document ne peut pas être future");
+        }
+        if (montant != null && montant.signum() < 0) {
+            throw new BadRequestException("Le montant du document ne peut pas être négatif");
+        }
+        if (Set.of(
+                TypeDocumentSinistre.FACTURE,
+                TypeDocumentSinistre.DEVIS,
+                TypeDocumentSinistre.REGLEMENT,
+                TypeDocumentSinistre.RECOURS
+        ).contains(type)) {
+            if (dateDocument == null || trimToNull(reference) == null
+                    || montant == null || montant.signum() <= 0
+                    || trimToNull(emetteur) == null) {
+                throw new BadRequestException(
+                        "La date, la référence, l'émetteur et un montant positif sont obligatoires pour ce document"
+                );
+            }
+        }
+        if (type == TypeDocumentSinistre.RAPPORT_EXPERT
+                && (dateDocument == null || missionExpertiseId == null)) {
+            throw new BadRequestException("La date et la mission sont obligatoires pour un rapport d'expertise");
         }
     }
 

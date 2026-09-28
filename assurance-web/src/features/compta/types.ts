@@ -700,8 +700,10 @@ export type CashSession = {
 export type TreasuryOperationType =
   | "TRANSFERT"
   | "AJUSTEMENT"
+  | "SINISTRE"
   | "ANNULATION_TRANSFERT"
-  | "ANNULATION_AJUSTEMENT";
+  | "ANNULATION_AJUSTEMENT"
+  | "ANNULATION_SINISTRE";
 
 export type TreasuryOperation = {
   id: string;

@@ -12,6 +12,9 @@ import type {
   PagedResponse,
   SinistreDashboard,
   SinistreDetail,
+  SinistreDuplicate,
+  SinistreGestionnaire,
+  SinistreTreasuryAccount,
   SinistreSummary,
   StatutSinistre,
   TypeDocument,
@@ -27,13 +30,31 @@ export const sinistreKeys = {
   detail: (id: string) => [...sinistreKeys.all, "detail", id] as const,
   coverage: (contractId: string, date: string) =>
     [...sinistreKeys.all, "coverage", contractId, date] as const,
+  duplicates: (contractId: string, vehicleId: string, date: string) =>
+    [...sinistreKeys.all, "duplicates", contractId, vehicleId, date] as const,
   experts: (includeInactive: boolean) =>
     [...sinistreKeys.all, "experts", includeInactive] as const,
   garages: (includeInactive: boolean) =>
     [...sinistreKeys.all, "garages", includeInactive] as const,
+  managers: () => [...sinistreKeys.all, "managers"] as const,
+  treasuryAccounts: () => [...sinistreKeys.all, "treasury-accounts"] as const,
 };
 
 export const sinistreApi = {
+  async treasuryAccounts() {
+    return unwrap(
+      await apiFetch<ApiResponse<SinistreTreasuryAccount[]>>(
+        "/api/v1/sinistres/comptes-tresorerie",
+      ),
+    ).map((item) => ({ ...item, id: String(item.id) }));
+  },
+  async managers() {
+    return unwrap(
+      await apiFetch<ApiResponse<SinistreGestionnaire[]>>(
+        "/api/v1/sinistres/gestionnaires",
+      ),
+    ).map((item) => ({ ...item, id: String(item.id) }));
+  },
   async dashboard() {
     return unwrap(
       await apiFetch<ApiResponse<SinistreDashboard>>(
@@ -67,6 +88,14 @@ export const sinistreApi = {
         `/api/v1/sinistres/couverture${buildQueryString({ contratId, dateSinistre })}`,
       ),
     );
+  },
+
+  async duplicates(contratId: string, vehiculeId: string, dateSinistre: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<SinistreDuplicate[]>>(
+        `/api/v1/sinistres/doublons${buildQueryString({ contratId, vehiculeId, dateSinistre })}`,
+      ),
+    ).map((item) => ({ ...item, id: String(item.id) }));
   },
 
   async create(request: object) {
@@ -122,6 +151,15 @@ export const sinistreApi = {
           method: "POST",
           body: JSON.stringify(request),
         },
+      ),
+    );
+  },
+
+  async updateParty(id: string, partyId: string, request: object) {
+    return unwrap(
+      await apiFetch<ApiResponse<SinistreDetail>>(
+        `/api/v1/sinistres/${id}/parties/${partyId}`,
+        { method: "PUT", body: JSON.stringify(request) },
       ),
     );
   },
@@ -185,10 +223,22 @@ export const sinistreApi = {
     type: TypeDocument,
     commentaire: string,
     file: File,
+    metadata?: {
+      dateDocument?: string;
+      reference?: string;
+      montant?: string;
+      emetteur?: string;
+      sinistreGarantieId?: string;
+      missionExpertiseId?: string;
+      garageId?: string;
+    },
   ) {
     const form = new FormData();
     form.append("type", type);
     if (commentaire.trim()) form.append("commentaire", commentaire.trim());
+    Object.entries(metadata ?? {}).forEach(([key, value]) => {
+      if (value?.trim()) form.append(key, value.trim());
+    });
     form.append("file", file);
     return unwrap(
       await apiUpload<ApiResponse<SinistreDetail>>(

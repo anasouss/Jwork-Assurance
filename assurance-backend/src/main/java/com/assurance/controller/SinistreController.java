@@ -13,7 +13,10 @@ import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.SinistreCouverturePreviewResponse;
 import com.assurance.dto.response.SinistreDashboardResponse;
 import com.assurance.dto.response.SinistreDetailResponse;
+import com.assurance.dto.response.SinistreGestionnaireResponse;
+import com.assurance.dto.response.SinistreDoublonResponse;
 import com.assurance.dto.response.SinistreSummaryResponse;
+import com.assurance.dto.response.CompteTresorerieResponse;
 import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.security.TenantContext;
@@ -21,6 +24,7 @@ import com.assurance.service.SinistreCouvertureService;
 import com.assurance.service.SinistreDashboardService;
 import com.assurance.service.SinistreDossierService;
 import com.assurance.service.SinistreService;
+import com.assurance.service.TresorerieService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +40,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/sinistres")
@@ -46,6 +51,38 @@ public class SinistreController {
     private final SinistreDossierService dossierService;
     private final SinistreCouvertureService couvertureService;
     private final SinistreDashboardService dashboardService;
+    private final TresorerieService tresorerieService;
+
+    @GetMapping("/doublons")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:create')")
+    public ResponseEntity<ApiResponse<List<SinistreDoublonResponse>>> duplicates(
+            @RequestParam Long contratId,
+            @RequestParam(required = false) Long vehiculeId,
+            @RequestParam LocalDate dateSinistre
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(sinistreService.findPossibleDuplicates(
+                TenantContext.getCurrentAgence(),
+                contratId,
+                vehiculeId,
+                dateSinistre
+        )));
+    }
+
+    @GetMapping("/comptes-tresorerie")
+    @PreAuthorize("hasAuthority('PERM_sinistre:finance')")
+    public ResponseEntity<ApiResponse<List<CompteTresorerieResponse>>> treasuryAccounts() {
+        return ResponseEntity.ok(ApiResponse.success(
+                tresorerieService.listAccounts(TenantContext.getCurrentAgence(), false)
+        ));
+    }
+
+    @GetMapping("/gestionnaires")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage')")
+    public ResponseEntity<ApiResponse<List<SinistreGestionnaireResponse>>> gestionnaires() {
+        return ResponseEntity.ok(ApiResponse.success(
+                sinistreService.listManagers(TenantContext.getCurrentAgence())
+        ));
+    }
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
@@ -173,6 +210,22 @@ public class SinistreController {
                 id,
                 request
         ), "Partie impliquée ajoutée"));
+    }
+
+    @PutMapping("/{id}/parties/{partieId}")
+    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    public ResponseEntity<ApiResponse<SinistreDetailResponse>> updateParty(
+            @PathVariable Long id,
+            @PathVariable Long partieId,
+            @Valid @RequestBody AddSinistrePartieRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(dossierService.updateParty(
+                TenantContext.getCurrentAgence(),
+                TenantContext.getCurrentUser(),
+                id,
+                partieId,
+                request
+        ), "Partie impliquée mise à jour"));
     }
 
     @DeleteMapping("/{id}/parties/{partieId}")

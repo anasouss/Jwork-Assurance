@@ -3,6 +3,7 @@ package com.assurance.entity;
 import com.assurance.enums.ModeReglementSinistre;
 import com.assurance.enums.TypeContrepartieSinistre;
 import com.assurance.enums.TypeOperationSinistre;
+import com.assurance.enums.CircuitFinancierSinistre;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -42,6 +43,19 @@ public class SinistreOperation extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "operation_annulee_id")
     private SinistreOperation operationAnnulee;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "compte_tresorerie_id")
+    private CompteTresorerie compteTresorerie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operation_tresorerie_id")
+    private OperationTresorerie operationTresorerie;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(name = "circuit_financier", nullable = false, length = 30)
+    private CircuitFinancierSinistre circuitFinancier = CircuitFinancierSinistre.DIRECT_COMPAGNIE;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)

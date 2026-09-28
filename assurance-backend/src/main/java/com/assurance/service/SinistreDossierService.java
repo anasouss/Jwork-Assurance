@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.dto.request.AddProvisionSinistreRequest;
 import com.assurance.dto.request.AddSinistreOperationRequest;
+import com.assurance.dto.request.AnnulerOperationTresorerieRequest;
 import com.assurance.dto.request.AddSinistrePartieRequest;
 import com.assurance.dto.request.UpdateSinistreGarantieRequest;
 import com.assurance.dto.request.UpsertMissionExpertiseRequest;
@@ -14,9 +15,11 @@ import com.assurance.entity.ProvisionSinistre;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreGarantie;
 import com.assurance.entity.SinistreOperation;
+import com.assurance.entity.OperationTresorerie;
 import com.assurance.entity.SinistrePartie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.DecisionCouvertureSinistre;
+import com.assurance.enums.CircuitFinancierSinistre;
 import com.assurance.enums.ModeReglementSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.enums.TypeContrepartieSinistre;
@@ -58,6 +61,7 @@ public class SinistreDossierService {
     private final SinistreReadinessService readinessService;
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
+    private final OperationTresorerieService operationTresorerieService;
 
     @Transactional
     public SinistreDetailResponse updateGuarantee(
@@ -123,6 +127,37 @@ public class SinistreDossierService {
                 context.acteur(),
                 TypeEvenementSinistre.MODIFICATION,
                 "Partie impliquée ajoutée : " + request.getNom().trim()
+        );
+        return responseMapper.toDetail(context.sinistre());
+    }
+
+    @Transactional
+    public SinistreDetailResponse updateParty(
+            Long agenceId,
+            Long utilisateurId,
+            Long sinistreId,
+            Long partieId,
+            AddSinistrePartieRequest request
+    ) {
+        Context context = context(agenceId, utilisateurId, sinistreId);
+        assertEditable(context.sinistre());
+        SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
+                .orElseThrow(() -> new ResourceNotFoundException("SinistrePartie", partieId));
+        partie.setType(request.getType());
+        partie.setNom(request.getNom().trim());
+        partie.setTelephone(trimToNull(request.getTelephone()));
+        partie.setCin(trimToNull(request.getCin()));
+        partie.setNumeroPermis(trimToNull(request.getNumeroPermis()));
+        partie.setImmatriculation(trimToNull(request.getImmatriculation()));
+        partie.setCompagnieAdverse(trimToNull(request.getCompagnieAdverse()));
+        partie.setNumeroPoliceAdverse(trimToNull(request.getNumeroPoliceAdverse()));
+        partie.setNotes(trimToNull(request.getNotes()));
+        partieRepository.save(partie);
+        evenementService.record(
+                context.sinistre(),
+                context.acteur(),
+                TypeEvenementSinistre.MODIFICATION,
+                "Partie impliquée mise à jour : " + partie.getNom()
         );
         return responseMapper.toDetail(context.sinistre());
     }
@@ -273,6 +308,33 @@ public class SinistreDossierService {
         }
         validatePaymentReference(request);
         ResolvedCounterparty counterparty = resolveCounterparty(context, request);
+        CircuitFinancierSinistre circuit = request.getCircuitFinancier() == null
+                ? CircuitFinancierSinistre.DIRECT_COMPAGNIE
+                : request.getCircuitFinancier();
+        if (circuit == CircuitFinancierSinistre.TRESORERIE_AGENCE
+                && request.getModeReglement() == ModeReglementSinistre.COMPENSATION) {
+            throw new BadRequestException("Une compensation ne mouvemente pas la trésorerie de l'agence");
+        }
+        OperationTresorerie treasuryOperation = null;
+        if (circuit == CircuitFinancierSinistre.TRESORERIE_AGENCE
+                && request.getModeReglement() != ModeReglementSinistre.COMPENSATION) {
+            if (request.getCompteTresorerieId() == null) {
+                throw new BadRequestException("Sélectionnez le compte de trésorerie utilisé");
+            }
+            treasuryOperation = operationTresorerieService.createClaimMovement(
+                    agenceId,
+                    request.getCompteTresorerieId(),
+                    request.getType(),
+                    request.getModeReglement(),
+                    request.getMontant(),
+                    request.getDateOperation(),
+                    request.getReference(),
+                    context.sinistre().getNumeroSinistre(),
+                    counterparty.name()
+            );
+        } else if (request.getCompteTresorerieId() != null) {
+            throw new BadRequestException("Le compte de trésorerie est réservé aux flux passant par l'agence");
+        }
         operationRepository.save(SinistreOperation.builder()
                 .sinistre(context.sinistre())
                 .saisiPar(context.acteur())
@@ -290,6 +352,12 @@ public class SinistreDossierService {
                 .contrepartieNomLibre(counterparty.freeName())
                 .justificationContrepartieLibre(counterparty.freeJustification())
                 .modeReglement(request.getModeReglement())
+                .circuitFinancier(circuit)
+                .compteTresorerie(treasuryOperation == null ? null
+                        : treasuryOperation.getCompteSource() == null
+                        ? treasuryOperation.getCompteDestination()
+                        : treasuryOperation.getCompteSource())
+                .operationTresorerie(treasuryOperation)
                 .notes(trimToNull(request.getNotes()))
                 .build());
         evenementService.record(
@@ -323,6 +391,18 @@ public class SinistreDossierService {
         if (operationRepository.existsByOperationAnnuleeId(operationId)) {
             throw new BadRequestException("Cette opération est déjà annulée");
         }
+        if (operation.getOperationTresorerie() != null) {
+            AnnulerOperationTresorerieRequest treasuryCancellation = new AnnulerOperationTresorerieRequest();
+            treasuryCancellation.setDateOperation(LocalDate.now());
+            treasuryCancellation.setMotif(trimToNull(motif) == null
+                    ? "Annulation de l'opération du sinistre " + context.sinistre().getNumeroSinistre()
+                    : motif.trim());
+            operationTresorerieService.cancel(
+                    agenceId,
+                    operation.getOperationTresorerie().getId(),
+                    treasuryCancellation
+            );
+        }
         operationRepository.save(SinistreOperation.builder()
                 .sinistre(context.sinistre())
                 .saisiPar(context.acteur())
@@ -341,6 +421,8 @@ public class SinistreDossierService {
                 .contrepartieNomLibre(operation.getContrepartieNomLibre())
                 .justificationContrepartieLibre(operation.getJustificationContrepartieLibre())
                 .modeReglement(operation.getModeReglement())
+                .circuitFinancier(operation.getCircuitFinancier())
+                .compteTresorerie(operation.getCompteTresorerie())
                 .notes(trimToNull(motif))
                 .build());
         evenementService.record(

@@ -55,6 +55,12 @@ public class SinistreDashboardService {
                         agenceId,
                         List.of(StatutSinistre.EN_ATTENTE_REGLEMENT, StatutSinistre.PARTIELLEMENT_REGLE)
                 ))
+                .actionsEnRetard(sinistreRepository
+                        .countByAgenceIdAndDateEcheanceActionLessThanEqualAndStatutIn(
+                                agenceId,
+                                today.minusDays(1),
+                                OPEN_STATUSES
+                        ))
                 .provisionsOuvertes(provisionRepository.totalCurrentByAgencyAndStatuses(agenceId, OPEN_STATUSES))
                 .reglementsAnnee(operationRepository.totalActiveByAgencyAndTypeAndDateBetween(
                         agenceId,

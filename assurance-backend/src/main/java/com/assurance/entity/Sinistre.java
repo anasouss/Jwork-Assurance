@@ -119,6 +119,12 @@ public class Sinistre extends AuditedEntity {
     @Column(length = 4000)
     private String notes;
 
+    @Column(name = "prochaine_action", length = 500)
+    private String prochaineAction;
+
+    @Column(name = "date_echeance_action")
+    private LocalDate dateEcheanceAction;
+
     @OneToOne(mappedBy = "sinistre", fetch = FetchType.LAZY)
     private SinistreCouverture couverture;
 }

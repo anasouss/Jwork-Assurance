@@ -23,6 +23,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @RestController
 @RequestMapping("/api/v1/sinistres/{sinistreId}/documents")
 @RequiredArgsConstructor
@@ -35,6 +38,13 @@ public class SinistreDocumentController {
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> upload(
             @PathVariable Long sinistreId,
             @RequestParam TypeDocumentSinistre type,
+            @RequestParam(required = false) LocalDate dateDocument,
+            @RequestParam(required = false) String reference,
+            @RequestParam(required = false) BigDecimal montant,
+            @RequestParam(required = false) String emetteur,
+            @RequestParam(required = false) Long sinistreGarantieId,
+            @RequestParam(required = false) Long missionExpertiseId,
+            @RequestParam(required = false) Long garageId,
             @RequestParam(required = false) String commentaire,
             @RequestParam("file") MultipartFile file
     ) {
@@ -43,6 +53,13 @@ public class SinistreDocumentController {
                 TenantContext.getCurrentUser(),
                 sinistreId,
                 type,
+                dateDocument,
+                reference,
+                montant,
+                emetteur,
+                sinistreGarantieId,
+                missionExpertiseId,
+                garageId,
                 commentaire,
                 file
         ), "Document ajouté"));

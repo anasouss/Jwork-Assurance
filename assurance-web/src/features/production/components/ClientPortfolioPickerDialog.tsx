@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -23,12 +24,21 @@ type ClientPortfolioPickerDialogProps = {
 export function ClientPortfolioPickerDialog({ open, onOpenChange, onSelect }: ClientPortfolioPickerDialogProps) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
+  const [groupeId, setGroupeId] = useState("TOUS");
   const [page, setPage] = useState(0);
 
+  const groupesQuery = useQuery({
+    queryKey: ["groupes-clients"],
+    queryFn: clientApi.listGroupesClients,
+    enabled: open,
+    staleTime: 60_000,
+  });
+
   const clientsQuery = useQuery({
-    queryKey: ["production", "portfolio-client-picker", deferredQuery, page],
+    queryKey: ["production", "portfolio-client-picker", deferredQuery, groupeId, page],
     queryFn: () => clientApi.listClients({
       query: deferredQuery || undefined,
+      groupeId: groupeId === "TOUS" ? undefined : groupeId,
       page,
       size: 25,
     }),
@@ -46,20 +56,46 @@ export function ClientPortfolioPickerDialog({ open, onOpenChange, onSelect }: Cl
           <DialogDescription>Sélectionnez le client dont vous souhaitez ouvrir le portefeuille.</DialogDescription>
         </DialogHeader>
 
-        <div className="border-b p-4">
-          <label className="relative min-w-0">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              className="pl-9"
-              placeholder="Nom, code client, RC, CIN ou ICE"
-              aria-label="Rechercher un client"
-              onChange={(event) => {
-                setQuery(event.target.value);
+        <div className="grid gap-3 border-b p-4 sm:grid-cols-[minmax(0,1fr)_16rem]">
+          <div className="grid min-w-0 gap-1.5">
+            <label htmlFor="portfolio-client-search" className="text-sm font-medium">Client</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="portfolio-client-search"
+                value={query}
+                className="pl-9"
+                placeholder="Nom, code client, RC, CIN ou ICE"
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
+          </div>
+          <div className="grid min-w-0 gap-1.5">
+            <span className="text-sm font-medium">Groupe</span>
+            <Combobox
+              value={groupeId}
+              options={[
+                { value: "TOUS", label: "Tous les groupes" },
+                ...(groupesQuery.data ?? [])
+                  .filter((groupe) => groupe.actif)
+                  .map((groupe) => ({
+                    value: groupe.id,
+                    label: `${groupe.code} - ${groupe.libelle}`,
+                  })),
+              ]}
+              placeholder="Tous les groupes"
+              searchPlaceholder="Rechercher un groupe..."
+              emptyText="Aucun groupe trouvé."
+              isLoading={groupesQuery.isLoading}
+              onValueChange={(value) => {
+                setGroupeId(value ? String(value) : "TOUS");
                 setPage(0);
               }}
             />
-          </label>
+          </div>
         </div>
 
         <div className="max-h-[55vh] min-h-80 divide-y overflow-y-auto">

@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { clientApi } from "../api/clients";
 
@@ -24,30 +23,12 @@ type ClientPortfolioPickerDialogProps = {
 export function ClientPortfolioPickerDialog({ open, onOpenChange, onSelect }: ClientPortfolioPickerDialogProps) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
-  const [groupeId, setGroupeId] = useState("TOUS");
-  const [origineId, setOrigineId] = useState("TOUTES");
-  const [collaborateurId, setCollaborateurId] = useState("TOUS");
   const [page, setPage] = useState(0);
 
-  const groupesQuery = useQuery({
-    queryKey: ["groupes-clients"],
-    queryFn: clientApi.listGroupesClients,
-    enabled: open,
-    staleTime: 60_000,
-  });
-  const acquisitionOptionsQuery = useQuery({
-    queryKey: ["crm", "acquisition-options"],
-    queryFn: clientApi.acquisitionOptions,
-    enabled: open,
-    staleTime: 60_000,
-  });
   const clientsQuery = useQuery({
-    queryKey: ["production", "portfolio-client-picker", deferredQuery, groupeId, origineId, collaborateurId, page],
+    queryKey: ["production", "portfolio-client-picker", deferredQuery, page],
     queryFn: () => clientApi.listClients({
       query: deferredQuery || undefined,
-      groupeId: groupeId === "TOUS" ? undefined : groupeId,
-      origineCommercialeId: origineId === "TOUTES" ? undefined : origineId,
-      collaborateurId: collaborateurId === "TOUS" ? undefined : collaborateurId,
       page,
       size: 25,
     }),
@@ -59,13 +40,13 @@ export function ClientPortfolioPickerDialog({ open, onOpenChange, onSelect }: Cl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-5xl">
+      <DialogContent className="overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="border-b px-5 py-4 text-left">
           <DialogTitle>Rechercher un client</DialogTitle>
           <DialogDescription>Sélectionnez le client dont vous souhaitez ouvrir le portefeuille.</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 border-b p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="border-b p-4">
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -79,33 +60,6 @@ export function ClientPortfolioPickerDialog({ open, onOpenChange, onSelect }: Cl
               }}
             />
           </label>
-          <Select value={groupeId} onValueChange={(value) => { setGroupeId(value); setPage(0); }}>
-            <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TOUS">Tous les groupes</SelectItem>
-              {(groupesQuery.data ?? []).map((groupe) => (
-                <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={origineId} onValueChange={(value) => { setOrigineId(value); setPage(0); }}>
-            <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TOUTES">Toutes les origines</SelectItem>
-              {(acquisitionOptionsQuery.data?.origines ?? []).map((origin) => (
-                <SelectItem key={origin.id} value={origin.id}>{origin.libelle}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={collaborateurId} onValueChange={(value) => { setCollaborateurId(value); setPage(0); }}>
-            <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TOUS">Tous les membres de l'équipe</SelectItem>
-              {(acquisitionOptionsQuery.data?.collaborateurs ?? []).filter((user) => user.actif).map((user) => (
-                <SelectItem key={user.id} value={user.id}>{user.nom}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="max-h-[55vh] min-h-80 divide-y overflow-y-auto">

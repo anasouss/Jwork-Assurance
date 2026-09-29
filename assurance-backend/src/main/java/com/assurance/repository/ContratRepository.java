@@ -419,6 +419,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             from Contrat contrat
             left join contrat.clients lien
             where contrat.agence.id = :agenceId
+              and contrat.statut <> com.assurance.enums.StatutContrat.DRAFT
               and (
                     lien.client.id = :clientId
                     or contrat.payeurPrime.id = :clientId

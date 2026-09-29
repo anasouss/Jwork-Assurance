@@ -876,7 +876,7 @@ function contractStatusLabel(status?: string | null, expired = false) {
   if (expired) return "Échu";
   if (normalized === "ACTIVE") return "En vigueur";
   if (normalized === "SUSPENDED") return "Suspendu";
-  if (normalized.includes("BROUILLON")) return "Brouillon";
+  if (normalized.includes("DRAFT") || normalized.includes("BROUILLON")) return "Brouillon";
   return status || "-";
 }
 

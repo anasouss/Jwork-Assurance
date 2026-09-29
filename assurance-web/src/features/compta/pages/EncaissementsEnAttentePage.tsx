@@ -16,7 +16,7 @@ import type { ClientPaymentMode, PaymentInstrument, PaymentInstrumentStatus } fr
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type StatusFilter = Extract<PaymentInstrumentStatus, "EN_ATTENTE" | "REMIS_EN_BANQUE" | "REJETE">;
-type ModeFilter = Exclude<ClientPaymentMode, "ESPECES"> | "ALL";
+type ModeFilter = Extract<ClientPaymentMode, "CHEQUE" | "EFFET" | "VIREMENT" | "VERSEMENT_BANCAIRE"> | "ALL";
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
   EN_ATTENTE: "En attente",
@@ -100,8 +100,6 @@ export default function EncaissementsEnAttentePage() {
               <SelectItem value="EFFET">Effets</SelectItem>
               <SelectItem value="VIREMENT">Virements</SelectItem>
               <SelectItem value="VERSEMENT_BANCAIRE">Versements bancaires</SelectItem>
-              <SelectItem value="CARTE">Cartes</SelectItem>
-              <SelectItem value="PRELEVEMENT">Prélèvements</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -185,12 +183,12 @@ function InstrumentAction({ instrument, canManage }: { instrument: PaymentInstru
     return <Button asChild size="sm" variant="outline"><Link to={`/app/compta/reglements/historique?search=${encodeURIComponent(instrument.numeroReglement)}`}>Voir le règlement <ArrowRight className="size-4" /></Link></Button>;
   }
   if (instrument.statut === "REMIS_EN_BANQUE") {
-    return <Button asChild size="sm" variant="outline"><Link to="/app/compta/tresorerie/rapprochement-bancaire">Rapprocher <ArrowRight className="size-4" /></Link></Button>;
+    return <span className="text-muted-foreground">-</span>;
   }
   if (instrument.mode === "CHEQUE" || instrument.mode === "EFFET") {
     return canManage
       ? <Button asChild size="sm"><Link to={`/app/compta/tresorerie/bordereaux-remise/nouveau?type=${instrument.mode}`}><FilePlus2 className="size-4" /> Préparer</Link></Button>
       : <Button size="sm" disabled><FilePlus2 className="size-4" /> Préparer</Button>;
   }
-  return <Button asChild size="sm" variant="outline"><Link to="/app/compta/tresorerie/rapprochement-bancaire">Rapprocher <ArrowRight className="size-4" /></Link></Button>;
+  return <span className="text-muted-foreground">-</span>;
 }

@@ -10,6 +10,14 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -414,38 +422,60 @@ export default function SinistreDeclarationPage() {
                     {selectedVehicle.numeroAttestation || "-"}
                   </p>
                 </div>
-                <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {selectedVehicle.garanties.map((guarantee) => {
-                    const checked = guaranteeIds.includes(guarantee.id);
-                    return (
-                      <label
-                        key={guarantee.id}
-                        className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-muted/40"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(value) =>
-                            setGuaranteeIds((current) =>
-                              value
-                                ? [...current, guarantee.id]
-                                : current.filter((id) => id !== guarantee.id),
-                            )
-                          }
-                        />
-                        <span>
-                          <span className="block font-medium">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <span className="sr-only">Sélection</span>
+                      </TableHead>
+                      <TableHead>Garantie</TableHead>
+                      <TableHead className="text-right">Valeur assurée (MAD)</TableHead>
+                      <TableHead className="text-right">Taux de franchise</TableHead>
+                      <TableHead className="text-right">Franchise minimale (MAD)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedVehicle.garanties.map((guarantee) => {
+                      const checked = guaranteeIds.includes(guarantee.id);
+                      return (
+                        <TableRow key={guarantee.id} data-state={checked ? "selected" : undefined}>
+                          <TableCell>
+                            <Checkbox
+                              checked={checked}
+                              aria-label={`Sélectionner la garantie ${guarantee.libelle}`}
+                              onCheckedChange={(value) =>
+                                setGuaranteeIds((current) =>
+                                  value
+                                    ? [...current, guarantee.id]
+                                    : current.filter((id) => id !== guarantee.id),
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="whitespace-normal font-medium">
                             {guarantee.code} · {guarantee.libelle}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Capital{" "}
-                            {guarantee.capital?.toLocaleString("fr-MA") ?? "-"}{" "}
-                            MAD
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatDecimal(guarantee.capital)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatRate(guarantee.tauxFranchise)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatDecimal(guarantee.franchiseMinimale)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {selectedVehicle.garanties.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                          Aucune garantie applicable à la date du sinistre.
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
               </div>
             ) : null}
           </div>
@@ -526,6 +556,16 @@ function mainInsured(contract: ContratListItem) {
     contract.clients?.[0]?.nomAffichage ||
     "Assuré non renseigné"
   );
+}
+const decimalFormatter = new Intl.NumberFormat("fr-MA", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+function formatDecimal(value?: number | null) {
+  return value == null ? "-" : decimalFormatter.format(value);
+}
+function formatRate(value?: number | null) {
+  return value == null ? "-" : `${decimalFormatter.format(value)} %`;
 }
 function todayIso() {
   return toIso(new Date());

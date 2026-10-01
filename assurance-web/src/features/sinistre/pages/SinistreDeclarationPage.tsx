@@ -429,9 +429,9 @@ export default function SinistreDeclarationPage() {
                         <span className="sr-only">Sélection</span>
                       </TableHead>
                       <TableHead>Garantie</TableHead>
-                      <TableHead className="text-right">Valeur assurée (MAD)</TableHead>
+                      <TableHead className="text-right">Valeur assurée</TableHead>
                       <TableHead className="text-right">Taux de franchise</TableHead>
-                      <TableHead className="text-right">Franchise minimale (MAD)</TableHead>
+                      <TableHead className="text-right">Franchise minimale</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

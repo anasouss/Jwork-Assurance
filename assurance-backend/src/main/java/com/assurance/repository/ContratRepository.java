@@ -129,6 +129,13 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                             lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%')
                         )
+                    ) or
+                    exists (
+                        select 1 from Vehicule v
+                        where v.contrat = c and (
+                            lower(coalesce(v.immatriculation, '')) like concat('%', :search, '%') or
+                            lower(coalesce(v.immatriculationProvisoire, '')) like concat('%', :search, '%')
+                        )
                     )
               )
               and (:dateDu is null or
@@ -176,6 +183,13 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                             lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%')
+                        )
+                    ) or
+                    exists (
+                        select 1 from Vehicule v
+                        where v.contrat = c and (
+                            lower(coalesce(v.immatriculation, '')) like concat('%', :search, '%') or
+                            lower(coalesce(v.immatriculationProvisoire, '')) like concat('%', :search, '%')
                         )
                     )
               )

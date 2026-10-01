@@ -240,7 +240,7 @@ export default function SinistreDeclarationPage() {
               <button
                 key={item.id}
                 type="button"
-                className="flex w-full items-center justify-between gap-4 p-3 text-left hover:bg-muted/60"
+                className="flex w-full cursor-pointer items-center justify-between gap-4 p-3 text-left hover:bg-muted/60"
                 onClick={() => selectContract(item)}
               >
                 <span>

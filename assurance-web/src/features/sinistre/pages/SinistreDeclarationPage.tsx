@@ -423,8 +423,8 @@ export default function SinistreDeclarationPage() {
                   </p>
                 </div>
                 <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
+                  <TableHeader className="bg-emerald-700 [&_th]:text-white">
+                    <TableRow className="hover:bg-emerald-700">
                       <TableHead className="w-12">
                         <span className="sr-only">Sélection</span>
                       </TableHead>

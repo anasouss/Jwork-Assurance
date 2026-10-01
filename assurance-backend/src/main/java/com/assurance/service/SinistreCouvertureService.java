@@ -223,7 +223,16 @@ public class SinistreCouvertureService {
                     .forEach(snapshot -> applyGuaranteeSnapshot(state, snapshot));
         }
         return state.values().stream()
-                .sorted(Comparator.comparing(snapshot -> snapshot.getGarantie().getCode()))
+                .sorted(Comparator
+                        .comparing(
+                                (MouvementGarantie snapshot) -> snapshot.getGarantie().getOrdreAffichage(),
+                                Comparator.nullsLast(Integer::compareTo)
+                        )
+                        .thenComparing(
+                                snapshot -> snapshot.getGarantie().getCode(),
+                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
+                        )
+                        .thenComparing(snapshot -> snapshot.getGarantie().getId()))
                 .toList();
     }
 

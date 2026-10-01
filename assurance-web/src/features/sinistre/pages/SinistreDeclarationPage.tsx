@@ -576,15 +576,17 @@ function mainInsured(contract: ContratListItem) {
     "Assuré non renseigné"
   );
 }
-const decimalFormatter = new Intl.NumberFormat("fr-MA", {
+const decimalFormatter = new Intl.NumberFormat("fr-FR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 function formatDecimal(value?: number | null) {
-  return value == null ? "-" : decimalFormatter.format(value);
+  return value == null
+    ? "-"
+    : decimalFormatter.format(value).replace(/[\u00a0\u202f]/g, " ");
 }
 function formatRate(value?: number | null) {
-  return value == null ? "-" : `${decimalFormatter.format(value)} %`;
+  return value == null ? "-" : `${formatDecimal(value)} %`;
 }
 function todayIso() {
   return toIso(new Date());

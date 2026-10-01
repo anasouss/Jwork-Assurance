@@ -130,6 +130,7 @@ export type CoveragePreview = {
       mouvementGarantieId: string;
       code: string;
       libelle: string;
+      typeGarantie: "VEHICULE" | "PERSONNE";
       capital?: number | null;
       prime?: number | null;
       taux?: number | null;

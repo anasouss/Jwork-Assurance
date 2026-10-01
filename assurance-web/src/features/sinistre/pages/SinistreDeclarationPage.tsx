@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, Check, LoaderCircle, Search, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -35,6 +35,10 @@ import { natureLabels } from "../format";
 import type { NatureSinistre } from "../types";
 
 const NATURES = Object.entries(natureLabels) as Array<[NatureSinistre, string]>;
+const GUARANTEE_GROUPS = [
+  { type: "VEHICULE", label: "Garanties véhicule" },
+  { type: "PERSONNE", label: "Garanties personnes" },
+] as const;
 
 export default function SinistreDeclarationPage() {
   const navigate = useNavigate();
@@ -435,36 +439,51 @@ export default function SinistreDeclarationPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedVehicle.garanties.map((guarantee) => {
-                      const checked = guaranteeIds.includes(guarantee.id);
+                    {GUARANTEE_GROUPS.map((group) => {
+                      const guarantees = selectedVehicle.garanties.filter(
+                        (guarantee) => guarantee.typeGarantie === group.type,
+                      );
+                      if (guarantees.length === 0) return null;
                       return (
-                        <TableRow key={guarantee.id} data-state={checked ? "selected" : undefined}>
-                          <TableCell>
-                            <Checkbox
-                              checked={checked}
-                              aria-label={`Sélectionner la garantie ${guarantee.libelle}`}
-                              onCheckedChange={(value) =>
-                                setGuaranteeIds((current) =>
-                                  value
-                                    ? [...current, guarantee.id]
-                                    : current.filter((id) => id !== guarantee.id),
-                                )
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="whitespace-normal font-medium">
-                            {guarantee.code} · {guarantee.libelle}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatDecimal(guarantee.capital)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatRate(guarantee.tauxFranchise)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatDecimal(guarantee.franchiseMinimale)}
-                          </TableCell>
-                        </TableRow>
+                        <Fragment key={group.type}>
+                          <TableRow className="bg-emerald-50 hover:bg-emerald-50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/30">
+                            <TableCell colSpan={5} className="font-semibold text-emerald-900 dark:text-emerald-100">
+                              {group.label}
+                            </TableCell>
+                          </TableRow>
+                          {guarantees.map((guarantee) => {
+                            const checked = guaranteeIds.includes(guarantee.id);
+                            return (
+                              <TableRow key={guarantee.id} data-state={checked ? "selected" : undefined}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={checked}
+                                    aria-label={`Sélectionner la garantie ${guarantee.libelle}`}
+                                    onCheckedChange={(value) =>
+                                      setGuaranteeIds((current) =>
+                                        value
+                                          ? [...current, guarantee.id]
+                                          : current.filter((id) => id !== guarantee.id),
+                                      )
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell className="whitespace-normal font-medium">
+                                  {guarantee.code} · {guarantee.libelle}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {formatDecimal(guarantee.capital)}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {formatRate(guarantee.tauxFranchise)}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {formatDecimal(guarantee.franchiseMinimale)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </Fragment>
                       );
                     })}
                     {selectedVehicle.garanties.length === 0 ? (

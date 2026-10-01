@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.TypeGarantie;
 import lombok.Builder;
 import lombok.Data;
 
@@ -41,6 +42,7 @@ public class SinistreCouverturePreviewResponse {
         private Long mouvementGarantieId;
         private String code;
         private String libelle;
+        private TypeGarantie typeGarantie;
         private BigDecimal capital;
         private BigDecimal prime;
         private BigDecimal taux;

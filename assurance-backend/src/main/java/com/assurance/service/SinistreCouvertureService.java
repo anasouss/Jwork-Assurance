@@ -354,6 +354,7 @@ public class SinistreCouvertureService {
                 .mouvementGarantieId(snapshot.getId())
                 .code(snapshot.getGarantie().getCode())
                 .libelle(snapshot.getGarantie().getLibelle())
+                .typeGarantie(snapshot.getGarantie().getTypeGarantie())
                 .capital(snapshot.getCapital())
                 .prime(snapshot.getPrime())
                 .taux(snapshot.getTaux())

@@ -127,6 +127,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                             lower(coalesce(cc.client.ice, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%') or
+                            lower(concat(coalesce(cc.client.nom, ''), ' ', coalesce(cc.client.prenom, ''))) like concat('%', :search, '%') or
+                            lower(concat(coalesce(cc.client.prenom, ''), ' ', coalesce(cc.client.nom, ''))) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%')
                         )
                     ) or
@@ -182,6 +184,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                             lower(coalesce(cc.client.ice, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%') or
+                            lower(concat(coalesce(cc.client.nom, ''), ' ', coalesce(cc.client.prenom, ''))) like concat('%', :search, '%') or
+                            lower(concat(coalesce(cc.client.prenom, ''), ' ', coalesce(cc.client.nom, ''))) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%')
                         )
                     ) or

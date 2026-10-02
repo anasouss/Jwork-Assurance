@@ -426,7 +426,7 @@ export default function ReglementsClientsPage() {
               />
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-sm">
+              <table className="w-full min-w-[1180px] text-sm">
                 <thead className="bg-orange-600 text-xs uppercase text-white">
                   <tr>
                     <th className="w-12 px-3 py-3 text-center">
@@ -442,7 +442,8 @@ export default function ReglementsClientsPage() {
                     </th>
                     <SortableHeader label="Payeur" column="PAYER" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <th className="px-3 py-3 text-left">Référence</th>
-                    <SortableHeader label="Police" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
+                    <th className="px-3 py-3 text-left">Type</th>
+                    <SortableHeader label="Police / contrat" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <th className="px-3 py-3 text-left">Nature</th>
                     <SortableHeader label="Date" column="DATE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <SortableHeader label="TTC" column="TTC" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
@@ -452,7 +453,7 @@ export default function ReglementsClientsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={10} rows={8} /> :
+                  {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={11} rows={8} /> :
                     (result?.rows ?? []).map((row) => (
                       <tr key={receivableTargetKey(row)} className="hover:bg-muted/30">
                         <td className="px-3 py-3 text-center">
@@ -462,8 +463,9 @@ export default function ReglementsClientsPage() {
                           />
                         </td>
                         <td className="px-3 py-3"><strong>{row.source.payeurNom}</strong></td>
-                        <td className="px-3 py-3 font-medium">{row.source.reference || "-"}</td>
-                        <td className="px-3 py-3"><strong>{row.source.police || "-"}</strong></td>
+                        <td className="px-3 py-3 font-medium">{documentReference(row)}</td>
+                        <td className="px-3 py-3">{receivableTypeLabel(row)}</td>
+                        <td className="px-3 py-3"><strong>{coverageReference(row)}</strong></td>
                         <td className="px-3 py-3">
                           <strong>{row.source.mouvement}</strong>
                         </td>
@@ -491,14 +493,14 @@ export default function ReglementsClientsPage() {
                     ))}
                   {!showResults && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
+                      <td colSpan={11} className="px-4 py-12 text-center text-muted-foreground">
                         Sélectionnez un client ou saisissez un numéro de facture ou de relevé.
                       </td>
                     </tr>
                   )}
                   {showResults && !receivables.isLoading && (result?.rows.length ?? 0) === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
+                      <td colSpan={11} className="px-4 py-12 text-center text-muted-foreground">
                         Aucun montant à encaisser ne correspond à la recherche.
                       </td>
                     </tr>
@@ -747,10 +749,32 @@ function sortReceivables(rows: ClientReceivable[], key: SortKey, direction: Sort
         : key === "DATE"
           ? String(left.source.dateEffet ?? "").localeCompare(String(right.source.dateEffet ?? ""))
           : key === "POLICE"
-            ? String(left.source.police ?? "").localeCompare(String(right.source.police ?? ""), "fr", { numeric: true })
+            ? coverageReference(left).localeCompare(coverageReference(right), "fr", { numeric: true })
             : String(left.source.payeurNom ?? "").localeCompare(String(right.source.payeurNom ?? ""), "fr");
     return comparison * factor;
   });
+}
+
+function documentReference(row: ClientReceivable) {
+  return row.source.documentClientId ? row.source.reference || "-" : "-";
+}
+
+function coverageReference(row: ClientReceivable) {
+  if (row.source.documentClientId) return "-";
+  if (row.source.nature === "ASSISTANCE") return row.source.reference || "-";
+  return row.source.police || "-";
+}
+
+function receivableTypeLabel(row: ClientReceivable) {
+  if (row.source.documentClientId) {
+    if (row.source.reference?.startsWith("REL-")) return "Relevé";
+    if (row.source.reference?.startsWith("FAC-")) return "Facture";
+    return "Document";
+  }
+  if (row.source.typeContrat === "PARTICULIER") return "Mono";
+  if (row.source.typeContrat === "CONVENTION") return "Convention";
+  if (row.source.typeContrat === "FLOTTE") return "Flotte";
+  return "-";
 }
 
 function sumReceivables(rows: ClientReceivable[], value: (row: ClientReceivable) => number) {

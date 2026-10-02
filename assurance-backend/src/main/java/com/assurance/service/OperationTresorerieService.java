@@ -128,7 +128,7 @@ public class OperationTresorerieService {
                 operation,
                 source,
                 SensMouvementTresorerie.SORTIE,
-                sessionService.requireOpenSession(agenceId, source),
+                sessionService.findOpenSession(agenceId, source),
                 "Transfert vers " + destination.getLibelle(),
                 null
         ));
@@ -136,7 +136,7 @@ public class OperationTresorerieService {
                 operation,
                 destination,
                 SensMouvementTresorerie.ENTREE,
-                sessionService.requireOpenSession(agenceId, destination),
+                sessionService.findOpenSession(agenceId, destination),
                 "Transfert depuis " + source.getLibelle(),
                 null
         ));
@@ -172,7 +172,7 @@ public class OperationTresorerieService {
                 operation,
                 account,
                 request.getSens(),
-                sessionService.requireOpenSession(agenceId, account),
+                sessionService.findOpenSession(agenceId, account),
                 "Ajustement de trésorerie",
                 null
         ));
@@ -220,7 +220,7 @@ public class OperationTresorerieService {
                 operation,
                 account,
                 direction,
-                sessionService.requireOpenSession(agenceId, account),
+                sessionService.findOpenSession(agenceId, account),
                 reason,
                 null
         ));
@@ -278,7 +278,7 @@ public class OperationTresorerieService {
                     reversal,
                     movement.getCompteTresorerie(),
                     inverseDirection,
-                    sessionService.requireOpenSession(agenceId, movement.getCompteTresorerie()),
+                    sessionService.findOpenSession(agenceId, movement.getCompteTresorerie()),
                     "Annulation de " + original.getNumero(),
                     movement.getId()
             ));

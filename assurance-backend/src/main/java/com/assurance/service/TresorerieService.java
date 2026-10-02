@@ -186,7 +186,7 @@ public class TresorerieService {
                 .compteTresorerie(account)
                 .instrumentReglement(instrument)
                 .ligneReleveBancaire(bankStatementLine)
-                .sessionCaisse(sessionCaisseService.requireOpenSession(
+                .sessionCaisse(sessionCaisseService.findOpenSession(
                         instrument.getAgence().getId(),
                         account
                 ))
@@ -225,7 +225,7 @@ public class TresorerieService {
                 .agence(original.getAgence())
                 .compteTresorerie(original.getCompteTresorerie())
                 .instrumentReglement(instrument)
-                .sessionCaisse(sessionCaisseService.requireOpenSession(
+                .sessionCaisse(sessionCaisseService.findOpenSession(
                         instrument.getAgence().getId(),
                         original.getCompteTresorerie()
                 ))

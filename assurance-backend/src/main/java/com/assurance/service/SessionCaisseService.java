@@ -125,18 +125,15 @@ public class SessionCaisseService {
     }
 
     @Transactional(readOnly = true)
-    public SessionCaisse requireOpenSession(Long agenceId, CompteTresorerie account) {
+    public SessionCaisse findOpenSession(Long agenceId, CompteTresorerie account) {
         if (account.getTypeCompte() != TypeCompteTresorerie.CAISSE) {
             return null;
         }
-        return sessionRepository.findFirstByAgenceIdAndCompteTresorerieIdAndUtilisateurIdAndStatut(
+        return sessionRepository.findFirstByAgenceIdAndCompteTresorerieIdAndStatut(
                 agenceId,
                 account.getId(),
-                accessService.currentUserId(),
                 StatutSessionCaisse.OUVERTE
-        ).orElseThrow(() -> new BadRequestException(
-                "Ouvrez votre session de caisse avant d'enregistrer cette opération"
-        ));
+        ).orElse(null);
     }
 
     @Transactional(readOnly = true)

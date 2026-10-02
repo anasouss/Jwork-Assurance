@@ -1206,6 +1206,7 @@ function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
   const { pdf } = ctx;
   pdf.setFillColor(255, 255, 255);
   pdf.setDrawColor(203, 213, 225);
+  pdf.setLineWidth(0.3);
   pdf.rect(ctx.x, ctx.y, ctx.width, 5, "FD");
   pdf.setFillColor(5, 150, 105);
   pdf.rect(ctx.x, ctx.y, 0.8, 5, "F");
@@ -1216,6 +1217,7 @@ function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
   ctx.y += 6;
   draw();
   pdf.setDrawColor(226, 232, 240);
+  pdf.setLineWidth(0.15);
   pdf.line(ctx.x, ctx.y, ctx.x + ctx.width, ctx.y);
   ctx.y += 2;
 }
@@ -1402,9 +1404,15 @@ function drawPdfTable(
   const actualWidths = widths.map((width) => (width / totalWidth) * tableWidth);
   const headerHeight = 5;
   ensurePdfSpace(ctx, headerHeight * 2);
-  ctx.pdf.setFillColor(255, 255, 255);
-  ctx.pdf.setDrawColor(203, 213, 225);
+  ctx.pdf.setFillColor(248, 250, 252);
+  ctx.pdf.setDrawColor(148, 163, 184);
+  ctx.pdf.setLineWidth(0.25);
   ctx.pdf.rect(tableX, ctx.y, tableWidth, headerHeight, "FD");
+  let borderX = tableX;
+  actualWidths.slice(0, -1).forEach((width) => {
+    borderX += width;
+    ctx.pdf.line(borderX, ctx.y, borderX, ctx.y + headerHeight);
+  });
   let cursorX = tableX + 1.5;
   ctx.pdf.setFont("helvetica", "bold");
   ctx.pdf.setFontSize(6);
@@ -1427,8 +1435,14 @@ function drawPdfTable(
     const rowHeight = Math.max(4.8, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
     ensurePdfSpace(ctx, rowHeight + 1);
     cursorX = tableX + 1.5;
-    ctx.pdf.setDrawColor(226, 232, 240);
-    ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
+    ctx.pdf.setDrawColor(203, 213, 225);
+    ctx.pdf.setLineWidth(0.15);
+    ctx.pdf.rect(tableX, ctx.y, tableWidth, rowHeight, "S");
+    borderX = tableX;
+    actualWidths.slice(0, -1).forEach((width) => {
+      borderX += width;
+      ctx.pdf.line(borderX, ctx.y, borderX, ctx.y + rowHeight);
+    });
     row.forEach((_cell, index) => {
       const isLast = index === row.length - 1;
       const emphasized = options.emphasizedRows?.has(rowIndex) ?? false;
@@ -1443,7 +1457,6 @@ function drawPdfTable(
     });
     ctx.y += rowHeight;
   }
-  ctx.pdf.line(tableX, ctx.y, tableX + tableWidth, ctx.y);
   ctx.y += 1;
 }
 

@@ -278,6 +278,7 @@ export type ClientDocumentSource = {
   typeContrat: TypeContrat;
   mouvement: string;
   reference?: string | null;
+  referenceSource?: string | null;
   compagnie: string;
   dateEffet: string;
   dateEcheance?: string | null;

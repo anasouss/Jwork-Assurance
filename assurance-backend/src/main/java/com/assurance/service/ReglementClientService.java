@@ -1713,6 +1713,7 @@ public class ReglementClientService {
                 .typeContrat(line.getElementFacturable().getContrat().getTypeContrat())
                 .mouvement(line.getMouvement())
                 .reference(document.getNumero())
+                .referenceSource(line.getNumeroQuittance())
                 .compagnie(line.getCompagnie())
                 .dateEffet(line.getDateOperation())
                 .dateEcheance(line.getDateEcheance())

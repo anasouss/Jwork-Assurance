@@ -23,6 +23,7 @@ public class SourceDocumentClientResponse {
     private TypeContrat typeContrat;
     private String mouvement;
     private String reference;
+    private String referenceSource;
     private String compagnie;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;

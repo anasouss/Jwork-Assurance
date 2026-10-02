@@ -1087,6 +1087,7 @@ public class DocumentClientService {
                 .typeContrat(contract.getTypeContrat())
                 .mouvement(sourceLabel(source))
                 .reference(sourceReference(source))
+                .referenceSource(sourceReference(source))
                 .compagnie(sourceCompany(source))
                 .dateEffet(element.getDateDebut())
                 .dateEcheance(element.getDateFin())

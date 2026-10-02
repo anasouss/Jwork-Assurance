@@ -36,6 +36,11 @@ import {
   type PayerSelection,
 } from "../components/use-payer-search";
 import { formatAccountingAmount } from "../format";
+import {
+  receivableCoverageReference,
+  receivableDocumentReference,
+  receivableTypeLabel,
+} from "../receivable-display";
 import type {
   ClientReceivable,
   ClientReceivablePage,
@@ -463,9 +468,9 @@ export default function ReglementsClientsPage() {
                           />
                         </td>
                         <td className="px-3 py-3"><strong>{row.source.payeurNom}</strong></td>
-                        <td className="px-3 py-3 font-medium">{documentReference(row)}</td>
+                        <td className="px-3 py-3 font-medium">{receivableDocumentReference(row)}</td>
                         <td className="px-3 py-3">{receivableTypeLabel(row)}</td>
-                        <td className="px-3 py-3"><strong>{coverageReference(row)}</strong></td>
+                        <td className="px-3 py-3"><strong>{receivableCoverageReference(row)}</strong></td>
                         <td className="px-3 py-3">
                           <strong>{row.source.mouvement}</strong>
                         </td>
@@ -749,32 +754,14 @@ function sortReceivables(rows: ClientReceivable[], key: SortKey, direction: Sort
         : key === "DATE"
           ? String(left.source.dateEffet ?? "").localeCompare(String(right.source.dateEffet ?? ""))
           : key === "POLICE"
-            ? coverageReference(left).localeCompare(coverageReference(right), "fr", { numeric: true })
+            ? receivableCoverageReference(left).localeCompare(
+              receivableCoverageReference(right),
+              "fr",
+              { numeric: true }
+            )
             : String(left.source.payeurNom ?? "").localeCompare(String(right.source.payeurNom ?? ""), "fr");
     return comparison * factor;
   });
-}
-
-function documentReference(row: ClientReceivable) {
-  return row.source.documentClientId ? row.source.reference || "-" : "-";
-}
-
-function coverageReference(row: ClientReceivable) {
-  if (row.source.documentClientId) return "-";
-  if (row.source.nature === "ASSISTANCE") return row.source.reference || "-";
-  return row.source.police || "-";
-}
-
-function receivableTypeLabel(row: ClientReceivable) {
-  if (row.source.documentClientId) {
-    if (row.source.reference?.startsWith("REL-")) return "Relevé";
-    if (row.source.reference?.startsWith("FAC-")) return "Facture";
-    return "Document";
-  }
-  if (row.source.typeContrat === "PARTICULIER") return "Mono";
-  if (row.source.typeContrat === "CONVENTION") return "Convention";
-  if (row.source.typeContrat === "FLOTTE") return "Flotte";
-  return "-";
 }
 
 function sumReceivables(rows: ClientReceivable[], value: (row: ClientReceivable) => number) {

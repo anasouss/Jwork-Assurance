@@ -61,6 +61,11 @@ import {
   showsOriginatingBank,
 } from "../client-payment-methods";
 import { formatAccountingAmount, parseAccountingAmount } from "../format";
+import {
+  receivableCoverageReference,
+  receivableDocumentReference,
+  receivableTypeLabel,
+} from "../receivable-display";
 import type {
   ClientPaymentMode,
   ClientReceivable,
@@ -313,12 +318,13 @@ export default function NouveauReglementClientPage() {
       >
         <section className="overflow-hidden rounded-md border bg-card">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead className="bg-orange-600 text-xs uppercase text-white">
                 <tr>
                   <th className="w-28 px-4 py-3 text-left">Priorité</th>
                   <th className="px-4 py-3 text-left">Référence</th>
-                  <th className="px-4 py-3 text-left">Police</th>
+                  <th className="px-4 py-3 text-left">Type</th>
+                  <th className="px-4 py-3 text-left">Police / contrat</th>
                   <th className="px-4 py-3 text-left">Nature</th>
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-right">Solde ouvert</th>
@@ -345,7 +351,7 @@ export default function NouveauReglementClientPage() {
                 </SortableContext>
                 {receivables.isLoading ? (
                   <tr>
-                    <td colSpan={8} className="h-24 text-center text-muted-foreground">
+                    <td colSpan={9} className="h-24 text-center text-muted-foreground">
                       Chargement...
                     </td>
                   </tr>
@@ -625,8 +631,9 @@ function SortableReceivableRow(props: {
           </span>
         </div>
       </td>
-      <td className="px-4 py-3 font-medium">{props.row.source.reference || "-"}</td>
-      <td className="px-4 py-3 font-medium">{props.row.source.police || "-"}</td>
+      <td className="px-4 py-3 font-medium">{receivableDocumentReference(props.row)}</td>
+      <td className="px-4 py-3">{receivableTypeLabel(props.row)}</td>
+      <td className="px-4 py-3 font-medium">{receivableCoverageReference(props.row)}</td>
       <td className="px-4 py-3">
         <div className="font-medium">{props.row.source.mouvement}</div>
         {props.row.source.documentClientId ? (

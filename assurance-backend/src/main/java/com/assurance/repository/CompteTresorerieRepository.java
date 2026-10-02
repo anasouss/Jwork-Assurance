@@ -17,7 +17,21 @@ public interface CompteTresorerieRepository extends JpaRepository<CompteTresorer
 
     Optional<CompteTresorerie> findByIdAndAgenceId(Long id, Long agenceId);
 
+    Optional<CompteTresorerie> findByAgenceIdAndUtilisateurTitulaireIdAndTypeCompteAndActifTrue(
+            Long agenceId,
+            Long utilisateurId,
+            TypeCompteTresorerie typeCompte
+    );
+
     boolean existsByAgenceIdAndCodeIgnoreCase(Long agenceId, String code);
 
     boolean existsByAgenceIdAndCodeIgnoreCaseAndIdNot(Long agenceId, String code, Long id);
+
+    boolean existsByAgenceIdAndUtilisateurTitulaireId(Long agenceId, Long utilisateurId);
+
+    boolean existsByAgenceIdAndUtilisateurTitulaireIdAndIdNot(
+            Long agenceId,
+            Long utilisateurId,
+            Long id
+    );
 }

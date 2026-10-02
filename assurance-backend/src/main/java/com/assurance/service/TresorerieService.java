@@ -11,6 +11,7 @@ import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.LigneReleveBancaire;
 import com.assurance.entity.InstrumentReglementCompagnie;
 import com.assurance.entity.MouvementTresorerie;
+import com.assurance.entity.Utilisateur;
 import com.assurance.enums.NatureMouvementTresorerie;
 import com.assurance.enums.NiveauAccesCompteTresorerie;
 import com.assurance.enums.SensMouvementTresorerie;
@@ -20,6 +21,7 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.CompteTresorerieRepository;
 import com.assurance.repository.MouvementTresorerieRepository;
+import com.assurance.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,7 @@ public class TresorerieService {
     private final AgenceRepository agenceRepository;
     private final CompteTresorerieRepository compteRepository;
     private final MouvementTresorerieRepository mouvementRepository;
+    private final UtilisateurRepository utilisateurRepository;
     private final TresorerieAccessService accessService;
 
     @Transactional(readOnly = true)
@@ -62,6 +65,7 @@ public class TresorerieService {
         CompteTresorerie account = apply(CompteTresorerie.builder().agence(agence).build(), request, code);
         account = compteRepository.save(account);
         accessService.assignCreatorAsSupervisor(account);
+        accessService.ensureCashOwnerAccess(account);
         return toResponse(account);
     }
 
@@ -72,6 +76,7 @@ public class TresorerieService {
             UpsertCompteTresorerieRequest request
     ) {
         CompteTresorerie account = requireAccount(agenceId, accountId);
+        Utilisateur formerOwner = account.getUtilisateurTitulaire();
         String code = normalizeCode(request.getCode());
         if (compteRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, accountId)) {
             throw new BadRequestException("Un compte de trésorerie utilise déjà ce code");
@@ -84,7 +89,14 @@ public class TresorerieService {
                     "Le solde initial ne peut pas être modifié. Utilisez une écriture d'ajustement."
             );
         }
-        return toResponse(compteRepository.save(apply(account, request, code)));
+        account = compteRepository.save(apply(account, request, code));
+        if (formerOwner != null
+                && (account.getUtilisateurTitulaire() == null
+                || !formerOwner.getId().equals(account.getUtilisateurTitulaire().getId()))) {
+            accessService.removeFormerCashOwnerUsage(account, formerOwner);
+        }
+        accessService.ensureCashOwnerAccess(account);
+        return toResponse(account);
     }
 
     @Transactional
@@ -309,6 +321,26 @@ public class TresorerieService {
         return account;
     }
 
+    @Transactional(readOnly = true)
+    public CompteTresorerie findCurrentUserCashAccount(Long agenceId) {
+        Long userId = accessService.currentUserId();
+        CompteTresorerie account = compteRepository
+                .findByAgenceIdAndUtilisateurTitulaireIdAndTypeCompteAndActifTrue(
+                        agenceId,
+                        userId,
+                        TypeCompteTresorerie.CAISSE
+                )
+                .orElseThrow(() -> new BadRequestException(
+                        "Aucune caisse active n'est affectée à votre utilisateur"
+                ));
+        accessService.requireAccess(
+                agenceId,
+                account.getId(),
+                NiveauAccesCompteTresorerie.UTILISATION
+        );
+        return account;
+    }
+
     private CompteTresorerie apply(
             CompteTresorerie account,
             UpsertCompteTresorerieRequest request,
@@ -318,9 +350,11 @@ public class TresorerieService {
                 && trimToNull(request.getNomBanque()) == null) {
             throw new BadRequestException("Le nom de la banque est obligatoire pour un compte bancaire");
         }
+        Utilisateur owner = resolveCashOwner(account, request);
         account.setCode(code);
         account.setLibelle(request.getLibelle().trim());
         account.setTypeCompte(request.getTypeCompte());
+        account.setUtilisateurTitulaire(owner);
         account.setNomBanque(trimToNull(request.getNomBanque()));
         account.setRib(trimToNull(request.getRib()));
         account.setDevise("MAD");
@@ -340,6 +374,10 @@ public class TresorerieService {
                 .code(account.getCode())
                 .libelle(account.getLibelle())
                 .typeCompte(account.getTypeCompte())
+                .utilisateurTitulaireId(account.getUtilisateurTitulaire() == null
+                        ? null : account.getUtilisateurTitulaire().getId())
+                .utilisateurTitulaire(account.getUtilisateurTitulaire() == null
+                        ? null : account.getUtilisateurTitulaire().getFullName())
                 .nomBanque(account.getNomBanque())
                 .rib(account.getRib())
                 .devise(account.getDevise())
@@ -347,6 +385,37 @@ public class TresorerieService {
                 .soldeCourant(money(account.getSoldeInitial()).add(movements))
                 .actif(account.getActif())
                 .build();
+    }
+
+    private Utilisateur resolveCashOwner(
+            CompteTresorerie account,
+            UpsertCompteTresorerieRequest request
+    ) {
+        if (request.getTypeCompte() != TypeCompteTresorerie.CAISSE) {
+            return null;
+        }
+        if (request.getUtilisateurTitulaireId() == null) {
+            throw new BadRequestException("Le caissier titulaire est obligatoire");
+        }
+        Long agenceId = account.getAgence().getId();
+        Long userId = request.getUtilisateurTitulaireId();
+        boolean alreadyAssigned = account.getId() == null
+                ? compteRepository.existsByAgenceIdAndUtilisateurTitulaireId(agenceId, userId)
+                : compteRepository.existsByAgenceIdAndUtilisateurTitulaireIdAndIdNot(
+                        agenceId,
+                        userId,
+                        account.getId()
+                );
+        if (alreadyAssigned) {
+            throw new BadRequestException("Cet utilisateur possède déjà une caisse");
+        }
+        return utilisateurRepository.findById(userId)
+                .filter(user -> user.getAgence() != null
+                        && agenceId.equals(user.getAgence().getId())
+                        && Boolean.TRUE.equals(user.getActif()))
+                .orElseThrow(() -> new BadRequestException(
+                        "Le caissier titulaire doit être un utilisateur actif de l'agence"
+                ));
     }
 
     private MouvementTresorerieResponse toResponse(MouvementTresorerie movement) {

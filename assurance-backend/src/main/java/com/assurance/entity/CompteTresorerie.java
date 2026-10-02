@@ -21,10 +21,16 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "comptes_tresorerie",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_compte_tresorerie_agence_code",
-                columnNames = {"agence_id", "code"}
-        ),
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_compte_tresorerie_agence_code",
+                        columnNames = {"agence_id", "code"}
+                ),
+                @UniqueConstraint(
+                        name = "uk_compte_tresorerie_titulaire",
+                        columnNames = "utilisateur_titulaire_id"
+                )
+        },
         indexes = @Index(name = "idx_compte_tresorerie_agence_type", columnList = "agence_id,type_compte"))
 @Getter
 @Setter
@@ -46,6 +52,10 @@ public class CompteTresorerie extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "type_compte", nullable = false, length = 20)
     private TypeCompteTresorerie typeCompte;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "utilisateur_titulaire_id")
+    private Utilisateur utilisateurTitulaire;
 
     @Column(name = "nom_banque", length = 160)
     private String nomBanque;

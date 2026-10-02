@@ -57,6 +57,7 @@ export default function TresorerieComptesPage() {
   const [accountType, setAccountType] = useState<TreasuryAccountType>("CAISSE");
   const [accountCode, setAccountCode] = useState("");
   const [accountLabel, setAccountLabel] = useState("");
+  const [ownerUserId, setOwnerUserId] = useState("");
   const [bankName, setBankName] = useState("");
   const [rib, setRib] = useState("");
   const [initialBalance, setInitialBalance] = useState("0");
@@ -77,7 +78,7 @@ export default function TresorerieComptesPage() {
   const treasuryUsers = useQuery({
     queryKey: ["compta", "treasury-users"],
     queryFn: comptaApi.treasuryUsers,
-    enabled: Boolean(assignmentAccount),
+    enabled: canManage && (Boolean(assignmentAccount) || (dialogOpen && accountType === "CAISSE")),
   });
   const assignments = useQuery({
     queryKey: ["compta", "treasury-account-assignments", assignmentAccount?.id],
@@ -99,6 +100,7 @@ export default function TresorerieComptesPage() {
         code: accountCode.trim(),
         libelle: accountLabel.trim(),
         typeCompte: accountType,
+        utilisateurTitulaireId: accountType === "CAISSE" ? ownerUserId : undefined,
         nomBanque: bankName.trim() || undefined,
         rib: rib.trim() || undefined,
         soldeInitial: parseAccountingAmount(initialBalance),
@@ -164,6 +166,7 @@ export default function TresorerieComptesPage() {
     setAccountType("CAISSE");
     setAccountCode("");
     setAccountLabel("");
+    setOwnerUserId("");
     setBankName("");
     setRib("");
     setInitialBalance("0");
@@ -175,6 +178,7 @@ export default function TresorerieComptesPage() {
     setAccountType(account.typeCompte);
     setAccountCode(account.code);
     setAccountLabel(account.libelle);
+    setOwnerUserId(account.utilisateurTitulaireId ?? "");
     setBankName(account.nomBanque ?? "");
     setRib(account.rib ?? "");
     setInitialBalance(String(account.soldeInitial));
@@ -271,6 +275,35 @@ export default function TresorerieComptesPage() {
                 </SelectContent>
               </Select>
             </div>
+            {accountType === "CAISSE" && (
+              <div className="grid gap-2">
+                <Label>Caissier titulaire *</Label>
+                <Select value={ownerUserId} onValueChange={setOwnerUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir un utilisateur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(treasuryUsers.data ?? [])
+                      .filter((user) => user.actif)
+                      .map((user) => {
+                        const ownedElsewhere = (accounts.data ?? []).some(
+                          (account) => account.typeCompte === "CAISSE"
+                            && account.id !== editingAccount?.id
+                            && account.utilisateurTitulaireId === user.id
+                        );
+                        return (
+                          <SelectItem key={user.id} value={user.id} disabled={ownedElsewhere}>
+                            {user.nomComplet}{ownedElsewhere ? " · déjà affecté" : ""}
+                          </SelectItem>
+                        );
+                      })}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Les encaissements en espèces de cet utilisateur seront affectés automatiquement à cette caisse.
+                </p>
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="treasury-account-code">Code *</Label>
@@ -335,6 +368,7 @@ export default function TresorerieComptesPage() {
               disabled={
                 !accountCode.trim()
                 || !accountLabel.trim()
+                || (accountType === "CAISSE" && !ownerUserId)
                 || (accountType === "BANQUE" && !bankName.trim())
                 || saveAccount.isPending
               }
@@ -354,7 +388,7 @@ export default function TresorerieComptesPage() {
       >
         <DialogContent className="max-h-[85vh] sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Accès au compte</DialogTitle>
+            <DialogTitle>Accès au compte bancaire</DialogTitle>
             <DialogDescription>
               {assignmentAccount?.libelle}. Les permissions de rôle restent obligatoires en plus de cet accès.
             </DialogDescription>
@@ -375,12 +409,13 @@ export default function TresorerieComptesPage() {
                     actif: false,
                     niveauAcces: "CONSULTATION" as TreasuryAccessLevel,
                   };
+                  const isOwner = assignmentAccount?.utilisateurTitulaireId === user.id;
                   return (
                     <TableRow key={user.id}>
                       <TableCell>
                         <Checkbox
-                          checked={row.actif}
-                          disabled={!user.actif}
+                          checked={isOwner || row.actif}
+                          disabled={!user.actif || isOwner}
                           onCheckedChange={(checked) => setAssignmentDraft((current) => ({
                             ...current,
                             [user.id]: { ...row, actif: checked === true },
@@ -388,7 +423,10 @@ export default function TresorerieComptesPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{user.nomComplet}</div>
+                        <div className="flex items-center gap-2 font-medium">
+                          {user.nomComplet}
+                          {isOwner && <Badge variant="secondary">Titulaire</Badge>}
+                        </div>
                         <div className="text-xs text-muted-foreground">{user.email}</div>
                       </TableCell>
                       <TableCell>{user.role || "-"}</TableCell>
@@ -542,6 +580,11 @@ function AccountSection({
                     {account.code}
                     {account.nomBanque ? ` · ${account.nomBanque}` : ""}
                   </p>
+                  {isCash && (
+                    <p className="truncate text-xs text-muted-foreground">
+                      {account.utilisateurTitulaire ?? "Aucun caissier titulaire"}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -562,18 +605,20 @@ function AccountSection({
                     >
                       <Edit3 className="size-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title="Affecter les utilisateurs"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onAssign(account);
-                      }}
-                    >
-                      <Users className="size-4" />
-                    </Button>
+                    {!isCash && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        title="Gérer les accès au compte bancaire"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onAssign(account);
+                        }}
+                      >
+                        <Users className="size-4" />
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"

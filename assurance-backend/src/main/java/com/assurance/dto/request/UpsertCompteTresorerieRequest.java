@@ -18,6 +18,7 @@ public class UpsertCompteTresorerieRequest {
     private String libelle;
     @NotNull
     private TypeCompteTresorerie typeCompte;
+    private Long utilisateurTitulaireId;
     @Size(max = 160)
     private String nomBanque;
     @Size(max = 120)

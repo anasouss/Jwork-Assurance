@@ -13,6 +13,8 @@ public class CompteTresorerieResponse {
     private String code;
     private String libelle;
     private TypeCompteTresorerie typeCompte;
+    private Long utilisateurTitulaireId;
+    private String utilisateurTitulaire;
     private String nomBanque;
     private String rib;
     private String devise;

@@ -129,9 +129,6 @@ export default function NouveauReglementClientPage() {
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const allocatedAmounts = allocationByReceivable(rows, paymentTotal);
   const remainingAmount = round(selectedTotal - paymentTotal);
-  const activeCashAccounts = (accounts.data ?? []).filter(
-    (account) => account.actif && account.typeCompte === "CAISSE"
-  );
   const activeBankAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "BANQUE"
   );
@@ -465,18 +462,7 @@ export default function NouveauReglementClientPage() {
                       />
                     </div>
                   ) : null}
-                  {method.mode === "ESPECES" ? (
-                    <AccountSelect
-                      accounts={accounts.data ?? []}
-                      type="CAISSE"
-                      label="Caisse créditée"
-                      value={method.compteTresorerieId}
-                      onChange={(value) => updateMethod(
-                        method.key,
-                        { compteTresorerieId: value }
-                      )}
-                    />
-                  ) : (
+                  {method.mode !== "ESPECES" ? (
                     <>
                       {!requiresPaymentReference(method.mode) ? (
                         <div className="grid gap-1.5">
@@ -519,7 +505,7 @@ export default function NouveauReglementClientPage() {
                         </div>
                       ) : null}
                     </>
-                  )}
+                  ) : null}
 
                     <div className="flex h-10 items-center justify-end gap-1 md:col-span-2 xl:col-span-1 xl:col-start-6">
                       {index === visibleMethods.length - 1 ? (
@@ -547,14 +533,6 @@ export default function NouveauReglementClientPage() {
                     </div>
                   </div>
 
-                  {method.mode === "ESPECES"
-                    && !accounts.isLoading
-                    && activeCashAccounts.length === 0 ? (
-                    <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                      <AlertCircle className="size-4 shrink-0" />
-                      Aucune caisse active n’est disponible.
-                    </div>
-                  ) : null}
                   {requiresBankAccountAtEntry(method.mode)
                     && !accounts.isLoading
                     && activeBankAccounts.length === 0 ? (
@@ -870,7 +848,9 @@ function buildRequest(
       dateEcheance: method.dateEcheance || undefined,
       referenceInstrument: method.referenceInstrument.trim() || undefined,
       banqueEmettrice: method.banqueEmettrice.trim() || undefined,
-      compteTresorerieId: method.compteTresorerieId || undefined,
+      compteTresorerieId: method.mode === "ESPECES"
+        ? undefined
+        : method.compteTresorerieId || undefined,
       affectations,
     };
   });
@@ -908,11 +888,7 @@ function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
 function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[]) {
   if (numeric(method.montant) <= 0) return false;
   if (method.mode === "ESPECES") {
-    return accounts.some(
-      (account) => account.id === method.compteTresorerieId
-        && account.actif
-        && account.typeCompte === "CAISSE"
-    );
+    return true;
   }
   if (requiresBankAccountAtEntry(method.mode)) {
     const validBankAccount = accounts.some(

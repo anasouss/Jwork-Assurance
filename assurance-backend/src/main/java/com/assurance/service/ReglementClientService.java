@@ -959,15 +959,14 @@ public class ReglementClientService {
             throw new BadRequestException("Une ventilation dépasse le montant de son moyen de règlement");
         }
         boolean cash = request.getMode() == ModeReglementClient.ESPECES;
-        CompteTresorerie account = null;
-        if (request.getCompteTresorerieId() != null) {
+        CompteTresorerie account = cash
+                ? tresorerieService.findCurrentUserCashAccount(agence.getId())
+                : null;
+        if (!cash && request.getCompteTresorerieId() != null) {
             account = tresorerieService.findAccount(agence.getId(), request.getCompteTresorerieId());
             if (!Boolean.TRUE.equals(account.getActif())) {
                 throw new BadRequestException("Le compte de trésorerie sélectionné est inactif");
             }
-        }
-        if (cash && (account == null || account.getTypeCompte() != TypeCompteTresorerie.CAISSE)) {
-            throw new BadRequestException("Un règlement en espèces doit être rattaché à une caisse active");
         }
         if (!cash && account != null && account.getTypeCompte() != TypeCompteTresorerie.BANQUE) {
             throw new BadRequestException("Ce moyen de règlement doit être rattaché à un compte bancaire");

@@ -136,6 +136,7 @@ public class TresorerieAccessService {
             existing.put(entry.getKey(), row);
         }
         affectationRepository.saveAll(existing.values());
+        ensureCashOwnerAccess(account);
         return listAssignments(agenceId, compteId);
     }
 
@@ -156,6 +157,39 @@ public class TresorerieAccessService {
         assignment.setNiveauAcces(NiveauAccesCompteTresorerie.SUPERVISION);
         assignment.setActif(true);
         affectationRepository.save(assignment);
+    }
+
+    @Transactional
+    public void ensureCashOwnerAccess(CompteTresorerie account) {
+        Utilisateur owner = account.getUtilisateurTitulaire();
+        if (owner == null) {
+            return;
+        }
+        AffectationCompteTresorerie assignment = affectationRepository
+                .findByCompteTresorerieIdAndUtilisateurId(account.getId(), owner.getId())
+                .orElseGet(() -> AffectationCompteTresorerie.builder()
+                        .agence(account.getAgence())
+                        .compteTresorerie(account)
+                        .utilisateur(owner)
+                        .build());
+        if (assignment.getNiveauAcces() == null
+                || !assignment.getNiveauAcces().allows(NiveauAccesCompteTresorerie.UTILISATION)) {
+            assignment.setNiveauAcces(NiveauAccesCompteTresorerie.UTILISATION);
+        }
+        assignment.setActif(true);
+        affectationRepository.save(assignment);
+    }
+
+    @Transactional
+    public void removeFormerCashOwnerUsage(CompteTresorerie account, Utilisateur formerOwner) {
+        affectationRepository
+                .findByCompteTresorerieIdAndUtilisateurId(account.getId(), formerOwner.getId())
+                .filter(assignment -> assignment.getNiveauAcces()
+                        == NiveauAccesCompteTresorerie.UTILISATION)
+                .ifPresent(assignment -> {
+                    assignment.setActif(false);
+                    affectationRepository.save(assignment);
+                });
     }
 
     public Long currentUserId() {

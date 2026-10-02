@@ -607,6 +607,8 @@ export type TreasuryAccount = {
   code: string;
   libelle: string;
   typeCompte: TreasuryAccountType;
+  utilisateurTitulaireId?: string | null;
+  utilisateurTitulaire?: string | null;
   nomBanque?: string | null;
   rib?: string | null;
   devise: string;
@@ -619,6 +621,7 @@ export type UpsertTreasuryAccountRequest = {
   code: string;
   libelle: string;
   typeCompte: TreasuryAccountType;
+  utilisateurTitulaireId?: string;
   nomBanque?: string;
   rib?: string;
   soldeInitial: number;

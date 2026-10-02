@@ -152,7 +152,9 @@ export default function ReglementsEnregistresPage() {
       dateEcheance: replacement.dateEcheance || undefined,
       referenceInstrument: replacement.referenceInstrument.trim() || undefined,
       banqueEmettrice: replacement.banqueEmettrice.trim() || undefined,
-      compteTresorerieId: replacement.compteTresorerieId || undefined,
+      compteTresorerieId: replacement.mode === "ESPECES"
+        ? undefined
+        : replacement.compteTresorerieId || undefined,
     }),
     onSuccess: async () => {
       toast.success("Instrument remplacé");
@@ -499,18 +501,7 @@ export default function ReglementsEnregistresPage() {
                 />
               </div>
             )}
-            {replacement.mode === "ESPECES" ? (
-              <AccountSelect
-                accounts={accounts.data ?? []}
-                type="CAISSE"
-                label="Caisse créditée"
-                value={replacement.compteTresorerieId}
-                onChange={(value) => setReplacement((current) => ({
-                  ...current,
-                  compteTresorerieId: value,
-                }))}
-              />
-            ) : (
+            {replacement.mode !== "ESPECES" ? (
               <>
                 <div className="grid gap-2">
                   <Label>Référence</Label>
@@ -551,7 +542,7 @@ export default function ReglementsEnregistresPage() {
                   </div>
                 )}
               </>
-            )}
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeReplacement}>Annuler</Button>
@@ -634,11 +625,7 @@ function newReplacement(): InstrumentDraft {
 
 function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
   if (row.mode === "ESPECES") {
-    return accounts.some(
-      (account) => account.id === row.compteTresorerieId
-        && account.actif
-        && account.typeCompte === "CAISSE"
-    );
+    return true;
   }
   if (requiresBankAccountAtEntry(row.mode)) {
     const validBankAccount = accounts.some(

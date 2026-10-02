@@ -1178,6 +1178,9 @@ function normalizeTreasuryAccount(account: TreasuryAccount): TreasuryAccount {
   return {
     ...account,
     id: String(account.id),
+    utilisateurTitulaireId: account.utilisateurTitulaireId == null
+      ? null
+      : String(account.utilisateurTitulaireId),
   };
 }
 

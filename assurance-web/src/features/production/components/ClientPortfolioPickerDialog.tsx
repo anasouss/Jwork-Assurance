@@ -116,7 +116,7 @@ export function ClientPortfolioPickerDialog({ open, onOpenChange, onSelect }: Cl
             <button
               key={client.id}
               type="button"
-              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-emerald-50 focus-visible:bg-emerald-50 focus-visible:outline-none dark:hover:bg-emerald-950/30"
+              className="flex w-full cursor-pointer items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-emerald-50 focus-visible:bg-emerald-50 focus-visible:outline-none dark:hover:bg-emerald-950/30"
               onClick={() => onSelect(client.id)}
             >
               <div className="min-w-0">

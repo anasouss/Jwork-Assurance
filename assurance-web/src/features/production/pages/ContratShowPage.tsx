@@ -1082,12 +1082,30 @@ async function openContratPdf(params: {
       ["Date d'effet", formatDate(params.mouvement?.dateEffet ?? params.contrat.dateEffet)],
       ["Date d'échéance", formatDate(params.mouvement?.dateEcheance ?? params.contrat.dateEcheance)],
       ["Fractionnement", text(params.contrat.fractionnement)],
+      ...(params.souscripteur?.groupe?.libelle
+        ? [["Groupe client", params.souscripteur.groupe.libelle] as [string, string]]
+        : []),
+      ...(!isSubscriberPayer(params.contrat, params.souscripteur)
+        ? [["Payeur des primes", params.contrat.payeurPrimeNom ?? payerTypeLabel(params.contrat.typePayeurPrime)] as [string, string]]
+        : []),
+      ...(params.contrat.modeFacturation === "CONSOLIDEE_GROUPE"
+        ? [["Facturation", billingModeLabel(params.contrat.modeFacturation)] as [string, string]]
+        : []),
+      ...(params.contrat.modeReglement
+        ? [["Mode de règlement", contractPaymentModeLabel(params.contrat.modeReglement)] as [string, string]]
+        : []),
+      ...(params.contrat.numeroBonCommande
+        ? [["N° bon de commande", params.contrat.numeroBonCommande] as [string, string]]
+        : []),
+      ...(params.contrat.montantBulletin != null
+        ? [["Montant du bulletin", moneyAmount(params.contrat.montantBulletin)] as [string, string]]
+        : []),
     ]);
-  });
+  }, "document");
 
   drawPdfSection(ctx, "INFORMATIONS CLIENT", () => {
     drawPdfParties(ctx, params.souscripteur, params.proprietaire, params.conducteur);
-  });
+  }, "user");
 
   for (const [index, vehicule] of (params.contrat.vehicules ?? []).entries()) {
     const vehicleTitle = (params.contrat.vehicules?.length ?? 0) > 1
@@ -1108,7 +1126,7 @@ async function openContratPdf(params: {
         ["Valeur vénale", formatOptionalAmount(vehicule.valeurVenale)],
         ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
       ]);
-    });
+    }, "vehicle");
     const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));
     if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
       const title = (params.contrat.vehicules?.length ?? 0) > 1
@@ -1135,7 +1153,7 @@ async function openContratPdf(params: {
         ["Date de MC", formatDate(remorque.dateMiseEnCirculation)],
         ["Valeur assurée", formatOptionalAmount(remorque.valeurAssuree)],
       ]);
-    });
+    }, "vehicle");
     const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.remorqueId ?? "") === String(remorque.remorqueId));
     if (garanties.some((garantie) => String(garantie.typeGarantie ?? "").toUpperCase() !== "PERSONNE")) {
       const title = (params.contrat.remorques?.length ?? 0) > 1 ? `GARANTIES REMORQUE ${index + 1}` : "GARANTIES REMORQUE";
@@ -1177,22 +1195,28 @@ type PdfContext = {
   pageHeight: number;
 };
 
+const PDF_SECTION_ACCENT_WIDTH = 0.55;
+const PDF_SECTION_BORDER_WIDTH = 0.26;
+const PDF_SECTION_HEADER_HEIGHT = 6.2;
+
 function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossier: string }) {
   const { pdf } = ctx;
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(6.5);
+  pdf.setFontSize(6.75);
   pdf.setTextColor(4, 120, 87);
   pdf.text("FICHE SYNTHÈSE", ctx.x, ctx.y);
   ctx.y += 5;
   pdf.setTextColor(2, 6, 23);
-  pdf.setFontSize(12);
+  pdf.setFontSize(13.5);
   pdf.text(pdfSafe(`Dossier N° ${params.dossier}`), ctx.x, ctx.y);
-  pdf.setFontSize(7);
+  pdf.setFontSize(10.5);
   pdf.text(pdfSafe(text(params.contrat.numeroPolice)), ctx.x + ctx.width, ctx.y - 1, { align: "right" });
   ctx.y += 4.5;
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(71, 85, 105);
+  pdf.setFontSize(7.5);
   pdf.text(pdfSafe(`${productLabel(params.contrat)} · Automobile`), ctx.x, ctx.y);
+  pdf.setFontSize(10.5);
   pdf.text("Police N°", ctx.x + ctx.width, ctx.y, { align: "right" });
   ctx.y += 5;
   pdf.setDrawColor(15, 23, 42);
@@ -1201,42 +1225,87 @@ function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossi
   ctx.y += 3;
 }
 
-function drawPdfSection(ctx: PdfContext, title: string, draw: () => void) {
+function drawPdfSection(
+  ctx: PdfContext,
+  title: string,
+  draw: () => void,
+  icon?: "document" | "user" | "vehicle",
+) {
   ensurePdfSpace(ctx, 12);
   const { pdf } = ctx;
-  pdf.setFillColor(255, 255, 255);
-  pdf.setDrawColor(203, 213, 225);
-  pdf.setLineWidth(0.3);
-  pdf.rect(ctx.x, ctx.y, ctx.width, 5, "FD");
-  pdf.setFillColor(5, 150, 105);
-  pdf.rect(ctx.x, ctx.y, 0.8, 5, "F");
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(6.5);
-  pdf.setTextColor(2, 6, 23);
-  pdf.text(pdfSafe(title), ctx.x + 3, ctx.y + 3.5);
-  ctx.y += 6;
-  draw();
+  const startPage = pdf.getNumberOfPages();
+  const startY = ctx.y;
+  pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(226, 232, 240);
-  pdf.setLineWidth(0.15);
-  pdf.line(ctx.x, ctx.y, ctx.x + ctx.width, ctx.y);
+  pdf.setLineWidth(PDF_SECTION_BORDER_WIDTH);
+  pdf.rect(ctx.x, ctx.y, ctx.width, PDF_SECTION_HEADER_HEIGHT, "FD");
+  pdf.setFillColor(5, 150, 105);
+  pdf.rect(ctx.x, ctx.y, PDF_SECTION_ACCENT_WIDTH, PDF_SECTION_HEADER_HEIGHT, "F");
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(2, 6, 23);
+  if (icon) drawPdfSectionIcon(ctx, icon, ctx.x + 2.1, ctx.y + 1);
+  pdf.text(pdfSafe(title), ctx.x + (icon ? 8 : 2.1), ctx.y + 4.1);
+  ctx.y += PDF_SECTION_HEADER_HEIGHT + 1.05;
+  draw();
+  ctx.y += 1.05;
+  const endPage = pdf.getNumberOfPages();
+  const endY = ctx.y;
+  pdf.setDrawColor(226, 232, 240);
+  pdf.setLineWidth(PDF_SECTION_BORDER_WIDTH);
+  for (let page = startPage; page <= endPage; page += 1) {
+    pdf.setPage(page);
+    const frameTop = page === startPage ? startY : 10;
+    const frameBottom = page === endPage ? endY : ctx.pageHeight - 12;
+    if (frameBottom > frameTop) {
+      pdf.rect(ctx.x, frameTop, ctx.width, frameBottom - frameTop, "S");
+    }
+  }
+  pdf.setPage(endPage);
+  ctx.y = endY;
   ctx.y += 2;
+}
+
+function drawPdfSectionIcon(
+  ctx: PdfContext,
+  icon: "document" | "user" | "vehicle",
+  x: number,
+  y: number,
+) {
+  const { pdf } = ctx;
+  pdf.setDrawColor(15, 23, 42);
+  pdf.setLineWidth(0.25);
+  if (icon === "document") {
+    pdf.rect(x, y, 3.5, 4, "S");
+    pdf.line(x + 0.75, y + 1.35, x + 2.75, y + 1.35);
+    pdf.line(x + 0.75, y + 2.45, x + 2.75, y + 2.45);
+    return;
+  }
+  if (icon === "user") {
+    pdf.circle(x + 1.75, y + 1, 0.8, "S");
+    pdf.ellipse(x + 1.75, y + 3.25, 1.5, 1.2, "S");
+    return;
+  }
+  pdf.roundedRect(x, y + 1, 4, 1.9, 0.35, 0.35, "S");
+  pdf.circle(x + 0.9, y + 3.2, 0.42, "S");
+  pdf.circle(x + 3.05, y + 3.2, 0.42, "S");
 }
 
 function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
   const columnCount = 5;
   const columnGap = 2;
-  const columnWidth = (ctx.width - 6 - columnGap * (columnCount - 1)) / columnCount;
+  const columnWidth = (ctx.width - 4.2 - columnGap * (columnCount - 1)) / columnCount;
   for (let index = 0; index < items.length; index += columnCount) {
     const row = items.slice(index, index + columnCount);
     const wrapped = row.map(([, value]) => wrapPdfText(ctx, valueToPdfText(value), columnWidth));
-    const rowHeight = Math.max(7, 4.5 + Math.max(...wrapped.map((lines) => lines.length)) * 2.3);
+    const rowHeight = Math.max(7.5, 4.5 + Math.max(...wrapped.map((lines) => lines.length)) * 2.7);
     ensurePdfSpace(ctx, rowHeight);
     row.forEach(([label], columnIndex) => {
       drawPdfInfoCell(
         ctx,
         label,
         wrapped[columnIndex],
-        ctx.x + 3 + columnIndex * (columnWidth + columnGap),
+        ctx.x + 2.1 + columnIndex * (columnWidth + columnGap),
         ctx.y,
         columnWidth,
         rowHeight,
@@ -1248,14 +1317,17 @@ function drawPdfInfoGrid(ctx: PdfContext, items: [string, ReactNode][]) {
 
 function drawPdfInfoCell(ctx: PdfContext, label: string, lines: string[], x: number, y: number, width: number, height: number) {
   ctx.pdf.setDrawColor(226, 232, 240);
+  ctx.pdf.setLineWidth(PDF_SECTION_BORDER_WIDTH);
+  ctx.pdf.setLineDashPattern([0.7, 0.7], 0);
   ctx.pdf.line(x, y + height - 1, x + width, y + height - 1);
+  ctx.pdf.setLineDashPattern([], 0);
   ctx.pdf.setFont("helvetica", "bold");
-  ctx.pdf.setFontSize(5.5);
+  ctx.pdf.setFontSize(6);
   ctx.pdf.setTextColor(100, 116, 139);
   ctx.pdf.text(pdfSafe(label.toUpperCase()), x, y + 2.5, { maxWidth: width });
-  ctx.pdf.setFontSize(6.3);
+  ctx.pdf.setFontSize(7.5);
   ctx.pdf.setTextColor(2, 6, 23);
-  ctx.pdf.text(lines.length ? lines : ["-"], x, y + 5.3, { maxWidth: width });
+  ctx.pdf.text(lines.length ? lines : ["-"], x, y + 5.5, { maxWidth: width });
 }
 
 function drawPdfParties(
@@ -1266,8 +1338,8 @@ function drawPdfParties(
 ) {
   const parties = groupContractParties(souscripteur, proprietaire, conducteur);
   if (!parties.length) return;
-  const availableWidth = ctx.width - 6;
-  const startX = ctx.x + 3;
+  const availableWidth = ctx.width - 4.2;
+  const startX = ctx.x + 2.1;
   const startY = ctx.y;
 
   if (parties.length === 1) {
@@ -1282,16 +1354,17 @@ function drawPdfParties(
     const wrapped = details.map((detail, index) => wrapPdfText(ctx, detail, widths[index] - 4));
     const height = Math.max(11, 6 + Math.max(...wrapped.map((lines) => lines.length)) * 2.8);
     ensurePdfSpace(ctx, height);
-    ctx.pdf.setDrawColor(203, 213, 225);
+    ctx.pdf.setDrawColor(226, 232, 240);
+    ctx.pdf.setLineWidth(PDF_SECTION_BORDER_WIDTH);
     ctx.pdf.rect(startX, startY, availableWidth, height, "S");
     ctx.pdf.setFont("helvetica", "bold");
-    ctx.pdf.setFontSize(5.8);
+    ctx.pdf.setFontSize(6.75);
     ctx.pdf.setTextColor(4, 120, 87);
     ctx.pdf.text(pdfSafe(party.roles.join(" · ").toUpperCase()), startX + 2, startY + 3.5);
     let x = startX + 2;
     wrapped.forEach((lines, index) => {
       ctx.pdf.setFont("helvetica", index === 0 ? "bold" : "normal");
-      ctx.pdf.setFontSize(index === 0 ? 7 : 6);
+      ctx.pdf.setFontSize(7.5);
       ctx.pdf.setTextColor(30, 41, 59);
       ctx.pdf.text(lines, x, startY + 7, { maxWidth: widths[index] - 4 });
       x += widths[index];
@@ -1313,16 +1386,17 @@ function drawPdfParties(
 
   parties.forEach((party, index) => {
     const x = startX + index * width;
-    ctx.pdf.setDrawColor(203, 213, 225);
+    ctx.pdf.setDrawColor(226, 232, 240);
+    ctx.pdf.setLineWidth(PDF_SECTION_BORDER_WIDTH);
     ctx.pdf.rect(x, startY, width, height, "S");
     ctx.pdf.setFont("helvetica", "bold");
-    ctx.pdf.setFontSize(5.8);
+    ctx.pdf.setFontSize(6.75);
     ctx.pdf.setTextColor(4, 120, 87);
     ctx.pdf.text(pdfSafe(party.roles.join(" · ").toUpperCase()), x + 2, startY + 3.5);
     let y = startY + 7;
     content[index].forEach((lines, lineIndex) => {
       ctx.pdf.setFont("helvetica", lineIndex === 0 ? "bold" : "normal");
-      ctx.pdf.setFontSize(lineIndex === 0 ? 7 : 6);
+      ctx.pdf.setFontSize(7.5);
       ctx.pdf.setTextColor(30, 41, 59);
       ctx.pdf.text(lines, x + 2, y, { maxWidth: width - 4 });
       y += lines.length * 2.8;
@@ -1398,29 +1472,24 @@ function drawPdfTable(
   } = {},
 ) {
   if (!rows.length) return;
-  const tableX = ctx.x + 3;
-  const tableWidth = ctx.width - 6;
+  const tableX = ctx.x + 2.1;
+  const tableWidth = ctx.width - 4.2;
   const totalWidth = widths.reduce((sum, width) => sum + width, 0);
   const actualWidths = widths.map((width) => (width / totalWidth) * tableWidth);
-  const headerHeight = 5;
+  const headerHeight = 5.5;
   ensurePdfSpace(ctx, headerHeight * 2);
-  ctx.pdf.setFillColor(248, 250, 252);
-  ctx.pdf.setDrawColor(148, 163, 184);
-  ctx.pdf.setLineWidth(0.25);
+  ctx.pdf.setFillColor(241, 245, 249);
+  ctx.pdf.setDrawColor(226, 232, 240);
+  ctx.pdf.setLineWidth(PDF_SECTION_BORDER_WIDTH);
   ctx.pdf.rect(tableX, ctx.y, tableWidth, headerHeight, "FD");
-  let borderX = tableX;
-  actualWidths.slice(0, -1).forEach((width) => {
-    borderX += width;
-    ctx.pdf.line(borderX, ctx.y, borderX, ctx.y + headerHeight);
-  });
   let cursorX = tableX + 1.5;
   ctx.pdf.setFont("helvetica", "bold");
-  ctx.pdf.setFontSize(6);
+  ctx.pdf.setFontSize(6.75);
   ctx.pdf.setTextColor(51, 65, 85);
   headers.forEach((header, index) => {
     const align = options.alignments?.[index] ?? (index === 0 ? "left" : "right");
     const textX = pdfCellTextX(cursorX, actualWidths[index], align);
-    ctx.pdf.text(pdfSafe(header), textX, ctx.y + 3.4, { align, maxWidth: actualWidths[index] - 3 });
+    ctx.pdf.text(pdfSafe(header), textX, ctx.y + 3.7, { align, maxWidth: actualWidths[index] - 3 });
     cursorX += actualWidths[index];
   });
   ctx.y += headerHeight;
@@ -1432,27 +1501,22 @@ function drawPdfTable(
       cell,
       actualWidths[index] - 3 - (index === 0 ? firstColumnIndent : 0),
     ));
-    const rowHeight = Math.max(4.8, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.5);
+    const rowHeight = Math.max(5.2, 2 + Math.max(...wrapped.map((lines) => lines.length)) * 2.7);
     ensurePdfSpace(ctx, rowHeight + 1);
     cursorX = tableX + 1.5;
-    ctx.pdf.setDrawColor(203, 213, 225);
-    ctx.pdf.setLineWidth(0.15);
-    ctx.pdf.rect(tableX, ctx.y, tableWidth, rowHeight, "S");
-    borderX = tableX;
-    actualWidths.slice(0, -1).forEach((width) => {
-      borderX += width;
-      ctx.pdf.line(borderX, ctx.y, borderX, ctx.y + rowHeight);
-    });
+    ctx.pdf.setDrawColor(226, 232, 240);
+    ctx.pdf.setLineWidth(PDF_SECTION_BORDER_WIDTH);
+    ctx.pdf.line(tableX, ctx.y + rowHeight, tableX + tableWidth, ctx.y + rowHeight);
     row.forEach((_cell, index) => {
       const isLast = index === row.length - 1;
       const emphasized = options.emphasizedRows?.has(rowIndex) ?? false;
       ctx.pdf.setFont("helvetica", emphasized || isLast ? "bold" : "normal");
-      ctx.pdf.setFontSize(6.3);
+      ctx.pdf.setFontSize(7.5);
       ctx.pdf.setTextColor(2, 6, 23);
       const align = options.alignments?.[index] ?? (index === 0 ? "left" : "right");
       const textX = pdfCellTextX(cursorX, actualWidths[index], align)
         + (index === 0 && align === "left" ? firstColumnIndent : 0);
-      ctx.pdf.text(wrapped[index], textX, ctx.y + 3.2, { align, maxWidth: actualWidths[index] - 3 });
+      ctx.pdf.text(wrapped[index], textX, ctx.y + 3.5, { align, maxWidth: actualWidths[index] - 3 });
       cursorX += actualWidths[index];
     });
     ctx.y += rowHeight;

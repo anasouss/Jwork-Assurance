@@ -53,7 +53,6 @@ import type {
   TreasuryAccountAssignment,
   TreasuryAccessLevel,
   TreasuryUser,
-  CashSession,
   TreasuryOperation,
   TreasuryOperationPage,
   TreasuryOperationType,
@@ -866,30 +865,6 @@ export const comptaApi = {
     )).map(normalizeTreasuryAssignment);
   },
 
-  async cashSessions() {
-    return unwrap(await apiFetch<ApiResponse<CashSession[]>>(
-      "/api/v1/compta/tresorerie/sessions-caisse"
-    )).map(normalizeCashSession);
-  },
-
-  async openCashSession(request: {
-    compteTresorerieId: string;
-    montantCompte: number;
-    note?: string;
-  }) {
-    return normalizeCashSession(unwrap(await apiFetch<ApiResponse<CashSession>>(
-      "/api/v1/compta/tresorerie/sessions-caisse",
-      { method: "POST", body: JSON.stringify(request) }
-    )));
-  },
-
-  async closeCashSession(id: string, request: { montantCompte: number; note?: string }) {
-    return normalizeCashSession(unwrap(await apiFetch<ApiResponse<CashSession>>(
-      `/api/v1/compta/tresorerie/sessions-caisse/${id}/cloture`,
-      { method: "POST", body: JSON.stringify(request) }
-    )));
-  },
-
   async treasuryOperations(params: {
     compteId?: string;
     type?: TreasuryOperationType;
@@ -1233,15 +1208,6 @@ function normalizeTreasuryAssignment(
     ...assignment,
     id: String(assignment.id),
     utilisateurId: String(assignment.utilisateurId),
-  };
-}
-
-function normalizeCashSession(session: CashSession): CashSession {
-  return {
-    ...session,
-    id: String(session.id),
-    compteTresorerieId: String(session.compteTresorerieId),
-    utilisateurId: String(session.utilisateurId),
   };
 }
 

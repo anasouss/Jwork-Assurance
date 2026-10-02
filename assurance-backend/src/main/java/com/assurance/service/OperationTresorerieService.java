@@ -11,7 +11,6 @@ import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.entity.OperationTresorerie;
 import com.assurance.entity.SequenceOperationTresorerie;
-import com.assurance.entity.SessionCaisse;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.NatureMouvementTresorerie;
 import com.assurance.enums.NiveauAccesCompteTresorerie;
@@ -55,7 +54,6 @@ public class OperationTresorerieService {
     private final AgenceRepository agenceRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieAccessService accessService;
-    private final SessionCaisseService sessionService;
 
     @Transactional(readOnly = true)
     public OperationTresoreriePageResponse search(
@@ -128,7 +126,6 @@ public class OperationTresorerieService {
                 operation,
                 source,
                 SensMouvementTresorerie.SORTIE,
-                sessionService.findOpenSession(agenceId, source),
                 "Transfert vers " + destination.getLibelle(),
                 null
         ));
@@ -136,7 +133,6 @@ public class OperationTresorerieService {
                 operation,
                 destination,
                 SensMouvementTresorerie.ENTREE,
-                sessionService.findOpenSession(agenceId, destination),
                 "Transfert depuis " + source.getLibelle(),
                 null
         ));
@@ -172,7 +168,6 @@ public class OperationTresorerieService {
                 operation,
                 account,
                 request.getSens(),
-                sessionService.findOpenSession(agenceId, account),
                 "Ajustement de trésorerie",
                 null
         ));
@@ -220,7 +215,6 @@ public class OperationTresorerieService {
                 operation,
                 account,
                 direction,
-                sessionService.findOpenSession(agenceId, account),
                 reason,
                 null
         ));
@@ -278,7 +272,6 @@ public class OperationTresorerieService {
                     reversal,
                     movement.getCompteTresorerie(),
                     inverseDirection,
-                    sessionService.findOpenSession(agenceId, movement.getCompteTresorerie()),
                     "Annulation de " + original.getNumero(),
                     movement.getId()
             ));
@@ -330,7 +323,6 @@ public class OperationTresorerieService {
             OperationTresorerie operation,
             CompteTresorerie account,
             SensMouvementTresorerie direction,
-            SessionCaisse session,
             String label,
             Long reversedMovementId
     ) {
@@ -338,7 +330,6 @@ public class OperationTresorerieService {
                 .agence(operation.getAgence())
                 .compteTresorerie(account)
                 .operationTresorerie(operation)
-                .sessionCaisse(session)
                 .nature(movementNature(operation.getTypeOperation()))
                 .sens(direction)
                 .dateOperation(operation.getDateOperation())

@@ -207,7 +207,7 @@ export default function TresorerieComptesPage() {
       <div className="grid gap-5">
         <AccountSection
           title="Caisses"
-          description="Espèces, ouverture quotidienne et clôture de caisse."
+          description="Encaissements en espèces et suivi du solde comptable."
           type="CAISSE"
           accounts={(accounts.data ?? []).filter((account) => account.typeCompte === "CAISSE")}
           loading={accounts.isLoading}

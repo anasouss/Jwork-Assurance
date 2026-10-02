@@ -40,7 +40,6 @@ public class TresorerieService {
     private final CompteTresorerieRepository compteRepository;
     private final MouvementTresorerieRepository mouvementRepository;
     private final TresorerieAccessService accessService;
-    private final SessionCaisseService sessionCaisseService;
 
     @Transactional(readOnly = true)
     public List<CompteTresorerieResponse> listAccounts(Long agenceId, boolean administration) {
@@ -95,9 +94,6 @@ public class TresorerieService {
             Boolean active
     ) {
         CompteTresorerie account = requireAccount(agenceId, accountId);
-        if (!Boolean.TRUE.equals(active) && sessionCaisseService.hasOpenSession(agenceId, accountId)) {
-            throw new BadRequestException("Clôturez la session de caisse avant de désactiver ce compte");
-        }
         account.setActif(Boolean.TRUE.equals(active));
         return toResponse(compteRepository.save(account));
     }
@@ -186,10 +182,6 @@ public class TresorerieService {
                 .compteTresorerie(account)
                 .instrumentReglement(instrument)
                 .ligneReleveBancaire(bankStatementLine)
-                .sessionCaisse(sessionCaisseService.findOpenSession(
-                        instrument.getAgence().getId(),
-                        account
-                ))
                 .nature(NatureMouvementTresorerie.REGLEMENT_CLIENT)
                 .sens(SensMouvementTresorerie.ENTREE)
                 .dateOperation(operationDate)
@@ -225,10 +217,6 @@ public class TresorerieService {
                 .agence(original.getAgence())
                 .compteTresorerie(original.getCompteTresorerie())
                 .instrumentReglement(instrument)
-                .sessionCaisse(sessionCaisseService.findOpenSession(
-                        instrument.getAgence().getId(),
-                        original.getCompteTresorerie()
-                ))
                 .nature(NatureMouvementTresorerie.REJET_INSTRUMENT)
                 .sens(SensMouvementTresorerie.SORTIE)
                 .dateOperation(operationDate)

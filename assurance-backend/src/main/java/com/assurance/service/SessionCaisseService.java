@@ -124,27 +124,6 @@ public class SessionCaisseService {
         return toResponse(sessionRepository.save(session));
     }
 
-    @Transactional(readOnly = true)
-    public SessionCaisse findOpenSession(Long agenceId, CompteTresorerie account) {
-        if (account.getTypeCompte() != TypeCompteTresorerie.CAISSE) {
-            return null;
-        }
-        return sessionRepository.findFirstByAgenceIdAndCompteTresorerieIdAndStatut(
-                agenceId,
-                account.getId(),
-                StatutSessionCaisse.OUVERTE
-        ).orElse(null);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean hasOpenSession(Long agenceId, Long accountId) {
-        return sessionRepository.existsByAgenceIdAndCompteTresorerieIdAndStatut(
-                agenceId,
-                accountId,
-                StatutSessionCaisse.OUVERTE
-        );
-    }
-
     private CompteTresorerie requireCashAccount(Long agenceId, Long accountId) {
         CompteTresorerie account = compteRepository.findByIdAndAgenceId(accountId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Compte de trésorerie", accountId));

@@ -678,25 +678,6 @@ export type TreasuryUser = {
   actif: boolean;
 };
 
-export type CashSession = {
-  id: string;
-  compteTresorerieId: string;
-  compteTresorerie: string;
-  utilisateurId: string;
-  utilisateur: string;
-  statut: "OUVERTE" | "CLOTUREE";
-  ouverteLe: string;
-  fermeeLe?: string | null;
-  soldeTheoriqueOuverture: number;
-  montantOuverture: number;
-  ecartOuverture: number;
-  soldeTheoriqueCloture?: number | null;
-  montantCompteCloture?: number | null;
-  ecartCloture?: number | null;
-  noteOuverture?: string | null;
-  noteCloture?: string | null;
-};
-
 export type TreasuryOperationType =
   | "TRANSFERT"
   | "AJUSTEMENT"

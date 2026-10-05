@@ -128,24 +128,12 @@ export default function SinistreDetailPage() {
   const experts = useQuery({
     queryKey: sinistreKeys.experts(false),
     queryFn: () => sinistreApi.experts(false),
-    enabled:
-      canManage &&
-      Boolean(
-        detail.data &&
-          (detail.data.missionsExpertise.length > 0 ||
-            isAtLeastTransmitted(detail.data.statut)),
-      ),
+    enabled: canManage && Boolean(detail.data),
   });
   const garages = useQuery({
     queryKey: sinistreKeys.garages(false),
     queryFn: () => sinistreApi.garages(false),
-    enabled:
-      canManage &&
-      Boolean(
-        detail.data &&
-          (detail.data.missionsExpertise.length > 0 ||
-            isAtLeastTransmitted(detail.data.statut)),
-      ),
+    enabled: canManage && Boolean(detail.data),
   });
   const managers = useQuery({
     queryKey: sinistreKeys.managers(),
@@ -322,9 +310,6 @@ export default function SinistreDetailPage() {
       .filter((item) => item.type === "ANNULATION" && item.operationAnnuleeId)
       .map((item) => item.operationAnnuleeId),
   );
-  const expertiseVisible =
-    dossier.missionsExpertise.length > 0 ||
-    isAtLeastTransmitted(dossier.statut);
   const financeVisible =
     dossier.provisions.length > 0 ||
     dossier.operations.length > 0 ||
@@ -332,7 +317,7 @@ export default function SinistreDetailPage() {
   const coverageAssessmentVisible = isAtLeastTransmitted(dossier.statut);
 
   return (
-    <div className="grid gap-4">
+    <div className="-mx-2 grid gap-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Button asChild variant="ghost" className="mb-2 -ml-3">
@@ -363,8 +348,9 @@ export default function SinistreDetailPage() {
         </div>
       </div>
       <WorkflowReadiness dossier={dossier} />
-      <div className="grid gap-4">
-        <GeneralSection
+      <div className="grid gap-3">
+        <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <GeneralSection
             dossier={dossier}
             cities={cities.data ?? []}
             managers={managers.data ?? []}
@@ -374,9 +360,26 @@ export default function SinistreDetailPage() {
             editable={canManage && !locked}
             saving={update.isPending}
             onSave={(request) => update.mutate(request)}
-        />
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="order-2 grid min-w-0 gap-4 xl:order-1">
+          />
+          <div className="min-w-0 xl:sticky xl:top-4">
+            <DocumentsPanel
+              dossier={dossier}
+              editable={canManage && !locked}
+              reviewing={reviewDocument.isPending}
+              downloading={download.isPending}
+              onAdd={(type) => {
+                setDocumentInitialType(type ?? null);
+                setDocumentOpen(true);
+              }}
+              onDownload={(id, name) => download.mutate({ id, name })}
+              onReview={(id, statut) =>
+                reviewDocument.mutate({ id, statut })
+              }
+              onDelete={(id, name) => setDocumentToDelete({ id, name })}
+            />
+          </div>
+        </div>
+        <div className="grid min-w-0 gap-3">
         <CoverageSection
             dossier={dossier}
             assessmentVisible={coverageAssessmentVisible}
@@ -454,17 +457,13 @@ export default function SinistreDetailPage() {
         <div className="grid gap-4">
             <WorkflowPanel
               title="Missions d’expertise"
-              summary={
-                expertiseVisible
-                  ? `${dossier.missionsExpertise.length} mission(s)`
-                  : "Disponible après transmission à la compagnie"
-              }
+              summary={`${dossier.missionsExpertise.length} mission(s)`}
               defaultOpen={
                 dossier.statut === "EXPERTISE" ||
                 dossier.missionsExpertise.length > 0
               }
               action={
-                expertiseVisible && canManage && !locked ? (
+                canManage && !locked ? (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -478,7 +477,6 @@ export default function SinistreDetailPage() {
                 ) : null
               }
             >
-            {expertiseVisible ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -536,12 +534,6 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-            ) : (
-              <div className="px-4 py-4 text-sm text-muted-foreground">
-                L’expert et le garage seront désignés ici après la transmission
-                du dossier à la compagnie.
-              </div>
-            )}
             </WorkflowPanel>
         </div>
         {financeVisible ? (
@@ -692,24 +684,6 @@ export default function SinistreDetailPage() {
             </WorkflowPanel>
           </div>
         ) : null}
-          </div>
-          <div className="order-1 min-w-0 xl:order-2 xl:sticky xl:top-4">
-            <DocumentsPanel
-              dossier={dossier}
-              editable={canManage && !locked}
-              reviewing={reviewDocument.isPending}
-              downloading={download.isPending}
-              onAdd={(type) => {
-                setDocumentInitialType(type ?? null);
-                setDocumentOpen(true);
-              }}
-              onDownload={(id, name) => download.mutate({ id, name })}
-              onReview={(id, statut) =>
-                reviewDocument.mutate({ id, statut })
-              }
-              onDelete={(id, name) => setDocumentToDelete({ id, name })}
-            />
-          </div>
         </div>
       </div>
       <HistoryDialog

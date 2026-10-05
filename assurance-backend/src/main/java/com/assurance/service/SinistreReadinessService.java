@@ -147,7 +147,7 @@ public class SinistreReadinessService {
 
     private ReadinessContext loadContext(Long sinistreId) {
         List<SinistreGarantie> involved = garantieRepository
-                .findBySinistreIdOrderBySnapshotCode(sinistreId)
+                .findForDetailOrderByConfiguredDisplay(sinistreId)
                 .stream()
                 .filter(SinistreGarantie::isImpliquee)
                 .toList();
@@ -161,7 +161,7 @@ public class SinistreReadinessService {
     }
 
     public BigDecimal totalIndemnisable(Long sinistreId) {
-        return totalIndemnisable(garantieRepository.findBySinistreIdOrderBySnapshotCode(sinistreId));
+        return totalIndemnisable(garantieRepository.findForDetailOrderByConfiguredDisplay(sinistreId));
     }
 
     public BigDecimal totalSettled(Long sinistreId) {

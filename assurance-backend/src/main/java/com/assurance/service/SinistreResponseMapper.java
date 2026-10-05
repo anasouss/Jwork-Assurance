@@ -77,7 +77,7 @@ public class SinistreResponseMapper {
     public SinistreDetailResponse toDetail(Sinistre sinistre) {
         SinistreCouverture couverture = resolveCouverture(sinistre);
         List<SinistreGarantie> garanties = garantieRepository
-                .findBySinistreIdOrderBySnapshotCode(sinistre.getId());
+                .findForDetailOrderByConfiguredDisplay(sinistre.getId());
         List<SinistrePartie> parties = partieRepository
                 .findBySinistreIdOrderByCreatedAt(sinistre.getId());
         List<SinistreDocument> documents = documentRepository

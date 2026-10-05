@@ -30,11 +30,11 @@ export const statusLabels = STATUS_LABELS;
 export const natureLabels = NATURE_LABELS;
 
 export function formatMoney(value?: number | null) {
-  return new Intl.NumberFormat("fr-MA", {
-    style: "currency",
-    currency: "MAD",
+  const formatted = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value ?? 0);
+  return `${formatted.replace(/[\u00a0\u202f]/g, " ")} MAD`;
 }
 
 export function formatDate(value?: string | null) {

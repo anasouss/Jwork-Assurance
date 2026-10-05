@@ -1947,7 +1947,7 @@ function DocumentReferences(props: {
         <div key={document.id} className="grid gap-0.5">
           <button
             type="button"
-            className="text-left text-xs font-medium text-amber-800 underline-offset-2 hover:underline dark:text-amber-300"
+            className="cursor-pointer rounded-sm text-left text-xs font-medium text-amber-800 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:text-amber-300"
             onClick={() => props.onOpen(document.id)}
           >
             {document.numero}

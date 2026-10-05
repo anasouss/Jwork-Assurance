@@ -8,6 +8,7 @@ import {
   CircleCheck,
   Download,
   FileCheck2,
+  FileText,
   FilePlus2,
   FileX2,
   History,
@@ -20,6 +21,7 @@ import {
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,6 +105,8 @@ export default function SinistreDetailPage() {
     null,
   );
   const [documentOpen, setDocumentOpen] = useState(false);
+  const [documentInitialType, setDocumentInitialType] =
+    useState<TypeDocument | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<{
     id: string;
     name: string;
@@ -371,6 +375,8 @@ export default function SinistreDetailPage() {
             saving={update.isPending}
             onSave={(request) => update.mutate(request)}
         />
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="order-2 grid min-w-0 gap-4 xl:order-1">
         <CoverageSection
             dossier={dossier}
             assessmentVisible={coverageAssessmentVisible}
@@ -528,161 +534,6 @@ export default function SinistreDetailPage() {
             </div>
             </WorkflowPanel>
           ) : null}
-          <WorkflowPanel
-            title="Documents"
-            summary={`${dossier.documents.length} déposé(s)`}
-            defaultOpen={
-              dossier.workflow.documentsRecus > 0 ||
-              dossier.workflow.documentsRejetes > 0 ||
-              dossier.workflow.documentsRequis.some(
-                (item) => item.obligatoire && !item.recu && !item.valide,
-              )
-            }
-            action={
-              canManage && !locked ? (
-                <Button size="sm" onClick={() => setDocumentOpen(true)}>
-                  <FilePlus2 className="size-4" />
-                  Déposer
-                </Button>
-              ) : null
-            }
-          >
-            {dossier.workflow.documentsRequis.length > 0 ? (
-              <div className="flex flex-wrap gap-2 border-b px-4 py-3">
-                {dossier.workflow.documentsRequis.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-2 rounded border px-2.5 py-1.5 text-sm ${
-                      item.valide
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : item.recu
-                          ? "border-amber-200 bg-amber-50 text-amber-800"
-                          : item.obligatoire
-                            ? "border-amber-300 bg-amber-50 text-amber-900"
-                            : "border-border bg-muted/40 text-muted-foreground"
-                    }`}
-                  >
-                    {item.valide ? <CircleCheck className="size-4" /> : <CircleAlert className="size-4" />}
-                    <span>{item.libelle}</span>
-                    <span className="text-xs font-medium">
-                      {item.valide
-                        ? "Validé"
-                        : item.recu
-                          ? "À contrôler"
-                          : item.obligatoire
-                            ? "Manquant"
-                            : "Facultatif"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Référence / émetteur</TableHead>
-                    <TableHead>Date / montant</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead className="w-40">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dossier.documents.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">
-                        {item.nomFichier}
-                      </TableCell>
-                      <TableCell>{documentTypeLabels[item.type]}</TableCell>
-                      <TableCell>
-                        <div>{item.reference || "-"}</div>
-                        <div className="text-xs text-muted-foreground">{item.emetteur || item.garantie || item.missionExpertise || "-"}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div>{formatDate(item.dateDocument || item.createdAt)}</div>
-                        <div className="text-xs tabular-nums text-muted-foreground">{item.montant == null ? "-" : formatMoney(item.montant)}</div>
-                      </TableCell>
-                      <TableCell>{item.statut}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Télécharger"
-                            onClick={() =>
-                              download.mutate({
-                                id: item.id,
-                                name: item.nomFichier,
-                              })
-                            }
-                          >
-                            <Download className="size-4" />
-                          </Button>
-                          {canManage && item.statut === "RECU" ? (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Valider"
-                                onClick={() =>
-                                  reviewDocument.mutate({
-                                    id: item.id,
-                                    statut: "VALIDE",
-                                  })
-                                }
-                              >
-                                <FileCheck2 className="size-4 text-emerald-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Rejeter"
-                                onClick={() =>
-                                  reviewDocument.mutate({
-                                    id: item.id,
-                                    statut: "REJETE",
-                                  })
-                                }
-                              >
-                                <FileX2 className="size-4 text-destructive" />
-                              </Button>
-                            </>
-                          ) : null}
-                          {canManage && !locked && item.statut !== "VALIDE" ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Supprimer"
-                              onClick={() =>
-                                setDocumentToDelete({
-                                  id: item.id,
-                                  name: item.nomFichier,
-                                })
-                              }
-                            >
-                              <Trash2 className="size-4 text-destructive" />
-                            </Button>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {dossier.documents.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="py-4 text-center text-muted-foreground"
-                      >
-                        Aucun document déposé.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </div>
-          </WorkflowPanel>
         </div>
         {financeVisible ? (
           <div className="grid gap-4">
@@ -832,6 +683,25 @@ export default function SinistreDetailPage() {
             </WorkflowPanel>
           </div>
         ) : null}
+          </div>
+          <div className="order-1 min-w-0 xl:order-2 xl:sticky xl:top-4">
+            <DocumentsPanel
+              dossier={dossier}
+              editable={canManage && !locked}
+              reviewing={reviewDocument.isPending}
+              downloading={download.isPending}
+              onAdd={(type) => {
+                setDocumentInitialType(type ?? null);
+                setDocumentOpen(true);
+              }}
+              onDownload={(id, name) => download.mutate({ id, name })}
+              onReview={(id, statut) =>
+                reviewDocument.mutate({ id, statut })
+              }
+              onDelete={(id, name) => setDocumentToDelete({ id, name })}
+            />
+          </div>
+        </div>
       </div>
       <HistoryDialog
         dossier={dossier}
@@ -869,7 +739,11 @@ export default function SinistreDetailPage() {
         open={documentOpen}
         saving={document.isPending}
         dossier={dossier}
-        onOpenChange={setDocumentOpen}
+        initialType={documentInitialType}
+        onOpenChange={(open) => {
+          setDocumentOpen(open);
+          if (!open) setDocumentInitialType(null);
+        }}
         onSubmit={(type, commentaire, file, metadata) =>
           document.mutate({ type, commentaire, file, metadata })
         }
@@ -1052,6 +926,179 @@ function WorkflowPanel({
       </div>
       <CollapsibleContent className="border-t">{children}</CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function DocumentsPanel({
+  dossier,
+  editable,
+  reviewing,
+  downloading,
+  onAdd,
+  onDownload,
+  onReview,
+  onDelete,
+}: {
+  dossier: SinistreDetail;
+  editable: boolean;
+  reviewing: boolean;
+  downloading: boolean;
+  onAdd: (type?: TypeDocument) => void;
+  onDownload: (id: string, name: string) => void;
+  onReview: (id: string, statut: "VALIDE" | "REJETE") => void;
+  onDelete: (id: string, name: string) => void;
+}) {
+  return (
+    <section className="overflow-hidden rounded-md border bg-card">
+      <div className="flex min-h-12 items-center justify-between gap-3 border-l-2 border-sky-600 bg-slate-50 px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="font-semibold">Pièces du dossier</h2>
+          <p className="text-xs text-muted-foreground">
+            {dossier.documents.length} document(s) déposé(s)
+          </p>
+        </div>
+        {editable ? (
+          <Button size="sm" onClick={() => onAdd()}>
+            <FilePlus2 className="size-4" />
+            Déposer
+          </Button>
+        ) : null}
+      </div>
+
+      {dossier.workflow.documentsRequis.length > 0 ? (
+        <div className="border-t px-3 py-3">
+          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+            Pièces attendues
+          </p>
+          <div className="grid gap-2">
+            {dossier.workflow.documentsRequis.map((item) => {
+              const status = item.valide
+                ? "Validé"
+                : item.recu
+                  ? "À contrôler"
+                  : item.obligatoire
+                    ? "Manquant"
+                    : "Facultatif";
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={!editable || item.valide || item.recu}
+                  onClick={() => onAdd(item.type)}
+                  className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm disabled:cursor-default ${
+                    item.valide
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : item.recu
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : item.obligatoire
+                          ? "cursor-pointer border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400"
+                          : "cursor-pointer border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {item.valide ? (
+                      <CircleCheck className="size-4 shrink-0" />
+                    ) : (
+                      <CircleAlert className="size-4 shrink-0" />
+                    )}
+                    <span className="truncate">{item.libelle}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-medium">{status}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="border-t">
+        <div className="flex items-center justify-between px-3 py-2">
+          <p className="text-xs font-semibold uppercase text-muted-foreground">
+            Documents déposés
+          </p>
+        </div>
+        {dossier.documents.length === 0 ? (
+          <div className="border-t px-4 py-6 text-center text-sm text-muted-foreground">
+            Aucun document déposé.
+          </div>
+        ) : (
+          <div className="divide-y border-t">
+            {dossier.documents.map((item) => (
+              <div key={item.id} className="flex items-start gap-2 px-3 py-3">
+                <FileText className="mt-0.5 size-4 shrink-0 text-sky-700" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium" title={item.nomFichier}>
+                    {item.nomFichier}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {documentTypeLabels[item.type]}
+                    {item.dateDocument ? ` · ${formatDate(item.dateDocument)}` : ""}
+                  </p>
+                  <p
+                    className={`mt-1 text-xs font-medium ${
+                      item.statut === "VALIDE"
+                        ? "text-emerald-700"
+                        : item.statut === "REJETE"
+                          ? "text-destructive"
+                          : "text-amber-700"
+                    }`}
+                  >
+                    {item.statut === "VALIDE"
+                      ? "Validé"
+                      : item.statut === "REJETE"
+                        ? "Rejeté"
+                        : "À contrôler"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={downloading}
+                    aria-label={`Télécharger ${item.nomFichier}`}
+                    onClick={() => onDownload(item.id, item.nomFichier)}
+                  >
+                    <Download className="size-4" />
+                  </Button>
+                  {editable && item.statut === "RECU" ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={reviewing}
+                        aria-label={`Valider ${item.nomFichier}`}
+                        onClick={() => onReview(item.id, "VALIDE")}
+                      >
+                        <FileCheck2 className="size-4 text-emerald-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={reviewing}
+                        aria-label={`Rejeter ${item.nomFichier}`}
+                        onClick={() => onReview(item.id, "REJETE")}
+                      >
+                        <FileX2 className="size-4 text-destructive" />
+                      </Button>
+                    </>
+                  ) : null}
+                  {editable && item.statut !== "VALIDE" ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Supprimer ${item.nomFichier}`}
+                      onClick={() => onDelete(item.id, item.nomFichier)}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -1257,12 +1304,11 @@ function GeneralSection({
                 </Select>
               </Field>
               <Field label="Échéance de l’action">
-                <Input
+                <DatePicker
                   disabled={!editable}
-                  type="date"
-                  value={form.dateEcheanceAction}
-                  onChange={(event) =>
-                    update("dateEcheanceAction", event.target.value)
+                  date={form.dateEcheanceAction}
+                  onSelect={(date) =>
+                    update("dateEcheanceAction", toIsoDate(date))
                   }
                 />
               </Field>
@@ -1503,6 +1549,11 @@ function paymentModeLabel(
     COMPENSATION: "Compensation",
     AUTRE: "Autre",
   }[mode];
+}
+
+function toIsoDate(date?: Date) {
+  if (!date) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function isAtLeastTransmitted(statut: StatutSinistre) {

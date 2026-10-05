@@ -1345,7 +1345,7 @@ function GeneralSection({
               }
             />
           </Field>
-          <Field label="N° PV">
+          <Field label="N° de procès-verbal (PV)">
             <Input
               disabled={!editable}
               value={form.numeroPv}

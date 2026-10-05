@@ -452,16 +452,19 @@ export default function SinistreDetailPage() {
             </div>
         </WorkflowPanel>
         <div className="grid gap-4">
-          {expertiseVisible ? (
             <WorkflowPanel
               title="Missions d’expertise"
-              summary={`${dossier.missionsExpertise.length} mission(s)`}
+              summary={
+                expertiseVisible
+                  ? `${dossier.missionsExpertise.length} mission(s)`
+                  : "Disponible après transmission à la compagnie"
+              }
               defaultOpen={
                 dossier.statut === "EXPERTISE" ||
-                dossier.missionsExpertise.length === 0
+                dossier.missionsExpertise.length > 0
               }
               action={
-                canManage && !locked ? (
+                expertiseVisible && canManage && !locked ? (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -475,6 +478,7 @@ export default function SinistreDetailPage() {
                 ) : null
               }
             >
+            {expertiseVisible ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -532,8 +536,13 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
+            ) : (
+              <div className="px-4 py-4 text-sm text-muted-foreground">
+                L’expert et le garage seront désignés ici après la transmission
+                du dossier à la compagnie.
+              </div>
+            )}
             </WorkflowPanel>
-          ) : null}
         </div>
         {financeVisible ? (
           <div className="grid gap-4">
@@ -948,6 +957,23 @@ function DocumentsPanel({
   onReview: (id: string, statut: "VALIDE" | "REJETE") => void;
   onDelete: (id: string, name: string) => void;
 }) {
+  const requiredDocuments = dossier.workflow.documentsRequis;
+  const mandatoryDocuments = requiredDocuments.filter((item) => item.obligatoire);
+  const openingComplete =
+    mandatoryDocuments.length === 0 ||
+    mandatoryDocuments.every((item) => item.valide);
+  const openingPending = requiredDocuments.some(
+    (item) => item.recu && !item.valide,
+  );
+  const expertiseDocuments = dossier.documents.filter((item) =>
+    ["DEVIS", "RAPPORT_EXPERT", "ACCORD"].includes(item.type),
+  ).length;
+  const settlementDocuments = dossier.documents.filter((item) =>
+    ["FACTURE", "REGLEMENT", "RECOURS"].includes(item.type),
+  ).length;
+  const expertiseAvailable = isAtLeastTransmitted(dossier.statut);
+  const settlementAvailable = isAtLeastExpertise(dossier.statut);
+
   return (
     <section className="overflow-hidden rounded-md border bg-card">
       <div className="flex min-h-12 items-center justify-between gap-3 border-l-2 border-sky-600 bg-slate-50 px-4 py-3">
@@ -965,51 +991,89 @@ function DocumentsPanel({
         ) : null}
       </div>
 
-      {dossier.workflow.documentsRequis.length > 0 ? (
-        <div className="border-t px-3 py-3">
-          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-            Pièces attendues
+      <div className="border-t">
+        <div className="px-3 py-2">
+          <p className="text-xs font-semibold uppercase text-muted-foreground">
+            Parcours documentaire
           </p>
-          <div className="grid gap-2">
-            {dossier.workflow.documentsRequis.map((item) => {
-              const status = item.valide
-                ? "Validé"
-                : item.recu
-                  ? "À contrôler"
-                  : item.obligatoire
-                    ? "Manquant"
-                    : "Facultatif";
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  disabled={!editable || item.valide || item.recu}
-                  onClick={() => onAdd(item.type)}
-                  className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm disabled:cursor-default ${
-                    item.valide
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : item.recu
-                        ? "border-amber-200 bg-amber-50 text-amber-800"
-                        : item.obligatoire
-                          ? "cursor-pointer border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400"
-                          : "cursor-pointer border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    {item.valide ? (
-                      <CircleCheck className="size-4 shrink-0" />
-                    ) : (
-                      <CircleAlert className="size-4 shrink-0" />
-                    )}
-                    <span className="truncate">{item.libelle}</span>
-                  </span>
-                  <span className="shrink-0 text-xs font-medium">{status}</span>
-                </button>
-              );
-            })}
-          </div>
         </div>
-      ) : null}
+        <DocumentStage
+          number={1}
+          title="Ouverture du dossier"
+          description="Déclaration, constat et pièces d’identité"
+          status={
+            openingComplete
+              ? "Complet"
+              : openingPending
+                ? "À contrôler"
+                : "À compléter"
+          }
+          tone={openingComplete ? "success" : "warning"}
+          active={!openingComplete}
+        >
+          {requiredDocuments.length > 0 ? (
+            <div className="mt-2 grid gap-1.5">
+              {requiredDocuments.map((item) => {
+                const status = item.valide
+                  ? "Validé"
+                  : item.recu
+                    ? "À contrôler"
+                    : item.obligatoire
+                      ? "Manquant"
+                      : "Facultatif";
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={!editable || item.valide || item.recu}
+                    onClick={() => onAdd(item.type)}
+                    className={`flex items-center justify-between gap-2 rounded border px-2.5 py-2 text-left text-xs disabled:cursor-default ${
+                      item.valide
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : item.recu
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : item.obligatoire
+                            ? "cursor-pointer border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400"
+                            : "cursor-pointer border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    <span className="truncate">{item.libelle}</span>
+                    <span className="shrink-0 font-medium">{status}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </DocumentStage>
+        <DocumentStage
+          number={2}
+          title="Expertise"
+          description="Devis, rapport d’expert et accord compagnie"
+          status={
+            expertiseAvailable
+              ? expertiseDocuments > 0
+                ? `${expertiseDocuments} déposé(s)`
+                : "À venir"
+              : "Après transmission"
+          }
+          tone={expertiseDocuments > 0 ? "success" : "neutral"}
+          active={expertiseAvailable && expertiseDocuments === 0}
+        />
+        <DocumentStage
+          number={3}
+          title="Règlement et recours"
+          description="Factures, justificatifs et recours"
+          status={
+            settlementAvailable
+              ? settlementDocuments > 0
+                ? `${settlementDocuments} déposé(s)`
+                : "À venir"
+              : "Étape ultérieure"
+          }
+          tone={settlementDocuments > 0 ? "success" : "neutral"}
+          active={settlementAvailable && settlementDocuments === 0}
+        />
+      </div>
 
       <div className="border-t">
         <div className="flex items-center justify-between px-3 py-2">
@@ -1102,6 +1166,60 @@ function DocumentsPanel({
   );
 }
 
+function DocumentStage({
+  number,
+  title,
+  description,
+  status,
+  tone,
+  active = false,
+  children,
+}: {
+  number: number;
+  title: string;
+  description: string;
+  status: string;
+  tone: "success" | "warning" | "neutral";
+  active?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className={`border-t px-3 py-3 ${active ? "bg-sky-50/50" : ""}`}>
+      <div className="flex items-start gap-2.5">
+        <span
+          className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
+            tone === "success"
+              ? "bg-emerald-100 text-emerald-700"
+              : active
+                ? "bg-sky-600 text-white"
+                : "bg-slate-100 text-slate-500"
+          }`}
+        >
+          {tone === "success" ? <CircleCheck className="size-3.5" /> : number}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium">{title}</p>
+            <span
+              className={`shrink-0 text-xs font-medium ${
+                tone === "success"
+                  ? "text-emerald-700"
+                  : tone === "warning"
+                    ? "text-amber-700"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {status}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GeneralSection({
   dossier,
   cities,
@@ -1158,7 +1276,6 @@ function GeneralSection({
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
       <section className="rounded-md border bg-card p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-semibold">Informations du sinistre</h2>
@@ -1194,6 +1311,29 @@ function GeneralSection({
             </Button>
           ) : null}
         </div>
+        <dl className="mb-4 grid gap-x-5 gap-y-3 border-y bg-slate-50 px-3 py-3 text-sm sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+          <Info label="Police" value={dossier.couverture.numeroPolice} />
+          <Info label="Dossier" value={dossier.couverture.numeroDossier} />
+          <Info label="Compagnie" value={dossier.couverture.compagnie} />
+          <Info label="Assuré" value={dossier.couverture.assure} />
+          <Info
+            label="Mouvement"
+            value={`${dossier.couverture.numeroMouvement} · ${formatDate(dossier.couverture.dateEffet)}`}
+          />
+          <Info
+            label="Véhicule"
+            value={[
+              dossier.couverture.immatriculation,
+              dossier.couverture.marque,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          />
+          <Info
+            label="Attestation"
+            value={dossier.couverture.numeroAttestation}
+          />
+        </dl>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Ville">
             <SinistreVilleSelect
@@ -1338,33 +1478,6 @@ function GeneralSection({
           </CollapsibleContent>
         </Collapsible>
       </section>
-      <section className="rounded-md border bg-card p-4">
-        <h2 className="mb-4 font-semibold">Couverture contractuelle</h2>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm lg:grid-cols-1 xl:grid-cols-2">
-          <Info label="Police" value={dossier.couverture.numeroPolice} />
-          <Info label="Dossier" value={dossier.couverture.numeroDossier} />
-          <Info label="Compagnie" value={dossier.couverture.compagnie} />
-          <Info label="Assuré" value={dossier.couverture.assure} />
-          <Info
-            label="Mouvement"
-            value={`${dossier.couverture.numeroMouvement} · du ${formatDate(dossier.couverture.dateEffet)}`}
-          />
-          <Info
-            label="Véhicule"
-            value={[
-              dossier.couverture.immatriculation,
-              dossier.couverture.marque,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          />
-          <Info
-            label="Attestation"
-            value={dossier.couverture.numeroAttestation}
-          />
-        </dl>
-      </section>
-    </div>
   );
 }
 

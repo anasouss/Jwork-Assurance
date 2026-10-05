@@ -888,7 +888,7 @@ function WorkflowPanel({
       onOpenChange={setOpen}
       className="overflow-hidden rounded-md border bg-card"
     >
-      <div className="flex min-h-12 items-center border-l-2 border-sky-900 bg-sky-700 text-white dark:bg-sky-800">
+      <div className="flex min-h-12 items-center border-l-2 border-sky-800 bg-sky-600 text-white dark:bg-sky-700">
         <CollapsibleTrigger asChild>
           <button
             type="button"
@@ -950,7 +950,7 @@ function DocumentsPanel({
 
   return (
     <section className="overflow-hidden rounded-md border bg-card">
-      <div className="flex min-h-12 items-center justify-between gap-3 border-l-2 border-sky-900 bg-sky-700 px-4 py-3 text-white dark:bg-sky-800">
+      <div className="flex min-h-12 items-center justify-between gap-3 border-l-2 border-sky-800 bg-sky-600 px-4 py-3 text-white dark:bg-sky-700">
         <div className="min-w-0">
           <h2 className="font-semibold">Pièces du dossier</h2>
           <p className="text-xs text-sky-100">

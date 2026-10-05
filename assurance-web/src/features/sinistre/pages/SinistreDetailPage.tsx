@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FilePlus2,
   FileX2,
+  History,
   Pencil,
   Plus,
   Save,
@@ -28,8 +29,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -48,7 +55,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { downloadBlob } from "@/lib/download";
 import { referenceApi } from "@/features/production/api/references";
@@ -84,6 +90,7 @@ export default function SinistreDetailPage() {
   const canManage = permissions.includes("sinistre:manage");
   const canFinance = permissions.includes("sinistre:finance");
   const [transitionOpen, setTransitionOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<SinistreDetail["parties"][number] | null>(null);
   const [financeMode, setFinanceMode] = useState<FinanceDialogMode | null>(
@@ -111,12 +118,24 @@ export default function SinistreDetailPage() {
   const experts = useQuery({
     queryKey: sinistreKeys.experts(false),
     queryFn: () => sinistreApi.experts(false),
-    enabled: canManage,
+    enabled:
+      canManage &&
+      Boolean(
+        detail.data &&
+          (detail.data.missionsExpertise.length > 0 ||
+            isAtLeastTransmitted(detail.data.statut)),
+      ),
   });
   const garages = useQuery({
     queryKey: sinistreKeys.garages(false),
     queryFn: () => sinistreApi.garages(false),
-    enabled: canManage,
+    enabled:
+      canManage &&
+      Boolean(
+        detail.data &&
+          (detail.data.missionsExpertise.length > 0 ||
+            isAtLeastTransmitted(detail.data.statut)),
+      ),
   });
   const managers = useQuery({
     queryKey: sinistreKeys.managers(),
@@ -126,7 +145,14 @@ export default function SinistreDetailPage() {
   const treasuryAccounts = useQuery({
     queryKey: sinistreKeys.treasuryAccounts(),
     queryFn: sinistreApi.treasuryAccounts,
-    enabled: canFinance,
+    enabled:
+      canFinance &&
+      Boolean(
+        detail.data &&
+          (detail.data.provisions.length > 0 ||
+            detail.data.operations.length > 0 ||
+            isAtLeastExpertise(detail.data.statut)),
+      ),
   });
 
   const accept = (result: SinistreDetail, message: string) => {
@@ -286,6 +312,14 @@ export default function SinistreDetailPage() {
       .filter((item) => item.type === "ANNULATION" && item.operationAnnuleeId)
       .map((item) => item.operationAnnuleeId),
   );
+  const expertiseVisible =
+    dossier.missionsExpertise.length > 0 ||
+    isAtLeastTransmitted(dossier.statut);
+  const financeVisible =
+    dossier.provisions.length > 0 ||
+    dossier.operations.length > 0 ||
+    isAtLeastExpertise(dossier.statut);
+  const coverageAssessmentVisible = isAtLeastTransmitted(dossier.statut);
 
   return (
     <div className="grid gap-4">
@@ -306,59 +340,39 @@ export default function SinistreDetailPage() {
             · {dossier.couverture.assure}
           </p>
         </div>
-        {canManage && dossier.workflow.transitions.length > 0 ? (
-          <Button onClick={() => setTransitionOpen(true)}>
-            Faire évoluer le dossier
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setHistoryOpen(true)}>
+            <History className="size-4" />
+            Historique
           </Button>
-        ) : null}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Metric
-          label="Provision"
-          value={formatMoney(dossier.totaux.provisionCourante)}
-        />
-        <Metric label="Réglé" value={formatMoney(dossier.totaux.totalRegle)} />
-        <Metric
-          label="Indemnisable"
-          value={formatMoney(dossier.totaux.totalIndemnisable)}
-        />
-        <Metric label="Frais" value={formatMoney(dossier.totaux.totalFrais)} />
-        <Metric
-          label="Recours"
-          value={formatMoney(dossier.totaux.totalRecours)}
-        />
-        <Metric
-          label="Reste à régler"
-          value={formatMoney(dossier.totaux.resteARegler)}
-        />
+          {canManage && dossier.workflow.transitions.length > 0 ? (
+            <Button onClick={() => setTransitionOpen(true)}>
+              Faire évoluer le dossier
+            </Button>
+          ) : null}
+        </div>
       </div>
       <WorkflowReadiness dossier={dossier} />
-      <Tabs defaultValue="synthese" className="grid gap-4">
-        <TabsList className="h-auto justify-start overflow-x-auto">
-          <TabsTrigger value="synthese">Synthèse</TabsTrigger>
-          <TabsTrigger value="couverture">Couverture et parties</TabsTrigger>
-          <TabsTrigger value="expertise">Expertise et documents</TabsTrigger>
-          <TabsTrigger value="finance">Financier</TabsTrigger>
-          <TabsTrigger value="historique">Historique</TabsTrigger>
-        </TabsList>
-        <TabsContent value="synthese">
-          <GeneralSection
+      <div className="grid gap-4">
+        <GeneralSection
             dossier={dossier}
             cities={cities.data ?? []}
             managers={managers.data ?? []}
+            responsibilityVisible={
+              coverageAssessmentVisible && dossier.nature === "ACCIDENT"
+            }
             editable={canManage && !locked}
             saving={update.isPending}
             onSave={(request) => update.mutate(request)}
-          />
-        </TabsContent>
-        <TabsContent value="couverture" className="grid gap-4">
-          <CoverageSection
+        />
+        <CoverageSection
             dossier={dossier}
+            assessmentVisible={coverageAssessmentVisible}
             editable={canManage && !locked}
             saving={guarantee.isPending}
             onSave={(id, request) => guarantee.mutate({ id, request })}
-          />
-          <section className="rounded-md border bg-card">
+        />
+        <section className="rounded-md border bg-card">
             <SectionHeader
               title="Parties impliquées"
               action={
@@ -423,10 +437,10 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-          </section>
-        </TabsContent>
-        <TabsContent value="expertise" className="grid gap-4">
-          <section className="rounded-md border bg-card">
+        </section>
+        <div className="grid gap-4">
+          {expertiseVisible ? (
+            <section className="rounded-md border bg-card">
             <SectionHeader
               title="Missions d’expertise"
               action={
@@ -501,7 +515,8 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-          </section>
+            </section>
+          ) : null}
           <section className="rounded-md border bg-card">
             <SectionHeader
               title="Documents"
@@ -640,9 +655,11 @@ export default function SinistreDetailPage() {
               </Table>
             </div>
           </section>
-        </TabsContent>
-        <TabsContent value="finance" className="grid gap-4">
-          <section className="rounded-md border bg-card">
+        </div>
+        {financeVisible ? (
+          <div className="grid gap-4">
+            <FinancialSummary dossier={dossier} />
+            <section className="rounded-md border bg-card">
             <SectionHeader
               title="Provisions"
               action={
@@ -688,15 +705,15 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-          </section>
-          <section className="rounded-md border bg-card">
+            </section>
+            <section className="rounded-md border bg-card">
             <SectionHeader
-              title="Opérations financières"
+              title="Règlements, frais et recours"
               action={
                 canFinance && !locked ? (
                   <Button size="sm" onClick={() => setFinanceMode("OPERATION")}>
                     <Banknote className="size-4" />
-                    Nouvelle opération
+                    Ajouter
                   </Button>
                 ) : null
               }
@@ -780,40 +797,15 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-          </section>
-        </TabsContent>
-        <TabsContent value="historique">
-          <section className="rounded-md border bg-card">
-            <SectionHeader title="Journal du dossier" />
-            <div className="divide-y">
-              {dossier.evenements.map((item) => (
-                <div key={item.id} className="flex gap-4 p-4">
-                  <div className="mt-1 size-2 shrink-0 rounded-full bg-sky-600" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap justify-between gap-2">
-                      <p className="font-medium">{item.description}</p>
-                      <time className="text-xs text-muted-foreground">
-                        {formatDate(item.createdAt)}
-                      </time>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {item.utilisateur}
-                      {item.ancienStatut && item.nouveauStatut
-                        ? ` · ${item.ancienStatut} → ${item.nouveauStatut}`
-                        : ""}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {dossier.evenements.length === 0 ? (
-                <p className="p-8 text-center text-muted-foreground">
-                  Aucun événement.
-                </p>
-              ) : null}
-            </div>
-          </section>
-        </TabsContent>
-      </Tabs>
+            </section>
+          </div>
+        ) : null}
+      </div>
+      <HistoryDialog
+        dossier={dossier}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+      />
       <SinistreTransitionDialog
         open={transitionOpen}
         transitions={dossier.workflow.transitions}
@@ -895,14 +887,76 @@ export default function SinistreDetailPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function FinancialSummary({ dossier }: { dossier: SinistreDetail }) {
+  const metrics = [
+    ["Provision", dossier.totaux.provisionCourante],
+    ["Indemnisable", dossier.totaux.totalIndemnisable],
+    ["Réglé", dossier.totaux.totalRegle],
+    ["Frais", dossier.totaux.totalFrais],
+    ["Recours", dossier.totaux.totalRecours],
+    ["Reste à régler", dossier.totaux.resteARegler],
+  ] as const;
   return (
-    <Card className="shadow-none">
-      <CardContent className="p-4">
-        <p className="text-xs uppercase text-muted-foreground">{label}</p>
-        <p className="mt-1 text-lg font-semibold">{value}</p>
-      </CardContent>
-    </Card>
+    <section className="overflow-hidden rounded-md border bg-card">
+      <SectionHeader title="Situation financière" />
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {metrics.map(([label, value]) => (
+          <div key={label} className="border-b px-4 py-3 last:border-b-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
+            <p className="text-xs uppercase text-muted-foreground">{label}</p>
+            <p className="mt-1 font-semibold tabular-nums">{formatMoney(value)}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HistoryDialog({
+  dossier,
+  open,
+  onOpenChange,
+}: {
+  dossier: SinistreDetail;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Historique du dossier</DialogTitle>
+          <DialogDescription>
+            Changements de statut et opérations enregistrées sur {dossier.numeroSinistre}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="divide-y rounded-md border">
+          {dossier.evenements.map((item) => (
+            <div key={item.id} className="flex gap-3 p-4">
+              <div className="mt-1.5 size-2 shrink-0 rounded-full bg-sky-600" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <p className="font-medium">{item.description}</p>
+                  <time className="text-xs text-muted-foreground">
+                    {formatDate(item.createdAt)}
+                  </time>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {item.utilisateur}
+                  {item.ancienStatut && item.nouveauStatut
+                    ? ` · ${statusLabels[item.ancienStatut]} → ${statusLabels[item.nouveauStatut]}`
+                    : ""}
+                </p>
+              </div>
+            </div>
+          ))}
+          {dossier.evenements.length === 0 ? (
+            <p className="p-8 text-center text-muted-foreground">
+              Aucun événement.
+            </p>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 function SectionHeader({
@@ -924,6 +978,7 @@ function GeneralSection({
   dossier,
   cities,
   managers,
+  responsibilityVisible,
   editable,
   saving,
   onSave,
@@ -931,6 +986,7 @@ function GeneralSection({
   dossier: SinistreDetail;
   cities: Array<{ id: string; libelle: string }>;
   managers: Array<{ id: string; nom: string }>;
+  responsibilityVisible: boolean;
   editable: boolean;
   saving: boolean;
   onSave: (request: object) => void;
@@ -941,7 +997,7 @@ function GeneralSection({
     lieu: "",
     circonstances: "",
     numeroPv: "",
-    tauxResponsabilite: "",
+    responsabilite: "NON_DETERMINEE",
     notes: "",
     gestionnaireId: "",
     prochaineAction: "",
@@ -955,9 +1011,9 @@ function GeneralSection({
         lieu: dossier.lieu || "",
         circonstances: dossier.circonstances || "",
         numeroPv: dossier.numeroPv || "",
-        tauxResponsabilite:
+        responsabilite:
           dossier.tauxResponsabilite == null
-            ? ""
+            ? "NON_DETERMINEE"
             : String(dossier.tauxResponsabilite),
         notes: dossier.notes || "",
         gestionnaireId: dossier.gestionnaireId || "",
@@ -985,9 +1041,14 @@ function GeneralSection({
                   lieu: form.lieu.trim() || undefined,
                   circonstances: form.circonstances.trim() || undefined,
                   numeroPv: form.numeroPv.trim() || undefined,
-                  tauxResponsabilite: form.tauxResponsabilite
-                    ? Number(form.tauxResponsabilite)
-                    : undefined,
+                  ...(responsibilityVisible
+                    ? {
+                        tauxResponsabilite:
+                          form.responsabilite === "NON_DETERMINEE"
+                            ? null
+                            : Number(form.responsabilite),
+                      }
+                    : {}),
                   notes: form.notes.trim() || undefined,
                   gestionnaireId: form.gestionnaireId || dossier.gestionnaireId,
                   prochaineAction: form.prochaineAction.trim() || undefined,
@@ -1001,6 +1062,33 @@ function GeneralSection({
           ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Ville">
+            <SinistreVilleSelect
+              cities={cities}
+              disabled={!editable}
+              value={form.villeId}
+              onValueChange={(value) => update("villeId", value)}
+            />
+          </Field>
+          <Field label="Lieu">
+            <Input
+              disabled={!editable}
+              value={form.lieu}
+              onChange={(event) => update("lieu", event.target.value)}
+            />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Circonstances">
+              <Textarea
+                disabled={!editable}
+                rows={4}
+                value={form.circonstances}
+                onChange={(event) =>
+                  update("circonstances", event.target.value)
+                }
+              />
+            </Field>
+          </div>
           <Field label="Référence compagnie">
             <Input
               disabled={!editable}
@@ -1017,26 +1105,30 @@ function GeneralSection({
               onChange={(event) => update("numeroPv", event.target.value)}
             />
           </Field>
-          <Field label="Ville">
-            <SinistreVilleSelect
-              cities={cities}
-              disabled={!editable}
-              value={form.villeId}
-              onValueChange={(value) => update("villeId", value)}
-            />
-          </Field>
-          <Field label="Responsabilité (%)">
-            <Input
-              disabled={!editable}
-              type="number"
-              min="0"
-              max="100"
-              value={form.tauxResponsabilite}
-              onChange={(event) =>
-                update("tauxResponsabilite", event.target.value)
-              }
-            />
-          </Field>
+          {responsibilityVisible ? (
+            <div className="sm:col-span-2">
+              <Field label="Responsabilité retenue">
+                <Select
+                  disabled={!editable}
+                  value={form.responsabilite}
+                  onValueChange={(value) => update("responsabilite", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NON_DETERMINEE">À déterminer</SelectItem>
+                    <SelectItem value="0">Adversaire responsable</SelectItem>
+                    <SelectItem value="50">Responsabilité partagée 50/50</SelectItem>
+                    <SelectItem value="100">Assuré responsable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          ) : null}
+          <div className="mt-1 border-t pt-4 sm:col-span-2">
+            <h3 className="text-sm font-semibold">Suivi interne</h3>
+          </div>
           <Field label="Gestionnaire">
             <Select
               disabled={!editable}
@@ -1070,27 +1162,6 @@ function GeneralSection({
                 maxLength={500}
                 value={form.prochaineAction}
                 onChange={(event) => update("prochaineAction", event.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="sm:col-span-2">
-            <Field label="Lieu">
-              <Input
-                disabled={!editable}
-                value={form.lieu}
-                onChange={(event) => update("lieu", event.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="sm:col-span-2">
-            <Field label="Circonstances">
-              <Textarea
-                disabled={!editable}
-                rows={5}
-                value={form.circonstances}
-                onChange={(event) =>
-                  update("circonstances", event.target.value)
-                }
               />
             </Field>
           </div>
@@ -1137,23 +1208,28 @@ function GeneralSection({
 
 function CoverageSection({
   dossier,
+  assessmentVisible,
   editable,
   saving,
   onSave,
 }: {
   dossier: SinistreDetail;
+  assessmentVisible: boolean;
   editable: boolean;
   saving: boolean;
   onSave: (id: string, request: object) => void;
 }) {
   return (
     <section className="rounded-md border bg-card">
-      <SectionHeader title="Garanties au jour du sinistre" />
-      <div className="grid gap-3 p-4">
+      <SectionHeader
+        title={assessmentVisible ? "Décision de couverture" : "Garanties impliquées"}
+      />
+      <div className={assessmentVisible ? "grid gap-3 p-4" : "divide-y"}>
         {dossier.garanties.map((item) => (
           <GuaranteeRow
             key={item.id}
             item={item}
+            assessmentVisible={assessmentVisible}
             editable={editable}
             saving={saving}
             onSave={(request) => onSave(item.id, request)}
@@ -1165,11 +1241,13 @@ function CoverageSection({
 }
 function GuaranteeRow({
   item,
+  assessmentVisible,
   editable,
   saving,
   onSave,
 }: {
   item: SinistreDetail["garanties"][number];
+  assessmentVisible: boolean;
   editable: boolean;
   saving: boolean;
   onSave: (request: object) => void;
@@ -1195,7 +1273,13 @@ function GuaranteeRow({
     );
   }, [item]);
   return (
-    <div className="grid items-end gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_190px_150px_170px_auto]">
+    <div
+      className={
+        assessmentVisible
+          ? "grid items-end gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_190px_150px_170px_auto]"
+          : "grid items-center gap-3 px-4 py-3 md:grid-cols-[minmax(220px,1fr)_auto]"
+      }
+    >
       <div>
         <div className="flex items-center gap-2">
           <Checkbox
@@ -1213,6 +1297,8 @@ function GuaranteeRow({
           {item.tauxFranchise ?? 0}% / {formatMoney(item.franchiseMinimale)}
         </p>
       </div>
+      {assessmentVisible ? (
+      <>
       <Field label="Décision">
         <Select
           disabled={!editable}
@@ -1248,6 +1334,8 @@ function GuaranteeRow({
           onChange={(event) => setIndemnisable(event.target.value)}
         />
       </Field>
+      </>
+      ) : null}
       {editable ? (
         <Button
           size="icon"
@@ -1299,6 +1387,28 @@ function paymentModeLabel(
   }[mode];
 }
 
+function isAtLeastTransmitted(statut: StatutSinistre) {
+  return [
+    "TRANSMIS_COMPAGNIE",
+    "EXPERTISE",
+    "EN_ATTENTE_REGLEMENT",
+    "PARTIELLEMENT_REGLE",
+    "REGLE",
+    "CLOTURE",
+    "ROUVERT",
+  ].includes(statut);
+}
+
+function isAtLeastExpertise(statut: StatutSinistre) {
+  return [
+    "EXPERTISE",
+    "EN_ATTENTE_REGLEMENT",
+    "PARTIELLEMENT_REGLE",
+    "REGLE",
+    "CLOTURE",
+  ].includes(statut);
+}
+
 function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {
   const blocked = dossier.workflow.transitions.filter(
     (transition) => !transition.autorisee,
@@ -1311,49 +1421,39 @@ function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {
     return null;
   }
   return (
-    <section className="rounded-md border bg-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold">Préparation du dossier</h2>
-          <p className="text-sm text-muted-foreground">
-            Contrôles appliqués avant chaque changement d’étape.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 text-sm">
-          {dossier.workflow.documentsRecus > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1">
-              <CircleAlert className="size-4 text-amber-600" />
-              {dossier.workflow.documentsRecus} document(s) à contrôler
-            </span>
-          ) : null}
-          {dossier.workflow.documentsRejetes > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-2 py-1 text-red-700">
-              <CircleAlert className="size-4" />
-              {dossier.workflow.documentsRejetes} document(s) rejeté(s)
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-emerald-700">
-              <CircleCheck className="size-4" /> Aucun document rejeté
-            </span>
-          )}
-        </div>
-      </div>
+    <section className="rounded-md border border-amber-200 bg-amber-50/60 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-700" />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-amber-950">
+            Actions requises avant la prochaine étape
+          </h2>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-amber-950/80">
+            {dossier.workflow.documentsRecus > 0 ? (
+              <span>{dossier.workflow.documentsRecus} document(s) à contrôler</span>
+            ) : null}
+            {dossier.workflow.documentsRejetes > 0 ? (
+              <span>{dossier.workflow.documentsRejetes} document(s) rejeté(s) à traiter</span>
+            ) : null}
+          </div>
       {blocked.length > 0 ? (
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
           {blocked.map((transition) => (
-            <div key={transition.statut} className="rounded-md bg-muted p-3">
+            <div key={transition.statut}>
               <p className="text-sm font-medium">
                 Avant « {statusLabels[transition.statut]} »
               </p>
-              <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
+              <ul className="mt-0.5 grid gap-0.5 text-sm text-amber-950/80">
                 {transition.blocages.map((blocker) => (
-                  <li key={blocker}>{blocker}</li>
+                  <li key={blocker}>• {blocker}</li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
       ) : null}
+        </div>
+      </div>
     </section>
   );
 }

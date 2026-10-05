@@ -65,6 +65,11 @@ export function SinistreFinanceDialog({
     () => buildCounterpartyOptions(dossier),
     [dossier],
   );
+  const settlementAvailable = [
+    "EN_ATTENTE_REGLEMENT",
+    "PARTIELLEMENT_REGLE",
+    "REGLE",
+  ].includes(dossier.statut);
   const selectedCounterparty = parseCounterpartyValue(counterpartyValue);
 
   useEffect(() => {
@@ -72,7 +77,7 @@ export function SinistreFinanceDialog({
       setDate(todayIso());
       setMontant("");
       setMotif("");
-      setType("REGLEMENT");
+      setType(settlementAvailable ? "REGLEMENT" : "FRAIS");
       setReference("");
       setCounterpartyValue("CLIENT");
       setFreeCounterpartyName("");
@@ -81,7 +86,7 @@ export function SinistreFinanceDialog({
       setCompteTresorerieId("");
       setCircuitFinancier("DIRECT_COMPAGNIE");
     }
-  }, [open, mode]);
+  }, [open, mode, settlementAvailable]);
 
   const referenceRequired =
     mode === "OPERATION" && modeReglement !== "ESPECES";
@@ -137,7 +142,9 @@ export function SinistreFinanceDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="REGLEMENT">Indemnisation</SelectItem>
+                  {settlementAvailable ? (
+                    <SelectItem value="REGLEMENT">Indemnisation</SelectItem>
+                  ) : null}
                   <SelectItem value="FRAIS">Frais de dossier</SelectItem>
                   <SelectItem value="RECOURS">Recours encaissé</SelectItem>
                 </SelectContent>

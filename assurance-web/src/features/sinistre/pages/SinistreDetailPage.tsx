@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Banknote,
+  ChevronDown,
   CircleAlert,
   CircleCheck,
   Download,
@@ -30,6 +31,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -372,18 +378,19 @@ export default function SinistreDetailPage() {
             saving={guarantee.isPending}
             onSave={(id, request) => guarantee.mutate({ id, request })}
         />
-        <section className="rounded-md border bg-card">
-            <SectionHeader
-              title="Parties impliquées"
-              action={
-                canManage && !locked ? (
-                  <Button size="sm" onClick={() => { setEditingParty(null); setPartyOpen(true); }}>
-                    <Plus className="size-4" />
-                    Ajouter
-                  </Button>
-                ) : null
-              }
-            />
+        <WorkflowPanel
+          title="Parties impliquées"
+          summary={`${dossier.parties.length} partie(s)`}
+          defaultOpen={dossier.parties.length > 0}
+          action={
+            canManage && !locked ? (
+              <Button size="sm" onClick={() => { setEditingParty(null); setPartyOpen(true); }}>
+                <Plus className="size-4" />
+                Ajouter
+              </Button>
+            ) : null
+          }
+        >
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -428,7 +435,7 @@ export default function SinistreDetailPage() {
                     <TableRow>
                       <TableCell
                         colSpan={5}
-                        className="py-8 text-center text-muted-foreground"
+                        className="py-4 text-center text-muted-foreground"
                       >
                         Aucune partie impliquée ajoutée.
                       </TableCell>
@@ -437,12 +444,16 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-        </section>
+        </WorkflowPanel>
         <div className="grid gap-4">
           {expertiseVisible ? (
-            <section className="rounded-md border bg-card">
-            <SectionHeader
+            <WorkflowPanel
               title="Missions d’expertise"
+              summary={`${dossier.missionsExpertise.length} mission(s)`}
+              defaultOpen={
+                dossier.statut === "EXPERTISE" ||
+                dossier.missionsExpertise.length === 0
+              }
               action={
                 canManage && !locked ? (
                   <Button
@@ -457,7 +468,7 @@ export default function SinistreDetailPage() {
                   </Button>
                 ) : null
               }
-            />
+            >
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -506,7 +517,7 @@ export default function SinistreDetailPage() {
                     <TableRow>
                       <TableCell
                         colSpan={6}
-                        className="py-8 text-center text-muted-foreground"
+                        className="py-4 text-center text-muted-foreground"
                       >
                         Aucune expertise mandatée.
                       </TableCell>
@@ -515,20 +526,27 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-            </section>
+            </WorkflowPanel>
           ) : null}
-          <section className="rounded-md border bg-card">
-            <SectionHeader
-              title="Documents"
-              action={
-                canManage && !locked ? (
-                  <Button size="sm" onClick={() => setDocumentOpen(true)}>
-                    <FilePlus2 className="size-4" />
-                    Déposer
-                  </Button>
-                ) : null
-              }
-            />
+          <WorkflowPanel
+            title="Documents"
+            summary={`${dossier.documents.length} déposé(s)`}
+            defaultOpen={
+              dossier.workflow.documentsRecus > 0 ||
+              dossier.workflow.documentsRejetes > 0 ||
+              dossier.workflow.documentsRequis.some(
+                (item) => item.obligatoire && !item.recu && !item.valide,
+              )
+            }
+            action={
+              canManage && !locked ? (
+                <Button size="sm" onClick={() => setDocumentOpen(true)}>
+                  <FilePlus2 className="size-4" />
+                  Déposer
+                </Button>
+              ) : null
+            }
+          >
             {dossier.workflow.documentsRequis.length > 0 ? (
               <div className="flex flex-wrap gap-2 border-b px-4 py-3">
                 {dossier.workflow.documentsRequis.map((item) => (
@@ -539,12 +557,22 @@ export default function SinistreDetailPage() {
                         ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                         : item.recu
                           ? "border-amber-200 bg-amber-50 text-amber-800"
-                          : "border-border bg-muted/40 text-muted-foreground"
+                          : item.obligatoire
+                            ? "border-amber-300 bg-amber-50 text-amber-900"
+                            : "border-border bg-muted/40 text-muted-foreground"
                     }`}
                   >
                     {item.valide ? <CircleCheck className="size-4" /> : <CircleAlert className="size-4" />}
                     <span>{item.libelle}</span>
-                    {item.obligatoire ? <span className="text-xs">Obligatoire</span> : null}
+                    <span className="text-xs font-medium">
+                      {item.valide
+                        ? "Validé"
+                        : item.recu
+                          ? "À contrôler"
+                          : item.obligatoire
+                            ? "Manquant"
+                            : "Facultatif"}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -645,7 +673,7 @@ export default function SinistreDetailPage() {
                     <TableRow>
                       <TableCell
                         colSpan={6}
-                        className="py-8 text-center text-muted-foreground"
+                        className="py-4 text-center text-muted-foreground"
                       >
                         Aucun document déposé.
                       </TableCell>
@@ -654,14 +682,15 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-          </section>
+          </WorkflowPanel>
         </div>
         {financeVisible ? (
           <div className="grid gap-4">
             <FinancialSummary dossier={dossier} />
-            <section className="rounded-md border bg-card">
-            <SectionHeader
+            <WorkflowPanel
               title="Provisions"
+              summary={`${dossier.provisions.length} écriture(s)`}
+              defaultOpen={dossier.provisions.length > 0}
               action={
                 canFinance && !locked ? (
                   <Button size="sm" onClick={() => setFinanceMode("PROVISION")}>
@@ -670,7 +699,7 @@ export default function SinistreDetailPage() {
                   </Button>
                 ) : null
               }
-            />
+            >
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -696,7 +725,7 @@ export default function SinistreDetailPage() {
                     <TableRow>
                       <TableCell
                         colSpan={4}
-                        className="py-8 text-center text-muted-foreground"
+                        className="py-4 text-center text-muted-foreground"
                       >
                         Aucune provision.
                       </TableCell>
@@ -705,10 +734,13 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-            </section>
-            <section className="rounded-md border bg-card">
-            <SectionHeader
+            </WorkflowPanel>
+            <WorkflowPanel
               title="Règlements, frais et recours"
+              summary={`${dossier.operations.length} opération(s)`}
+              defaultOpen={
+                dossier.operations.length > 0 || isSettlementStage(dossier.statut)
+              }
               action={
                 canFinance && !locked ? (
                   <Button size="sm" onClick={() => setFinanceMode("OPERATION")}>
@@ -717,7 +749,7 @@ export default function SinistreDetailPage() {
                   </Button>
                 ) : null
               }
-            />
+            >
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -788,7 +820,7 @@ export default function SinistreDetailPage() {
                     <TableRow>
                       <TableCell
                         colSpan={7}
-                        className="py-8 text-center text-muted-foreground"
+                        className="py-4 text-center text-muted-foreground"
                       >
                         Aucune opération financière.
                       </TableCell>
@@ -797,7 +829,7 @@ export default function SinistreDetailPage() {
                 </TableBody>
               </Table>
             </div>
-            </section>
+            </WorkflowPanel>
           </div>
         ) : null}
       </div>
@@ -974,6 +1006,55 @@ function SectionHeader({
   );
 }
 
+function WorkflowPanel({
+  title,
+  summary,
+  action,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  summary?: string;
+  action?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="overflow-hidden rounded-md border bg-card"
+    >
+      <div className="flex min-h-12 items-center border-l-2 border-sky-600 bg-slate-50">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-4 py-3 text-left"
+          >
+            <ChevronDown
+              className={`size-4 shrink-0 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+            <span className="font-semibold">{title}</span>
+            {summary ? (
+              <span className="truncate text-sm text-muted-foreground">
+                {summary}
+              </span>
+            ) : null}
+          </button>
+        </CollapsibleTrigger>
+        {action ? <div className="shrink-0 pr-3">{action}</div> : null}
+      </div>
+      <CollapsibleContent className="border-t">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function GeneralSection({
   dossier,
   cities,
@@ -1003,6 +1084,11 @@ function GeneralSection({
     prochaineAction: "",
     dateEcheanceAction: "",
   });
+  const [trackingOpen, setTrackingOpen] = useState(
+    Boolean(
+      dossier.prochaineAction || dossier.dateEcheanceAction || dossier.notes,
+    ),
+  );
   useEffect(
     () =>
       setForm({
@@ -1026,7 +1112,7 @@ function GeneralSection({
     setForm((current) => ({ ...current, [key]: value }));
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-      <section className="rounded-md border bg-card p-5">
+      <section className="rounded-md border bg-card p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-semibold">Informations du sinistre</h2>
           {editable ? (
@@ -1081,7 +1167,7 @@ function GeneralSection({
             <Field label="Circonstances">
               <Textarea
                 disabled={!editable}
-                rows={4}
+                rows={3}
                 value={form.circonstances}
                 onChange={(event) =>
                   update("circonstances", event.target.value)
@@ -1126,59 +1212,89 @@ function GeneralSection({
               </Field>
             </div>
           ) : null}
-          <div className="mt-1 border-t pt-4 sm:col-span-2">
-            <h3 className="text-sm font-semibold">Suivi interne</h3>
-          </div>
-          <Field label="Gestionnaire">
-            <Select
-              disabled={!editable}
-              value={form.gestionnaireId}
-              onValueChange={(value) => update("gestionnaireId", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner" />
-              </SelectTrigger>
-              <SelectContent>
-                {managers.map((manager) => (
-                  <SelectItem key={manager.id} value={manager.id}>
-                    {manager.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Échéance de l’action">
-            <Input
-              disabled={!editable}
-              type="date"
-              value={form.dateEcheanceAction}
-              onChange={(event) => update("dateEcheanceAction", event.target.value)}
-            />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Prochaine action">
-              <Input
-                disabled={!editable}
-                maxLength={500}
-                value={form.prochaineAction}
-                onChange={(event) => update("prochaineAction", event.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="sm:col-span-2">
-            <Field label="Notes internes">
-              <Textarea
-                disabled={!editable}
-                value={form.notes}
-                onChange={(event) => update("notes", event.target.value)}
-              />
-            </Field>
-          </div>
         </div>
+        <Collapsible
+          open={trackingOpen}
+          onOpenChange={setTrackingOpen}
+          className="mt-4 border-t pt-3"
+        >
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center justify-between py-1 text-left"
+            >
+              <span>
+                <span className="text-sm font-semibold">Suivi interne</span>
+                {!trackingOpen && form.prochaineAction ? (
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {form.prochaineAction}
+                  </span>
+                ) : null}
+              </span>
+              <ChevronDown
+                className={`size-4 text-muted-foreground transition-transform ${trackingOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <Field label="Gestionnaire">
+                <Select
+                  disabled={!editable}
+                  value={form.gestionnaireId}
+                  onValueChange={(value) => update("gestionnaireId", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {managers.map((manager) => (
+                      <SelectItem key={manager.id} value={manager.id}>
+                        {manager.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Échéance de l’action">
+                <Input
+                  disabled={!editable}
+                  type="date"
+                  value={form.dateEcheanceAction}
+                  onChange={(event) =>
+                    update("dateEcheanceAction", event.target.value)
+                  }
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Prochaine action">
+                  <Input
+                    disabled={!editable}
+                    maxLength={500}
+                    value={form.prochaineAction}
+                    onChange={(event) =>
+                      update("prochaineAction", event.target.value)
+                    }
+                  />
+                </Field>
+              </div>
+              <div className="sm:col-span-2">
+                <Field label="Notes internes">
+                  <Textarea
+                    disabled={!editable}
+                    rows={2}
+                    value={form.notes}
+                    onChange={(event) => update("notes", event.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </section>
-      <section className="rounded-md border bg-card p-5">
+      <section className="rounded-md border bg-card p-4">
         <h2 className="mb-4 font-semibold">Couverture contractuelle</h2>
-        <dl className="grid gap-3 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm lg:grid-cols-1 xl:grid-cols-2">
           <Info label="Police" value={dossier.couverture.numeroPolice} />
           <Info label="Dossier" value={dossier.couverture.numeroDossier} />
           <Info label="Compagnie" value={dossier.couverture.compagnie} />
@@ -1219,11 +1335,13 @@ function CoverageSection({
   saving: boolean;
   onSave: (id: string, request: object) => void;
 }) {
+  const involvedCount = dossier.garanties.filter((item) => item.impliquee).length;
   return (
-    <section className="rounded-md border bg-card">
-      <SectionHeader
-        title={assessmentVisible ? "Décision de couverture" : "Garanties impliquées"}
-      />
+    <WorkflowPanel
+      title={assessmentVisible ? "Décision de couverture" : "Garanties impliquées"}
+      summary={`${involvedCount} sur ${dossier.garanties.length} sélectionnée(s)`}
+      defaultOpen={!assessmentVisible || involvedCount === 0}
+    >
       <div className={assessmentVisible ? "grid gap-3 p-4" : "divide-y"}>
         {dossier.garanties.map((item) => (
           <GuaranteeRow
@@ -1236,7 +1354,7 @@ function CoverageSection({
           />
         ))}
       </div>
-    </section>
+    </WorkflowPanel>
   );
 }
 function GuaranteeRow({
@@ -1407,6 +1525,12 @@ function isAtLeastExpertise(statut: StatutSinistre) {
     "REGLE",
     "CLOTURE",
   ].includes(statut);
+}
+
+function isSettlementStage(statut: StatutSinistre) {
+  return ["EN_ATTENTE_REGLEMENT", "PARTIELLEMENT_REGLE", "REGLE"].includes(
+    statut,
+  );
 }
 
 function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {

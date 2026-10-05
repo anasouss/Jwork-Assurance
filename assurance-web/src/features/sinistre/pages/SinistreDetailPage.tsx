@@ -317,7 +317,7 @@ export default function SinistreDetailPage() {
   const coverageAssessmentVisible = isAtLeastTransmitted(dossier.statut);
 
   return (
-    <div className="-mx-2 grid gap-3">
+    <div className="mx-auto grid w-full max-w-[1600px] gap-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Button asChild variant="ghost" className="mb-2 -ml-3">

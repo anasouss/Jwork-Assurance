@@ -888,18 +888,18 @@ function WorkflowPanel({
       onOpenChange={setOpen}
       className="overflow-hidden rounded-md border bg-card"
     >
-      <div className="flex min-h-12 items-center border-l-2 border-sky-600 bg-slate-50">
+      <div className="flex min-h-12 items-center border-l-2 border-sky-900 bg-sky-700 text-white dark:bg-sky-800">
         <CollapsibleTrigger asChild>
           <button
             type="button"
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-4 py-3 text-left"
           >
             <ChevronDown
-              className={`size-4 shrink-0 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`}
+              className={`size-4 shrink-0 text-sky-100 transition-transform ${open ? "rotate-180" : ""}`}
             />
             <span className="font-semibold">{title}</span>
             {summary ? (
-              <span className="truncate text-sm text-muted-foreground">
+              <span className="truncate text-sm text-sky-100">
                 {summary}
               </span>
             ) : null}
@@ -950,10 +950,10 @@ function DocumentsPanel({
 
   return (
     <section className="overflow-hidden rounded-md border bg-card">
-      <div className="flex min-h-12 items-center justify-between gap-3 border-l-2 border-sky-600 bg-slate-50 px-4 py-3">
+      <div className="flex min-h-12 items-center justify-between gap-3 border-l-2 border-sky-900 bg-sky-700 px-4 py-3 text-white dark:bg-sky-800">
         <div className="min-w-0">
           <h2 className="font-semibold">Pièces du dossier</h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-sky-100">
             {dossier.documents.length} document(s) déposé(s)
           </p>
         </div>

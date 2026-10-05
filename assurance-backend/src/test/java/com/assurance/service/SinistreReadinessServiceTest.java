@@ -47,7 +47,7 @@ class SinistreReadinessServiceTest {
     @Test
     void settlementReadinessUsesAcceptedIndemnityAndActivePayments() {
         Sinistre claim = claim(10L, StatutSinistre.EN_ATTENTE_REGLEMENT);
-        when(guarantees.findBySinistreIdOrderBySnapshotCode(10L))
+        when(guarantees.findForDetailOrderByConfiguredDisplay(10L))
                 .thenReturn(List.of(acceptedGuarantee("1000.00")));
         when(operations.totalByType(10L, TypeOperationSinistre.REGLEMENT))
                 .thenReturn(new BigDecimal("400.00"));
@@ -64,7 +64,7 @@ class SinistreReadinessServiceTest {
     @Test
     void closureRequiresReleasedProvision() {
         Sinistre claim = claim(11L, StatutSinistre.REGLE);
-        when(guarantees.findBySinistreIdOrderBySnapshotCode(11L))
+        when(guarantees.findForDetailOrderByConfiguredDisplay(11L))
                 .thenReturn(List.of(acceptedGuarantee("1000.00")));
         when(operations.totalByType(11L, TypeOperationSinistre.REGLEMENT))
                 .thenReturn(new BigDecimal("1000.00"));
@@ -97,7 +97,7 @@ class SinistreReadinessServiceTest {
     @Test
     void transmissionIsBlockedWhenARequiredDocumentIsMissing() {
         Sinistre claim = claim(12L, StatutSinistre.DECLARE);
-        when(guarantees.findBySinistreIdOrderBySnapshotCode(12L))
+        when(guarantees.findForDetailOrderByConfiguredDisplay(12L))
                 .thenReturn(List.of(acceptedGuarantee("1000.00")));
         when(documents.findBySinistreIdOrderByCreatedAtDesc(12L)).thenReturn(List.of());
         when(documentRequirements.applicable(1L, NatureSinistre.ACCIDENT)).thenReturn(List.of(

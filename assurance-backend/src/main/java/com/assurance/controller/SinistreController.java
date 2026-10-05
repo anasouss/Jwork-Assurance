@@ -6,6 +6,7 @@ import com.assurance.dto.request.AddSinistrePartieRequest;
 import com.assurance.dto.request.CreateSinistreRequest;
 import com.assurance.dto.request.TransitionSinistreRequest;
 import com.assurance.dto.request.UpdateSinistreGarantieRequest;
+import com.assurance.dto.request.UpdateSinistreGarantiesRequest;
 import com.assurance.dto.request.UpdateSinistreRequest;
 import com.assurance.dto.request.UpsertMissionExpertiseRequest;
 import com.assurance.dto.response.ApiResponse;
@@ -196,6 +197,20 @@ public class SinistreController {
                 garantieId,
                 request
         ), "Garantie mise à jour"));
+    }
+
+    @PutMapping("/{id}/garanties")
+    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    public ResponseEntity<ApiResponse<SinistreDetailResponse>> updateGuarantees(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateSinistreGarantiesRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(dossierService.updateGuarantees(
+                TenantContext.getCurrentAgence(),
+                TenantContext.getCurrentUser(),
+                id,
+                request
+        ), "Garanties mises à jour"));
     }
 
     @PostMapping("/{id}/parties")

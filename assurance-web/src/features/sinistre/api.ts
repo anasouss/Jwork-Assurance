@@ -143,6 +143,18 @@ export const sinistreApi = {
     );
   },
 
+  async updateGuarantees(id: string, guarantees: object[]) {
+    return unwrap(
+      await apiFetch<ApiResponse<SinistreDetail>>(
+        `/api/v1/sinistres/${id}/garanties`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ garanties: guarantees }),
+        },
+      ),
+    );
+  },
+
   async addParty(id: string, request: object) {
     return unwrap(
       await apiFetch<ApiResponse<SinistreDetail>>(

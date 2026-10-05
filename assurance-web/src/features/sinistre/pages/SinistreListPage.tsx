@@ -1,13 +1,31 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Eye, FilePlus2, Search, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ban, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -27,7 +45,11 @@ import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
 import { formatDate, formatMoney, natureLabels, statusLabels } from "../format";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
-import type { NatureSinistre, StatutSinistre } from "../types";
+import type {
+  NatureSinistre,
+  SinistreSummary,
+  StatutSinistre,
+} from "../types";
 
 const PAGE_SIZE = 25;
 type Filters = {
@@ -40,6 +62,7 @@ type Filters = {
 type PortfolioScope = { clientId: string; contratId: string; brancheId: string };
 
 export default function SinistreListPage() {
+  const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [initial] = useState(() => readState(params));
   const [filters, setFilters] = useState(initial.filters);
@@ -48,6 +71,12 @@ export default function SinistreListPage() {
   const [scope, setScope] = useState(initial.scope);
   const canCreate = useAuthStore(
     (state) => state.user?.permissions?.includes("sinistre:create") ?? false,
+  );
+  const canManage = useAuthStore(
+    (state) => state.user?.permissions?.includes("sinistre:manage") ?? false,
+  );
+  const [claimToCancel, setClaimToCancel] = useState<SinistreSummary | null>(
+    null,
   );
   const request = useMemo(
     () => ({
@@ -74,6 +103,24 @@ export default function SinistreListPage() {
     queryKey: sinistreKeys.list(request),
     queryFn: () => sinistreApi.list(request),
     placeholderData: (previous) => previous,
+  });
+  const cancelClaim = useMutation({
+    mutationFn: (id: string) =>
+      sinistreApi.transition(
+        id,
+        "ANNULE",
+        "Annulation depuis la liste des dossiers",
+      ),
+    onSuccess: () => {
+      setClaimToCancel(null);
+      queryClient.invalidateQueries({ queryKey: sinistreKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: sinistreKeys.dashboard() });
+      toast.success("Dossier annulé");
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof Error ? error.message : "Annulation impossible",
+      ),
   });
 
   function apply(next: Filters) {
@@ -275,14 +322,37 @@ export default function SinistreListPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="icon">
-                        <Link
-                          aria-label={`Ouvrir ${item.numeroSinistre}`}
-                          to={`/app/sinistre/dossiers/${item.id}`}
-                        >
-                          <Eye className="size-4" />
-                        </Link>
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Actions pour ${item.numeroSinistre}`}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/app/sinistre/dossiers/${item.id}`}>
+                              <Eye className="size-4" />
+                              Ouvrir le dossier
+                            </Link>
+                          </DropdownMenuItem>
+                          {canManage && canCancelClaim(item.statut) ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => setClaimToCancel(item)}
+                              >
+                                <Ban className="size-4" />
+                                Annuler le dossier
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -309,8 +379,41 @@ export default function SinistreListPage() {
           />
         </CardContent>
       </Card>
+      <AlertDialog
+        open={claimToCancel !== null}
+        onOpenChange={(open) => {
+          if (!open) setClaimToCancel(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler ce dossier sinistre ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {claimToCancel?.numeroSinistre} restera dans l’historique avec le
+              statut « Annulé ». Cette action ne supprime aucune trace du
+              dossier.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Conserver</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={cancelClaim.isPending}
+              onClick={() => {
+                if (claimToCancel) cancelClaim.mutate(claimToCancel.id);
+              }}
+            >
+              Annuler le dossier
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
+}
+
+function canCancelClaim(statut: StatutSinistre) {
+  return ["BROUILLON", "DECLARE", "DOSSIER_INCOMPLET"].includes(statut);
 }
 
 function Field({

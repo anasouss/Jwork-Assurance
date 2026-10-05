@@ -5,6 +5,7 @@ import com.assurance.dto.request.AddSinistreOperationRequest;
 import com.assurance.dto.request.AnnulerOperationTresorerieRequest;
 import com.assurance.dto.request.AddSinistrePartieRequest;
 import com.assurance.dto.request.UpdateSinistreGarantieRequest;
+import com.assurance.dto.request.UpdateSinistreGarantiesRequest;
 import com.assurance.dto.request.UpsertMissionExpertiseRequest;
 import com.assurance.dto.response.SinistreDetailResponse;
 import com.assurance.entity.Client;
@@ -42,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 
 @Service
@@ -76,26 +78,62 @@ public class SinistreDossierService {
         SinistreGarantie garantie = garantieRepository.findByIdAndSinistreId(garantieId, sinistreId)
                 .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", garantieId));
         validateGuaranteeDecision(request);
-        garantie.setImpliquee(Boolean.TRUE.equals(request.getImpliquee()));
-        garantie.setDecisionCouverture(request.getDecisionCouverture());
-        garantie.setFranchiseAppliquee(request.getFranchiseAppliquee());
-        garantie.setMontantIndemnisable(request.getMontantIndemnisable());
-        if (request.getDecisionCouverture() == DecisionCouvertureSinistre.REFUSEE) {
-            garantie.setMontantIndemnisable(null);
-        }
+        applyGuaranteeDecision(
+                garantie,
+                request.getDecisionCouverture(),
+                request.getImpliquee(),
+                request.getFranchiseAppliquee(),
+                request.getMontantIndemnisable()
+        );
         garantieRepository.save(garantie);
-        BigDecimal paid = readinessService.totalSettled(sinistreId);
-        BigDecimal indemnity = readinessService.totalIndemnisable(sinistreId);
-        if (paid.compareTo(indemnity) > 0) {
-            throw new BadRequestException(
-                    "Le montant indemnisable ne peut pas être inférieur aux indemnisations déjà enregistrées"
-            );
-        }
+        validateIndemnityAgainstSettlements(sinistreId);
         evenementService.record(
                 context.sinistre(),
                 context.acteur(),
                 TypeEvenementSinistre.MODIFICATION,
                 "Décision de couverture mise à jour pour la garantie " + garantie.getSnapshotCode()
+        );
+        synchronizeSettlementStatus(context);
+        return responseMapper.toDetail(context.sinistre());
+    }
+
+    @Transactional
+    public SinistreDetailResponse updateGuarantees(
+            Long agenceId,
+            Long utilisateurId,
+            Long sinistreId,
+            UpdateSinistreGarantiesRequest request
+    ) {
+        Context context = context(agenceId, utilisateurId, sinistreId);
+        assertEditable(context.sinistre());
+        Set<Long> ids = new HashSet<>();
+        request.getGaranties().forEach(item -> {
+            if (!ids.add(item.getId())) {
+                throw new BadRequestException("Une garantie ne peut être mise à jour qu'une seule fois");
+            }
+            SinistreGarantie garantie = garantieRepository
+                    .findByIdAndSinistreId(item.getId(), sinistreId)
+                    .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", item.getId()));
+            validateGuaranteeDecision(
+                    item.getDecisionCouverture(),
+                    item.getImpliquee(),
+                    item.getMontantIndemnisable()
+            );
+            applyGuaranteeDecision(
+                    garantie,
+                    item.getDecisionCouverture(),
+                    item.getImpliquee(),
+                    item.getFranchiseAppliquee(),
+                    item.getMontantIndemnisable()
+            );
+            garantieRepository.save(garantie);
+        });
+        validateIndemnityAgainstSettlements(sinistreId);
+        evenementService.record(
+                context.sinistre(),
+                context.acteur(),
+                TypeEvenementSinistre.MODIFICATION,
+                "Garanties du sinistre mises à jour (" + ids.size() + ")"
         );
         synchronizeSettlementStatus(context);
         return responseMapper.toDetail(context.sinistre());
@@ -523,14 +561,50 @@ public class SinistreDossierService {
     }
 
     private void validateGuaranteeDecision(UpdateSinistreGarantieRequest request) {
-        boolean accepted = request.getDecisionCouverture() == DecisionCouvertureSinistre.ACCEPTEE
-                || request.getDecisionCouverture() == DecisionCouvertureSinistre.PARTIELLE;
-        if (Boolean.TRUE.equals(request.getImpliquee())
+        validateGuaranteeDecision(
+                request.getDecisionCouverture(),
+                request.getImpliquee(),
+                request.getMontantIndemnisable()
+        );
+    }
+
+    private void validateGuaranteeDecision(
+            DecisionCouvertureSinistre decision,
+            Boolean impliquee,
+            BigDecimal montantIndemnisable
+    ) {
+        boolean accepted = decision == DecisionCouvertureSinistre.ACCEPTEE
+                || decision == DecisionCouvertureSinistre.PARTIELLE;
+        if (Boolean.TRUE.equals(impliquee)
                 && accepted
-                && (request.getMontantIndemnisable() == null
-                || request.getMontantIndemnisable().signum() <= 0)) {
+                && (montantIndemnisable == null || montantIndemnisable.signum() <= 0)) {
             throw new BadRequestException(
                     "Un montant indemnisable positif est obligatoire pour une garantie acceptée"
+            );
+        }
+    }
+
+    private void applyGuaranteeDecision(
+            SinistreGarantie garantie,
+            DecisionCouvertureSinistre decision,
+            Boolean impliquee,
+            BigDecimal franchiseAppliquee,
+            BigDecimal montantIndemnisable
+    ) {
+        garantie.setImpliquee(Boolean.TRUE.equals(impliquee));
+        garantie.setDecisionCouverture(decision);
+        garantie.setFranchiseAppliquee(franchiseAppliquee);
+        garantie.setMontantIndemnisable(
+                decision == DecisionCouvertureSinistre.REFUSEE ? null : montantIndemnisable
+        );
+    }
+
+    private void validateIndemnityAgainstSettlements(Long sinistreId) {
+        BigDecimal paid = readinessService.totalSettled(sinistreId);
+        BigDecimal indemnity = readinessService.totalIndemnisable(sinistreId);
+        if (paid.compareTo(indemnity) > 0) {
+            throw new BadRequestException(
+                    "Le montant indemnisable ne peut pas être inférieur aux indemnisations déjà enregistrées"
             );
         }
     }

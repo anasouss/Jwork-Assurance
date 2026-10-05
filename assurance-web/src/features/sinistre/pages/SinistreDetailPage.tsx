@@ -183,9 +183,9 @@ export default function SinistreDetailPage() {
     onError: fail,
   });
   const guarantee = useMutation({
-    mutationFn: ({ id, request }: { id: string; request: object }) =>
-      sinistreApi.updateGuarantee(sinistreId, id, request),
-    onSuccess: (result) => accept(result, "Garantie mise à jour"),
+    mutationFn: (guarantees: object[]) =>
+      sinistreApi.updateGuarantees(sinistreId, guarantees),
+    onSuccess: (result) => accept(result, "Garanties mises à jour"),
     onError: fail,
   });
   const party = useMutation({
@@ -385,7 +385,7 @@ export default function SinistreDetailPage() {
             assessmentVisible={coverageAssessmentVisible}
             editable={canManage && !locked}
             saving={guarantee.isPending}
-            onSave={(id, request) => guarantee.mutate({ id, request })}
+            onSave={(guarantees) => guarantee.mutate(guarantees)}
         />
         <WorkflowPanel
           title="Parties impliquées"
@@ -1466,77 +1466,120 @@ function CoverageSection({
   assessmentVisible: boolean;
   editable: boolean;
   saving: boolean;
-  onSave: (id: string, request: object) => void;
+  onSave: (guarantees: object[]) => void;
 }) {
-  const involvedCount = dossier.garanties.filter((item) => item.impliquee).length;
+  const [drafts, setDrafts] = useState<Record<string, GuaranteeDraft>>(() =>
+    Object.fromEntries(
+      dossier.garanties.map((item) => [item.id, toGuaranteeDraft(item)]),
+    ),
+  );
+  useEffect(() => {
+    setDrafts(
+      Object.fromEntries(
+        dossier.garanties.map((item) => [item.id, toGuaranteeDraft(item)]),
+      ),
+    );
+  }, [dossier.garanties]);
+
+  const changed = dossier.garanties.filter((item) =>
+    guaranteeDraftChanged(item, drafts[item.id]),
+  );
+  const involvedCount = dossier.garanties.filter(
+    (item) => drafts[item.id]?.involved ?? item.impliquee,
+  ).length;
+
   return (
     <WorkflowPanel
       title={assessmentVisible ? "Décision de couverture" : "Garanties impliquées"}
       summary={`${involvedCount} sur ${dossier.garanties.length} sélectionnée(s)`}
       defaultOpen={!assessmentVisible || involvedCount === 0}
+      action={
+        editable ? (
+          <Button
+            size="sm"
+            disabled={saving || changed.length === 0}
+            onClick={() =>
+              onSave(
+                changed.map((item) => {
+                  const draft = drafts[item.id];
+                  return {
+                    id: item.id,
+                    decisionCouverture: draft.decision,
+                    impliquee: draft.involved,
+                    franchiseAppliquee: draft.franchise
+                      ? Number(draft.franchise)
+                      : undefined,
+                    montantIndemnisable: draft.indemnisable
+                      ? Number(draft.indemnisable)
+                      : undefined,
+                  };
+                }),
+              )
+            }
+          >
+            <Save className="size-4" />
+            Enregistrer
+          </Button>
+        ) : null
+      }
     >
       <div className={assessmentVisible ? "grid gap-3 p-4" : "divide-y"}>
-        {dossier.garanties.map((item) => (
-          <GuaranteeRow
-            key={item.id}
-            item={item}
-            assessmentVisible={assessmentVisible}
-            editable={editable}
-            saving={saving}
-            onSave={(request) => onSave(item.id, request)}
-          />
-        ))}
+        {dossier.garanties.map((item) => {
+          const draft = drafts[item.id] ?? toGuaranteeDraft(item);
+          return (
+            <GuaranteeRow
+              key={item.id}
+              item={item}
+              draft={draft}
+              assessmentVisible={assessmentVisible}
+              editable={editable}
+              onChange={(next) =>
+                setDrafts((current) => ({ ...current, [item.id]: next }))
+              }
+            />
+          );
+        })}
       </div>
     </WorkflowPanel>
   );
 }
+
+type GuaranteeDraft = {
+  decision: DecisionCouverture;
+  involved: boolean;
+  franchise: string;
+  indemnisable: string;
+};
+
 function GuaranteeRow({
   item,
+  draft,
   assessmentVisible,
   editable,
-  saving,
-  onSave,
+  onChange,
 }: {
   item: SinistreDetail["garanties"][number];
+  draft: GuaranteeDraft;
   assessmentVisible: boolean;
   editable: boolean;
-  saving: boolean;
-  onSave: (request: object) => void;
+  onChange: (draft: GuaranteeDraft) => void;
 }) {
-  const [decision, setDecision] = useState<DecisionCouverture>(
-    item.decisionCouverture,
-  );
-  const [involved, setInvolved] = useState(item.impliquee);
-  const [franchise, setFranchise] = useState(
-    item.franchiseAppliquee == null ? "" : String(item.franchiseAppliquee),
-  );
-  const [indemnisable, setIndemnisable] = useState(
-    item.montantIndemnisable == null ? "" : String(item.montantIndemnisable),
-  );
-  useEffect(() => {
-    setInvolved(item.impliquee);
-    setDecision(item.decisionCouverture);
-    setFranchise(
-      item.franchiseAppliquee == null ? "" : String(item.franchiseAppliquee),
-    );
-    setIndemnisable(
-      item.montantIndemnisable == null ? "" : String(item.montantIndemnisable),
-    );
-  }, [item]);
   return (
     <div
       className={
         assessmentVisible
-          ? "grid items-end gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_190px_150px_170px_auto]"
-          : "grid items-center gap-3 px-4 py-3 md:grid-cols-[minmax(220px,1fr)_auto]"
+          ? "grid items-end gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_190px_150px_170px]"
+          : "grid items-center gap-3 px-4 py-3"
       }
     >
       <div>
         <div className="flex items-center gap-2">
           <Checkbox
-            checked={involved}
+            checked={draft.involved}
             disabled={!editable}
-            onCheckedChange={(checked) => setInvolved(checked === true)}
+            onCheckedChange={(checked) =>
+              onChange({ ...draft, involved: checked === true })
+            }
             aria-label={`Garantie impliquée ${item.libelle}`}
           />
           <p className="font-medium">
@@ -1553,8 +1596,10 @@ function GuaranteeRow({
       <Field label="Décision">
         <Select
           disabled={!editable}
-          value={decision}
-          onValueChange={(value) => setDecision(value as DecisionCouverture)}
+          value={draft.decision}
+          onValueChange={(value) =>
+            onChange({ ...draft, decision: value as DecisionCouverture })
+          }
         >
           <SelectTrigger>
             <SelectValue />
@@ -1572,8 +1617,10 @@ function GuaranteeRow({
           disabled={!editable}
           type="number"
           min="0"
-          value={franchise}
-          onChange={(event) => setFranchise(event.target.value)}
+          value={draft.franchise}
+          onChange={(event) =>
+            onChange({ ...draft, franchise: event.target.value })
+          }
         />
       </Field>
       <Field label="Montant indemnisable">
@@ -1581,33 +1628,44 @@ function GuaranteeRow({
           disabled={!editable}
           type="number"
           min="0"
-          value={indemnisable}
-          onChange={(event) => setIndemnisable(event.target.value)}
+          value={draft.indemnisable}
+          onChange={(event) =>
+            onChange({ ...draft, indemnisable: event.target.value })
+          }
         />
       </Field>
       </>
       ) : null}
-      {editable ? (
-        <Button
-          size="icon"
-          variant="outline"
-          disabled={saving}
-          aria-label={`Enregistrer ${item.code}`}
-          onClick={() =>
-            onSave({
-              decisionCouverture: decision,
-              impliquee: involved,
-              franchiseAppliquee: franchise ? Number(franchise) : undefined,
-              montantIndemnisable: indemnisable
-                ? Number(indemnisable)
-                : undefined,
-            })
-          }
-        >
-          <Save className="size-4" />
-        </Button>
-      ) : null}
     </div>
+  );
+}
+
+function toGuaranteeDraft(
+  item: SinistreDetail["garanties"][number],
+): GuaranteeDraft {
+  return {
+    decision: item.decisionCouverture,
+    involved: item.impliquee,
+    franchise:
+      item.franchiseAppliquee == null ? "" : String(item.franchiseAppliquee),
+    indemnisable:
+      item.montantIndemnisable == null
+        ? ""
+        : String(item.montantIndemnisable),
+  };
+}
+
+function guaranteeDraftChanged(
+  item: SinistreDetail["garanties"][number],
+  draft?: GuaranteeDraft,
+) {
+  if (!draft) return false;
+  const initial = toGuaranteeDraft(item);
+  return (
+    draft.decision !== initial.decision ||
+    draft.involved !== initial.involved ||
+    draft.franchise !== initial.franchise ||
+    draft.indemnisable !== initial.indemnisable
   );
 }
 

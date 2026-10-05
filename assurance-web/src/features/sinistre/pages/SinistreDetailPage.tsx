@@ -1003,11 +1003,11 @@ function DocumentsPanel({
                     onClick={() => onAdd(item.type)}
                     className={`flex items-center justify-between gap-2 rounded border px-2.5 py-2 text-left text-xs disabled:cursor-default ${
                       item.valide
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
                         : item.recu
-                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
                           : item.obligatoire
-                            ? "cursor-pointer border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400"
+                            ? "cursor-pointer border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:border-amber-500"
                             : "cursor-pointer border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
                     }`}
                   >
@@ -1158,15 +1158,15 @@ function DocumentStage({
   children?: React.ReactNode;
 }) {
   return (
-    <div className={`border-t px-3 py-3 ${active ? "bg-sky-50/50" : ""}`}>
+    <div className={`border-t px-3 py-3 ${active ? "bg-sky-50/50 dark:bg-sky-950/30" : ""}`}>
       <div className="flex items-start gap-2.5">
         <span
           className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
             tone === "success"
-              ? "bg-emerald-100 text-emerald-700"
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
               : active
                 ? "bg-sky-600 text-white"
-                : "bg-slate-100 text-slate-500"
+                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"
           }`}
         >
           {tone === "success" ? <CircleCheck className="size-3.5" /> : number}
@@ -1285,7 +1285,7 @@ function GeneralSection({
             </Button>
           ) : null}
         </div>
-        <dl className="mb-4 grid gap-x-5 gap-y-3 border-y bg-slate-50 px-3 py-3 text-sm sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+        <dl className="mb-4 grid gap-x-5 gap-y-3 border-y bg-muted/40 px-3 py-3 text-sm sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
           <Info label="Police" value={dossier.couverture.numeroPolice} />
           <Info label="Dossier" value={dossier.couverture.numeroDossier} />
           <Info label="Compagnie" value={dossier.couverture.compagnie} />
@@ -1741,14 +1741,14 @@ function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {
     return null;
   }
   return (
-    <section className="rounded-md border border-amber-200 bg-amber-50/60 px-4 py-3">
+    <section className="rounded-md border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
       <div className="flex items-start gap-3">
-        <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-700" />
+        <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-amber-950">
+          <h2 className="text-sm font-semibold text-amber-950 dark:text-amber-100">
             Actions requises avant la prochaine étape
           </h2>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-amber-950/80">
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-amber-950/80 dark:text-amber-200/80">
             {dossier.workflow.documentsRecus > 0 ? (
               <span>{dossier.workflow.documentsRecus} document(s) à contrôler</span>
             ) : null}
@@ -1763,7 +1763,7 @@ function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {
               <p className="text-sm font-medium">
                 Avant « {statusLabels[transition.statut]} »
               </p>
-              <ul className="mt-0.5 grid gap-0.5 text-sm text-amber-950/80">
+              <ul className="mt-0.5 grid gap-0.5 text-sm text-amber-950/80 dark:text-amber-200/80">
                 {transition.blocages.map((blocker) => (
                   <li key={blocker}>• {blocker}</li>
                 ))}

@@ -146,7 +146,7 @@ export function moduleActiveClass(module: AppNavigationItem["module"]) {
     case "production":
       return "bg-emerald-600 text-white";
     case "sinistre":
-      return "bg-sky-600 text-white";
+      return "bg-sky-700 text-white";
     case "companies":
       return "bg-amber-600 text-white";
     case "crm":

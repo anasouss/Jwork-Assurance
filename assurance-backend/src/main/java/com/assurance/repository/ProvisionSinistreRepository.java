@@ -19,6 +19,8 @@ public interface ProvisionSinistreRepository extends JpaRepository<ProvisionSini
 
     Optional<ProvisionSinistre> findFirstBySinistreIdOrderByDateProvisionDescCreatedAtDesc(Long sinistreId);
 
+    boolean existsBySinistreId(Long sinistreId);
+
     @Query("""
             select coalesce(sum(p.montant), 0)
             from ProvisionSinistre p

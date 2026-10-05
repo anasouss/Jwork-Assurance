@@ -32,6 +32,9 @@ import com.assurance.repository.ExpertSinistreRepository;
 import com.assurance.repository.GarageSinistreRepository;
 import com.assurance.repository.MissionExpertiseRepository;
 import com.assurance.repository.ProvisionSinistreRepository;
+import com.assurance.repository.SinistreCouvertureRepository;
+import com.assurance.repository.SinistreDocumentRepository;
+import com.assurance.repository.SinistreEvenementRepository;
 import com.assurance.repository.SinistreGarantieRepository;
 import com.assurance.repository.SinistreOperationRepository;
 import com.assurance.repository.SinistrePartieRepository;
@@ -55,6 +58,9 @@ public class SinistreDossierService {
     private final SinistrePartieRepository partieRepository;
     private final ProvisionSinistreRepository provisionRepository;
     private final SinistreOperationRepository operationRepository;
+    private final SinistreDocumentRepository documentRepository;
+    private final SinistreEvenementRepository evenementRepository;
+    private final SinistreCouvertureRepository couvertureRepository;
     private final MissionExpertiseRepository missionRepository;
     private final ExpertSinistreRepository expertRepository;
     private final GarageSinistreRepository garageRepository;
@@ -137,6 +143,29 @@ public class SinistreDossierService {
         );
         synchronizeSettlementStatus(context);
         return responseMapper.toDetail(context.sinistre());
+    }
+
+    @Transactional
+    public void deleteEarlyClaim(Long agenceId, Long sinistreId) {
+        Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
+        if (!DELETABLE_STATUSES.contains(sinistre.getStatut())) {
+            throw new BadRequestException(
+                    "Seul un dossier brouillon, déclaré ou incomplet peut être supprimé"
+            );
+        }
+        if (documentRepository.existsBySinistreId(sinistreId)
+                || missionRepository.existsBySinistreId(sinistreId)
+                || provisionRepository.existsBySinistreId(sinistreId)
+                || operationRepository.existsBySinistreId(sinistreId)) {
+            throw new BadRequestException(
+                    "Ce dossier contient déjà des documents, expertises ou écritures financières. Annulez-le au lieu de le supprimer"
+            );
+        }
+        evenementRepository.deleteBySinistreId(sinistreId);
+        partieRepository.deleteBySinistreId(sinistreId);
+        garantieRepository.deleteBySinistreId(sinistreId);
+        couvertureRepository.deleteBySinistreId(sinistreId);
+        sinistreRepository.delete(sinistre);
     }
 
     @Transactional
@@ -479,6 +508,12 @@ public class SinistreDossierService {
             StatutSinistre.EN_ATTENTE_REGLEMENT,
             StatutSinistre.PARTIELLEMENT_REGLE,
             StatutSinistre.REGLE
+    );
+
+    private static final Set<StatutSinistre> DELETABLE_STATUSES = EnumSet.of(
+            StatutSinistre.BROUILLON,
+            StatutSinistre.DECLARE,
+            StatutSinistre.DOSSIER_INCOMPLET
     );
 
     private void validatePaymentReference(AddSinistreOperationRequest request) {

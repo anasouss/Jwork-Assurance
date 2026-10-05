@@ -10,4 +10,6 @@ public interface SinistreEvenementRepository extends JpaRepository<SinistreEvene
 
     @EntityGraph(attributePaths = "utilisateur")
     List<SinistreEvenement> findBySinistreIdOrderByCreatedAtDesc(Long sinistreId);
+
+    void deleteBySinistreId(Long sinistreId);
 }

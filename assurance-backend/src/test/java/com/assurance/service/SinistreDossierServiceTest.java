@@ -19,6 +19,9 @@ import com.assurance.repository.ExpertSinistreRepository;
 import com.assurance.repository.GarageSinistreRepository;
 import com.assurance.repository.MissionExpertiseRepository;
 import com.assurance.repository.ProvisionSinistreRepository;
+import com.assurance.repository.SinistreCouvertureRepository;
+import com.assurance.repository.SinistreDocumentRepository;
+import com.assurance.repository.SinistreEvenementRepository;
 import com.assurance.repository.SinistreGarantieRepository;
 import com.assurance.repository.SinistreOperationRepository;
 import com.assurance.repository.SinistrePartieRepository;
@@ -43,6 +46,9 @@ class SinistreDossierServiceTest {
     private final SinistrePartieRepository parties = mock(SinistrePartieRepository.class);
     private final ProvisionSinistreRepository provisions = mock(ProvisionSinistreRepository.class);
     private final SinistreOperationRepository operations = mock(SinistreOperationRepository.class);
+    private final SinistreDocumentRepository documents = mock(SinistreDocumentRepository.class);
+    private final SinistreEvenementRepository claimEvents = mock(SinistreEvenementRepository.class);
+    private final SinistreCouvertureRepository coverage = mock(SinistreCouvertureRepository.class);
     private final MissionExpertiseRepository missions = mock(MissionExpertiseRepository.class);
     private final ExpertSinistreRepository experts = mock(ExpertSinistreRepository.class);
     private final GarageSinistreRepository garages = mock(GarageSinistreRepository.class);
@@ -59,6 +65,9 @@ class SinistreDossierServiceTest {
             parties,
             provisions,
             operations,
+            documents,
+            claimEvents,
+            coverage,
             missions,
             experts,
             garages,

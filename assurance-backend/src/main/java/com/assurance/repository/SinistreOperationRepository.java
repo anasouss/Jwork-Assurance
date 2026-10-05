@@ -32,6 +32,8 @@ public interface SinistreOperationRepository extends JpaRepository<SinistreOpera
 
     boolean existsByContrepartiePartieId(Long partieId);
 
+    boolean existsBySinistreId(Long sinistreId);
+
     @Query("""
             select coalesce(sum(o.montant), 0)
             from SinistreOperation o

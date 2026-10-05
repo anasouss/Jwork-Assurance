@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface SinistreCouvertureRepository extends JpaRepository<SinistreCouverture, Long> {
 
     Optional<SinistreCouverture> findBySinistreId(Long sinistreId);
+
+    void deleteBySinistreId(Long sinistreId);
 }

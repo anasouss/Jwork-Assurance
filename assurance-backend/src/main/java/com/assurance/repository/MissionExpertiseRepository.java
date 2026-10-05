@@ -17,4 +17,6 @@ public interface MissionExpertiseRepository extends JpaRepository<MissionExperti
     boolean existsBySinistreIdAndExpertId(Long sinistreId, Long expertId);
 
     boolean existsBySinistreIdAndGarageId(Long sinistreId, Long garageId);
+
+    boolean existsBySinistreId(Long sinistreId);
 }

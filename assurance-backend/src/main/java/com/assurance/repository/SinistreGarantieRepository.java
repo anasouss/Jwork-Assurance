@@ -27,4 +27,6 @@ public interface SinistreGarantieRepository extends JpaRepository<SinistreGarant
     );
 
     Optional<SinistreGarantie> findByIdAndSinistreId(Long id, Long sinistreId);
+
+    void deleteBySinistreId(Long sinistreId);
 }

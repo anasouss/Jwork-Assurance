@@ -19,4 +19,6 @@ public interface SinistreDocumentRepository extends JpaRepository<SinistreDocume
     List<SinistreDocument> findBySinistreIdOrderByCreatedAtDesc(Long sinistreId);
 
     Optional<SinistreDocument> findByIdAndSinistreId(Long id, Long sinistreId);
+
+    boolean existsBySinistreId(Long sinistreId);
 }

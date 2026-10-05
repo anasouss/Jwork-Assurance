@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
+import {
+  Ban,
+  Eye,
+  FilePlus2,
+  MoreHorizontal,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -78,6 +86,9 @@ export default function SinistreListPage() {
   const [claimToCancel, setClaimToCancel] = useState<SinistreSummary | null>(
     null,
   );
+  const [claimToDelete, setClaimToDelete] = useState<SinistreSummary | null>(
+    null,
+  );
   const request = useMemo(
     () => ({
       query: applied.query.trim() || undefined,
@@ -120,6 +131,19 @@ export default function SinistreListPage() {
     onError: (error) =>
       toast.error(
         error instanceof Error ? error.message : "Annulation impossible",
+      ),
+  });
+  const deleteClaim = useMutation({
+    mutationFn: sinistreApi.deleteEarlyClaim,
+    onSuccess: () => {
+      setClaimToDelete(null);
+      queryClient.invalidateQueries({ queryKey: sinistreKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: sinistreKeys.dashboard() });
+      toast.success("Dossier supprimé définitivement");
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof Error ? error.message : "Suppression impossible",
       ),
   });
 
@@ -349,6 +373,13 @@ export default function SinistreListPage() {
                                 <Ban className="size-4" />
                                 Annuler le dossier
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => setClaimToDelete(item)}
+                              >
+                                <Trash2 className="size-4" />
+                                Supprimer définitivement
+                              </DropdownMenuItem>
                             </>
                           ) : null}
                         </DropdownMenuContent>
@@ -404,6 +435,35 @@ export default function SinistreListPage() {
               }}
             >
               Annuler le dossier
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={claimToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setClaimToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer définitivement ce dossier ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {claimToDelete?.numeroSinistre} sera supprimé sans possibilité de
+              restauration. La suppression sera refusée si le dossier contient
+              déjà des documents, une expertise ou une écriture financière.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Conserver</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteClaim.isPending}
+              onClick={() => {
+                if (claimToDelete) deleteClaim.mutate(claimToDelete.id);
+              }}
+            >
+              Supprimer définitivement
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

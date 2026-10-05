@@ -113,6 +113,12 @@ export const sinistreApi = {
     );
   },
 
+  async deleteEarlyClaim(id: string) {
+    return apiFetch<ApiResponse<null>>(`/api/v1/sinistres/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   async update(id: string, request: object) {
     return unwrap(
       await apiFetch<ApiResponse<SinistreDetail>>(`/api/v1/sinistres/${id}`, {

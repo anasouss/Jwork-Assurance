@@ -183,6 +183,13 @@ public class SinistreController {
         ), "Statut du sinistre mis à jour"));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    public ResponseEntity<ApiResponse<Void>> deleteEarlyClaim(@PathVariable Long id) {
+        dossierService.deleteEarlyClaim(TenantContext.getCurrentAgence(), id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Dossier supprimé"));
+    }
+
     @PutMapping("/{id}/garanties/{garantieId}")
     @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> updateGuarantee(

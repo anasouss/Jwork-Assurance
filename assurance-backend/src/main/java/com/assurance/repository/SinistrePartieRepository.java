@@ -11,4 +11,6 @@ public interface SinistrePartieRepository extends JpaRepository<SinistrePartie, 
     List<SinistrePartie> findBySinistreIdOrderByCreatedAt(Long sinistreId);
 
     Optional<SinistrePartie> findByIdAndSinistreId(Long id, Long sinistreId);
+
+    void deleteBySinistreId(Long sinistreId);
 }

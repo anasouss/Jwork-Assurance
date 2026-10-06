@@ -45,7 +45,6 @@ import type {
 const ALL = "__all__";
 const NONE = "__none__";
 const ASSISTANCE_TYPES = ["Assistance Automobile", "Assistance Voyage"] as const;
-type ProductActiveFilter = "ALL" | "ACTIVE" | "INACTIVE";
 type ProductSortKey = "PRODUCT" | "COMPANY" | "TYPE" | "CATEGORY" | "USAGES" | "HT" | "TTC" | "PERIOD" | "ACTIVE";
 type ProductSortDirection = "asc" | "desc";
 type TariffSortColumn = "PERIOD" | "HT" | "TTC";
@@ -57,10 +56,6 @@ export default function AssistanceProductsSettingsPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("compagnieId") || ALL);
   const [selectedType, setSelectedType] = useState(searchParams.get("type") || ALL);
   const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get("categorieId") || ALL);
-  const [activeFilter, setActiveFilter] = useState<ProductActiveFilter>(() => {
-    const value = searchParams.get("statut");
-    return value === "ACTIVE" || value === "INACTIVE" ? value : "ALL";
-  });
   const deferredProductSearch = useDeferredValue(productSearch.trim());
   const [productSort, setProductSort] = useState<{ key: ProductSortKey; direction: ProductSortDirection }>({
     key: "PRODUCT",
@@ -85,9 +80,8 @@ export default function AssistanceProductsSettingsPage() {
     compagnieAssistanceId: selectedCompanyId === ALL ? undefined : selectedCompanyId,
     type: selectedType === ALL ? undefined : selectedType,
     categorieClientId: selectedCategoryId === ALL ? undefined : selectedCategoryId,
-    actif: activeFilter === "ALL" ? undefined : String(activeFilter === "ACTIVE"),
     includeInactive: "true",
-  }), [activeFilter, deferredProductSearch, selectedCategoryId, selectedCompanyId, selectedType]);
+  }), [deferredProductSearch, selectedCategoryId, selectedCompanyId, selectedType]);
 
   const products = useQuery({
     queryKey: ["referentiel", "produits-assistance", "settings", productFilters],
@@ -120,9 +114,8 @@ export default function AssistanceProductsSettingsPage() {
     if (selectedCompanyId !== ALL) params.set("compagnieId", selectedCompanyId);
     if (selectedType !== ALL) params.set("type", selectedType);
     if (selectedCategoryId !== ALL) params.set("categorieId", selectedCategoryId);
-    if (activeFilter !== "ALL") params.set("statut", activeFilter);
     setSearchParams(params, { replace: true });
-  }, [activeFilter, productSearch, selectedCategoryId, selectedCompanyId, selectedType, setSearchParams]);
+  }, [productSearch, selectedCategoryId, selectedCompanyId, selectedType, setSearchParams]);
 
   useEffect(() => {
     if (!productDialogOpen) return;
@@ -223,12 +216,12 @@ export default function AssistanceProductsSettingsPage() {
       </div>
 
       <section className="rounded-lg border bg-card p-4">
-        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_220px_200px_190px_190px_150px]">
+        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_240px_220px_210px_210px]">
           <div>
             <h2 className="font-semibold">Liste des produits</h2>
             <p className="text-sm text-muted-foreground">Les tarifs se gèrent depuis l'action Tarifs de chaque produit.</p>
           </div>
-          <div className="relative">
+          <div className="relative self-start">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="pl-9" placeholder="Filtrer produit" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} />
           </div>
@@ -263,16 +256,6 @@ export default function AssistanceProductsSettingsPage() {
               {(categories.data ?? []).map((category) => (
                 <SelectItem key={category.id} value={category.id}>{category.libelle}</SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-          <Select value={activeFilter} onValueChange={(value) => setActiveFilter(value as ProductActiveFilter)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tous les statuts</SelectItem>
-              <SelectItem value="ACTIVE">Actifs</SelectItem>
-              <SelectItem value="INACTIVE">Inactifs</SelectItem>
             </SelectContent>
           </Select>
         </div>

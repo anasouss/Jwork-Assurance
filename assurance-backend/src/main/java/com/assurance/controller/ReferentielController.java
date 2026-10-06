@@ -430,17 +430,15 @@ public class ReferentielController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Long categorieClientId,
             @RequestParam(required = false) Long usageId,
-            @RequestParam(required = false) Boolean actif,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        Boolean activeFilter = actif != null ? actif : includeInactive ? null : true;
         return ResponseEntity.ok(ApiResponse.success(produitAssistanceRepository.search(
                         blankToNull(recherche),
                         compagnieAssistanceId,
                         blankToNull(type),
                         categorieClientId,
                         usageId,
-                        activeFilter
+                        includeInactive ? null : true
                 ).stream()
                 .map(this::toProduitAssistanceResponse)
                 .toList()));

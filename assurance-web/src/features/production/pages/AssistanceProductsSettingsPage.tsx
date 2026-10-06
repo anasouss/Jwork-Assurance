@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Check, ChevronsUpDown, Edit, Plus, Search, Trash2 } from "lucide-react";
@@ -44,6 +44,8 @@ import type {
 
 const ALL = "__all__";
 const NONE = "__none__";
+const ASSISTANCE_TYPES = ["Assistance Automobile", "Assistance Voyage"] as const;
+type ProductActiveFilter = "ALL" | "ACTIVE" | "INACTIVE";
 type ProductSortKey = "PRODUCT" | "COMPANY" | "TYPE" | "CATEGORY" | "USAGES" | "HT" | "TTC" | "PERIOD" | "ACTIVE";
 type ProductSortDirection = "asc" | "desc";
 type TariffSortColumn = "PERIOD" | "HT" | "TTC";
@@ -51,8 +53,15 @@ type TariffSortColumn = "PERIOD" | "HT" | "TTC";
 export default function AssistanceProductsSettingsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [productSearch, setProductSearch] = useState("");
+  const [productSearch, setProductSearch] = useState(searchParams.get("recherche") || "");
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("compagnieId") || ALL);
+  const [selectedType, setSelectedType] = useState(searchParams.get("type") || ALL);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get("categorieId") || ALL);
+  const [activeFilter, setActiveFilter] = useState<ProductActiveFilter>(() => {
+    const value = searchParams.get("statut");
+    return value === "ACTIVE" || value === "INACTIVE" ? value : "ALL";
+  });
+  const deferredProductSearch = useDeferredValue(productSearch.trim());
   const [productSort, setProductSort] = useState<{ key: ProductSortKey; direction: ProductSortDirection }>({
     key: "PRODUCT",
     direction: "asc",
@@ -71,9 +80,18 @@ export default function AssistanceProductsSettingsPage() {
     staleTime: 60_000,
   });
 
+  const productFilters = useMemo(() => ({
+    recherche: deferredProductSearch || undefined,
+    compagnieAssistanceId: selectedCompanyId === ALL ? undefined : selectedCompanyId,
+    type: selectedType === ALL ? undefined : selectedType,
+    categorieClientId: selectedCategoryId === ALL ? undefined : selectedCategoryId,
+    actif: activeFilter === "ALL" ? undefined : String(activeFilter === "ACTIVE"),
+    includeInactive: "true",
+  }), [activeFilter, deferredProductSearch, selectedCategoryId, selectedCompanyId, selectedType]);
+
   const products = useQuery({
-    queryKey: ["referentiel", "produits-assistance", "settings"],
-    queryFn: () => referenceApi.list("produits-assistance", { includeInactive: "true" }),
+    queryKey: ["referentiel", "produits-assistance", "settings", productFilters],
+    queryFn: () => referenceApi.list("produits-assistance", productFilters),
     staleTime: 60_000,
   });
 
@@ -98,13 +116,13 @@ export default function AssistanceProductsSettingsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (selectedCompanyId === ALL) {
-      params.delete("compagnieId");
-    } else {
-      params.set("compagnieId", selectedCompanyId);
-    }
+    if (productSearch.trim()) params.set("recherche", productSearch.trim());
+    if (selectedCompanyId !== ALL) params.set("compagnieId", selectedCompanyId);
+    if (selectedType !== ALL) params.set("type", selectedType);
+    if (selectedCategoryId !== ALL) params.set("categorieId", selectedCategoryId);
+    if (activeFilter !== "ALL") params.set("statut", activeFilter);
     setSearchParams(params, { replace: true });
-  }, [selectedCompanyId, setSearchParams]);
+  }, [activeFilter, productSearch, selectedCategoryId, selectedCompanyId, selectedType, setSearchParams]);
 
   useEffect(() => {
     if (!productDialogOpen) return;
@@ -117,27 +135,14 @@ export default function AssistanceProductsSettingsPage() {
   }, [editingTarif, tarifProduct]);
 
   const filteredProducts = useMemo(() => {
-    const term = productSearch.trim().toLowerCase();
-    const filtered = (products.data ?? []).filter((product) => {
-      if (selectedCompanyId !== ALL && refString(product, "compagnieAssistanceId") !== selectedCompanyId) return false;
-      if (!term) return true;
-      return [
-        product.libelle,
-        refString(product, "type"),
-        refString(product, "compagnieAssistanceLibelle"),
-        refString(product, "categorieClientLibelle"),
-        refString(product, "prestations"),
-        refArray(product, "usageCodes").join(" "),
-      ].some((value) => String(value ?? "").toLowerCase().includes(term));
-    });
-    return filtered.sort((left, right) => {
+    return [...(products.data ?? [])].sort((left, right) => {
       const comparison = compareProductValues(
         productSortValue(left, productSort.key),
         productSortValue(right, productSort.key)
       );
       return productSort.direction === "asc" ? comparison : -comparison;
     });
-  }, [productSearch, productSort, products.data, selectedCompanyId]);
+  }, [productSort, products.data]);
 
   const sortedTariffs = useMemo(() => [...(tarifs.data ?? [])].sort((left, right) => compareTableValues(
     tariffSortValue(left, tariffSort.column),
@@ -218,7 +223,7 @@ export default function AssistanceProductsSettingsPage() {
       </div>
 
       <section className="rounded-lg border bg-card p-4">
-        <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_280px_280px]">
+        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_220px_200px_190px_190px_150px]">
           <div>
             <h2 className="font-semibold">Liste des produits</h2>
             <p className="text-sm text-muted-foreground">Les tarifs se gèrent depuis l'action Tarifs de chaque produit.</p>
@@ -236,6 +241,38 @@ export default function AssistanceProductsSettingsPage() {
               {(companies.data ?? []).map((company) => (
                 <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Tous les types</SelectItem>
+              {ASSISTANCE_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>{type}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Toutes les catégories</SelectItem>
+              {(categories.data ?? []).map((category) => (
+                <SelectItem key={category.id} value={category.id}>{category.libelle}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={activeFilter} onValueChange={(value) => setActiveFilter(value as ProductActiveFilter)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tous les statuts</SelectItem>
+              <SelectItem value="ACTIVE">Actifs</SelectItem>
+              <SelectItem value="INACTIVE">Inactifs</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -257,6 +294,11 @@ export default function AssistanceProductsSettingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {products.isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Chargement des produits...</TableCell>
+                </TableRow>
+              ) : null}
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
@@ -331,8 +373,9 @@ export default function AssistanceProductsSettingsPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Aucun</SelectItem>
-                  <SelectItem value="Assistance Automobile">Assistance Automobile</SelectItem>
-                  <SelectItem value="Assistance Voyage">Assistance Voyage</SelectItem>
+                  {ASSISTANCE_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>

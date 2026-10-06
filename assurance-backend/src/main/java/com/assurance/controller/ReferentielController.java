@@ -425,23 +425,23 @@ public class ReferentielController {
     @GetMapping("/produits-assistance")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> produitsAssistance(
+            @RequestParam(required = false) String recherche,
             @RequestParam(required = false) Long compagnieAssistanceId,
+            @RequestParam(required = false) String type,
             @RequestParam(required = false) Long categorieClientId,
             @RequestParam(required = false) Long usageId,
+            @RequestParam(required = false) Boolean actif,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return ResponseEntity.ok(ApiResponse.success(produitAssistanceRepository.findAll(Sort.by("libelle")).stream()
-                .filter(produit -> includeInactive || Boolean.TRUE.equals(produit.getActif()))
-                .filter(produit -> compagnieAssistanceId == null
-                        || (produit.getCompagnieAssistance() != null
-                        && produit.getCompagnieAssistance().getId().equals(compagnieAssistanceId)))
-                .filter(produit -> categorieClientId == null
-                        || produit.getCategorieClient() == null
-                        || produit.getCategorieClient().getId().equals(categorieClientId))
-                .filter(produit -> usageId == null
-                        || produit.getUsages() == null
-                        || produit.getUsages().isEmpty()
-                        || produit.getUsages().stream().anyMatch(usage -> usage.getId().equals(usageId)))
+        Boolean activeFilter = actif != null ? actif : includeInactive ? null : true;
+        return ResponseEntity.ok(ApiResponse.success(produitAssistanceRepository.search(
+                        blankToNull(recherche),
+                        compagnieAssistanceId,
+                        blankToNull(type),
+                        categorieClientId,
+                        usageId,
+                        activeFilter
+                ).stream()
                 .map(this::toProduitAssistanceResponse)
                 .toList()));
     }

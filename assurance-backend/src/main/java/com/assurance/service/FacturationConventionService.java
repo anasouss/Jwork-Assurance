@@ -88,12 +88,13 @@ public class FacturationConventionService {
                 payer.group(),
                 emissionDate
         );
+        LocalDate contractualDueDate = earliestContractualDueDate(selected);
         return PropositionEcheanceDocumentClientResponse.builder()
                 .dateEmission(emissionDate)
                 .delaiJours(condition.days())
                 .dateEcheanceProposee(condition.configured()
                         ? emissionDate.plusDays(condition.days())
-                        : null)
+                        : contractualDueDate)
                 .origine(condition.origin())
                 .conditionPaiementId(condition.conditionId())
                 .dateFinCondition(condition.conditionEndDate())
@@ -235,6 +236,8 @@ public class FacturationConventionService {
             throw new BadRequestException(
                     "Aucune condition de paiement active n'autorise une date d'échéance pour ce payeur"
             );
+        } else {
+            dueDate = earliestContractualDueDate(selected);
         }
         DocumentClient document = DocumentClient.builder()
                 .agence(agence)
@@ -348,6 +351,13 @@ public class FacturationConventionService {
             }
             echeanceRepository.saveAll(toSave);
         }
+    }
+
+    private LocalDate earliestContractualDueDate(List<EcheanceFacturationConvention> schedules) {
+        return schedules.stream()
+                .map(EcheanceFacturationConvention::getDateEcheance)
+                .min(LocalDate::compareTo)
+                .orElseThrow(() -> new BadRequestException("Sélectionnez au moins une échéance"));
     }
 
     private List<Period> buildPeriods(LocalDate start, LocalDate end, Fractionnement fractionnement) {

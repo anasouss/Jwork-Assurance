@@ -393,9 +393,9 @@ export default function FacturationConventionsPage() {
                     {` : ${dueDateProposal.data.delaiJours} jours maximum.`}
                   </p>
                 </>
-              ) : dueDateProposal.data ? (
+              ) : dueDateProposal.data?.dateEcheanceProposee ? (
                 <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
-                  Aucune condition de paiement active pour ce payeur. La facture sera émise sans date d’échéance.
+                  Date d’échéance contractuelle : {shortDate(dueDateProposal.data.dateEcheanceProposee)}.
                 </p>
               ) : null}
             </div>

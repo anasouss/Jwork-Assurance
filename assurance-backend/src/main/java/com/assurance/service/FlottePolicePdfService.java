@@ -259,11 +259,11 @@ public class FlottePolicePdfService {
             if (showEnergy) {
                 table.addCell(valueCell(target.energie(), TextAlignment.CENTER));
             }
-            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurNeuf()), TextAlignment.RIGHT));
-            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurVenale()), TextAlignment.RIGHT));
-            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurGlace()), TextAlignment.RIGHT));
+            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurNeuf()), TextAlignment.CENTER));
+            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurVenale()), TextAlignment.CENTER));
+            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurGlace()), TextAlignment.CENTER));
             if (hasDcCapital) {
-                table.addCell(valueCell(formatMoneyOrEmpty(capitalFor(rowGuarantees, "DC")), TextAlignment.RIGHT));
+                table.addCell(valueCell(formatMoneyOrEmpty(capitalFor(rowGuarantees, "DC")), TextAlignment.CENTER));
             }
             if (codes.isEmpty() && !showAssistance) {
                 table.addCell(valueCell("-", TextAlignment.CENTER));

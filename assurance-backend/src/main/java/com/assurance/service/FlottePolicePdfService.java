@@ -202,7 +202,7 @@ public class FlottePolicePdfService {
         boolean hasDcCapital = codes.contains("DC");
         boolean showAssistance = !list(contrat.getAssistances()).isEmpty();
         boolean showPfOrPtc = targets.stream().anyMatch(target -> !target.pfOuPtc().isBlank());
-        boolean showEnergy = targets.stream().anyMatch(target -> !target.energie().isBlank());
+        boolean showEnergy = targets.stream().anyMatch(target -> !value(target.energie(), "").isBlank());
         int valueColumns = hasDcCapital ? 4 : 3;
         int guaranteeColumns = Math.max(1, codes.size() + (showAssistance ? 2 : 0));
         int columnCount = 6 + (showPfOrPtc ? 1 : 0) + (showEnergy ? 1 : 0)

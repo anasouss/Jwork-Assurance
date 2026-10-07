@@ -55,6 +55,10 @@ public class FlottePolicePdfService {
     private static final DeviceRgb SELECTED_BG = new DeviceRgb(236, 253, 245);
     private static final DeviceRgb ASSISTANCE_BG = new DeviceRgb(255, 251, 235);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final float CONTEXT_FONT_SIZE = 10f;
+    private static final float SECTION_FONT_SIZE = 11f;
+    private static final float TABLE_FONT_SIZE = 8.5f;
+    private static final float TABLE_PADDING = 3f;
 
     private final ContratService contratService;
 
@@ -69,7 +73,7 @@ public class FlottePolicePdfService {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(output));
             Document document = new Document(pdf, PageSize.A4.rotate());
-            document.setMargins(14, 12, 14, 12);
+            document.setMargins(18, 16, 18, 16);
             document.setFont(PdfFontFactory.createFont(StandardFonts.HELVETICA));
 
             writeHeader(document, contrat, mouvement);
@@ -140,19 +144,19 @@ public class FlottePolicePdfService {
 
     private void writeHeader(Document document, ContratResponse contrat, ContratResponse.MouvementView mouvement) throws Exception {
         Table title = new Table(new float[]{1})
-                .setWidth(UnitValue.createPercentValue(38))
+                .setWidth(UnitValue.createPercentValue(62))
                 .setHorizontalAlignment(HorizontalAlignment.CENTER);
         title.addCell(new Cell()
                 .add(new Paragraph("POLICE FLOTTE AUTOMOBILE")
                         .setBold().setFontSize(13).setTextAlignment(TextAlignment.CENTER).setFontColor(INK))
                 .add(new Paragraph("ACTE N° " + movementNumber(mouvement) + " : " + movementLabel(mouvement))
-                        .setBold().setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFontColor(INK))
+                        .setBold().setFontSize(10).setTextAlignment(TextAlignment.CENTER).setFontColor(INK))
                 .setBackgroundColor(HEADER_BG)
-                .setBorder(new SolidBorder(BORDER, 1.1f))
-                .setPaddingTop(5)
-                .setPaddingBottom(5));
+                .setBorder(new SolidBorder(ACCENT, 1.3f))
+                .setPaddingTop(6)
+                .setPaddingBottom(6));
         document.add(title);
-        document.add(new Paragraph(" ").setMarginBottom(3));
+        document.add(new Paragraph(" ").setMarginBottom(6));
     }
 
     private void writeContext(Document document, ContratResponse contrat, ContratResponse.MouvementView mouvement) {
@@ -171,23 +175,23 @@ public class FlottePolicePdfService {
                 .add(labelValue("Assuré : ", clientName(subscriber)))
                 .add(labelValue("Adresse : ", clientAddress(subscriber)))
                 .add(billing)
-                .setFontSize(7.5f)
-                .setBorder(new SolidBorder(SOFT_BORDER, 0.8f))
-                .setPadding(5));
+                .setFontSize(CONTEXT_FONT_SIZE)
+                .setBorder(new SolidBorder(SOFT_BORDER, 0.9f))
+                .setPadding(6));
         info.addCell(new Cell()
                 .add(new Paragraph("Police N° " + safe(value(contrat.getNumeroPolice(), "-"))).setBold().setFontColor(ACCENT))
                 .add(new Paragraph("Date d'effet " + formatDate(mouvement == null ? contrat.getDateEffet() : mouvement.getDateEffet())
                         + "  Date d'expiration " + formatDate(mouvement == null ? contrat.getDateEcheance() : mouvement.getDateEcheance())))
-                .setFontSize(7.5f)
+                .setFontSize(CONTEXT_FONT_SIZE)
                 .setTextAlignment(TextAlignment.RIGHT)
-                .setBorder(new SolidBorder(SOFT_BORDER, 0.8f))
-                .setPadding(5));
+                .setBorder(new SolidBorder(SOFT_BORDER, 0.9f))
+                .setPadding(6));
         document.add(info);
 
         Table sectionTitle = new Table(new float[]{1, 1}).setWidth(UnitValue.createPercentValue(100)).setMarginTop(5).setMarginBottom(2);
-        sectionTitle.addCell(borderlessCell("I. Le tarif", TextAlignment.LEFT).setBold().setFontSize(9));
+        sectionTitle.addCell(borderlessCell("I. Le tarif", TextAlignment.LEFT).setBold().setFontSize(SECTION_FONT_SIZE));
         sectionTitle.addCell(borderlessCell(value(contrat.getNumeroDossier(), "#" + contrat.getId()), TextAlignment.RIGHT)
-                .setBold().setFontSize(6.5f).setFontColor(ACCENT));
+                .setBold().setFontSize(TABLE_FONT_SIZE).setFontColor(ACCENT));
         document.add(sectionTitle);
     }
 
@@ -266,8 +270,8 @@ public class FlottePolicePdfService {
         table.addCell(new Cell(1, columnCount - 1)
                 .add(new Paragraph("TOTAL").setBold())
                 .setTextAlignment(TextAlignment.CENTER)
-                .setBorder(new SolidBorder(BORDER, 0.8f))
-                .setPadding(2));
+                .setBorder(new SolidBorder(BORDER, 1.2f))
+                .setPadding(TABLE_PADDING));
         table.addCell(valueCell(formatMoney(rowsTotal), TextAlignment.RIGHT).setBold());
         document.add(table);
     }
@@ -278,7 +282,7 @@ public class FlottePolicePdfService {
         if (codes.isEmpty()) {
             return;
         }
-        Paragraph legend = new Paragraph().setFontSize(5.5f).setFontColor(ACCENT).setMarginTop(3).setMarginBottom(4);
+        Paragraph legend = new Paragraph().setFontSize(7f).setFontColor(ACCENT).setMarginTop(3).setMarginBottom(6);
         for (int index = 0; index < codes.size(); index++) {
             String code = codes.get(index);
             if (index > 0) {
@@ -311,7 +315,7 @@ public class FlottePolicePdfService {
             return false;
         }
 
-        document.add(new Paragraph(toRoman(section) + ". Les franchises").setBold().setFontSize(9).setMarginTop(4).setMarginBottom(2));
+        document.add(new Paragraph(toRoman(section) + ". Les franchises").setBold().setFontSize(SECTION_FONT_SIZE).setMarginTop(4).setMarginBottom(2));
         float[] widths = new float[usages.size() + 1];
         widths[0] = 1.3f;
         for (int index = 1; index < widths.length; index++) {
@@ -340,7 +344,7 @@ public class FlottePolicePdfService {
         if (lines.isEmpty()) {
             return;
         }
-        document.add(new Paragraph(toRoman(section) + ". Quittance").setBold().setFontSize(9).setMarginTop(4).setMarginBottom(2));
+        document.add(new Paragraph(toRoman(section) + ". Quittance").setBold().setFontSize(SECTION_FONT_SIZE).setMarginTop(4).setMarginBottom(2));
         Table table = new Table(new float[]{2.3f, 1.7f, 1.5f, 1.4f, 1.3f, 1.5f, 1.8f})
                 .setWidth(UnitValue.createPercentValue(100));
         for (String header : List.of("Catégorie", "Prime nette", "Taxes", "TPF", "ACC", "CNPAC", "Total")) {
@@ -565,22 +569,22 @@ public class FlottePolicePdfService {
                 .add(new Paragraph(safe(content)).setBold())
                 .setTextAlignment(TextAlignment.CENTER)
                 .setVerticalAlignment(com.itextpdf.layout.property.VerticalAlignment.MIDDLE)
-                .setFontSize(6.1f)
+                .setFontSize(TABLE_FONT_SIZE)
                 .setBackgroundColor(background)
-                .setBorder(new SolidBorder(BORDER, 0.8f))
-                .setPadding(2));
+                .setBorder(new SolidBorder(BORDER, 1f))
+                .setPadding(TABLE_PADDING));
     }
 
     private Cell headerCell(String content, DeviceRgb background) {
         return new Cell().add(new Paragraph(safe(content)).setBold())
-                .setTextAlignment(TextAlignment.CENTER).setFontSize(6.3f)
-                .setBackgroundColor(background).setBorder(new SolidBorder(BORDER, 0.8f)).setPadding(2);
+                .setTextAlignment(TextAlignment.CENTER).setFontSize(TABLE_FONT_SIZE)
+                .setBackgroundColor(background).setBorder(new SolidBorder(BORDER, 1f)).setPadding(TABLE_PADDING);
     }
 
     private Cell valueCell(String content, TextAlignment alignment) {
         return new Cell().add(new Paragraph(safe(content)))
-                .setTextAlignment(alignment).setFontSize(6.1f)
-                .setBorder(new SolidBorder(BORDER, 0.7f)).setPadding(2);
+                .setTextAlignment(alignment).setFontSize(TABLE_FONT_SIZE)
+                .setBorder(new SolidBorder(BORDER, 1f)).setPadding(TABLE_PADDING);
     }
 
     private Cell guaranteeCell(String content) {

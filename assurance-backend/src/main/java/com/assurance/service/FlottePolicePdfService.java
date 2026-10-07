@@ -337,8 +337,8 @@ public class FlottePolicePdfService {
         table.addHeaderCell(headerCell("Garanties", HEADER_BG));
         usages.forEach(usage -> table.addHeaderCell(headerCell("Usage " + usage, HEADER_BG)));
         rows.forEach((code, values) -> {
-            table.addCell(valueCell(code, TextAlignment.LEFT).setBold());
-            values.forEach(item -> table.addCell(valueCell(item, TextAlignment.LEFT)));
+            table.addCell(valueCell(code, TextAlignment.CENTER).setBold());
+            values.forEach(item -> table.addCell(valueCell(item, TextAlignment.CENTER)));
         });
         document.add(table);
         return true;

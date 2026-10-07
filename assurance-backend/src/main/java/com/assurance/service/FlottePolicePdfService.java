@@ -162,19 +162,14 @@ public class FlottePolicePdfService {
     private void writeContext(Document document, ContratResponse contrat, ContratResponse.MouvementView mouvement) {
         ClientResponse subscriber = subscriber(contrat);
         boolean subscriberPays = isSubscriberPayer(contrat, subscriber);
-        Paragraph billing = new Paragraph();
-        if (!subscriberPays) {
-            billing.add(new Text("Payeur : ").setBold().setFontColor(ACCENT))
-                    .add(safe(value(contrat.getPayeurPrimeNom(), "-")))
-                    .add("    ");
-        }
-        billing.add(new Text("Facturation : ").setBold().setFontColor(ACCENT))
-                .add(safe(billingMode(contrat)));
-        Table info = new Table(new float[]{7, 3}).setWidth(UnitValue.createPercentValue(100));
-        info.addCell(new Cell()
+        Cell insuredCell = new Cell()
                 .add(labelValue("Assuré : ", clientName(subscriber)))
-                .add(labelValue("Adresse : ", clientAddress(subscriber)))
-                .add(billing)
+                .add(labelValue("Adresse : ", clientAddress(subscriber)));
+        if (!subscriberPays) {
+            insuredCell.add(labelValue("Payeur : ", value(contrat.getPayeurPrimeNom(), "-")));
+        }
+        Table info = new Table(new float[]{7, 3}).setWidth(UnitValue.createPercentValue(100));
+        info.addCell(insuredCell
                 .setFontSize(CONTEXT_FONT_SIZE)
                 .setBorder(new SolidBorder(SOFT_BORDER, 0.9f))
                 .setPadding(6));
@@ -551,12 +546,6 @@ public class FlottePolicePdfService {
         }
         return contrat.getPayeurPrimeClientId() != null && subscriber != null && subscriber.getId() != null
                 && contrat.getPayeurPrimeClientId().equals(subscriber.getId());
-    }
-
-    private String billingMode(ContratResponse contrat) {
-        return contrat.getModeFacturation() != null && "CONSOLIDEE_GROUPE".equals(contrat.getModeFacturation().name())
-                ? "Consolidée au groupe"
-                : "Directe au payeur";
     }
 
     private String movementNumber(ContratResponse.MouvementView movement) {

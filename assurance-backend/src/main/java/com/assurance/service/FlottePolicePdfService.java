@@ -201,10 +201,13 @@ public class FlottePolicePdfService {
         List<String> codes = guaranteeCodes(guarantees);
         boolean hasDcCapital = codes.contains("DC");
         boolean showAssistance = !list(contrat.getAssistances()).isEmpty();
+        boolean showPfOrPtc = targets.stream().anyMatch(target -> !target.pfOuPtc().isBlank());
+        boolean showEnergy = targets.stream().anyMatch(target -> !target.energie().isBlank());
         int valueColumns = hasDcCapital ? 4 : 3;
         int guaranteeColumns = Math.max(1, codes.size() + (showAssistance ? 2 : 0));
-        int columnCount = 8 + valueColumns + guaranteeColumns;
-        float[] widths = tariffWidths(codes.size(), hasDcCapital, showAssistance);
+        int columnCount = 6 + (showPfOrPtc ? 1 : 0) + (showEnergy ? 1 : 0)
+                + valueColumns + guaranteeColumns;
+        float[] widths = tariffWidths(codes.size(), hasDcCapital, showAssistance, showPfOrPtc, showEnergy);
         Table table = new Table(widths).setWidth(UnitValue.createPercentValue(100));
 
         addHeader(table, "Usage", 2, 1, HEADER_BG);
@@ -212,8 +215,12 @@ public class FlottePolicePdfService {
         addHeader(table, "N°\nd'immatric", 2, 1, HEADER_BG);
         addHeader(table, "N°\nattestation", 2, 1, HEADER_BG);
         addHeader(table, "Date de\nMC", 2, 1, HEADER_BG);
-        addHeader(table, "PF/PTC", 2, 1, HEADER_BG);
-        addHeader(table, "ÉNERGIE", 2, 1, HEADER_BG);
+        if (showPfOrPtc) {
+            addHeader(table, "PF/PTC", 2, 1, HEADER_BG);
+        }
+        if (showEnergy) {
+            addHeader(table, "ÉNERGIE", 2, 1, HEADER_BG);
+        }
         addHeader(table, "VALEURS", 1, valueColumns, HEADER_BG);
         addHeader(table, "GARANTIES À ASSURER", 1, guaranteeColumns, SELECTED_BG);
         addHeader(table, "Montant total", 2, 1, HEADER_BG);
@@ -246,8 +253,12 @@ public class FlottePolicePdfService {
             table.addCell(valueCell(target.immatriculation(), TextAlignment.CENTER));
             table.addCell(valueCell(target.numeroAttestation(), TextAlignment.CENTER));
             table.addCell(valueCell(formatDate(target.dateMiseEnCirculation()), TextAlignment.CENTER));
-            table.addCell(valueCell(target.pfOuPtc(), TextAlignment.CENTER));
-            table.addCell(valueCell(target.energie(), TextAlignment.CENTER));
+            if (showPfOrPtc) {
+                table.addCell(valueCell(target.pfOuPtc(), TextAlignment.CENTER));
+            }
+            if (showEnergy) {
+                table.addCell(valueCell(target.energie(), TextAlignment.CENTER));
+            }
             table.addCell(valueCell(formatMoneyOrEmpty(target.valeurNeuf()), TextAlignment.RIGHT));
             table.addCell(valueCell(formatMoneyOrEmpty(target.valeurVenale()), TextAlignment.RIGHT));
             table.addCell(valueCell(formatMoneyOrEmpty(target.valeurGlace()), TextAlignment.RIGHT));
@@ -603,8 +614,21 @@ public class FlottePolicePdfService {
         return bold ? cell.setBold() : cell;
     }
 
-    private float[] tariffWidths(int codeCount, boolean hasDcCapital, boolean showAssistance) {
-        List<Float> widths = new ArrayList<>(List.of(1.0f, 1.5f, 2.3f, 2.0f, 1.35f, 0.9f, 1.15f, 1.35f, 1.35f, 1.35f));
+    private float[] tariffWidths(
+            int codeCount,
+            boolean hasDcCapital,
+            boolean showAssistance,
+            boolean showPfOrPtc,
+            boolean showEnergy
+    ) {
+        List<Float> widths = new ArrayList<>(List.of(1.0f, 1.5f, 2.3f, 2.0f, 1.35f));
+        if (showPfOrPtc) {
+            widths.add(0.9f);
+        }
+        if (showEnergy) {
+            widths.add(1.15f);
+        }
+        widths.addAll(List.of(1.35f, 1.35f, 1.35f));
         if (hasDcCapital) {
             widths.add(1.25f);
         }

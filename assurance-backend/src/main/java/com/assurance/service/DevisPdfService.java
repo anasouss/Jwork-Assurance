@@ -195,32 +195,47 @@ public class DevisPdfService {
     ) {
         List<String> codes = garantieCodes.isEmpty() ? List.of("-") : garantieCodes;
         boolean showInsuredSeats = vehicules.stream().anyMatch(this::isSchoolTransportVehicle);
+        boolean showPfOrPtc = vehicules.stream().anyMatch(vehicule -> !pfOrPtc(vehicule).isBlank());
+        boolean showEnergy = vehicules.stream()
+                .map(Vehicule::getCarburant)
+                .anyMatch(carburant -> carburant != null && !carburant.isBlank());
         int valuesColumnsCount = hasDcCapitalColumn ? 4 : 3;
         int guaranteeColumnsCount = Math.max(1, codes.size());
-        int totalColumns = 7 + (showInsuredSeats ? 1 : 0)
+        int totalColumns = 5 + (showPfOrPtc ? 1 : 0) + (showInsuredSeats ? 1 : 0) + (showEnergy ? 1 : 0)
                 + valuesColumnsCount + guaranteeColumnsCount;
-        float[] widths = new float[totalColumns];
-        for (int i = 0; i < totalColumns; i++) {
-            widths[i] = 1.0f;
+        List<Float> columnWidths = new ArrayList<>(List.of(1.2f, 1.3f, 1.5f, 1.2f));
+        if (showPfOrPtc) {
+            columnWidths.add(1f);
         }
-        widths[0] = 1.2f;
-        widths[1] = 1.3f;
-        widths[2] = 1.5f;
-        widths[3] = 1.2f;
-        widths[4] = 1.0f;
-        widths[5] = showInsuredSeats ? 0.8f : 1.0f;
-        widths[totalColumns - 1] = 1.4f;
+        if (showInsuredSeats) {
+            columnWidths.add(0.8f);
+        }
+        if (showEnergy) {
+            columnWidths.add(1f);
+        }
+        for (int index = 0; index < valuesColumnsCount + guaranteeColumnsCount; index++) {
+            columnWidths.add(1f);
+        }
+        columnWidths.add(1.4f);
+        float[] widths = new float[columnWidths.size()];
+        for (int index = 0; index < columnWidths.size(); index++) {
+            widths[index] = columnWidths.get(index);
+        }
 
         Table table = new Table(widths).setWidth(UnitValue.createPercentValue(100));
         table.addCell(headerCell("Usage", 2, 1));
         table.addCell(headerCell("Marque", 2, 1));
         table.addCell(headerCell("N°\nd'immatric", 2, 1));
         table.addCell(headerCell("Date de\nMC", 2, 1));
-        table.addCell(headerCell("PF/PTC", 2, 1));
+        if (showPfOrPtc) {
+            table.addCell(headerCell("PF/PTC", 2, 1));
+        }
         if (showInsuredSeats) {
             table.addCell(stackedHeaderCell("Nbre", "Places", 2, 1));
         }
-        table.addCell(headerCell("ENERGIE", 2, 1));
+        if (showEnergy) {
+            table.addCell(headerCell("ENERGIE", 2, 1));
+        }
         table.addCell(headerCell("VALEURS", 1, valuesColumnsCount));
         table.addCell(headerCell("GARANTIES A ASSURER", 1, guaranteeColumnsCount).setBackgroundColor(GUARANTEE_GROUP_BG));
         table.addCell(headerCell("Montant total", 2, 1));
@@ -250,11 +265,15 @@ public class DevisPdfService {
             table.addCell(valueCell(vehicule.getMarque() != null ? value(vehicule.getMarque().getLibelle(), "") : "", TextAlignment.LEFT, rowBackground));
             table.addCell(valueCell(value(vehicule.getImmatriculation(), ""), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(formatDate(vehicule.getDatePremiereCirculation()), TextAlignment.CENTER, rowBackground));
-            table.addCell(valueCell(pfOrPtc(vehicule), TextAlignment.CENTER, rowBackground));
+            if (showPfOrPtc) {
+                table.addCell(valueCell(pfOrPtc(vehicule), TextAlignment.CENTER, rowBackground));
+            }
             if (showInsuredSeats) {
                 table.addCell(valueCell(value(vehicule.getNombrePlaces(), ""), TextAlignment.CENTER, rowBackground));
             }
-            table.addCell(valueCell(value(vehicule.getCarburant(), "").toUpperCase(Locale.ROOT), TextAlignment.CENTER, rowBackground));
+            if (showEnergy) {
+                table.addCell(valueCell(value(vehicule.getCarburant(), "").toUpperCase(Locale.ROOT), TextAlignment.CENTER, rowBackground));
+            }
             table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurNeuf()), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurVenale()), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(formatInsuredValueOrEmpty(vehicule.getValeurGlace()), TextAlignment.CENTER, rowBackground));

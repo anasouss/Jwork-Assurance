@@ -111,6 +111,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/ContratShowPage")),
       },
       {
+        path: "production/contrats/:contratId/pdf",
+        lazy: lazyRoute(() => import("@/features/production/pages/ContratPdfPage")),
+      },
+      {
         path: "production/portefeuille-clients",
         element: <Navigate to="/app/production" replace />,
       },

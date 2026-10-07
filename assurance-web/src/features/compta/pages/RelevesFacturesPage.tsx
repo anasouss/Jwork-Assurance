@@ -535,9 +535,9 @@ export default function RelevesFacturesPage() {
                           <DocumentReferences documents={row.documents} onOpen={setDetailId} />
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <Button asChild variant="ghost" size="icon" title="Voir le contrat">
+                          <Button asChild variant="ghost" size="icon" title="Ouvrir le PDF du contrat">
                             <Link
-                              to={`/app/production/contrats/${row.contratId}${row.mouvementId ? `?mouvementId=${row.mouvementId}` : ""}`}
+                              to={`/app/production/contrats/${row.contratId}/pdf${row.mouvementId ? `?mouvementId=${row.mouvementId}` : ""}`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

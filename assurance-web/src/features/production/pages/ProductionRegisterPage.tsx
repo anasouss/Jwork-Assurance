@@ -275,8 +275,8 @@ function RegisterRow({ row }: { row: ProductionRegisterRow }) {
       <TableCell className="text-right tabular-nums">{row.assistanceTtc ? moneyAmount(row.assistanceTtc) : "-"}</TableCell>
       <TableCell className="text-center"><Badge variant={row.statut === "VALIDE" ? "success" : "red"}>{row.statut === "VALIDE" ? "Validé" : "Annulé"}</Badge></TableCell>
       <TableCell className="text-center">
-        <Button asChild variant="ghost" size="icon" title="Voir le mouvement">
-          <Link to={`/app/production/contrats/${row.contratId}?mouvementId=${row.mouvementId}`} target="_blank" rel="noopener noreferrer"><Eye className="size-4" /></Link>
+        <Button asChild variant="ghost" size="icon" title="Ouvrir le PDF du mouvement">
+          <Link to={`/app/production/contrats/${row.contratId}/pdf?mouvementId=${row.mouvementId}`} target="_blank" rel="noopener noreferrer"><Eye className="size-4" /></Link>
         </Button>
       </TableCell>
     </TableRow>

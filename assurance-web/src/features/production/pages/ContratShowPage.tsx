@@ -90,28 +90,26 @@ export default function ContratShowPage() {
   const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement ? `-acte-${selectedActNumber}` : ""}.pdf`;
   const openPdf = async () => {
     if (generatingPdf) return;
-    const previewWindow = contrat.typeContrat === "FLOTTE" ? window.open("about:blank", "_blank") : null;
-    if (contrat.typeContrat === "FLOTTE" && !previewWindow) return;
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) return;
     setGeneratingPdf(true);
     try {
-      if (contrat.typeContrat === "FLOTTE") {
-        const blob = await contractApi.downloadFlottePolicyPdf(contratId, mouvementId);
-        const url = URL.createObjectURL(blob);
-        previewWindow!.location.href = url;
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-        return;
-      }
-      await openContratPdf({
-        contrat,
-        dossier,
-        souscripteur,
-        proprietaire,
-        conducteur,
-        compagnie,
-        convention,
-        mouvement: selectedMouvement,
-        filename: pdfName,
-      });
+      const blob = contrat.typeContrat === "FLOTTE"
+        ? await contractApi.downloadFlottePolicyPdf(contratId, mouvementId)
+        : await generateContratPdfBlob({
+            contrat,
+            dossier,
+            souscripteur,
+            proprietaire,
+            conducteur,
+            compagnie,
+            convention,
+            mouvement: selectedMouvement,
+            filename: pdfName,
+          });
+      const url = URL.createObjectURL(blob);
+      previewWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       previewWindow?.close();
       toast.error(error instanceof Error ? error.message : "Génération du PDF impossible");
@@ -1047,7 +1045,35 @@ function statusLabel(statut?: string | null) {
   return text(statut);
 }
 
-async function openContratPdf(params: {
+export async function generateContratPdfDocument(
+  contrat: ContratSummary,
+  compagnies: ReferenceOption[] | undefined,
+  conventions: ReferenceOption[] | undefined,
+  mouvementId?: string | null,
+) {
+  const dossier = contrat.numeroDossier ?? contrat.numeroContrat ?? `#${contrat.id}`;
+  const souscripteur = clientByRole(contrat, "SOUSCRIPTEUR");
+  const proprietaire = clientByRole(contrat, "PROPRIETAIRE") ?? souscripteur;
+  const conducteur = clientByRole(contrat, "CONDUCTEUR")
+    ?? (proprietaire?.conducteurHabituel ? proprietaire : null);
+  const mouvement = mouvementId
+    ? contrat.mouvements?.find((item) => String(item.id) === String(mouvementId))
+    : null;
+  const actNumber = mouvement?.numeroMouvement ?? "1";
+  return generateContratPdfBlob({
+    contrat,
+    dossier,
+    souscripteur,
+    proprietaire,
+    conducteur,
+    compagnie: optionLabel(compagnies, contrat.compagnieAssuranceId),
+    convention: optionLabel(conventions, contrat.conventionId),
+    mouvement,
+    filename: `fiche-${sanitizeFilename(dossier)}${mouvement ? `-acte-${actNumber}` : ""}.pdf`,
+  });
+}
+
+async function generateContratPdfBlob(params: {
   contrat: ContratSummary;
   dossier: string;
   souscripteur?: ClientResponse | null;
@@ -1177,14 +1203,7 @@ async function openContratPdf(params: {
     drawPdfQuittance(ctx, params.contrat);
   });
 
-  const blobUrl = URL.createObjectURL(pdf.output("blob"));
-  const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
-  if (!opened) {
-    pdf.save(params.filename);
-    URL.revokeObjectURL(blobUrl);
-  } else {
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-  }
+  return pdf.output("blob");
 }
 
 type PdfContext = {

@@ -414,12 +414,12 @@ function EcheanceTableRow({
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
               <Link
-                to={`/app/production/contrats/${row.contratId}`}
+                to={`/app/production/contrats/${row.contratId}/pdf`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <Eye className="size-4" />
-                Ouvrir le dossier
+                Ouvrir le PDF
               </Link>
             </DropdownMenuItem>
             {fleetRenewal ? (

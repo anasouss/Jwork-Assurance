@@ -339,7 +339,7 @@ function ContratRow({
       <td className="px-2 py-2">
         <div className="flex items-center justify-center gap-2">
           {canViewContrat ? (
-            <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Visualiser">
+            <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Ouvrir le PDF">
               <Link
                 to={showContratPath(contrat, movement)}
                 target="_blank"
@@ -668,7 +668,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
 
 function showContratPath(contrat: ContratListItem, movement: MovementLine) {
   const query = movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : "";
-  return `/app/production/contrats/${contrat.id}${query}`;
+  return `/app/production/contrats/${contrat.id}/pdf${query}`;
 }
 
 function editContratPath(contrat: ContratListItem) {

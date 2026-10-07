@@ -52,6 +52,8 @@ public class FlottePolicePdfService {
     private static final DeviceRgb BORDER = new DeviceRgb(51, 65, 85);
     private static final DeviceRgb SOFT_BORDER = new DeviceRgb(203, 213, 225);
     private static final DeviceRgb HEADER_BG = new DeviceRgb(241, 245, 249);
+    private static final DeviceRgb GUARANTEE_GROUP_BG = new DeviceRgb(236, 242, 250);
+    private static final DeviceRgb GUARANTEE_HEADER_BG = new DeviceRgb(242, 246, 252);
     private static final DeviceRgb SELECTED_BG = new DeviceRgb(236, 253, 245);
     private static final DeviceRgb ASSISTANCE_BG = new DeviceRgb(255, 251, 235);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -217,7 +219,7 @@ public class FlottePolicePdfService {
             addHeader(table, "ÉNERGIE", 2, 1, HEADER_BG);
         }
         addHeader(table, "VALEURS", 1, valueColumns, HEADER_BG);
-        addHeader(table, "GARANTIES À ASSURER", 1, guaranteeColumns, SELECTED_BG);
+        addHeader(table, "GARANTIES À ASSURER", 1, guaranteeColumns, GUARANTEE_GROUP_BG);
         addHeader(table, "Montant total", 2, 1, HEADER_BG);
         addHeader(table, "Valeur à\nneuf", 1, 1, HEADER_BG);
         addHeader(table, "Valeur\nvénale", 1, 1, HEADER_BG);
@@ -226,9 +228,9 @@ public class FlottePolicePdfService {
             addHeader(table, "Capital\nDC", 1, 1, HEADER_BG);
         }
         if (codes.isEmpty() && !showAssistance) {
-            addHeader(table, "-", 1, 1, SELECTED_BG);
+            addHeader(table, "-", 1, 1, GUARANTEE_HEADER_BG);
         } else {
-            codes.forEach(code -> addHeader(table, code, 1, 1, SELECTED_BG));
+            codes.forEach(code -> addHeader(table, code, 1, 1, GUARANTEE_HEADER_BG));
         }
         if (showAssistance) {
             addHeader(table, "ASSISTANCE", 1, 1, ASSISTANCE_BG);

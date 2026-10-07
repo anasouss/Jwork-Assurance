@@ -50,7 +50,7 @@ export function ClientPortfolioPickerDialog({ open, onOpenChange, onSelect }: Cl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-3xl">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="border-b px-5 py-4 text-left">
           <DialogTitle>Rechercher un client</DialogTitle>
           <DialogDescription>Sélectionnez le client dont vous souhaitez ouvrir le portefeuille.</DialogDescription>

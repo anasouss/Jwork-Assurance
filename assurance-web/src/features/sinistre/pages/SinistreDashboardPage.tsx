@@ -129,7 +129,7 @@ export default function SinistreDashboardPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-sky-700 [&_th]:text-white">
                 <TableRow>
                   <TableHead>N° sinistre</TableHead>
                   <TableHead>Assuré</TableHead>

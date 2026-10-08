@@ -111,7 +111,14 @@ export function TargetGuaranteesTable({
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
     const next = selected.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item));
     setSelected(next);
-    onRequestCalculation?.(target, garantieId, next);
+    const garantie = garanties.find((item) => item.id === garantieId);
+    const updatedItem = next.find((item) => item.garantieId === garantieId && sameTarget(item, target));
+    const selectedLine = garantie
+      ? selectedLineFor(matchingLines(lignes, garantie, target), updatedItem)
+      : undefined;
+    if (!garantie || guaranteeReadyForCalculation(garantie, target, selectedLine, updatedItem, primeInputEnabled)) {
+      onRequestCalculation?.(target, garantieId, next);
+    }
   };
   const automaticPricing = pricingMode === "AUTOMATIQUE_GRILLE";
   const primeInputEnabled = pricingMode === "MANUELLE_AVEC_PRIME_NETTE";
@@ -134,11 +141,14 @@ export function TargetGuaranteesTable({
       toast.error("Cette garantie est incompatible avec une garantie existante de l'extension");
       return;
     }
+    const nextItem = { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) };
     const next = checked
-      ? [...baseSelection, { ...targetedInput(garantie, target), ...targetLineSelectionPatch(garantie, selectedLine, target, pricingMode) }]
+      ? [...baseSelection, nextItem]
       : selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)));
     setSelected(next);
-    onRequestCalculation?.(target, garantie.id, next);
+    if (!checked || guaranteeReadyForCalculation(garantie, target, selectedLine, nextItem, primeInputEnabled)) {
+      onRequestCalculation?.(target, garantie.id, next);
+    }
   };
 
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
@@ -604,6 +614,33 @@ function targetGuaranteeCapitalValue(garantie: ReferenceOption, line: ReferenceO
     if (source === "GLACE") return target.valeurGlace;
   }
   return target.kind === "remorque" ? target.valeurAssuree : toNumber(line?.capital);
+}
+
+function guaranteeReadyForCalculation(
+  garantie: ReferenceOption,
+  target: Target,
+  line: ReferenceOption | undefined,
+  item: GarantieInput | undefined,
+  requireManualPrime: boolean,
+) {
+  if (!item) {
+    return false;
+  }
+  const source = String(item.sourceValeurSelectionnee ?? "AUCUNE").toUpperCase();
+  const sourceRequired = target.kind === "vehicule"
+    && lineMode(line) !== "CAPITAL"
+    && Boolean(garantie.avecCapital)
+    && selectableTargetValueSources(garantie, target, line).length > 0;
+  if (sourceRequired && source === "AUCUNE") {
+    return false;
+  }
+  if (garantie.avecCapital && targetGuaranteeCapitalValue(garantie, line, target, item) == null) {
+    return false;
+  }
+  if (requireManualPrime && item.prime == null) {
+    return false;
+  }
+  return true;
 }
 
 function capitalDisplay(garantie: ReferenceOption, line: ReferenceOption | undefined, target: Target, capital?: number) {

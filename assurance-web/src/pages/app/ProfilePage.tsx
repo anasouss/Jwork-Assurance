@@ -99,7 +99,7 @@ export default function ProfilePage() {
         </div>
 
         <Card className="overflow-hidden">
-          <div className="flex flex-col gap-5 border-b bg-gradient-to-r from-primary/10 via-amber-50 to-background p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-5 border-b bg-muted/50 p-5 dark:bg-muted/20 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="size-16 border bg-background shadow-sm">
                 <AvatarFallback className="bg-primary text-lg font-semibold text-primary-foreground">{initials || <UserRound className="size-6" />}</AvatarFallback>

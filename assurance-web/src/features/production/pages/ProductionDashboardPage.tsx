@@ -143,14 +143,14 @@ export default function ProductionDashboardPage() {
               <EcheanceNatureCard title="Assistance" status="À venir" disabled />
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="grid gap-1.5 text-xs font-semibold uppercase text-emerald-950">
+              <label className="grid gap-1.5 text-xs font-semibold uppercase text-emerald-950 dark:text-emerald-300">
                 <span>Date du</span>
                 <DatePicker
                   date={echeanceFilters.dateDu}
                   onSelect={(date) => setEcheanceFilters((current) => ({ ...current, dateDu: toDateOnly(date) }))}
                 />
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold uppercase text-emerald-950">
+              <label className="grid gap-1.5 text-xs font-semibold uppercase text-emerald-950 dark:text-emerald-300">
                 <span>Date au</span>
                 <DatePicker
                   date={echeanceFilters.dateAu}
@@ -162,7 +162,7 @@ export default function ProductionDashboardPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEcheanceDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-green-600 hover:bg-green-700" disabled={!canOpenEcheances} onClick={openEcheances}>
+            <Button className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:text-white dark:hover:bg-green-500" disabled={!canOpenEcheances} onClick={openEcheances}>
               Afficher l'échéancier
             </Button>
           </DialogFooter>
@@ -186,15 +186,15 @@ function EcheanceNatureCard({ title, status, active, disabled }: { title: string
     <div
       className={cn(
         "flex min-h-24 items-center justify-between gap-3 rounded-md border p-4",
-        active && "border-emerald-500 bg-emerald-50",
-        disabled && "border-dashed bg-muted/20 text-muted-foreground"
+        active && "border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100",
+        disabled && "border-dashed bg-muted/20 text-muted-foreground dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400"
       )}
     >
       <span className="flex min-w-0 items-center gap-2">
         <span className={cn("size-3 shrink-0 rounded-full border", active && "border-emerald-600 bg-emerald-600")} />
         <span className="min-w-0 text-base font-semibold leading-snug">{title}</span>
       </span>
-      <span className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold", disabled ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700")}>
+      <span className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold", disabled ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200")}>
         {status}
       </span>
     </div>

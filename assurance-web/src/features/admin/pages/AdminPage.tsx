@@ -1064,14 +1064,19 @@ function RolesPanel({
               </label>
             </div>
 
-            <Tabs value={permissionModule} onValueChange={setPermissionModule} className="min-w-0 gap-3">
-              <TabsList className="h-auto w-full justify-start overflow-x-auto">
+            <Tabs
+              orientation="vertical"
+              value={permissionModule}
+              onValueChange={setPermissionModule}
+              className="grid min-w-0 items-start gap-3 md:grid-cols-[190px_minmax(0,1fr)]"
+            >
+              <TabsList className="h-auto w-full items-stretch justify-start">
                 {groupedPermissions.map(([module, resources]) => {
                   const modulePermissions = resources.flatMap(([, items]) => items);
                   const selectedCount = modulePermissions.filter((permission) => form.permissionIds.includes(permission.id)).length;
                   return (
-                    <TabsTrigger key={module} value={module} className="shrink-0 gap-2 px-3">
-                      {moduleLabel(module)}
+                    <TabsTrigger key={module} value={module} className="h-9 w-full justify-between gap-2 px-3">
+                      <span className="truncate">{moduleLabel(module)}</span>
                       <span className="text-xs tabular-nums text-muted-foreground">{selectedCount}/{modulePermissions.length}</span>
                     </TabsTrigger>
                   );

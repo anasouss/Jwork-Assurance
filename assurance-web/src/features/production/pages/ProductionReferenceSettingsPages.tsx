@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown, Edit, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Edit, Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +20,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { referenceApi } from "../api/references";
 import { referenceAdminApi } from "../api/reference-admin";
@@ -1122,7 +1123,26 @@ export function GarantiesSettingsPage() {
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <Flag label="Obligatoire" checked={payload.obligatoire} onChange={(value) => update({ obligatoire: value })} />
               {isVehicleGuarantee ? (
-                <Field label="Traitement métier">
+                <Field label={(
+                  <span className="inline-flex items-center gap-1.5">
+                    Traitement métier
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          role="img"
+                          tabIndex={0}
+                          aria-label="Explication du traitement métier"
+                          className="inline-flex cursor-help text-muted-foreground hover:text-foreground"
+                        >
+                          <Info className="size-3.5" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-72 leading-relaxed">
+                        Standard : comportement configurable. RC : règles dédiées à la responsabilité civile. Défense et recours : identification métier de la garantie DR.
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                )}>
                   <Select
                     value={businessTreatment}
                     onValueChange={(value) => update({

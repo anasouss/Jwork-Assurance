@@ -32,6 +32,7 @@ type VehicleFormProps = {
   showCrm: boolean;
   prospectionMode: boolean;
   controleStockAttestation: boolean;
+  showTowingExtension?: boolean;
   usageFieldLabel?: string;
   errors: Record<string, string>;
 };
@@ -55,6 +56,7 @@ export function VehicleForm({
   showCrm,
   prospectionMode,
   controleStockAttestation,
+  showTowingExtension = false,
   usageFieldLabel = "Usage",
   errors,
 }: VehicleFormProps) {
@@ -96,6 +98,7 @@ export function VehicleForm({
       valeurVenale: toOptionalNumber(found.valeurVenale),
       valeurNeuf: toOptionalNumber(found.valeurNeuf),
       valeurGlace: toOptionalNumber(found.valeurGlace),
+      remorque: Boolean(found.remorque),
     });
   };
 
@@ -265,14 +268,25 @@ export function VehicleForm({
           </Field>
         ) : null}
       </div>
-      <div className="mt-3 flex items-center gap-2">
-        <Checkbox
-          checked={Boolean(vehicule.organismeCredit)}
-          onCheckedChange={(checked) => update(checked
-            ? { organismeCredit: true }
-            : { organismeCredit: false, nomOrganismeCredit: undefined, montantCredit: undefined, dateFinCredit: undefined })}
-        />
-        <span className="text-sm">Organisme de crédit</span>
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+        {showTowingExtension ? (
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={Boolean(vehicule.remorque)}
+              onCheckedChange={(checked) => update({ remorque: Boolean(checked) })}
+            />
+            <span>Avec remorque (extension RC)</span>
+          </label>
+        ) : null}
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <Checkbox
+            checked={Boolean(vehicule.organismeCredit)}
+            onCheckedChange={(checked) => update(checked
+              ? { organismeCredit: true }
+              : { organismeCredit: false, nomOrganismeCredit: undefined, montantCredit: undefined, dateFinCredit: undefined })}
+          />
+          <span>Organisme de crédit</span>
+        </label>
       </div>
       {vehicule.organismeCredit ? (
         <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-3">

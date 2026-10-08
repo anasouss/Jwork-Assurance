@@ -103,6 +103,10 @@ public class MouvementVehicule extends BaseEntity {
     @Column(name = "numero_attestation", length = 80)
     private String numeroAttestation;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean remorque = false;
+
     @Column(name = "coefficient_prorata", precision = 14, scale = 6)
     private BigDecimal coefficientProrata;
 

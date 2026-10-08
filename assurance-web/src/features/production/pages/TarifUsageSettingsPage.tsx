@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Edit, History, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, History, Percent, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { ServerPagination } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { pricingApi } from "../api/pricing";
+import { referenceAdminApi } from "../api/reference-admin";
 import { referenceApi } from "../api/references";
 import { bulkTarifUsageSchema, tarifUsageSchema } from "../schemas";
 import { Field } from "../components/Field";
@@ -37,6 +38,8 @@ export default function TarifUsageSettingsPage() {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [trailerRatesDialogOpen, setTrailerRatesDialogOpen] = useState(false);
+  const [trailerRates, setTrailerRates] = useState<Record<string, number>>({});
   const [historyPage, setHistoryPage] = useState(0);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string>();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -73,6 +76,12 @@ export default function TarifUsageSettingsPage() {
     setSelectedIds((current) => current.filter((id) => filteredTarifs.some((tarif) => tarif.id === id)));
   }, [filteredTarifs]);
 
+  useEffect(() => {
+    setTrailerRates(Object.fromEntries(
+      (usages.data ?? []).map((usage) => [usage.id, Number(usage.tauxExtensionRemorque ?? 0)]),
+    ));
+  }, [usages.data]);
+
   const save = useMutation({
     mutationFn: ({ id, value }: { id?: string; value: UpsertTarifUsageRequest }) =>
       id ? pricingApi.updateUsageRate(id, value) : pricingApi.createUsageRate(value),
@@ -103,6 +112,25 @@ export default function TarifUsageSettingsPage() {
       setResetDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "tarifs-usage"] });
       toast.success(`${result.updatedRows} tarif(s) traité(s)`);
+    },
+    onError: showError,
+  });
+
+  const saveTrailerRates = useMutation({
+    mutationFn: async () => {
+      const changedUsages = (usages.data ?? []).filter((usage) =>
+        Number(usage.tauxExtensionRemorque ?? 0) !== Number(trailerRates[usage.id] ?? 0));
+      if (changedUsages.length > 0) {
+        await referenceAdminApi.updateUsageTrailerRates(changedUsages.map((usage) => ({
+          usageId: usage.id,
+          taux: trailerRates[usage.id] ?? 0,
+        })));
+      }
+    },
+    onSuccess: async () => {
+      setTrailerRatesDialogOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "usages"] });
+      toast.success("Majorations RC remorque enregistrées");
     },
     onError: showError,
   });
@@ -153,6 +181,70 @@ export default function TarifUsageSettingsPage() {
           </Button>
         </div>
       </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="font-semibold">Extension RC remorque</h2>
+          <p className="text-sm text-muted-foreground">
+            Majoration appliquée à la prime RC lorsqu'un véhicule est déclaré avec une remorque.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setTrailerRatesDialogOpen(true)}>
+          <Percent className="size-4" />
+          Paramétrer par usage
+        </Button>
+      </div>
+
+      <Dialog open={trailerRatesDialogOpen} onOpenChange={setTrailerRatesDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Majoration RC remorque par usage</DialogTitle>
+            <DialogDescription>
+              Saisissez le pourcentage ajouté à la prime RC du véhicule. Par exemple, 15 correspond à une majoration de 15 %.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto rounded-md border">
+            <Table>
+              <TableHeader className="bg-emerald-700 [&_th]:text-white">
+                <TableRow className="hover:bg-emerald-700">
+                  <TableHead>Usage</TableHead>
+                  <TableHead className="w-48">Majoration RC (%)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(usages.data ?? []).filter((usage) => usage.code !== "REMORQUE").map((usage) => (
+                  <TableRow key={usage.id}>
+                    <TableCell>
+                      <span className="font-medium">{usage.code}</span>
+                      <span className="ml-2 text-muted-foreground">{usage.libelle}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={trailerRates[usage.id] ?? 0}
+                        onChange={(event) => setTrailerRates((current) => ({
+                          ...current,
+                          [usage.id]: Math.min(100, Math.max(0, Number(event.target.value))),
+                        }))}
+                        aria-label={`Majoration RC remorque ${usage.code ?? usage.libelle}`}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrailerRatesDialogOpen(false)}>Annuler</Button>
+            <Button disabled={saveTrailerRates.isPending} onClick={() => saveTrailerRates.mutate()}>
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={tarifDialogOpen} onOpenChange={(open) => { setTarifDialogOpen(open); if (!open) setEditing(null); }}>
         <DialogContent className="sm:max-w-5xl">

@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Component
@@ -233,10 +234,6 @@ public class DataSeeder implements CommandLineRunner {
         seedParametreApplication("TAUX_RSS", "DECIMAL", "0.60", "Coefficient RC lorsque le client est saharien");
         seedParametreApplication("MULTIPLICATEUR_RC_DEFAUT", "DECIMAL", "1", "Multiplicateur RC par defaut");
         seedParametreApplication("MULTIPLICATEUR_RC_TPV", "DECIMAL", "1", "Multiplicateur RC TPV par defaut");
-        seedParametreApplication("TAUX_RC_REMORQUE_A", "DECIMAL", "0.10", "Taux RC remorque rattachee a usage tourisme");
-        seedParametreApplication("TAUX_RC_REMORQUE_C1", "DECIMAL", "0.20", "Taux RC remorque rattachee a usage C1");
-        seedParametreApplication("TAUX_RC_REMORQUE_C2", "DECIMAL", "0.30", "Taux RC remorque rattachee a usage C2");
-        seedParametreApplication("TAUX_RC_REMORQUE_DEFAUT", "DECIMAL", "0.20", "Taux RC remorque par defaut");
         seedParametreApplication("DR_MODE_VARIABLE", "BOOLEAN", "false", "Autorise le mode variable pour Defense et Recours");
         seedParametreApplication("RVE_TAUX_ZERO_AUTORISE", "BOOLEAN", "false", "Autorise les lignes RVE a taux zero");
         seedParametreApplication("ENABLE_ATTESTATION_STOCK_CHECK", "BOOLEAN", "1", "Active le controle du stock des attestations pendant la production");
@@ -854,6 +851,7 @@ public class DataSeeder implements CommandLineRunner {
                         .byPrime(byPrime)
                         .byCategorieTransport(byCategorieTransport)
                         .garantiesPersonne(garantiesPersonne)
+                        .tauxExtensionRemorque(defaultTauxExtensionRemorque(code))
                         .actif(true)
                         .build())
         );
@@ -870,6 +868,14 @@ public class DataSeeder implements CommandLineRunner {
             usage.setGarantiesPersonne(garantiesPersonne);
         }
         return usageRepository.save(usage);
+    }
+
+    private BigDecimal defaultTauxExtensionRemorque(String code) {
+        return switch (code == null ? "" : code.toUpperCase(Locale.ROOT)) {
+            case "A" -> BigDecimal.valueOf(10);
+            case "C2" -> BigDecimal.valueOf(30);
+            default -> BigDecimal.valueOf(20);
+        };
     }
 
     private CategorieTransport seedCategorieTransport(String code, String libelle, String description) {

@@ -61,6 +61,13 @@ export const referenceAdminApi = {
   createUsage: (payload: UpsertUsageRequest) => createReference("usages", payload),
   updateUsage: (id: string, payload: UpsertUsageRequest) =>
     updateReference("usages", id, payload),
+  updateUsageTrailerRates: async (lignes: Array<{ usageId: string; taux: number }>) =>
+    unwrap(
+      await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/usages/taux-extension-remorque", {
+        method: "PUT",
+        body: JSON.stringify({ lignes }),
+      }),
+    ),
   createAttestationUsageGroup: (payload: UpsertGroupeUsageAttestationRequest) =>
     createReference("groupes-usage-attestation", payload),
   updateAttestationUsageGroup: (id: string, payload: UpsertGroupeUsageAttestationRequest) =>

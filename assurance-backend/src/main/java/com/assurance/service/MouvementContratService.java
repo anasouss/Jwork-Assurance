@@ -704,6 +704,7 @@ public class MouvementContratService {
                     .dateEcheance(vehicule.getDateEcheance())
                     .crm(vehicule.getCrm())
                     .numeroAttestation(vehicule.getNumeroAttestation())
+                    .remorque(Boolean.TRUE.equals(vehicule.getRemorque()))
                     .coefficientProrata(vehicule.getCoefficientProrata())
                     .valeurVenale(vehicule.getValeurVenale())
                     .valeurNeuf(vehicule.getValeurNeuf())

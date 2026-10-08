@@ -93,6 +93,7 @@ export type ContractTargetsSectionProps = {
   crmPartage?: boolean;
   crmPartageValeur?: string;
   showVehicleCrm?: boolean;
+  showTowingExtension?: boolean;
   prospectionMode?: boolean;
   controleStockAttestation?: boolean;
   lockContractDates?: boolean;
@@ -162,6 +163,7 @@ export function ContractTargetsSection({
   crmPartage = false,
   crmPartageValeur = "",
   showVehicleCrm = true,
+  showTowingExtension = false,
   prospectionMode = false,
   controleStockAttestation = true,
   lockContractDates = false,
@@ -490,6 +492,7 @@ export function ContractTargetsSection({
                     crmPartage={crmPartage}
                     crmPartageValeur={crmPartageValeur}
                     showCrm={showVehicleCrm}
+                    showTowingExtension={showTowingExtension}
                     prospectionMode={prospectionMode}
                     controleStockAttestation={controleStockAttestation}
                     usageFieldLabel={usageFieldLabel}

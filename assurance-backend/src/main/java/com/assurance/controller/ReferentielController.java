@@ -20,6 +20,7 @@ import com.assurance.dto.request.UpsertReferenceRequest;
 import com.assurance.dto.request.UpsertTarifProduitAssistanceRequest;
 import com.assurance.dto.request.UpsertTarifUsageRequest;
 import com.assurance.dto.request.UpsertUsageRequest;
+import com.assurance.dto.request.UpdateUsageTauxExtensionRemorqueRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AjustementTarifUsageResponse;
 import com.assurance.dto.response.GrilleTarifaireCatalogueResponse;
@@ -138,6 +139,7 @@ public class ReferentielController {
                         .putValue("byPrime", usage.getByPrime())
                         .putValue("byCategorieTransport", usage.getByCategorieTransport())
                         .putValue("garantiesPersonne", Boolean.TRUE.equals(usage.getGarantiesPersonne()))
+                        .putValue("tauxExtensionRemorque", usage.getTauxExtensionRemorque())
                         .putValue("consommeAttestation", usage.getConsommeAttestation())
                         .putValue("groupeUsageAttestationId", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getId() : null)
                         .putValue("groupeUsageAttestationCode", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getCode() : null)
@@ -171,6 +173,27 @@ public class ReferentielController {
                 });
         applyUsageRequest(usage, request);
         return ResponseEntity.ok(ApiResponse.success(toUsageResponse(usageRepository.save(usage)), "Usage modifie"));
+    }
+
+    @PutMapping("/usages/taux-extension-remorque")
+    @Transactional
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> updateUsageTauxExtensionRemorque(
+            @Valid @RequestBody UpdateUsageTauxExtensionRemorqueRequest request
+    ) {
+        Set<Long> usageIds = new HashSet<>();
+        List<Usage> usages = request.getLignes().stream().map(ligne -> {
+            if (!usageIds.add(ligne.getUsageId())) {
+                throw new BadRequestException("Un usage ne peut etre renseigne qu'une seule fois");
+            }
+            Usage usage = usageRepository.findById(ligne.getUsageId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usage", ligne.getUsageId()));
+            usage.setTauxExtensionRemorque(ligne.getTaux());
+            return usage;
+        }).toList();
+        return ResponseEntity.ok(ApiResponse.success(
+                usageRepository.saveAll(usages).stream().map(this::toUsageResponse).toList(),
+                "Majorations RC remorque modifiees"
+        ));
     }
 
     @GetMapping("/marques")
@@ -1574,6 +1597,9 @@ public class ReferentielController {
         usage.setByPrime(Boolean.TRUE.equals(request.getByPrime()));
         usage.setByCategorieTransport(Boolean.TRUE.equals(request.getByCategorieTransport()));
         usage.setGarantiesPersonne(Boolean.TRUE.equals(request.getGarantiesPersonne()));
+        if (request.getTauxExtensionRemorque() != null) {
+            usage.setTauxExtensionRemorque(request.getTauxExtensionRemorque());
+        }
         usage.setActif(request.getActif() == null ? true : request.getActif());
     }
 
@@ -1586,6 +1612,7 @@ public class ReferentielController {
                 .putValue("byPrime", usage.getByPrime())
                 .putValue("byCategorieTransport", usage.getByCategorieTransport())
                 .putValue("garantiesPersonne", Boolean.TRUE.equals(usage.getGarantiesPersonne()))
+                .putValue("tauxExtensionRemorque", usage.getTauxExtensionRemorque())
                 .putValue("consommeAttestation", usage.getConsommeAttestation())
                 .putValue("groupeUsageAttestationId", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getId() : null)
                 .putValue("groupeUsageAttestationCode", usage.getGroupeUsageAttestation() != null ? usage.getGroupeUsageAttestation().getCode() : null)

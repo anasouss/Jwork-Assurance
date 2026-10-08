@@ -2509,6 +2509,7 @@ public class ContratService {
         input.setDateEcheance(snapshot.getDateEcheance());
         input.setCrm(snapshot.getCrm());
         input.setNumeroAttestation(snapshot.getNumeroAttestation());
+        input.setRemorque(Boolean.TRUE.equals(snapshot.getRemorque()));
         input.setCoefficientProrata(snapshot.getCoefficientProrata());
         input.setValeurVenale(snapshot.getValeurVenale());
         input.setValeurNeuf(snapshot.getValeurNeuf());
@@ -2937,6 +2938,7 @@ public class ContratService {
         vehicule.setDateEcheance(snapshot.getDateEcheance());
         vehicule.setCrm(snapshot.getCrm());
         vehicule.setNumeroAttestation(snapshot.getNumeroAttestation());
+        vehicule.setRemorque(Boolean.TRUE.equals(snapshot.getRemorque()));
         vehicule.setCoefficientProrata(snapshot.getCoefficientProrata());
         vehicule.setValeurVenale(snapshot.getValeurVenale());
         vehicule.setValeurNeuf(snapshot.getValeurNeuf());
@@ -5164,7 +5166,7 @@ public class ContratService {
                 .consommeAttestation(snapshot.getUsage() != null ? snapshot.getUsage().getConsommeAttestation() : null)
                 .immatriculation(snapshot.getImmatriculation())
                 .numeroAttestation(snapshot.getNumeroAttestation())
-                .remorque(false)
+                .remorque(Boolean.TRUE.equals(snapshot.getRemorque()))
                 .marqueId(snapshot.getMarque() != null ? snapshot.getMarque().getId() : null)
                 .marque(snapshot.getMarque() != null ? snapshot.getMarque().getLibelle() : null)
                 .carrosserieId(snapshot.getCarrosserie() != null ? snapshot.getCarrosserie().getId() : null)

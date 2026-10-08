@@ -669,6 +669,7 @@ export function UsagesSettingsPage() {
       byPrime: Boolean(editing.byPrime),
       byCategorieTransport: Boolean(editing.byCategorieTransport),
       garantiesPersonne: Boolean(editing.garantiesPersonne),
+      tauxExtensionRemorque: Number(editing.tauxExtensionRemorque ?? 0),
       actif: editing.actif !== false,
     } : emptyUsage());
   }, [editing]);
@@ -2096,6 +2097,7 @@ function emptyUsage(): UpsertUsageRequest {
     byPrime: false,
     byCategorieTransport: false,
     garantiesPersonne: false,
+    tauxExtensionRemorque: 0,
     actif: true,
   };
 }

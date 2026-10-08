@@ -96,6 +96,7 @@ export const usageSchema = z.object({
   byPrime: z.boolean().optional(),
   byCategorieTransport: z.boolean().optional(),
   garantiesPersonne: z.boolean().optional(),
+  tauxExtensionRemorque: z.number().min(0).max(100).optional(),
   actif: z.boolean().optional(),
 });
 

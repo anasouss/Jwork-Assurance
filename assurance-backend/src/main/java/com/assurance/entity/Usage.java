@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -66,6 +67,10 @@ public class Usage extends BaseEntity {
     @Builder.Default
     @Column(name = "garanties_personne")
     private Boolean garantiesPersonne = false;
+
+    @Builder.Default
+    @Column(name = "taux_extension_remorque", nullable = false, precision = 7, scale = 4)
+    private BigDecimal tauxExtensionRemorque = BigDecimal.ZERO;
 
     @Builder.Default
     @Column(nullable = false)

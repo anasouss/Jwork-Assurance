@@ -16,6 +16,7 @@ export type ReferenceOption = {
   champMoteur?: "CYLINDREE" | "PUISSANCE_FISCALE" | null;
   conducteurPermisRequis?: boolean | null;
   assistanceAutorisee?: boolean | null;
+  tauxExtensionRemorque?: number | null;
   [key: string]: unknown;
 };
 
@@ -1104,6 +1105,7 @@ export type UpsertUsageRequest = {
   byPrime?: boolean;
   byCategorieTransport?: boolean;
   garantiesPersonne?: boolean;
+  tauxExtensionRemorque?: number;
   actif?: boolean;
 };
 

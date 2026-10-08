@@ -246,6 +246,17 @@ public class CalculGarantieService {
     }
 
     private BigDecimal calculerPrimeRcVehicule(Contrat contrat, Vehicule vehicule, Garantie garantie) {
+        BigDecimal prime = calculerPrimeRcVehiculeBase(contrat, vehicule, garantie);
+        if (prime == null) {
+            return null;
+        }
+        if (Boolean.TRUE.equals(vehicule.getRemorque())) {
+            prime = prime.add(prime.multiply(resolveTauxRemorque(contrat, vehicule.getUsage())));
+        }
+        return prime.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculerPrimeRcVehiculeBase(Contrat contrat, Vehicule vehicule, Garantie garantie) {
         TarifUsage tarif = resolveTarifUsage(vehicule);
         if (tarif == null || tarif.getPrimeNette() == null) {
             return null;
@@ -264,7 +275,7 @@ public class CalculGarantieService {
         prime = prime.multiply(resolveCrm(vehicule.getCrm()));
         prime = prime.multiply(resolveCoefficientSahara(contrat));
         prime = prime.multiply(resolveMultiplicateurRc(contrat, vehicule.getUsage()));
-        return prime.setScale(2, RoundingMode.HALF_UP);
+        return prime;
     }
 
     private BigDecimal calculerPrimeRcRemorque(Contrat contrat, Remorque remorque, Garantie garantie) {
@@ -302,26 +313,27 @@ public class CalculGarantieService {
         }
         return contrat.getVehicules().stream()
                 .filter(Objects::nonNull)
-                .map(vehicule -> calculerPrimeRcVehicule(contrat, vehicule, garantie))
+                .map(vehicule -> calculerPrimeRcVehiculeBase(contrat, vehicule, garantie))
                 .filter(prime -> prime != null && prime.compareTo(BigDecimal.ZERO) > 0)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
     }
 
     private BigDecimal resolveTauxRemorque(Contrat contrat) {
-        Long agenceId = contrat != null && contrat.getAgence() != null ? contrat.getAgence().getId() : null;
-        String usageDominant = resolveUsageDominantVehicules(contrat);
-        return switch (usageDominant) {
-            case "A" -> parametreApplicationService.getDecimal(agenceId, "TAUX_RC_REMORQUE_A", BigDecimal.valueOf(0.10));
-            case "C1" -> parametreApplicationService.getDecimal(agenceId, "TAUX_RC_REMORQUE_C1", BigDecimal.valueOf(0.20));
-            case "C2" -> parametreApplicationService.getDecimal(agenceId, "TAUX_RC_REMORQUE_C2", BigDecimal.valueOf(0.30));
-            default -> parametreApplicationService.getDecimal(agenceId, "TAUX_RC_REMORQUE_DEFAUT", BigDecimal.valueOf(0.20));
-        };
+        return resolveTauxRemorque(contrat, null);
     }
 
-    private String resolveUsageDominantVehicules(Contrat contrat) {
+    private BigDecimal resolveTauxRemorque(Contrat contrat, Usage usage) {
+        Usage effectiveUsage = usage != null ? usage : resolveUsageDominantVehicules(contrat);
+        BigDecimal tauxPourcentage = effectiveUsage == null
+                ? BigDecimal.ZERO
+                : Optional.ofNullable(effectiveUsage.getTauxExtensionRemorque()).orElse(BigDecimal.ZERO);
+        return tauxPourcentage.movePointLeft(2);
+    }
+
+    private Usage resolveUsageDominantVehicules(Contrat contrat) {
         if (contrat == null || contrat.getVehicules() == null) {
-            return "";
+            return null;
         }
         Map<String, Long> counts = contrat.getVehicules().stream()
                 .filter(Objects::nonNull)
@@ -331,11 +343,21 @@ public class CalculGarantieService {
                 .filter(Objects::nonNull)
                 .map(code -> code.toUpperCase(Locale.ROOT))
                 .collect(Collectors.groupingBy(code -> code, Collectors.counting()));
-        return counts.entrySet().stream()
+        String dominantCode = counts.entrySet().stream()
                 .max(Comparator.comparingLong((Map.Entry<String, Long> entry) -> entry.getValue())
                         .thenComparingInt(entry -> usagePriority(entry.getKey())))
                 .map(Map.Entry::getKey)
-                .orElse("");
+                .orElse(null);
+        if (dominantCode == null) {
+            return null;
+        }
+        return contrat.getVehicules().stream()
+                .filter(Objects::nonNull)
+                .map(Vehicule::getUsage)
+                .filter(Objects::nonNull)
+                .filter(candidate -> dominantCode.equalsIgnoreCase(candidate.getCode()))
+                .findFirst()
+                .orElse(null);
     }
 
     private TarifUsage resolveTarifUsage(Vehicule vehicule) {

@@ -14,6 +14,7 @@ type FixedCapability =
   | "showRemorqueSection"
   | "singleRemorqueLayout"
   | "singleVehicleLayout"
+  | "showTowingExtension"
   | "vehicleSectionTitle";
 
 type SingleContractAvenantProps = Omit<ContractTargetsSectionProps, FixedCapability> & {
@@ -84,6 +85,7 @@ export function FlotteAvenantTargetsSection(props: FlotteAvenantTargetsSectionPr
       guaranteeLayout="tariff"
       showRemorqueSection
       showVehicleSection
+      showTowingExtension
       remorqueSectionTitle="Remorques"
       vehicleSectionTitle="Véhicules"
     />

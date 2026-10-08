@@ -4,5 +4,5 @@ import {
 } from "./ContractTargetsSection";
 
 export function FlotteTargetsSection(props: ContractTargetsSectionProps) {
-  return <ContractTargetsSection {...props} />;
+  return <ContractTargetsSection {...props} showTowingExtension />;
 }

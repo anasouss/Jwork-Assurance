@@ -1138,7 +1138,7 @@ export function GarantiesSettingsPage() {
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-72 leading-relaxed">
-                        Standard : comportement configurable. RC : règles dédiées à la responsabilité civile. Défense et recours : identification métier de la garantie DR.
+                        Standard : aucune règle spéciale. RC : garantie ajoutée automatiquement, non désélectionnable, avec capital et tarif RC calculés par le système. Défense et recours : classe la garantie comme DR sans modifier son calcul ; configurez son taux et sa base tarifaire séparément.
                       </TooltipContent>
                     </Tooltip>
                   </span>

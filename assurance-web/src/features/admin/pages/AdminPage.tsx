@@ -948,6 +948,7 @@ function RolesPanel({
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<AdminRole | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [permissionModule, setPermissionModule] = useState("");
   const [form, setForm] = useState<UpsertAdminRoleRequest>(emptyRole(agencies[0]?.id));
   const groupedPermissions = useMemo(() => groupPermissions(permissions), [permissions]);
 
@@ -958,7 +959,8 @@ function RolesPanel({
       ...next,
       permissionIds: includePermissionDependencies(next.permissionIds, permissions),
     });
-  }, [agencies, dialogOpen, editing, permissions]);
+    setPermissionModule(groupedPermissions[0]?.[0] ?? "");
+  }, [agencies, dialogOpen, editing, groupedPermissions, permissions]);
 
   const save = useMutation({
     mutationFn: () => editing ? adminApi.updateRole(editing.id, form) : adminApi.createRole(form),
@@ -1038,12 +1040,12 @@ function RolesPanel({
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="max-h-[92vh] overflow-hidden sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier rôle" : "Ajouter rôle"}</DialogTitle>
             <DialogDescription>Les permissions déterminent les modules visibles et les actions autorisées.</DialogDescription>
           </DialogHeader>
-          <div className="grid max-h-[70vh] gap-4 overflow-y-auto pr-1">
+          <div className="grid max-h-[72vh] gap-5 overflow-y-auto pr-1">
             <div className="grid gap-3 sm:grid-cols-2">
               <LabeledInput label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
               <LabeledInput label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
@@ -1062,42 +1064,83 @@ function RolesPanel({
               </label>
             </div>
 
-            <div className="grid gap-3">
-              {groupedPermissions.map(([module, resources]) => (
-                <div key={module} className="rounded-md border p-3">
-                  <div className="mb-3 text-sm font-semibold uppercase text-muted-foreground">{moduleLabel(module)}</div>
-                  <div className="grid gap-4">
-                    {resources.map(([resource, items]) => (
-                      <div key={resource} className="grid gap-2">
-                        <div className="text-xs font-semibold uppercase text-muted-foreground">{resourceLabel(resource)}</div>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                          {items.map((permission) => (
-                            <label key={permission.id} className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
-                              <Checkbox
-                                checked={form.permissionIds.includes(permission.id)}
-                                onCheckedChange={(checked) => setForm((current) => ({
-                                  ...current,
-                                  permissionIds: updatePermissionSelection(
-                                    current.permissionIds,
-                                    permission,
-                                    checked === true,
-                                    permissions,
-                                  ),
-                                }))}
-                              />
-                              <span>
-                                <span className="block font-medium">{permission.nom}</span>
-                                <span className="block text-xs text-muted-foreground">{permission.code}</span>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
+            <Tabs value={permissionModule} onValueChange={setPermissionModule} className="min-w-0 gap-3">
+              <TabsList className="h-auto w-full justify-start overflow-x-auto">
+                {groupedPermissions.map(([module, resources]) => {
+                  const modulePermissions = resources.flatMap(([, items]) => items);
+                  const selectedCount = modulePermissions.filter((permission) => form.permissionIds.includes(permission.id)).length;
+                  return (
+                    <TabsTrigger key={module} value={module} className="shrink-0 gap-2 px-3">
+                      {moduleLabel(module)}
+                      <span className="text-xs tabular-nums text-muted-foreground">{selectedCount}/{modulePermissions.length}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+
+              {groupedPermissions.map(([module, resources]) => {
+                const modulePermissions = resources.flatMap(([, items]) => items);
+                const selectedCount = modulePermissions.filter((permission) => form.permissionIds.includes(permission.id)).length;
+                const allSelected = selectedCount === modulePermissions.length && modulePermissions.length > 0;
+                return (
+                  <TabsContent key={module} value={module} className="grid gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold">{moduleLabel(module)}</h3>
+                        <p className="text-xs text-muted-foreground">{selectedCount} autorisation(s) sélectionnée(s)</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <Checkbox
+                          checked={allSelected ? true : selectedCount > 0 ? "indeterminate" : false}
+                          onCheckedChange={(checked) => setForm((current) => ({
+                            ...current,
+                            permissionIds: checked === true
+                              ? includePermissionDependencies(
+                                  [...current.permissionIds, ...modulePermissions.map((permission) => permission.id)],
+                                  permissions,
+                                )
+                              : removePermissionSelection(
+                                  current.permissionIds,
+                                  modulePermissions.map((permission) => permission.id),
+                                  permissions,
+                                ),
+                          }))}
+                        />
+                        Tout autoriser
+                      </label>
+                    </div>
+
+                    <div className="divide-y rounded-md border">
+                      {resources.map(([resource, items]) => (
+                        <section key={resource} className="grid gap-2 p-3">
+                          <div className="text-xs font-semibold uppercase text-muted-foreground">{resourceLabel(resource)}</div>
+                          <div className="grid gap-x-5 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {items.map((permission) => (
+                              <label key={permission.id} className="flex min-h-8 items-start gap-2 text-sm">
+                                <Checkbox
+                                  className="mt-0.5"
+                                  checked={form.permissionIds.includes(permission.id)}
+                                  onCheckedChange={(checked) => setForm((current) => ({
+                                    ...current,
+                                    permissionIds: updatePermissionSelection(
+                                      current.permissionIds,
+                                      permission,
+                                      checked === true,
+                                      permissions,
+                                    ),
+                                  }))}
+                                />
+                                <span className="font-medium leading-5">{permission.nom}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
@@ -1506,7 +1549,12 @@ function groupPermissions(permissions: AdminPermission[]) {
     .sort(([left], [right]) => moduleOrder(left) - moduleOrder(right))
     .map(([module, resources]) => [
       module,
-      Array.from(resources.entries()).sort(([left], [right]) => resourceLabel(left).localeCompare(resourceLabel(right))),
+      Array.from(resources.entries())
+        .sort(([left], [right]) => resourceLabel(left).localeCompare(resourceLabel(right)))
+        .map(([resource, items]) => [
+          resource,
+          [...items].sort((left, right) => permissionActionOrder(left.code) - permissionActionOrder(right.code)),
+        ] as const),
     ] as const);
 }
 
@@ -1542,7 +1590,16 @@ function updatePermissionSelection(
     return includePermissionDependencies(Array.from(selected), permissions);
   }
 
-  selected.delete(permission.id);
+  return removePermissionSelection(Array.from(selected), [permission.id], permissions);
+}
+
+function removePermissionSelection(
+  permissionIds: string[],
+  removedPermissionIds: string[],
+  permissions: AdminPermission[],
+) {
+  const selected = new Set(permissionIds);
+  removedPermissionIds.forEach((id) => selected.delete(id));
   let changed = true;
   while (changed) {
     changed = false;
@@ -1559,6 +1616,13 @@ function updatePermissionSelection(
     }
   }
   return Array.from(selected);
+}
+
+function permissionActionOrder(code: string) {
+  const action = code.split(":")[1] ?? "";
+  const order = ["view", "create", "update", "manage", "draft", "rectify", "renew", "validate", "transmit", "reconcile", "cancel", "delete"];
+  const index = order.indexOf(action);
+  return index === -1 ? order.length : index;
 }
 
 function moduleOrder(module: string) {

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ColorPickerField } from "@/components/ui/color-picker-field";
 import { Input } from "@/components/ui/input";
 import {
@@ -338,16 +338,21 @@ export function CategoriesClientSettingsPage() {
             <Field label="Libellé" required>
               <Input value={payload.libelle} onChange={(event) => setPayload((current) => ({ ...current, libelle: event.target.value }))} />
             </Field>
-            <Field label="Usages autorisés">
+            <Field label="Usages autorisés" className="min-w-0">
               <UsageMultiSelect
                 usages={usages.data ?? []}
                 value={payload.usageIds ?? []}
                 onChange={(usageIds) => setPayload((current) => ({ ...current, usageIds }))}
               />
             </Field>
-            <Flag label="Actif" checked={payload.actif} onChange={(actif) => setPayload((current) => ({ ...current, actif }))} />
-            <div className="flex items-end gap-2 lg:col-span-2">
-              <Button disabled={save.isPending} onClick={() => {
+            <div className="grid min-w-0 gap-1.5 text-sm">
+              <span className="font-medium">Statut</span>
+              <Flag label="Actif" checked={payload.actif} onChange={(actif) => setPayload((current) => ({ ...current, actif }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            <Button disabled={save.isPending} onClick={() => {
                 const parsed = clientCategorySchema.safeParse(cleanTextPayload(payload));
                 if (!parsed.success) {
                   toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
@@ -355,12 +360,10 @@ export function CategoriesClientSettingsPage() {
                 }
                 save.mutate({ id: editing?.id, value: parsed.data });
               }}>
-                <Plus className="size-4" />
-                {editing ? "Modifier" : "Ajouter"}
-              </Button>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            </div>
-          </div>
+              <Plus className="size-4" />
+              {editing ? "Modifier" : "Ajouter"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1914,7 +1917,7 @@ function ReferenceTable({
 
 function Flag({ label, checked, onChange }: { label: string; checked?: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className="flex min-h-10 items-center gap-2 rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900">
+    <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-slate-600 dark:bg-slate-900">
       <Checkbox checked={Boolean(checked)} onCheckedChange={(value) => onChange(Boolean(value))} />
       <span>{label}</span>
     </label>
@@ -1953,7 +1956,7 @@ function UsageMultiSelect({
         <Button
           type="button"
           variant="outline"
-          className="h-9 w-full justify-between border-slate-300 bg-slate-50/70 px-3 font-normal shadow-none dark:border-slate-600 dark:bg-slate-900"
+          className="h-9 min-w-0 w-full justify-between border-slate-300 bg-slate-50/70 px-3 font-normal shadow-none dark:border-slate-600 dark:bg-slate-900"
         >
           <span className="truncate">{label}</span>
           <ChevronsUpDown className="size-4 opacity-50" />
@@ -1971,14 +1974,14 @@ function UsageMultiSelect({
           >
             <CommandEmpty>Aucun usage.</CommandEmpty>
             <CommandGroup>
-              <CommandItem value="__all__" onSelect={() => onChange([])}>
+              <CommandItem className="cursor-pointer" value="__all__" onSelect={() => onChange([])}>
                 <Check className={cn("size-4", value.length === 0 ? "opacity-100" : "opacity-0")} />
                 Tous les usages
               </CommandItem>
               {usages.map((usage) => {
                 const checked = value.includes(usage.id);
                 return (
-                  <CommandItem key={usage.id} value={usageLabel(usage)} onSelect={() => toggle(usage.id)}>
+                  <CommandItem className="cursor-pointer" key={usage.id} value={usageLabel(usage)} onSelect={() => toggle(usage.id)}>
                     <Check className={cn("size-4", checked ? "opacity-100" : "opacity-0")} />
                     <span className="truncate">{usageLabel(usage)}</span>
                   </CommandItem>

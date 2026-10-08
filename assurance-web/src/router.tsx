@@ -296,7 +296,17 @@ export const router = createBrowserRouter([
       },
       {
         path: "admin",
-        lazy: lazyRoute(() => import("@/features/admin/pages/AdminPage")),
+        lazy: lazyRoute(() => import("@/features/admin/pages/AdminLayout")),
+        children: [
+          { index: true, lazy: lazyRoute(() => import("@/features/admin/pages/AdminIndexPage")) },
+          { path: "utilisateurs", lazy: lazyRoute(() => import("@/features/admin/pages/AdminUsersPage")) },
+          { path: "roles", lazy: lazyRoute(() => import("@/features/admin/pages/AdminRolesPage")) },
+          { path: "roles/:roleId", lazy: lazyRoute(() => import("@/features/admin/pages/AdminRolesPage")) },
+          { path: "audit", lazy: lazyRoute(() => import("@/features/admin/pages/AdminAuditPage")) },
+          { path: "agence", lazy: lazyRoute(() => import("@/features/admin/pages/AdminAgenciesPage")) },
+          { path: "agences", lazy: lazyRoute(() => import("@/features/admin/pages/AdminAgenciesPage")) },
+          { path: "administrateurs-plateforme", lazy: lazyRoute(() => import("@/features/admin/pages/PlatformAdminsPage")) },
+        ],
       },
       {
         path: "production/parametres",

@@ -82,7 +82,12 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "compta", title: "Bordereaux de remise", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText, permission: "tresorerie:view" },
   { module: "compta", title: "Bordereaux compagnies", url: "/app/compta/bordereaux-compagnies", icon: Building2, permission: "bordereau-compagnie:view" },
   { module: "compta", title: "Paramètres", url: "/app/compta/parametres", icon: Settings, permission: "tresorerie:view" },
-  { module: "admin", title: "Administration", url: "/app/admin", icon: UserCog, exact: true, permissionPrefixes: MODULE_PERMISSION_PREFIXES.administration },
+  { module: "admin", title: "Utilisateurs", url: "/app/admin/utilisateurs", icon: Users, permissions: ["user:view", "user:manage", "config:view", "config:manage"] },
+  { module: "admin", title: "Rôles & permissions", url: "/app/admin/roles", icon: UserCog, permissions: ["role:view", "role:manage", "config:view", "config:manage"] },
+  { module: "admin", title: "Audit", url: "/app/admin/audit", icon: ClipboardList, permission: "audit:view" },
+  { module: "admin", title: "Mon agence", url: "/app/admin/agence", icon: Building2, permissions: ["agence:view", "agence:manage-self", "config:view"], requiresAgencyContext: true },
+  { module: "admin", title: "Agences", url: "/app/admin/agences", icon: Building2, permissions: ["agence:view", "agence:create", "config:view", "config:manage"], platformOnly: true },
+  { module: "admin", title: "Administrateurs plateforme", url: "/app/admin/administrateurs-plateforme", icon: ShieldCheck, platformOnly: true },
 ];
 
 export function canSeeNavigationItem(

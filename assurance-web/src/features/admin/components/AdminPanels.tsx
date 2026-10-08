@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
-  Building2,
   Edit,
   ExternalLink,
   Eye,
@@ -13,11 +12,9 @@ import {
   MonitorSmartphone,
   Plus,
   Search,
-  ShieldCheck,
   Smartphone,
   Tablet,
   Trash2,
-  Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,7 +32,6 @@ import { Badge } from "@/components/ui/badge";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -52,9 +48,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
-import { useAuthStore } from "@/store/auth-store";
 import { adminApi } from "../api";
-import { AgencyImageUploadField } from "../components/AgencyImageUploadField";
+import { AgencyImageUploadField } from "./AgencyImageUploadField";
 import type {
   AdminAgency,
   AdminAuditEvent,
@@ -68,184 +63,9 @@ import type {
   UpsertPlatformAdminRequest,
 } from "../types";
 
-const ADMIN_TABLE_HEADER_CLASS = "bg-fuchsia-700 text-white [&_th]:text-white";
+const ADMIN_TABLE_HEADER_CLASS = "bg-fuchsia-700 text-white [&_th]:text-white [&_tr:hover]:bg-fuchsia-700";
 
-export default function AdminPage() {
-  const queryClient = useQueryClient();
-  const user = useAuthStore((state) => state.user);
-  const permissions = user?.permissions ?? [];
-  const canViewUsers = permissions.includes("user:view") || permissions.includes("user:manage") || permissions.includes("config:view") || permissions.includes("config:manage");
-  const canViewRoles = permissions.includes("role:view") || permissions.includes("role:manage") || permissions.includes("config:view") || permissions.includes("config:manage");
-  const canViewAudit = permissions.includes("audit:view");
-  const canManageUsers = permissions.includes("user:manage") || permissions.includes("config:manage");
-  const canManageRoles = permissions.includes("role:manage") || permissions.includes("config:manage");
-  const canManagePlatformAgencies = permissions.includes("agence:create") || permissions.includes("config:manage");
-  const canManageOwnAgency = permissions.includes("agence:manage-self");
-  const canManageAgencies = canManagePlatformAgencies || canManageOwnAgency;
-  const canViewAgencies = permissions.includes("agence:view") || permissions.includes("config:view");
-  const canAccessAgencySettings = canViewAgencies || canManageOwnAgency;
-  const isPlatformAdmin = Boolean(user?.platformAdmin);
-  const isPlatformMode = isPlatformAdmin && user?.operatingMode === "PLATFORM";
-  const defaultTab = canViewUsers ? "users" : canViewRoles ? "roles" : canViewAudit ? "audit" : "agencies";
-
-  const users = useQuery({ queryKey: ["admin", "users"], queryFn: adminApi.users, staleTime: 30_000, enabled: canViewUsers });
-  const roles = useQuery({ queryKey: ["admin", "roles"], queryFn: adminApi.roles, staleTime: 30_000, enabled: canViewRoles || canManageUsers });
-  const permissionsQuery = useQuery({ queryKey: ["admin", "permissions"], queryFn: adminApi.permissions, staleTime: 60_000, enabled: canViewRoles });
-  const agencies = useQuery({
-    queryKey: ["admin", "agencies"],
-    queryFn: adminApi.agencies,
-    staleTime: 60_000,
-    enabled: canAccessAgencySettings,
-  });
-  const platformAdmins = useQuery({
-    queryKey: ["admin", "platform-admins"],
-    queryFn: adminApi.platformAdmins,
-    staleTime: 30_000,
-    enabled: isPlatformMode,
-  });
-
-  const availableAgencies = useMemo<AdminAgency[]>(() => {
-    if (canAccessAgencySettings) {
-      return agencies.data ?? [];
-    }
-    return user?.agenceId ? [{
-      id: user.agenceId,
-      code: "",
-      nom: user.agenceName ?? "Agence",
-      logoDisponible: false,
-      signatureDisponible: false,
-      statut: "ACTIVE",
-    }] : [];
-  }, [agencies.data, canAccessAgencySettings, user?.agenceId, user?.agenceName]);
-
-  return (
-    <div className="grid gap-5">
-      <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-400">
-          {isPlatformMode ? "Administration de la plateforme" : "Administration d’agence"}
-        </p>
-        <h1 className="text-2xl font-semibold">Accès et organisation</h1>
-        <p className="text-sm text-muted-foreground">
-          {isPlatformMode
-            ? "Gérez les agences, leurs accès et les administrateurs globaux de la plateforme."
-            : "Gérez les comptes de l’agence, leurs rôles et les appareils connectés."}
-        </p>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        {canViewUsers ? <SummaryCard icon={Users} label="Utilisateurs" value={users.data?.length ?? 0} detail={`${users.data?.filter((item) => item.actif).length ?? 0} actifs`} /> : null}
-        {canViewRoles ? <SummaryCard icon={ShieldCheck} label="Rôles d’agence" value={roles.data?.length ?? 0} detail={`${permissionsQuery.data?.length ?? 0} permissions disponibles`} /> : null}
-        {canAccessAgencySettings ? <SummaryCard icon={Building2} label={isPlatformMode ? "Agences accessibles" : "Agence"} value={availableAgencies.length} detail={isPlatformMode ? "Périmètre plateforme" : user?.agenceName ?? "Agence courante"} /> : null}
-        {isPlatformMode ? (
-          <SummaryCard
-            icon={ShieldCheck}
-            label="Administrateurs plateforme"
-            value={platformAdmins.data?.length ?? 0}
-            detail={`${platformAdmins.data?.filter((item) => item.actif).length ?? 0} actifs`}
-          />
-        ) : null}
-      </div>
-
-      <Tabs defaultValue={defaultTab} className="grid gap-4">
-        <TabsList className="w-fit">
-          {canViewUsers ? <TabsTrigger value="users">Utilisateurs</TabsTrigger> : null}
-          {canViewRoles ? <TabsTrigger value="roles">Rôles & permissions</TabsTrigger> : null}
-          {canViewAudit ? <TabsTrigger value="audit">Audit</TabsTrigger> : null}
-          {canAccessAgencySettings ? <TabsTrigger value="agencies">{isPlatformMode ? "Agences" : "Mon agence"}</TabsTrigger> : null}
-          {isPlatformMode ? <TabsTrigger value="platform-admins">Administrateurs plateforme</TabsTrigger> : null}
-        </TabsList>
-
-        {canViewUsers ? <TabsContent value="users">
-          <UsersPanel
-            users={users.data ?? []}
-            loading={users.isLoading}
-            roles={roles.data ?? []}
-            agencies={availableAgencies}
-            canSelectAgency={isPlatformMode}
-            currentAgencyId={user?.agenceId ?? undefined}
-            currentAgencyName={user?.agenceName ?? undefined}
-            canManage={canManageUsers}
-            currentUserId={user?.id}
-            onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "users"] })}
-          />
-        </TabsContent> : null}
-
-        {canViewRoles ? <TabsContent value="roles">
-          <RolesPanel
-            roles={roles.data ?? []}
-            loading={roles.isLoading}
-            permissions={permissionsQuery.data ?? []}
-            agencies={availableAgencies}
-            canManage={canManageRoles}
-            onChanged={async () => {
-              await queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });
-              await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-            }}
-          />
-        </TabsContent> : null}
-
-        {canViewAudit ? (
-          <TabsContent value="audit">
-            <AuditPanel />
-          </TabsContent>
-        ) : null}
-
-        {canAccessAgencySettings ? (
-          <TabsContent value="agencies">
-            <AgenciesPanel
-              agencies={agencies.data ?? []}
-              loading={agencies.isLoading}
-              canManage={canManageAgencies}
-              canCreate={isPlatformMode && canManagePlatformAgencies}
-              canEditPlatformFields={isPlatformMode && canManagePlatformAgencies}
-              onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "agencies"] })}
-            />
-          </TabsContent>
-        ) : null}
-
-        {isPlatformMode ? (
-          <TabsContent value="platform-admins">
-            <PlatformAdminsPanel
-              users={platformAdmins.data ?? []}
-              loading={platformAdmins.isLoading}
-              currentUserId={user?.id}
-              onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "platform-admins"] })}
-            />
-          </TabsContent>
-        ) : null}
-      </Tabs>
-    </div>
-  );
-}
-
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: number;
-  detail: string;
-}) {
-  return (
-    <Card className="rounded-md shadow-none">
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="grid size-10 shrink-0 place-items-center rounded-md bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300">
-          <Icon className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">{label}</div>
-          <div className="truncate text-xs text-muted-foreground">{detail}</div>
-        </div>
-        <div className="text-2xl font-semibold tabular-nums">{value}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function UsersPanel({
+export function UsersPanel({
   users,
   loading,
   roles,
@@ -495,7 +315,7 @@ function UsersPanel({
   );
 }
 
-function PlatformAdminsPanel({
+export function PlatformAdminsPanel({
   users,
   loading,
   currentUserId,
@@ -875,7 +695,7 @@ function sessionDeviceIcon(deviceType?: string | null) {
   }
 }
 
-function AuditPanel() {
+export function AuditPanel() {
   const [draftFilters, setDraftFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
   const [page, setPage] = useState(0);
@@ -1280,12 +1100,13 @@ function auditSourceLabel(source?: string | null) {
   return ({ API: "Application", IMPORT: "Import", SYSTEM: "Système" } as Record<string, string>)[source ?? ""] ?? source ?? "-";
 }
 
-function RolesPanel({
+export function RolesPanel({
   roles,
   loading,
   permissions,
   agencies,
   canManage,
+  roleId,
   onChanged,
 }: {
   roles: AdminRole[];
@@ -1293,33 +1114,34 @@ function RolesPanel({
   permissions: AdminPermission[];
   agencies: AdminAgency[];
   canManage: boolean;
+  roleId?: string;
   onChanged: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState<AdminRole | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const navigate = useNavigate();
+  const editing = roleId && roleId !== "new" ? roles.find((role) => role.id === roleId) ?? null : null;
+  const editorOpen = Boolean(roleId);
   const [permissionModule, setPermissionModule] = useState("");
   const [form, setForm] = useState<UpsertAdminRoleRequest>(emptyRole(agencies[0]?.id));
   const groupedPermissions = useMemo(() => groupPermissions(permissions), [permissions]);
 
   useEffect(() => {
-    if (!dialogOpen) return;
+    if (!editorOpen || (roleId !== "new" && !editing)) return;
     const next = editing ? roleToForm(editing) : emptyRole(agencies[0]?.id);
     setForm({
       ...next,
       permissionIds: includePermissionDependencies(next.permissionIds, permissions),
     });
     setPermissionModule(groupedPermissions[0]?.[0] ?? "");
-  }, [agencies, dialogOpen, editing, groupedPermissions, permissions]);
+  }, [agencies, editing, editorOpen, groupedPermissions, permissions, roleId]);
 
   const save = useMutation({
     mutationFn: () => editing ? adminApi.updateRole(editing.id, form) : adminApi.createRole(form),
     onSuccess: async () => {
-      setDialogOpen(false);
-      setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });
       onChanged();
       toast.success("Role enregistré");
+      navigate("/app/admin/roles");
     },
     onError: showError,
   });
@@ -1334,10 +1156,28 @@ function RolesPanel({
     onError: showError,
   });
 
+  if (editorOpen && !canManage) {
+    return <Navigate to="/app/admin/roles" replace />;
+  }
+
+  if (editorOpen && roleId !== "new" && !editing) {
+    if (loading) {
+      return <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">Chargement du rôle...</div>;
+    }
+    return (
+      <div className="grid gap-4 rounded-lg border bg-card p-6">
+        <h2 className="text-lg font-semibold">Rôle introuvable</h2>
+        <p className="text-sm text-muted-foreground">Ce rôle n’existe pas ou n’est pas accessible dans ce périmètre.</p>
+        <Button className="w-fit" variant="outline" onClick={() => navigate("/app/admin/roles")}>Retour aux rôles</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 rounded-lg border bg-card p-4">
+      {!editorOpen ? <>
       <div className="flex justify-end">
-        <Button disabled={!canManage} onClick={() => { setEditing(null); setDialogOpen(true); }}>
+        <Button disabled={!canManage} onClick={() => navigate("/app/admin/roles/new")}>
           <Plus className="size-4" />
           Ajouter rôle
         </Button>
@@ -1346,7 +1186,7 @@ function RolesPanel({
         <Table>
           <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
             <TableRow>
-              <TableHead>Role</TableHead>
+              <TableHead>Rôle</TableHead>
               <TableHead>Agence</TableHead>
               <TableHead>Permissions</TableHead>
               <TableHead>Type</TableHead>
@@ -1373,7 +1213,7 @@ function RolesPanel({
                         label: "Modifier",
                         icon: Edit,
                         disabled: !canManage,
-                        onSelect: () => { setEditing(role); setDialogOpen(true); },
+                        onSelect: () => navigate(`/app/admin/roles/${role.id}`),
                       },
                       {
                         label: "Supprimer",
@@ -1396,14 +1236,16 @@ function RolesPanel({
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[92vh] overflow-hidden sm:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Modifier rôle" : "Ajouter rôle"}</DialogTitle>
-            <DialogDescription>Les permissions déterminent les modules visibles et les actions autorisées.</DialogDescription>
-          </DialogHeader>
-          <div className="grid max-h-[72vh] gap-5 overflow-y-auto pr-1">
+      </> : (
+        <div className="grid gap-5">
+          <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">{editing ? "Modifier le rôle" : "Ajouter un rôle"}</h2>
+              <p className="text-sm text-muted-foreground">Les permissions déterminent les modules visibles et les actions autorisées.</p>
+            </div>
+            <Button variant="outline" onClick={() => navigate("/app/admin/roles")}>Retour aux rôles</Button>
+          </div>
+          <div className="grid gap-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <LabeledInput label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
               <LabeledInput label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
@@ -1505,17 +1347,17 @@ function RolesPanel({
               })}
             </Tabs>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <Button variant="outline" onClick={() => navigate("/app/admin/roles")}>Annuler</Button>
             <Button onClick={() => save.mutate()} disabled={save.isPending}>Enregistrer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function AgenciesPanel({
+export function AgenciesPanel({
   agencies,
   loading,
   canManage,

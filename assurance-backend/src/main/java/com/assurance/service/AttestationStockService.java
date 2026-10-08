@@ -13,6 +13,7 @@ import com.assurance.dto.response.SeuilStockAttestationResponse;
 import com.assurance.entity.AttestationStock;
 import com.assurance.entity.Agence;
 import com.assurance.entity.CompagnieAssurance;
+import com.assurance.entity.CategorieClient;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.GroupeUsageAttestation;
@@ -29,6 +30,7 @@ import com.assurance.enums.TypeMouvementStockAttestation;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.CompagnieAssuranceRepository;
+import com.assurance.repository.CategorieClientRepository;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.AttestationStockRepository;
 import com.assurance.repository.GroupeUsageAttestationRepository;
@@ -58,6 +60,7 @@ public class AttestationStockService {
     private final MouvementStockAttestationRepository mouvementStockAttestationRepository;
     private final SeuilStockAttestationRepository seuilStockAttestationRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
+    private final CategorieClientRepository categorieClientRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
     private final UsageRepository usageRepository;
     private final ParametreApplicationService parametreApplicationService;
@@ -68,7 +71,11 @@ public class AttestationStockService {
     }
 
     public String normaliserNumero(String numero, Contrat contrat, Usage usage) {
-        return attestationNumeroService.normaliser(numero, contrat != null ? contrat.getCompagnieAssurance() : null, usage);
+        return attestationNumeroService.normaliser(
+                numero,
+                contrat != null ? contrat.getCompagnieAssurance() : null,
+                groupeStock(contrat, usage)
+        );
     }
 
     public List<String> listerDisponibles(String fragment, Contrat contrat, Usage usage) {
@@ -78,7 +85,7 @@ public class AttestationStockService {
                 || !hasText(fragment)) {
             return List.of();
         }
-        GroupeUsageAttestation groupe = groupeStock(usage);
+        GroupeUsageAttestation groupe = groupeStock(contrat, usage);
         if (groupe == null) {
             return List.of();
         }
@@ -92,13 +99,13 @@ public class AttestationStockService {
     }
 
     @Transactional(readOnly = true)
-    public List<String> listerDisponibles(Long agenceId, Long compagnieId, Long usageId, String fragment) {
+    public List<String> listerDisponibles(Long agenceId, Long compagnieId, Long usageId, Long categorieClientId, String fragment) {
         if (!controleActif(agenceId) || compagnieId == null || usageId == null || !hasText(fragment)) {
             return List.of();
         }
         Usage usage = usageRepository.findById(usageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
-        GroupeUsageAttestation groupe = groupeStock(usage);
+        GroupeUsageAttestation groupe = groupeStock(categorieClientId, usage);
         if (groupe == null) {
             return List.of();
         }
@@ -115,18 +122,26 @@ public class AttestationStockService {
     }
 
     @Transactional(readOnly = true)
-    public AttestationNumeroValidationResponse validerNumero(Long agenceId, Long compagnieId, Long usageId, String numero, String numeroCourant) {
+    public AttestationNumeroValidationResponse validerNumero(
+            Long agenceId,
+            Long compagnieId,
+            Long usageId,
+            Long categorieClientId,
+            String numero,
+            String numeroCourant
+    ) {
         CompagnieAssurance compagnie = compagnieId == null ? null : compagnieAssuranceRepository.findById(compagnieId)
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", compagnieId));
         Usage usage = usageId == null ? null : usageRepository.findById(usageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
+        GroupeUsageAttestation groupe = groupeStock(categorieClientId, usage);
         String prefixe = attestationNumeroService.normaliserPrefixe(compagnie != null ? compagnie.getPrefixeAttestation() : null);
-        String codeUsageStock = attestationNumeroService.codeGroupe(usage);
-        String numeroNormalise = attestationNumeroService.normaliser(numero, compagnie, usage);
+        String codeUsageStock = attestationNumeroService.codeGroupe(groupe);
+        String numeroNormalise = attestationNumeroService.normaliser(numero, compagnie, groupe);
         boolean controleStockActif = controleActif(agenceId);
         boolean validationRequise = controleStockActif
                 && Boolean.TRUE.equals(usage != null ? usage.getConsommeAttestation() : null)
-                && groupeStock(usage) != null
+                && groupe != null
                 && compagnie != null;
 
         if (!validationRequise) {
@@ -153,7 +168,7 @@ public class AttestationStockService {
                     .build();
         }
 
-        String numeroCourantNormalise = attestationNumeroService.normaliser(numeroCourant, compagnie, usage);
+        String numeroCourantNormalise = attestationNumeroService.normaliser(numeroCourant, compagnie, groupe);
         if (hasText(numeroCourantNormalise) && numeroCourantNormalise.equalsIgnoreCase(numeroNormalise)) {
             return AttestationNumeroValidationResponse.builder()
                     .controleStockActif(true)
@@ -167,9 +182,8 @@ public class AttestationStockService {
                     .build();
         }
 
-        GroupeUsageAttestation groupe = groupeStock(usage);
         List<AttestationStock> candidates = attestationStockRepository.findGestionnable(
-                attestationNumeroService.candidats(numeroNormalise, compagnie, usage),
+                attestationNumeroService.candidats(numeroNormalise, compagnie, groupe),
                 agenceId,
                 compagnie.getId(),
                 groupe.getId()
@@ -188,7 +202,7 @@ public class AttestationStockService {
                 .codeUsageStock(codeUsageStock)
                 .statut(stock != null ? stock.getStatut() : null)
                 .message(message)
-                .suggestions(listerDisponibles(agenceId, compagnieId, usageId, numero))
+                .suggestions(listerDisponibles(agenceId, compagnieId, usageId, categorieClientId, numero))
                 .build();
     }
 
@@ -401,13 +415,13 @@ public class AttestationStockService {
         if (contrat == null || contrat.getCompagnieAssurance() == null) {
             return;
         }
-        GroupeUsageAttestation groupe = groupeStock(usage);
+        GroupeUsageAttestation groupe = groupeStock(contrat, usage);
         if (groupe == null) {
             return;
         }
         String numeroNormalise = normaliserNumero(numero, contrat, usage);
         List<AttestationStock> attestations = attestationStockRepository.findGestionnableForUpdate(
-                attestationNumeroService.candidats(numeroNormalise, contrat.getCompagnieAssurance(), usage),
+                attestationNumeroService.candidats(numeroNormalise, contrat.getCompagnieAssurance(), groupe),
                 contrat.getAgence().getId(),
                 contrat.getCompagnieAssurance().getId(),
                 groupe.getId()
@@ -431,25 +445,48 @@ public class AttestationStockService {
         }
     }
 
+    @Transactional
+    public void liberer(Contrat contrat, MouvementContrat mouvement, AttestationStock attestation) {
+        if (attestation == null
+                || !controleActif(contrat != null && contrat.getAgence() != null ? contrat.getAgence().getId() : null)
+                || contrat == null
+                || attestation.getContrat() == null
+                || !contrat.getId().equals(attestation.getContrat().getId())) {
+            return;
+        }
+        String numeroAvant = attestation.getNumero();
+        attestation.setStatut(StatutAttestationStock.DISPONIBLE);
+        attestation.setDateUtilisation(null);
+        attestation.setNumeroDossier(null);
+        attestation.setNumeroPolice(null);
+        attestation.setContrat(null);
+        attestation.setMouvementContrat(null);
+        attestation.setVehicule(null);
+        attestation.setRemorque(null);
+        attestationStockRepository.save(attestation);
+        enregistrerMouvement(attestation, TypeMouvementStockAttestation.LIBERATION, contrat, mouvement, numeroAvant, null);
+        recalculerSeuil(attestation);
+    }
+
     public boolean doitConsommer(Contrat contrat, TypeMouvementContrat typeMouvement, Usage usage) {
         if (!controleActif(contrat != null && contrat.getAgence() != null ? contrat.getAgence().getId() : null)) {
             return false;
         }
         return Boolean.TRUE.equals(typeMouvement != null ? typeMouvement.getConsommeAttestation() : null)
                 && Boolean.TRUE.equals(usage != null ? usage.getConsommeAttestation() : null)
-                && groupeStock(usage) != null;
+                && groupeStock(contrat, usage) != null;
     }
 
     private AttestationStock trouverDisponiblePourUpdate(Contrat contrat, Usage usage, String numeroNormalise) {
         if (contrat == null || contrat.getCompagnieAssurance() == null) {
             throw new BadRequestException("Compagnie invalide pour le controle du stock d'attestation");
         }
-        GroupeUsageAttestation groupe = groupeStock(usage);
+        GroupeUsageAttestation groupe = groupeStock(contrat, usage);
         if (groupe == null) {
             throw new BadRequestException("Usage invalide pour le controle du stock d'attestation");
         }
         List<AttestationStock> candidates = attestationStockRepository.findGestionnableForUpdate(
-                attestationNumeroService.candidats(numeroNormalise, contrat.getCompagnieAssurance(), usage),
+                attestationNumeroService.candidats(numeroNormalise, contrat.getCompagnieAssurance(), groupe),
                 contrat.getAgence().getId(),
                 contrat.getCompagnieAssurance().getId(),
                 groupe.getId()
@@ -460,8 +497,31 @@ public class AttestationStockService {
                 .orElseThrow(() -> new BadRequestException("Ce numéro d'attestation n'est pas disponible en stock"));
     }
 
-    private GroupeUsageAttestation groupeStock(Usage usage) {
-        GroupeUsageAttestation groupe = usage != null ? usage.getGroupeUsageAttestation() : null;
+    private GroupeUsageAttestation groupeStock(Contrat contrat, Usage usage) {
+        GroupeUsageAttestation override = contrat != null && contrat.getCategorieClient() != null
+                ? contrat.getCategorieClient().getGroupeUsageAttestation()
+                : null;
+        return groupeActif(override != null ? override : usage != null ? usage.getGroupeUsageAttestation() : null);
+    }
+
+    private GroupeUsageAttestation groupeStock(Long categorieClientId, Usage usage) {
+        CategorieClient categorie = categorieClientId == null
+                ? null
+                : categorieClientRepository.findByIdWithUsages(categorieClientId)
+                        .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", categorieClientId));
+        if (categorie != null
+                && usage != null
+                && categorie.getUsages() != null
+                && !categorie.getUsages().isEmpty()
+                && categorie.getUsages().stream().noneMatch(autorise -> autorise.getId().equals(usage.getId()))) {
+            throw new BadRequestException("L'usage selectionne ne correspond pas a la categorie client");
+        }
+        GroupeUsageAttestation override = categorie != null ? categorie.getGroupeUsageAttestation() : null;
+        GroupeUsageAttestation groupeUsage = usage != null ? usage.getGroupeUsageAttestation() : null;
+        return groupeActif(override != null ? override : groupeUsage);
+    }
+
+    private GroupeUsageAttestation groupeActif(GroupeUsageAttestation groupe) {
         if (groupe == null || !Boolean.TRUE.equals(groupe.getVisibleStock()) || !Boolean.TRUE.equals(groupe.getActif())) {
             return null;
         }

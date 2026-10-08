@@ -353,6 +353,8 @@ export function ContractInfoSection({
                   numeroCourant={form.numeroAttestationInitiale}
                   compagnieAssuranceId={form.compagnieAssuranceId}
                   usageId={form.usageId}
+                  categorieClientId={form.categorieClientId}
+                  groupeUsageAttestationCode={form.groupeUsageAttestationCode}
                   compagnies={form.refs.compagnies.data ?? []}
                   usages={form.refs.usages.data ?? []}
                   controleStock={form.modeTermeRenouvellement !== "COMPAGNIE"}

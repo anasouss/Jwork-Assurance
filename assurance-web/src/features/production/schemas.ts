@@ -38,6 +38,7 @@ export const clientCategorySchema = z.object({
   code: z.string().min(2, "Code obligatoire"),
   libelle: z.string().min(2, "Libelle obligatoire"),
   usageIds: z.array(z.string()).optional(),
+  groupeUsageAttestationId: z.string().optional(),
   actif: z.boolean().optional(),
 });
 

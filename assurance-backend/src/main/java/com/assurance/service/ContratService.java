@@ -2681,12 +2681,7 @@ public class ContratService {
                 continue;
             }
             AttestationStock attestation = stockMovement.getAttestationStock();
-            attestationStockService.liberer(
-                    contrat,
-                    mouvement,
-                    attestation.getNumero(),
-                    attestation.getUsageRepresentatif()
-            );
+            attestationStockService.liberer(contrat, mouvement, attestation);
         }
     }
 
@@ -5116,14 +5111,14 @@ public class ContratService {
         return toResponse(contrat, includeTargetSummaries, selectedMouvementId, true);
     }
 
-    private ContratResponse.VehiculeView toVehiculeView(Vehicule vehicule) {
+    private ContratResponse.VehiculeView toVehiculeView(Vehicule vehicule, String groupeUsageAttestationCode) {
         return ContratResponse.VehiculeView.builder()
                 .vehiculeId(vehicule.getId())
                 .typeVehicule(vehicule.getTypeVehicule().name())
                 .usageId(vehicule.getUsage() != null ? vehicule.getUsage().getId() : null)
                 .usageCode(vehicule.getUsage() != null ? vehicule.getUsage().getCode() : null)
                 .usageLibelle(vehicule.getUsage() != null ? vehicule.getUsage().getLibelle() : null)
-                .groupeUsageAttestationCode(vehicule.getUsage() != null && vehicule.getUsage().getGroupeUsageAttestation() != null ? vehicule.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .groupeUsageAttestationCode(groupeUsageAttestationCode != null ? groupeUsageAttestationCode : usageStockCode(vehicule.getUsage()))
                 .consommeAttestation(vehicule.getUsage() != null ? vehicule.getUsage().getConsommeAttestation() : null)
                 .immatriculation(vehicule.getImmatriculation())
                 .numeroAttestation(vehicule.getNumeroAttestation())
@@ -5157,7 +5152,7 @@ public class ContratService {
                 .build();
     }
 
-    private ContratResponse.VehiculeView toVehiculeView(MouvementVehicule snapshot) {
+    private ContratResponse.VehiculeView toVehiculeView(MouvementVehicule snapshot, String groupeUsageAttestationCode) {
         Vehicule vehicule = snapshot.getVehicule();
         return ContratResponse.VehiculeView.builder()
                 .vehiculeId(vehicule != null ? vehicule.getId() : snapshot.getId())
@@ -5165,7 +5160,7 @@ public class ContratService {
                 .usageId(snapshot.getUsage() != null ? snapshot.getUsage().getId() : null)
                 .usageCode(snapshot.getUsage() != null ? snapshot.getUsage().getCode() : null)
                 .usageLibelle(snapshot.getUsage() != null ? snapshot.getUsage().getLibelle() : null)
-                .groupeUsageAttestationCode(snapshot.getUsage() != null && snapshot.getUsage().getGroupeUsageAttestation() != null ? snapshot.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .groupeUsageAttestationCode(groupeUsageAttestationCode != null ? groupeUsageAttestationCode : usageStockCode(snapshot.getUsage()))
                 .consommeAttestation(snapshot.getUsage() != null ? snapshot.getUsage().getConsommeAttestation() : null)
                 .immatriculation(snapshot.getImmatriculation())
                 .numeroAttestation(snapshot.getNumeroAttestation())
@@ -5199,13 +5194,13 @@ public class ContratService {
                 .build();
     }
 
-    private ContratResponse.RemorqueView toRemorqueView(Remorque remorque) {
+    private ContratResponse.RemorqueView toRemorqueView(Remorque remorque, String groupeUsageAttestationCode) {
         return ContratResponse.RemorqueView.builder()
                 .remorqueId(remorque.getId())
                 .usageId(remorque.getUsage() != null ? remorque.getUsage().getId() : null)
                 .usageCode(remorque.getUsage() != null ? remorque.getUsage().getCode() : null)
                 .usageLibelle(remorque.getUsage() != null ? remorque.getUsage().getLibelle() : null)
-                .groupeUsageAttestationCode(remorque.getUsage() != null && remorque.getUsage().getGroupeUsageAttestation() != null ? remorque.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .groupeUsageAttestationCode(groupeUsageAttestationCode != null ? groupeUsageAttestationCode : usageStockCode(remorque.getUsage()))
                 .consommeAttestation(remorque.getUsage() != null ? remorque.getUsage().getConsommeAttestation() : null)
                 .immatriculation(remorque.getImmatriculation())
                 .numeroAttestation(remorque.getNumeroAttestation())
@@ -5221,14 +5216,14 @@ public class ContratService {
                 .build();
     }
 
-    private ContratResponse.RemorqueView toRemorqueView(MouvementRemorque snapshot) {
+    private ContratResponse.RemorqueView toRemorqueView(MouvementRemorque snapshot, String groupeUsageAttestationCode) {
         Remorque remorque = snapshot.getRemorque();
         return ContratResponse.RemorqueView.builder()
                 .remorqueId(remorque != null ? remorque.getId() : snapshot.getId())
                 .usageId(snapshot.getUsage() != null ? snapshot.getUsage().getId() : null)
                 .usageCode(snapshot.getUsage() != null ? snapshot.getUsage().getCode() : null)
                 .usageLibelle(snapshot.getUsage() != null ? snapshot.getUsage().getLibelle() : null)
-                .groupeUsageAttestationCode(snapshot.getUsage() != null && snapshot.getUsage().getGroupeUsageAttestation() != null ? snapshot.getUsage().getGroupeUsageAttestation().getCode() : null)
+                .groupeUsageAttestationCode(groupeUsageAttestationCode != null ? groupeUsageAttestationCode : usageStockCode(snapshot.getUsage()))
                 .consommeAttestation(snapshot.getUsage() != null ? snapshot.getUsage().getConsommeAttestation() : null)
                 .immatriculation(snapshot.getImmatriculation())
                 .numeroAttestation(snapshot.getNumeroAttestation())
@@ -5242,6 +5237,12 @@ public class ContratService {
                 .coefficientProrata(snapshot.getCoefficientProrata())
                 .valeurAssuree(snapshot.getValeurAssuree())
                 .build();
+    }
+
+    private String usageStockCode(Usage usage) {
+        return usage != null && usage.getGroupeUsageAttestation() != null
+                ? usage.getGroupeUsageAttestation().getCode()
+                : null;
     }
 
     private ContratResponse.GarantieView toGarantieView(ContratGarantie contratGarantie) {
@@ -5343,23 +5344,31 @@ public class ContratService {
         List<ContratResponse.VehiculeView> vehicules;
         List<ContratResponse.RemorqueView> remorques;
         List<ContratResponse.GarantieView> garanties;
+        String groupeUsageAttestationCode = contrat.getCategorieClient() != null
+                && contrat.getCategorieClient().getGroupeUsageAttestation() != null
+                ? contrat.getCategorieClient().getGroupeUsageAttestation().getCode()
+                : null;
         if (selectedMouvement == null) {
             List<Vehicule> vehiculesActifs = fallbackInactiveForView ? activeVehiculesForView(contrat) : activeVehicules(contrat);
             List<Remorque> remorquesActives = fallbackInactiveForView ? activeRemorquesForView(contrat) : activeRemorques(contrat);
             List<ContratGarantie> garantiesActives = fallbackInactiveForView ? activeGarantiesForView(contrat) : activeGaranties(contrat);
-            vehicules = vehiculesActifs.stream().map(this::toVehiculeView).toList();
-            remorques = remorquesActives.stream().map(this::toRemorqueView).toList();
+            vehicules = vehiculesActifs.stream()
+                    .map(vehicule -> toVehiculeView(vehicule, groupeUsageAttestationCode))
+                    .toList();
+            remorques = remorquesActives.stream()
+                    .map(remorque -> toRemorqueView(remorque, groupeUsageAttestationCode))
+                    .toList();
             garanties = garantiesActives.stream().map(this::toGarantieView).toList();
         } else {
             vehicules = mouvementVehiculeRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
                     .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                     .sorted(Comparator.comparing(MouvementVehicule::getId))
-                    .map(this::toVehiculeView)
+                    .map(snapshot -> toVehiculeView(snapshot, groupeUsageAttestationCode))
                     .toList();
             remorques = mouvementRemorqueRepository.findByMouvementContratId(selectedMouvement.getId()).stream()
                     .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                     .sorted(Comparator.comparing(MouvementRemorque::getId))
-                    .map(this::toRemorqueView)
+                    .map(snapshot -> toRemorqueView(snapshot, groupeUsageAttestationCode))
                     .toList();
             List<MouvementGarantie> garantieSnapshots = mouvementGarantieRepository
                     .findByMouvementContratId(selectedMouvement.getId());
@@ -5457,8 +5466,12 @@ public class ContratService {
                 .usageId(contrat.getUsage() != null ? contrat.getUsage().getId() : null)
                 .usageCode(contrat.getUsage() != null ? contrat.getUsage().getCode() : null)
                 .usageLibelle(contrat.getUsage() != null ? contrat.getUsage().getLibelle() : null)
-                .groupeUsageAttestationCode(contrat.getUsage() != null && contrat.getUsage().getGroupeUsageAttestation() != null ? contrat.getUsage().getGroupeUsageAttestation().getCode() : null)
-                .groupeUsageAttestationLibelle(contrat.getUsage() != null && contrat.getUsage().getGroupeUsageAttestation() != null ? contrat.getUsage().getGroupeUsageAttestation().getLibelle() : null)
+                .groupeUsageAttestationCode(groupeUsageAttestationCode != null ? groupeUsageAttestationCode : usageStockCode(contrat.getUsage()))
+                .groupeUsageAttestationLibelle(contrat.getCategorieClient() != null && contrat.getCategorieClient().getGroupeUsageAttestation() != null
+                        ? contrat.getCategorieClient().getGroupeUsageAttestation().getLibelle()
+                        : contrat.getUsage() != null && contrat.getUsage().getGroupeUsageAttestation() != null
+                                ? contrat.getUsage().getGroupeUsageAttestation().getLibelle()
+                                : null)
                 .consommeAttestation(contrat.getUsage() != null ? contrat.getUsage().getConsommeAttestation() : null)
                 .grilleTarifaireId(contrat.getGrilleTarifaire() != null ? contrat.getGrilleTarifaire().getId() : null)
                 .dateEffet(contrat.getDateEffet())

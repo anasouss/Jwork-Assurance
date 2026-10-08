@@ -59,6 +59,8 @@ export type ContractTargetsSectionProps = {
   remorqueUsages?: ReferenceOption[];
   compagnies?: ReferenceOption[];
   compagnieAssuranceId?: string | null;
+  categorieClientId?: string | null;
+  groupeUsageAttestationCode?: string | null;
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
@@ -107,6 +109,7 @@ export type ContractTargetsSectionProps = {
   remorqueSectionTitle?: string;
   guaranteeLayout?: "tariff" | "particulier";
   primeColumnLabel?: string;
+  usageFieldLabel?: string;
 };
 
 export function ContractTargetsSection({
@@ -124,6 +127,9 @@ export function ContractTargetsSection({
   remorqueUsages,
   compagnies = [],
   compagnieAssuranceId,
+  categorieClientId,
+  groupeUsageAttestationCode,
+  usageFieldLabel = "Usage",
   marques,
   carrosseries,
   categoriesTransport,
@@ -474,6 +480,8 @@ export function ContractTargetsSection({
                     usages={usages}
                     compagnies={compagnies}
                     compagnieAssuranceId={compagnieAssuranceId}
+                    categorieClientId={categorieClientId}
+                    groupeUsageAttestationCode={groupeUsageAttestationCode}
                     marques={marques}
                     carrosseries={carrosseries}
                     categoriesTransport={categoriesTransport}
@@ -484,6 +492,7 @@ export function ContractTargetsSection({
                     showCrm={showVehicleCrm}
                     prospectionMode={prospectionMode}
                     controleStockAttestation={controleStockAttestation}
+                    usageFieldLabel={usageFieldLabel}
                     errors={errors}
                   />
                   <SectionSubmitButton
@@ -654,6 +663,8 @@ export function ContractTargetsSection({
                     usages={availableRemorqueUsages}
                     compagnies={compagnies}
                     compagnieAssuranceId={compagnieAssuranceId}
+                    categorieClientId={categorieClientId}
+                    groupeUsageAttestationCode={groupeUsageAttestationCode}
                     marques={marques}
                     prospectionMode={prospectionMode}
                     controleStockAttestation={controleStockAttestation}

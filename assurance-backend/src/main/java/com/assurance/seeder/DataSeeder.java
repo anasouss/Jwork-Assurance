@@ -193,7 +193,7 @@ public class DataSeeder implements CommandLineRunner {
 
         Usage usageA = seedUsage("A", "TOURISME", "Tourisme", groupeA, true, true, false, false, false, berline);
         Usage usageC1 = seedUsage("C1", "C1", "Commerce C1", groupeC, true, true, false, false, false, utilitaire);
-        seedUsage("C2", "C2", "Commerce C2", groupeC, true, true, false, false, false, utilitaire);
+        Usage usageC2 = seedUsage("C2", "C2", "Commerce C2", groupeC, true, true, false, false, false, utilitaire);
         Usage usageCyclos = seedUsage("CYCLOS", "CYCLOS", "Cyclos et motocycles", groupeE, true, false, true, false, false, moto);
         seedUsage("D1", "TRANSPORT DE MATIERE INFLAMMABLE <= 3,5T", "Divers", groupeD, true, true, false, true, false, utilitaire);
         seedUsage("D2", "TRANSPORT DE MATIERE INFLAMMABLE > 3,5T", "Divers", groupeD, true, false, false, true, false, camion);
@@ -244,7 +244,9 @@ public class DataSeeder implements CommandLineRunner {
         seedCategorieClient("GRAND_PUBLIC", "GRAND PUBLIC");
         CategorieClient location = seedCategorieClient("LOCATION", "LOCATION");
         CategorieClient tpv = seedCategorieClient("TPV", "TPV");
-        attachUsages(location, usageA, usageC1, usageCyclos);
+        location.setGroupeUsageAttestation(groupeD);
+        categorieClientRepository.save(location);
+        attachUsages(location, usageA, usageC1, usageC2, usageCyclos);
         attachUsages(tpv, usageB1, usageB2);
 
         Role superAdmin = roleRepository.findByAgenceIsNullAndCode("SUPER_ADMIN").orElseGet(() -> roleRepository.save(

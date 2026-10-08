@@ -244,6 +244,8 @@ export function ContratFormLayout({
       usages={form.availableUsages}
       compagnies={form.refs.compagnies.data ?? []}
       compagnieAssuranceId={form.compagnieAssuranceId}
+      categorieClientId={form.categorieClientId}
+      groupeUsageAttestationCode={form.groupeUsageAttestationCode}
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
@@ -251,6 +253,7 @@ export function ContratFormLayout({
       tarifsUsage={form.refs.tarifsUsage.data ?? []}
       allowMultipleVehicules={allowMultipleVehicules}
       showUsage={form.typeContrat !== "PARTICULIER" && !showConvention}
+      usageFieldLabel={form.isFlotteLocationCategory ? "Sous-usage" : "Usage"}
       showSousClasse={form.typeContrat !== "PARTICULIER"}
       showAttestation={form.typeContrat !== "PARTICULIER" && !showConvention}
       controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}
@@ -316,6 +319,9 @@ export function ContratFormLayout({
       remorqueUsages={flotteRemorqueUsages}
       compagnies={form.refs.compagnies.data ?? []}
       compagnieAssuranceId={form.compagnieAssuranceId}
+      categorieClientId={form.categorieClientId}
+      groupeUsageAttestationCode={form.groupeUsageAttestationCode}
+      usageFieldLabel={form.isFlotteLocationCategory ? "Sous-usage" : "Usage"}
       marques={form.refs.marques.data ?? []}
       carrosseries={form.refs.carrosseries.data ?? []}
       categoriesTransport={form.refs.categoriesTransport.data ?? []}
@@ -359,6 +365,8 @@ export function ContratFormLayout({
       usages={form.availableUsages}
       compagnies={form.refs.compagnies.data ?? []}
       compagnieAssuranceId={form.compagnieAssuranceId}
+      categorieClientId={form.categorieClientId}
+      groupeUsageAttestationCode={form.groupeUsageAttestationCode}
       marques={form.refs.marques.data ?? []}
       maxRemorques={maxRemorques}
       controleStockAttestation={form.modeTermeRenouvellement !== "COMPAGNIE"}

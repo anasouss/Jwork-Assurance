@@ -15,6 +15,7 @@ public class AuditEventResponse {
     private Long agenceId;
     private Long actorUserId;
     private String actorName;
+    private String actorEmail;
     private AuditActorType actorType;
     private String entityType;
     private String entityId;

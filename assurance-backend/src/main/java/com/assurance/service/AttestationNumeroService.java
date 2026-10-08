@@ -18,11 +18,15 @@ import java.util.Set;
 public class AttestationNumeroService {
 
     public String normaliser(String valeur, CompagnieAssurance compagnie, Usage usage) {
+        return normaliser(valeur, compagnie, groupeActif(usage));
+    }
+
+    public String normaliser(String valeur, CompagnieAssurance compagnie, GroupeUsageAttestation groupe) {
         if (!hasText(valeur)) {
             return null;
         }
         String prefixe = normaliserPrefixe(compagnie != null ? compagnie.getPrefixeAttestation() : null);
-        String codeGroupe = codeGroupe(usage);
+        String codeGroupe = codeGroupe(groupe);
         if (!hasText(prefixe) || !hasText(codeGroupe)) {
             return valeur.trim();
         }
@@ -34,6 +38,10 @@ public class AttestationNumeroService {
     }
 
     public List<String> candidats(String valeur, CompagnieAssurance compagnie, Usage usage) {
+        return candidats(valeur, compagnie, groupeActif(usage));
+    }
+
+    public List<String> candidats(String valeur, CompagnieAssurance compagnie, GroupeUsageAttestation groupe) {
         Set<String> valeurs = new LinkedHashSet<>();
         if (!hasText(valeur)) {
             return new ArrayList<>(valeurs);
@@ -41,7 +49,7 @@ public class AttestationNumeroService {
         valeurs.add(valeur.trim().toUpperCase(Locale.ROOT));
 
         String prefixe = normaliserPrefixe(compagnie != null ? compagnie.getPrefixeAttestation() : null);
-        String codeGroupe = codeGroupe(usage);
+        String codeGroupe = codeGroupe(groupe);
         if (!hasText(prefixe) || !hasText(codeGroupe)) {
             return new ArrayList<>(valeurs);
         }
@@ -57,11 +65,18 @@ public class AttestationNumeroService {
     }
 
     public String codeGroupe(Usage usage) {
-        GroupeUsageAttestation groupe = usage != null ? usage.getGroupeUsageAttestation() : null;
+        return codeGroupe(groupeActif(usage));
+    }
+
+    public String codeGroupe(GroupeUsageAttestation groupe) {
         if (groupe == null || !Boolean.TRUE.equals(groupe.getVisibleStock()) || !Boolean.TRUE.equals(groupe.getActif())) {
             return null;
         }
         return normaliserToken(groupe.getCode());
+    }
+
+    private GroupeUsageAttestation groupeActif(Usage usage) {
+        return usage != null ? usage.getGroupeUsageAttestation() : null;
     }
 
     public String normaliserPrefixe(String prefixe) {

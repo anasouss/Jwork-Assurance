@@ -30,6 +30,8 @@ export function VehiculeSection({
   usages,
   compagnies = [],
   compagnieAssuranceId,
+  categorieClientId,
+  groupeUsageAttestationCode,
   marques,
   carrosseries,
   categoriesTransport,
@@ -37,6 +39,7 @@ export function VehiculeSection({
   tarifsUsage = [],
   allowMultipleVehicules = true,
   showUsage = true,
+  usageFieldLabel = "Usage",
   showSousClasse = true,
   showAttestation = true,
   controleStockAttestation = true,
@@ -54,6 +57,8 @@ export function VehiculeSection({
   usages: ReferenceOption[];
   compagnies?: ReferenceOption[];
   compagnieAssuranceId?: string | null;
+  categorieClientId?: string | null;
+  groupeUsageAttestationCode?: string | null;
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
@@ -61,6 +66,7 @@ export function VehiculeSection({
   tarifsUsage?: ReferenceOption[];
   allowMultipleVehicules?: boolean;
   showUsage?: boolean;
+  usageFieldLabel?: string;
   showSousClasse?: boolean;
   showAttestation?: boolean;
   controleStockAttestation?: boolean;
@@ -166,10 +172,10 @@ export function VehiculeSection({
               </div>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {showUsage ? (
-                  <Field label="Usage" required error={errors[`vehicules.${index}.usageId`]}>
+                  <Field label={usageFieldLabel} required error={errors[`vehicules.${index}.usageId`]}>
                     <AutocompleteSelect
                       value={vehicule.usageId ?? ""}
-                      placeholder="Usage"
+                      placeholder={usageFieldLabel}
                       emptyText="Aucun usage trouvé"
                       invalidText="Usage invalide : choisissez une option existante."
                       options={usages.map((usage) => ({
@@ -298,6 +304,8 @@ export function VehiculeSection({
                       numeroCourant={vehicule.numeroAttestationInitiale}
                       compagnieAssuranceId={compagnieAssuranceId}
                       usageId={vehicule.usageId}
+                      categorieClientId={categorieClientId}
+                      groupeUsageAttestationCode={groupeUsageAttestationCode}
                       compagnies={compagnies}
                       usages={usages}
                       controleStock={controleStockAttestation}

@@ -20,6 +20,8 @@ type VehicleFormProps = {
   usages: ReferenceOption[];
   compagnies: ReferenceOption[];
   compagnieAssuranceId?: string | null;
+  categorieClientId?: string | null;
+  groupeUsageAttestationCode?: string | null;
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
@@ -30,6 +32,7 @@ type VehicleFormProps = {
   showCrm: boolean;
   prospectionMode: boolean;
   controleStockAttestation: boolean;
+  usageFieldLabel?: string;
   errors: Record<string, string>;
 };
 
@@ -40,6 +43,8 @@ export function VehicleForm({
   usages,
   compagnies,
   compagnieAssuranceId,
+  categorieClientId,
+  groupeUsageAttestationCode,
   marques,
   carrosseries,
   categoriesTransport,
@@ -50,6 +55,7 @@ export function VehicleForm({
   showCrm,
   prospectionMode,
   controleStockAttestation,
+  usageFieldLabel = "Usage",
   errors,
 }: VehicleFormProps) {
   const usage = usages.find((item) => item.id === vehicule.usageId);
@@ -96,10 +102,10 @@ export function VehicleForm({
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Usage" required error={errors[`vehicules.${index}.usageId`]}>
+        <Field label={usageFieldLabel} required error={errors[`vehicules.${index}.usageId`]}>
           <AutocompleteSelect
             value={vehicule.usageId ?? ""}
-            placeholder="Usage"
+            placeholder={usageFieldLabel}
             emptyText="Aucun usage trouvé"
             invalidText="Usage invalide : choisissez une option existante."
             options={usages.map((usage) => ({
@@ -230,6 +236,8 @@ export function VehicleForm({
               numeroCourant={vehicule.numeroAttestationInitiale}
               compagnieAssuranceId={compagnieAssuranceId}
               usageId={vehicule.usageId}
+              categorieClientId={categorieClientId}
+              groupeUsageAttestationCode={groupeUsageAttestationCode}
               compagnies={compagnies}
               usages={usages}
               controleStock={controleStockAttestation}
@@ -290,6 +298,8 @@ type RemorqueFormProps = {
   usages: ReferenceOption[];
   compagnies: ReferenceOption[];
   compagnieAssuranceId?: string | null;
+  categorieClientId?: string | null;
+  groupeUsageAttestationCode?: string | null;
   marques: ReferenceOption[];
   prospectionMode: boolean;
   controleStockAttestation: boolean;
@@ -303,6 +313,8 @@ export function RemorqueForm({
   usages,
   compagnies,
   compagnieAssuranceId,
+  categorieClientId,
+  groupeUsageAttestationCode,
   marques,
   prospectionMode,
   controleStockAttestation,
@@ -367,6 +379,8 @@ export function RemorqueForm({
               numeroCourant={remorque.numeroAttestationInitiale}
               compagnieAssuranceId={compagnieAssuranceId}
               usageId={remorque.usageId}
+              categorieClientId={categorieClientId}
+              groupeUsageAttestationCode={groupeUsageAttestationCode}
               compagnies={compagnies}
               usages={usages}
               controleStock={controleStockAttestation}

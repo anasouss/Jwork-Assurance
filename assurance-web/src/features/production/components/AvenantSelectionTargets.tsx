@@ -23,6 +23,8 @@ type Props = {
   duplicataAttestationDrafts: Record<string, DuplicataAttestationDraft>;
   setDuplicataAttestationDrafts: (value: Record<string, DuplicataAttestationDraft> | ((current: Record<string, DuplicataAttestationDraft>) => Record<string, DuplicataAttestationDraft>)) => void;
   compagnieAssuranceId?: string | null;
+  categorieClientId?: string | null;
+  groupeUsageAttestationCode?: string | null;
   compagnies: ReferenceOption[];
   usages: ReferenceOption[];
 };
@@ -37,6 +39,8 @@ export function AvenantSelectionTargets({
   duplicataAttestationDrafts,
   setDuplicataAttestationDrafts,
   compagnieAssuranceId,
+  categorieClientId,
+  groupeUsageAttestationCode,
   compagnies,
   usages,
 }: Props) {
@@ -81,6 +85,8 @@ export function AvenantSelectionTargets({
                           onChange={(value) => updatePrecision(key, { numeroAttestation: value }, setPrecisionDrafts)}
                           compagnieAssuranceId={compagnieAssuranceId}
                           usageId={target.usageId}
+                          categorieClientId={categorieClientId}
+                          groupeUsageAttestationCode={groupeUsageAttestationCode}
                           compagnies={compagnies}
                           usages={usages}
                           numeroCourant={target.numeroAttestation}
@@ -98,6 +104,8 @@ export function AvenantSelectionTargets({
                         onChange={(value) => updateDuplicataAttestation(key, { numeroAttestation: value }, setDuplicataAttestationDrafts)}
                         compagnieAssuranceId={compagnieAssuranceId}
                         usageId={target.usageId}
+                        categorieClientId={categorieClientId}
+                        groupeUsageAttestationCode={groupeUsageAttestationCode}
                         compagnies={compagnies}
                         usages={usages}
                         numeroCourant={target.numeroAttestation}

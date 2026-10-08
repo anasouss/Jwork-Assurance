@@ -41,6 +41,7 @@ export type UpsertCategorieClientRequest = {
   code: string;
   libelle: string;
   usageIds?: string[];
+  groupeUsageAttestationId?: string;
   actif?: boolean;
 };
 

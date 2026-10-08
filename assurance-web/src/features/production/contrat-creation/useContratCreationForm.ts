@@ -137,6 +137,7 @@ export function useContratCreationForm(
     () => refs.categoriesClient.data?.find((item) => item.id === categorieClientId) ?? null,
     [categorieClientId, refs.categoriesClient.data]
   );
+  const groupeUsageAttestationCode = String(selectedCategorieClient?.groupeUsageAttestationCode ?? "") || undefined;
   const isFlotteLocationCategory = typeContrat === "FLOTTE" && String(selectedCategorieClient?.code ?? "").trim().toUpperCase() === "LOCATION";
   const categorieUsageIds = useMemo(
     () => referenceStringArray(selectedCategorieClient, "usageIds"),
@@ -1322,6 +1323,7 @@ export function useContratCreationForm(
   return {
     typeContrat,
     categorieClientId,
+    groupeUsageAttestationCode,
     refs,
     groupesClients,
     lignesGrille,

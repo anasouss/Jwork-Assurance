@@ -12,10 +12,10 @@ import java.util.Optional;
 public interface CategorieClientRepository extends JpaRepository<CategorieClient, Long> {
     Optional<CategorieClient> findByCodeIgnoreCase(String code);
 
-    @EntityGraph(attributePaths = "usages")
+    @EntityGraph(attributePaths = {"usages", "groupeUsageAttestation"})
     @Query("select categorie from CategorieClient categorie where categorie.id = :id")
     Optional<CategorieClient> findByIdWithUsages(@Param("id") Long id);
 
-    @EntityGraph(attributePaths = "usages")
+    @EntityGraph(attributePaths = {"usages", "groupeUsageAttestation"})
     List<CategorieClient> findAllByOrderByLibelleAsc();
 }

@@ -15,6 +15,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
     @Query("""
             select event
             from AuditEvent event
+            left join Utilisateur actor on actor.id = event.actorUserId
             where (:agenceId is null or event.agenceId = :agenceId)
               and (:entityType is null or event.entityType = :entityType)
               and (:entityId is null or event.entityId = :entityId)
@@ -25,6 +26,8 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
               and (
                     :search is null
                     or lower(coalesce(event.actorName, '')) like concat('%', :search, '%')
+                    or lower(coalesce(actor.email, '')) like concat('%', :search, '%')
+                    or lower(concat(coalesce(actor.prenom, ''), ' ', coalesce(actor.nom, ''))) like concat('%', :search, '%')
                     or lower(event.entityType) like concat('%', :search, '%')
                     or lower(event.entityId) like concat('%', :search, '%')
                     or lower(coalesce(event.requestId, '')) like concat('%', :search, '%')

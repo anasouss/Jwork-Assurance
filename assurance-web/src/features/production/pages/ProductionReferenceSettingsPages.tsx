@@ -289,6 +289,7 @@ export function CategoriesClientSettingsPage() {
   const queryClient = useQueryClient();
   const categories = useReference("categories-client");
   const usages = useReference("usages");
+  const groupesStock = useReference("groupes-usage-attestation");
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertCategorieClientRequest>(emptyCategorieClient());
@@ -298,6 +299,7 @@ export function CategoriesClientSettingsPage() {
       code: editing.code ?? "",
       libelle: editing.libelle,
       usageIds: refArray(editing, "usageIds"),
+      groupeUsageAttestationId: String(editing.groupeUsageAttestationId ?? "") || undefined,
       actif: editing.actif !== false,
     } : emptyCategorieClient());
   }, [editing]);
@@ -317,7 +319,7 @@ export function CategoriesClientSettingsPage() {
   return (
     <ReferenceShell
       title="Catégories client"
-      description="Catégories qui limitent les usages autorisés pour conventions, flottes et produits d'assistance."
+      description="Catégories qui encadrent les usages tarifaires et, si nécessaire, la famille de stock d’attestations."
     >
       <div className="flex justify-end">
         <Button onClick={() => { setEditing(null); setPayload(emptyCategorieClient()); setDialogOpen(true); }}>
@@ -330,7 +332,7 @@ export function CategoriesClientSettingsPage() {
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier catégorie client" : "Ajouter catégorie client"}</DialogTitle>
-            <DialogDescription>Les usages cochés seront les seuls proposés pour cette catégorie. Aucun usage sélectionné signifie aucun filtre.</DialogDescription>
+            <DialogDescription>Les usages cochés pilotent la tarification. Pour LOCATION, ils représentent les sous-usages. La famille de stock peut être imposée séparément.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 lg:grid-cols-2">
             <Field label="Code" required>
@@ -339,12 +341,29 @@ export function CategoriesClientSettingsPage() {
             <Field label="Libellé" required>
               <Input value={payload.libelle} onChange={(event) => setPayload((current) => ({ ...current, libelle: event.target.value }))} />
             </Field>
-            <Field label="Usages autorisés" className="min-w-0">
+            <Field label="Usages tarifaires autorisés" className="min-w-0">
               <UsageMultiSelect
                 usages={usages.data ?? []}
                 value={payload.usageIds ?? []}
                 onChange={(usageIds) => setPayload((current) => ({ ...current, usageIds }))}
               />
+            </Field>
+            <Field label="Famille de stock d’attestations">
+              <Select
+                value={payload.groupeUsageAttestationId || "__usage__"}
+                onValueChange={(value) => setPayload((current) => ({
+                  ...current,
+                  groupeUsageAttestationId: value === "__usage__" ? undefined : value,
+                }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__usage__">Selon l’usage tarifaire</SelectItem>
+                  {(groupesStock.data ?? []).map((groupe) => (
+                    <SelectItem key={groupe.id} value={groupe.id}>{usageLabel(groupe)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <div className="grid min-w-0 gap-1.5 text-sm">
               <span className="font-medium">Statut</span>
@@ -377,7 +396,8 @@ export function CategoriesClientSettingsPage() {
                 <TableRow className="hover:bg-emerald-700">
                   <TableHead>Code</TableHead>
                   <TableHead>Libellé</TableHead>
-                  <TableHead>Usages autorisés</TableHead>
+                  <TableHead>Usages tarifaires autorisés</TableHead>
+                  <TableHead>Stock attestations</TableHead>
                   <TableHead>Actif</TableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -387,7 +407,8 @@ export function CategoriesClientSettingsPage() {
                   <TableRow key={categorie.id}>
                     <TableCell className="font-medium">{categorie.code ?? "-"}</TableCell>
                     <TableCell>{categorie.libelle}</TableCell>
-                    <TableCell>{categoryUsageSummary(categorie)}</TableCell>
+                    <TableCell className="max-w-3xl whitespace-normal leading-5">{categoryUsageSummary(categorie)}</TableCell>
+                    <TableCell>{categoryStockSummary(categorie)}</TableCell>
                     <TableCell>{categorie.actif === false ? "Non" : "Oui"}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon-sm" onClick={() => { setEditing(categorie); setDialogOpen(true); }} aria-label={`Modifier ${categorie.libelle}`}>
@@ -398,7 +419,7 @@ export function CategoriesClientSettingsPage() {
                 ))}
                 {!categories.isLoading && (categories.data ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Aucune catégorie client.</TableCell>
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Aucune catégorie client.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -564,7 +585,7 @@ type TransportCategoryPayload = {
 };
 
 function emptyCategorieClient(): UpsertCategorieClientRequest {
-  return { code: "", libelle: "", usageIds: [], actif: true };
+  return { code: "", libelle: "", usageIds: [], groupeUsageAttestationId: undefined, actif: true };
 }
 
 function emptyGroupeUsageAttestation(): UpsertGroupeUsageAttestationRequest {
@@ -2342,6 +2363,15 @@ function categoryUsageSummary(category: ReferenceOption) {
     return "Tous les usages";
   }
   return codes.length > 0 ? codes.join(", ") : libelles.join(", ");
+}
+
+function categoryStockSummary(category: ReferenceOption) {
+  const code = String(category.groupeUsageAttestationCode ?? "");
+  const libelle = String(category.groupeUsageAttestationLibelle ?? "");
+  if (!code && !libelle) {
+    return "Selon l’usage";
+  }
+  return code && libelle ? `${code} - ${libelle}` : code || libelle;
 }
 
 function refArray(item: ReferenceOption | Record<string, unknown>, key: string) {

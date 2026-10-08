@@ -14,5 +14,6 @@ public class UpsertCategorieClientRequest {
     private String libelle;
 
     private List<Long> usageIds;
+    private Long groupeUsageAttestationId;
     private Boolean actif;
 }

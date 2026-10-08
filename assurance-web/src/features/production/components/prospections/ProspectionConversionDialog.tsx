@@ -205,6 +205,8 @@ function AttestationInputs({
                   onChange={(value) => onChange({ ...values, [row.key]: value })}
                   compagnieAssuranceId={contrat.compagnieAssuranceId}
                   usageId={row.usageId}
+                  categorieClientId={contrat.categorieClientId}
+                  groupeUsageAttestationCode={contrat.groupeUsageAttestationCode}
                   compagnies={compagnies}
                   usages={usages}
                   numeroCourant={row.currentNumero}

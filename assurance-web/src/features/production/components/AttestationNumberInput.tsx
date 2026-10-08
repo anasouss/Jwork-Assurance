@@ -10,6 +10,8 @@ type Props = {
   onChange: (value: string) => void;
   compagnieAssuranceId?: string | null;
   usageId?: string | null;
+  categorieClientId?: string | null;
+  groupeUsageAttestationCode?: string | null;
   compagnies?: ReferenceOption[];
   usages?: ReferenceOption[];
   numeroCourant?: string | null;
@@ -25,6 +27,8 @@ export function AttestationNumberInput({
   onChange,
   compagnieAssuranceId,
   usageId,
+  categorieClientId,
+  groupeUsageAttestationCode,
   compagnies = [],
   usages = [],
   numeroCourant,
@@ -39,8 +43,8 @@ export function AttestationNumberInput({
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const canonicalPrefix = useMemo(
-    () => buildCanonicalPrefix(compagnies, usages, compagnieAssuranceId, usageId, validation),
-    [compagnieAssuranceId, compagnies, usageId, usages, validation]
+    () => buildCanonicalPrefix(compagnies, usages, compagnieAssuranceId, usageId, groupeUsageAttestationCode, validation),
+    [compagnieAssuranceId, compagnies, groupeUsageAttestationCode, usageId, usages, validation]
   );
   const rawValue = value ?? "";
   const displayValue = stripPrefix(rawValue, canonicalPrefix);
@@ -64,6 +68,7 @@ export function AttestationNumberInput({
       attestationStockApi.validateAttestationNumero({
         compagnieAssuranceId: compagnieAssuranceId ?? undefined,
         usageId: usageId ?? undefined,
+        categorieClientId: categorieClientId ?? undefined,
         numero,
         numeroCourant: numeroCourant ?? undefined,
       })
@@ -93,7 +98,7 @@ export function AttestationNumberInput({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [canValidate, compagnieAssuranceId, disabled, numeroCourant, onChange, rawValue, usageId]);
+  }, [canValidate, categorieClientId, compagnieAssuranceId, disabled, numeroCourant, onChange, rawValue, usageId]);
 
   const valid = validation?.validationRequise ? validation.disponible : true;
   const message = validation?.message;
@@ -163,12 +168,14 @@ function buildCanonicalPrefix(
   usages: ReferenceOption[],
   compagnieAssuranceId?: string | null,
   usageId?: string | null,
+  groupeUsageAttestationCode?: string | null,
   validation?: AttestationNumeroValidation | null
 ) {
   const prefixe = stringValue(compagnies.find((item) => item.id === compagnieAssuranceId)?.prefixeAttestation)
     || stringValue(validation?.prefixe);
-  const codeUsageStock = stringValue(usages.find((item) => item.id === usageId)?.groupeUsageAttestationCode)
-    || stringValue(validation?.codeUsageStock);
+  const codeUsageStock = stringValue(groupeUsageAttestationCode)
+    || stringValue(validation?.codeUsageStock)
+    || stringValue(usages.find((item) => item.id === usageId)?.groupeUsageAttestationCode);
   return normalizeToken(prefixe) + normalizeToken(codeUsageStock);
 }
 

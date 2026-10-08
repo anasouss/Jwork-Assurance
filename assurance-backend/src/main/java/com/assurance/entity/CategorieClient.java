@@ -6,6 +6,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -35,6 +36,10 @@ public class CategorieClient extends BaseEntity {
     @Builder.Default
     @Column(nullable = false)
     private Boolean actif = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "groupe_usage_attestation_id")
+    private GroupeUsageAttestation groupeUsageAttestation;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

@@ -1843,8 +1843,14 @@ public class ReferentielController {
         if (request.getUsageIds() != null && usages.size() != request.getUsageIds().size()) {
             throw new ResourceNotFoundException("Usage", request.getUsageIds());
         }
+        GroupeUsageAttestation groupeUsageAttestation = request.getGroupeUsageAttestationId() == null
+                ? null
+                : groupeUsageAttestationRepository.findById(request.getGroupeUsageAttestationId())
+                        .filter(groupe -> Boolean.TRUE.equals(groupe.getActif()) && Boolean.TRUE.equals(groupe.getVisibleStock()))
+                        .orElseThrow(() -> new BadRequestException("Groupe de stock d'attestations inactif ou inconnu"));
         categorie.setCode(request.getCode().trim().toUpperCase());
         categorie.setLibelle(request.getLibelle().trim());
+        categorie.setGroupeUsageAttestation(groupeUsageAttestation);
         if (categorie.getUsages() == null) {
             categorie.setUsages(new HashSet<>());
         }
@@ -1985,6 +1991,9 @@ public class ReferentielController {
                 .putValue("usageIds", usages.stream().map(Usage::getId).toList())
                 .putValue("usageCodes", usages.stream().map(Usage::getCode).toList())
                 .putValue("usageLibelles", usages.stream().map(Usage::getLibelle).toList())
+                .putValue("groupeUsageAttestationId", categorie.getGroupeUsageAttestation() != null ? categorie.getGroupeUsageAttestation().getId() : null)
+                .putValue("groupeUsageAttestationCode", categorie.getGroupeUsageAttestation() != null ? categorie.getGroupeUsageAttestation().getCode() : null)
+                .putValue("groupeUsageAttestationLibelle", categorie.getGroupeUsageAttestation() != null ? categorie.getGroupeUsageAttestation().getLibelle() : null)
                 .putValue("actif", categorie.getActif())
                 .map();
     }

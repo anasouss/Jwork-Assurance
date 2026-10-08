@@ -216,10 +216,17 @@ public class AttestationStockController {
     public ResponseEntity<ApiResponse<List<String>>> suggestions(
             @RequestParam Long compagnieAssuranceId,
             @RequestParam Long usageId,
+            @RequestParam(required = false) Long categorieClientId,
             @RequestParam(defaultValue = "") String fragment
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                attestationStockService.listerDisponibles(TenantContext.getCurrentAgence(), compagnieAssuranceId, usageId, fragment)
+                attestationStockService.listerDisponibles(
+                        TenantContext.getCurrentAgence(),
+                        compagnieAssuranceId,
+                        usageId,
+                        categorieClientId,
+                        fragment
+                )
         ));
     }
 
@@ -228,11 +235,19 @@ public class AttestationStockController {
     public ResponseEntity<ApiResponse<AttestationNumeroValidationResponse>> validation(
             @RequestParam Long compagnieAssuranceId,
             @RequestParam Long usageId,
+            @RequestParam(required = false) Long categorieClientId,
             @RequestParam(defaultValue = "") String numero,
             @RequestParam(required = false) String numeroCourant
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                attestationStockService.validerNumero(TenantContext.getCurrentAgence(), compagnieAssuranceId, usageId, numero, numeroCourant)
+                attestationStockService.validerNumero(
+                        TenantContext.getCurrentAgence(),
+                        compagnieAssuranceId,
+                        usageId,
+                        categorieClientId,
+                        numero,
+                        numeroCourant
+                )
         ));
     }
 }

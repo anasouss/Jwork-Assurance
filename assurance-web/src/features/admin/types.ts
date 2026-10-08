@@ -51,6 +51,7 @@ export type AdminAuditEvent = {
   id: string;
   actorUserId?: string | null;
   actorName?: string | null;
+  actorEmail?: string | null;
   actorType: "USER" | "SYSTEM" | "IMPORT";
   entityType: string;
   entityId?: string | null;

@@ -974,7 +974,12 @@ function AuditPanel() {
             {(events.data?.items ?? []).map((event: AdminAuditEvent) => (
               <TableRow key={event.id}>
                 <TableCell className="whitespace-nowrap">{formatDateTime(event.occurredAt)}</TableCell>
-                <TableCell>{event.actorName || event.actorType}</TableCell>
+                <TableCell>
+                  <div className="font-medium">{event.actorName || auditActorLabel(event.actorType)}</div>
+                  {event.actorEmail && event.actorEmail !== event.actorName ? (
+                    <div className="text-xs text-muted-foreground">{event.actorEmail}</div>
+                  ) : null}
+                </TableCell>
                 <TableCell><Badge variant={auditActionVariant(event.action)}>{auditActionLabel(event.action)}</Badge></TableCell>
                 <TableCell>
                   <div className="font-medium">{auditEntityTypeLabel(event.entityType)}</div>
@@ -1070,7 +1075,11 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
           <>
             <DialogHeader>
               <DialogTitle>{auditActionLabel(event.action)} · {auditEntityTypeLabel(event.entityType)} {auditEntityReference(event)}</DialogTitle>
-              <DialogDescription>{formatDateTime(event.occurredAt)} par {event.actorName || auditActorLabel(event.actorType)}</DialogDescription>
+              <DialogDescription>
+                {formatDateTime(event.occurredAt)} par {event.actorName || auditActorLabel(event.actorType)}
+                {event.actorEmail && event.actorEmail !== event.actorName ? ` · ${event.actorEmail}` : ""}
+                {event.actorUserId ? ` · ID ${event.actorUserId}` : ""}
+              </DialogDescription>
             </DialogHeader>
             <div className="grid max-h-[65vh] gap-4 overflow-y-auto pr-1">
               <div className="overflow-x-auto rounded-md border">

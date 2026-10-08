@@ -1041,6 +1041,8 @@ export default function AvenantContratPage() {
           usages={avenantTargetUsages}
           compagnies={compagnies.data ?? []}
           compagnieAssuranceId={contrat?.compagnieAssuranceId}
+          categorieClientId={contrat?.categorieClientId}
+          groupeUsageAttestationCode={contrat?.groupeUsageAttestationCode}
           marques={marques.data ?? []}
           carrosseries={carrosseries.data ?? []}
           categoriesTransport={categoriesTransport.data ?? []}

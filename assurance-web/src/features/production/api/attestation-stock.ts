@@ -84,6 +84,7 @@ export const attestationStockApi = {
   async suggestionsAttestation(params: {
     compagnieAssuranceId?: string;
     usageId?: string;
+    categorieClientId?: string;
     fragment?: string;
   }) {
     return unwrap(
@@ -96,6 +97,7 @@ export const attestationStockApi = {
   async validateAttestationNumero(params: {
     compagnieAssuranceId?: string;
     usageId?: string;
+    categorieClientId?: string;
     numero?: string;
     numeroCourant?: string;
   }) {

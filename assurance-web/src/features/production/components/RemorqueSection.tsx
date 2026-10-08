@@ -17,6 +17,8 @@ export function RemorqueSection({
   usages,
   compagnies = [],
   compagnieAssuranceId,
+  categorieClientId,
+  groupeUsageAttestationCode,
   marques,
   maxRemorques,
   controleStockAttestation = true,
@@ -29,6 +31,8 @@ export function RemorqueSection({
   usages: ReferenceOption[];
   compagnies?: ReferenceOption[];
   compagnieAssuranceId?: string | null;
+  categorieClientId?: string | null;
+  groupeUsageAttestationCode?: string | null;
   marques: ReferenceOption[];
   maxRemorques?: number | null;
   controleStockAttestation?: boolean;
@@ -129,6 +133,8 @@ export function RemorqueSection({
                   numeroCourant={remorque.numeroAttestationInitiale}
                   compagnieAssuranceId={compagnieAssuranceId}
                   usageId={remorque.usageId}
+                  categorieClientId={categorieClientId}
+                  groupeUsageAttestationCode={groupeUsageAttestationCode}
                   compagnies={compagnies}
                   usages={usages}
                   controleStock={controleStockAttestation}

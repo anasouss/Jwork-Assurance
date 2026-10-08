@@ -8,6 +8,7 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.AuditAction;
 import com.assurance.repository.AuditEventRepository;
+import com.assurance.repository.UtilisateurRepository;
 import com.assurance.security.AuditRequestContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +23,9 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ public class AuditEventService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final AuditEventRepository auditEventRepository;
+    private final UtilisateurRepository utilisateurRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -77,18 +82,32 @@ public class AuditEventService {
                 normalize(search, true),
                 PageRequest.of(safePage, safeSize)
         );
+        Map<Long, Utilisateur> actors = utilisateurRepository.findAllById(result.getContent().stream()
+                        .map(AuditEvent::getActorUserId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Utilisateur::getId, Function.identity()));
         return PagedResponse.<AuditEventResponse>builder()
-                .items(result.getContent().stream().map(this::toResponse).toList())
+                .items(result.getContent().stream()
+                        .map(event -> toResponse(event, actors.get(event.getActorUserId())))
+                        .toList())
                 .page(PageMetadata.from(result))
                 .build();
     }
 
-    private AuditEventResponse toResponse(AuditEvent event) {
+    private AuditEventResponse toResponse(AuditEvent event, Utilisateur actor) {
+        String snapshot = event.getActorName();
+        String actorName = actor == null ? snapshot : actor.getFullName();
+        String actorEmail = actor == null && snapshot != null && snapshot.contains("@")
+                ? snapshot
+                : actor == null ? null : actor.getEmail();
         return AuditEventResponse.builder()
                 .id(event.getId())
                 .agenceId(event.getAgenceId())
                 .actorUserId(event.getActorUserId())
-                .actorName(event.getActorName())
+                .actorName(actorName)
+                .actorEmail(actorEmail)
                 .actorType(event.getActorType())
                 .entityType(event.getEntityType())
                 .entityId(event.getEntityId())

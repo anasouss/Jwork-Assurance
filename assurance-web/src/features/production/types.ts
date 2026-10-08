@@ -1161,6 +1161,7 @@ export type UpsertGarantieRequest = {
   critereSelectionTarif?: "TAUX_PRIME" | "TAUX_FRANCHISE";
   sourcesValeurAutorisees?: string[];
   sourceValeurParDefaut?: string;
+  garantieReferencePrimeId?: string;
   saisieManuelleAutorisee?: boolean;
   verrouillee?: boolean;
   compagniesSansProrataIds?: string[];

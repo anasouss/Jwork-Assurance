@@ -83,6 +83,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @RestController
@@ -1387,6 +1388,8 @@ public class ReferentielController {
             throw new BadRequestException("La source de valeur par defaut doit faire partie des sources autorisees");
         }
 
+        Garantie garantieReferencePrime = resolveGarantieReferencePrime(garantie, request, typeGarantie, modes);
+
         garantie.setCode(request.getCode());
         garantie.setLibelle(request.getLibelle());
         garantie.setDescription(blankToNull(request.getDescription()));
@@ -1420,6 +1423,7 @@ public class ReferentielController {
         garantie.setSourceValeurParDefaut(sourceParDefaut);
         garantie.getSourcesValeurAutorisees().clear();
         garantie.getSourcesValeurAutorisees().addAll(sources);
+        garantie.setGarantieReferencePrime(garantieReferencePrime);
         garantie.setSaisieManuelleAutorisee(saisieManuelleAutorisee);
         garantie.setVerrouillee(Boolean.TRUE.equals(request.getVerrouillee()));
         garantie.setOrdreAffichage(request.getOrdreAffichage());
@@ -1459,6 +1463,9 @@ public class ReferentielController {
                 .putValue("modesAutorises", new LinkedHashSet<>(garantie.getModesAutorises()))
                 .putValue("sourceValeurParDefaut", garantie.getSourceValeurParDefaut())
                 .putValue("sourcesValeurAutorisees", new LinkedHashSet<>(garantie.getSourcesValeurAutorisees()))
+                .putValue("garantieReferencePrimeId", garantie.getGarantieReferencePrime() != null ? garantie.getGarantieReferencePrime().getId() : null)
+                .putValue("garantieReferencePrimeCode", garantie.getGarantieReferencePrime() != null ? garantie.getGarantieReferencePrime().getCode() : null)
+                .putValue("garantieReferencePrimeLibelle", garantie.getGarantieReferencePrime() != null ? garantie.getGarantieReferencePrime().getLibelle() : null)
                 .putValue("saisieManuelleAutorisee", garantie.getSaisieManuelleAutorisee())
                 .putValue("verrouillee", garantie.getVerrouillee())
                 .putValue("compagniesSansProrataIds", compagnieGarantieRepository.findByGarantieId(garantie.getId()).stream()
@@ -1468,6 +1475,53 @@ public class ReferentielController {
                 .putValue("ordreAffichage", garantie.getOrdreAffichage())
                 .putValue("actif", garantie.getActif())
                 .map();
+    }
+
+    private Garantie resolveGarantieReferencePrime(
+            Garantie garantie,
+            UpsertGarantieRequest request,
+            TypeGarantie typeGarantie,
+            Set<ModeTarificationGarantie> modes
+    ) {
+        if (request.getGarantieReferencePrimeId() == null) {
+            return null;
+        }
+        if (typeGarantie != TypeGarantie.VEHICULE || !modes.contains(ModeTarificationGarantie.TAUX)) {
+            throw new BadRequestException("Une prime de garantie de reference necessite une garantie vehicule tarifee au taux");
+        }
+        if (Boolean.TRUE.equals(request.getResponsabiliteCivile())) {
+            throw new BadRequestException("La responsabilite civile ne peut pas dependre de la prime d'une autre garantie");
+        }
+        if (!Boolean.TRUE.equals(request.getAvecCapital()) || !Boolean.TRUE.equals(request.getSaisieManuelleAutorisee())) {
+            throw new BadRequestException("Une garantie basee sur une autre prime exige la saisie de son propre capital");
+        }
+
+        Garantie reference = garantieRepository.findById(request.getGarantieReferencePrimeId())
+                .filter(candidate -> Boolean.TRUE.equals(candidate.getActif()))
+                .orElseThrow(() -> new ResourceNotFoundException("Garantie", request.getGarantieReferencePrimeId()));
+        if (reference.getTypeGarantie() != TypeGarantie.VEHICULE) {
+            throw new BadRequestException("La garantie de reference doit etre une garantie vehicule");
+        }
+        if (reference.getBrancheAssurance() == null
+                || !Objects.equals(reference.getBrancheAssurance().getId(), request.getBrancheAssuranceId())) {
+            throw new BadRequestException("La garantie de reference doit appartenir a la meme branche");
+        }
+        if (garantie.getId() != null && garantie.getId().equals(reference.getId())) {
+            throw new BadRequestException("Une garantie ne peut pas utiliser sa propre prime comme reference");
+        }
+
+        Set<Long> visited = new HashSet<>();
+        Garantie cursor = reference;
+        while (cursor != null) {
+            if (cursor.getId() != null && !visited.add(cursor.getId())) {
+                throw new BadRequestException("Une dependance circulaire existe entre les garanties de reference");
+            }
+            if (garantie.getId() != null && garantie.getId().equals(cursor.getId())) {
+                throw new BadRequestException("La garantie de reference creerait une dependance circulaire");
+            }
+            cursor = cursor.getGarantieReferencePrime();
+        }
+        return reference;
     }
 
     private void applyCompagnieProrataRequest(Garantie garantie, Set<Long> compagniesSansProrataIds) {

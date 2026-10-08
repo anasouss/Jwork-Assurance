@@ -1,6 +1,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -235,6 +236,11 @@ export function TargetGuaranteesTable({
                       <span className="xl:hidden">{garantie.code || garantie.libelle}</span>
                       <span className="hidden xl:inline">{garantie.code ? `${garantie.code} - ` : ""}{garantie.libelle}</span>
                     </div>
+                    {garantie.garantieReferencePrimeId ? (
+                      <Badge variant="outline" className="mt-1">
+                        Base tarifaire : prime {String(garantie.garantieReferencePrimeCode ?? garantie.garantieReferencePrimeLibelle ?? "de référence")}
+                      </Badge>
+                    ) : null}
                     {warning ? <div className="mt-1 text-xs text-destructive">{warning}</div> : null}
                   </td>
                   <GuaranteeTableCell>

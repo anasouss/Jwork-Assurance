@@ -56,6 +56,8 @@ export type AdminAuditEvent = {
   entityId?: string | null;
   action: "CREATED" | "UPDATED" | "DELETED";
   occurredAt: string;
+  beforeData?: Record<string, unknown> | null;
+  afterData?: Record<string, unknown> | null;
   requestId?: string | null;
   source?: string | null;
 };

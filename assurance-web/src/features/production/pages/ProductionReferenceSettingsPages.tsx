@@ -872,6 +872,7 @@ export function GarantiesSettingsPage() {
         critereSelectionTarif: modesTarificationMultiple.includes("TAUX") ? current.critereSelectionTarif : "TAUX_PRIME",
         avecFranchise: hasRate ? current.avecFranchise : false,
         avecFranchiseMinimale: hasRate ? current.avecFranchiseMinimale : false,
+        garantieReferencePrimeId: hasRate ? current.garantieReferencePrimeId : undefined,
       };
     });
   };
@@ -911,6 +912,7 @@ export function GarantiesSettingsPage() {
       return {
         ...current,
         saisieManuelleAutorisee: checked,
+        garantieReferencePrimeId: checked ? current.garantieReferencePrimeId : undefined,
         sourcesValeurAutorisees,
         sourceValeurParDefaut: !checked && current.sourceValeurParDefaut === "MANUEL"
           ? "AUCUNE"
@@ -935,6 +937,7 @@ export function GarantiesSettingsPage() {
         groupeExclusionId: undefined,
         sourcesValeurAutorisees: [],
         sourceValeurParDefaut: "AUCUNE",
+        garantieReferencePrimeId: undefined,
         requiertValeurVenale: false,
         requiertValeurNeuf: false,
         requiertValeurGlace: false,
@@ -1125,6 +1128,7 @@ export function GarantiesSettingsPage() {
                     onValueChange={(value) => update({
                       responsabiliteCivile: value === "RC",
                       defenseRecours: value === "DEFENSE_RECOURS",
+                      garantieReferencePrimeId: value === "RC" ? undefined : payload.garantieReferencePrimeId,
                     })}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1139,6 +1143,7 @@ export function GarantiesSettingsPage() {
               {isVehicleGuarantee ? (
                 <Flag label="Capital / valeur assurée" checked={payload.avecCapital} onChange={(value) => update({
                   avecCapital: value,
+                  garantieReferencePrimeId: value ? payload.garantieReferencePrimeId : undefined,
                   saisieManuelleAutorisee: value ? payload.saisieManuelleAutorisee : false,
                   sourcesValeurAutorisees: value
                     ? payload.sourcesValeurAutorisees
@@ -1185,6 +1190,40 @@ export function GarantiesSettingsPage() {
                     </SelectContent>
                   </Select>
                 </Field>
+                {hasRateMode && !payload.responsabiliteCivile ? (
+                  <Field label="Base de calcul du taux">
+                    <Select
+                      value={payload.garantieReferencePrimeId ?? "CAPITAL_ASSURE"}
+                      onValueChange={(value) => {
+                        const usesReferencePrime = value !== "CAPITAL_ASSURE";
+                        update({
+                          garantieReferencePrimeId: usesReferencePrime ? value : undefined,
+                          avecCapital: usesReferencePrime ? true : payload.avecCapital,
+                          saisieManuelleAutorisee: usesReferencePrime ? true : payload.saisieManuelleAutorisee,
+                          sourcesValeurAutorisees: usesReferencePrime
+                            ? Array.from(new Set([...(payload.sourcesValeurAutorisees ?? []), "MANUEL"]))
+                            : payload.sourcesValeurAutorisees,
+                          sourceValeurParDefaut: usesReferencePrime ? "MANUEL" : payload.sourceValeurParDefaut,
+                        });
+                      }}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CAPITAL_ASSURE">Capital / valeur assurée</SelectItem>
+                        {(garanties.data ?? [])
+                          .filter((candidate) => candidate.actif !== false)
+                          .filter((candidate) => String(candidate.typeGarantie ?? "VEHICULE") === "VEHICULE")
+                          .filter((candidate) => candidate.id !== editing?.id)
+                          .filter((candidate) => !payload.brancheAssuranceId || String(candidate.brancheAssuranceId ?? "") === payload.brancheAssuranceId)
+                          .map((candidate) => (
+                            <SelectItem key={candidate.id} value={candidate.id}>
+                              Prime nette - {candidate.code ? `${candidate.code} - ` : ""}{candidate.libelle}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                ) : null}
                 {(payload.modesTarificationMultiple ?? []).includes("TAUX") ? (
                   <Field label="Valeur du sélecteur tarifaire">
                     <Select
@@ -2094,6 +2133,7 @@ function garantiePayloadFromReference(garantie: ReferenceOption): UpsertGarantie
     critereSelectionTarif: garantie.critereSelectionTarif === "TAUX_FRANCHISE" ? "TAUX_FRANCHISE" : "TAUX_PRIME",
     sourcesValeurAutorisees: stringArray(garantie.sourcesValeurAutorisees),
     sourceValeurParDefaut: String(garantie.sourceValeurParDefaut ?? "AUCUNE"),
+    garantieReferencePrimeId: garantie.garantieReferencePrimeId ? String(garantie.garantieReferencePrimeId) : undefined,
     saisieManuelleAutorisee: Boolean(garantie.saisieManuelleAutorisee),
     verrouillee: Boolean(garantie.verrouillee),
     compagniesSansProrataIds: stringArray(garantie.compagniesSansProrataIds),
@@ -2122,6 +2162,7 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
       critereSelectionTarif: "TAUX_PRIME",
       sourcesValeurAutorisees: [],
       sourceValeurParDefaut: "AUCUNE",
+      garantieReferencePrimeId: undefined,
       saisieManuelleAutorisee: false,
       responsabiliteCivile: false,
       defenseRecours: false,
@@ -2169,6 +2210,9 @@ function normalizeGarantiePayload(payload: UpsertGarantieRequest): UpsertGaranti
     modesTarificationMultiple: normalizedMultipleModes,
     sourcesValeurAutorisees,
     sourceValeurParDefaut,
+    garantieReferencePrimeId: hasRateMode && !responsabiliteCivile
+      ? payload.garantieReferencePrimeId || undefined
+      : undefined,
     saisieManuelleAutorisee,
   };
 }

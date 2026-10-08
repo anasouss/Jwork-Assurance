@@ -131,6 +131,10 @@ public class Garantie extends BaseEntity {
     @Column(name = "source_valeur_par_defaut", length = 40)
     private SourceValeurGarantie sourceValeurParDefaut;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "garantie_reference_prime_id")
+    private Garantie garantieReferencePrime;
+
     @Builder.Default
     @Column(name = "saisie_manuelle_autorisee", nullable = false)
     private Boolean saisieManuelleAutorisee = false;

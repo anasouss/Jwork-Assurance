@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
   Building2,
   Edit,
+  ExternalLink,
+  Eye,
   ImageIcon,
   KeyRound,
   Laptop,
@@ -853,35 +856,106 @@ function sessionDeviceIcon(deviceType?: string | null) {
 }
 
 function AuditPanel() {
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [draftFilters, setDraftFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
+  const [filters, setFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
   const [page, setPage] = useState(0);
+  const [selectedEvent, setSelectedEvent] = useState<AdminAuditEvent | null>(null);
   const events = useQuery({
-    queryKey: ["admin", "audit", appliedSearch, page],
-    queryFn: () => adminApi.auditEvents({ search: appliedSearch || undefined, page, size: 25 }),
+    queryKey: ["admin", "audit", filters, page],
+    queryFn: () => adminApi.auditEvents({
+      search: filters.search.trim() || undefined,
+      action: filters.action === AUDIT_ALL ? undefined : filters.action,
+      entityType: filters.entityType === AUDIT_ALL ? undefined : filters.entityType,
+      dateFrom: filters.dateFrom ? `${filters.dateFrom}T00:00:00` : undefined,
+      dateTo: filters.dateTo ? `${filters.dateTo}T23:59:59` : undefined,
+      page,
+      size: 25,
+    }),
     placeholderData: (previous) => previous,
   });
+
+  const applyFilters = () => {
+    if (draftFilters.dateFrom && draftFilters.dateTo && draftFilters.dateFrom > draftFilters.dateTo) {
+      toast.error("La date de début doit précéder la date de fin");
+      return;
+    }
+    setPage(0);
+    setFilters({ ...draftFilters, search: draftFilters.search.trim() });
+  };
+
+  const resetFilters = () => {
+    setDraftFilters(EMPTY_AUDIT_FILTERS);
+    setFilters(EMPTY_AUDIT_FILTERS);
+    setPage(0);
+  };
 
   return (
     <div className="grid gap-4 rounded-lg border bg-card p-4">
       <form
-        className="flex max-w-lg gap-2"
+        className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.4fr)_180px_220px_160px_160px_auto]"
         onSubmit={(event) => {
           event.preventDefault();
-          setPage(0);
-          setAppliedSearch(search.trim());
+          applyFilters();
         }}
       >
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Utilisateur, entité ou identifiant"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Recherche</span>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Utilisateur, référence ou identifiant"
+              value={draftFilters.search}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))}
+            />
+          </div>
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Action</span>
+          <Select value={draftFilters.action} onValueChange={(action) => setDraftFilters((current) => ({ ...current, action: action as AuditFilters["action"] }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AUDIT_ALL}>Toutes</SelectItem>
+              <SelectItem value="CREATED">Création</SelectItem>
+              <SelectItem value="UPDATED">Modification</SelectItem>
+              <SelectItem value="DELETED">Suppression</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Type d’objet</span>
+          <Select value={draftFilters.entityType} onValueChange={(entityType) => setDraftFilters((current) => ({ ...current, entityType }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AUDIT_ALL}>Tous les objets</SelectItem>
+              {AUDIT_ENTITY_TYPES.map((entityType) => (
+                <SelectItem key={entityType} value={entityType}>{auditEntityTypeLabel(entityType)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Du</span>
+          <DatePicker
+            date={draftFilters.dateFrom}
+            maxDate={draftFilters.dateTo ? new Date(`${draftFilters.dateTo}T00:00:00`) : undefined}
+            onSelect={(date) => setDraftFilters((current) => ({ ...current, dateFrom: toDateOnly(date) ?? "" }))}
           />
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Au</span>
+          <DatePicker
+            date={draftFilters.dateTo}
+            minDate={draftFilters.dateFrom ? new Date(`${draftFilters.dateFrom}T00:00:00`) : undefined}
+            onSelect={(date) => setDraftFilters((current) => ({ ...current, dateTo: toDateOnly(date) ?? "" }))}
+          />
+        </label>
+        <div className="flex gap-2">
+          <Button type="submit">Rechercher</Button>
+          <Button type="button" variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser les filtres" onClick={resetFilters}>
+            <X className="size-4" />
+          </Button>
         </div>
-        <Button type="submit">Rechercher</Button>
       </form>
 
       <div className="overflow-x-auto rounded-md border">
@@ -891,9 +965,9 @@ function AuditPanel() {
               <TableHead>Date</TableHead>
               <TableHead>Utilisateur</TableHead>
               <TableHead>Action</TableHead>
-              <TableHead>Entité</TableHead>
-              <TableHead>Identifiant</TableHead>
-              <TableHead>Source</TableHead>
+              <TableHead>Objet</TableHead>
+              <TableHead>Résumé</TableHead>
+              <TableHead className="w-16 text-right">Détails</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -901,10 +975,17 @@ function AuditPanel() {
               <TableRow key={event.id}>
                 <TableCell className="whitespace-nowrap">{formatDateTime(event.occurredAt)}</TableCell>
                 <TableCell>{event.actorName || event.actorType}</TableCell>
-                <TableCell><Badge variant="outline">{auditActionLabel(event.action)}</Badge></TableCell>
-                <TableCell>{event.entityType}</TableCell>
-                <TableCell>{event.entityId || "-"}</TableCell>
-                <TableCell>{event.source || "-"}</TableCell>
+                <TableCell><Badge variant={auditActionVariant(event.action)}>{auditActionLabel(event.action)}</Badge></TableCell>
+                <TableCell>
+                  <div className="font-medium">{auditEntityTypeLabel(event.entityType)}</div>
+                  <div className="text-xs text-muted-foreground">{auditEntityReference(event)}</div>
+                </TableCell>
+                <TableCell className="max-w-md">{auditEventSummary(event)}</TableCell>
+                <TableCell className="text-right">
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Voir le détail de l'événement ${event.id}`} onClick={() => setSelectedEvent(event)}>
+                    <Eye className="size-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
             {!events.isLoading && !(events.data?.items.length ?? 0) ? (
@@ -924,12 +1005,248 @@ function AuditPanel() {
         loading={events.isFetching}
         onPageChange={setPage}
       />
+
+      <AuditEventDialog event={selectedEvent} onOpenChange={(open) => { if (!open) setSelectedEvent(null); }} />
     </div>
   );
 }
 
+const AUDIT_ALL = "__all__";
+
+type AuditFilters = {
+  search: string;
+  action: typeof AUDIT_ALL | AdminAuditEvent["action"];
+  entityType: string;
+  dateFrom: string;
+  dateTo: string;
+};
+
+const EMPTY_AUDIT_FILTERS: AuditFilters = {
+  search: "",
+  action: AUDIT_ALL,
+  entityType: AUDIT_ALL,
+  dateFrom: "",
+  dateTo: "",
+};
+
+const AUDIT_ENTITY_TYPES = [
+  "Contrat",
+  "Sinistre",
+  "DocumentClient",
+  "ReglementClient",
+  "BordereauCompagnie",
+  "ReglementCompagnie",
+  "CompteTresorerie",
+  "MouvementTresorerie",
+  "OperationTresorerie",
+  "BordereauRemise",
+  "RapprochementBancaire",
+  "ImportReleveBancaire",
+  "LigneReleveBancaire",
+  "ProfilImportReleveBancaire",
+  "SessionCaisse",
+  "AffectationCompteTresorerie",
+  "ConditionPaiementClient",
+  "AjustementTarifUsage",
+] as const;
+
 function auditActionLabel(action: AdminAuditEvent["action"]) {
   return ({ CREATED: "Création", UPDATED: "Modification", DELETED: "Suppression" })[action] ?? action;
+}
+
+function auditActionVariant(action: AdminAuditEvent["action"]): "success" | "info" | "red" {
+  if (action === "CREATED") return "success";
+  if (action === "DELETED") return "red";
+  return "info";
+}
+
+function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | null; onOpenChange: (open: boolean) => void }) {
+  const fields = event ? auditChangedFields(event) : [];
+  const entityUrl = event ? auditEntityUrl(event) : null;
+  return (
+    <Dialog open={Boolean(event)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-4xl">
+        {event ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>{auditActionLabel(event.action)} · {auditEntityTypeLabel(event.entityType)} {auditEntityReference(event)}</DialogTitle>
+              <DialogDescription>{formatDateTime(event.occurredAt)} par {event.actorName || auditActorLabel(event.actorType)}</DialogDescription>
+            </DialogHeader>
+            <div className="grid max-h-[65vh] gap-4 overflow-y-auto pr-1">
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader className="bg-muted/40">
+                    <TableRow>
+                      <TableHead>Champ</TableHead>
+                      <TableHead>Avant</TableHead>
+                      <TableHead>Après</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fields.map((field) => (
+                      <TableRow key={field}>
+                        <TableCell className="font-medium">{auditFieldLabel(field)}</TableCell>
+                        <TableCell className="max-w-72 break-words text-muted-foreground">{formatAuditValue(event.beforeData?.[field])}</TableCell>
+                        <TableCell className="max-w-72 break-words">{formatAuditValue(event.afterData?.[field])}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!fields.length ? (
+                      <TableRow><TableCell colSpan={3} className="py-8 text-center text-muted-foreground">Aucune différence enregistrée.</TableCell></TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
+              </div>
+              <dl className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                <div><dt className="font-medium text-foreground">Source</dt><dd>{auditSourceLabel(event.source)}</dd></div>
+                <div><dt className="font-medium text-foreground">Requête</dt><dd className="break-all font-mono">{event.requestId || "-"}</dd></div>
+              </dl>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
+              {entityUrl ? (
+                <Button asChild>
+                  <Link to={entityUrl} onClick={() => onOpenChange(false)}>
+                    <ExternalLink className="size-4" />
+                    Ouvrir l’objet
+                  </Link>
+                </Button>
+              ) : null}
+            </DialogFooter>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function auditChangedFields(event: AdminAuditEvent) {
+  return Array.from(new Set([
+    ...Object.keys(event.beforeData ?? {}),
+    ...Object.keys(event.afterData ?? {}),
+  ])).sort((left, right) => auditFieldLabel(left).localeCompare(auditFieldLabel(right), "fr"));
+}
+
+function auditEventSummary(event: AdminAuditEvent) {
+  const fields = auditChangedFields(event);
+  if (event.action === "CREATED") return `${fields.length} champ(s) enregistré(s)`;
+  if (event.action === "DELETED") return "Enregistrement supprimé";
+  if (!fields.length) return "Modification enregistrée";
+  const labels = fields.slice(0, 2).map(auditFieldLabel);
+  return fields.length > 2 ? `${labels.join(", ")} +${fields.length - 2}` : labels.join(", ");
+}
+
+function auditEntityReference(event: AdminAuditEvent) {
+  const snapshot = { ...(event.beforeData ?? {}), ...(event.afterData ?? {}) };
+  const candidates = [
+    "numeroSinistre",
+    "numeroDossier",
+    "numeroPolice",
+    "numeroDocument",
+    "numeroBordereau",
+    "reference",
+    "code",
+    "libelle",
+    "nom",
+  ];
+  for (const key of candidates) {
+    const value = snapshot[key];
+    if (typeof value === "string" && value.trim()) return `n° ${value.trim()}`;
+  }
+  return event.entityId ? `#${event.entityId}` : "";
+}
+
+function auditEntityTypeLabel(entityType: string) {
+  return ({
+    Contrat: "Contrat",
+    Sinistre: "Sinistre",
+    DocumentClient: "Document client",
+    ReglementClient: "Règlement client",
+    BordereauCompagnie: "Bordereau compagnie",
+    ReglementCompagnie: "Règlement compagnie",
+    CompteTresorerie: "Compte de trésorerie",
+    MouvementTresorerie: "Mouvement de trésorerie",
+    OperationTresorerie: "Opération de trésorerie",
+    BordereauRemise: "Bordereau de remise",
+    RapprochementBancaire: "Rapprochement bancaire",
+    ImportReleveBancaire: "Import de relevé bancaire",
+    LigneReleveBancaire: "Ligne de relevé bancaire",
+    ProfilImportReleveBancaire: "Profil d’import bancaire",
+    SessionCaisse: "Session de caisse",
+    AffectationCompteTresorerie: "Affectation de compte",
+    ConditionPaiementClient: "Condition de paiement",
+    AjustementTarifUsage: "Ajustement tarifaire",
+  } as Record<string, string>)[entityType] ?? splitAuditIdentifier(entityType);
+}
+
+function auditFieldLabel(field: string) {
+  return ({
+    actif: "Actif",
+    agence: "Agence",
+    client: "Client",
+    statut: "Statut",
+    dateEffet: "Date d’effet",
+    dateEcheance: "Date d’échéance",
+    dateSinistre: "Date du sinistre",
+    dateDeclaration: "Date de déclaration",
+    numeroDossier: "N° dossier",
+    numeroPolice: "N° police",
+    numeroSinistre: "N° sinistre",
+    montant: "Montant",
+    montantTtc: "Montant TTC",
+    primeTtc: "Prime TTC",
+    notes: "Notes",
+    commentaire: "Commentaire",
+    circonstances: "Circonstances",
+  } as Record<string, string>)[field] ?? splitAuditIdentifier(field);
+}
+
+function splitAuditIdentifier(value: string) {
+  const words = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replaceAll("_", " ")
+    .trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1).toLowerCase() : value;
+}
+
+function formatAuditValue(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "-";
+  if (typeof value === "boolean") return value ? "Oui" : "Non";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split("-");
+      return `${day}/${month}/${year}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return formatDateTime(value);
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(formatAuditValue).join(", ") || "-";
+  if (typeof value === "object") {
+    const reference = value as { type?: unknown; id?: unknown };
+    if (typeof reference.type === "string" && reference.id != null) {
+      return `${auditEntityTypeLabel(reference.type)} #${String(reference.id)}`;
+    }
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+function auditEntityUrl(event: AdminAuditEvent) {
+  if (!event.entityId || event.action === "DELETED") return null;
+  return ({
+    Contrat: `/app/production/contrats/${event.entityId}`,
+    Sinistre: `/app/sinistre/dossiers/${event.entityId}`,
+    BordereauCompagnie: `/app/compta/bordereaux-compagnies/${event.entityId}`,
+    CompteTresorerie: `/app/compta/tresorerie/comptes/${event.entityId}`,
+  } as Record<string, string>)[event.entityType] ?? null;
+}
+
+function auditActorLabel(actorType: AdminAuditEvent["actorType"]) {
+  return ({ USER: "Utilisateur", SYSTEM: "Système", IMPORT: "Import" })[actorType];
+}
+
+function auditSourceLabel(source?: string | null) {
+  return ({ API: "Application", IMPORT: "Import", SYSTEM: "Système" } as Record<string, string>)[source ?? ""] ?? source ?? "-";
 }
 
 function RolesPanel({

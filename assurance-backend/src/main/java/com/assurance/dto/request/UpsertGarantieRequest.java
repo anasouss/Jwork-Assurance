@@ -39,6 +39,7 @@ public class UpsertGarantieRequest {
     private CritereSelectionTarif critereSelectionTarif;
     private Set<SourceValeurGarantie> sourcesValeurAutorisees;
     private SourceValeurGarantie sourceValeurParDefaut;
+    private Long garantieReferencePrimeId;
     private Boolean saisieManuelleAutorisee;
     private Boolean verrouillee;
     private Set<Long> compagniesSansProrataIds;

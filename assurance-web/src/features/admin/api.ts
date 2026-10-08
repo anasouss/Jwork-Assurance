@@ -16,7 +16,15 @@ import type {
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
 
 export const adminApi = {
-  async auditEvents(params: { search?: string; page?: number; size?: number }) {
+  async auditEvents(params: {
+    search?: string;
+    action?: "CREATED" | "UPDATED" | "DELETED";
+    entityType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    size?: number;
+  }) {
     return unwrap(await apiFetch<ApiResponse<AdminAuditPage>>(
       `/api/v1/audit-events${buildQueryString(params)}`
     ));

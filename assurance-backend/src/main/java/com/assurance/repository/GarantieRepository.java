@@ -12,6 +12,7 @@ public interface GarantieRepository extends JpaRepository<Garantie, Long> {
     @Override
     @EntityGraph(attributePaths = {
             "groupeExclusion",
+            "garantieReferencePrime",
             "modesTarificationMultiple",
             "modesAutorises",
             "sourcesValeurAutorisees"

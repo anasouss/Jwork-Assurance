@@ -28,6 +28,8 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
                     or lower(event.entityType) like concat('%', :search, '%')
                     or lower(event.entityId) like concat('%', :search, '%')
                     or lower(coalesce(event.requestId, '')) like concat('%', :search, '%')
+                    or lower(coalesce(event.beforeData, '')) like concat('%', :search, '%')
+                    or lower(coalesce(event.afterData, '')) like concat('%', :search, '%')
               )
             order by event.occurredAt desc, event.id desc
             """)

@@ -339,7 +339,7 @@ public class ContratService {
         contratGarantieRepository.flush();
         contrat.getGaranties().removeIf(garantie -> garantie.getVehicule() != null && vehicule.getId().equals(garantie.getVehicule().getId()));
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
-        for (CreateContratRequest.GarantieInput input : inputs == null ? List.<CreateContratRequest.GarantieInput>of() : inputs) {
+        for (CreateContratRequest.GarantieInput input : orderGarantieInputsByPrimeDependency(contrat, inputs)) {
             if (input.getGarantieId() == null) {
                 continue;
             }
@@ -426,20 +426,23 @@ public class ContratService {
         List<Vehicule> vehicules = activeVehiculesForView(contrat);
         List<Remorque> remorques = activeRemorquesForView(contrat);
         List<ContratGarantie> current = activeGarantiesForView(contrat);
-        List<ContratGarantie> recalculated = new ArrayList<>();
+        List<ContratGarantie> recalculatedByDependency = new ArrayList<>();
+        Map<Long, ContratGarantie> recalculatedById = new HashMap<>();
         List<String> blockers = new ArrayList<>();
         int changed = 0;
 
-        for (ContratGarantie existing : current) {
+        for (ContratGarantie existing : orderContratGarantiesByPrimeDependency(current)) {
             try {
                 CreateContratRequest.GarantieInput input = tariffRecalculationInput(contrat, existing);
                 ContratGarantie next = buildCalculatedDraftGarantieForTarget(
                         contrat,
                         input,
                         existing.getVehicule(),
-                        existing.getRemorque()
+                        existing.getRemorque(),
+                        recalculatedByDependency
                 );
-                recalculated.add(next);
+                recalculatedByDependency.add(next);
+                recalculatedById.put(existing.getId(), next);
                 if (!sameTariffSnapshot(existing, next)) {
                     changed++;
                 }
@@ -447,6 +450,11 @@ public class ContratService {
                 blockers.add(tariffRecalculationTargetLabel(existing) + " : " + exception.getMessage());
             }
         }
+
+        List<ContratGarantie> recalculated = current.stream()
+                .map(garantie -> recalculatedById.get(garantie.getId()))
+                .filter(Objects::nonNull)
+                .toList();
 
         QuittanceResponse before = calculateDraftQuittance(contrat, current, vehicules, remorques);
         QuittanceResponse after = blockers.isEmpty()
@@ -536,7 +544,7 @@ public class ContratService {
         contratGarantieRepository.flush();
         contrat.getGaranties().removeIf(garantie -> garantie.getRemorque() != null && remorque.getId().equals(garantie.getRemorque().getId()));
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
-        for (CreateContratRequest.GarantieInput input : inputs == null ? List.<CreateContratRequest.GarantieInput>of() : inputs) {
+        for (CreateContratRequest.GarantieInput input : orderGarantieInputsByPrimeDependency(contrat, inputs)) {
             if (input.getGarantieId() == null) {
                 continue;
             }
@@ -753,7 +761,7 @@ public class ContratService {
 
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
-        for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
+        for (CreateContratRequest.GarantieInput input : orderGarantieInputsByPrimeDependency(contrat, request.getGaranties())) {
             Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
@@ -765,7 +773,7 @@ public class ContratService {
             ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
             SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
-            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
+            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garantiesCreees);
             validateGarantieTarget(garantie, vehicule, remorque, client);
             registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
             validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
@@ -1942,7 +1950,7 @@ public class ContratService {
     ) {
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
-        for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
+        for (CreateContratRequest.GarantieInput input : orderGarantieInputsByPrimeDependency(contrat, request.getGaranties())) {
             Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
@@ -1954,7 +1962,7 @@ public class ContratService {
             ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
             SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
-            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
+            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garantiesCreees);
             validateGarantieTarget(garantie, vehicule, remorque, client);
             registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
             validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
@@ -2043,14 +2051,21 @@ public class ContratService {
             Vehicule vehicule,
             Remorque remorque
     ) {
-        return contratGarantieRepository.save(buildCalculatedDraftGarantieForTarget(contrat, input, vehicule, remorque));
+        return contratGarantieRepository.save(buildCalculatedDraftGarantieForTarget(
+                contrat,
+                input,
+                vehicule,
+                remorque,
+                contrat.getGaranties()
+        ));
     }
 
     private ContratGarantie buildCalculatedDraftGarantieForTarget(
             Contrat contrat,
             CreateContratRequest.GarantieInput input,
             Vehicule vehicule,
-            Remorque remorque
+            Remorque remorque,
+            List<ContratGarantie> garantiesCalculees
     ) {
         Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
         Client client = input.getClientId() == null ? null :
@@ -2061,7 +2076,7 @@ public class ContratService {
         ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
         SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
         FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
-        GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
+        GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garantiesCalculees);
         validateGarantieTarget(garantie, vehicule, remorque, client);
         validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
         validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
@@ -5037,7 +5052,7 @@ public class ContratService {
     ) {
         List<ContratGarantie> garanties = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
-        for (CreateContratRequest.GarantieInput input : request.getGaranties() == null ? List.<CreateContratRequest.GarantieInput>of() : request.getGaranties()) {
+        for (CreateContratRequest.GarantieInput input : orderGarantieInputsByPrimeDependency(contrat, request.getGaranties())) {
             Garantie garantie = requireGuaranteeForContract(contrat, input.getGarantieId());
             Client client = input.getClientId() == null ? null :
                     clientRepository.findByAgenceIdAndId(request.getAgenceId(), input.getClientId())
@@ -5049,7 +5064,7 @@ public class ContratService {
             ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
             SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
-            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne);
+            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garanties);
             validateGarantieTarget(garantie, vehicule, remorque, client);
             registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
             validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
@@ -6517,6 +6532,85 @@ public class ContratService {
         return id != null ? String.valueOf(id) : "NEW:" + System.identityHashCode(entity);
     }
 
+    private List<CreateContratRequest.GarantieInput> orderGarantieInputsByPrimeDependency(
+            Contrat contrat,
+            List<CreateContratRequest.GarantieInput> inputs
+    ) {
+        List<CreateContratRequest.GarantieInput> ordered = new ArrayList<>(inputs == null ? List.of() : inputs);
+        Map<Long, Garantie> garanties = new HashMap<>();
+        for (CreateContratRequest.GarantieInput input : ordered) {
+            if (input != null && input.getGarantieId() != null) {
+                garanties.computeIfAbsent(
+                        input.getGarantieId(),
+                        id -> requireGuaranteeForContract(contrat, id)
+                );
+            }
+        }
+        Map<Long, Integer> depths = new HashMap<>();
+        ordered.sort(Comparator.comparingInt(input -> {
+            if (input == null || input.getGarantieId() == null) {
+                return 0;
+            }
+            return primeDependencyDepth(garanties.get(input.getGarantieId()), depths, new HashSet<>());
+        }));
+        return ordered;
+    }
+
+    private List<ContratGarantie> orderContratGarantiesByPrimeDependency(List<ContratGarantie> garanties) {
+        List<ContratGarantie> ordered = new ArrayList<>(garanties);
+        Map<Long, Integer> depths = new HashMap<>();
+        ordered.sort(Comparator.comparingInt(garantie ->
+                primeDependencyDepth(garantie.getGarantie(), depths, new HashSet<>())));
+        return ordered;
+    }
+
+    private int primeDependencyDepth(Garantie garantie, Map<Long, Integer> depths, Set<Long> visiting) {
+        if (garantie == null || garantie.getGarantieReferencePrime() == null) {
+            return 0;
+        }
+        Long garantieId = garantie.getId();
+        if (garantieId != null && depths.containsKey(garantieId)) {
+            return depths.get(garantieId);
+        }
+        if (garantieId != null && !visiting.add(garantieId)) {
+            throw new BadRequestException("Une dependance circulaire existe entre les garanties de reference");
+        }
+        int depth = 1 + primeDependencyDepth(garantie.getGarantieReferencePrime(), depths, visiting);
+        if (garantieId != null) {
+            visiting.remove(garantieId);
+            depths.put(garantieId, depth);
+        }
+        return depth;
+    }
+
+    private BigDecimal resolvePrimeGarantieReference(
+            Garantie garantie,
+            Vehicule vehicule,
+            Remorque remorque,
+            Client client,
+            List<ContratGarantie> garantiesCalculees
+    ) {
+        Garantie reference = garantie.getGarantieReferencePrime();
+        ContratGarantie ligneReference = (garantiesCalculees == null ? List.<ContratGarantie>of() : garantiesCalculees)
+                .stream()
+                .filter(candidate -> candidate.getGarantie() != null
+                        && Objects.equals(candidate.getGarantie().getId(), reference.getId()))
+                .filter(candidate -> sameEntity(candidate.getVehicule(), vehicule)
+                        && sameEntity(candidate.getRemorque(), remorque)
+                        && sameEntity(candidate.getClient(), client))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException(
+                        "La garantie " + garantie.getCode() + " exige la garantie de reference " + reference.getCode()
+                                + " sur la meme cible"
+                ));
+        if (ligneReference.getPrime() == null) {
+            throw new BadRequestException(
+                    "La prime nette de la garantie " + reference.getCode() + " doit etre calculee avant " + garantie.getCode()
+            );
+        }
+        return ligneReference.getPrime();
+    }
+
     private String garantieLabel(Garantie garantie) {
         String code = blankToNull(garantie.getCode());
         return code == null ? garantie.getLibelle() : code + " - " + garantie.getLibelle();
@@ -6647,10 +6741,12 @@ public class ContratService {
             LigneGrilleTarifaire ligneGrilleTarifaire,
             Vehicule vehicule,
             Remorque remorque,
+            Client client,
             Usage usageCible,
             ModeTarificationGarantie modeSelectionne,
             SourceValeurGarantie sourceValeurSelectionnee,
-            FormuleGarantiePersonne formuleGarantiePersonne
+            FormuleGarantiePersonne formuleGarantiePersonne,
+            List<ContratGarantie> garantiesCalculees
     ) {
         BigDecimal valeurVenale = firstNonNull(input.getValeurVenale(), vehicule != null ? vehicule.getValeurVenale() : null);
         BigDecimal valeurNeuf = firstNonNull(input.getValeurNeuf(), vehicule != null ? vehicule.getValeurNeuf() : null);
@@ -6690,7 +6786,7 @@ public class ContratService {
         BigDecimal franchiseMinimale = Boolean.TRUE.equals(garantie.getAvecFranchiseMinimale())
                 ? firstNonNull(input.getFranchiseMinimale(), calculGarantieService.resolveFranchiseMinimaleLigne(ligneGrilleTarifaire, remorque != null))
                 : null;
-        BigDecimal prime = resolvePrime(contrat, garantie, input, ligneGrilleTarifaire, vehicule, remorque, modeSelectionne, capital, taux);
+        BigDecimal prime = resolvePrime(contrat, garantie, input, ligneGrilleTarifaire, vehicule, remorque, client, modeSelectionne, capital, taux, garantiesCalculees);
 
         return new GarantieMontants(
                 valeurVenale,
@@ -6760,9 +6856,11 @@ public class ContratService {
             LigneGrilleTarifaire ligneGrilleTarifaire,
             Vehicule vehicule,
             Remorque remorque,
+            Client client,
             ModeTarificationGarantie modeSelectionne,
             BigDecimal capital,
-            BigDecimal taux
+            BigDecimal taux,
+            List<ContratGarantie> garantiesCalculees
     ) {
         boolean contratManuel = contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE;
         if (contratManuel && Boolean.TRUE.equals(contrat.getSaisiePrimeNette())) {
@@ -6770,6 +6868,22 @@ public class ContratService {
         }
         if (contratManuel && garantie.getTypeGarantie() == TypeGarantie.PERSONNE) {
             return input.getPrime();
+        }
+        if (garantie.getGarantieReferencePrime() != null) {
+            if (modeSelectionne != ModeTarificationGarantie.TAUX) {
+                throw new BadRequestException("La garantie " + garantie.getCode() + " doit etre tarifee au taux pour utiliser une prime de reference");
+            }
+            BigDecimal primeReference = resolvePrimeGarantieReference(
+                    garantie,
+                    vehicule,
+                    remorque,
+                    client,
+                    garantiesCalculees
+            );
+            if (taux == null) {
+                throw new BadRequestException("Le taux est obligatoire pour la garantie " + garantie.getCode());
+            }
+            return scale(primeReference.multiply(taux).divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP));
         }
         if (Boolean.TRUE.equals(garantie.getResponsabiliteCivile())) {
             BigDecimal primeRc = calculGarantieService.calculerPrimeResponsabiliteCivile(contrat, vehicule, remorque, garantie);

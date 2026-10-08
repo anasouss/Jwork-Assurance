@@ -130,6 +130,7 @@ export const garantieSchema = z.object({
   critereSelectionTarif: z.enum(["TAUX_PRIME", "TAUX_FRANCHISE"]),
   sourcesValeurAutorisees: z.array(z.enum(["VENALE", "NEUF", "GLACE", "MANUEL"])).optional(),
   sourceValeurParDefaut: z.enum(["AUCUNE", "VENALE", "NEUF", "GLACE", "MANUEL"]),
+  garantieReferencePrimeId: z.string().optional(),
   saisieManuelleAutorisee: z.boolean().optional(),
   verrouillee: z.boolean().optional(),
   compagniesSansProrataIds: z.array(z.string()).optional(),
@@ -172,6 +173,12 @@ export const garantieSchema = z.object({
   }
   if (value.sourceValeurParDefaut !== "AUCUNE" && !(value.sourcesValeurAutorisees ?? []).includes(value.sourceValeurParDefaut)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["sourceValeurParDefaut"], message: "La source par défaut doit être autorisée" });
+  }
+  if (value.garantieReferencePrimeId && (value.typeGarantie !== "VEHICULE" || !value.modesAutorises.includes("TAUX") || value.responsabiliteCivile)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["garantieReferencePrimeId"], message: "Une prime de référence nécessite une garantie véhicule standard tarifée au taux" });
+  }
+  if (value.garantieReferencePrimeId && (!value.avecCapital || !value.saisieManuelleAutorisee)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["garantieReferencePrimeId"], message: "Cette base tarifaire exige la saisie du capital propre à la garantie" });
   }
 });
 

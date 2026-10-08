@@ -185,6 +185,11 @@ export function FlotteGarantieSection({
                         <div className="mt-1 flex flex-wrap gap-1">
                           {!isRc && !grilleSelected ? <Badge variant="outline">Grille requise</Badge> : null}
                           {!isRc && grilleSelected && !hasLine ? <Badge variant="outline">Tarif manquant</Badge> : null}
+                          {garantie.garantieReferencePrimeId ? (
+                            <Badge variant="outline">
+                              Base tarifaire : prime {String(garantie.garantieReferencePrimeCode ?? garantie.garantieReferencePrimeLibelle ?? "de référence")}
+                            </Badge>
+                          ) : null}
                           {warning ? <Badge variant="destructive">{warning}</Badge> : null}
                         </div>
                       </td>

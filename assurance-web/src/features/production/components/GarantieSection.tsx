@@ -236,7 +236,10 @@ export function GarantieSection({
               const manualValue = selectedSource === "MANUEL";
               const manualCapital = canEnterManualCapital(garantie, item, selectedLine);
               const displayCapital = guaranteeCapitalValue(garantie, selectedLine, selectedVehicle, item);
-              const estimatedPrime = automaticPricing && checked && !isRc ? estimatePrime(selectedLine, displayCapital) : undefined;
+              const usesReferencePrime = Boolean(garantie.garantieReferencePrimeId);
+              const estimatedPrime = automaticPricing && checked && !isRc && !usesReferencePrime
+                ? estimatePrime(selectedLine, displayCapital)
+                : undefined;
               const previewLine = automaticPricing && checked
                 ? guaranteePreviewLine(preview, garantie.id, item?.vehiculeIndex ?? 0)
                 : undefined;
@@ -263,6 +266,11 @@ export function GarantieSection({
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {automaticPricing && !isRc && !hasLine ? <Badge variant="outline">Tarif manquant</Badge> : null}
+                      {usesReferencePrime ? (
+                        <Badge variant="outline">
+                          Base tarifaire : prime {String(garantie.garantieReferencePrimeCode ?? garantie.garantieReferencePrimeLibelle ?? "de référence")}
+                        </Badge>
+                      ) : null}
                     </div>
                   </td>
                   {vehiculeCount > 1 ? (

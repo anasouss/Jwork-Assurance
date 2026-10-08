@@ -426,7 +426,7 @@ export function ContractTargetsSection({
                         key={key}
                         type="button"
                         className={cn(
-                          "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                          "flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2",
                           active ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100" : "hover:bg-muted/60"
                         )}
                         onClick={() => setActiveKey(targetKey(target))}
@@ -615,7 +615,7 @@ export function ContractTargetsSection({
                       key={key}
                       type="button"
                       className={cn(
-                        "flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                        "flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2",
                         active ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100" : "hover:bg-muted/60"
                       )}
                       onClick={() => setActiveKey(targetKey(target))}
@@ -828,7 +828,10 @@ function TargetSubsection({
     <Collapsible open={open} onOpenChange={handleOpenChange} className="overflow-hidden rounded-md border bg-card">
       <div className="flex items-center justify-between gap-3 bg-emerald-50 px-4 py-3 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
         <CollapsibleTrigger asChild>
-          <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-emerald-700 dark:hover:text-emerald-100">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left transition-colors hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 dark:hover:text-emerald-100"
+          >
             <ChevronDown className={cn("size-4 shrink-0 transition-transform", !open && "-rotate-90")} />
             <span className="truncate text-sm font-semibold">{title}</span>
             {badge ? <Badge variant="secondary">{badge}</Badge> : null}

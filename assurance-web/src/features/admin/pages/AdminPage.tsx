@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { ServerPagination } from "@/components/shared";
+import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -67,6 +67,8 @@ import type {
   UpsertAdminUserRequest,
   UpsertPlatformAdminRequest,
 } from "../types";
+
+const ADMIN_TABLE_HEADER_CLASS = "bg-fuchsia-700 text-white [&_th]:text-white";
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
@@ -156,6 +158,7 @@ export default function AdminPage() {
         {canViewUsers ? <TabsContent value="users">
           <UsersPanel
             users={users.data ?? []}
+            loading={users.isLoading}
             roles={roles.data ?? []}
             agencies={availableAgencies}
             canSelectAgency={isPlatformMode}
@@ -170,6 +173,7 @@ export default function AdminPage() {
         {canViewRoles ? <TabsContent value="roles">
           <RolesPanel
             roles={roles.data ?? []}
+            loading={roles.isLoading}
             permissions={permissionsQuery.data ?? []}
             agencies={availableAgencies}
             canManage={canManageRoles}
@@ -190,6 +194,7 @@ export default function AdminPage() {
           <TabsContent value="agencies">
             <AgenciesPanel
               agencies={agencies.data ?? []}
+              loading={agencies.isLoading}
               canManage={canManageAgencies}
               canCreate={isPlatformMode && canManagePlatformAgencies}
               canEditPlatformFields={isPlatformMode && canManagePlatformAgencies}
@@ -202,6 +207,7 @@ export default function AdminPage() {
           <TabsContent value="platform-admins">
             <PlatformAdminsPanel
               users={platformAdmins.data ?? []}
+              loading={platformAdmins.isLoading}
               currentUserId={user?.id}
               onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "platform-admins"] })}
             />
@@ -241,6 +247,7 @@ function SummaryCard({
 
 function UsersPanel({
   users,
+  loading,
   roles,
   agencies,
   canSelectAgency,
@@ -251,6 +258,7 @@ function UsersPanel({
   onChanged,
 }: {
   users: AdminUser[];
+  loading: boolean;
   roles: AdminRole[];
   agencies: AdminAgency[];
   canSelectAgency: boolean;
@@ -336,7 +344,7 @@ function UsersPanel({
 
       <div className="overflow-x-auto rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
             <TableRow>
               <TableHead>Utilisateur</TableHead>
               <TableHead>Agence</TableHead>
@@ -348,7 +356,9 @@ function UsersPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((item) => (
+            {loading ? (
+              <TableRowsSkeleton rows={6} colSpan={7} />
+            ) : filtered.length ? filtered.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>
                   <div className="font-medium">{item.fullName}</div>
@@ -391,7 +401,13 @@ function UsersPanel({
                   />
                 </TableCell>
               </TableRow>
-            ))}
+            )) : (
+              <TableRow>
+                <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
+                  Aucun utilisateur trouvé
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -481,10 +497,12 @@ function UsersPanel({
 
 function PlatformAdminsPanel({
   users,
+  loading,
   currentUserId,
   onChanged,
 }: {
   users: AdminUser[];
+  loading: boolean;
   currentUserId?: string;
   onChanged: () => void;
 }) {
@@ -564,7 +582,7 @@ function PlatformAdminsPanel({
 
       <div className="overflow-x-auto rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
             <TableRow>
               <TableHead>Administrateur</TableHead>
               <TableHead>Téléphone</TableHead>
@@ -574,7 +592,9 @@ function PlatformAdminsPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length ? filtered.map((item) => (
+            {loading ? (
+              <TableRowsSkeleton rows={6} colSpan={5} />
+            ) : filtered.length ? filtered.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>
                   <div className="flex items-center gap-2 font-medium">
@@ -960,7 +980,7 @@ function AuditPanel() {
 
       <div className="overflow-x-auto rounded-md border">
         <Table>
-          <TableHeader className="bg-muted/40">
+          <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Utilisateur</TableHead>
@@ -971,7 +991,9 @@ function AuditPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(events.data?.items ?? []).map((event: AdminAuditEvent) => (
+            {events.isLoading ? (
+              <TableRowsSkeleton rows={8} colSpan={6} />
+            ) : (events.data?.items ?? []).map((event: AdminAuditEvent) => (
               <TableRow key={event.id}>
                 <TableCell className="whitespace-nowrap">{formatDateTime(event.occurredAt)}</TableCell>
                 <TableCell>
@@ -1084,7 +1106,7 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
             <div className="grid max-h-[65vh] gap-4 overflow-y-auto pr-1">
               <div className="overflow-x-auto rounded-md border">
                 <Table>
-                  <TableHeader className="bg-muted/40">
+                  <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
                     <TableRow>
                       <TableHead>Champ</TableHead>
                       <TableHead>Avant</TableHead>
@@ -1260,12 +1282,14 @@ function auditSourceLabel(source?: string | null) {
 
 function RolesPanel({
   roles,
+  loading,
   permissions,
   agencies,
   canManage,
   onChanged,
 }: {
   roles: AdminRole[];
+  loading: boolean;
   permissions: AdminPermission[];
   agencies: AdminAgency[];
   canManage: boolean;
@@ -1320,7 +1344,7 @@ function RolesPanel({
       </div>
       <div className="overflow-x-auto rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
             <TableRow>
               <TableHead>Role</TableHead>
               <TableHead>Agence</TableHead>
@@ -1330,7 +1354,9 @@ function RolesPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {roles.map((role) => (
+            {loading ? (
+              <TableRowsSkeleton rows={5} colSpan={5} />
+            ) : roles.length ? roles.map((role) => (
               <TableRow key={role.id}>
                 <TableCell>
                   <div className="font-medium">{role.nom}</div>
@@ -1360,7 +1386,13 @@ function RolesPanel({
                   />
                 </TableCell>
               </TableRow>
-            ))}
+            )) : (
+              <TableRow>
+                <TableCell colSpan={5} className="h-28 text-center text-muted-foreground">
+                  Aucun rôle trouvé
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -1485,12 +1517,14 @@ function RolesPanel({
 
 function AgenciesPanel({
   agencies,
+  loading,
   canManage,
   canCreate,
   canEditPlatformFields,
   onChanged,
 }: {
   agencies: AdminAgency[];
+  loading: boolean;
   canManage: boolean;
   canCreate: boolean;
   canEditPlatformFields: boolean;
@@ -1561,7 +1595,7 @@ function AgenciesPanel({
       </div> : null}
       <div className="overflow-x-auto rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
             <TableRow>
               <TableHead>Agence</TableHead>
               <TableHead>Ville</TableHead>
@@ -1571,7 +1605,9 @@ function AgenciesPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {agencies.map((agence) => (
+            {loading ? (
+              <TableRowsSkeleton rows={5} colSpan={5} />
+            ) : agencies.length ? agencies.map((agence) => (
               <TableRow key={agence.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -1594,7 +1630,13 @@ function AgenciesPanel({
                   </Button>
                 </TableCell>
               </TableRow>
-            ))}
+            )) : (
+              <TableRow>
+                <TableCell colSpan={5} className="h-28 text-center text-muted-foreground">
+                  Aucune agence trouvée
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>

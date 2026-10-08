@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Eye, FilePlus2, MoreHorizontal, Search, X } from "lucide-react";
+import { ChevronDown, Eye, FilePlus2, Loader2, MoreHorizontal, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { amendmentKeys, contractKeys, referenceKeys } from "@/lib/query-keys";
 import { FilterField as SharedFilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -139,7 +139,13 @@ export default function ContratsPage() {
           ) : null}
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.1fr_1.1fr_1fr_1fr_1fr_1fr_1fr_auto]">
+          <form
+            className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.1fr_1.1fr_1fr_1fr_1fr_1fr_1fr_auto]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              applyFilters(filters);
+            }}
+          >
             <FilterField label="Type de contrat">
               <Select value={filters.typeContrat} onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as ContractFilters["typeContrat"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -184,8 +190,13 @@ export default function ContratsPage() {
               <Input value={filters.numeroPolice} onChange={(event) => setFilters((current) => ({ ...current, numeroPolice: event.target.value }))} />
             </FilterField>
             <div className="flex items-end gap-2">
-              <Button type="button" className="h-9 px-4" onClick={() => applyFilters(filters)}>
-                <Search className="size-4" />
+              <Button
+                type="submit"
+                className="h-9 px-4"
+                aria-label="Rechercher"
+                disabled={contrats.isFetching}
+              >
+                {contrats.isFetching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
               </Button>
               <Button
                 type="button"
@@ -200,7 +211,7 @@ export default function ContratsPage() {
                 <X className="size-4" />
               </Button>
             </div>
-          </div>
+          </form>
         </CardContent>
       </Card>
 

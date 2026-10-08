@@ -1,8 +1,11 @@
 package com.assurance.dto.response;
 
 import com.assurance.entity.Permission;
+import com.assurance.security.PermissionDependencies;
 import lombok.Builder;
 import lombok.Data;
+
+import java.util.Set;
 
 @Data
 @Builder
@@ -13,6 +16,7 @@ public class AdminPermissionResponse {
     private String module;
     private String description;
     private Boolean superAdminOnly;
+    private Set<String> requiredPermissionCodes;
 
     public static AdminPermissionResponse from(Permission permission) {
         return AdminPermissionResponse.builder()
@@ -22,6 +26,7 @@ public class AdminPermissionResponse {
                 .module(permission.getModule())
                 .description(permission.getDescription())
                 .superAdminOnly(permission.getSuperAdminOnly())
+                .requiredPermissionCodes(PermissionDependencies.requiredFor(permission.getCode()))
                 .build();
     }
 }

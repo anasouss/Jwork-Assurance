@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { ServerPagination } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +54,7 @@ import { adminApi } from "../api";
 import { AgencyImageUploadField } from "../components/AgencyImageUploadField";
 import type {
   AdminAgency,
+  AdminAuditEvent,
   AdminPermission,
   AdminRole,
   AdminUser,
@@ -67,6 +69,9 @@ export default function AdminPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const permissions = user?.permissions ?? [];
+  const canViewUsers = permissions.includes("user:view") || permissions.includes("user:manage") || permissions.includes("config:view") || permissions.includes("config:manage");
+  const canViewRoles = permissions.includes("role:view") || permissions.includes("role:manage") || permissions.includes("config:view") || permissions.includes("config:manage");
+  const canViewAudit = permissions.includes("audit:view");
   const canManageUsers = permissions.includes("user:manage") || permissions.includes("config:manage");
   const canManageRoles = permissions.includes("role:manage") || permissions.includes("config:manage");
   const canManagePlatformAgencies = permissions.includes("agence:create") || permissions.includes("config:manage");
@@ -76,10 +81,11 @@ export default function AdminPage() {
   const canAccessAgencySettings = canViewAgencies || canManageOwnAgency;
   const isPlatformAdmin = Boolean(user?.platformAdmin);
   const isPlatformMode = isPlatformAdmin && user?.operatingMode === "PLATFORM";
+  const defaultTab = canViewUsers ? "users" : canViewRoles ? "roles" : canViewAudit ? "audit" : "agencies";
 
-  const users = useQuery({ queryKey: ["admin", "users"], queryFn: adminApi.users, staleTime: 30_000 });
-  const roles = useQuery({ queryKey: ["admin", "roles"], queryFn: adminApi.roles, staleTime: 30_000 });
-  const permissionsQuery = useQuery({ queryKey: ["admin", "permissions"], queryFn: adminApi.permissions, staleTime: 60_000 });
+  const users = useQuery({ queryKey: ["admin", "users"], queryFn: adminApi.users, staleTime: 30_000, enabled: canViewUsers });
+  const roles = useQuery({ queryKey: ["admin", "roles"], queryFn: adminApi.roles, staleTime: 30_000, enabled: canViewRoles || canManageUsers });
+  const permissionsQuery = useQuery({ queryKey: ["admin", "permissions"], queryFn: adminApi.permissions, staleTime: 60_000, enabled: canViewRoles });
   const agencies = useQuery({
     queryKey: ["admin", "agencies"],
     queryFn: adminApi.agencies,
@@ -121,10 +127,10 @@ export default function AdminPage() {
         </p>
       </div>
 
-      <div className={`grid gap-3 ${isPlatformMode ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
-        <SummaryCard icon={Users} label="Utilisateurs" value={users.data?.length ?? 0} detail={`${users.data?.filter((item) => item.actif).length ?? 0} actifs`} />
-        <SummaryCard icon={ShieldCheck} label="Rôles d’agence" value={roles.data?.length ?? 0} detail={`${permissionsQuery.data?.length ?? 0} permissions disponibles`} />
-        <SummaryCard icon={Building2} label={isPlatformMode ? "Agences accessibles" : "Agence"} value={availableAgencies.length} detail={isPlatformMode ? "Périmètre plateforme" : user?.agenceName ?? "Agence courante"} />
+      <div className="grid gap-3 md:grid-cols-3">
+        {canViewUsers ? <SummaryCard icon={Users} label="Utilisateurs" value={users.data?.length ?? 0} detail={`${users.data?.filter((item) => item.actif).length ?? 0} actifs`} /> : null}
+        {canViewRoles ? <SummaryCard icon={ShieldCheck} label="Rôles d’agence" value={roles.data?.length ?? 0} detail={`${permissionsQuery.data?.length ?? 0} permissions disponibles`} /> : null}
+        {canAccessAgencySettings ? <SummaryCard icon={Building2} label={isPlatformMode ? "Agences accessibles" : "Agence"} value={availableAgencies.length} detail={isPlatformMode ? "Périmètre plateforme" : user?.agenceName ?? "Agence courante"} /> : null}
         {isPlatformMode ? (
           <SummaryCard
             icon={ShieldCheck}
@@ -135,15 +141,16 @@ export default function AdminPage() {
         ) : null}
       </div>
 
-      <Tabs defaultValue="users" className="grid gap-4">
+      <Tabs defaultValue={defaultTab} className="grid gap-4">
         <TabsList className="w-fit">
-          <TabsTrigger value="users">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="roles">Rôles & permissions</TabsTrigger>
+          {canViewUsers ? <TabsTrigger value="users">Utilisateurs</TabsTrigger> : null}
+          {canViewRoles ? <TabsTrigger value="roles">Rôles & permissions</TabsTrigger> : null}
+          {canViewAudit ? <TabsTrigger value="audit">Audit</TabsTrigger> : null}
           {canAccessAgencySettings ? <TabsTrigger value="agencies">{isPlatformMode ? "Agences" : "Mon agence"}</TabsTrigger> : null}
           {isPlatformMode ? <TabsTrigger value="platform-admins">Administrateurs plateforme</TabsTrigger> : null}
         </TabsList>
 
-        <TabsContent value="users">
+        {canViewUsers ? <TabsContent value="users">
           <UsersPanel
             users={users.data ?? []}
             roles={roles.data ?? []}
@@ -155,9 +162,9 @@ export default function AdminPage() {
             currentUserId={user?.id}
             onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "users"] })}
           />
-        </TabsContent>
+        </TabsContent> : null}
 
-        <TabsContent value="roles">
+        {canViewRoles ? <TabsContent value="roles">
           <RolesPanel
             roles={roles.data ?? []}
             permissions={permissionsQuery.data ?? []}
@@ -168,7 +175,13 @@ export default function AdminPage() {
               await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
             }}
           />
-        </TabsContent>
+        </TabsContent> : null}
+
+        {canViewAudit ? (
+          <TabsContent value="audit">
+            <AuditPanel />
+          </TabsContent>
+        ) : null}
 
         {canAccessAgencySettings ? (
           <TabsContent value="agencies">
@@ -839,6 +852,86 @@ function sessionDeviceIcon(deviceType?: string | null) {
   }
 }
 
+function AuditPanel() {
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const events = useQuery({
+    queryKey: ["admin", "audit", appliedSearch, page],
+    queryFn: () => adminApi.auditEvents({ search: appliedSearch || undefined, page, size: 25 }),
+    placeholderData: (previous) => previous,
+  });
+
+  return (
+    <div className="grid gap-4 rounded-lg border bg-card p-4">
+      <form
+        className="flex max-w-lg gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setPage(0);
+          setAppliedSearch(search.trim());
+        }}
+      >
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Utilisateur, entité ou identifiant"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+        <Button type="submit">Rechercher</Button>
+      </form>
+
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader className="bg-muted/40">
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Utilisateur</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Entité</TableHead>
+              <TableHead>Identifiant</TableHead>
+              <TableHead>Source</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(events.data?.items ?? []).map((event: AdminAuditEvent) => (
+              <TableRow key={event.id}>
+                <TableCell className="whitespace-nowrap">{formatDateTime(event.occurredAt)}</TableCell>
+                <TableCell>{event.actorName || event.actorType}</TableCell>
+                <TableCell><Badge variant="outline">{auditActionLabel(event.action)}</Badge></TableCell>
+                <TableCell>{event.entityType}</TableCell>
+                <TableCell>{event.entityId || "-"}</TableCell>
+                <TableCell>{event.source || "-"}</TableCell>
+              </TableRow>
+            ))}
+            {!events.isLoading && !(events.data?.items.length ?? 0) ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  Aucun événement d’audit trouvé.
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </div>
+      <ServerPagination
+        page={events.data?.page.number ?? page}
+        totalPages={events.data?.page.totalPages ?? 1}
+        totalElements={events.data?.page.totalElements}
+        loading={events.isFetching}
+        onPageChange={setPage}
+      />
+    </div>
+  );
+}
+
+function auditActionLabel(action: AdminAuditEvent["action"]) {
+  return ({ CREATED: "Création", UPDATED: "Modification", DELETED: "Suppression" })[action] ?? action;
+}
+
 function RolesPanel({
   roles,
   permissions,
@@ -860,8 +953,12 @@ function RolesPanel({
 
   useEffect(() => {
     if (!dialogOpen) return;
-    setForm(editing ? roleToForm(editing) : emptyRole(agencies[0]?.id));
-  }, [agencies, dialogOpen, editing]);
+    const next = editing ? roleToForm(editing) : emptyRole(agencies[0]?.id);
+    setForm({
+      ...next,
+      permissionIds: includePermissionDependencies(next.permissionIds, permissions),
+    });
+  }, [agencies, dialogOpen, editing, permissions]);
 
   const save = useMutation({
     mutationFn: () => editing ? adminApi.updateRole(editing.id, form) : adminApi.createRole(form),
@@ -966,26 +1063,36 @@ function RolesPanel({
             </div>
 
             <div className="grid gap-3">
-              {groupedPermissions.map(([module, items]) => (
+              {groupedPermissions.map(([module, resources]) => (
                 <div key={module} className="rounded-md border p-3">
-                  <div className="mb-2 text-sm font-semibold uppercase text-muted-foreground">{module}</div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {items.map((permission) => (
-                      <label key={permission.id} className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
-                        <Checkbox
-                          checked={form.permissionIds.includes(permission.id)}
-                          onCheckedChange={(checked) => {
-                            const ids = new Set(form.permissionIds);
-                            if (checked) ids.add(permission.id);
-                            else ids.delete(permission.id);
-                            setForm({ ...form, permissionIds: Array.from(ids) });
-                          }}
-                        />
-                        <span>
-                          <span className="block font-medium">{permission.nom}</span>
-                          <span className="block text-xs text-muted-foreground">{permission.code}</span>
-                        </span>
-                      </label>
+                  <div className="mb-3 text-sm font-semibold uppercase text-muted-foreground">{moduleLabel(module)}</div>
+                  <div className="grid gap-4">
+                    {resources.map(([resource, items]) => (
+                      <div key={resource} className="grid gap-2">
+                        <div className="text-xs font-semibold uppercase text-muted-foreground">{resourceLabel(resource)}</div>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {items.map((permission) => (
+                            <label key={permission.id} className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
+                              <Checkbox
+                                checked={form.permissionIds.includes(permission.id)}
+                                onCheckedChange={(checked) => setForm((current) => ({
+                                  ...current,
+                                  permissionIds: updatePermissionSelection(
+                                    current.permissionIds,
+                                    permission,
+                                    checked === true,
+                                    permissions,
+                                  ),
+                                }))}
+                              />
+                              <span>
+                                <span className="block font-medium">{permission.nom}</span>
+                                <span className="block text-xs text-muted-foreground">{permission.code}</span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1387,12 +1494,118 @@ function agencyToForm(agence: AdminAgency): UpsertAdminAgencyRequest {
 }
 
 function groupPermissions(permissions: AdminPermission[]) {
-  const groups = new Map<string, AdminPermission[]>();
+  const groups = new Map<string, Map<string, AdminPermission[]>>();
   permissions.forEach((permission) => {
     const module = permission.module || "Autres";
-    groups.set(module, [...(groups.get(module) ?? []), permission]);
+    const resource = permission.code.split(":", 1)[0] || "autres";
+    const resources = groups.get(module) ?? new Map<string, AdminPermission[]>();
+    resources.set(resource, [...(resources.get(resource) ?? []), permission]);
+    groups.set(module, resources);
   });
-  return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  return Array.from(groups.entries())
+    .sort(([left], [right]) => moduleOrder(left) - moduleOrder(right))
+    .map(([module, resources]) => [
+      module,
+      Array.from(resources.entries()).sort(([left], [right]) => resourceLabel(left).localeCompare(resourceLabel(right))),
+    ] as const);
+}
+
+function includePermissionDependencies(permissionIds: string[], permissions: AdminPermission[]) {
+  const selected = new Set(permissionIds);
+  const byCode = new Map(permissions.map((permission) => [permission.code, permission]));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const permission of permissions) {
+      if (!selected.has(permission.id)) continue;
+      for (const requiredCode of permission.requiredPermissionCodes ?? []) {
+        const required = byCode.get(requiredCode);
+        if (required && !selected.has(required.id)) {
+          selected.add(required.id);
+          changed = true;
+        }
+      }
+    }
+  }
+  return Array.from(selected);
+}
+
+function updatePermissionSelection(
+  permissionIds: string[],
+  permission: AdminPermission,
+  checked: boolean,
+  permissions: AdminPermission[],
+) {
+  const selected = new Set(permissionIds);
+  if (checked) {
+    selected.add(permission.id);
+    return includePermissionDependencies(Array.from(selected), permissions);
+  }
+
+  selected.delete(permission.id);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const candidate of permissions) {
+      if (!selected.has(candidate.id)) continue;
+      const requirementsSatisfied = (candidate.requiredPermissionCodes ?? []).every((requiredCode) => {
+        const required = permissions.find((item) => item.code === requiredCode);
+        return !required || selected.has(required.id);
+      });
+      if (!requirementsSatisfied) {
+        selected.delete(candidate.id);
+        changed = true;
+      }
+    }
+  }
+  return Array.from(selected);
+}
+
+function moduleOrder(module: string) {
+  const order = ["production", "companies", "crm", "sinistre", "compta", "administration", "shared"];
+  const index = order.indexOf(module);
+  return index === -1 ? order.length : index;
+}
+
+function moduleLabel(module: string) {
+  return ({
+    production: "Production",
+    companies: "Compagnies",
+    crm: "CRM",
+    sinistre: "Sinistres",
+    compta: "Comptabilité",
+    administration: "Administration",
+    shared: "Référentiels partagés",
+  } as Record<string, string>)[module] ?? module;
+}
+
+function resourceLabel(resource: string) {
+  return ({
+    contrat: "Contrats",
+    avenant: "Avenants",
+    client: "Clients",
+    vehicule: "Véhicules",
+    garantie: "Garanties",
+    "grille-tarifaire": "Grilles tarifaires",
+    quittance: "Quittances",
+    "reglement-client": "Règlements clients",
+    tresorerie: "Trésorerie",
+    "bordereau-compagnie": "Bordereaux compagnies",
+    "reglement-compagnie": "Règlements compagnies",
+    "regle-fiscale": "Règles fiscales",
+    assistance: "Assistance",
+    "carte-verte": "Cartes vertes",
+    "piece-jointe": "Pièces jointes",
+    "attestation-stock": "Stock d’attestations",
+    agence: "Agence",
+    user: "Utilisateurs",
+    role: "Rôles",
+    audit: "Audit",
+    config: "Configuration",
+    referentiel: "Référentiels partagés",
+    "contact-compagnie": "Contacts compagnie",
+    sinistre: "Dossiers sinistre",
+  } as Record<string, string>)[resource] ?? resource;
 }
 
 function formatDateTime(value?: string | null) {

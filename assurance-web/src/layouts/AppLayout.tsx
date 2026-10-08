@@ -5,7 +5,7 @@ import { moduleForPath, routeRequiresAgencyContext } from "@/components/app-navi
 import { AppSidebar } from "@/components/app-sidebar";
 import { AccessDenied, LoadingPage } from "@/components/shared";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { hasAnyPermission, permissionRequirementForPath } from "@/lib/authorization";
+import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
 import { useAuthStore } from "@/store/auth-store";
 import { hasAgencyContext, isPlatformAdmin } from "@/lib/platform-context";
 
@@ -36,7 +36,7 @@ export default function AppLayout() {
   const permissionRequirement = permissionRequirementForPath(location.pathname);
   const canAccessRoute =
     !permissionRequirement ||
-    hasAnyPermission(user.permissions ?? [], permissionRequirement.anyOf);
+    satisfiesPermissionRequirement(user.permissions ?? [], permissionRequirement);
   const agencyContextMissing = routeRequiresAgencyContext(location.pathname) && !hasAgencyContext(user);
   const platformRouteDenied = location.pathname.startsWith("/app/platform")
     && (!isPlatformAdmin(user) || hasAgencyContext(user));

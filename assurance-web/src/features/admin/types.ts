@@ -44,6 +44,32 @@ export type AdminPermission = {
   module: string;
   description?: string | null;
   superAdminOnly: boolean;
+  requiredPermissionCodes: string[];
+};
+
+export type AdminAuditEvent = {
+  id: string;
+  actorUserId?: string | null;
+  actorName?: string | null;
+  actorType: "USER" | "SYSTEM" | "IMPORT";
+  entityType: string;
+  entityId?: string | null;
+  action: "CREATED" | "UPDATED" | "DELETED";
+  occurredAt: string;
+  requestId?: string | null;
+  source?: string | null;
+};
+
+export type AdminAuditPage = {
+  items: AdminAuditEvent[];
+  page: {
+    number: number;
+    size: number;
+    totalPages: number;
+    totalElements: number;
+    first: boolean;
+    last: boolean;
+  };
 };
 
 export type AdminAgency = {

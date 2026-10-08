@@ -113,8 +113,9 @@ public class PermissionSeeder implements CommandLineRunner {
             permission.setNom(definition.name());
             changed = true;
         }
-        if (!Objects.equals(permission.getModule(), definition.module())) {
-            permission.setModule(definition.module());
+        String businessModule = businessModule(definition.module());
+        if (!Objects.equals(permission.getModule(), businessModule)) {
+            permission.setModule(businessModule);
             changed = true;
         }
         if (!Objects.equals(permission.getDescription(), definition.description())) {
@@ -134,6 +135,19 @@ public class PermissionSeeder implements CommandLineRunner {
 
     private static Definition restricted(String code, String name, String module) {
         return new Definition(code, name, module, null, true);
+    }
+
+    private static String businessModule(String resource) {
+        return switch (resource) {
+            case "client" -> "crm";
+            case "quittance", "reglement-client", "tresorerie", "bordereau-compagnie",
+                    "reglement-compagnie" -> "compta";
+            case "contact-compagnie", "grille-tarifaire" -> "companies";
+            case "referentiel" -> "shared";
+            case "agence", "admin", "config" -> "administration";
+            case "sinistre" -> "sinistre";
+            default -> "production";
+        };
     }
 
     private record Definition(

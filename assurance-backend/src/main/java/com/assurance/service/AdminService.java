@@ -24,6 +24,7 @@ import com.assurance.repository.PermissionRepository;
 import com.assurance.repository.RefreshSessionRepository;
 import com.assurance.repository.RoleRepository;
 import com.assurance.repository.UtilisateurRepository;
+import com.assurance.security.PermissionDependencies;
 import com.assurance.security.TenantContext;
 import com.assurance.util.DeviceInfoParser;
 import lombok.RequiredArgsConstructor;
@@ -639,6 +640,25 @@ public class AdminService {
                 throw new UnauthorizedException("Permission réservée à l'administration de la plateforme");
             }
             permissions.add(permission);
+        }
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            Set<String> assignedCodes = permissions.stream()
+                    .map(Permission::getCode)
+                    .collect(java.util.stream.Collectors.toSet());
+            Set<String> requiredCodes = permissions.stream()
+                    .flatMap(permission -> PermissionDependencies.requiredFor(permission.getCode()).stream())
+                    .filter(code -> !assignedCodes.contains(code))
+                    .collect(java.util.stream.Collectors.toSet());
+            for (String requiredCode : requiredCodes) {
+                Permission required = permissionRepository.findByCode(requiredCode)
+                        .orElseThrow(() -> new ResourceNotFoundException("Permission", requiredCode));
+                if (Boolean.TRUE.equals(required.getSuperAdminOnly()) && !can(actor, "config:manage")) {
+                    throw new UnauthorizedException("Permission réservée à l'administration de la plateforme");
+                }
+                changed |= permissions.add(required);
+            }
         }
         return permissions;
     }

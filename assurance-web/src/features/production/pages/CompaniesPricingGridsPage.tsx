@@ -44,7 +44,7 @@ const EMPTY_FILTERS: Filters = {
 export default function CompaniesPricingGridsPage() {
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("referentiel:manage");
+  const canManage = permissions.includes("grille-tarifaire:manage") || permissions.includes("referentiel:manage");
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<{ column: PricingGridSortColumn; direction: TableSortDirection }>({ column: "grid", direction: "asc" });

@@ -1,7 +1,8 @@
-import { apiFetch, apiFetchBlob, apiUpload } from "@/lib/api/base";
+import { apiFetch, apiFetchBlob, apiUpload, buildQueryString } from "@/lib/api/base";
 import type { ApiResponse } from "@/lib/types";
 import type {
   AdminAgency,
+  AdminAuditPage,
   AdminPermission,
   AdminRole,
   AdminUser,
@@ -15,6 +16,12 @@ import type {
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
 
 export const adminApi = {
+  async auditEvents(params: { search?: string; page?: number; size?: number }) {
+    return unwrap(await apiFetch<ApiResponse<AdminAuditPage>>(
+      `/api/v1/audit-events${buildQueryString(params)}`
+    ));
+  },
+
   async platformAdmins() {
     return unwrap(await apiFetch<ApiResponse<AdminUser[]>>("/api/v1/admin/platform-admins"));
   },

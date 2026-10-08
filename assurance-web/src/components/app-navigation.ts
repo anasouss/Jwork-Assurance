@@ -19,6 +19,7 @@ import {
   UserCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { MODULE_PERMISSION_PREFIXES } from "@/lib/authorization";
 
 export type AppModule = {
   title: string;
@@ -28,6 +29,7 @@ export type AppModule = {
   disabled?: boolean;
   permission?: string;
   permissions?: readonly string[];
+  permissionPrefixes?: readonly string[];
   requiresAgencyContext?: boolean;
   platformOnly?: boolean;
 };
@@ -37,43 +39,38 @@ export type AppNavigationItem = AppModule & {
 };
 
 export const appModules: AppModule[] = [
-  { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true },
-  { title: "Production", url: "/app/production", icon: BadgeCheck, permission: "contrat:view" },
-  { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, permissions: ["sinistre:view", "sinistre:create", "sinistre:manage", "sinistre:finance", "sinistre:referentiel"] },
-  { title: "Compagnies", url: "/app/companies", icon: Building2, permissions: ["referentiel:view", "referentiel:manage", "contact-compagnie:view", "contact-compagnie:manage"] },
-  { title: "CRM", url: "/app/crm", icon: Users, permission: "client:view" },
+  { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true, permissions: ["contrat:view", "quittance:view"] },
+  { title: "Production", url: "/app/production", icon: BadgeCheck, permissionPrefixes: MODULE_PERMISSION_PREFIXES.production },
+  { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, permissionPrefixes: MODULE_PERMISSION_PREFIXES.sinistre },
+  { title: "Compagnies", url: "/app/companies", icon: Building2, permissionPrefixes: MODULE_PERMISSION_PREFIXES.companies },
+  { title: "CRM", url: "/app/crm", icon: Users, permissionPrefixes: MODULE_PERMISSION_PREFIXES.crm },
   {
     title: "Compta",
     url: "/app/compta",
     icon: Calculator,
-    permissions: [
-      "quittance:view",
-      "reglement-client:view",
-      "tresorerie:view",
-      "bordereau-compagnie:view",
-      "reglement-compagnie:view",
-    ],
+    permissionPrefixes: MODULE_PERMISSION_PREFIXES.compta,
   },
-  { title: "Administration", url: "/app/admin", icon: Settings, permission: "user:view" },
+  { title: "Administration", url: "/app/admin", icon: Settings, permissionPrefixes: MODULE_PERMISSION_PREFIXES.administration },
 ];
 
 export const appNavigation: AppNavigationItem[] = [
   { module: "dashboard", title: "Vue plateforme", url: "/app/platform", icon: LayoutDashboard, platformOnly: true },
-  { module: "dashboard", title: "Vue générale", url: "/app", icon: LayoutDashboard, exact: true, requiresAgencyContext: true },
+  { module: "dashboard", title: "Vue générale", url: "/app", icon: LayoutDashboard, exact: true, permissions: ["contrat:view", "quittance:view"], requiresAgencyContext: true },
   { module: "production", title: "Tableau de bord", url: "/app/production", icon: ShieldCheck, exact: true, permission: "contrat:view" },
   { module: "production", title: "Ajouter dossier", url: "/app/production/ajouter-dossier", icon: FilePlus2, permission: "contrat:create" },
   { module: "production", title: "Contrats", url: "/app/production/contrats", icon: Files, permission: "contrat:view" },
-  { module: "production", title: "Stock attestations", url: "/app/production/attestations-stock", icon: Boxes, permission: "contrat:view" },
-  { module: "production", title: "Commandes attestations", url: "/app/production/attestations-stock/commandes", icon: ClipboardList, permission: "contrat:view" },
-  { module: "production", title: "Réceptions attestations", url: "/app/production/attestations-stock/receptions", icon: Truck, permission: "contrat:view" },
+  { module: "production", title: "Stock attestations", url: "/app/production/attestations-stock", icon: Boxes, permission: "attestation-stock:view" },
+  { module: "production", title: "Commandes attestations", url: "/app/production/attestations-stock/commandes", icon: ClipboardList, permission: "attestation-stock:view" },
+  { module: "production", title: "Réceptions attestations", url: "/app/production/attestations-stock/receptions", icon: Truck, permission: "attestation-stock:view" },
   { module: "production", title: "Paramètres", url: "/app/production/parametres", icon: Settings, permission: "referentiel:view" },
   { module: "sinistre", title: "Tableau de bord", url: "/app/sinistre", icon: LayoutDashboard, exact: true, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
   { module: "sinistre", title: "Dossiers sinistre", url: "/app/sinistre/dossiers", icon: Files, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
   { module: "sinistre", title: "Déclarer", url: "/app/sinistre/declarer", icon: FilePlus2, permission: "sinistre:create" },
   { module: "sinistre", title: "Experts & garages", url: "/app/sinistre/referentiels", icon: Users, permission: "sinistre:referentiel" },
-  { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permission: "referentiel:view" },
+  { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permissionPrefixes: MODULE_PERMISSION_PREFIXES.companies },
   { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "referentiel:view" },
   { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "referentiel:view" },
+  { module: "companies", title: "Grilles tarifaires", url: "/app/companies/grilles-tarifaires", icon: Calculator, permissions: ["grille-tarifaire:view", "grille-tarifaire:manage", "referentiel:manage"] },
   { module: "companies", title: "Contacts", url: "/app/companies/contacts", icon: Users, permissions: ["contact-compagnie:view", "contact-compagnie:manage"] },
   { module: "crm", title: "Portefeuille client", url: "/app/crm", icon: Users, exact: true, permission: "client:view" },
   { module: "crm", title: "Paramètres", url: "/app/crm/parametres", icon: Settings, permission: "client:manage" },
@@ -85,7 +82,7 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "compta", title: "Bordereaux de remise", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText, permission: "tresorerie:view" },
   { module: "compta", title: "Bordereaux compagnies", url: "/app/compta/bordereaux-compagnies", icon: Building2, permission: "bordereau-compagnie:view" },
   { module: "compta", title: "Paramètres", url: "/app/compta/parametres", icon: Settings, permission: "tresorerie:view" },
-  { module: "admin", title: "Utilisateurs & rôles", url: "/app/admin", icon: UserCog, exact: true, permission: "user:view" },
+  { module: "admin", title: "Administration", url: "/app/admin", icon: UserCog, exact: true, permissionPrefixes: MODULE_PERMISSION_PREFIXES.administration },
 ];
 
 export function canSeeNavigationItem(
@@ -94,6 +91,9 @@ export function canSeeNavigationItem(
   context?: { platformAdmin: boolean; hasAgencyContext: boolean }
 ) {
   if (context) {
+    if (item.url === "/app" && item.exact && context.platformAdmin && !context.hasAgencyContext) {
+      return true;
+    }
     const agencyRequired = item.requiresAgencyContext || routeRequiresAgencyContext(item.url);
     if (agencyRequired && !context.hasAgencyContext) {
       return false;
@@ -105,7 +105,31 @@ export function canSeeNavigationItem(
   if (item.permissions?.length) {
     return item.permissions.some((permission) => userPermissions.includes(permission));
   }
+  if (item.permissionPrefixes?.length) {
+    return item.permissionPrefixes.some((prefix) =>
+      userPermissions.some((permission) => permission.startsWith(`${prefix}:`))
+    );
+  }
   return !item.permission || userPermissions.includes(item.permission);
+}
+
+export function moduleLandingPath(
+  module: AppNavigationItem["module"],
+  userPermissions: readonly string[],
+  context: { platformAdmin: boolean; hasAgencyContext: boolean }
+) {
+  return appNavigation.find((item) =>
+    item.module === module && canSeeNavigationItem(item, userPermissions, context)
+  )?.url ?? appModules.find((item) => moduleForPath(item.url) === module)?.url ?? "/app";
+}
+
+export function firstAccessibleAgencyPath(
+  userPermissions: readonly string[],
+  context: { platformAdmin: boolean; hasAgencyContext: boolean }
+) {
+  return appNavigation.find((item) =>
+    item.module !== "dashboard" && canSeeNavigationItem(item, userPermissions, context)
+  )?.url ?? "/app/profile";
 }
 
 export function routeRequiresAgencyContext(pathname: string) {

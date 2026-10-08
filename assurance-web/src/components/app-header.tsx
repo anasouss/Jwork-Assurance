@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { appModules, canSeeNavigationItem, moduleActiveClass, moduleForPath, moduleTitle } from "@/components/app-navigation";
+import { appModules, canSeeNavigationItem, moduleActiveClass, moduleForPath, moduleLandingPath, moduleTitle } from "@/components/app-navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,10 +83,14 @@ export function AppHeader() {
 
               const itemModule = moduleForPath(item.url);
               const isActive = activeModule === itemModule;
+              const target = moduleLandingPath(itemModule, permissions, {
+                platformAdmin,
+                hasAgencyContext: agencyContext,
+              });
               return (
                 <NavLink
                   key={item.url}
-                  to={item.url}
+                  to={target}
                   className={[
                     "flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors",
                     isActive ? moduleActiveClass(itemModule) : "text-muted-foreground hover:bg-muted hover:text-foreground",

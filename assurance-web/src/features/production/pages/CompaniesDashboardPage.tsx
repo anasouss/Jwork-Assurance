@@ -38,7 +38,7 @@ export default function CompaniesDashboardPage() {
       description: "Catalogue des grilles et configurations par usage.",
       icon: TableProperties,
       href: "/app/companies/grilles-tarifaires",
-      permission: "referentiel:view",
+      permissions: ["grille-tarifaire:view", "grille-tarifaire:manage", "referentiel:manage"],
     },
     {
       title: "Assistance",

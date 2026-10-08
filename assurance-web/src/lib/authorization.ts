@@ -1,5 +1,6 @@
 export type PermissionRequirement = {
-  anyOf: readonly string[];
+  anyOf?: readonly string[];
+  anyPrefix?: readonly string[];
 };
 
 type RoutePermissionRule = PermissionRequirement & {
@@ -7,6 +8,15 @@ type RoutePermissionRule = PermissionRequirement & {
 };
 
 const startsWith = (prefix: string) => (pathname: string) => pathname.startsWith(prefix);
+
+export const MODULE_PERMISSION_PREFIXES = {
+  production: ["contrat", "avenant", "attestation-stock", "carte-verte", "piece-jointe", "assistance", "referentiel", "garantie", "grille-tarifaire", "regle-fiscale", "vehicule"],
+  sinistre: ["sinistre"],
+  companies: ["referentiel", "grille-tarifaire", "contact-compagnie"],
+  crm: ["client"],
+  compta: ["quittance", "reglement-client", "tresorerie", "bordereau-compagnie", "reglement-compagnie"],
+  administration: ["user", "role", "agence", "audit", "config"],
+} as const;
 
 const routePermissionRules: readonly RoutePermissionRule[] = [
   {
@@ -19,17 +29,15 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
   },
   {
     matches: startsWith("/app/sinistre"),
-    anyOf: [
-      "sinistre:view",
-      "sinistre:create",
-      "sinistre:manage",
-      "sinistre:finance",
-      "sinistre:referentiel",
-    ],
+    anyPrefix: MODULE_PERMISSION_PREFIXES.sinistre,
   },
   {
     matches: startsWith("/app/companies/contacts"),
     anyOf: ["contact-compagnie:view", "contact-compagnie:manage"],
+  },
+  {
+    matches: startsWith("/app/companies/grilles-tarifaires"),
+    anyOf: ["grille-tarifaire:view", "grille-tarifaire:manage", "referentiel:manage"],
   },
   {
     matches: startsWith("/app/production/renouvellements/"),
@@ -67,7 +75,7 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
   },
   {
     matches: startsWith("/app/production"),
-    anyOf: ["contrat:view", "contrat:create", "contrat:update"],
+    anyPrefix: MODULE_PERMISSION_PREFIXES.production,
   },
   {
     matches: startsWith("/app/compta/reglements"),
@@ -93,18 +101,7 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
   },
   {
     matches: startsWith("/app/compta"),
-    anyOf: [
-      "quittance:view",
-      "quittance:create",
-      "quittance:manage",
-      "reglement-client:view",
-      "reglement-client:create",
-      "reglement-client:manage",
-      "tresorerie:view",
-      "tresorerie:manage",
-      "bordereau-compagnie:view",
-      "reglement-compagnie:view",
-    ],
+    anyPrefix: MODULE_PERMISSION_PREFIXES.compta,
   },
   {
     matches: startsWith("/app/crm/parametres"),
@@ -112,15 +109,15 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
   },
   {
     matches: startsWith("/app/crm"),
-    anyOf: ["client:view", "client:create", "client:manage"],
+    anyPrefix: MODULE_PERMISSION_PREFIXES.crm,
   },
   {
     matches: startsWith("/app/companies"),
-    anyOf: ["referentiel:view", "referentiel:manage", "contact-compagnie:view", "contact-compagnie:manage"],
+    anyPrefix: MODULE_PERMISSION_PREFIXES.companies,
   },
   {
     matches: startsWith("/app/admin"),
-    anyOf: ["user:view", "user:manage", "config:view", "config:manage"],
+    anyPrefix: MODULE_PERMISSION_PREFIXES.administration,
   },
 ];
 
@@ -131,9 +128,20 @@ export function hasAnyPermission(
   return required.some((permission) => permissions.includes(permission));
 }
 
+export function satisfiesPermissionRequirement(
+  permissions: readonly string[],
+  requirement: PermissionRequirement
+) {
+  const exactMatch = requirement.anyOf?.some((permission) => permissions.includes(permission)) ?? false;
+  const prefixMatch = requirement.anyPrefix?.some((prefix) =>
+    permissions.some((permission) => permission.startsWith(`${prefix}:`))
+  ) ?? false;
+  return exactMatch || prefixMatch;
+}
+
 export function permissionRequirementForPath(
   pathname: string
 ): PermissionRequirement | null {
   const rule = routePermissionRules.find((candidate) => candidate.matches(pathname));
-  return rule ? { anyOf: rule.anyOf } : null;
+  return rule ? { anyOf: rule.anyOf, anyPrefix: rule.anyPrefix } : null;
 }

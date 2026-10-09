@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Car, FileText, FileTextIcon, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -51,6 +52,7 @@ export default function ContratShowPage() {
   const { contratId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const mouvementId = searchParams.get("mouvementId");
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const contratQuery = useQuery({
     queryKey: ["contrat", contratId, mouvementId],
     queryFn: () => contractApi.getContrat(contratId, { mouvementId }),
@@ -84,7 +86,37 @@ export default function ContratShowPage() {
   const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
   const isVehicleReplacement = String(selectedMouvement?.code ?? "").toUpperCase() === "CHV_M";
   const showGuaranteePrimes = contrat.typeContrat !== "PARTICULIER" || Boolean(contrat.saisiePrimeNette);
-  const pdfPath = `/app/production/contrats/${contratId}/pdf${mouvementId ? `?mouvementId=${encodeURIComponent(mouvementId)}` : ""}`;
+  const selectedActNumber = selectedMouvement?.numeroMouvement ?? "1";
+  const pdfName = `fiche-${sanitizeFilename(dossier)}${selectedMouvement ? `-acte-${selectedActNumber}` : ""}.pdf`;
+  const openPdf = async () => {
+    if (generatingPdf) return;
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) return;
+    setGeneratingPdf(true);
+    try {
+      const blob = contrat.typeContrat === "FLOTTE"
+        ? await contractApi.downloadFlottePolicyPdf(contratId, mouvementId)
+        : await generateContratPdfBlob({
+            contrat,
+            dossier,
+            souscripteur,
+            proprietaire,
+            conducteur,
+            compagnie,
+            convention,
+            mouvement: selectedMouvement,
+            filename: pdfName,
+          });
+      const url = URL.createObjectURL(blob);
+      previewWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      previewWindow?.close();
+      toast.error(error instanceof Error ? error.message : "Génération du PDF impossible");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -94,11 +126,9 @@ export default function ContratShowPage() {
         </Button>
         <div className="flex items-center gap-2">
           <Badge className="bg-emerald-600">{statusLabel(selectedMouvement?.statut ?? contrat.statut)}</Badge>
-          <Button asChild>
-            <Link to={pdfPath} target="_blank" rel="noopener noreferrer">
-              <FileTextIcon className="size-4" />
-              Ouvrir PDF
-            </Link>
+          <Button type="button" onClick={openPdf} disabled={generatingPdf}>
+            <FileTextIcon className="size-4" />
+            {generatingPdf ? "Génération..." : "Ouvrir PDF"}
           </Button>
         </div>
       </div>
@@ -1029,6 +1059,7 @@ export async function generateContratPdfDocument(
   const mouvement = mouvementId
     ? contrat.mouvements?.find((item) => String(item.id) === String(mouvementId))
     : null;
+  const actNumber = mouvement?.numeroMouvement ?? "1";
   return generateContratPdfBlob({
     contrat,
     dossier,
@@ -1038,21 +1069,8 @@ export async function generateContratPdfDocument(
     compagnie: optionLabel(compagnies, contrat.compagnieAssuranceId),
     convention: optionLabel(conventions, contrat.conventionId),
     mouvement,
-    filename: contractPdfFilename(contrat, mouvementId),
+    filename: `fiche-${sanitizeFilename(dossier)}${mouvement ? `-acte-${actNumber}` : ""}.pdf`,
   });
-}
-
-export function contractPdfFilename(contrat: ContratSummary, mouvementId?: string | null) {
-  const dossier = contrat.numeroDossier ?? contrat.numeroContrat ?? `contrat-${contrat.id}`;
-  const mouvement = mouvementId
-    ? contrat.mouvements?.find((item) => String(item.id) === String(mouvementId))
-    : null;
-  const actSuffix = mouvement ? `-acte-${mouvement.numeroMouvement ?? "1"}` : "";
-  if (contrat.typeContrat === "FLOTTE") {
-    const reference = contrat.numeroPolice ?? dossier;
-    return `police-flotte-${sanitizeFilename(reference)}${actSuffix}.pdf`;
-  }
-  return `fiche-${sanitizeFilename(dossier)}${actSuffix}.pdf`;
 }
 
 async function generateContratPdfBlob(params: {

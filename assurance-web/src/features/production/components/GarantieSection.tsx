@@ -792,7 +792,7 @@ function AssistanceTable({
         <colgroup className="hidden xl:table-column-group">
           <col className="w-[150px]" />
           <col className="w-[150px]" />
-          <col className="w-[120px]" />
+          <col className="w-[90px]" />
           <col className="w-[150px]" />
           <col className="w-[170px]" />
           <col className="w-[230px]" />

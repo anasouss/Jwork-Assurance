@@ -1,6 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -290,7 +289,7 @@ export function VehicleForm({
           </label>
         ) : null}
         <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <Checkbox
+          <Switch
             checked={Boolean(vehicule.organismeCredit)}
             onCheckedChange={(checked) => update(checked
               ? { organismeCredit: true }

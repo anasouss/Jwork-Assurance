@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Input } from "@/components/ui/input";
@@ -348,8 +347,8 @@ export function VehiculeSection({
                     <span>Remorque</span>
                   </label>
                 ) : null}
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Switch
                     checked={Boolean(vehicule.organismeCredit)}
                     onCheckedChange={(checked) =>
                       update(index, checked

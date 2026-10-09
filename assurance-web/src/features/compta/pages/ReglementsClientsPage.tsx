@@ -445,7 +445,7 @@ export default function ReglementsClientsPage() {
                         className="border-white data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-orange-600 data-[state=indeterminate]:border-white data-[state=indeterminate]:bg-white data-[state=indeterminate]:text-orange-600"
                       />
                     </th>
-                    <SortableHeader label="Payeur" column="PAYER" active={sortKey} direction={sortDirection} onSort={changeSort} />
+                    <th className="px-3 py-3 text-left">Assuré</th>
                     <th className="px-3 py-3 text-left">Référence</th>
                     <th className="px-3 py-3 text-left">Type</th>
                     <SortableHeader label="Police / contrat" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
@@ -467,7 +467,13 @@ export default function ReglementsClientsPage() {
                             onCheckedChange={(value) => toggle(row, value === true)}
                           />
                         </td>
-                        <td className="px-3 py-3"><strong>{row.source.payeurNom}</strong></td>
+                        <td className="px-3 py-3">
+                          <strong>
+                            {row.source.assureNom
+                              || row.source.souscripteurNom
+                              || row.source.payeurNom}
+                          </strong>
+                        </td>
                         <td className="px-3 py-3 font-medium">{receivableDocumentReference(row)}</td>
                         <td className="px-3 py-3">{receivableTypeLabel(row)}</td>
                         <td className="px-3 py-3"><strong>{receivableCoverageReference(row)}</strong></td>

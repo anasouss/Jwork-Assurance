@@ -390,7 +390,7 @@ public class DocumentClientService {
                 .map(LigneDocumentClient::getDocument)
                 .collect(Collectors.toMap(
                         DocumentClient::getId,
-                        Function.identity(),
+                        document -> document,
                         (first, ignored) -> first,
                         LinkedHashMap::new
                 ));

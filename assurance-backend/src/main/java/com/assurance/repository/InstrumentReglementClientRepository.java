@@ -24,6 +24,19 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             "compteTresorerie",
             "affectations",
             "affectations.elementFacturable",
+            "affectations.elementFacturable.contrat",
+            "affectations.documentClient"
+    })
+    List<InstrumentReglementClient> findByReglementIdAndAgenceIdOrderByIdAsc(
+            Long reglementId,
+            Long agenceId
+    );
+
+    @EntityGraph(attributePaths = {
+            "reglement",
+            "compteTresorerie",
+            "affectations",
+            "affectations.elementFacturable",
             "affectations.documentClient"
     })
     List<InstrumentReglementClient> findByAgenceIdAndStatutOrderByDateEcheanceAscIdAsc(

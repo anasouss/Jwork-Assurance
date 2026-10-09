@@ -290,6 +290,7 @@ public class ReglementClientService {
     public DocumentClientResponse createInvoiceFromPayment(Long agenceId, Long paymentId) {
         ReglementClient payment = reglementRepository.findByIdAndAgenceIdForUpdate(paymentId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
+        loadPaymentInstruments(payment, agenceId);
         if (payment.getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Seul un règlement valide peut être facturé");
         }
@@ -1848,8 +1849,17 @@ public class ReglementClientService {
     }
 
     private ReglementClient findPayment(Long agenceId, Long paymentId) {
-        return reglementRepository.findByIdAndAgenceId(paymentId, agenceId)
+        ReglementClient payment = reglementRepository.findByIdAndAgenceId(paymentId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
+        loadPaymentInstruments(payment, agenceId);
+        return payment;
+    }
+
+    private void loadPaymentInstruments(ReglementClient payment, Long agenceId) {
+        instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(
+                payment.getId(),
+                agenceId
+        );
     }
 
     private ReglementClientResponse toResponse(ReglementClient payment) {

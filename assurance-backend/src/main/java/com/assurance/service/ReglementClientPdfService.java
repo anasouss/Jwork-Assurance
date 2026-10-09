@@ -14,6 +14,7 @@ import com.assurance.enums.StatutReglementClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ReglementClientRepository;
+import com.assurance.repository.InstrumentReglementClientRepository;
 import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
@@ -67,12 +68,17 @@ public class ReglementClientPdfService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final ReglementClientRepository reglementRepository;
+    private final InstrumentReglementClientRepository instrumentRepository;
     private final AgencyLogoStorageService agencyLogoStorageService;
 
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long reglementId) {
         ReglementClient payment = reglementRepository.findByIdAndAgenceId(reglementId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", reglementId));
+        instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(
+                reglementId,
+                agenceId
+        );
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(output));
             Document document = new Document(pdf, PageSize.A4);

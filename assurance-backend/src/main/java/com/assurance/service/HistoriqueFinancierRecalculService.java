@@ -362,6 +362,8 @@ public class HistoriqueFinancierRecalculService {
                     .crm(snapshot.getCrm())
                     .numeroAttestation(snapshot.getNumeroAttestation())
                     .remorque(Boolean.TRUE.equals(snapshot.getRemorque()))
+                    .numeroRemorque(snapshot.getNumeroRemorque())
+                    .marqueRemorque(snapshot.getMarqueRemorque())
                     .coefficientProrata(snapshot.getCoefficientProrata())
                     .valeurVenale(snapshot.getValeurVenale())
                     .valeurNeuf(snapshot.getValeurNeuf())

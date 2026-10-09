@@ -705,6 +705,8 @@ public class MouvementContratService {
                     .crm(vehicule.getCrm())
                     .numeroAttestation(vehicule.getNumeroAttestation())
                     .remorque(Boolean.TRUE.equals(vehicule.getRemorque()))
+                    .numeroRemorque(vehicule.getNumeroRemorque())
+                    .marqueRemorque(vehicule.getMarqueRemorque())
                     .coefficientProrata(vehicule.getCoefficientProrata())
                     .valeurVenale(vehicule.getValeurVenale())
                     .valeurNeuf(vehicule.getValeurNeuf())

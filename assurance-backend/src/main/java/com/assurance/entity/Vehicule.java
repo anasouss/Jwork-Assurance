@@ -23,7 +23,8 @@ import java.time.LocalDate;
 @Table(name = "vehicules", indexes = {
         @Index(name = "idx_vehicule_contrat", columnList = "contrat_id"),
         @Index(name = "idx_vehicule_immatriculation", columnList = "immatriculation"),
-        @Index(name = "idx_vehicule_categorie_transport", columnList = "categorie_transport_id")
+        @Index(name = "idx_vehicule_categorie_transport", columnList = "categorie_transport_id"),
+        @Index(name = "idx_vehicule_marque_remorque", columnList = "marque_remorque_id")
 })
 @Getter
 @Setter
@@ -101,6 +102,13 @@ public class Vehicule extends BaseEntity {
     @Builder.Default
     @Column(name = "remorque", nullable = false)
     private Boolean remorque = false;
+
+    @Column(name = "numero_remorque", length = 80)
+    private String numeroRemorque;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "marque_remorque_id")
+    private Marque marqueRemorque;
 
     @Column(name = "coefficient_prorata", precision = 14, scale = 6)
     private BigDecimal coefficientProrata;

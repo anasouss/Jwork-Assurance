@@ -413,6 +413,12 @@ function VehicleSection({
             ["Valeur à neuf", formatOptionalAmount(vehicule.valeurNeuf)],
             ["Valeur vénale", formatOptionalAmount(vehicule.valeurVenale)],
             ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
+            ...(vehicule.remorque
+              ? [
+                  ["N° remorque", text(vehicule.numeroRemorque)],
+                  ["Marque remorque", text(vehicule.marqueRemorque)],
+                ] as [string, ReactNode][]
+              : []),
           ]}
         />
       </Section>
@@ -1151,6 +1157,12 @@ async function generateContratPdfBlob(params: {
         ["Valeur à neuf", formatOptionalAmount(vehicule.valeurNeuf)],
         ["Valeur vénale", formatOptionalAmount(vehicule.valeurVenale)],
         ["Valeur glaces", formatOptionalAmount(vehicule.valeurGlace)],
+        ...(vehicule.remorque
+          ? [
+              ["N° remorque", text(vehicule.numeroRemorque)],
+              ["Marque remorque", text(vehicule.marqueRemorque)],
+            ] as [string, string][]
+          : []),
       ]);
     }, "vehicle");
     const garanties = (params.contrat.garanties ?? []).filter((garantie) => String(garantie.vehiculeId ?? "") === String(vehicule.vehiculeId));

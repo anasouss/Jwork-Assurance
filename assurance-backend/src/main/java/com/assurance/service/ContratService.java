@@ -320,7 +320,39 @@ public class ContratService {
         }
         contrat.setNombreVehicules(Math.max(contrat.getNombreVehicules() == null ? 0 : contrat.getNombreVehicules(), index + 1));
         contratRepository.save(contrat);
+        recalculateAutomaticVehicleGuarantees(contrat, vehicule);
         return toResponse(contrat);
+    }
+
+    private void recalculateAutomaticVehicleGuarantees(Contrat contrat, Vehicule vehicule) {
+        if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE) {
+            return;
+        }
+
+        List<ContratGarantie> allGuarantees = activeGarantiesForView(contrat);
+        List<ContratGarantie> vehicleGuarantees = allGuarantees.stream()
+                .filter(item -> item.getVehicule() != null && Objects.equals(item.getVehicule().getId(), vehicule.getId()))
+                .toList();
+        if (vehicleGuarantees.isEmpty()) {
+            return;
+        }
+
+        List<ContratGarantie> calculationContext = new ArrayList<>(allGuarantees.stream()
+                .filter(item -> item.getVehicule() == null || !Objects.equals(item.getVehicule().getId(), vehicule.getId()))
+                .toList());
+        for (ContratGarantie existing : orderContratGarantiesByPrimeDependency(vehicleGuarantees)) {
+            CreateContratRequest.GarantieInput input = tariffRecalculationInput(contrat, existing);
+            ContratGarantie recalculated = buildCalculatedDraftGarantieForTarget(
+                    contrat,
+                    input,
+                    vehicule,
+                    null,
+                    calculationContext
+            );
+            applyTariffSnapshot(existing, recalculated);
+            contratGarantieRepository.save(existing);
+            calculationContext.add(existing);
+        }
     }
 
     @Transactional
@@ -693,6 +725,7 @@ public class ContratService {
 
         List<Vehicule> vehiculesCrees = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
+            validateTowingExtensionInput(input);
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
             validateUsageForClientCategory(contrat, usage);
@@ -722,6 +755,10 @@ public class ContratService {
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .remorque(input.getRemorque() == null ? false : input.getRemorque())
+                    .numeroRemorque(Boolean.TRUE.equals(input.getRemorque()) ? blankToNull(input.getNumeroRemorque()) : null)
+                    .marqueRemorque(Boolean.TRUE.equals(input.getRemorque())
+                            ? resolveMarque(input.getMarqueRemorqueId(), input.getMarqueRemorqueLibelle(), true)
+                            : null)
                     .coefficientProrata(input.getCoefficientProrata())
                     .valeurVenale(input.getValeurVenale())
                     .valeurNeuf(input.getValeurNeuf())
@@ -1164,6 +1201,7 @@ public class ContratService {
         Usage usageContrat = contrat.getUsage();
         List<Vehicule> vehiculesCrees = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
+            validateTowingExtensionInput(input);
             if (input.getTypeVehicule() == null) {
                 if (finalMode) {
                     throw new BadRequestException("Le type vehicule est obligatoire");
@@ -1199,6 +1237,10 @@ public class ContratService {
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
                     .remorque(input.getRemorque() == null ? false : input.getRemorque())
+                    .numeroRemorque(Boolean.TRUE.equals(input.getRemorque()) ? blankToNull(input.getNumeroRemorque()) : null)
+                    .marqueRemorque(Boolean.TRUE.equals(input.getRemorque())
+                            ? resolveMarque(input.getMarqueRemorqueId(), input.getMarqueRemorqueLibelle(), true)
+                            : null)
                     .coefficientProrata(input.getCoefficientProrata())
                     .valeurVenale(input.getValeurVenale())
                     .valeurNeuf(input.getValeurNeuf())
@@ -1457,6 +1499,7 @@ public class ContratService {
         if (!hasText(input.getCrm())) {
             throw new BadRequestException("CRM obligatoire");
         }
+        validateTowingExtensionInput(input);
         Usage usage = input.getUsageId() == null
                 ? contrat.getUsage()
                 : usageRepository.findById(input.getUsageId())
@@ -1497,6 +1540,12 @@ public class ContratService {
         }
         if (Boolean.TRUE.equals(usage.getByCategorieTransport()) && input.getCategorieTransportId() == null) {
             throw new BadRequestException("Categorie transport obligatoire pour cet usage");
+        }
+    }
+
+    private void validateTowingExtensionInput(CreateContratRequest.VehiculeInput input) {
+        if (input != null && Boolean.TRUE.equals(input.getRemorque()) && !hasText(input.getNumeroRemorque())) {
+            throw new BadRequestException("Numero remorque obligatoire");
         }
     }
 
@@ -1618,6 +1667,10 @@ public class ContratService {
         vehicule.setCrm(input.getCrm());
         vehicule.setNumeroAttestation(input.getNumeroAttestation());
         vehicule.setRemorque(input.getRemorque() == null ? false : input.getRemorque());
+        vehicule.setNumeroRemorque(Boolean.TRUE.equals(input.getRemorque()) ? blankToNull(input.getNumeroRemorque()) : null);
+        vehicule.setMarqueRemorque(Boolean.TRUE.equals(input.getRemorque())
+                ? resolveMarque(input.getMarqueRemorqueId(), input.getMarqueRemorqueLibelle(), true)
+                : null);
         vehicule.setCoefficientProrata(input.getCoefficientProrata());
         vehicule.setValeurVenale(input.getValeurVenale());
         vehicule.setValeurNeuf(input.getValeurNeuf());
@@ -2510,6 +2563,8 @@ public class ContratService {
         input.setCrm(snapshot.getCrm());
         input.setNumeroAttestation(snapshot.getNumeroAttestation());
         input.setRemorque(Boolean.TRUE.equals(snapshot.getRemorque()));
+        input.setNumeroRemorque(snapshot.getNumeroRemorque());
+        input.setMarqueRemorqueId(snapshot.getMarqueRemorque() != null ? snapshot.getMarqueRemorque().getId() : null);
         input.setCoefficientProrata(snapshot.getCoefficientProrata());
         input.setValeurVenale(snapshot.getValeurVenale());
         input.setValeurNeuf(snapshot.getValeurNeuf());
@@ -2939,6 +2994,8 @@ public class ContratService {
         vehicule.setCrm(snapshot.getCrm());
         vehicule.setNumeroAttestation(snapshot.getNumeroAttestation());
         vehicule.setRemorque(Boolean.TRUE.equals(snapshot.getRemorque()));
+        vehicule.setNumeroRemorque(snapshot.getNumeroRemorque());
+        vehicule.setMarqueRemorque(snapshot.getMarqueRemorque());
         vehicule.setCoefficientProrata(snapshot.getCoefficientProrata());
         vehicule.setValeurVenale(snapshot.getValeurVenale());
         vehicule.setValeurNeuf(snapshot.getValeurNeuf());
@@ -4969,6 +5026,7 @@ public class ContratService {
     ) {
         List<Vehicule> vehicules = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
+            validateTowingExtensionInput(input);
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
             validateUsageForClientCategory(contrat, usage);
@@ -4997,6 +5055,11 @@ public class ContratService {
                     .dateEcheance(dateEcheanceCible)
                     .crm(input.getCrm())
                     .numeroAttestation(input.getNumeroAttestation())
+                    .remorque(Boolean.TRUE.equals(input.getRemorque()))
+                    .numeroRemorque(Boolean.TRUE.equals(input.getRemorque()) ? blankToNull(input.getNumeroRemorque()) : null)
+                    .marqueRemorque(Boolean.TRUE.equals(input.getRemorque())
+                            ? resolveMarque(input.getMarqueRemorqueId(), input.getMarqueRemorqueLibelle(), false)
+                            : null)
                     .coefficientProrata(input.getCoefficientProrata())
                     .valeurVenale(input.getValeurVenale())
                     .valeurNeuf(input.getValeurNeuf())
@@ -5125,6 +5188,9 @@ public class ContratService {
                 .immatriculation(vehicule.getImmatriculation())
                 .numeroAttestation(vehicule.getNumeroAttestation())
                 .remorque(vehicule.getRemorque())
+                .numeroRemorque(vehicule.getNumeroRemorque())
+                .marqueRemorqueId(vehicule.getMarqueRemorque() != null ? vehicule.getMarqueRemorque().getId() : null)
+                .marqueRemorque(vehicule.getMarqueRemorque() != null ? vehicule.getMarqueRemorque().getLibelle() : null)
                 .marqueId(vehicule.getMarque() != null ? vehicule.getMarque().getId() : null)
                 .marque(vehicule.getMarque() != null ? vehicule.getMarque().getLibelle() : null)
                 .carrosserieId(vehicule.getCarrosserie() != null ? vehicule.getCarrosserie().getId() : null)
@@ -5167,6 +5233,9 @@ public class ContratService {
                 .immatriculation(snapshot.getImmatriculation())
                 .numeroAttestation(snapshot.getNumeroAttestation())
                 .remorque(Boolean.TRUE.equals(snapshot.getRemorque()))
+                .numeroRemorque(snapshot.getNumeroRemorque())
+                .marqueRemorqueId(snapshot.getMarqueRemorque() != null ? snapshot.getMarqueRemorque().getId() : null)
+                .marqueRemorque(snapshot.getMarqueRemorque() != null ? snapshot.getMarqueRemorque().getLibelle() : null)
                 .marqueId(snapshot.getMarque() != null ? snapshot.getMarque().getId() : null)
                 .marque(snapshot.getMarque() != null ? snapshot.getMarque().getLibelle() : null)
                 .carrosserieId(snapshot.getCarrosserie() != null ? snapshot.getCarrosserie().getId() : null)

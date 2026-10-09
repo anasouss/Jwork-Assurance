@@ -641,6 +641,9 @@ export type VehiculeInput = {
   numeroAttestationInitiale?: string;
   coefficientProrata?: number;
   remorque?: boolean;
+  numeroRemorque?: string;
+  marqueRemorqueId?: string;
+  marqueRemorqueLibelle?: string;
   valeurVenale?: number;
   valeurNeuf?: number;
   valeurGlace?: number;
@@ -657,6 +660,7 @@ export type VehiculeResponse = VehiculeInput & {
   groupeUsageAttestationCode?: string | null;
   consommeAttestation?: boolean | null;
   marque?: string | null;
+  marqueRemorque?: string | null;
   carrosserie?: string | null;
   categorieTransportCode?: string | null;
   categorieTransportLibelle?: string | null;
@@ -1381,6 +1385,9 @@ export type ContratSummary = {
     immatriculation?: string | null;
     numeroAttestation?: string | null;
     remorque?: boolean | null;
+    numeroRemorque?: string | null;
+    marqueRemorqueId?: string | null;
+    marqueRemorque?: string | null;
     marqueId?: string | null;
     marque?: string | null;
     carrosserieId?: string | null;

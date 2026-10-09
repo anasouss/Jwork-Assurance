@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { Field } from "../components/Field";
@@ -99,6 +100,9 @@ export function VehicleForm({
       valeurNeuf: toOptionalNumber(found.valeurNeuf),
       valeurGlace: toOptionalNumber(found.valeurGlace),
       remorque: Boolean(found.remorque),
+      numeroRemorque: found.numeroRemorque ?? undefined,
+      marqueRemorqueId: stringValue(found.marqueRemorqueId) || undefined,
+      marqueRemorqueLibelle: found.marqueRemorque ?? undefined,
     });
   };
 
@@ -271,9 +275,16 @@ export function VehicleForm({
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
         {showTowingExtension ? (
           <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <Checkbox
+            <Switch
               checked={Boolean(vehicule.remorque)}
-              onCheckedChange={(checked) => update({ remorque: Boolean(checked) })}
+              onCheckedChange={(checked) => update(checked
+                ? { remorque: true }
+                : {
+                    remorque: false,
+                    numeroRemorque: undefined,
+                    marqueRemorqueId: undefined,
+                    marqueRemorqueLibelle: undefined,
+                  })}
             />
             <span>Remorque</span>
           </label>
@@ -288,6 +299,28 @@ export function VehicleForm({
           <span>Organisme de crédit</span>
         </label>
       </div>
+      {showTowingExtension && vehicule.remorque ? (
+        <div className="mt-3 grid max-w-3xl gap-3 md:grid-cols-2">
+          <Field label="N° remorque" required error={errors[`vehicules.${index}.numeroRemorque`]}>
+            <Input
+              value={vehicule.numeroRemorque ?? ""}
+              onChange={(event) => update({ numeroRemorque: event.target.value })}
+            />
+          </Field>
+          <Field label="Marque remorque">
+            <AutocompleteSelect
+              value={vehicule.marqueRemorqueId ?? ""}
+              customValue={vehicule.marqueRemorqueLibelle}
+              allowCustomValue
+              placeholder="Marque remorque"
+              emptyText="Aucune marque trouvée"
+              options={marques.map((marque) => ({ value: marque.id, label: marque.libelle, keywords: marque.code }))}
+              onValueChange={(value) => update({ marqueRemorqueId: value || undefined, marqueRemorqueLibelle: undefined })}
+              onCustomValueChange={(value) => update({ marqueRemorqueId: undefined, marqueRemorqueLibelle: value })}
+            />
+          </Field>
+        </div>
+      ) : null}
       {vehicule.organismeCredit ? (
         <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-3">
           <Field label="Nom organisme">

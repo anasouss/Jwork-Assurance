@@ -124,6 +124,9 @@ public class CreateContratRequest {
         private String crm;
         private String numeroAttestation;
         private Boolean remorque;
+        private String numeroRemorque;
+        private Long marqueRemorqueId;
+        private String marqueRemorqueLibelle;
         private BigDecimal coefficientProrata;
         private BigDecimal valeurVenale;
         private BigDecimal valeurNeuf;

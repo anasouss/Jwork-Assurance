@@ -680,15 +680,13 @@ export function useContratCreationForm(
           )));
         }
       }
-      if (variables.part === "garanties") {
-        const savedTargetGaranties = targetGaranties(hydrated.garanties, variables.target);
-        setGaranties((current) => [
-          ...current.filter((garantie) => !isTargetGarantie(garantie, variables.target)),
-          ...savedTargetGaranties,
-        ]);
-        setPreview(hydrated.preview);
-        setTargetPreview(hydrated.targetPreview);
-      }
+      const savedTargetGaranties = targetGaranties(hydrated.garanties, variables.target);
+      setGaranties((current) => [
+        ...current.filter((garantie) => !isTargetGarantie(garantie, variables.target)),
+        ...savedTargetGaranties,
+      ]);
+      setPreview(hydrated.preview);
+      setTargetPreview(hydrated.targetPreview);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
@@ -1017,6 +1015,9 @@ export function useContratCreationForm(
         if (vehiculeUsage?.byCategorieTransport) {
           requireField(`vehicules.${index}.categorieTransportId`, vehicule.categorieTransportId, "Catégorie transport obligatoire.");
         }
+        if (vehicule.remorque) {
+          requireField(`vehicules.${index}.numeroRemorque`, vehicule.numeroRemorque, "N° remorque obligatoire.");
+        }
         requireField(`vehicules.${index}.crm`, vehicule.crm, "CRM obligatoire.");
         requireField(`vehicules.${index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");
         requireField(
@@ -1114,6 +1115,13 @@ export function useContratCreationForm(
         }
         if (vehiculeUsage?.byCategorieTransport) {
           requireField(`vehicules.${target.index}.categorieTransportId`, vehicule.categorieTransportId, "Catégorie transport obligatoire.");
+        }
+        if (vehicule.remorque) {
+          requireField(
+            `vehicules.${target.index}.numeroRemorque`,
+            vehicule.numeroRemorque,
+            "N° remorque obligatoire."
+          );
         }
         requireField(`vehicules.${target.index}.crm`, vehicule.crm, "CRM obligatoire.");
         requireField(`vehicules.${target.index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");
@@ -1782,6 +1790,9 @@ function hydrateDraft(draft: ContratSummary) {
         numeroAttestationInitiale: nullToUndefined(vehicule.numeroAttestation),
         coefficientProrata: nullToUndefined(vehicule.coefficientProrata),
         remorque: Boolean(vehicule.remorque),
+        numeroRemorque: nullToUndefined(vehicule.numeroRemorque),
+        marqueRemorqueId: nullToUndefined(vehicule.marqueRemorqueId),
+        marqueRemorqueLibelle: nullToUndefined(vehicule.marqueRemorque),
         valeurVenale: nullToUndefined(vehicule.valeurVenale),
         valeurNeuf: nullToUndefined(vehicule.valeurNeuf),
         valeurGlace: nullToUndefined(vehicule.valeurGlace),

@@ -106,6 +106,9 @@ public class ContratResponse {
         private String immatriculation;
         private String numeroAttestation;
         private Boolean remorque;
+        private String numeroRemorque;
+        private Long marqueRemorqueId;
+        private String marqueRemorque;
         private Long marqueId;
         private String marque;
         private Long carrosserieId;

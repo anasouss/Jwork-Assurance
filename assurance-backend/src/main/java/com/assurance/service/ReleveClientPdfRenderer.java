@@ -520,12 +520,19 @@ public class ReleveClientPdfRenderer {
 
     private void writeTotal(Document document, DocumentClient source, PdfFont bold) {
         Table total = new Table(new float[]{1.55f, 1})
-                .setWidth(UnitValue.createPercentValue(27))
+                .setWidth(UnitValue.createPercentValue(31))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
                 .setMarginRight(0)
                 .setMarginTop(10);
+        addTotalRow(total, "Total TTC", source.getTotalDebit(), bold);
+        addTotalRow(total, "Total acompte", source.getTotalCredit(), bold);
+        addTotalRow(total, "Total à payer", source.getTotalDocument(), bold);
+        document.add(total);
+    }
+
+    private void addTotalRow(Table total, String label, BigDecimal value, PdfFont bold) {
         total.addCell(new Cell()
-                .add(new Paragraph(isInvoice(source) ? "Total TTC" : "Total")
+                .add(new Paragraph(label)
                         .setFont(bold)
                         .setFontSize(8.5f)
                         .setFontColor(ColorConstants.WHITE)
@@ -535,13 +542,12 @@ public class ReleveClientPdfRenderer {
                 .setBackgroundColor(TABLE_HEADER_BLUE)
                 .setPadding(4));
         total.addCell(new Cell()
-                .add(new Paragraph(amount(source.getTotalDocument())).setFont(bold).setFontSize(8.5f).setMargin(0))
+                .add(new Paragraph(amount(value)).setFont(bold).setFontSize(8.5f).setMargin(0))
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setBorder(TABLE_BORDER)
                 .setBackgroundColor(LIGHT_BLUE)
                 .setFontColor(BRAND_BLUE)
                 .setPadding(4));
-        document.add(total);
     }
 
     private void writePaymentText(Document document, DocumentClient source, PdfFont bold, PdfFont italic) {

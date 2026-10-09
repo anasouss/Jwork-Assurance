@@ -725,14 +725,11 @@ public class DocumentClientService {
         for (BillableSource source : orderedSources) {
             ElementFacturable element = source.element();
             BigDecimal originalTtc = money(element.getPrimeTotale());
-            BigDecimal ttc = request.getTypeDocument() == TypeDocumentClient.RELEVE
-                    ? originalTtc.subtract(directPayments.getOrDefault(element.getId(), ZERO)).max(ZERO)
-                    : originalTtc;
-            BigDecimal ratio = originalTtc.signum() > 0
-                    ? ttc.divide(originalTtc, 10, RoundingMode.HALF_UP)
-                    : BigDecimal.ONE;
-            BigDecimal lineDebit = ttc.signum() > 0 ? ttc : ZERO;
-            BigDecimal lineCredit = ttc.signum() < 0 ? ttc.abs() : ZERO;
+            BigDecimal paid = request.getTypeDocument() == TypeDocumentClient.RELEVE
+                    ? directPayments.getOrDefault(element.getId(), ZERO).min(originalTtc.max(ZERO))
+                    : ZERO;
+            BigDecimal lineDebit = originalTtc.signum() > 0 ? originalTtc : ZERO;
+            BigDecimal lineCredit = originalTtc.signum() < 0 ? originalTtc.abs() : paid;
             LigneDocumentClient line = LigneDocumentClient.builder()
                     .document(document)
                     .quittance(source.quittance())
@@ -747,10 +744,10 @@ public class DocumentClientService {
                     .compagnie(sourceCompany(source))
                     .debit(lineDebit)
                     .credit(lineCredit)
-                    .primeNette(money(element.getPrimeNette()).multiply(ratio).setScale(2, RoundingMode.HALF_UP))
-                    .taxes(taxes(element).multiply(ratio).setScale(2, RoundingMode.HALF_UP))
-                    .accessoires(accessories(element).multiply(ratio).setScale(2, RoundingMode.HALF_UP))
-                    .montantTtc(ttc)
+                    .primeNette(money(element.getPrimeNette()))
+                    .taxes(taxes(element))
+                    .accessoires(accessories(element))
+                    .montantTtc(originalTtc)
                     .build();
             document.getLignes().add(line);
             debit = debit.add(lineDebit);

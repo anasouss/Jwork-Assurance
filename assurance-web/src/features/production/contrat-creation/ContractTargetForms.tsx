@@ -275,7 +275,7 @@ export function VehicleForm({
               checked={Boolean(vehicule.remorque)}
               onCheckedChange={(checked) => update({ remorque: Boolean(checked) })}
             />
-            <span>Avec remorque (extension RC)</span>
+            <span>Remorque</span>
           </label>
         ) : null}
         <label className="flex cursor-pointer items-center gap-2 text-sm">

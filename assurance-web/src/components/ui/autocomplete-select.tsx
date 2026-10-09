@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -44,12 +45,40 @@ export function AutocompleteSelect({
   className,
 }: AutocompleteSelectProps) {
   const inputId = React.useId();
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const selectedOption = options.find((option) => option.value === value);
   const selectedLabel = selectedOption?.label ?? customValue ?? "";
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState(selectedLabel);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [invalid, setInvalid] = React.useState(false);
+  const [menuPosition, setMenuPosition] = React.useState<{
+    left: number;
+    width: number;
+    maxHeight: number;
+    top?: number;
+    bottom?: number;
+  } | null>(null);
+
+  const updateMenuPosition = React.useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    const gap = 4;
+    const viewportPadding = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
+    const spaceAbove = rect.top - gap - viewportPadding;
+    const openBelow = spaceBelow >= 160 || spaceBelow >= spaceAbove;
+    const maxHeight = Math.max(96, Math.min(256, openBelow ? spaceBelow : spaceAbove));
+    const width = Math.min(rect.width, window.innerWidth - viewportPadding * 2);
+    const left = Math.min(
+      Math.max(viewportPadding, rect.left),
+      Math.max(viewportPadding, window.innerWidth - width - viewportPadding)
+    );
+    setMenuPosition(openBelow
+      ? { left, width, maxHeight, top: rect.bottom + gap }
+      : { left, width, maxHeight, bottom: window.innerHeight - rect.top + gap });
+  }, []);
 
   React.useEffect(() => {
     if (!open) {
@@ -70,6 +99,20 @@ export function AutocompleteSelect({
   React.useEffect(() => {
     setActiveIndex(0);
   }, [query]);
+
+  React.useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition(null);
+      return;
+    }
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   const selectOption = (option: AutocompleteOption) => {
     onValueChange(option.value);
@@ -110,6 +153,7 @@ export function AutocompleteSelect({
   return (
     <div className={cn("relative grid gap-1.5", className)}>
       <Input
+        ref={inputRef}
         name={`lookup-${inputId.replace(/:/g, "")}`}
         autoComplete={autoComplete}
         data-1p-ignore="true"
@@ -123,6 +167,7 @@ export function AutocompleteSelect({
         aria-autocomplete="list"
         onFocus={() => {
           if (openOnFocus) {
+            updateMenuPosition();
             setOpen(true);
           }
         }}
@@ -164,8 +209,11 @@ export function AutocompleteSelect({
         className={cn("pr-9", invalid && "border-red-500 ring-1 ring-red-500/20")}
       />
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      {open && !disabled ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-64 overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
+      {open && !disabled && menuPosition && typeof document !== "undefined" ? createPortal(
+        <div
+          className="fixed z-[100] overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg"
+          style={menuPosition}
+        >
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">{emptyText}</div>
           ) : (
@@ -190,7 +238,8 @@ export function AutocompleteSelect({
               );
             })
           )}
-        </div>
+        </div>,
+        document.body
       ) : null}
       {invalid ? <span className="text-xs text-red-600">{invalidText}</span> : null}
     </div>

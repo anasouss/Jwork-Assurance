@@ -579,6 +579,7 @@ export type ClientCrm = {
     dateEffet?: string | null;
     dateEcheance?: string | null;
     compagnie?: string | null;
+    assureNom?: string | null;
     roleClient?: string | null;
     typePayeurPrime?: string | null;
     payeurPrimeNom?: string | null;

@@ -324,6 +324,7 @@ function ProductionSection({
                 </Select>
               </TableHead>
               <TableHead className="text-white">Police / dossier</TableHead>
+              <TableHead className="text-white">Assuré</TableHead>
               <TableHead className="text-white">Compagnie</TableHead>
               <TableHead className="text-white">Date de souscription</TableHead>
               <TableHead className="text-white">Statut</TableHead>
@@ -346,6 +347,7 @@ function ProductionSection({
                   <div className="font-medium">{contract.numeroPolice || "Sans numéro de police"}</div>
                   <div className="text-xs text-muted-foreground">{contract.numeroDossier || `#${contract.id}`}</div>
                 </TableCell>
+                <TableCell className="font-medium">{contract.assureNom || "-"}</TableCell>
                 <TableCell>{contract.compagnie || "-"}</TableCell>
                 <TableCell>{formatDate(contract.dateSouscription)}</TableCell>
                 <TableCell><ContractStatus status={contract.statut} dateEcheance={contract.dateEcheance} /></TableCell>

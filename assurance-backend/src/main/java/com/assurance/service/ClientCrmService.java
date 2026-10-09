@@ -7,6 +7,7 @@ import com.assurance.entity.ContratClient;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.Quittance;
 import com.assurance.enums.CategorieMouvementContrat;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.exception.ResourceNotFoundException;
@@ -132,6 +133,7 @@ public class ClientCrmService {
                     .dateEffet(contrat.getDateEffet())
                     .dateEcheance(contrat.getDateEcheance())
                     .compagnie(contrat.getCompagnieAssurance() == null ? null : contrat.getCompagnieAssurance().getNom())
+                    .assureNom(insuredName(contrat))
                     .roleClient(roles)
                     .typePayeurPrime(contrat.getTypePayeurPrime() == null ? "SOUSCRIPTEUR" : contrat.getTypePayeurPrime().name())
                     .payeurPrimeNom(contrat.getPayeurPrime() == null ? null : contrat.getPayeurPrime().getNomAffichage())
@@ -151,6 +153,25 @@ public class ClientCrmService {
                 .totalQuittances(total)
                 .totalImpayes(impaye)
                 .build();
+    }
+
+    private String insuredName(Contrat contract) {
+        ContratClient insured = preferredClientForRole(contract, RoleClientContrat.PROPRIETAIRE);
+        if (insured == null) {
+            insured = preferredClientForRole(contract, RoleClientContrat.SOUSCRIPTEUR);
+        }
+        return insured == null || insured.getClient() == null
+                ? null
+                : insured.getClient().getNomAffichage();
+    }
+
+    private ContratClient preferredClientForRole(Contrat contract, RoleClientContrat role) {
+        return contract.getClients().stream()
+                .filter(link -> link.getRole() == role)
+                .min(java.util.Comparator.comparing(
+                        link -> !Boolean.TRUE.equals(link.getPrincipalPourRole())
+                ))
+                .orElse(null);
     }
 
     private LocalDate subscriptionDate(List<MouvementContrat> movements) {

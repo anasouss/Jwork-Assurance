@@ -494,7 +494,7 @@ export default function RelevesFacturesPage() {
                       <Header align="right">Reste à payer</Header>
                       <Header>FC/RL</Header>
                       <Header>Référence document</Header>
-                      <Header align="center">Détail</Header>
+                      <Header align="center">Actions</Header>
                     </tr>
                   </thead>
                   <tbody>
@@ -544,15 +544,7 @@ export default function RelevesFacturesPage() {
                           <DocumentReferences documents={row.documents} onOpen={setDetailId} />
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <Button asChild variant="ghost" size="icon" title="Ouvrir le PDF du contrat">
-                            <Link
-                              to={`/app/production/contrats/${row.contratId}/pdf${row.mouvementId ? `?mouvementId=${row.mouvementId}` : ""}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Eye className="size-4" />
-                            </Link>
-                          </Button>
+                          <SourceActionsMenu row={row} onOpenDocument={setDetailId} />
                         </td>
                       </tr>
                     ))}
@@ -967,6 +959,54 @@ function DocumentActionsMenu(props: {
   );
 }
 
+function SourceActionsMenu(props: {
+  row: ClientDocumentSource;
+  onOpenDocument: (id: string) => void;
+}) {
+  const contractPdfUrl = `/app/production/contrats/${props.row.contratId}/pdf${
+    props.row.mouvementId ? `?mouvementId=${props.row.mouvementId}` : ""
+  }`;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Actions"
+          aria-label={`Actions pour ${props.row.police || props.row.reference || props.row.dossier}`}
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-64">
+        <DropdownMenuItem asChild>
+          <Link to={`/app/production/contrats/${props.row.contratId}`}>
+            <Eye className="size-4" />
+            Voir le contrat
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to={contractPdfUrl} target="_blank" rel="noopener noreferrer">
+            <FileDown className="size-4" />
+            Prévisualiser la police
+          </Link>
+        </DropdownMenuItem>
+        {props.row.documents.length ? <DropdownMenuSeparator /> : null}
+        {props.row.documents.map((document) => (
+          <DropdownMenuItem key={document.id} onSelect={() => props.onOpenDocument(document.id)}>
+            {document.type === "FACTURE"
+              ? <ReceiptText className="size-4" />
+              : <FileText className="size-4" />}
+            <span className="min-w-0 truncate">
+              Voir / imprimer {document.type === "FACTURE" ? "la facture" : "le relevé"} {document.numero}
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function IssueDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -991,7 +1031,12 @@ function IssueDialog(props: {
   });
   const invoiceEligible = props.rows.every((row) => row.facturable);
   const debit = props.rows.reduce((sum, row) => sum + Math.max(row.montantTtc, 0), 0);
-  const credit = props.rows.reduce((sum, row) => sum + Math.abs(Math.min(row.montantTtc, 0)), 0);
+  const credit = props.rows.reduce(
+    (sum, row) => sum
+      + Math.abs(Math.min(row.montantTtc, 0))
+      + (type === "RELEVE" ? Math.max(row.montantRegle, 0) : 0),
+    0
+  );
   const today = useMemo(() => startOfLocalDay(new Date()), []);
   const maximumDueDate = dueDateProposal.data?.dateEcheanceProposee
     ? parseLocalDate(dueDateProposal.data.dateEcheanceProposee)
@@ -1134,10 +1179,10 @@ function IssueDialog(props: {
               <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} />
             </FilterField>
             <div className="rounded-md border">
-              <SummaryLine label="Total débit" value={debit} tone="debit" />
-              {type === "RELEVE" ? <SummaryLine label="Total crédit" value={credit} tone="credit" /> : null}
+              <SummaryLine label="Total TTC" value={debit} tone="debit" />
+              {type === "RELEVE" ? <SummaryLine label="Total acompte" value={credit} tone="credit" /> : null}
               <SummaryLine
-                label={type === "RELEVE" ? "Solde" : "Total à payer"}
+                label="Total à payer"
                 value={debit - credit}
                 tone="balance"
                 strong

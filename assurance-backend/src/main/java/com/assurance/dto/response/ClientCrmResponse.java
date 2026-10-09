@@ -32,6 +32,7 @@ public class ClientCrmResponse {
         private LocalDate dateEffet;
         private LocalDate dateEcheance;
         private String compagnie;
+        private String assureNom;
         private String roleClient;
         private String typePayeurPrime;
         private String payeurPrimeNom;

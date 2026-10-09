@@ -1018,6 +1018,14 @@ export function useContratCreationForm(
         if (vehicule.remorque) {
           requireField(`vehicules.${index}.numeroRemorque`, vehicule.numeroRemorque, "N° remorque obligatoire.");
         }
+        if (vehicule.organismeCredit) {
+          requireField(`vehicules.${index}.nomOrganismeCredit`, vehicule.nomOrganismeCredit, "Nom de l'organisme obligatoire.");
+          requireField(`vehicules.${index}.montantCredit`, vehicule.montantCredit, "Montant du crédit obligatoire.");
+          requireField(`vehicules.${index}.dateFinCredit`, vehicule.dateFinCredit, "Date de fin du crédit obligatoire.");
+          if (vehicule.montantCredit != null && vehicule.montantCredit <= 0) {
+            nextErrors[`vehicules.${index}.montantCredit`] = "Le montant du crédit doit être supérieur à zéro.";
+          }
+        }
         requireField(`vehicules.${index}.crm`, vehicule.crm, "CRM obligatoire.");
         requireField(`vehicules.${index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");
         requireField(
@@ -1122,6 +1130,26 @@ export function useContratCreationForm(
             vehicule.numeroRemorque,
             "N° remorque obligatoire."
           );
+        }
+        if (vehicule.organismeCredit) {
+          requireField(
+            `vehicules.${target.index}.nomOrganismeCredit`,
+            vehicule.nomOrganismeCredit,
+            "Nom de l'organisme obligatoire."
+          );
+          requireField(
+            `vehicules.${target.index}.montantCredit`,
+            vehicule.montantCredit,
+            "Montant du crédit obligatoire."
+          );
+          requireField(
+            `vehicules.${target.index}.dateFinCredit`,
+            vehicule.dateFinCredit,
+            "Date de fin du crédit obligatoire."
+          );
+          if (vehicule.montantCredit != null && vehicule.montantCredit <= 0) {
+            nextErrors[`vehicules.${target.index}.montantCredit`] = "Le montant du crédit doit être supérieur à zéro.";
+          }
         }
         requireField(`vehicules.${target.index}.crm`, vehicule.crm, "CRM obligatoire.");
         requireField(`vehicules.${target.index}.nombrePlaces`, vehicule.nombrePlaces, "Nombre de places obligatoire.");

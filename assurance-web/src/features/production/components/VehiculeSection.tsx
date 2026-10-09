@@ -384,13 +384,13 @@ export function VehiculeSection({
               ) : null}
               {vehicule.organismeCredit ? (
                 <div className="mt-3 grid max-w-5xl gap-3 md:grid-cols-3">
-                  <Field label="Nom organisme">
+                  <Field label="Nom organisme" required error={errors[`vehicules.${index}.nomOrganismeCredit`]}>
                     <Input value={vehicule.nomOrganismeCredit ?? ""} onChange={(event) => update(index, { nomOrganismeCredit: event.target.value })} />
                   </Field>
-                  <Field label="Montant de crédit">
+                  <Field label="Montant de crédit" required error={errors[`vehicules.${index}.montantCredit`]}>
                     <MoneyInput value={vehicule.montantCredit} onValueChange={(value) => update(index, { montantCredit: value })} />
                   </Field>
-                  <Field label="Date fin crédit">
+                  <Field label="Date fin crédit" required error={errors[`vehicules.${index}.dateFinCredit`]}>
                     <DatePicker date={vehicule.dateFinCredit} onSelect={(date) => update(index, { dateFinCredit: toDateOnly(date) })} />
                   </Field>
                 </div>

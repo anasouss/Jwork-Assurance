@@ -725,7 +725,7 @@ public class ContratService {
 
         List<Vehicule> vehiculesCrees = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
-            validateTowingExtensionInput(input);
+            validateConditionalVehicleInput(input);
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
             validateUsageForClientCategory(contrat, usage);
@@ -763,10 +763,10 @@ public class ContratService {
                     .valeurVenale(input.getValeurVenale())
                     .valeurNeuf(input.getValeurNeuf())
                     .valeurGlace(input.getValeurGlace())
-                    .organismeCredit(input.getOrganismeCredit() == null ? false : input.getOrganismeCredit())
-                    .nomOrganismeCredit(input.getNomOrganismeCredit())
-                    .montantCredit(input.getMontantCredit())
-                    .dateFinCredit(input.getDateFinCredit())
+                    .organismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()))
+                    .nomOrganismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? blankToNull(input.getNomOrganismeCredit()) : null)
+                    .montantCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getMontantCredit() : null)
+                    .dateFinCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getDateFinCredit() : null)
                     .build());
             vehiculesCrees.add(vehicule);
             contrat.getVehicules().add(vehicule);
@@ -1201,7 +1201,7 @@ public class ContratService {
         Usage usageContrat = contrat.getUsage();
         List<Vehicule> vehiculesCrees = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
-            validateTowingExtensionInput(input);
+            validateConditionalVehicleInput(input);
             if (input.getTypeVehicule() == null) {
                 if (finalMode) {
                     throw new BadRequestException("Le type vehicule est obligatoire");
@@ -1245,10 +1245,10 @@ public class ContratService {
                     .valeurVenale(input.getValeurVenale())
                     .valeurNeuf(input.getValeurNeuf())
                     .valeurGlace(input.getValeurGlace())
-                    .organismeCredit(input.getOrganismeCredit() == null ? false : input.getOrganismeCredit())
-                    .nomOrganismeCredit(input.getNomOrganismeCredit())
-                    .montantCredit(input.getMontantCredit())
-                    .dateFinCredit(input.getDateFinCredit())
+                    .organismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()))
+                    .nomOrganismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? blankToNull(input.getNomOrganismeCredit()) : null)
+                    .montantCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getMontantCredit() : null)
+                    .dateFinCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getDateFinCredit() : null)
                     .build());
             vehiculesCrees.add(vehicule);
             contrat.getVehicules().add(vehicule);
@@ -1499,7 +1499,7 @@ public class ContratService {
         if (!hasText(input.getCrm())) {
             throw new BadRequestException("CRM obligatoire");
         }
-        validateTowingExtensionInput(input);
+        validateConditionalVehicleInput(input);
         Usage usage = input.getUsageId() == null
                 ? contrat.getUsage()
                 : usageRepository.findById(input.getUsageId())
@@ -1543,9 +1543,24 @@ public class ContratService {
         }
     }
 
-    private void validateTowingExtensionInput(CreateContratRequest.VehiculeInput input) {
-        if (input != null && Boolean.TRUE.equals(input.getRemorque()) && !hasText(input.getNumeroRemorque())) {
+    private void validateConditionalVehicleInput(CreateContratRequest.VehiculeInput input) {
+        if (input == null) {
+            return;
+        }
+        if (Boolean.TRUE.equals(input.getRemorque()) && !hasText(input.getNumeroRemorque())) {
             throw new BadRequestException("Numero remorque obligatoire");
+        }
+        if (!Boolean.TRUE.equals(input.getOrganismeCredit())) {
+            return;
+        }
+        if (!hasText(input.getNomOrganismeCredit())) {
+            throw new BadRequestException("Nom de l'organisme de credit obligatoire");
+        }
+        if (input.getMontantCredit() == null || input.getMontantCredit().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Le montant du credit doit etre superieur a zero");
+        }
+        if (input.getDateFinCredit() == null) {
+            throw new BadRequestException("Date de fin du credit obligatoire");
         }
     }
 
@@ -1675,10 +1690,10 @@ public class ContratService {
         vehicule.setValeurVenale(input.getValeurVenale());
         vehicule.setValeurNeuf(input.getValeurNeuf());
         vehicule.setValeurGlace(input.getValeurGlace());
-        vehicule.setOrganismeCredit(input.getOrganismeCredit() == null ? false : input.getOrganismeCredit());
-        vehicule.setNomOrganismeCredit(input.getNomOrganismeCredit());
-        vehicule.setMontantCredit(input.getMontantCredit());
-        vehicule.setDateFinCredit(input.getDateFinCredit());
+        vehicule.setOrganismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()));
+        vehicule.setNomOrganismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? blankToNull(input.getNomOrganismeCredit()) : null);
+        vehicule.setMontantCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getMontantCredit() : null);
+        vehicule.setDateFinCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getDateFinCredit() : null);
     }
 
     private void validateDraftRemorqueInput(CreateContratRequest.RemorqueInput input) {
@@ -5026,7 +5041,7 @@ public class ContratService {
     ) {
         List<Vehicule> vehicules = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
-            validateTowingExtensionInput(input);
+            validateConditionalVehicleInput(input);
             Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
             validateUsageForClientCategory(contrat, usage);
@@ -5064,10 +5079,10 @@ public class ContratService {
                     .valeurVenale(input.getValeurVenale())
                     .valeurNeuf(input.getValeurNeuf())
                     .valeurGlace(input.getValeurGlace())
-                    .organismeCredit(input.getOrganismeCredit() == null ? false : input.getOrganismeCredit())
-                    .nomOrganismeCredit(input.getNomOrganismeCredit())
-                    .montantCredit(input.getMontantCredit())
-                    .dateFinCredit(input.getDateFinCredit())
+                    .organismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()))
+                    .nomOrganismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? blankToNull(input.getNomOrganismeCredit()) : null)
+                    .montantCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getMontantCredit() : null)
+                    .dateFinCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getDateFinCredit() : null)
                     .build());
         }
         return vehicules;

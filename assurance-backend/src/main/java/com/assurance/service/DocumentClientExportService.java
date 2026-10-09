@@ -80,7 +80,7 @@ public class DocumentClientExportService {
                     dateAu,
                     search,
                     true,
-                    false,
+                    true,
                     sort,
                     page,
                     EXPORT_PAGE_SIZE,
@@ -97,7 +97,8 @@ public class DocumentClientExportService {
         String[] headers = {
                 "Souscripteur", "Assuré", "Payeur", "Police / référence", "Dossier", "Nature",
                 "Mouvement", "Compagnie", "Type contrat", "Date effet", "Date échéance",
-                "Prime nette", "Taxes et frais", "TTC", "FC/RL", "Référence document"
+                "Prime nette", "Taxes et frais", "TTC", "Réglé", "Reste à payer", "FC/RL",
+                "Référence document"
         };
 
         try (Workbook workbook = new XSSFWorkbook();
@@ -120,7 +121,7 @@ public class DocumentClientExportService {
                 writeRow(row, item, textStyle, moneyStyle);
             }
 
-            int[] widths = {26, 26, 26, 22, 18, 20, 28, 24, 16, 15, 15, 17, 17, 17, 12, 30};
+            int[] widths = {26, 26, 26, 22, 18, 20, 28, 24, 16, 15, 15, 17, 17, 17, 17, 17, 12, 30};
             for (int column = 0; column < widths.length; column++) {
                 sheet.setColumnWidth(column, widths[column] * 256);
             }
@@ -149,12 +150,14 @@ public class DocumentClientExportService {
         setText(row, column++, enumLabel(item.getNature()), textStyle);
         setText(row, column++, item.getMouvement(), textStyle);
         setText(row, column++, item.getCompagnie(), textStyle);
-        setText(row, column++, enumLabel(item.getTypeContrat()), textStyle);
+        setText(row, column++, contractTypeLabel(item.getTypeContrat()), textStyle);
         setText(row, column++, formatDate(item.getDateEffet()), textStyle);
         setText(row, column++, formatDate(item.getDateEcheance()), textStyle);
         setMoney(row, column++, item.getPrimeNette(), moneyStyle);
         setMoney(row, column++, money(item.getTaxes()).add(money(item.getAccessoires())), moneyStyle);
         setMoney(row, column++, item.getMontantTtc(), moneyStyle);
+        setMoney(row, column++, item.getMontantRegle(), moneyStyle);
+        setMoney(row, column++, item.getSoldeRestant(), moneyStyle);
         setText(row, column++, documentTypes(item.getDocuments()), textStyle);
         setText(row, column, documentReferences(item.getDocuments()), textStyle);
     }
@@ -167,6 +170,13 @@ public class DocumentClientExportService {
                 .map(type -> type == TypeDocumentClient.FACTURE ? "FC" : "RL")
                 .distinct()
                 .collect(Collectors.joining(", "));
+    }
+
+    private String contractTypeLabel(TypeContrat type) {
+        if (type == TypeContrat.PARTICULIER) return "Mono";
+        if (type == TypeContrat.FLOTTE) return "Flotte";
+        if (type == TypeContrat.CONVENTION) return "Convention";
+        return "";
     }
 
     private String documentReferences(List<SourceDocumentClientResponse.DocumentReference> documents) {

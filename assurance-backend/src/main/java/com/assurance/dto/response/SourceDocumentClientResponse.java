@@ -38,6 +38,8 @@ public class SourceDocumentClientResponse {
     private BigDecimal taxes;
     private BigDecimal accessoires;
     private BigDecimal montantTtc;
+    private BigDecimal montantRegle;
+    private BigDecimal soldeRestant;
     private boolean dejaFacturee;
     private boolean facturable;
     private List<DocumentReference> documents;

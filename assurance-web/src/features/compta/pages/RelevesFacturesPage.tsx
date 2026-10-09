@@ -467,7 +467,7 @@ export default function RelevesFacturesPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1540px] border-collapse text-sm [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r [&_th:not(:last-child)]:border-white/35">
+                <table className="w-full min-w-[1660px] border-collapse text-sm [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r [&_th:not(:last-child)]:border-white/35">
                   <thead className="border-y bg-amber-600 text-white">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left">
@@ -491,15 +491,16 @@ export default function RelevesFacturesPage() {
                       <Header align="right">Prime nette</Header>
                       <Header align="right">Taxes et frais</Header>
                       <SortHeader column="primeTotale" activeColumn={urlState.sourceSortBy} direction={urlState.sourceSortDirection} onSort={sortSources} align="right">TTC</SortHeader>
+                      <Header align="right">Reste à payer</Header>
                       <Header>FC/RL</Header>
                       <Header>Référence document</Header>
                       <Header align="center">Détail</Header>
                     </tr>
                   </thead>
                   <tbody>
-                    {sources.isLoading ? <LoadingRows columns={13} /> : null}
+                    {sources.isLoading ? <LoadingRows columns={14} /> : null}
                     {!sources.isLoading && !(sources.data?.rows.length) ? (
-                      <tr><td colSpan={13} className="h-32 text-center text-muted-foreground">Aucune écriture trouvée.</td></tr>
+                      <tr><td colSpan={14} className="h-32 text-center text-muted-foreground">Aucune écriture impayée trouvée.</td></tr>
                     ) : null}
                     {pageRows.map((row) => (
                       <tr key={row.elementFacturableId} className="border-b hover:bg-muted/30">
@@ -520,7 +521,9 @@ export default function RelevesFacturesPage() {
                           </div>
                           {row.nature === "ASSISTANCE" ? (
                             <div className="text-xs text-muted-foreground">Contrat d'assistance</div>
-                          ) : null}
+                          ) : (
+                            <div className="text-xs text-muted-foreground">{contractTypeLabel(row.typeContrat)}</div>
+                          )}
                         </td>
                         <td className="px-3 py-3">{row.mouvement}</td>
                         <td className="px-3 py-3">{row.compagnie}</td>
@@ -528,6 +531,12 @@ export default function RelevesFacturesPage() {
                         <MoneyCell value={row.primeNette} />
                         <MoneyCell value={taxesAndFees(row)} />
                         <MoneyCell value={row.montantTtc} strong />
+                        <td className="px-3 py-3 text-right">
+                          <div className="font-semibold tabular-nums">{formatAmount(row.soldeRestant)}</div>
+                          <Badge variant="outline" className="mt-1">
+                            {row.montantRegle > 0 ? "Partiel" : "Impayé"}
+                          </Badge>
+                        </td>
                         <td className="px-3 py-3">
                           <DocumentTypeBadges documents={row.documents} />
                         </td>
@@ -1096,7 +1105,7 @@ function IssueDialog(props: {
                   <Header>Date</Header>
                   <Header align="right">Prime nette</Header>
                   <Header align="right">Taxes et frais</Header>
-                  <Header align="right">TTC</Header>
+                  <Header align="right">Reste à payer</Header>
                 </tr>
               </thead>
               <tbody>
@@ -1106,13 +1115,15 @@ function IssueDialog(props: {
                       <div>{row.nature === "ASSISTANCE" ? row.reference || "-" : row.police || row.reference || "-"}</div>
                       {row.nature === "ASSISTANCE" ? (
                         <div className="text-xs text-muted-foreground">Contrat d'assistance</div>
-                      ) : null}
+                      ) : (
+                        <div className="text-xs text-muted-foreground">{contractTypeLabel(row.typeContrat)}</div>
+                      )}
                     </td>
                     <td className="px-3 py-2">{row.mouvement}</td>
                     <td className="px-3 py-2">{formatDate(row.dateEffet)}</td>
                     <MoneyCell value={row.primeNette} />
                     <MoneyCell value={taxesAndFees(row)} />
-                    <MoneyCell value={row.montantTtc} strong />
+                    <MoneyCell value={row.soldeRestant} strong />
                   </tr>
                 ))}
               </tbody>
@@ -1761,17 +1772,20 @@ function RevisionDocumentDialog(props: {
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-slate-100/90 dark:bg-slate-900/70"><tr>
                   <th className="w-12 px-3 py-3" />
-                  <Header>Police / référence</Header><Header>Mouvement</Header><Header>Date</Header><Header align="right">TTC</Header>
+                  <Header>Police / référence</Header><Header>Mouvement</Header><Header>Date</Header><Header align="right">Reste à payer</Header>
                 </tr></thead>
                 <tbody>
                   {sources.isLoading ? <TableRowsSkeleton colSpan={5} rows={3} /> : candidates.map((row) => {
                     const id = row.elementFacturableId as string;
                     return <tr key={id} className="border-t">
                       <td className="px-3 py-3"><Checkbox checked={Boolean(selected[id])} onCheckedChange={(checked) => setSelected((current) => ({ ...current, [id]: checked === true }))} aria-label={`Ajouter ${row.police || row.reference || row.mouvement}`} /></td>
-                      <td className="px-3 py-3 font-medium">{row.police || row.reference || "-"}</td>
+                      <td className="px-3 py-3">
+                        <div className="font-medium">{row.police || row.reference || "-"}</div>
+                        <div className="text-xs text-muted-foreground">{contractTypeLabel(row.typeContrat)}</div>
+                      </td>
                       <td className="px-3 py-3">{row.mouvement}</td>
                       <td className="px-3 py-3">{formatDate(row.dateEffet)}</td>
-                      <MoneyCell value={row.montantTtc} strong />
+                      <MoneyCell value={row.soldeRestant} strong />
                     </tr>;
                   })}
                   {!sources.isLoading && !candidates.length ? <tr><td colSpan={5} className="h-20 text-center text-muted-foreground">Aucune autre écriture éligible.</td></tr> : null}
@@ -2153,6 +2167,13 @@ function formatDate(value?: string | null) {
   if (!value) return "-";
   const [year, month, day] = value.split("-");
   return `${day}/${month}/${year}`;
+}
+
+function contractTypeLabel(type?: string | null) {
+  if (type === "PARTICULIER") return "Mono";
+  if (type === "FLOTTE") return "Flotte";
+  if (type === "CONVENTION") return "Convention";
+  return "-";
 }
 
 function parseLocalDate(value: string) {

@@ -314,6 +314,8 @@ export const comptaApi = {
         payeurId: String(row.payeurId),
         souscripteurId: row.souscripteurId == null ? null : String(row.souscripteurId),
         assureId: row.assureId == null ? null : String(row.assureId),
+        montantRegle: Number(row.montantRegle ?? 0),
+        soldeRestant: Number(row.soldeRestant ?? row.montantTtc ?? 0),
         documents: (row.documents ?? []).map((document) => ({
           ...document,
           id: String(document.id),

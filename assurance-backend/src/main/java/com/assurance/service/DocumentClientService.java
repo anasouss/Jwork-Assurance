@@ -245,7 +245,10 @@ public class DocumentClientService {
         validatePeriod(dateDu, dateAu);
         String normalizedDocumentState = normalizeDocumentState(documentState);
         String normalizedSearch = normalizeSearch(search);
-        Pageable pageable = PageRequest.of(normalizePage(page), normalizeSize(size), sort);
+        int pageNumber = normalizePage(page);
+        int pageSize = normalizeSize(size);
+        Pageable pageable = PageRequest.of(pageNumber, pageSize, sort);
+        Pageable sourcePageable = includeSummary ? Pageable.unpaged(sort) : pageable;
         // The public souscripteurId filter matches CRM portfolio membership, including payer and linked roles.
         Page<ElementFacturable> result = elementFacturableRepository.searchForClientDocuments(
                 agenceId,
@@ -261,7 +264,7 @@ public class DocumentClientService {
                 payeurType,
                 payeurId,
                 normalizedSearch,
-                pageable
+                sourcePageable
         );
 
         List<Long> pageIds = result.getContent().stream().map(ElementFacturable::getId).toList();
@@ -283,7 +286,8 @@ public class DocumentClientService {
                         TypeDocumentClient.FACTURE,
                         StatutDocumentClient.EMIS
                 ));
-        List<SourceDocumentClientResponse> rows = result.getContent().stream()
+        Map<Long, SourceBalance> balances = loadSourceBalances(result.getContent());
+        List<SourceDocumentClientResponse> matchingRows = result.getContent().stream()
                 .map(element -> resolveSource(element, quittances, assistances))
                 .map(source -> toSourceResponse(
                         source,
@@ -291,123 +295,52 @@ public class DocumentClientService {
                         subscribers.get(source.element().getContrat().getId()),
                         insuredClients.get(source.element().getContrat().getId()),
                         documents.getOrDefault(source.element().getId(), List.of()),
-                        alreadyInvoiced
+                        alreadyInvoiced,
+                        balances.get(source.element().getId())
                 ))
+                .filter(row -> !includeSummary || row.getSoldeRestant().signum() > 0)
                 .toList();
+        int fromIndex = includeSummary
+                ? Math.min(pageNumber * pageSize, matchingRows.size())
+                : 0;
+        int toIndex = includeSummary
+                ? Math.min(fromIndex + pageSize, matchingRows.size())
+                : matchingRows.size();
+        List<SourceDocumentClientResponse> rows = matchingRows.subList(fromIndex, toIndex);
         SourceDocumentClientPageResponse.Summary summary = includeSummary
-                ? summarizeSources(
-                        agenceId,
-                        brancheId,
-                        contratId,
-                        souscripteurId,
-                        compagnieId,
-                        typeContrat,
-                        normalizedDocumentState,
-                        includeInvoiced,
-                        dateDu,
-                        dateAu,
-                        payeurType,
-                        payeurId,
-                        normalizedSearch,
-                        sort,
-                        result
-                )
+                ? summarizeOutstandingSources(matchingRows)
                 : emptySourceSummary(result.getTotalElements());
+        SourceDocumentClientPageResponse.PageInfo responsePage = includeSummary
+                ? pageInfo(pageNumber, pageSize, matchingRows.size())
+                : pageInfo(result);
 
         return SourceDocumentClientPageResponse.builder()
                 .summary(summary)
-                .page(pageInfo(result))
+                .page(responsePage)
                 .rows(rows)
                 .build();
     }
 
-    private SourceDocumentClientPageResponse.Summary summarizeSources(
-            Long agenceId,
-            Long brancheId,
-            Long contratId,
-            Long souscripteurId,
-            Long compagnieId,
-            TypeContrat typeContrat,
-            String documentState,
-            boolean includeInvoiced,
-            LocalDate dateDu,
-            LocalDate dateAu,
-            String payeurType,
-            Long payeurId,
-            String search,
-            Sort sort,
-            Page<ElementFacturable> pagedResult
+    private SourceDocumentClientPageResponse.Summary summarizeOutstandingSources(
+            List<SourceDocumentClientResponse> rows
     ) {
-        List<ElementFacturable> elements;
-        if (pagedResult.getNumber() == 0
-                && pagedResult.getNumberOfElements() == pagedResult.getTotalElements()) {
-            elements = pagedResult.getContent();
-        } else {
-            elements = elementFacturableRepository.searchForClientDocuments(
-                    agenceId,
-                    brancheId,
-                    contratId,
-                    souscripteurId,
-                    compagnieId,
-                    typeContrat,
-                    documentState,
-                    includeInvoiced,
-                    dateDu,
-                    dateAu,
-                    payeurType,
-                    payeurId,
-                    search,
-                    Pageable.unpaged(sort)
-            ).getContent();
-        }
-
-        List<Long> elementIds = elements.stream().map(ElementFacturable::getId).toList();
-        if (elementIds.isEmpty()) {
-            return emptySourceSummary(pagedResult.getTotalElements());
-        }
-
-        List<LigneDocumentClient> invoiceLines = ligneDocumentClientRepository
-                .findIssuedDocumentsByElementIds(elementIds, StatutDocumentClient.EMIS)
-                .stream()
-                .filter(line -> line.getDocument().getTypeDocument() == TypeDocumentClient.FACTURE)
-                .toList();
-        Set<Long> invoicedElementIds = invoiceLines.stream()
-                .map(line -> line.getElementFacturable().getId())
-                .collect(Collectors.toSet());
-        Map<Long, DocumentClient> invoices = invoiceLines.stream()
-                .map(LigneDocumentClient::getDocument)
-                .collect(Collectors.toMap(
-                        DocumentClient::getId,
-                        document -> document,
-                        (first, ignored) -> first,
-                        LinkedHashMap::new
-                ));
-
-        Map<Long, BigDecimal> documentAllocations = loadActiveAllocationTotalsByDocument(invoices.keySet());
-        BigDecimal montantFacture = invoices.values().stream()
-                .map(DocumentClient::getTotalDocument)
+        BigDecimal montantFacture = rows.stream()
+                .filter(SourceDocumentClientResponse::isDejaFacturee)
+                .map(SourceDocumentClientResponse::getMontantTtc)
                 .map(this::money)
                 .reduce(ZERO, BigDecimal::add);
-        BigDecimal impayeFacture = invoices.values().stream()
-                .map(invoice -> money(invoice.getTotalDocument())
-                        .subtract(documentAllocations.getOrDefault(invoice.getId(), ZERO))
-                        .max(ZERO))
+        BigDecimal impayeFacture = rows.stream()
+                .filter(SourceDocumentClientResponse::isDejaFacturee)
+                .map(SourceDocumentClientResponse::getSoldeRestant)
+                .map(this::money)
                 .reduce(ZERO, BigDecimal::add);
-
-        List<ElementFacturable> uninvoicedElements = elements.stream()
-                .filter(element -> !invoicedElementIds.contains(element.getId()))
-                .toList();
-        Map<Long, BigDecimal> directAllocations = loadActiveAllocationTotalsByElement(
-                uninvoicedElements.stream().map(ElementFacturable::getId).toList()
-        );
-        BigDecimal impayeNonFacture = uninvoicedElements.stream()
-                .map(element -> money(element.getPrimeTotale())
-                        .subtract(directAllocations.getOrDefault(element.getId(), ZERO))
-                        .max(ZERO))
+        BigDecimal impayeNonFacture = rows.stream()
+                .filter(row -> !row.isDejaFacturee())
+                .map(SourceDocumentClientResponse::getSoldeRestant)
+                .map(this::money)
                 .reduce(ZERO, BigDecimal::add);
-
         return SourceDocumentClientPageResponse.Summary.builder()
-                .total(pagedResult.getTotalElements())
+                .total(rows.size())
                 .soldeImpaye(money(impayeFacture.add(impayeNonFacture)))
                 .montantFacture(money(montantFacture))
                 .impayeFacture(money(impayeFacture))
@@ -436,15 +369,79 @@ public class DocumentClientService {
         return totals;
     }
 
-    private Map<Long, BigDecimal> loadActiveAllocationTotalsByDocument(Collection<Long> documentIds) {
+    private Map<Long, SourceBalance> loadSourceBalances(List<ElementFacturable> elements) {
+        if (elements.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> elementIds = elements.stream().map(ElementFacturable::getId).toList();
+        Map<Long, BigDecimal> directPayments = loadActiveAllocationTotalsByElement(elementIds);
+        Map<Long, SourceBalance> balances = new HashMap<>();
+        elements.forEach(element -> balances.put(
+                element.getId(),
+                sourceBalance(element.getPrimeTotale(), directPayments.getOrDefault(element.getId(), ZERO))
+        ));
+
+        List<LigneDocumentClient> issuedInvoiceLines = ligneDocumentClientRepository
+                .findIssuedDocumentsByElementIds(elementIds, StatutDocumentClient.EMIS)
+                .stream()
+                .filter(line -> line.getDocument().getTypeDocument() == TypeDocumentClient.FACTURE)
+                .toList();
+        Map<Long, DocumentClient> invoices = issuedInvoiceLines.stream()
+                .map(LigneDocumentClient::getDocument)
+                .collect(Collectors.toMap(
+                        DocumentClient::getId,
+                        Function.identity(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+        Map<Long, BigDecimal> parentPayments = loadActiveParentAllocationTotalsByDocument(
+                invoices.keySet()
+        );
+        List<LigneDocumentClient> allInvoiceLines = invoices.values().stream()
+                .flatMap(invoice -> invoice.getLignes().stream())
+                .toList();
+        Map<Long, BigDecimal> invoiceLinePayments = loadActiveAllocationTotalsByElement(
+                allInvoiceLines.stream()
+                        .map(line -> line.getElementFacturable().getId())
+                        .distinct()
+                        .toList()
+        );
+        invoices.values().forEach(invoice -> {
+            BigDecimal remainingPayment = parentPayments.getOrDefault(invoice.getId(), ZERO);
+            for (LigneDocumentClient line : invoice.getLignes().stream()
+                    .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
+                    .toList()) {
+                Long elementId = line.getElementFacturable().getId();
+                BigDecimal lineTotal = money(line.getMontantTtc()).max(ZERO);
+                BigDecimal directPaid = invoiceLinePayments.getOrDefault(elementId, ZERO)
+                        .min(lineTotal);
+                BigDecimal available = lineTotal.subtract(directPaid).max(ZERO);
+                BigDecimal parentPaid = remainingPayment.min(available);
+                BigDecimal paid = directPaid.add(parentPaid);
+                balances.put(elementId, sourceBalance(lineTotal, paid));
+                remainingPayment = remainingPayment.subtract(parentPaid).max(ZERO);
+            }
+        });
+        return balances;
+    }
+
+    private Map<Long, BigDecimal> loadActiveParentAllocationTotalsByDocument(
+            Collection<Long> documentIds
+    ) {
         if (documentIds.isEmpty()) {
             return Map.of();
         }
         Map<Long, BigDecimal> totals = new HashMap<>();
-        for (Object[] row : affectationReglementClientRepository.sumByDocumentIds(documentIds)) {
+        for (Object[] row : affectationReglementClientRepository.sumParentByDocumentIds(documentIds)) {
             totals.merge((Long) row[0], money((BigDecimal) row[2]), BigDecimal::add);
         }
         return totals;
+    }
+
+    private SourceBalance sourceBalance(BigDecimal totalValue, BigDecimal paidValue) {
+        BigDecimal total = money(totalValue).max(ZERO);
+        BigDecimal paid = money(paidValue).min(total).max(ZERO);
+        return new SourceBalance(paid, total.subtract(paid).max(ZERO));
     }
 
     @Transactional(readOnly = true)
@@ -491,7 +488,8 @@ public class DocumentClientService {
                         subscribers.get(source.element().getContrat().getId()),
                         insuredClients.get(source.element().getContrat().getId()),
                         documents.getOrDefault(source.element().getId(), List.of()),
-                        alreadyInvoiced
+                        alreadyInvoiced,
+                        null
                 ))
                 .collect(Collectors.toMap(
                         SourceDocumentClientResponse::getElementFacturableId,
@@ -650,6 +648,17 @@ public class DocumentClientService {
         if (request.getTypeDocument() == TypeDocumentClient.FACTURE) {
             validateInvoiceSources(sources, allowActiveDirectPayments);
         }
+        Map<Long, BigDecimal> directPayments = request.getTypeDocument() == TypeDocumentClient.RELEVE
+                ? loadActiveAllocationTotalsByElement(requestedIds)
+                : Map.of();
+        if (request.getTypeDocument() == TypeDocumentClient.RELEVE
+                && sources.stream().anyMatch(source -> money(source.element().getPrimeTotale())
+                        .subtract(directPayments.getOrDefault(source.element().getId(), ZERO))
+                        .signum() <= 0)) {
+            throw new BadRequestException(
+                    "Une ou plusieurs écritures ne présentent plus de solde impayé"
+            );
+        }
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         LocalDate emissionDate = LocalDate.now();
@@ -715,7 +724,13 @@ public class DocumentClientService {
         BigDecimal credit = ZERO;
         for (BillableSource source : orderedSources) {
             ElementFacturable element = source.element();
-            BigDecimal ttc = money(element.getPrimeTotale());
+            BigDecimal originalTtc = money(element.getPrimeTotale());
+            BigDecimal ttc = request.getTypeDocument() == TypeDocumentClient.RELEVE
+                    ? originalTtc.subtract(directPayments.getOrDefault(element.getId(), ZERO)).max(ZERO)
+                    : originalTtc;
+            BigDecimal ratio = originalTtc.signum() > 0
+                    ? ttc.divide(originalTtc, 10, RoundingMode.HALF_UP)
+                    : BigDecimal.ONE;
             BigDecimal lineDebit = ttc.signum() > 0 ? ttc : ZERO;
             BigDecimal lineCredit = ttc.signum() < 0 ? ttc.abs() : ZERO;
             LigneDocumentClient line = LigneDocumentClient.builder()
@@ -732,9 +747,9 @@ public class DocumentClientService {
                     .compagnie(sourceCompany(source))
                     .debit(lineDebit)
                     .credit(lineCredit)
-                    .primeNette(money(element.getPrimeNette()))
-                    .taxes(taxes(element))
-                    .accessoires(accessories(element))
+                    .primeNette(money(element.getPrimeNette()).multiply(ratio).setScale(2, RoundingMode.HALF_UP))
+                    .taxes(taxes(element).multiply(ratio).setScale(2, RoundingMode.HALF_UP))
+                    .accessoires(accessories(element).multiply(ratio).setScale(2, RoundingMode.HALF_UP))
                     .montantTtc(ttc)
                     .build();
             document.getLignes().add(line);
@@ -1070,11 +1085,15 @@ public class DocumentClientService {
             Client subscriber,
             Client insuredClient,
             List<SourceDocumentClientResponse.DocumentReference> documents,
-            Set<Long> alreadyInvoiced
+            Set<Long> alreadyInvoiced,
+            SourceBalance sourceBalance
     ) {
         ElementFacturable element = source.element();
         Contrat contract = element.getContrat();
         BigDecimal ttc = money(element.getPrimeTotale());
+        SourceBalance balance = sourceBalance == null
+                ? new SourceBalance(ZERO, ttc.max(ZERO))
+                : sourceBalance;
         return SourceDocumentClientResponse.builder()
                 .elementFacturableId(element.getId())
                 .nature(element.getNature())
@@ -1106,6 +1125,8 @@ public class DocumentClientService {
                 .taxes(taxes(element))
                 .accessoires(accessories(element))
                 .montantTtc(ttc)
+                .montantRegle(balance.paid())
+                .soldeRestant(balance.remaining())
                 .dejaFacturee(alreadyInvoiced.contains(element.getId()))
                 .facturable(ttc.signum() > 0 && !alreadyInvoiced.contains(element.getId()))
                 .documents(documents)
@@ -1263,6 +1284,22 @@ public class DocumentClientService {
                 .totalPages(page.getTotalPages())
                 .first(page.isFirst())
                 .last(page.isLast())
+                .build();
+    }
+
+    private SourceDocumentClientPageResponse.PageInfo pageInfo(
+            int page,
+            int size,
+            int totalElements
+    ) {
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
+        return SourceDocumentClientPageResponse.PageInfo.builder()
+                .number(page)
+                .size(size)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .first(page == 0)
+                .last(totalPages == 0 || page >= totalPages - 1)
                 .build();
     }
 
@@ -1441,6 +1478,9 @@ public class DocumentClientService {
             Quittance quittance,
             AssistanceContrat assistance
     ) {
+    }
+
+    private record SourceBalance(BigDecimal paid, BigDecimal remaining) {
     }
 
     private record DocumentPeriod(LocalDate start, LocalDate end) {

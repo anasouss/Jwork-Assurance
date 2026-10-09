@@ -293,6 +293,8 @@ export type ClientDocumentSource = {
   taxes: number;
   accessoires: number;
   montantTtc: number;
+  montantRegle: number;
+  soldeRestant: number;
   dejaFacturee: boolean;
   facturable: boolean;
   documents: Array<{

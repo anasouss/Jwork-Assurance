@@ -452,7 +452,7 @@ export default function ReglementsClientsPage() {
                     <th className="px-3 py-3 text-left">Nature</th>
                     <SortableHeader label="Date" column="DATE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <SortableHeader label="TTC" column="TTC" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
-                    <SortableHeader label="Solde" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
+                    <SortableHeader label="Reste à payer" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <th className="px-3 py-3 text-center">Statut</th>
                     <th className="w-16 px-3 py-3 text-center">Détail</th>
                   </tr>

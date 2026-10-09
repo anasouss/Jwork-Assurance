@@ -157,8 +157,7 @@ public class ReglementClientService {
                         source.getElementFacturableId(),
                         AllocationAmounts.empty()
                 )))
-                .filter(row -> row.getSoldeOuvert().signum() > 0
-                        || row.getMontantEnAttente().signum() > 0)
+                .filter(row -> row.getSoldeOuvert().signum() > 0)
                 .toList();
 
         return CreanceClientPageResponse.builder()
@@ -211,8 +210,7 @@ public class ReglementClientService {
                         toInvoiceSource(document),
                         amounts.getOrDefault(document.getId(), AllocationAmounts.empty())
                 ))
-                .filter(row -> row.getSoldeOuvert().signum() > 0
-                        || row.getMontantEnAttente().signum() > 0)
+                .filter(row -> row.getSoldeOuvert().signum() > 0)
                 .toList();
 
         return CreanceClientPageResponse.builder()

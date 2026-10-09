@@ -63,7 +63,7 @@ export default function EncaissementsEnAttentePage() {
     setPage(0);
   }
 
-  const dateLabel = status === "EN_ATTENTE" ? "Reçu" : "Statut";
+  const dateLabel = status === "EN_ATTENTE" ? "Échéance" : "Statut";
 
   return (
     <div className="grid gap-5">

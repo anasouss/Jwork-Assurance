@@ -106,14 +106,14 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
               and (
                     :dateDu is null
                     or (:statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
-                        and instrument.dateInstrument >= :dateDu)
+                        and coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
                     or (:statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                         and instrument.dateStatut >= :dateDu)
               )
               and (
                     :dateAu is null
                     or (:statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
-                        and instrument.dateInstrument <= :dateAu)
+                        and coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)
                     or (:statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
                         and instrument.dateStatut <= :dateAu)
               )

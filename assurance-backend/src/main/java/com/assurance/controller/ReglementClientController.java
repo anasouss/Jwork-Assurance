@@ -15,10 +15,13 @@ import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.security.TenantContext;
+import com.assurance.service.ReglementClientPdfService;
 import com.assurance.service.ReglementClientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +42,7 @@ import java.util.List;
 public class ReglementClientController {
 
     private final ReglementClientService reglementClientService;
+    private final ReglementClientPdfService reglementClientPdfService;
 
     @GetMapping("/creances")
     @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
@@ -151,6 +155,24 @@ public class ReglementClientController {
                 TenantContext.getCurrentAgence(),
                 paymentId
         )));
+    }
+
+    @GetMapping("/{paymentId}/pdf")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<byte[]> paymentPdf(@PathVariable Long paymentId) {
+        ReglementClientResponse detail = reglementClientService.detail(
+                TenantContext.getCurrentAgence(),
+                paymentId
+        );
+        byte[] pdf = reglementClientPdfService.generate(
+                TenantContext.getCurrentAgence(),
+                paymentId
+        );
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=" + detail.getNumero() + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @PostMapping

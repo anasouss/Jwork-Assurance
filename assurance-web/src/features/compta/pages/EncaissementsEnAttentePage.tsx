@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Eye, FilePlus2, RotateCcw, Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,12 +25,14 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 };
 
 export default function EncaissementsEnAttentePage() {
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search")?.trim() ?? "";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
   const [status, setStatus] = useState<StatusFilter>("EN_ATTENTE");
   const [mode, setMode] = useState<ModeFilter>("ALL");
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
+  const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);

@@ -88,6 +88,7 @@ export default function ReglementsEnregistresPage() {
   const [dateTo, setDateTo] = useState("");
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
+  const [openingPaymentId, setOpeningPaymentId] = useState<string>();
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
@@ -190,6 +191,27 @@ export default function ReglementsEnregistresPage() {
     setSortDirection(sortBy === column && sortDirection === "desc" ? "asc" : "desc");
     setSortBy(column);
     setPage(0);
+  }
+
+  async function previewPayment(payment: ClientPayment) {
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      return;
+    }
+    previewWindow.opener = null;
+    setOpeningPaymentId(payment.id);
+    try {
+      const blob = await comptaApi.clientPaymentPdf(payment.id);
+      const url = URL.createObjectURL(blob);
+      previewWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      previewWindow.close();
+      toast.error(error instanceof Error ? error.message : "Prévisualisation impossible");
+    } finally {
+      setOpeningPaymentId(undefined);
+    }
   }
 
   return (
@@ -318,13 +340,16 @@ export default function ReglementsEnregistresPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <Button asChild variant="ghost" size="icon" title="Voir le règlement">
-                        <Link
-                          to={`/app/compta/reglements/${payment.id}`}
-                          aria-label={`Voir le règlement ${payment.numero}`}
-                        >
-                          <Eye className="size-4" />
-                        </Link>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        title="Prévisualiser le règlement PDF"
+                        aria-label={`Prévisualiser le règlement ${payment.numero} en PDF`}
+                        disabled={openingPaymentId === payment.id}
+                        onClick={() => void previewPayment(payment)}
+                      >
+                        <Eye className="size-4" />
                       </Button>
                       {payment.statut === "VALIDE"
                         && canIssueInvoice

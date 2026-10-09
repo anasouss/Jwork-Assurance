@@ -37,7 +37,9 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
     @EntityGraph(attributePaths = {
             "clientPayeur", "groupePayeur", "creePar", "instruments",
             "instruments.compteTresorerie", "instruments.affectations",
-            "instruments.affectations.elementFacturable"
+            "instruments.affectations.elementFacturable",
+            "instruments.affectations.elementFacturable.contrat",
+            "instruments.affectations.documentClient"
     })
     Optional<ReglementClient> findByIdAndAgenceId(Long id, Long agenceId);
 

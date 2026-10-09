@@ -20,7 +20,11 @@ import type { ClientCrm } from "../types";
 import { moneyAmount } from "../utils/format";
 
 type PortfolioContract = ClientCrm["contrats"][number];
-type AccountingStatus = { label: string; tone: "emerald" | "amber" | "red" | "blue" | "slate" };
+type AccountingStatus = {
+  label: string;
+  tone: "emerald" | "amber" | "red" | "blue" | "slate";
+  collectionState?: "NONE" | "COLLECTED" | "IN_PROGRESS" | "PARTIAL" | "UNPAID";
+};
 const EMPTY_CONTRACTS: PortfolioContract[] = [];
 
 export default function ClientPortfolioPage() {
@@ -28,6 +32,7 @@ export default function ClientPortfolioPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canViewDocuments = permissions.includes("quittance:view");
   const canViewReceivables = permissions.includes("reglement-client:view");
+  const canViewTreasury = permissions.includes("tresorerie:view");
   const canViewCompanyAccounting = permissions.includes("bordereau-compagnie:view");
   const canViewClaims = ["sinistre:view", "sinistre:manage", "sinistre:finance"].some((permission) => permissions.includes(permission));
   const [branchId, setBranchId] = useState("ALL");
@@ -117,8 +122,13 @@ export default function ClientPortfolioPage() {
   const portfolioScope = new URLSearchParams({ souscripteurId: client.id });
   if (activeContractId) portfolioScope.set("contratId", activeContractId);
   if (activeBranchId) portfolioScope.set("sourceBrancheId", activeBranchId);
-  const accountingUrl = `/app/compta/releves-factures?${portfolioScope}`;
   const accountingDocumentsUrl = `/app/compta/releves-factures?${portfolioScope}&tab=documents&documentStatut=EMIS`;
+  const receivablesUrl = `/app/compta/reglements?${new URLSearchParams({ cible: "CLIENT", payeurId: client.id })}`;
+  const paymentSearch = client.nomAffichage || client.raisonSociale || client.nom || client.codeClient || "";
+  const paymentHistoryUrl = `/app/compta/reglements/historique?${new URLSearchParams({ search: paymentSearch })}`;
+  const pendingCollectionsUrl = canViewTreasury
+    ? `/app/compta/tresorerie/encaissements-en-attente?${new URLSearchParams({ search: paymentSearch })}`
+    : paymentHistoryUrl;
   const claimsScope = new URLSearchParams({ clientId: client.id });
   if (activeContractId) claimsScope.set("contratId", activeContractId);
   if (activeBranchId) claimsScope.set("brancheId", activeBranchId);
@@ -190,7 +200,9 @@ export default function ClientPortfolioPage() {
             companyError={companyAccountingQuery.isError}
             summary={receivablesQuery.data?.summary}
             companySummary={companyAccountingQuery.data}
-            clientAccountingUrl={accountingUrl}
+            clientReceivablesUrl={receivablesUrl}
+            clientPaymentHistoryUrl={paymentHistoryUrl}
+            clientPendingCollectionsUrl={pendingCollectionsUrl}
             companyAccountingUrl="/app/compta/bordereaux-compagnies"
           />
         )}
@@ -376,7 +388,9 @@ function AccountingSection({
   companyError,
   summary,
   companySummary,
-  clientAccountingUrl,
+  clientReceivablesUrl,
+  clientPaymentHistoryUrl,
+  clientPendingCollectionsUrl,
   companyAccountingUrl,
 }: {
   canViewClient: boolean;
@@ -387,10 +401,21 @@ function AccountingSection({
   companyError: boolean;
   summary?: { total: number; montantInitial: number; montantConfirme: number; montantEnAttente: number; soldeOuvert: number };
   companySummary?: CompanyPortfolioAccountingSummary;
-  clientAccountingUrl: string;
+  clientReceivablesUrl: string;
+  clientPaymentHistoryUrl: string;
+  clientPendingCollectionsUrl: string;
   companyAccountingUrl: string;
 }) {
   const clientStatus = accountingClientStatus(summary);
+  const clientDetailsUrl = clientStatus.collectionState === "COLLECTED"
+    ? clientPaymentHistoryUrl
+    : clientStatus.collectionState === "IN_PROGRESS"
+      ? clientPendingCollectionsUrl
+      : clientReceivablesUrl;
+  const remainingToCollect = Math.max(
+    0,
+    (summary?.montantInitial ?? 0) - (summary?.montantConfirme ?? 0),
+  );
   const accountingDifference = (summary?.soldeOuvert ?? 0) - (companySummary?.netCompagnie ?? 0);
   const showDifference = canViewClient
     && canViewCompany
@@ -423,9 +448,9 @@ function AccountingSection({
             loading={clientLoading}
             error={clientError}
             status={clientStatus}
-            metric={{ label: "Reste à encaisser", value: money(summary?.soldeOuvert) }}
+            metric={{ label: "Reste à encaisser", value: money(remainingToCollect) }}
             pending={summary?.montantEnAttente ? `${money(summary.montantEnAttente)} en attente de confirmation` : undefined}
-            detailsUrl={clientAccountingUrl}
+            detailsUrl={clientDetailsUrl}
           />
           <AccountingFlow
             title="Règlements compagnie"
@@ -840,11 +865,19 @@ function AccountingStatusBadge({ status }: { status: AccountingStatus }) {
 }
 
 function accountingClientStatus(summary?: { montantInitial: number; montantConfirme: number; montantEnAttente: number; soldeOuvert: number }): AccountingStatus {
-  if (!summary || summary.montantInitial <= 0) return { label: "À jour", tone: "emerald" };
-  if (summary.soldeOuvert <= 0) return { label: "Payé", tone: "emerald" };
-  if (summary.montantConfirme > 0) return { label: "Partiel", tone: "amber" };
-  if (summary.montantEnAttente > 0) return { label: "En attente", tone: "blue" };
-  return { label: "Impayé", tone: "red" };
+  if (!summary || summary.montantInitial <= 0) {
+    return { label: "Aucune créance", tone: "slate", collectionState: "NONE" };
+  }
+  if (summary.montantConfirme >= summary.montantInitial) {
+    return { label: "Encaissé", tone: "emerald", collectionState: "COLLECTED" };
+  }
+  if (summary.montantEnAttente > 0) {
+    return { label: "Encaissement en cours", tone: "blue", collectionState: "IN_PROGRESS" };
+  }
+  if (summary.montantConfirme > 0) {
+    return { label: "Encaissement partiel", tone: "amber", collectionState: "PARTIAL" };
+  }
+  return { label: "Impayé", tone: "red", collectionState: "UNPAID" };
 }
 
 function companyAccountingStatus(status?: CompanyPortfolioAccountingSummary["statut"]): AccountingStatus {

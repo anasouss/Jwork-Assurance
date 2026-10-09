@@ -180,7 +180,7 @@ function InstrumentAction({ instrument, canManage }: { instrument: PaymentInstru
     return <Button asChild size="sm" variant="outline"><Link to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>Voir le bordereau <ArrowRight className="size-4" /></Link></Button>;
   }
   if (instrument.statut === "REJETE") {
-    return <Button asChild size="sm" variant="outline"><Link to={`/app/compta/reglements/historique?search=${encodeURIComponent(instrument.numeroReglement)}`}>Voir le règlement <ArrowRight className="size-4" /></Link></Button>;
+    return <Button asChild size="sm" variant="outline"><Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link></Button>;
   }
   if (instrument.statut === "REMIS_EN_BANQUE") {
     return <span className="text-muted-foreground">-</span>;

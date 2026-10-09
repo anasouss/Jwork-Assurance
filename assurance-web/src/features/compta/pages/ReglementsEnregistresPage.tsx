@@ -5,7 +5,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import { FileText, ReceiptText, RotateCcw, Search, XCircle } from "lucide-react";
+import { Eye, FileText, ReceiptText, RotateCcw, Search, XCircle } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -318,6 +318,14 @@ export default function ReglementsEnregistresPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <Button asChild variant="ghost" size="icon" title="Voir le règlement">
+                        <Link
+                          to={`/app/compta/reglements/${payment.id}`}
+                          aria-label={`Voir le règlement ${payment.numero}`}
+                        >
+                          <Eye className="size-4" />
+                        </Link>
+                      </Button>
                       {payment.statut === "VALIDE"
                         && canIssueInvoice
                         && hasDirectActiveAllocations(payment) && (
@@ -339,9 +347,6 @@ export default function ReglementsEnregistresPage() {
                           <XCircle className="size-4 text-red-600" />
                         </Button>
                       )}
-                      {!(payment.statut === "VALIDE" && (
-                        canManage || (canIssueInvoice && hasDirectActiveAllocations(payment))
-                      )) && "-"}
                     </div>
                   </td>
                 </tr>

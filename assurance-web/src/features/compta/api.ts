@@ -516,6 +516,12 @@ export const comptaApi = {
     )));
   },
 
+  async clientPayment(id: string) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/${id}`
+    )));
+  },
+
   async createClientPayment(request: CreateClientPaymentRequest) {
     return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
       "/api/v1/compta/reglements-clients",

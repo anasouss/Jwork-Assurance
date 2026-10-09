@@ -187,6 +187,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/ReglementsEnregistresPage")),
       },
       {
+        path: "compta/reglements/:reglementId",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ReglementClientDetailPage")),
+      },
+      {
         path: "compta/bordereaux-compagnies",
         lazy: lazyRoute(() => import("@/features/compta/pages/BordereauxCompagniesPage")),
       },

@@ -1,4 +1,6 @@
 -- Converted from the Skay `usage_tarifs` dump for our `tarifs_usage` entity.
+-- TarifUsageSeeder temporarily provides carburant_id, copies it to the
+-- tarif_usage_carburants join table, adds hybrid equivalents, then removes it.
 -- Import through reference codes/labels, not old numeric ids, so it works with generated Long ids.
 -- Old max bounds equal to 0 are converted to NULL/open-ended when the criterion is present.
 -- Legacy usage-id mapping used here:

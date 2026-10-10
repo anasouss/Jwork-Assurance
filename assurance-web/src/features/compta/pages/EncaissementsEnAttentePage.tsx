@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Banknote, Eye, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { SortIcon } from "@/components/ui/sort-icon";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
@@ -35,6 +36,8 @@ import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREAS
 
 type StatusFilter = Extract<PaymentInstrumentStatus, "EN_ATTENTE" | "REMIS_EN_BANQUE" | "REJETE">;
 type ModeFilter = Extract<ClientPaymentMode, "CHEQUE" | "EFFET" | "VIREMENT" | "VERSEMENT_BANCAIRE"> | "ALL";
+type InstrumentSortBy = "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" | "DUE" | "AMOUNT";
+type SortDirection = "ASC" | "DESC";
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
   EN_ATTENTE: "En attente",
@@ -60,19 +63,23 @@ export default function EncaissementsEnAttentePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
+  const [sortBy, setSortBy] = useState<InstrumentSortBy>("DUE");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("ASC");
   const [selectedInstruments, setSelectedInstruments] = useState<PaymentInstrument[]>([]);
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacementDate, setReplacementDate] = useState(TODAY);
   const [replacementReason, setReplacementReason] = useState("");
 
   const instruments = useQuery({
-    queryKey: ["compta", "treasury", "collection-queue", status, mode, appliedSearch, dateFrom, dateTo, page],
+    queryKey: ["compta", "treasury", "collection-queue", status, mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection, page],
     queryFn: () => comptaApi.paymentInstruments({
       statut: status,
       mode: mode === "ALL" ? undefined : mode,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
       dateAu: dateTo || undefined,
+      sortBy,
+      sortDirection,
       page,
       size: TREASURY_PAGE_SIZE,
     }),
@@ -111,6 +118,19 @@ export default function EncaissementsEnAttentePage() {
     setAppliedSearch("");
     setDateFrom("");
     setDateTo("");
+    setPage(0);
+    setSortBy("DUE");
+    setSortDirection("ASC");
+    setSelectedInstruments([]);
+  }
+
+  function changeSort(column: InstrumentSortBy) {
+    if (sortBy === column) {
+      setSortDirection((current) => current === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortBy(column);
+      setSortDirection(column === "AMOUNT" || column === "RECEIVED" ? "DESC" : "ASC");
+    }
     setPage(0);
     setSelectedInstruments([]);
   }
@@ -239,14 +259,14 @@ export default function EncaissementsEnAttentePage() {
                   aria-label="Sélectionner les instruments éligibles de la page"
                 />
               </th>
-              <th className="px-4 py-3 text-left">Référence</th>
-              <th className="px-4 py-3 text-left">Payeur</th>
-              <th className="px-4 py-3 text-left">Règlement</th>
-              <th className="px-4 py-3 text-left">Mode</th>
-              <th className="px-4 py-3 text-left">Reçu le</th>
-              <th className="px-4 py-3 text-left">Échéance</th>
+              <CollectionSortHeader column="REFERENCE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Référence</CollectionSortHeader>
+              <CollectionSortHeader column="PAYER" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Payeur</CollectionSortHeader>
+              <CollectionSortHeader column="PAYMENT" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Règlement</CollectionSortHeader>
+              <CollectionSortHeader column="MODE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Mode</CollectionSortHeader>
+              <CollectionSortHeader column="RECEIVED" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Reçu le</CollectionSortHeader>
+              <CollectionSortHeader column="DUE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Échéance</CollectionSortHeader>
               <th className="px-4 py-3 text-left">Traitement</th>
-              <th className="px-4 py-3 text-right">Montant</th>
+              <CollectionSortHeader column="AMOUNT" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="right">Montant</CollectionSortHeader>
               <th className="w-44 px-4 py-3 text-right">Action</th>
             </tr></thead>
             <tbody className="divide-y">
@@ -343,6 +363,32 @@ export default function EncaissementsEnAttentePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function CollectionSortHeader(props: {
+  children: ReactNode;
+  column: InstrumentSortBy;
+  activeColumn: InstrumentSortBy;
+  direction: SortDirection;
+  onSort: (column: InstrumentSortBy) => void;
+  align?: "right";
+}) {
+  const active = props.column === props.activeColumn;
+  return (
+    <th
+      aria-sort={active ? props.direction === "ASC" ? "ascending" : "descending" : "none"}
+      className="whitespace-nowrap px-4 py-3"
+    >
+      <button
+        type="button"
+        onClick={() => props.onSort(props.column)}
+        className={`inline-flex w-full items-center gap-1 hover:text-white/80 ${props.align === "right" ? "justify-end" : "justify-start"}`}
+      >
+        {props.children}
+        <SortIcon isActive={active} direction={props.direction.toLowerCase() as "asc" | "desc"} />
+      </button>
+    </th>
   );
 }
 

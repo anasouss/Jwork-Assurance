@@ -201,7 +201,7 @@ export const tarifUsageSchema = z.object({
   ptcMin: z.number().optional(),
   ptcMax: z.number().optional(),
   sousClasseId: z.string().optional(),
-  carburant: z.string().optional(),
+  carburantIds: z.array(z.string()).optional(),
   primeNette: z.number().optional(),
   primeParPlace: z.number().optional(),
   actif: z.boolean().optional(),

@@ -5,6 +5,7 @@ import com.assurance.dto.response.AjustementTarifUsageResponse;
 import com.assurance.dto.response.PageMetadata;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.entity.AjustementTarifUsage;
+import com.assurance.entity.Carburant;
 import com.assurance.entity.LigneAjustementTarifUsage;
 import com.assurance.entity.TarifUsage;
 import com.assurance.enums.SensAjustementTarifUsage;
@@ -246,7 +247,10 @@ public class TarifUsageAjustementService {
     private String describe(TarifUsage tarif) {
         return List.of(
                         text(tarif.getCategorieTransport() == null ? null : tarif.getCategorieTransport().getLibelle()),
-                        text(tarif.getCarburant() == null ? null : tarif.getCarburant().getLibelle()),
+                        tarif.getCarburants().stream()
+                                .map(Carburant::getLibelle)
+                                .sorted(String.CASE_INSENSITIVE_ORDER)
+                                .collect(Collectors.joining(", ")),
                         text(tarif.getSousClasse() == null ? null : tarif.getSousClasse().getCode()),
                         range("PF", tarif.getPuissanceFiscaleMin(), tarif.getPuissanceFiscaleMax()),
                         range("Places", tarif.getNombrePlacesMin(), tarif.getNombrePlacesMax()),

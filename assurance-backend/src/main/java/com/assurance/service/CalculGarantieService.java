@@ -32,6 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -405,14 +406,14 @@ public class CalculGarantieService {
         if (Boolean.TRUE.equals(usage.getBySousClasse())) {
             return tarif.getSousClasse() != null
                     && equalsIgnoreCase(tarif.getSousClasse().getCode(), vehicule.getSousClasse())
-                    && matchesCarburant(tarif.getCarburant(), vehicule.getCarburant());
+                    && matchesCarburant(tarif.getCarburants(), vehicule.getCarburant());
         }
         if (Boolean.TRUE.equals(usage.getByPtc())) {
             return inRange(parsePositiveDecimal(vehicule.getPtc()), tarif.getPtcMin(), tarif.getPtcMax());
         }
         if (Boolean.TRUE.equals(usage.getByCarburantAndPf())) {
             return inRange(parsePositiveDecimal(vehicule.getPuissanceFiscale()), tarif.getPuissanceFiscaleMin(), tarif.getPuissanceFiscaleMax())
-                    && matchesCarburant(tarif.getCarburant(), vehicule.getCarburant());
+                    && matchesCarburant(tarif.getCarburants(), vehicule.getCarburant());
         }
         if (Boolean.TRUE.equals(usage.getByPrime())) {
             return inRange(parsePositiveDecimal(vehicule.getNombrePlaces()), tarif.getNombrePlacesMin(), tarif.getNombrePlacesMax());
@@ -420,12 +421,13 @@ public class CalculGarantieService {
         return true;
     }
 
-    private boolean matchesCarburant(Carburant tarifCarburant, String vehiculeCarburant) {
-        if (tarifCarburant == null) {
+    private boolean matchesCarburant(Set<Carburant> tarifCarburants, String vehiculeCarburant) {
+        if (tarifCarburants == null || tarifCarburants.isEmpty()) {
             return true;
         }
-        return equalsIgnoreCase(tarifCarburant.getCode(), vehiculeCarburant)
-                || equalsIgnoreCase(tarifCarburant.getLibelle(), vehiculeCarburant);
+        return tarifCarburants.stream().anyMatch(carburant ->
+                equalsIgnoreCase(carburant.getCode(), vehiculeCarburant)
+                        || equalsIgnoreCase(carburant.getLibelle(), vehiculeCarburant));
     }
 
     private boolean matchesCategorieTransport(

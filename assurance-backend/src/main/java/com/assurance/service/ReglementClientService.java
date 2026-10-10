@@ -889,6 +889,8 @@ public class ReglementClientService {
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
+            String sortBy,
+            String sortDirection,
             int page,
             int size
     ) {
@@ -902,6 +904,8 @@ public class ReglementClientService {
                 dateDu,
                 dateAu,
                 search == null || search.isBlank() ? null : search.trim(),
+                instrumentSortBy(sortBy),
+                "DESC".equalsIgnoreCase(sortDirection) ? "DESC" : "ASC",
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
         );
         Map<Long, LigneBordereauRemise> remittanceLines = activeRemittanceLines(
@@ -923,6 +927,14 @@ public class ReglementClientService {
                         ))
                         .toList())
                 .build();
+    }
+
+    private String instrumentSortBy(String sortBy) {
+        return switch (sortBy == null ? "" : sortBy.trim().toUpperCase(Locale.ROOT)) {
+            case "REFERENCE", "PAYER", "PAYMENT", "MODE", "RECEIVED", "AMOUNT" ->
+                    sortBy.trim().toUpperCase(Locale.ROOT);
+            default -> "DUE";
+        };
     }
 
     public ReglementClientResponse.Instrument toInstrumentRegisterResponse(

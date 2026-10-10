@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Edit, History, Percent, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronsUpDown, Edit, History, Percent, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { ServerPagination } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +23,7 @@ import { bulkTarifUsageSchema, tarifUsageSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { MoneyInput } from "../components/MoneyInput";
 import { toDateOnly } from "../date";
+import { cn } from "@/lib/utils";
 import { money, numberValue, range, text, toNumber } from "../utils/format";
 import type { BulkUpdateTarifUsageRequest, ReferenceOption, TarifUsageAdjustment, UpsertTarifUsageRequest } from "../types";
 
@@ -261,7 +264,7 @@ export default function TarifUsageSettingsPage() {
                   update({
                     usageId,
                     categorieTransportId: undefined,
-                    carburant: undefined,
+                    carburantIds: undefined,
                     puissanceFiscaleMin: undefined,
                     puissanceFiscaleMax: undefined,
                     nombrePlacesMin: undefined,
@@ -298,19 +301,12 @@ export default function TarifUsageSettingsPage() {
               </Field>
             ) : null}
             {selectedUsage?.byCarburantAndPf ? (
-              <Field label="Carburant">
-                <Select
-                  value={payload.carburant || "__none"}
-                  onValueChange={(value) => update({ carburant: value === "__none" ? undefined : value })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                  <SelectItem value="__none">Aucun</SelectItem>
-                  {(carburants.data ?? []).map((carburant) => (
-                    <SelectItem key={carburant.id} value={carburant.code ?? carburant.libelle}>{carburant.libelle}</SelectItem>
-                  ))}
-                  </SelectContent>
-                </Select>
+              <Field label="Carburant" required>
+                <FuelMultiSelect
+                  carburants={carburants.data ?? []}
+                  value={payload.carburantIds ?? []}
+                  onChange={(value) => update({ carburantIds: value })}
+                />
               </Field>
             ) : null}
             {selectedUsage?.byCarburantAndPf ? (
@@ -355,7 +351,13 @@ export default function TarifUsageSettingsPage() {
             <div className="flex items-end gap-2">
               <Button
                 disabled={save.isPending}
-                onClick={() => saveTarif(editing, payload, Boolean(selectedUsage?.bySousClasse), save.mutate)}
+                onClick={() => saveTarif(
+                  editing,
+                  payload,
+                  Boolean(selectedUsage?.bySousClasse),
+                  Boolean(selectedUsage?.byCarburantAndPf),
+                  save.mutate
+                )}
               >
                 <Plus className="size-4" />
                 {editing ? "Modifier" : "Ajouter"}
@@ -519,7 +521,7 @@ export default function TarifUsageSettingsPage() {
                     </TableCell>
                     <TableCell className="font-medium">{text(tarif.usageCode)}</TableCell>
                     <TableCell>{text(tarif.categorieTransportLibelle)}</TableCell>
-                    <TableCell>{text(tarif.carburant)}</TableCell>
+                    <TableCell>{text(tarif.carburantLibelle ?? tarif.carburant)}</TableCell>
                     <TableCell>{range(tarif.puissanceFiscaleMin, tarif.puissanceFiscaleMax)}</TableCell>
                     <TableCell>{range(tarif.nombrePlacesMin, tarif.nombrePlacesMax)}</TableCell>
                     <TableCell>{range(tarif.ptcMin, tarif.ptcMax)}</TableCell>
@@ -777,14 +779,82 @@ function useReference(path: string) {
   });
 }
 
+function FuelMultiSelect({
+  carburants,
+  value,
+  onChange,
+}: {
+  carburants: ReferenceOption[];
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const available = carburants.filter((carburant) => carburant.actif !== false || value.includes(carburant.id));
+  const selected = available.filter((carburant) => value.includes(carburant.id));
+  const label = selected.length === 0
+    ? "Choisir"
+    : selected.length === 1
+      ? selected[0].libelle
+      : selected.map((carburant) => carburant.libelle).join(", ");
+
+  function toggle(carburantId: string) {
+    const next = new Set(value);
+    if (next.has(carburantId)) {
+      next.delete(carburantId);
+    } else {
+      next.add(carburantId);
+    }
+    onChange(Array.from(next));
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" className="h-9 w-full min-w-0 justify-between px-3 font-normal">
+          <span className={cn("truncate", selected.length === 0 && "text-muted-foreground")}>{label}</span>
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder="Rechercher un carburant..." />
+          <CommandList className="max-h-64">
+            <CommandEmpty>Aucun carburant.</CommandEmpty>
+            <CommandGroup>
+              {available.map((carburant) => {
+                const checked = value.includes(carburant.id);
+                return (
+                  <CommandItem
+                    key={carburant.id}
+                    value={`${carburant.code ?? ""} ${carburant.libelle}`}
+                    className="cursor-pointer"
+                    onSelect={() => toggle(carburant.id)}
+                  >
+                    <Check className={cn("size-4", checked ? "opacity-100" : "opacity-0")} />
+                    <span className="truncate">{carburant.libelle}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function saveTarif(
   editing: ReferenceOption | null,
   payload: UpsertTarifUsageRequest,
   sousClasseRequired: boolean,
+  carburantRequired: boolean,
   mutate: (variables: { id?: string; value: UpsertTarifUsageRequest }) => void
 ) {
   if (sousClasseRequired && !payload.sousClasseId) {
     toast.error("La sous-classe est obligatoire pour cet usage");
+    return;
+  }
+  if (carburantRequired && !payload.carburantIds?.length) {
+    toast.error("Au moins un carburant est obligatoire pour cet usage");
     return;
   }
   const parsed = tarifUsageSchema.safeParse(cleanPayload(payload));
@@ -810,7 +880,7 @@ function tarifPayload(tarif: ReferenceOption): UpsertTarifUsageRequest {
     ptcMin: toNumber(tarif.ptcMin),
     ptcMax: toNumber(tarif.ptcMax),
     sousClasseId: String(tarif.sousClasseId ?? ""),
-    carburant: String(tarif.carburant ?? ""),
+    carburantIds: Array.isArray(tarif.carburantIds) ? tarif.carburantIds.map(String) : [],
     primeNette: toNumber(tarif.primeNetteInitiale ?? tarif.primeNette),
     primeParPlace: toNumber(tarif.primeParPlace),
     actif: tarif.actif !== false,
@@ -821,7 +891,7 @@ function cleanPayload(payload: UpsertTarifUsageRequest): UpsertTarifUsageRequest
   return {
     ...payload,
     categorieTransportId: payload.categorieTransportId || undefined,
-    carburant: payload.carburant || undefined,
+    carburantIds: payload.carburantIds?.length ? payload.carburantIds : undefined,
     sousClasseId: payload.sousClasseId || undefined,
   };
 }

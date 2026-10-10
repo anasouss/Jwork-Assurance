@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @Data
 public class UpsertTarifUsageRequest {
@@ -18,8 +19,7 @@ public class UpsertTarifUsageRequest {
     private BigDecimal ptcMin;
     private BigDecimal ptcMax;
     private Long sousClasseId;
-    private Long carburantId;
-    private String carburant;
+    private Set<Long> carburantIds;
     private BigDecimal primeNette;
     private BigDecimal primeParPlace;
     private Boolean actif;

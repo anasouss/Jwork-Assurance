@@ -603,6 +603,8 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    sortBy?: "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" | "DUE" | "AMOUNT";
+    sortDirection?: "ASC" | "DESC";
     page: number;
     size: number;
   }) {

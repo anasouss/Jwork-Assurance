@@ -1140,7 +1140,7 @@ export type UpsertTarifUsageRequest = {
   ptcMin?: number;
   ptcMax?: number;
   sousClasseId?: string;
-  carburant?: string;
+  carburantIds?: string[];
   primeNette?: number;
   primeParPlace?: number;
   actif?: boolean;

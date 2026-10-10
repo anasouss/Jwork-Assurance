@@ -29,6 +29,11 @@ public class TarifUsageSeeder implements CommandLineRunner {
             return;
         }
 
+        boolean temporaryLegacyFuelColumn = !columnExists("tarifs_usage", "carburant_id");
+        if (temporaryLegacyFuelColumn) {
+            jdbcTemplate.execute("ALTER TABLE tarifs_usage ADD COLUMN carburant_id BIGINT NULL");
+        }
+
         String sql = readBundledSql("data/tarifs_usage.sql");
         if (sql == null || sql.isBlank()) {
             return;
@@ -42,6 +47,40 @@ public class TarifUsageSeeder implements CommandLineRunner {
                 .map(String::trim)
                 .filter(statement -> !statement.isBlank())
                 .forEach(jdbcTemplate::execute);
+
+        jdbcTemplate.update("""
+                INSERT IGNORE INTO tarif_usage_carburants (tarif_usage_id, carburant_id)
+                SELECT id, carburant_id
+                FROM tarifs_usage
+                WHERE carburant_id IS NOT NULL
+                """);
+        jdbcTemplate.update("""
+                INSERT IGNORE INTO tarif_usage_carburants (tarif_usage_id, carburant_id)
+                SELECT lien.tarif_usage_id, hybride.id
+                FROM tarif_usage_carburants lien
+                JOIN carburants source_carburant ON source_carburant.id = lien.carburant_id
+                JOIN carburants hybride
+                  ON hybride.code = CASE source_carburant.code
+                      WHEN 'DIESEL' THEN 'HYBRIDE_D'
+                      WHEN 'ESSENCE' THEN 'HYBRIDE_E'
+                      ELSE NULL
+                  END
+                WHERE source_carburant.code IN ('DIESEL', 'ESSENCE')
+                """);
+        if (temporaryLegacyFuelColumn) {
+            jdbcTemplate.execute("ALTER TABLE tarifs_usage DROP COLUMN carburant_id");
+        }
+    }
+
+    private boolean columnExists(String tableName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                """, Integer.class, tableName, columnName);
+        return count != null && count > 0;
     }
 
     private String readBundledSql(String path) {

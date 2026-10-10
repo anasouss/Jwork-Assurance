@@ -4,7 +4,9 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -14,13 +16,14 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "tarifs_usage", indexes = {
         @Index(name = "idx_tarif_usage", columnList = "usage_id"),
         @Index(name = "idx_tarif_usage_sous_classe", columnList = "sous_classe_id"),
-        @Index(name = "idx_tarif_usage_categorie_transport", columnList = "categorie_transport_id"),
-        @Index(name = "idx_tarif_usage_carburant", columnList = "carburant_id")
+        @Index(name = "idx_tarif_usage_categorie_transport", columnList = "categorie_transport_id")
 })
 @Getter
 @Setter
@@ -59,9 +62,14 @@ public class TarifUsage extends BaseEntity {
     @JoinColumn(name = "categorie_transport_id")
     private CategorieTransport categorieTransport;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "carburant_id")
-    private Carburant carburant;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "tarif_usage_carburants",
+            joinColumns = @JoinColumn(name = "tarif_usage_id"),
+            inverseJoinColumns = @JoinColumn(name = "carburant_id")
+    )
+    @Builder.Default
+    private Set<Carburant> carburants = new LinkedHashSet<>();
 
     @Column(name = "prime_nette", precision = 14, scale = 2)
     private BigDecimal primeNette;

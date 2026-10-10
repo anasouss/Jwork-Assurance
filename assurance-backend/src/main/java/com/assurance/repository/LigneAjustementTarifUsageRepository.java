@@ -19,7 +19,7 @@ public interface LigneAjustementTarifUsageRepository extends JpaRepository<Ligne
             "tarifUsage",
             "tarifUsage.usage",
             "tarifUsage.categorieTransport",
-            "tarifUsage.carburant",
+            "tarifUsage.carburants",
             "tarifUsage.sousClasse"
     })
     List<LigneAjustementTarifUsage> findByAjustementIdOrderByTarifUsageIdAsc(Long ajustementId);

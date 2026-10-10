@@ -272,6 +272,8 @@ public class ReglementClientController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "DUE") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size
     ) {
@@ -282,6 +284,8 @@ public class ReglementClientController {
                 dateDu,
                 dateAu,
                 search,
+                sortBy,
+                sortDirection,
                 page,
                 size
         )));

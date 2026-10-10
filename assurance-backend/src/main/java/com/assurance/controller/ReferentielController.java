@@ -1671,6 +1671,10 @@ public class ReferentielController {
         if (!Boolean.TRUE.equals(usage.getBySousClasse())) {
             sousClasse = null;
         }
+        Set<Carburant> carburants = resolveTarifUsageCarburants(request);
+        if (Boolean.TRUE.equals(usage.getByCarburantAndPf()) && carburants.isEmpty()) {
+            throw new BadRequestException("Au moins un carburant est obligatoire pour cet usage");
+        }
         tarif.setUsage(usage);
         tarif.setCategorieTransport(categorieTransport);
         tarif.setPuissanceFiscaleMin(request.getPuissanceFiscaleMin());
@@ -1680,7 +1684,8 @@ public class ReferentielController {
         tarif.setPtcMin(request.getPtcMin());
         tarif.setPtcMax(request.getPtcMax());
         tarif.setSousClasse(sousClasse);
-        tarif.setCarburant(resolveTarifUsageCarburant(request));
+        tarif.getCarburants().clear();
+        tarif.getCarburants().addAll(carburants);
         tarif.setPrimeNette(request.getPrimeNette());
         tarif.setPrimeParPlace(request.getPrimeParPlace());
         tarif.setActif(request.getActif() == null ? true : request.getActif());
@@ -1693,7 +1698,9 @@ public class ReferentielController {
     private Map<String, Object> toTarifUsageResponse(TarifUsage tarif, BigDecimal effectivePrimeNette) {
         Usage usage = tarif.getUsage();
         CategorieTransport categorieTransport = tarif.getCategorieTransport();
-        Carburant carburant = tarif.getCarburant();
+        List<Carburant> carburants = tarif.getCarburants().stream()
+                .sorted(Comparator.comparing(Carburant::getLibelle, String.CASE_INSENSITIVE_ORDER))
+                .toList();
         SousClasse sousClasse = tarif.getSousClasse();
         return option(tarif.getId(), usage != null ? usage.getCode() : null, usage != null ? usage.getLibelle() : "Tarif usage")
                 .putValue("usageId", usage != null ? usage.getId() : null)
@@ -1715,10 +1722,12 @@ public class ReferentielController {
                 .putValue("sousClasseId", sousClasse != null ? sousClasse.getId() : null)
                 .putValue("sousClasseCode", sousClasse != null ? sousClasse.getCode() : null)
                 .putValue("sousClasseLibelle", sousClasse != null ? sousClasse.getLibelle() : null)
-                .putValue("carburantId", carburant != null ? carburant.getId() : null)
-                .putValue("carburantCode", carburant != null ? carburant.getCode() : null)
-                .putValue("carburantLibelle", carburant != null ? carburant.getLibelle() : null)
-                .putValue("carburant", carburant != null ? carburant.getLibelle() : null)
+                .putValue("carburantIds", carburants.stream().map(Carburant::getId).toList())
+                .putValue("carburantCodes", carburants.stream().map(Carburant::getCode).toList())
+                .putValue("carburantLibelles", carburants.stream().map(Carburant::getLibelle).toList())
+                .putValue("carburant", carburants.stream()
+                        .map(Carburant::getLibelle)
+                        .collect(java.util.stream.Collectors.joining(", ")))
                 .putValue("primeNetteInitiale", tarif.getPrimeNette())
                 .putValue("primeNette", effectivePrimeNette)
                 .putValue("primeParPlace", tarif.getPrimeParPlace())
@@ -1726,19 +1735,22 @@ public class ReferentielController {
                 .map();
     }
 
-    private Carburant resolveTarifUsageCarburant(UpsertTarifUsageRequest request) {
-        Long carburantId = request.getCarburantId();
-        if (carburantId != null) {
-            return carburantRepository.findById(carburantId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Carburant", carburantId));
+    private Set<Carburant> resolveTarifUsageCarburants(UpsertTarifUsageRequest request) {
+        Set<Long> ids = request.getCarburantIds() == null
+                ? Set.of()
+                : request.getCarburantIds().stream()
+                        .filter(Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (ids.isEmpty()) {
+            return new LinkedHashSet<>();
         }
-        String carburantValue = blankToNull(request.getCarburant());
-        if (carburantValue == null) {
-            return null;
+        List<Carburant> carburants = carburantRepository.findAllById(ids);
+        if (carburants.size() != ids.size()) {
+            throw new BadRequestException("Un ou plusieurs carburants sont inconnus");
         }
-        return carburantRepository.findByCodeIgnoreCase(carburantValue)
-                .or(() -> carburantRepository.findByLibelleIgnoreCase(carburantValue))
-                .orElseThrow(() -> new ResourceNotFoundException("Carburant", carburantValue));
+        return carburants.stream()
+                .sorted(Comparator.comparing(Carburant::getLibelle, String.CASE_INSENSITIVE_ORDER))
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
     private boolean amountsDiffer(BigDecimal left, BigDecimal right) {

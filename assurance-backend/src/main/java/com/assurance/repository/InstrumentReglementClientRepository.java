@@ -180,10 +180,34 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                     or lower(coalesce(issuingBank.libelle, '')) like lower(concat('%', :search, '%'))
               )
             order by
-              case when instrument.statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
+              case when :sortBy = 'REFERENCE' and :sortDirection = 'ASC'
+                   then lower(coalesce(instrument.referenceInstrument, '')) end asc,
+              case when :sortBy = 'REFERENCE' and :sortDirection = 'DESC'
+                   then lower(coalesce(instrument.referenceInstrument, '')) end desc,
+              case when :sortBy = 'PAYER' and :sortDirection = 'ASC'
+                   then lower(reglement.payeurNom) end asc,
+              case when :sortBy = 'PAYER' and :sortDirection = 'DESC'
+                   then lower(reglement.payeurNom) end desc,
+              case when :sortBy = 'PAYMENT' and :sortDirection = 'ASC'
+                   then lower(reglement.numero) end asc,
+              case when :sortBy = 'PAYMENT' and :sortDirection = 'DESC'
+                   then lower(reglement.numero) end desc,
+              case when :sortBy = 'MODE' and :sortDirection = 'ASC'
+                   then instrument.mode end asc,
+              case when :sortBy = 'MODE' and :sortDirection = 'DESC'
+                   then instrument.mode end desc,
+              case when :sortBy = 'RECEIVED' and :sortDirection = 'ASC'
+                   then instrument.dateInstrument end asc,
+              case when :sortBy = 'RECEIVED' and :sortDirection = 'DESC'
+                   then instrument.dateInstrument end desc,
+              case when :sortBy = 'DUE' and :sortDirection = 'ASC'
                    then coalesce(instrument.dateEcheance, instrument.dateInstrument) end asc,
-              case when instrument.statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
-                   then instrument.dateStatut end desc,
+              case when :sortBy = 'DUE' and :sortDirection = 'DESC'
+                   then coalesce(instrument.dateEcheance, instrument.dateInstrument) end desc,
+              case when :sortBy = 'AMOUNT' and :sortDirection = 'ASC'
+                   then instrument.montant end asc,
+              case when :sortBy = 'AMOUNT' and :sortDirection = 'DESC'
+                   then instrument.montant end desc,
               instrument.id desc
             """)
     Page<InstrumentReglementClient> searchByStatus(
@@ -193,6 +217,8 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("search") String search,
+            @Param("sortBy") String sortBy,
+            @Param("sortDirection") String sortDirection,
             Pageable pageable
     );
 

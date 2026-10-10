@@ -173,7 +173,7 @@ export function SinistreDeclarationContextDialog({
           <div className="grid gap-2">
             <Label htmlFor="claim-contract-search">Police ou assuré</Label>
             {contract ? (
-              <div className="flex flex-col gap-3 rounded-md border bg-muted/25 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/35 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold">{contract.numeroPolice || contract.numeroDossier}</p>
@@ -280,8 +280,8 @@ export function SinistreDeclarationContextDialog({
             </Alert>
           ) : null}
           {coverage.data ? (
-            <div className="grid gap-3 border-t pt-4">
-              <div className="flex flex-wrap items-center gap-3 text-sm">
+            <div className="grid gap-4 overflow-hidden rounded-md border border-sky-200 bg-sky-50/35 p-4 dark:border-sky-900 dark:bg-sky-950/20">
+              <div className="flex flex-wrap items-center gap-3 border-b border-sky-200 pb-3 text-sm dark:border-sky-900">
                 <span className="flex items-center gap-2 font-medium">
                   <Shield className="size-4 text-sky-700" />
                   {coverage.data.brancheLibelle || coverage.data.brancheCode || "Branche"}
@@ -302,7 +302,9 @@ export function SinistreDeclarationContextDialog({
                           type="button"
                           className={cn(
                             "flex cursor-pointer items-center gap-3 rounded-md border p-3 text-left",
-                            selected ? "border-sky-600 bg-sky-50 dark:bg-sky-950/30" : "hover:bg-muted/50",
+                            selected
+                              ? "border-sky-600 bg-sky-100/80 shadow-sm dark:border-sky-500 dark:bg-sky-950/55"
+                              : "bg-background/80 hover:border-sky-300 hover:bg-background dark:hover:border-sky-800",
                           )}
                           onClick={() => setVehiculeId(vehicle.id)}
                         >

@@ -119,59 +119,46 @@ public class ReglementClientPdfService {
             PdfFont regular,
             PdfFont bold
     ) {
-        Table header = new Table(new float[]{1})
-                .setWidth(UnitValue.createPercentValue(100));
-        Cell identity = cell().setHeight(118).setVerticalAlignment(VerticalAlignment.TOP);
+        Table header = new Table(new float[]{1.2f, 1.8f})
+                .setWidth(UnitValue.createPercentValue(100))
+                .setMarginBottom(4);
+        Cell identity = cell().setVerticalAlignment(VerticalAlignment.MIDDLE);
         byte[] logo = agencyLogoStorageService.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(310, 108);
+            image.scaleToFit(180, 68);
             identity.add(image);
         } else {
-            identity.add(new Paragraph(payment.getAgence().getNom()).setFont(bold).setFontSize(17));
+            identity.add(new Paragraph(payment.getAgence().getNom()).setFont(bold).setFontSize(15));
         }
         header.addCell(identity);
+
+        Cell title = cell().setTextAlignment(TextAlignment.RIGHT)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE);
+        title.add(new Paragraph("FICHE DE RÈGLEMENT CLIENT")
+                .setFont(bold).setFontSize(14).setFontColor(INK).setMargin(0));
+        title.add(new Paragraph(payment.getNumero())
+                .setFont(bold).setFontSize(10.5f).setFontColor(TABLE_HEADER)
+                .setMarginTop(5).setMarginBottom(0));
+        title.add(new Paragraph(paymentStatus(payment))
+                .setFont(regular).setFontSize(8).setFontColor(MUTED)
+                .setMarginTop(3).setMarginBottom(0));
+        title.add(new Paragraph(city(payment.getAgence()) + " · " + DATE_FORMAT.format(payment.getDateReglement()))
+                .setFont(regular).setFontSize(8).setFontColor(MUTED)
+                .setMarginTop(3).setMarginBottom(0));
+        header.addCell(title);
         document.add(header);
-
-        document.add(new Paragraph(city(payment.getAgence()) + " Le " + DATE_FORMAT.format(payment.getDateReglement()))
-                .setTextAlignment(TextAlignment.RIGHT).setFontSize(9).setFontColor(INK)
-                .setMarginTop(4).setMarginBottom(4));
-
-        Table recipient = new Table(new float[]{1})
-                .setWidth(UnitValue.createPercentValue(46))
-                .setHorizontalAlignment(HorizontalAlignment.RIGHT)
-                .setMarginBottom(14);
-        recipient.addCell(new Cell()
-                .add(new Paragraph(value(payment.getPayeurNom())).setFont(bold).setFontSize(9.5f)
-                        .setFontColor(INK).setTextAlignment(TextAlignment.CENTER).setMargin(0))
-                .setBorder(new SolidBorder(ACCENT, 0.65f)).setBackgroundColor(SOFT_ACCENT).setPadding(4));
-        recipient.addCell(new Cell()
-                .add(new Paragraph(payerAddress(payment)).setFontSize(8.5f)
-                        .setTextAlignment(TextAlignment.CENTER).setMargin(0))
-                .setMinHeight(30).setBorderTop(Border.NO_BORDER)
-                .setBorderRight(new SolidBorder(ACCENT, 0.65f))
-                .setBorderBottom(new SolidBorder(ACCENT, 0.65f))
-                .setBorderLeft(new SolidBorder(ACCENT, 0.65f)).setPadding(5));
-        document.add(recipient);
-
-        document.add(new Paragraph()
-                .add(new com.itextpdf.layout.element.Text("Objet : ").setFont(regular).setUnderline())
-                .add(new com.itextpdf.layout.element.Text("Détail de votre règlement").setFont(bold))
-                .setFontSize(10).setFontColor(INK).setMarginBottom(12));
-
-        Table reference = new Table(new float[]{1.4f, 1.2f})
-                .setWidth(UnitValue.createPercentValue(48)).setMarginBottom(14);
-        reference.addCell(referenceCell("N° règlement :", payment.getNumero(), bold));
-        reference.addCell(referenceCell("Statut :", paymentStatus(payment), bold));
-        document.add(reference);
+        document.add(new Paragraph("")
+                .setBorderBottom(new SolidBorder(FOOTER_ACCENT, 0.8f))
+                .setMarginTop(0).setMarginBottom(12));
     }
 
     private void writeOverview(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
-        Table overview = new Table(new float[]{1.5f, 1f, 1.1f})
-                .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(15);
+        Table overview = new Table(new float[]{1.7f, 0.8f, 1.1f, 1.1f})
+                .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(12);
+        overview.addCell(infoCell("PAYEUR", payerIdentity(payment), regular, bold));
         overview.addCell(infoCell("DATE DU RÈGLEMENT", date(payment.getDateReglement()), regular, bold));
-        overview.addCell(infoCell("MOYENS DE PAIEMENT",
-                String.valueOf(payment.getInstruments().size()), regular, bold));
+        overview.addCell(infoCell("STATUT", paymentStatus(payment), regular, bold));
         overview.addCell(infoCell("ENREGISTRÉ PAR",
                 payment.getCreePar() == null ? null : payment.getCreePar().getFullName(), regular, bold));
         document.add(overview);
@@ -284,7 +271,9 @@ public class ReglementClientPdfService {
 
     private void writeSignatures(Document document, PdfFont bold) {
         Table signatures = new Table(new float[]{1, 1})
-                .setWidth(UnitValue.createPercentValue(100)).setMarginTop(18);
+                .setWidth(UnitValue.createPercentValue(100))
+                .setKeepTogether(true)
+                .setMarginTop(14);
         signatures.addCell(signatureCell("Cachet et signature de l’agence", bold));
         signatures.addCell(signatureCell("Signature du client", bold));
         document.add(signatures);
@@ -347,17 +336,6 @@ public class ReglementClientPdfService {
         return new Paragraph(text).setFont(bold).setFontSize(10).setFontColor(INK).setMarginBottom(7);
     }
 
-    private Cell referenceCell(String label, String content, PdfFont bold) {
-        return new Cell()
-                .add(new Paragraph()
-                        .add(new com.itextpdf.layout.element.Text(label + " ").setFont(bold))
-                        .add(value(content))
-                        .setFontSize(8.5f).setMargin(0))
-                .setBorder(new SolidBorder(ACCENT, 0.65f))
-                .setBackgroundColor(new DeviceRgb(241, 244, 247))
-                .setPadding(4);
-    }
-
     private Cell totalLabelCell(String label, PdfFont bold) {
         return new Cell()
                 .add(new Paragraph(label).setFont(bold).setFontSize(8.5f)
@@ -387,7 +365,7 @@ public class ReglementClientPdfService {
     }
 
     private Cell signatureCell(String label, PdfFont bold) {
-        return new Cell().setMinHeight(66).setPadding(8).setBorder(new SolidBorder(ACCENT, 0.65f))
+        return new Cell().setMinHeight(52).setPadding(7).setBorder(new SolidBorder(ACCENT, 0.65f))
                 .add(new Paragraph(label).setFont(bold).setFontSize(8).setFontColor(MUTED));
     }
 
@@ -475,6 +453,13 @@ public class ReglementClientPdfService {
                 payer.getVille() == null ? null : payer.getVille().getNom()
         );
         return address.isBlank() ? "-" : address.toUpperCase(Locale.FRENCH);
+    }
+
+    private String payerIdentity(ReglementClient payment) {
+        String address = payerAddress(payment);
+        return address.equals("-")
+                ? value(payment.getPayeurNom())
+                : value(payment.getPayeurNom()) + "\n" + address;
     }
 
     private String city(Agence agency) {

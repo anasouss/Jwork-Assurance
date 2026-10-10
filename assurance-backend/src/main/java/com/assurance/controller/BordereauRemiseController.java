@@ -2,11 +2,13 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.CreerBordereauRemiseRequest;
 import com.assurance.dto.request.DeposerBordereauRemiseRequest;
+import com.assurance.dto.request.SelectionInstrumentsBordereauRequest;
 import com.assurance.dto.request.TraiterLigneBordereauRemiseRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.BordereauRemisePageResponse;
 import com.assurance.dto.response.BordereauRemiseResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
+import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.enums.StatutBordereauRemise;
 import com.assurance.enums.TypeBordereauRemise;
 import com.assurance.security.TenantContext;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/compta/tresorerie/bordereaux-remise")
@@ -57,6 +60,19 @@ public class BordereauRemiseController {
                 search,
                 page,
                 size
+        )));
+    }
+
+    @PostMapping("/instruments-eligibles/selection")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<ApiResponse<List<ReglementClientResponse.Instrument>>> selectedEligibleInstruments(
+            @RequestParam TypeBordereauRemise type,
+            @Valid @RequestBody SelectionInstrumentsBordereauRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.selectedEligibleInstruments(
+                TenantContext.getCurrentAgence(),
+                type,
+                request.getInstrumentIds()
         )));
     }
 

@@ -8,6 +8,7 @@ import com.assurance.dto.response.BordereauRemisePageResponse;
 import com.assurance.dto.response.BordereauRemiseResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.OperationTresorerieResponse;
+import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.BordereauRemise;
@@ -41,7 +42,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -97,6 +101,39 @@ public class BordereauRemiseService {
     }
 
     @Transactional(readOnly = true)
+    public List<ReglementClientResponse.Instrument> selectedEligibleInstruments(
+            Long agenceId,
+            TypeBordereauRemise type,
+            List<Long> requestedIds
+    ) {
+        ModeReglementClient expectedMode = modeFor(type);
+        List<Long> ids = new ArrayList<>(new LinkedHashSet<>(requestedIds));
+        List<InstrumentReglementClient> instruments = instrumentRepository.findAllByAgenceIdAndIdIn(
+                agenceId,
+                ids
+        );
+        if (instruments.size() != ids.size()) {
+            throw new BadRequestException("Un instrument sélectionné est introuvable");
+        }
+        if (lineRepository.existsActiveByInstrumentIds(ids, ACTIVE_STATUSES)) {
+            throw new BadRequestException("Un instrument appartient déjà à un bordereau actif");
+        }
+        if (instruments.stream().anyMatch(instrument ->
+                instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
+                        || instrument.getMode() != expectedMode)) {
+            throw new BadRequestException("Tous les instruments doivent être en attente et du même type");
+        }
+        Map<Long, InstrumentReglementClient> byId = instruments.stream().collect(Collectors.toMap(
+                InstrumentReglementClient::getId,
+                Function.identity()
+        ));
+        return ids.stream()
+                .map(byId::get)
+                .map(reglementClientService::toInstrumentRegisterResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public BordereauRemisePageResponse search(
             Long agenceId,
             TypeBordereauRemise type,
@@ -144,7 +181,9 @@ public class BordereauRemiseService {
                 .statut(StatutBordereauRemise.BROUILLON)
                 .dateBordereau(request.getDateBordereau())
                 .compteDestination(destination)
-                .referenceBancaire(trimToNull(request.getReferenceBancaire()))
+                .referenceBancaire(request.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
+                        ? trimToNull(request.getReferenceBancaire())
+                        : null)
                 .notes(trimToNull(request.getNotes()))
                 .montantTotal(ZERO)
                 .build();

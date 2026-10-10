@@ -630,6 +630,19 @@ export const comptaApi = {
     return { ...result, rows: result.rows.map(normalizePaymentInstrument) };
   },
 
+  async selectedEligibleRemittanceInstruments(
+    type: Exclude<RemittanceSlipType, "VERSEMENT_ESPECES">,
+    instrumentIds: string[]
+  ) {
+    return unwrap(await apiFetch<ApiResponse<PaymentInstrument[]>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/instruments-eligibles/selection${buildQueryString({ type })}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ instrumentIds }),
+      }
+    )).map(normalizePaymentInstrument);
+  },
+
   async remittanceSlips(params: {
     type?: RemittanceSlipType;
     statut?: RemittanceSlipStatus;

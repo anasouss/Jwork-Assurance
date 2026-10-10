@@ -129,6 +129,18 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             @Param("ids") Collection<Long> ids
     );
 
+    @EntityGraph(attributePaths = {"reglement", "compteTresorerie"})
+    @Query("""
+            select instrument
+            from InstrumentReglementClient instrument
+            where instrument.agence.id = :agenceId
+              and instrument.id in :ids
+            """)
+    List<InstrumentReglementClient> findAllByAgenceIdAndIdIn(
+            @Param("agenceId") Long agenceId,
+            @Param("ids") Collection<Long> ids
+    );
+
     @EntityGraph(attributePaths = {
             "reglement",
             "compteTresorerie"

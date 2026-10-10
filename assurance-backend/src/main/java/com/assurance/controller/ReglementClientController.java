@@ -11,12 +11,16 @@ import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientResponse;
+import com.assurance.dto.response.UtilisateurTresorerieResponse;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.security.TenantContext;
+import com.assurance.service.JournalReglementsPdfService;
 import com.assurance.service.ReglementClientPdfService;
 import com.assurance.service.ReglementClientService;
+import com.assurance.service.TresorerieAccessService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -43,6 +47,8 @@ public class ReglementClientController {
 
     private final ReglementClientService reglementClientService;
     private final ReglementClientPdfService reglementClientPdfService;
+    private final JournalReglementsPdfService journalReglementsPdfService;
+    private final TresorerieAccessService tresorerieAccessService;
 
     @GetMapping("/creances")
     @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
@@ -146,6 +152,40 @@ public class ReglementClientController {
                 page,
                 size
         )));
+    }
+
+    @GetMapping("/journal/utilisateurs")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<ApiResponse<List<UtilisateurTresorerieResponse>>> journalUsers() {
+        return ResponseEntity.ok(ApiResponse.success(tresorerieAccessService.listAgencyUsers(
+                TenantContext.getCurrentAgence()
+        )));
+    }
+
+    @GetMapping("/journal/pdf")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<byte[]> paymentJournalPdf(
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) Long utilisateurId,
+            @RequestParam(required = false) ModeReglementClient mode,
+            @RequestParam(required = false) StatutReglementClient statut
+    ) {
+        byte[] pdf = journalReglementsPdfService.generate(
+                TenantContext.getCurrentAgence(),
+                dateDu,
+                dateAu,
+                utilisateurId,
+                mode,
+                statut
+        );
+        String filename = "journal-reglements-" + dateDu + "-" + dateAu + ".pdf";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=" + filename)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @GetMapping("/{paymentId}")

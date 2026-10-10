@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
+  BookOpenText,
   Eye,
   History,
   RotateCcw,
@@ -299,12 +300,20 @@ export default function ReglementsClientsPage() {
             Montants à encaisser, paiements partiels et moyens de règlement.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/app/compta/reglements/historique">
-            <History className="size-4" />
-            Règlements enregistrés
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to="/app/compta/reglements/historique?journal=1">
+              <BookOpenText className="size-4" />
+              Journal des règlements
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/app/compta/reglements/historique">
+              <History className="size-4" />
+              Règlements enregistrés
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <section className="grid gap-4 rounded-md border bg-card p-4">

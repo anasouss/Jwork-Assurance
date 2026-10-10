@@ -518,6 +518,24 @@ export const comptaApi = {
     )));
   },
 
+  async clientPaymentJournalUsers() {
+    return unwrap(await apiFetch<ApiResponse<TreasuryUser[]>>(
+      "/api/v1/compta/reglements-clients/journal/utilisateurs"
+    )).map((user) => ({ ...user, id: String(user.id) }));
+  },
+
+  async clientPaymentJournalPdf(params: {
+    dateDu: string;
+    dateAu: string;
+    utilisateurId?: string;
+    mode?: PaymentInstrument["mode"];
+    statut?: ClientPayment["statut"];
+  }) {
+    return apiFetchBlob(
+      `/api/v1/compta/reglements-clients/journal/pdf${buildQueryString(params)}`
+    );
+  },
+
   async clientPayment(id: string) {
     return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
       `/api/v1/compta/reglements-clients/${id}`

@@ -3,6 +3,7 @@ package com.assurance.repository;
 import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.StatutReglementClient;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -12,6 +13,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
@@ -30,6 +32,29 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
     List<InstrumentReglementClient> findByReglementIdAndAgenceIdOrderByIdAsc(
             Long reglementId,
             Long agenceId
+    );
+
+    @EntityGraph(attributePaths = {"reglement", "reglement.creePar"})
+    @Query("""
+            select instrument
+            from InstrumentReglementClient instrument
+            join instrument.reglement reglement
+            where instrument.agence.id = :agenceId
+              and reglement.createdAt >= :saisiDu
+              and reglement.createdAt < :saisiAvant
+              and instrument.statut <> com.assurance.enums.StatutInstrumentReglement.REMPLACE
+              and (:utilisateurId is null or reglement.creePar.id = :utilisateurId)
+              and (:mode is null or instrument.mode = :mode)
+              and (:statutReglement is null or reglement.statut = :statutReglement)
+            order by reglement.createdAt asc, reglement.numero asc, instrument.id asc
+            """)
+    List<InstrumentReglementClient> findForPaymentJournal(
+            @Param("agenceId") Long agenceId,
+            @Param("saisiDu") LocalDateTime saisiDu,
+            @Param("saisiAvant") LocalDateTime saisiAvant,
+            @Param("utilisateurId") Long utilisateurId,
+            @Param("mode") ModeReglementClient mode,
+            @Param("statutReglement") StatutReglementClient statutReglement
     );
 
     @EntityGraph(attributePaths = {

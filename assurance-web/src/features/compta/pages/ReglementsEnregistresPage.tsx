@@ -5,13 +5,29 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import { Eye, FileText, ReceiptText, RotateCcw, Search, XCircle } from "lucide-react";
+import {
+  BookOpenText,
+  Eye,
+  FileText,
+  MoreHorizontal,
+  ReceiptText,
+  RotateCcw,
+  Search,
+  XCircle,
+} from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +65,7 @@ import type {
 } from "../types";
 
 const PAGE_SIZE = 25;
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = toDateOnly(new Date())!;
 type PaymentSortBy = "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
 
 type InstrumentDraft = {
@@ -89,6 +105,13 @@ export default function ReglementsEnregistresPage() {
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
+  const [journalOpen, setJournalOpen] = useState(searchParams.get("journal") === "1");
+  const [journalDateFrom, setJournalDateFrom] = useState(TODAY);
+  const [journalDateTo, setJournalDateTo] = useState(TODAY);
+  const [journalUserId, setJournalUserId] = useState("ALL");
+  const [journalMode, setJournalMode] = useState<ClientPaymentMode | "ALL">("ALL");
+  const [journalStatus, setJournalStatus] = useState<ClientPayment["statut"] | "ALL">("ALL");
+  const [journalLoading, setJournalLoading] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
@@ -109,6 +132,12 @@ export default function ReglementsEnregistresPage() {
   const accounts = useQuery({
     queryKey: ["compta", "treasury-accounts"],
     queryFn: comptaApi.treasuryAccounts,
+  });
+
+  const journalUsers = useQuery({
+    queryKey: ["compta", "client-payment-journal-users"],
+    queryFn: comptaApi.clientPaymentJournalUsers,
+    enabled: journalOpen,
   });
 
   const cancelPayment = useMutation({
@@ -214,6 +243,41 @@ export default function ReglementsEnregistresPage() {
     }
   }
 
+  async function previewJournal() {
+    if (!journalDateFrom || !journalDateTo) {
+      toast.error("Renseignez la période du journal");
+      return;
+    }
+    if (journalDateFrom > journalDateTo) {
+      toast.error("La date de début doit précéder la date de fin");
+      return;
+    }
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      return;
+    }
+    previewWindow.opener = null;
+    setJournalLoading(true);
+    try {
+      const blob = await comptaApi.clientPaymentJournalPdf({
+        dateDu: journalDateFrom,
+        dateAu: journalDateTo,
+        utilisateurId: journalUserId === "ALL" ? undefined : journalUserId,
+        mode: journalMode === "ALL" ? undefined : journalMode,
+        statut: journalStatus === "ALL" ? undefined : journalStatus,
+      });
+      const url = URL.createObjectURL(blob);
+      previewWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      previewWindow.close();
+      toast.error(error instanceof Error ? error.message : "Génération du journal impossible");
+    } finally {
+      setJournalLoading(false);
+    }
+  }
+
   return (
     <div className="grid gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -226,12 +290,18 @@ export default function ReglementsEnregistresPage() {
             Historique, annulations et remplacement des moyens de paiement rejetés.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/app/compta/reglements">
-            <ReceiptText className="size-4" />
-            Créances ouvertes
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setJournalOpen(true)}>
+            <BookOpenText className="size-4" />
+            Journal des règlements
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/app/compta/reglements">
+              <ReceiptText className="size-4" />
+              Créances ouvertes
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_180px_180px_auto]">
@@ -317,18 +387,6 @@ export default function ReglementsEnregistresPage() {
                         <span key={instrument.id} className="inline-flex items-center gap-1.5">
                           <Badge variant="outline">{MODE_LABELS[instrument.mode]}</Badge>
                           <InstrumentStatusBadge value={instrument.statut} />
-                          {instrument.statut === "REJETE" && canManage && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setInstrumentToReplace(instrument);
-                                setReplacement(newReplacement());
-                              }}
-                            >
-                              Remplacer
-                            </Button>
-                          )}
                         </span>
                       ))}
                     </div>
@@ -339,39 +397,20 @@ export default function ReglementsEnregistresPage() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        title="Prévisualiser le règlement PDF"
-                        aria-label={`Prévisualiser le règlement ${payment.numero} en PDF`}
-                        disabled={openingPaymentId === payment.id}
-                        onClick={() => void previewPayment(payment)}
-                      >
-                        <Eye className="size-4" />
-                      </Button>
-                      {payment.statut === "VALIDE"
-                        && canIssueInvoice
-                        && hasDirectActiveAllocations(payment) && (
-                        <Button
-                          size="sm"
-                          onClick={() => setPaymentToInvoice(payment)}
-                        >
-                          <FileText className="size-4" />
-                          Créer la facture
-                        </Button>
-                      )}
-                      {payment.statut === "VALIDE" && canManage && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Annuler le règlement"
-                          onClick={() => setPaymentToCancel(payment)}
-                        >
-                          <XCircle className="size-4 text-red-600" />
-                        </Button>
-                      )}
+                    <div className="flex justify-end">
+                      <PaymentActionsMenu
+                        payment={payment}
+                        canManage={canManage}
+                        canIssueInvoice={canIssueInvoice}
+                        pdfLoading={openingPaymentId === payment.id}
+                        onPreview={() => void previewPayment(payment)}
+                        onInvoice={() => setPaymentToInvoice(payment)}
+                        onCancel={() => setPaymentToCancel(payment)}
+                        onReplace={(instrument) => {
+                          setInstrumentToReplace(instrument);
+                          setReplacement(newReplacement());
+                        }}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -396,6 +435,91 @@ export default function ReglementsEnregistresPage() {
           />
         )}
       </section>
+
+      <Dialog open={journalOpen} onOpenChange={setJournalOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Journal des règlements</DialogTitle>
+            <DialogDescription>
+              Générez un état des règlements saisis et des moyens de paiement pour une période.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Date du</Label>
+              <DatePicker
+                date={journalDateFrom}
+                onSelect={(value) => setJournalDateFrom(toDateOnly(value) ?? "")}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Date au</Label>
+              <DatePicker
+                date={journalDateTo}
+                onSelect={(value) => setJournalDateTo(toDateOnly(value) ?? "")}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Utilisateur</Label>
+              <Select value={journalUserId} onValueChange={setJournalUserId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous les utilisateurs</SelectItem>
+                  {(journalUsers.data ?? []).map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.nomComplet}{user.actif ? "" : " (inactif)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Mode de règlement</Label>
+              <Select
+                value={journalMode}
+                onValueChange={(value) => setJournalMode(value as ClientPaymentMode | "ALL")}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous les modes</SelectItem>
+                  {Object.entries(MODE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2 sm:col-span-2">
+              <Label>Statut du règlement</Label>
+              <Select
+                value={journalStatus}
+                onValueChange={(value) => setJournalStatus(value as ClientPayment["statut"] | "ALL")}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous les statuts</SelectItem>
+                  <SelectItem value="VALIDE">Validés</SelectItem>
+                  <SelectItem value="ANNULE">Annulés</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+            Les chèques et effets en attente restent distingués des montants définitivement encaissés.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={journalLoading} onClick={() => setJournalOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={journalLoading || !journalDateFrom || !journalDateTo}
+              onClick={() => void previewJournal()}
+            >
+              <Eye className="size-4" />
+              {journalLoading ? "Génération..." : "Prévisualiser le PDF"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(paymentToInvoice)}
@@ -623,6 +747,81 @@ function AccountSelect({
         </p>
       )}
     </div>
+  );
+}
+
+function PaymentActionsMenu({
+  payment,
+  canManage,
+  canIssueInvoice,
+  pdfLoading,
+  onPreview,
+  onInvoice,
+  onCancel,
+  onReplace,
+}: {
+  payment: ClientPayment;
+  canManage: boolean;
+  canIssueInvoice: boolean;
+  pdfLoading: boolean;
+  onPreview: () => void;
+  onInvoice: () => void;
+  onCancel: () => void;
+  onReplace: (instrument: PaymentInstrument) => void;
+}) {
+  const rejectedInstruments = canManage
+    ? payment.instruments.filter((instrument) => instrument.statut === "REJETE")
+    : [];
+  const canCreateInvoice = payment.statut === "VALIDE"
+    && canIssueInvoice
+    && hasDirectActiveAllocations(payment);
+  const canReplaceInstrument = rejectedInstruments.length > 0;
+  const canCancelPayment = payment.statut === "VALIDE" && canManage;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Actions pour le règlement ${payment.numero}`}
+          title="Actions"
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuItem disabled={pdfLoading} onSelect={onPreview}>
+          <Eye className="size-4" />
+          {pdfLoading ? "Ouverture..." : "Prévisualiser le PDF"}
+        </DropdownMenuItem>
+        {canCreateInvoice && (
+          <DropdownMenuItem onSelect={onInvoice}>
+            <FileText className="size-4" />
+            Créer la facture
+          </DropdownMenuItem>
+        )}
+        {canReplaceInstrument && <DropdownMenuSeparator />}
+        {rejectedInstruments.map((instrument) => (
+          <DropdownMenuItem
+            key={instrument.id}
+            onSelect={() => onReplace(instrument)}
+          >
+            <RotateCcw className="size-4" />
+            Remplacer {MODE_LABELS[instrument.mode].toLowerCase()}
+            {instrument.referenceInstrument ? ` ${instrument.referenceInstrument}` : ""}
+          </DropdownMenuItem>
+        ))}
+        {canCancelPayment && <DropdownMenuSeparator />}
+        {canCancelPayment && (
+          <DropdownMenuItem variant="destructive" onSelect={onCancel}>
+            <XCircle className="size-4" />
+            Annuler le règlement
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

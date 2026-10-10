@@ -2,6 +2,7 @@ package com.assurance.service;
 
 import com.assurance.entity.AffectationReglementClient;
 import com.assurance.entity.Agence;
+import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.ElementFacturable;
@@ -58,13 +59,15 @@ import java.util.Locale;
 @Slf4j
 public class ReglementClientPdfService {
 
-    private static final DeviceRgb INK = new DeviceRgb(20, 33, 48);
-    private static final DeviceRgb ACCENT = new DeviceRgb(217, 119, 6);
-    private static final DeviceRgb SOFT_ACCENT = new DeviceRgb(255, 247, 237);
-    private static final DeviceRgb SOFT_BLUE = new DeviceRgb(241, 245, 249);
-    private static final DeviceRgb BORDER = new DeviceRgb(203, 213, 225);
+    private static final DeviceRgb INK = new DeviceRgb(17, 48, 78);
+    private static final DeviceRgb ACCENT = new DeviceRgb(17, 48, 78);
+    private static final DeviceRgb TABLE_HEADER = new DeviceRgb(35, 78, 116);
+    private static final DeviceRgb FOOTER_ACCENT = new DeviceRgb(0, 147, 211);
+    private static final DeviceRgb SOFT_ACCENT = new DeviceRgb(232, 244, 250);
+    private static final DeviceRgb SOFT_BLUE = new DeviceRgb(248, 250, 252);
+    private static final DeviceRgb BORDER = new DeviceRgb(157, 171, 184);
     private static final DeviceRgb MUTED = new DeviceRgb(71, 85, 105);
-    private static final float PAGE_MARGIN = 30f;
+    private static final float PAGE_MARGIN = 24f;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final ReglementClientRepository reglementRepository;
@@ -82,12 +85,17 @@ public class ReglementClientPdfService {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(output));
             Document document = new Document(pdf, PageSize.A4);
-            document.setMargins(28, PAGE_MARGIN, 54, PAGE_MARGIN);
+            document.setMargins(22, PAGE_MARGIN, 72, PAGE_MARGIN);
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             document.setFont(regular).setFontSize(9).setFontColor(INK);
             pdf.addEventHandler(com.itextpdf.kernel.events.PdfDocumentEvent.END_PAGE,
-                    event -> writeFooter((com.itextpdf.kernel.events.PdfDocumentEvent) event, payment, regular));
+                    event -> writeFooter(
+                            (com.itextpdf.kernel.events.PdfDocumentEvent) event,
+                            payment,
+                            regular,
+                            bold
+                    ));
 
             writeHeader(document, payment, regular, bold);
             writeOverview(document, payment, regular, bold);
@@ -105,39 +113,65 @@ public class ReglementClientPdfService {
         }
     }
 
-    private void writeHeader(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
-        Table header = new Table(new float[]{1.2f, 2.2f})
+    private void writeHeader(
+            Document document,
+            ReglementClient payment,
+            PdfFont regular,
+            PdfFont bold
+    ) {
+        Table header = new Table(new float[]{1})
                 .setWidth(UnitValue.createPercentValue(100));
-        Cell identity = cell().setMinHeight(72).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        Cell identity = cell().setHeight(118).setVerticalAlignment(VerticalAlignment.TOP);
         byte[] logo = agencyLogoStorageService.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(180, 62);
+            image.scaleToFit(310, 108);
             identity.add(image);
         } else {
-            identity.add(new Paragraph(payment.getAgence().getNom()).setFont(bold).setFontSize(15));
+            identity.add(new Paragraph(payment.getAgence().getNom()).setFont(bold).setFontSize(17));
         }
         header.addCell(identity);
-
-        Cell title = cell().setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.MIDDLE);
-        title.add(new Paragraph("FICHE DE RÈGLEMENT CLIENT")
-                .setFont(bold).setFontSize(15).setMargin(0));
-        title.add(new Paragraph(payment.getNumero())
-                .setFont(bold).setFontSize(12).setFontColor(ACCENT).setMarginTop(5).setMarginBottom(0));
-        title.add(new Paragraph(paymentStatus(payment))
-                .setFont(regular).setFontSize(8).setFontColor(statusColor(payment))
-                .setMarginTop(4).setMarginBottom(0));
-        header.addCell(title);
         document.add(header);
-        document.add(new Paragraph("")
-                .setBorderBottom(new SolidBorder(ACCENT, 1.4f)).setMarginTop(2).setMarginBottom(14));
+
+        document.add(new Paragraph(city(payment.getAgence()) + " Le " + DATE_FORMAT.format(payment.getDateReglement()))
+                .setTextAlignment(TextAlignment.RIGHT).setFontSize(9).setFontColor(INK)
+                .setMarginTop(4).setMarginBottom(4));
+
+        Table recipient = new Table(new float[]{1})
+                .setWidth(UnitValue.createPercentValue(46))
+                .setHorizontalAlignment(HorizontalAlignment.RIGHT)
+                .setMarginBottom(14);
+        recipient.addCell(new Cell()
+                .add(new Paragraph(value(payment.getPayeurNom())).setFont(bold).setFontSize(9.5f)
+                        .setFontColor(INK).setTextAlignment(TextAlignment.CENTER).setMargin(0))
+                .setBorder(new SolidBorder(ACCENT, 0.65f)).setBackgroundColor(SOFT_ACCENT).setPadding(4));
+        recipient.addCell(new Cell()
+                .add(new Paragraph(payerAddress(payment)).setFontSize(8.5f)
+                        .setTextAlignment(TextAlignment.CENTER).setMargin(0))
+                .setMinHeight(30).setBorderTop(Border.NO_BORDER)
+                .setBorderRight(new SolidBorder(ACCENT, 0.65f))
+                .setBorderBottom(new SolidBorder(ACCENT, 0.65f))
+                .setBorderLeft(new SolidBorder(ACCENT, 0.65f)).setPadding(5));
+        document.add(recipient);
+
+        document.add(new Paragraph()
+                .add(new com.itextpdf.layout.element.Text("Objet : ").setFont(regular).setUnderline())
+                .add(new com.itextpdf.layout.element.Text("Détail de votre règlement").setFont(bold))
+                .setFontSize(10).setFontColor(INK).setMarginBottom(12));
+
+        Table reference = new Table(new float[]{1.4f, 1.2f})
+                .setWidth(UnitValue.createPercentValue(48)).setMarginBottom(14);
+        reference.addCell(referenceCell("N° règlement :", payment.getNumero(), bold));
+        reference.addCell(referenceCell("Statut :", paymentStatus(payment), bold));
+        document.add(reference);
     }
 
     private void writeOverview(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
         Table overview = new Table(new float[]{1.5f, 1f, 1.1f})
                 .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(15);
-        overview.addCell(infoCell("PAYEUR", payment.getPayeurNom(), regular, bold));
         overview.addCell(infoCell("DATE DU RÈGLEMENT", date(payment.getDateReglement()), regular, bold));
+        overview.addCell(infoCell("MOYENS DE PAIEMENT",
+                String.valueOf(payment.getInstruments().size()), regular, bold));
         overview.addCell(infoCell("ENREGISTRÉ PAR",
                 payment.getCreePar() == null ? null : payment.getCreePar().getFullName(), regular, bold));
         document.add(overview);
@@ -146,9 +180,10 @@ public class ReglementClientPdfService {
                 .setWidth(UnitValue.createPercentValue(55))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
                 .setMarginBottom(15);
-        totals.addCell(infoCell("MONTANT TOTAL", amount(payment.getMontantTotal()) + " MAD", regular, bold)
-                .setBackgroundColor(SOFT_ACCENT));
-        totals.addCell(infoCell("NON AFFECTÉ", amount(payment.getMontantNonAffecte()) + " MAD", regular, bold));
+        totals.addCell(totalLabelCell("Montant total", bold));
+        totals.addCell(totalValueCell(amount(payment.getMontantTotal()) + " MAD", bold));
+        totals.addCell(totalLabelCell("Non affecté", bold));
+        totals.addCell(totalValueCell(amount(payment.getMontantNonAffecte()) + " MAD", bold));
         document.add(totals);
     }
 
@@ -258,20 +293,26 @@ public class ReglementClientPdfService {
     private void writeFooter(
             com.itextpdf.kernel.events.PdfDocumentEvent event,
             ReglementClient payment,
-            PdfFont regular
+            PdfFont regular,
+            PdfFont bold
     ) {
         PdfDocument pdf = event.getDocument();
         PdfPage page = event.getPage();
         Rectangle pageSize = page.getPageSize();
         PdfCanvas canvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdf);
-        canvas.setStrokeColor(ACCENT).setLineWidth(0.5f)
-                .moveTo(PAGE_MARGIN, 38).lineTo(pageSize.getWidth() - PAGE_MARGIN, 38).stroke();
+        canvas.setStrokeColor(FOOTER_ACCENT).setLineWidth(0.65f)
+                .moveTo(PAGE_MARGIN, 57).lineTo(pageSize.getWidth() - PAGE_MARGIN, 57).stroke();
         Canvas footer = new Canvas(canvas, pdf, new Rectangle(
-                PAGE_MARGIN, 14, pageSize.getWidth() - PAGE_MARGIN * 2, 18));
-        footer.add(new Paragraph(agencyLine(payment.getAgence()) + "  ·  " + payment.getNumero()
-                        + "  ·  Page " + pdf.getPageNumber(page))
-                .setFont(regular).setFontSize(7).setFontColor(MUTED)
-                .setTextAlignment(TextAlignment.CENTER).setMargin(0));
+                PAGE_MARGIN, 9, pageSize.getWidth() - PAGE_MARGIN * 2, 44));
+        Agence agency = payment.getAgence();
+        addFooterLine(footer, contactLine(agency), regular);
+        addFooterLine(footer, addressLine(agency), regular);
+        addFooterLine(footer, legalLine(agency), regular);
+        String bank = bankLine(agency);
+        if (!bank.isBlank()) {
+            addFooterLine(footer, bank, bold);
+        }
+        addFooterLine(footer, payment.getNumero() + " · Page " + pdf.getPageNumber(page), regular);
         footer.close();
     }
 
@@ -303,7 +344,38 @@ public class ReglementClientPdfService {
     }
 
     private Paragraph sectionTitle(String text, PdfFont bold) {
-        return new Paragraph(text).setFont(bold).setFontSize(11).setMarginBottom(7);
+        return new Paragraph(text).setFont(bold).setFontSize(10).setFontColor(INK).setMarginBottom(7);
+    }
+
+    private Cell referenceCell(String label, String content, PdfFont bold) {
+        return new Cell()
+                .add(new Paragraph()
+                        .add(new com.itextpdf.layout.element.Text(label + " ").setFont(bold))
+                        .add(value(content))
+                        .setFontSize(8.5f).setMargin(0))
+                .setBorder(new SolidBorder(ACCENT, 0.65f))
+                .setBackgroundColor(new DeviceRgb(241, 244, 247))
+                .setPadding(4);
+    }
+
+    private Cell totalLabelCell(String label, PdfFont bold) {
+        return new Cell()
+                .add(new Paragraph(label).setFont(bold).setFontSize(8.5f)
+                        .setFontColor(ColorConstants.WHITE).setMargin(0))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBorder(new SolidBorder(ACCENT, 0.65f))
+                .setBackgroundColor(TABLE_HEADER)
+                .setPadding(5);
+    }
+
+    private Cell totalValueCell(String content, PdfFont bold) {
+        return new Cell()
+                .add(new Paragraph(content).setFont(bold).setFontSize(8.5f)
+                        .setFontColor(INK).setMargin(0))
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setBorder(new SolidBorder(ACCENT, 0.65f))
+                .setBackgroundColor(SOFT_ACCENT)
+                .setPadding(5);
     }
 
     private Cell infoCell(String label, String content, PdfFont regular, PdfFont bold) {
@@ -315,15 +387,15 @@ public class ReglementClientPdfService {
     }
 
     private Cell signatureCell(String label, PdfFont bold) {
-        return new Cell().setMinHeight(72).setPadding(8).setBorder(new SolidBorder(BORDER, 0.6f))
+        return new Cell().setMinHeight(66).setPadding(8).setBorder(new SolidBorder(ACCENT, 0.65f))
                 .add(new Paragraph(label).setFont(bold).setFontSize(8).setFontColor(MUTED));
     }
 
     private void addHeader(Table table, String text, PdfFont bold, TextAlignment alignment) {
         table.addHeaderCell(new Cell().add(new Paragraph(text).setFont(bold).setFontSize(6.5f).setMargin(0))
-                .setBackgroundColor(INK).setFontColor(ColorConstants.WHITE)
+                .setBackgroundColor(TABLE_HEADER).setFontColor(ColorConstants.WHITE)
                 .setTextAlignment(alignment).setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .setBorder(new SolidBorder(INK, 0.5f)).setPadding(6));
+                .setBorder(new SolidBorder(ColorConstants.WHITE, 0.35f)).setPadding(5));
     }
 
     private void addBody(Table table, String text, PdfFont font, TextAlignment alignment, DeviceRgb background) {
@@ -360,17 +432,6 @@ public class ReglementClientPdfService {
         return "ENREGISTRÉ";
     }
 
-    private DeviceRgb statusColor(ReglementClient payment) {
-        String status = paymentStatus(payment);
-        if (status.equals("ANNULÉ") || status.equals("INSTRUMENT REJETÉ")) {
-            return new DeviceRgb(220, 38, 38);
-        }
-        if (status.equals("ENCAISSÉ")) {
-            return new DeviceRgb(5, 150, 105);
-        }
-        return new DeviceRgb(37, 99, 235);
-    }
-
     private String modeLabel(ModeReglementClient mode) {
         return switch (mode) {
             case ESPECES -> "Espèces";
@@ -401,10 +462,78 @@ public class ReglementClientPdfService {
         };
     }
 
-    private String agencyLine(Agence agency) {
-        String address = joinAvailable(agency.getAdresse(), agency.getVille());
-        String contact = joinAvailable(agency.getTelephone(), agency.getEmail());
-        return joinAvailable(joinAvailable(agency.getNom(), address), contact);
+    private String payerAddress(ReglementClient payment) {
+        Client payer = payment.getClientPayeur();
+        if (payer == null && payment.getGroupePayeur() != null) {
+            payer = payment.getGroupePayeur().getClientTresorerie();
+        }
+        if (payer == null) {
+            return "-";
+        }
+        String address = joinAvailable(
+                payer.getAdresse(),
+                payer.getVille() == null ? null : payer.getVille().getNom()
+        );
+        return address.isBlank() ? "-" : address.toUpperCase(Locale.FRENCH);
+    }
+
+    private String city(Agence agency) {
+        return agency.getVille() == null || agency.getVille().isBlank() ? "" : agency.getVille().trim();
+    }
+
+    private void addFooterLine(Canvas footer, String content, PdfFont font) {
+        if (content == null || content.isBlank()) {
+            return;
+        }
+        footer.add(new Paragraph(content).setFont(font).setFontSize(6.7f).setFontColor(INK)
+                .setTextAlignment(TextAlignment.CENTER).setMargin(0).setMultipliedLeading(1.02f));
+    }
+
+    private String contactLine(Agence agency) {
+        StringBuilder result = new StringBuilder();
+        append(result, "GSM / Tél : ", agency.getTelephone());
+        append(result, "Fax : ", agency.getFax());
+        append(result, "Email : ", agency.getEmail());
+        return result.toString();
+    }
+
+    private String addressLine(Agence agency) {
+        StringBuilder result = new StringBuilder();
+        append(result, "Adresse : ", joinAvailable(agency.getAdresse(), agency.getVille()));
+        append(result, "IF : ", agency.getIdentifiantFiscal());
+        append(result, "Patente : ", agency.getPatente());
+        append(result, "ICE : ", agency.getIce());
+        return result.toString();
+    }
+
+    private String legalLine(Agence agency) {
+        if (agency.getNumeroAgrement() == null || agency.getNumeroAgrement().isBlank()) {
+            return "";
+        }
+        StringBuilder result = new StringBuilder(
+                "Intermédiaire d'assurances régi par la loi 17-99, portant code des assurances sous le n° d'agrément : "
+        ).append(agency.getNumeroAgrement().trim());
+        if (agency.getDateAgrement() != null) {
+            result.append(" du ").append(DATE_FORMAT.format(agency.getDateAgrement()));
+        }
+        return result.toString();
+    }
+
+    private String bankLine(Agence agency) {
+        StringBuilder result = new StringBuilder();
+        append(result, "RIB : ", agency.getRib());
+        append(result, "Banque : ", agency.getBanque());
+        return result.toString();
+    }
+
+    private void append(StringBuilder target, String label, String content) {
+        if (content == null || content.isBlank()) {
+            return;
+        }
+        if (target.length() > 0) {
+            target.append(" - ");
+        }
+        target.append(label).append(content.trim());
     }
 
     private String date(LocalDate date) {

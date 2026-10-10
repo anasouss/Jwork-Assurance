@@ -35,14 +35,16 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
     );
 
     @EntityGraph(attributePaths = {
-            "clientPayeur", "groupePayeur", "creePar", "instruments",
+            "clientPayeur", "clientPayeur.ville", "groupePayeur", "groupePayeur.clientTresorerie",
+            "groupePayeur.clientTresorerie.ville", "creePar", "instruments",
             "instruments.compteTresorerie"
     })
     Optional<ReglementClient> findByIdAndAgenceId(Long id, Long agenceId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {
-            "clientPayeur", "groupePayeur", "creePar", "instruments",
+            "clientPayeur", "clientPayeur.ville", "groupePayeur", "groupePayeur.clientTresorerie",
+            "groupePayeur.clientTresorerie.ville", "creePar", "instruments",
             "instruments.compteTresorerie"
     })
     @Query("""

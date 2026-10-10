@@ -117,7 +117,6 @@ public class JournalReglementsPdfService {
             writeOverview(document, instruments, regular, bold);
             writeModeSummary(document, instruments, regular, bold);
             writeDetails(document, instruments, regular, bold);
-            writeSignatures(document, bold);
 
             document.close();
             return output.toByteArray();
@@ -344,16 +343,6 @@ public class JournalReglementsPdfService {
         ).setFont(regular).setFontSize(7.5f).setFontColor(MUTED).setMarginTop(8).setMarginBottom(0));
     }
 
-    private void writeSignatures(Document document, PdfFont bold) {
-        Table signatures = new Table(new float[]{1, 1})
-                .setWidth(UnitValue.createPercentValue(100))
-                .setMarginTop(14)
-                .setKeepTogether(true);
-        signatures.addCell(signatureCell("Visa de l’utilisateur", bold));
-        signatures.addCell(signatureCell("Visa du responsable", bold));
-        document.add(signatures);
-    }
-
     private void writeFooter(
             com.itextpdf.kernel.events.PdfDocumentEvent event,
             Agence agency,
@@ -386,11 +375,6 @@ public class JournalReglementsPdfService {
         Cell result = infoCell(label, content, regular, bold);
         result.setTextAlignment(TextAlignment.CENTER);
         return result;
-    }
-
-    private Cell signatureCell(String label, PdfFont bold) {
-        return new Cell().setMinHeight(46).setPadding(7).setBorder(new SolidBorder(BORDER, 0.55f))
-                .add(new Paragraph(label).setFont(bold).setFontSize(7.5f).setFontColor(MUTED));
     }
 
     private Paragraph sectionTitle(String text, PdfFont bold) {

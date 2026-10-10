@@ -540,37 +540,35 @@ export function ContractInfoSection({
             ) : null}
           </>
         ) : null}
-        <div className="grid gap-3 md:col-span-2 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4">
-          <Field label="Réduction saharienne" error={form.validationErrors.reductionSaharienne}>
-            <div className="flex h-10 items-center">
-              <Switch
-                className={reductionSaharienneEligible ? "cursor-pointer" : "cursor-not-allowed"}
-                checked={form.reductionSaharienne}
-                disabled={!reductionSaharienneEligible}
-                onCheckedChange={(checked) => {
-                  form.setReductionSaharienne(checked);
-                  if (!checked) {
-                    form.setJustificatifSahara("");
-                  }
-                }}
-              />
-            </div>
+        <Field label="Réduction saharienne" error={form.validationErrors.reductionSaharienne}>
+          <div className="flex h-10 items-center">
+            <Switch
+              className={reductionSaharienneEligible ? "cursor-pointer" : "cursor-not-allowed"}
+              checked={form.reductionSaharienne}
+              disabled={!reductionSaharienneEligible}
+              onCheckedChange={(checked) => {
+                form.setReductionSaharienne(checked);
+                if (!checked) {
+                  form.setJustificatifSahara("");
+                }
+              }}
+            />
+          </div>
+        </Field>
+        {form.reductionSaharienne ? (
+          <Field label="Justificatif Sahara" required error={form.validationErrors.justificatifSahara}>
+            <Select value={form.justificatifSahara} onValueChange={form.setJustificatifSahara}>
+              <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CNI">CNI</SelectItem>
+                <SelectItem value="Certificat de résidence">Certificat de résidence</SelectItem>
+                <SelectItem value="Certificat de présence au corps">Certificat de présence au corps</SelectItem>
+                <SelectItem value="Registre de commerce modèle J">Registre de commerce modèle J</SelectItem>
+                <SelectItem value="Autre">Autre</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
-          {form.reductionSaharienne ? (
-            <Field label="Justificatif Sahara" required error={form.validationErrors.justificatifSahara}>
-              <Select value={form.justificatifSahara} onValueChange={form.setJustificatifSahara}>
-                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CNI">CNI</SelectItem>
-                  <SelectItem value="Certificat de résidence">Certificat de résidence</SelectItem>
-                  <SelectItem value="Certificat de présence au corps">Certificat de présence au corps</SelectItem>
-                  <SelectItem value="Registre de commerce modèle J">Registre de commerce modèle J</SelectItem>
-                  <SelectItem value="Autre">Autre</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : null}
-        </div>
+        ) : null}
       </div>
       <div className="mt-4 flex justify-end border-t pt-3">
         <Button

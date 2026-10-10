@@ -57,22 +57,23 @@ public class SinistreCouvertureService {
             LocalDate dateSinistre
     ) {
         EtatCouverture state = resolveState(agenceId, contratId, dateSinistre);
-        MouvementVehicule vehicule = resolveVehicule(state.vehicules(), vehiculeId);
+        boolean automobile = isAutomobile(state.contrat());
+        MouvementVehicule vehicule = resolveVehicule(state.vehicules(), vehiculeId, automobile);
         List<MouvementGarantie> garanties = state.garanties().stream()
-                .filter(snapshot -> snapshot.getVehicule() == null
-                        || Objects.equals(snapshot.getVehicule().getId(), vehicule.getVehicule().getId()))
+                .filter(snapshot -> vehicule == null
+                        ? snapshot.getVehicule() == null && snapshot.getRemorque() == null
+                        : snapshot.getVehicule() == null
+                            || Objects.equals(snapshot.getVehicule().getId(), vehicule.getVehicule().getId()))
                 .toList();
         if (garanties.isEmpty()) {
-            throw new BadRequestException(
-                    "Aucune garantie couverte n'a été trouvée pour ce véhicule à la date du sinistre"
-            );
+            throw new BadRequestException("Aucune garantie couverte n'a été trouvée à la date du sinistre");
         }
 
         return new CouvertureResolue(
                 state.contrat(),
                 state.mouvement(),
                 state.assure(),
-                vehicule.getVehicule(),
+                vehicule == null ? null : vehicule.getVehicule(),
                 vehicule,
                 garanties,
                 List.copyOf(state.vehicules().values())
@@ -98,7 +99,7 @@ public class SinistreCouvertureService {
             );
         }
         Map<Long, MouvementVehicule> vehicules = replayVehicules(mouvements);
-        if (vehicules.isEmpty()) {
+        if (vehicules.isEmpty() && isAutomobile(contrat)) {
             throw new BadRequestException(
                     "Aucun véhicule couvert n'a été trouvé à la date du sinistre"
             );
@@ -187,7 +188,8 @@ public class SinistreCouvertureService {
 
     private MouvementVehicule resolveVehicule(
             Map<Long, MouvementVehicule> vehicules,
-            Long vehiculeId
+            Long vehiculeId,
+            boolean automobile
     ) {
         if (vehiculeId != null) {
             MouvementVehicule snapshot = vehicules.get(vehiculeId);
@@ -196,10 +198,21 @@ public class SinistreCouvertureService {
             }
             return snapshot;
         }
+        if (vehicules.isEmpty() && !automobile) {
+            return null;
+        }
+        if (vehicules.isEmpty()) {
+            throw new BadRequestException("Aucun véhicule couvert n'a été trouvé à la date du sinistre");
+        }
         if (vehicules.size() > 1) {
             throw new BadRequestException("Le véhicule concerné est obligatoire pour ce contrat");
         }
         return vehicules.values().iterator().next();
+    }
+
+    private boolean isAutomobile(Contrat contrat) {
+        return contrat.getBrancheAssurance() != null
+                && "AUTOMOBILE".equalsIgnoreCase(contrat.getBrancheAssurance().getCode());
     }
 
     private List<MouvementGarantie> replayGaranties(List<MouvementContrat> mouvements) {
@@ -322,6 +335,12 @@ public class SinistreCouvertureService {
                 .contratId(couverture.contrat().getId())
                 .numeroDossier(couverture.contrat().getNumeroDossier())
                 .numeroPolice(couverture.contrat().getNumeroPolice())
+                .brancheCode(couverture.contrat().getBrancheAssurance() == null
+                        ? null
+                        : couverture.contrat().getBrancheAssurance().getCode())
+                .brancheLibelle(couverture.contrat().getBrancheAssurance() == null
+                        ? null
+                        : couverture.contrat().getBrancheAssurance().getLibelle())
                 .compagnie(couverture.contrat().getCompagnieAssurance().getNom())
                 .assure(couverture.assure().getNomAffichage())
                 .mouvementId(couverture.mouvement().getId())
@@ -329,6 +348,10 @@ public class SinistreCouvertureService {
                 .mouvement(couverture.mouvement().getTypeMouvement().getLibelle())
                 .dateEffet(couverture.mouvement().getDateEffet())
                 .dateEcheance(couverture.mouvement().getDateEcheance())
+                .garanties(couverture.garanties().stream()
+                        .filter(garantie -> garantie.getVehicule() == null && garantie.getRemorque() == null)
+                        .map(this::toGuaranteePreview)
+                        .toList())
                 .vehicules(vehicules)
                 .build();
     }

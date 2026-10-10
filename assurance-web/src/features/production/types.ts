@@ -1498,6 +1498,9 @@ export type ContratListItem = {
   createdAt?: string | null;
   typeContrat: TypeContrat;
   statut: string;
+  brancheAssuranceId?: string | null;
+  brancheAssuranceCode?: string | null;
+  brancheAssuranceLibelle?: string | null;
   compagnieAssuranceId?: string | null;
   compagnieCode?: string | null;
   compagnieLibelle?: string | null;

@@ -284,27 +284,34 @@ public class SinistreService {
             Sinistre sinistre,
             SinistreCouvertureService.CouvertureResolue couverture
     ) {
+        var vehicule = couverture.vehiculeSnapshot();
         return SinistreCouverture.builder()
                 .sinistre(sinistre)
                 .numeroPolice(couverture.contrat().getNumeroPolice())
                 .numeroDossier(couverture.contrat().getNumeroDossier())
+                .brancheCode(couverture.contrat().getBrancheAssurance() == null
+                        ? null
+                        : couverture.contrat().getBrancheAssurance().getCode())
+                .brancheLibelle(couverture.contrat().getBrancheAssurance() == null
+                        ? null
+                        : couverture.contrat().getBrancheAssurance().getLibelle())
                 .compagnieCode(couverture.contrat().getCompagnieAssurance().getCode())
                 .compagnieLibelle(couverture.contrat().getCompagnieAssurance().getNom())
                 .clientCode(couverture.assure().getCodeClient())
                 .assure(couverture.assure().getNomAffichage())
                 .dateEffet(couverture.contrat().getDateEffet())
                 .dateEcheance(couverture.contrat().getDateEcheance())
-                .immatriculation(couverture.vehiculeSnapshot().getImmatriculation())
-                .numeroAttestation(couverture.vehiculeSnapshot().getNumeroAttestation())
-                .marque(couverture.vehiculeSnapshot().getMarque() == null
+                .immatriculation(vehicule == null ? null : vehicule.getImmatriculation())
+                .numeroAttestation(vehicule == null ? null : vehicule.getNumeroAttestation())
+                .marque(vehicule == null || vehicule.getMarque() == null
                         ? null
-                        : couverture.vehiculeSnapshot().getMarque().getLibelle())
-                .usageCode(couverture.vehiculeSnapshot().getUsage() == null
+                        : vehicule.getMarque().getLibelle())
+                .usageCode(vehicule == null || vehicule.getUsage() == null
                         ? null
-                        : couverture.vehiculeSnapshot().getUsage().getCode())
-                .usageLibelle(couverture.vehiculeSnapshot().getUsage() == null
+                        : vehicule.getUsage().getCode())
+                .usageLibelle(vehicule == null || vehicule.getUsage() == null
                         ? null
-                        : couverture.vehiculeSnapshot().getUsage().getLibelle())
+                        : vehicule.getUsage().getLibelle())
                 .build();
     }
 
@@ -337,7 +344,7 @@ public class SinistreService {
                 .map(item -> item.getGarantie().getId())
                 .collect(java.util.stream.Collectors.toSet());
         if (!available.containsAll(selectedIds)) {
-            throw new BadRequestException("Une garantie sélectionnée ne couvrait pas le véhicule à la date du sinistre");
+            throw new BadRequestException("Une garantie sélectionnée ne couvrait pas le risque à la date du sinistre");
         }
     }
 

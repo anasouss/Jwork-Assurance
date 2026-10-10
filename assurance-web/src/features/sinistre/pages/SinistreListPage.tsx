@@ -53,6 +53,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
 import { formatDate, formatMoney, natureLabels, statusLabels } from "../format";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
+import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
 import type {
   NatureSinistre,
   SinistreSummary,
@@ -89,6 +90,7 @@ export default function SinistreListPage() {
   const [claimToDelete, setClaimToDelete] = useState<SinistreSummary | null>(
     null,
   );
+  const [declarationOpen, setDeclarationOpen] = useState(false);
   const request = useMemo(
     () => ({
       query: applied.query.trim() || undefined,
@@ -175,11 +177,9 @@ export default function SinistreListPage() {
           </p>
         </div>
         {canCreate ? (
-          <Button asChild>
-            <Link to="/app/sinistre/declarer">
-              <FilePlus2 className="size-4" />
-              Déclarer
-            </Link>
+          <Button onClick={() => setDeclarationOpen(true)}>
+            <FilePlus2 className="size-4" />
+            Déclarer
           </Button>
         ) : null}
       </div>
@@ -410,6 +410,10 @@ export default function SinistreListPage() {
           />
         </CardContent>
       </Card>
+      <SinistreDeclarationContextDialog
+        open={declarationOpen}
+        onOpenChange={setDeclarationOpen}
+      />
       <AlertDialog
         open={claimToCancel !== null}
         onOpenChange={(open) => {

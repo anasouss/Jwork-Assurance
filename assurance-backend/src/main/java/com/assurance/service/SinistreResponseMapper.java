@@ -199,6 +199,8 @@ public class SinistreResponseMapper {
                 .numeroMouvement(sinistre.getMouvementCouverture().getNumeroMouvement())
                 .numeroDossier(couverture.getNumeroDossier())
                 .numeroPolice(couverture.getNumeroPolice())
+                .brancheCode(couverture.getBrancheCode())
+                .brancheLibelle(couverture.getBrancheLibelle())
                 .compagnie(couverture.getCompagnieLibelle())
                 .clientCode(couverture.getClientCode())
                 .assure(couverture.getAssure())

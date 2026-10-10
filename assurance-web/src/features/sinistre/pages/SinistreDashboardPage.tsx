@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -25,8 +26,10 @@ import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
 import { formatDate, formatMoney, natureLabels } from "../format";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
+import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
 
 export default function SinistreDashboardPage() {
+  const [declarationOpen, setDeclarationOpen] = useState(false);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canCreate = permissions.includes("sinistre:create");
   const dashboard = useQuery({
@@ -86,11 +89,9 @@ export default function SinistreDashboardPage() {
             <Link to="/app/sinistre/dossiers">Voir les dossiers</Link>
           </Button>
           {canCreate ? (
-            <Button asChild>
-              <Link to="/app/sinistre/declarer">
-                <FilePlus2 className="size-4" />
-                Déclarer
-              </Link>
+            <Button onClick={() => setDeclarationOpen(true)}>
+              <FilePlus2 className="size-4" />
+              Déclarer
             </Button>
           ) : null}
         </div>
@@ -187,6 +188,10 @@ export default function SinistreDashboardPage() {
           </div>
         </CardContent>
       </Card>
+      <SinistreDeclarationContextDialog
+        open={declarationOpen}
+        onOpenChange={setDeclarationOpen}
+      />
     </div>
   );
 }

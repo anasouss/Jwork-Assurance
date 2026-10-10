@@ -296,7 +296,10 @@ export default function ReglementsEnregistresPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setJournalOpen(true)}>
+          <Button
+            className="bg-orange-600 text-white hover:bg-orange-700"
+            onClick={() => setJournalOpen(true)}
+          >
             <BookOpenText className="size-4" />
             Journal des règlements
           </Button>

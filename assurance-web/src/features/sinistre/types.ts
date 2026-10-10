@@ -111,6 +111,8 @@ export type CoveragePreview = {
   contratId: string;
   numeroDossier?: string | null;
   numeroPolice?: string | null;
+  brancheCode?: string | null;
+  brancheLibelle?: string | null;
   compagnie: string;
   assure: string;
   mouvementId: string;
@@ -118,6 +120,7 @@ export type CoveragePreview = {
   mouvement: string;
   dateEffet: string;
   dateEcheance: string;
+  garanties: CoverageGuarantee[];
   vehicules: Array<{
     id: string;
     immatriculation?: string | null;
@@ -125,19 +128,21 @@ export type CoveragePreview = {
     marque?: string | null;
     usageCode?: string | null;
     usageLibelle?: string | null;
-    garanties: Array<{
-      id: string;
-      mouvementGarantieId: string;
-      code: string;
-      libelle: string;
-      typeGarantie: "VEHICULE" | "PERSONNE";
-      capital?: number | null;
-      prime?: number | null;
-      taux?: number | null;
-      tauxFranchise?: number | null;
-      franchiseMinimale?: number | null;
-    }>;
+    garanties: CoverageGuarantee[];
   }>;
+};
+
+export type CoverageGuarantee = {
+  id: string;
+  mouvementGarantieId: string;
+  code: string;
+  libelle: string;
+  typeGarantie: "VEHICULE" | "PERSONNE";
+  capital?: number | null;
+  prime?: number | null;
+  taux?: number | null;
+  tauxFranchise?: number | null;
+  franchiseMinimale?: number | null;
 };
 
 export type SinistreDetail = SinistreSummary & {
@@ -161,6 +166,8 @@ export type SinistreDetail = SinistreSummary & {
     numeroMouvement: string;
     numeroDossier?: string | null;
     numeroPolice?: string | null;
+    brancheCode?: string | null;
+    brancheLibelle?: string | null;
     compagnie: string;
     clientCode?: string | null;
     assure: string;

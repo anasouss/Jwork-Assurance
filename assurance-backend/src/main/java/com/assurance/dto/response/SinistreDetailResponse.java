@@ -65,6 +65,8 @@ public class SinistreDetailResponse {
         private String numeroMouvement;
         private String numeroDossier;
         private String numeroPolice;
+        private String brancheCode;
+        private String brancheLibelle;
         private String compagnie;
         private String clientCode;
         private String assure;

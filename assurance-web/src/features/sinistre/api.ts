@@ -30,7 +30,7 @@ export const sinistreKeys = {
   detail: (id: string) => [...sinistreKeys.all, "detail", id] as const,
   coverage: (contractId: string, date: string) =>
     [...sinistreKeys.all, "coverage", contractId, date] as const,
-  duplicates: (contractId: string, vehicleId: string, date: string) =>
+  duplicates: (contractId: string, vehicleId: string | undefined, date: string) =>
     [...sinistreKeys.all, "duplicates", contractId, vehicleId, date] as const,
   experts: (includeInactive: boolean) =>
     [...sinistreKeys.all, "experts", includeInactive] as const,
@@ -90,7 +90,7 @@ export const sinistreApi = {
     );
   },
 
-  async duplicates(contratId: string, vehiculeId: string, dateSinistre: string) {
+  async duplicates(contratId: string, vehiculeId: string | undefined, dateSinistre: string) {
     return unwrap(
       await apiFetch<ApiResponse<SinistreDuplicate[]>>(
         `/api/v1/sinistres/doublons${buildQueryString({ contratId, vehiculeId, dateSinistre })}`,

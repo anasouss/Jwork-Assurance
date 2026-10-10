@@ -45,7 +45,7 @@ public interface SinistreRepository extends JpaRepository<Sinistre, Long>, JpaSp
             where s.agence.id = :agenceId
               and s.contrat.id = :contratId
               and s.dateSinistre = :dateSinistre
-              and (:vehiculeId is null or s.vehicule.id = :vehiculeId)
+              and ((:vehiculeId is null and s.vehicule is null) or s.vehicule.id = :vehiculeId)
             order by s.createdAt desc
             """)
     List<Sinistre> findPossibleDuplicates(

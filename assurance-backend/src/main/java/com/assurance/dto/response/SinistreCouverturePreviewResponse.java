@@ -14,6 +14,8 @@ public class SinistreCouverturePreviewResponse {
     private Long contratId;
     private String numeroDossier;
     private String numeroPolice;
+    private String brancheCode;
+    private String brancheLibelle;
     private String compagnie;
     private String assure;
     private Long mouvementId;
@@ -21,6 +23,7 @@ public class SinistreCouverturePreviewResponse {
     private String mouvement;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
+    private List<Garantie> garanties;
     private List<Vehicule> vehicules;
 
     @Data

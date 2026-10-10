@@ -23,6 +23,9 @@ public class ContratListItemResponse {
     private LocalDateTime createdAt;
     private TypeContrat typeContrat;
     private StatutContrat statut;
+    private Long brancheAssuranceId;
+    private String brancheAssuranceCode;
+    private String brancheAssuranceLibelle;
     private Long compagnieAssuranceId;
     private String compagnieCode;
     private String compagnieLibelle;

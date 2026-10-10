@@ -38,6 +38,12 @@ public class SinistreCouverture extends BaseEntity {
     @Column(name = "numero_dossier", length = 80)
     private String numeroDossier;
 
+    @Column(name = "branche_code", length = 60)
+    private String brancheCode;
+
+    @Column(name = "branche_libelle", length = 160)
+    private String brancheLibelle;
+
     @Column(name = "compagnie_code", length = 60)
     private String compagnieCode;
 

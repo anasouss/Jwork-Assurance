@@ -1,4 +1,4 @@
-import { Combobox } from "@/components/ui/combobox";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Label } from "@/components/ui/label";
 import type { BankReference } from "../types";
 
@@ -18,7 +18,7 @@ export function BankSelect({
   return (
     <div className="grid gap-1.5">
       <Label>{label} <span className="text-destructive">*</span></Label>
-      <Combobox
+      <AutocompleteSelect
         options={banks.filter((bank) => bank.actif).map((bank) => ({
           value: bank.id,
           label: bank.libelle,
@@ -26,9 +26,9 @@ export function BankSelect({
         }))}
         value={value}
         onValueChange={(nextValue) => onChange(String(nextValue))}
-        placeholder="Sélectionner une banque"
-        searchPlaceholder="Nom, code ou ancien nom..."
+        placeholder="Nom, code ou ancien nom"
         emptyText="Aucune banque active trouvée."
+        invalidText="Banque invalide : choisissez une option existante."
         disabled={disabled}
       />
     </div>

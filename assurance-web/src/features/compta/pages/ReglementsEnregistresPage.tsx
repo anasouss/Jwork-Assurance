@@ -650,7 +650,7 @@ export default function ReglementsEnregistresPage() {
             </div>
             {(replacement.mode === "EFFET" || replacement.mode === "CHEQUE") && (
               <div className="grid gap-2">
-                <Label>{replacement.mode === "CHEQUE" ? "Date prévue de remise" : "Échéance"}</Label>
+                <Label>Date d’échéance</Label>
                 <DatePicker
                   date={replacement.dateEcheance}
                   onSelect={(value) => setReplacement((current) => ({

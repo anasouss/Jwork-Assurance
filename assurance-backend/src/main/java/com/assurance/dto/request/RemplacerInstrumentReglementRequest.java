@@ -29,4 +29,7 @@ public class RemplacerInstrumentReglementRequest {
     private String banqueEmettrice;
 
     private Long compteTresorerieId;
+
+    @Size(max = 500)
+    private String motif;
 }

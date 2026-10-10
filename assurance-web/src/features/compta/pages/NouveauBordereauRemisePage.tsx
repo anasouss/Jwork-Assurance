@@ -40,7 +40,6 @@ export default function NouveauBordereauRemisePage() {
   const [destinationId, setDestinationId] = useState("");
   const [cashAmount, setCashAmount] = useState<number>();
   const [slipDate, setSlipDate] = useState(TODAY);
-  const [bankReference, setBankReference] = useState("");
   const [notes, setNotes] = useState("");
   const [creationDialogOpen, setCreationDialogOpen] = useState(false);
 
@@ -88,13 +87,12 @@ export default function NouveauBordereauRemisePage() {
         throw new Error("Sélectionnez les instruments depuis les encaissements en attente");
       }
       return type === "VERSEMENT_ESPECES"
-        ? comptaApi.createCashRemittance({
+        ? comptaApi.createRemittanceSlip({
             type,
             dateBordereau: slipDate,
             compteSourceId: sourceId,
             compteDestinationId: destinationId,
             montantEspeces: cashAmount,
-            referenceBancaire: bankReference.trim() || undefined,
             notes: notes.trim() || undefined,
             instrumentIds: [],
           })
@@ -128,7 +126,7 @@ export default function NouveauBordereauRemisePage() {
     : "/app/compta/tresorerie/bordereaux-remise";
 
   return (
-    <div className="grid gap-5">
+    <div className="mx-auto grid w-full max-w-7xl gap-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Button asChild variant="ghost" className="mb-2 -ml-3">
@@ -170,7 +168,7 @@ export default function NouveauBordereauRemisePage() {
                 <span className="h-5 w-1 rounded-sm bg-emerald-500" />
                 <h2 className="font-semibold">Détails du versement</h2>
               </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="grid gap-2">
                   <Label>Caisse source</Label>
                   <Select value={sourceId} onValueChange={setSourceId}>
@@ -189,12 +187,8 @@ export default function NouveauBordereauRemisePage() {
                   <MoneyInput id="cash-amount" value={cashAmount} onValueChange={setCashAmount} />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Date de versement</Label>
+                  <Label>Date du bordereau</Label>
                   <DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="bank-reference">Référence bancaire <span className="font-normal text-muted-foreground">(facultatif)</span></Label>
-                  <Input id="bank-reference" value={bankReference} onChange={(event) => setBankReference(event.target.value)} />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="slip-notes">Notes <span className="font-normal text-muted-foreground">(facultatif)</span></Label>
@@ -253,7 +247,7 @@ export default function NouveauBordereauRemisePage() {
           {type === "VERSEMENT_ESPECES" && (
             <div className="flex justify-end bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
               <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}>
-                <Banknote className="size-4" /> Enregistrer le versement
+                <Banknote className="size-4" /> Créer le bordereau
               </Button>
             </div>
           )}

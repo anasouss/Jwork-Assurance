@@ -181,9 +181,7 @@ public class BordereauRemiseService {
                 .statut(StatutBordereauRemise.BROUILLON)
                 .dateBordereau(request.getDateBordereau())
                 .compteDestination(destination)
-                .referenceBancaire(request.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
-                        ? trimToNull(request.getReferenceBancaire())
-                        : null)
+                .referenceBancaire(null)
                 .notes(trimToNull(request.getNotes()))
                 .montantTotal(ZERO)
                 .build();
@@ -204,11 +202,7 @@ public class BordereauRemiseService {
         if (request.getType() != TypeBordereauRemise.VERSEMENT_ESPECES) {
             throw new BadRequestException("Ce point d'entrée est réservé aux versements d'espèces");
         }
-        BordereauRemiseResponse created = create(agenceId, request);
-        DeposerBordereauRemiseRequest depositRequest = new DeposerBordereauRemiseRequest();
-        depositRequest.setDateDepot(request.getDateBordereau());
-        depositRequest.setReferenceBancaire(request.getReferenceBancaire());
-        return deposit(agenceId, created.getId(), depositRequest);
+        return create(agenceId, request);
     }
 
     @Transactional
@@ -219,10 +213,10 @@ public class BordereauRemiseService {
     ) {
         BordereauRemise slip = findForUpdate(agenceId, id);
         if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
-            throw new BadRequestException("Seul un bordereau brouillon peut être déposé");
+            throw new BadRequestException("Seul un bordereau en instance peut être remis");
         }
         if (request.getDateDepot().isBefore(slip.getDateBordereau())) {
-            throw new BadRequestException("La date de dépôt ne peut pas précéder la date du bordereau");
+            throw new BadRequestException("La date de remise ne peut pas précéder la date du bordereau");
         }
         slip.setDateDepot(request.getDateDepot());
         if (request.getReferenceBancaire() != null) {
@@ -296,7 +290,7 @@ public class BordereauRemiseService {
     public BordereauRemiseResponse cancel(Long agenceId, Long id) {
         BordereauRemise slip = findForUpdate(agenceId, id);
         if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
-            throw new BadRequestException("Seul un bordereau brouillon peut être annulé");
+            throw new BadRequestException("Seul un bordereau en instance peut être annulé");
         }
         slip.setStatut(StatutBordereauRemise.ANNULE);
         return toResponse(bordereauRepository.saveAndFlush(slip), true);
@@ -402,7 +396,7 @@ public class BordereauRemiseService {
     private BordereauRemise requireDeposited(BordereauRemise slip) {
         if (slip.getStatut() != StatutBordereauRemise.DEPOSE
                 && slip.getStatut() != StatutBordereauRemise.PARTIELLEMENT_TRAITE) {
-            throw new BadRequestException("Le bordereau doit être déposé avant son traitement");
+            throw new BadRequestException("Le bordereau doit être remis avant son traitement");
         }
         return slip;
     }
@@ -422,7 +416,7 @@ public class BordereauRemiseService {
 
     private void requireOperationAfterDeposit(BordereauRemise slip, LocalDate operationDate) {
         if (slip.getDateDepot() != null && operationDate.isBefore(slip.getDateDepot())) {
-            throw new BadRequestException("La date d'opération ne peut pas précéder le dépôt");
+            throw new BadRequestException("La date d'opération ne peut pas précéder la remise");
         }
     }
 

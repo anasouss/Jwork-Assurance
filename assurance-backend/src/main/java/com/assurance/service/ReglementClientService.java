@@ -730,7 +730,7 @@ public class ReglementClientService {
             Long instrumentId,
             RemplacerInstrumentReglementRequest request
     ) {
-        InstrumentReglementClient replaced = instrumentRepository.findByIdAndAgenceId(
+        InstrumentReglementClient replaced = instrumentRepository.findByIdAndAgenceIdForUpdate(
                         instrumentId,
                         agenceId
                 )
@@ -741,13 +741,27 @@ public class ReglementClientService {
         if (replaced.getReglement().getStatut() == StatutReglementClient.ANNULE) {
             throw new BadRequestException("Le règlement est annulé");
         }
-        if (replaced.getStatut() != StatutInstrumentReglement.REJETE) {
-            throw new BadRequestException("Seul un instrument rejeté peut être remplacé");
+        boolean pendingReplacement = replaced.getStatut() == StatutInstrumentReglement.EN_ATTENTE;
+        if (!pendingReplacement && replaced.getStatut() != StatutInstrumentReglement.REJETE) {
+            throw new BadRequestException(
+                    "Seul un instrument au bureau ou rejeté peut être remplacé"
+            );
+        }
+        if (pendingReplacement) {
+            ensureNotReservedByDraftRemittance(replaced);
+            if (trimToNull(request.getMotif()) == null) {
+                throw new BadRequestException("Le motif du remplacement est obligatoire");
+            }
         }
         if (money(request.getMontant()).compareTo(money(replaced.getMontant())) != 0) {
             throw new BadRequestException(
-                    "Le remplacement doit conserver le montant de l'instrument rejeté"
+                    "Le remplacement doit conserver le montant de l'instrument d'origine"
             );
+        }
+        LocalDate replacementDate = request.getDateInstrument() == null
+                ? LocalDate.now() : request.getDateInstrument();
+        if (replacementDate.isAfter(LocalDate.now())) {
+            throw new BadRequestException("La date du remplacement ne peut pas être future");
         }
 
         CreerReglementClientRequest.Instrument replacementRequest = new CreerReglementClientRequest.Instrument();
@@ -761,7 +775,9 @@ public class ReglementClientService {
         replacementRequest.setAffectations(replaced.getAffectations().stream()
                 .map(this::copyReplacementAllocation)
                 .toList());
-        validateReplacementBalances(replaced.getAffectations());
+        if (!pendingReplacement) {
+            validateReplacementBalances(replaced.getAffectations());
+        }
 
         InstrumentReglementClient replacement = buildInstrument(
                 replaced.getAgence(),
@@ -769,8 +785,7 @@ public class ReglementClientService {
                 replacementRequest
         );
         replacement.setInstrumentRemplace(replaced);
-        replacement.setDateStatut(request.getDateInstrument() == null
-                ? LocalDate.now() : request.getDateInstrument());
+        replacement.setDateStatut(replacementDate);
         replacementRequest.getAffectations().forEach(requestedAllocation ->
                 replacement.getAffectations().add(AffectationReglementClient.builder()
                         .instrument(replacement)
@@ -800,9 +815,16 @@ public class ReglementClientService {
                                 : StatutAffectationReglement.EN_ATTENTE)
                         .build()));
 
+        if (pendingReplacement) {
+            replaced.getAffectations().forEach(allocation ->
+                    allocation.setStatut(StatutAffectationReglement.ANNULEE));
+        }
+        String replacementReason = trimToNull(request.getMotif());
         replaced.setStatut(StatutInstrumentReglement.REMPLACE);
-        replaced.setDateStatut(LocalDate.now());
-        replaced.setMotifStatut("Remplacé par un nouvel instrument");
+        replaced.setDateStatut(replacementDate);
+        replaced.setMotifStatut(replacementReason == null
+                ? "Remplacé par un règlement " + request.getMode().name().toLowerCase(Locale.ROOT)
+                : replacementReason);
         replaced.getReglement().getInstruments().add(replacement);
         ReglementClient payment = reglementRepository.saveAndFlush(replaced.getReglement());
         if (replacement.getStatut() == StatutInstrumentReglement.CONFIRME) {
@@ -902,6 +924,8 @@ public class ReglementClientService {
         return ReglementClientResponse.Instrument.builder()
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
+                .clientPayeurId(instrument.getReglement().getClientPayeur() == null
+                        ? null : instrument.getReglement().getClientPayeur().getId())
                 .numeroReglement(instrument.getReglement().getNumero())
                 .payeurNom(instrument.getReglement().getPayeurNom())
                 .mode(instrument.getMode())
@@ -913,6 +937,12 @@ public class ReglementClientService {
                 .referenceInstrument(instrument.getReferenceInstrument())
                 .banqueEmettrice(instrument.getBanqueEmettrice())
                 .motifStatut(instrument.getMotifStatut())
+                .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
+                        ? null : instrument.getInstrumentRemplace().getId())
+                .modeInstrumentRemplace(instrument.getInstrumentRemplace() == null
+                        ? null : instrument.getInstrumentRemplace().getMode())
+                .referenceInstrumentRemplace(instrument.getInstrumentRemplace() == null
+                        ? null : instrument.getInstrumentRemplace().getReferenceInstrument())
                 .compteTresorerieId(instrument.getCompteTresorerie() == null
                         ? null : instrument.getCompteTresorerie().getId())
                 .compteTresorerie(instrument.getCompteTresorerie() == null
@@ -1325,7 +1355,7 @@ public class ReglementClientService {
                 Set.of(StatutBordereauRemise.BROUILLON)
         ).isEmpty()) {
             throw new BadRequestException(
-                    "L'instrument est réservé par un bordereau brouillon. Déposez ou annulez ce bordereau"
+                    "L'instrument appartient à un bordereau en instance. Remettez ou annulez ce bordereau"
             );
         }
     }
@@ -1883,6 +1913,8 @@ public class ReglementClientService {
         return ReglementClientResponse.Instrument.builder()
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
+                .clientPayeurId(instrument.getReglement().getClientPayeur() == null
+                        ? null : instrument.getReglement().getClientPayeur().getId())
                 .numeroReglement(instrument.getReglement().getNumero())
                 .payeurNom(instrument.getReglement().getPayeurNom())
                 .mode(instrument.getMode())
@@ -1894,6 +1926,12 @@ public class ReglementClientService {
                 .referenceInstrument(instrument.getReferenceInstrument())
                 .banqueEmettrice(instrument.getBanqueEmettrice())
                 .motifStatut(instrument.getMotifStatut())
+                .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
+                        ? null : instrument.getInstrumentRemplace().getId())
+                .modeInstrumentRemplace(instrument.getInstrumentRemplace() == null
+                        ? null : instrument.getInstrumentRemplace().getMode())
+                .referenceInstrumentRemplace(instrument.getInstrumentRemplace() == null
+                        ? null : instrument.getInstrumentRemplace().getReferenceInstrument())
                 .compteTresorerieId(instrument.getCompteTresorerie() == null
                         ? null : instrument.getCompteTresorerie().getId())
                 .compteTresorerie(instrument.getCompteTresorerie() == null

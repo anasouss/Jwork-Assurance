@@ -459,7 +459,7 @@ export default function NouveauReglementClientPage() {
                   </div>
                   {method.mode === "EFFET" || method.mode === "CHEQUE" ? (
                     <div className="grid gap-1.5">
-                      <Label>Date d’échéance</Label>
+                      <Label>{method.mode === "CHEQUE" ? "Date prévue de remise" : "Date d’échéance"}</Label>
                       <DatePicker
                         date={method.dateEcheance}
                         onSelect={(value) => updateMethod(method.key, {

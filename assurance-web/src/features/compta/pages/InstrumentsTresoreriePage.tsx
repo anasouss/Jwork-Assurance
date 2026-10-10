@@ -25,8 +25,8 @@ const TYPE_LABELS: Record<RemittanceSlipType, string> = {
 };
 
 const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
-  BROUILLON: "Brouillon",
-  DEPOSE: "Déposé",
+  BROUILLON: "En instance",
+  DEPOSE: "Remis",
   PARTIELLEMENT_TRAITE: "Partiellement traité",
   CLOTURE: "Clôturé",
   ANNULE: "Annulé",
@@ -92,8 +92,8 @@ export default function InstrumentsTresoreriePage() {
         </Select></div>
         <div className="grid gap-2"><Label>Statut</Label><Select value={status} onValueChange={(value) => { setStatus(value as StatusFilter); setPage(0); }}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
-            <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">Brouillons</SelectItem>
-            <SelectItem value="DEPOSE">Déposés</SelectItem><SelectItem value="PARTIELLEMENT_TRAITE">Partiellement traités</SelectItem>
+            <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">En instance</SelectItem>
+            <SelectItem value="DEPOSE">Remis</SelectItem><SelectItem value="PARTIELLEMENT_TRAITE">Partiellement traités</SelectItem>
             <SelectItem value="CLOTURE">Clôturés</SelectItem><SelectItem value="ANNULE">Annulés</SelectItem>
           </SelectContent>
         </Select></div>
@@ -104,11 +104,11 @@ export default function InstrumentsTresoreriePage() {
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Tous les bordereaux</h2><p className="text-sm text-muted-foreground">Ouvrez un bordereau pour enregistrer son dépôt ou le résultat de ses instruments.</p></div>
+        <div className="border-b px-4 py-3"><h2 className="font-semibold">Tous les bordereaux</h2><p className="text-sm text-muted-foreground">Ouvrez un bordereau pour enregistrer sa remise ou le résultat de ses instruments.</p></div>
         <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-sm">
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
             <th className="px-4 py-3 text-left">N° bordereau</th><th className="px-4 py-3 text-left">Type</th>
-            <th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Dépôt</th>
+            <th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Remis le</th>
             <th className="px-4 py-3 text-left">Destination</th><th className="px-4 py-3 text-center">Instruments</th>
             <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-left">Statut</th><th className="w-16 px-4 py-3"><span className="sr-only">Détail</span></th>
           </tr></thead>

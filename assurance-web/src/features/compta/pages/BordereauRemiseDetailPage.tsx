@@ -16,8 +16,8 @@ import type { RemittanceSlipLine } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY } from "./treasury-format";
 
 const STATUS_LABELS = {
-  BROUILLON: "Brouillon",
-  DEPOSE: "Déposé",
+  BROUILLON: "En instance",
+  DEPOSE: "Remis",
   PARTIELLEMENT_TRAITE: "Partiellement traité",
   CLOTURE: "Clôturé",
   ANNULE: "Annulé",
@@ -56,7 +56,7 @@ export default function BordereauRemiseDetailPage() {
       referenceBancaire: depositReference.trim() || undefined,
     }),
     onSuccess: async () => {
-      toast.success("Bordereau déposé");
+      toast.success("Bordereau remis");
       setDepositOpen(false);
       await invalidate();
     },
@@ -153,7 +153,7 @@ export default function BordereauRemiseDetailPage() {
             <Button disabled={!canManage} onClick={() => {
               setDepositReference(data.referenceBancaire ?? "");
               setDepositOpen(true);
-            }}><Send className="size-4" /> Marquer comme déposé</Button>
+            }}><Send className="size-4" /> Marquer comme remis</Button>
           </>}
           {data.operationTresorerieId && <Button asChild variant="outline"><Link to={`/app/compta/tresorerie/operations?search=${data.numero}`}><Landmark className="size-4" /> Voir l’opération</Link></Button>}
         </div>
@@ -162,7 +162,7 @@ export default function BordereauRemiseDetailPage() {
       <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 lg:grid-cols-5">
         <Summary label="Statut" value={STATUS_LABELS[data.statut]} />
         <Summary label="Date" value={formatTreasuryDate(data.dateBordereau)} />
-        <Summary label="Dépôt" value={formatTreasuryDate(data.dateDepot)} />
+        <Summary label="Remis le" value={formatTreasuryDate(data.dateDepot)} />
         <Summary label="Destination" value={data.compteDestination} />
         <Summary label="Montant total" value={formatTreasuryMoney(data.montantTotal)} strong />
       </section>
@@ -204,10 +204,10 @@ export default function BordereauRemiseDetailPage() {
       </section>}
 
       <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Confirmer le dépôt</DialogTitle><DialogDescription>{instrumentSlip ? "Les instruments passeront au statut remis en banque." : "Le transfert de la caisse vers la banque sera enregistré."}</DialogDescription></DialogHeader>
-          <div className="grid gap-4"><div className="grid gap-2"><Label>Date de dépôt</Label><DatePicker date={depositDate} onSelect={(value) => setDepositDate(toDateOnly(value) ?? "")} /></div>
+        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Confirmer la remise</DialogTitle><DialogDescription>{instrumentSlip ? "Les instruments passeront au statut remis en banque." : "Le transfert de la caisse vers la banque sera enregistré."}</DialogDescription></DialogHeader>
+          <div className="grid gap-4"><div className="grid gap-2"><Label>Date de remise</Label><DatePicker date={depositDate} onSelect={(value) => setDepositDate(toDateOnly(value) ?? "")} /></div>
             <div className="grid gap-2"><Label htmlFor="deposit-reference">Référence bancaire</Label><Input id="deposit-reference" value={depositReference} onChange={(event) => setDepositReference(event.target.value)} /></div></div>
-          <DialogFooter><Button variant="outline" onClick={() => setDepositOpen(false)}>Annuler</Button><Button disabled={!depositDate || deposit.isPending} onClick={() => deposit.mutate()}>Confirmer le dépôt</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDepositOpen(false)}>Annuler</Button><Button disabled={!depositDate || deposit.isPending} onClick={() => deposit.mutate()}>Confirmer la remise</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

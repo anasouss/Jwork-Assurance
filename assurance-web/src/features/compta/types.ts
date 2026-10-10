@@ -468,6 +468,7 @@ export type PaymentAllocation = {
 export type PaymentInstrument = {
   id: string;
   reglementId: string;
+  clientPayeurId?: string | null;
   numeroReglement: string;
   payeurNom: string;
   mode: ClientPaymentMode;
@@ -479,6 +480,9 @@ export type PaymentInstrument = {
   referenceInstrument?: string | null;
   banqueEmettrice?: string | null;
   motifStatut?: string | null;
+  instrumentRemplaceId?: string | null;
+  modeInstrumentRemplace?: ClientPaymentMode | null;
+  referenceInstrumentRemplace?: string | null;
   compteTresorerieId?: string | null;
   compteTresorerie?: string | null;
   bordereauRemiseId?: string | null;
@@ -603,6 +607,7 @@ export type ReplacePaymentInstrumentRequest = {
   referenceInstrument?: string;
   banqueEmettrice?: string;
   compteTresorerieId?: string;
+  motif?: string;
 };
 
 export type TreasuryAccount = {

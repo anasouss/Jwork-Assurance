@@ -33,6 +33,7 @@ public class ReglementClientResponse {
     public static class Instrument {
         private Long id;
         private Long reglementId;
+        private Long clientPayeurId;
         private String numeroReglement;
         private String payeurNom;
         private ModeReglementClient mode;
@@ -44,6 +45,9 @@ public class ReglementClientResponse {
         private String referenceInstrument;
         private String banqueEmettrice;
         private String motifStatut;
+        private Long instrumentRemplaceId;
+        private ModeReglementClient modeInstrumentRemplace;
+        private String referenceInstrumentRemplace;
         private Long compteTresorerieId;
         private String compteTresorerie;
         private Long bordereauRemiseId;

@@ -143,6 +143,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
 
     @EntityGraph(attributePaths = {
             "reglement",
+            "reglement.clientPayeur",
             "compteTresorerie"
     })
     @Query("""

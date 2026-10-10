@@ -1180,6 +1180,12 @@ function normalizePaymentInstrument(instrument: PaymentInstrument): PaymentInstr
     ...instrument,
     id: String(instrument.id),
     reglementId: String(instrument.reglementId),
+    clientPayeurId: instrument.clientPayeurId == null
+      ? null
+      : String(instrument.clientPayeurId),
+    instrumentRemplaceId: instrument.instrumentRemplaceId == null
+      ? null
+      : String(instrument.instrumentRemplaceId),
     compteTresorerieId: instrument.compteTresorerieId == null
       ? null
       : String(instrument.compteTresorerieId),

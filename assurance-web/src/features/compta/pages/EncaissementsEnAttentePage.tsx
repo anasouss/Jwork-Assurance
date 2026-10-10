@@ -1,20 +1,37 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Eye, Plus, RotateCcw, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Banknote, Eye, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import type { ClientPaymentMode, PaymentInstrument, PaymentInstrumentStatus } from "../types";
-import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TREASURY_PAGE_SIZE } from "./treasury-format";
+import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type StatusFilter = Extract<PaymentInstrumentStatus, "EN_ATTENTE" | "REMIS_EN_BANQUE" | "REJETE">;
 type ModeFilter = Extract<ClientPaymentMode, "CHEQUE" | "EFFET" | "VIREMENT" | "VERSEMENT_BANCAIRE"> | "ALL";
@@ -32,6 +49,8 @@ export default function EncaissementsEnAttentePage() {
   const initialMode = searchParams.get("mode");
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
+  const canReplacePayment = permissions.includes("reglement-client:manage");
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<StatusFilter>("EN_ATTENTE");
   const [mode, setMode] = useState<ModeFilter>(
     initialMode === "CHEQUE" || initialMode === "EFFET" ? initialMode : "ALL"
@@ -42,6 +61,9 @@ export default function EncaissementsEnAttentePage() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
   const [selectedInstruments, setSelectedInstruments] = useState<PaymentInstrument[]>([]);
+  const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
+  const [replacementDate, setReplacementDate] = useState(TODAY);
+  const [replacementReason, setReplacementReason] = useState("");
 
   const instruments = useQuery({
     queryKey: ["compta", "treasury", "collection-queue", status, mode, appliedSearch, dateFrom, dateTo, page],
@@ -54,6 +76,27 @@ export default function EncaissementsEnAttentePage() {
       page,
       size: TREASURY_PAGE_SIZE,
     }),
+  });
+
+  const replaceWithCash = useMutation({
+    mutationFn: () => comptaApi.replacePaymentInstrument(instrumentToReplace!.id, {
+      mode: "ESPECES",
+      montant: instrumentToReplace!.montant,
+      dateInstrument: replacementDate,
+      motif: replacementReason.trim(),
+    }),
+    onSuccess: async () => {
+      const replacedId = instrumentToReplace?.id;
+      setInstrumentToReplace(undefined);
+      setReplacementDate(TODAY);
+      setReplacementReason("");
+      setSelectedInstruments((current) => current.filter((row) => row.id !== replacedId));
+      toast.success("Le règlement au bureau a été remplacé par des espèces");
+      await queryClient.invalidateQueries({ queryKey: ["compta"] });
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Remplacement impossible"
+    ),
   });
 
   function applyFilters() {
@@ -227,7 +270,17 @@ export default function EncaissementsEnAttentePage() {
                   <td className="px-4 py-3">{formatTreasuryDate(instrument.dateEcheance)}</td>
                   <td className="px-4 py-3"><WorkflowBadge instrument={instrument} /></td>
                   <td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(instrument.montant)}</td>
-                  <td className="px-4 py-3 text-right"><InstrumentAction instrument={instrument} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <InstrumentAction
+                      instrument={instrument}
+                      canReplace={canReplacePayment}
+                      onReplace={() => {
+                        setInstrumentToReplace(instrument);
+                        setReplacementDate(TODAY);
+                        setReplacementReason("");
+                      }}
+                    />
+                  </td>
                 </tr>
               ))}
               {!instruments.isLoading && (instruments.data?.rows.length ?? 0) === 0 && (
@@ -238,6 +291,45 @@ export default function EncaissementsEnAttentePage() {
         </div>
         {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={setPage} />}
       </section>
+
+      <Dialog open={Boolean(instrumentToReplace)} onOpenChange={(open) => !open && setInstrumentToReplace(undefined)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remplacer par un règlement en espèces</DialogTitle>
+            <DialogDescription>
+              Confirmez cette opération uniquement après réception des espèces. Le chèque ou l’effet restera conservé dans l’historique comme remplacé.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="font-medium">{instrumentToReplace?.payeurNom}</div>
+            <div className="mt-1 text-muted-foreground">
+              {instrumentToReplace ? paymentModeLabel(instrumentToReplace.mode) : "-"} · {instrumentToReplace?.referenceInstrument || "Sans référence"} · {formatTreasuryMoney(instrumentToReplace?.montant ?? 0)}
+            </div>
+          </div>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Date de réception des espèces</Label>
+              <DatePicker date={replacementDate} onSelect={(value) => setReplacementDate(toDateOnly(value) ?? "")} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="cash-replacement-reason">Motif</Label>
+              <Textarea
+                id="cash-replacement-reason"
+                value={replacementReason}
+                onChange={(event) => setReplacementReason(event.target.value)}
+                placeholder="Ex. Chèque restitué au client après règlement en espèces"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={replaceWithCash.isPending} onClick={() => setInstrumentToReplace(undefined)}>Annuler</Button>
+            <Button disabled={!replacementDate || !replacementReason.trim() || replaceWithCash.isPending} onClick={() => replaceWithCash.mutate()}>
+              <Banknote className="size-4" />
+              {replaceWithCash.isPending ? "Enregistrement..." : "Confirmer les espèces reçues"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -250,25 +342,57 @@ function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
     return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200">Remis en banque</Badge>;
   }
   if (instrument.bordereauRemiseId) {
-    return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200">Brouillon {instrument.numeroBordereauRemise}</Badge>;
+    return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200">Bordereau en instance {instrument.numeroBordereauRemise}</Badge>;
   }
   if (instrument.mode === "CHEQUE" || instrument.mode === "EFFET") {
-    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">À remettre</Badge>;
+    if (instrument.dateEcheance && instrument.dateEcheance < TODAY) {
+      return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-200">Échu au bureau</Badge>;
+    }
+    if (instrument.dateEcheance === TODAY) {
+      return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-200">À traiter aujourd’hui</Badge>;
+    }
+    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">Règlement au bureau</Badge>;
   }
   return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">À rapprocher</Badge>;
 }
 
-function InstrumentAction({ instrument }: { instrument: PaymentInstrument }) {
-  if (instrument.bordereauRemiseId) {
-    return <Button asChild size="sm" variant="outline"><Link to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>Voir le bordereau <ArrowRight className="size-4" /></Link></Button>;
-  }
-  if (instrument.statut === "REJETE") {
-    return <Button asChild size="sm" variant="outline"><Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link></Button>;
-  }
-  if (instrument.statut === "REMIS_EN_BANQUE") {
-    return <span className="text-muted-foreground">-</span>;
-  }
-  return <span className="text-muted-foreground">-</span>;
+function InstrumentAction({ instrument, canReplace, onReplace }: {
+  instrument: PaymentInstrument;
+  canReplace: boolean;
+  onReplace: () => void;
+}) {
+  const replaceable = canReplace
+    && instrument.statut === "EN_ATTENTE"
+    && !instrument.bordereauRemiseId
+    && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET");
+  return <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button size="icon" variant="ghost" title="Actions" aria-label={`Actions pour ${instrument.referenceInstrument || instrument.numeroReglement}`}>
+        <MoreHorizontal className="size-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="min-w-56">
+      {instrument.clientPayeurId && (
+        <DropdownMenuItem asChild>
+          <Link to={`/app/production/portefeuille-clients/${instrument.clientPayeurId}`}><UserRound className="size-4" /> Voir la fiche client</Link>
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem asChild>
+        <Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link>
+      </DropdownMenuItem>
+      {instrument.bordereauRemiseId && (
+        <DropdownMenuItem asChild>
+          <Link to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>Voir le bordereau <ArrowRight className="size-4" /></Link>
+        </DropdownMenuItem>
+      )}
+      {replaceable && <DropdownMenuSeparator />}
+      {replaceable && (
+        <DropdownMenuItem onSelect={onReplace}>
+          <Banknote className="size-4" /> Remplacer par espèces
+        </DropdownMenuItem>
+      )}
+    </DropdownMenuContent>
+  </DropdownMenu>;
 }
 
 function isSelectableForSlip(instrument: PaymentInstrument) {

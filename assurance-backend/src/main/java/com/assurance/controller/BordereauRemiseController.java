@@ -144,7 +144,7 @@ public class BordereauRemiseController {
         return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.createCashDeposit(
                 TenantContext.getCurrentAgence(),
                 request
-        ), "Versement d'espèces enregistré"));
+        ), "Bordereau de versement d'espèces créé"));
     }
 
     @PostMapping("/{id}/depot")
@@ -157,7 +157,7 @@ public class BordereauRemiseController {
                 TenantContext.getCurrentAgence(),
                 id,
                 request
-        ), "Bordereau déposé"));
+        ), "Bordereau remis"));
     }
 
     @PostMapping("/{bordereauId}/lignes/{lineId}/encaissement")

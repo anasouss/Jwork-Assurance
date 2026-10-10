@@ -112,10 +112,20 @@ export default function ReglementClientDetailPage() {
                   <td className="px-4 py-3">
                     <div>{formatDate(instrument.dateInstrument)}</div>
                     {instrument.dateEcheance && (
-                      <div className="text-xs text-muted-foreground">Échéance {formatDate(instrument.dateEcheance)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {instrument.mode === "CHEQUE" ? "Remise prévue" : "Échéance"} {formatDate(instrument.dateEcheance)}
+                      </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">{instrument.referenceInstrument || "-"}</td>
+                  <td className="px-4 py-3">
+                    <div>{instrument.referenceInstrument || "-"}</div>
+                    {instrument.instrumentRemplaceId && (
+                      <div className="text-xs text-muted-foreground">
+                        Remplace {instrument.modeInstrumentRemplace ? MODE_LABELS[instrument.modeInstrumentRemplace].toLowerCase() : "le moyen"}
+                        {instrument.referenceInstrumentRemplace ? ` ${instrument.referenceInstrumentRemplace}` : ""}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div>{instrument.banqueEmettrice || instrument.compteTresorerie || "-"}</div>
                     {instrument.banqueEmettrice && instrument.compteTresorerie && (
@@ -128,7 +138,9 @@ export default function ReglementClientDetailPage() {
                       {INSTRUMENT_STATUS_LABELS[instrument.statut]}
                     </Badge>
                     {instrument.motifStatut && (
-                      <div className="mt-1 text-xs text-red-600">{instrument.motifStatut}</div>
+                      <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>
+                        {instrument.motifStatut}
+                      </div>
                     )}
                   </td>
                 </tr>

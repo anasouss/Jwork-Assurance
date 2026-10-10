@@ -643,9 +643,9 @@ export default function ReglementsEnregistresPage() {
                 }))}
               />
             </div>
-            {replacement.mode === "EFFET" && (
+            {(replacement.mode === "EFFET" || replacement.mode === "CHEQUE") && (
               <div className="grid gap-2">
-                <Label>Échéance</Label>
+                <Label>{replacement.mode === "CHEQUE" ? "Date prévue de remise" : "Échéance"}</Label>
                 <DatePicker
                   date={replacement.dateEcheance}
                   onSelect={(value) => setReplacement((current) => ({
@@ -866,7 +866,7 @@ function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
   }
   if (requiresPaymentReference(row.mode)
     && !row.referenceInstrument.trim()) return false;
-  return row.mode !== "EFFET" || Boolean(row.dateEcheance);
+  return (row.mode !== "EFFET" && row.mode !== "CHEQUE") || Boolean(row.dateEcheance);
 }
 
 function formatDate(value?: string | null) {

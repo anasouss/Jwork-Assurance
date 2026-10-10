@@ -295,15 +295,27 @@ export default function EncaissementsEnAttentePage() {
       <Dialog open={Boolean(instrumentToReplace)} onOpenChange={(open) => !open && setInstrumentToReplace(undefined)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remplacer par un règlement en espèces</DialogTitle>
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                <Banknote className="size-5" />
+              </span>
+              <DialogTitle>Remplacer par un règlement en espèces</DialogTitle>
+            </div>
             <DialogDescription>
               Confirmez cette opération uniquement après réception des espèces. Le chèque ou l’effet restera conservé dans l’historique comme remplacé.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-md border bg-muted/30 p-3 text-sm">
-            <div className="font-medium">{instrumentToReplace?.payeurNom}</div>
-            <div className="mt-1 text-muted-foreground">
-              {instrumentToReplace ? paymentModeLabel(instrumentToReplace.mode) : "-"} · {instrumentToReplace?.referenceInstrument || "Sans référence"} · {formatTreasuryMoney(instrumentToReplace?.montant ?? 0)}
+          <div className="rounded-md border border-emerald-200 bg-emerald-50/60 p-3 text-sm dark:border-emerald-900 dark:bg-emerald-950/25">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="font-semibold">{instrumentToReplace?.payeurNom}</div>
+                <div className="mt-1 text-muted-foreground">
+                  {instrumentToReplace ? paymentModeLabel(instrumentToReplace.mode) : "-"} · {instrumentToReplace?.referenceInstrument || "Sans référence"}
+                </div>
+              </div>
+              <div className="font-semibold tabular-nums text-emerald-800 dark:text-emerald-200">
+                {formatTreasuryMoney(instrumentToReplace?.montant ?? 0)}
+              </div>
             </div>
           </div>
           <div className="grid gap-4">
@@ -345,13 +357,13 @@ function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
     return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200">Bordereau en instance {instrument.numeroBordereauRemise}</Badge>;
   }
   if (instrument.mode === "CHEQUE" || instrument.mode === "EFFET") {
-    if (instrument.dateEcheance && instrument.dateEcheance < TODAY) {
+    if (instrument.reglementBureau && instrument.dateEcheance && instrument.dateEcheance < TODAY) {
       return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-200">Échu au bureau</Badge>;
     }
-    if (instrument.dateEcheance === TODAY) {
+    if (instrument.reglementBureau && instrument.dateEcheance === TODAY) {
       return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-200">À traiter aujourd’hui</Badge>;
     }
-    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">Règlement au bureau</Badge>;
+    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">{instrument.reglementBureau ? "Règlement au bureau" : "À remettre"}</Badge>;
   }
   return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">À rapprocher</Badge>;
 }
@@ -364,6 +376,7 @@ function InstrumentAction({ instrument, canReplace, onReplace }: {
   const replaceable = canReplace
     && instrument.statut === "EN_ATTENTE"
     && !instrument.bordereauRemiseId
+    && instrument.reglementBureau
     && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET");
   return <DropdownMenu>
     <DropdownMenuTrigger asChild>
@@ -387,7 +400,7 @@ function InstrumentAction({ instrument, canReplace, onReplace }: {
       )}
       {replaceable && <DropdownMenuSeparator />}
       {replaceable && (
-        <DropdownMenuItem onSelect={onReplace}>
+        <DropdownMenuItem className="text-emerald-700 focus:bg-emerald-50 focus:text-emerald-800 dark:text-emerald-300 dark:focus:bg-emerald-950/50 dark:focus:text-emerald-200" onSelect={onReplace}>
           <Banknote className="size-4" /> Remplacer par espèces
         </DropdownMenuItem>
       )}

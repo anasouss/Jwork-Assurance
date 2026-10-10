@@ -43,7 +43,10 @@ public class ReglementClientResponse {
         private LocalDate dateEcheance;
         private LocalDate dateStatut;
         private String referenceInstrument;
+        private Long banqueEmettriceId;
+        private String banqueEmettriceCode;
         private String banqueEmettrice;
+        private Boolean reglementBureau;
         private String motifStatut;
         private Long instrumentRemplaceId;
         private ModeReglementClient modeInstrumentRemplace;

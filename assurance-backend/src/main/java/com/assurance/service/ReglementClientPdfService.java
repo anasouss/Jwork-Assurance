@@ -191,9 +191,11 @@ public class ReglementClientPdfService {
                 .sorted(Comparator.comparing(InstrumentReglementClient::getId))
                 .toList()) {
             DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
-            String bank = join(instrument.getBanqueEmettrice(), instrument.getCompteTresorerie() == null
-                    ? null : instrument.getCompteTresorerie().getLibelle());
-            String status = instrumentStatus(instrument.getStatut());
+            String bank = join(instrument.getBanqueEmettriceReference() == null
+                            ? null : instrument.getBanqueEmettriceReference().getLibelle(),
+                    instrument.getCompteTresorerie() == null
+                            ? null : instrument.getCompteTresorerie().getLibelle());
+            String status = instrumentStatus(instrument);
             if (instrument.getMotifStatut() != null && !instrument.getMotifStatut().isBlank()) {
                 status += "\n" + instrument.getMotifStatut().trim();
             }
@@ -422,9 +424,10 @@ public class ReglementClientPdfService {
         };
     }
 
-    private String instrumentStatus(StatutInstrumentReglement status) {
-        return switch (status) {
-            case EN_ATTENTE -> "En attente";
+    private String instrumentStatus(InstrumentReglementClient instrument) {
+        return switch (instrument.getStatut()) {
+            case EN_ATTENTE -> Boolean.TRUE.equals(instrument.getReglementBureau())
+                    ? "Règlement au bureau" : "À remettre";
             case REMIS_EN_BANQUE -> "Remis en banque";
             case CONFIRME -> "Confirmé";
             case REJETE -> "Rejeté";

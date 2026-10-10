@@ -38,6 +38,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { BankSelect } from "../components/BankSelect";
 import { parseAccountingAmount } from "../format";
 import type {
   TreasuryAccount,
@@ -58,7 +59,7 @@ export default function TresorerieComptesPage() {
   const [accountCode, setAccountCode] = useState("");
   const [accountLabel, setAccountLabel] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
-  const [bankName, setBankName] = useState("");
+  const [bankId, setBankId] = useState("");
   const [rib, setRib] = useState("");
   const [initialBalance, setInitialBalance] = useState("0");
   const [accountToToggle, setAccountToToggle] = useState<TreasuryAccount>();
@@ -79,6 +80,11 @@ export default function TresorerieComptesPage() {
     queryKey: ["compta", "treasury-users"],
     queryFn: comptaApi.treasuryUsers,
     enabled: canManage && (Boolean(assignmentAccount) || (dialogOpen && accountType === "CAISSE")),
+  });
+  const banks = useQuery({
+    queryKey: ["compta", "banks", "active"],
+    queryFn: () => comptaApi.banks(),
+    enabled: dialogOpen && accountType === "BANQUE",
   });
   const assignments = useQuery({
     queryKey: ["compta", "treasury-account-assignments", assignmentAccount?.id],
@@ -101,7 +107,7 @@ export default function TresorerieComptesPage() {
         libelle: accountLabel.trim(),
         typeCompte: accountType,
         utilisateurTitulaireId: accountType === "CAISSE" ? ownerUserId : undefined,
-        nomBanque: bankName.trim() || undefined,
+        banqueId: accountType === "BANQUE" ? bankId || undefined : undefined,
         rib: rib.trim() || undefined,
         soldeInitial: parseAccountingAmount(initialBalance),
         actif: editingAccount?.actif ?? true,
@@ -167,7 +173,7 @@ export default function TresorerieComptesPage() {
     setAccountCode("");
     setAccountLabel("");
     setOwnerUserId("");
-    setBankName("");
+    setBankId("");
     setRib("");
     setInitialBalance("0");
     setDialogOpen(true);
@@ -179,7 +185,7 @@ export default function TresorerieComptesPage() {
     setAccountCode(account.code);
     setAccountLabel(account.libelle);
     setOwnerUserId(account.utilisateurTitulaireId ?? "");
-    setBankName(account.nomBanque ?? "");
+    setBankId(account.banqueId ?? "");
     setRib(account.rib ?? "");
     setInitialBalance(String(account.soldeInitial));
     setDialogOpen(true);
@@ -326,15 +332,13 @@ export default function TresorerieComptesPage() {
             </div>
             {accountType === "BANQUE" && (
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="treasury-bank-name">Banque *</Label>
-                  <Input
-                    id="treasury-bank-name"
-                    value={bankName}
-                    placeholder="Nom de la banque"
-                    onChange={(event) => setBankName(event.target.value)}
-                  />
-                </div>
+                <BankSelect
+                  banks={banks.data ?? []}
+                  value={bankId}
+                  onChange={setBankId}
+                  label="Banque"
+                  disabled={banks.isLoading}
+                />
                 <div className="grid gap-2">
                   <Label htmlFor="treasury-bank-rib">RIB</Label>
                   <Input
@@ -369,7 +373,7 @@ export default function TresorerieComptesPage() {
                 !accountCode.trim()
                 || !accountLabel.trim()
                 || (accountType === "CAISSE" && !ownerUserId)
-                || (accountType === "BANQUE" && !bankName.trim())
+                || (accountType === "BANQUE" && !bankId)
                 || saveAccount.isPending
               }
               onClick={() => saveAccount.mutate()}

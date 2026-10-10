@@ -20,6 +20,7 @@ import {
 export interface ComboboxOption {
   value: string | number
   label: string
+  keywords?: string
 }
 
 interface ComboboxProps {
@@ -95,7 +96,7 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
+                  value={`${option.label} ${option.keywords ?? ""}`.trim()}
                   onSelect={() => {
                     onValueChange(option.value === value ? "" : option.value)
                     setOpen(false)

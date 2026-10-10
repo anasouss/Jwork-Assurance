@@ -15,7 +15,10 @@ import java.util.Optional;
 
 public interface ReglementClientRepository extends JpaRepository<ReglementClient, Long> {
 
-    @EntityGraph(attributePaths = {"clientPayeur", "groupePayeur", "creePar", "instruments", "instruments.compteTresorerie"})
+    @EntityGraph(attributePaths = {
+            "clientPayeur", "groupePayeur", "creePar", "instruments",
+            "instruments.compteTresorerie", "instruments.banqueEmettriceReference"
+    })
     @Query("""
             select distinct r
             from ReglementClient r
@@ -37,7 +40,7 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
     @EntityGraph(attributePaths = {
             "clientPayeur", "clientPayeur.ville", "groupePayeur", "groupePayeur.clientTresorerie",
             "groupePayeur.clientTresorerie.ville", "creePar", "instruments",
-            "instruments.compteTresorerie"
+            "instruments.compteTresorerie", "instruments.banqueEmettriceReference"
     })
     Optional<ReglementClient> findByIdAndAgenceId(Long id, Long agenceId);
 
@@ -45,7 +48,7 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
     @EntityGraph(attributePaths = {
             "clientPayeur", "clientPayeur.ville", "groupePayeur", "groupePayeur.clientTresorerie",
             "groupePayeur.clientTresorerie.ville", "creePar", "instruments",
-            "instruments.compteTresorerie"
+            "instruments.compteTresorerie", "instruments.banqueEmettriceReference"
     })
     @Query("""
             select payment

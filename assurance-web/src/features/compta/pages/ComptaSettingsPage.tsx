@@ -1,4 +1,4 @@
-import { Banknote } from "lucide-react";
+import { Banknote, Landmark } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -8,6 +8,12 @@ const settings = [
     description: "Comptes de trésorerie utilisés pour les encaissements et les règlements.",
     href: "/app/compta/tresorerie/comptes",
     icon: Banknote,
+  },
+  {
+    title: "Banques",
+    description: "Référentiel des banques utilisé par les règlements et les comptes de trésorerie.",
+    href: "/app/compta/parametres/banques",
+    icon: Landmark,
   },
 ];
 

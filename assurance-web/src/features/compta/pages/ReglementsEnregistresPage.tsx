@@ -51,6 +51,7 @@ import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { BankSelect } from "../components/BankSelect";
 import {
   requiresBankAccountAtEntry,
   requiresPaymentReference,
@@ -73,7 +74,7 @@ type InstrumentDraft = {
   dateInstrument: string;
   dateEcheance: string;
   referenceInstrument: string;
-  banqueEmettrice: string;
+  banqueEmettriceId: string;
   compteTresorerieId: string;
 };
 
@@ -133,6 +134,10 @@ export default function ReglementsEnregistresPage() {
     queryKey: ["compta", "treasury-accounts"],
     queryFn: comptaApi.treasuryAccounts,
   });
+  const banks = useQuery({
+    queryKey: ["compta", "banks", "active"],
+    queryFn: () => comptaApi.banks(),
+  });
 
   const journalUsers = useQuery({
     queryKey: ["compta", "client-payment-journal-users"],
@@ -181,7 +186,7 @@ export default function ReglementsEnregistresPage() {
       dateInstrument: replacement.dateInstrument || TODAY,
       dateEcheance: replacement.dateEcheance || undefined,
       referenceInstrument: replacement.referenceInstrument.trim() || undefined,
-      banqueEmettrice: replacement.banqueEmettrice.trim() || undefined,
+      banqueEmettriceId: replacement.banqueEmettriceId || undefined,
       compteTresorerieId: replacement.mode === "ESPECES"
         ? undefined
         : replacement.compteTresorerieId || undefined,
@@ -680,20 +685,18 @@ export default function ReglementsEnregistresPage() {
                   />
                 )}
                 {showsOriginatingBank(replacement.mode) && (
-                  <div className="grid gap-2">
-                    <Label>
-                      {replacement.mode === "CHEQUE" || replacement.mode === "EFFET"
-                        ? "Banque émettrice"
-                        : "Banque d’origine"}
-                    </Label>
-                    <Input
-                      value={replacement.banqueEmettrice}
-                      onChange={(event) => setReplacement((current) => ({
-                        ...current,
-                        banqueEmettrice: event.target.value,
-                      }))}
-                    />
-                  </div>
+                  <BankSelect
+                    banks={banks.data ?? []}
+                    value={replacement.banqueEmettriceId}
+                    label={replacement.mode === "CHEQUE" || replacement.mode === "EFFET"
+                      ? "Banque émettrice"
+                      : "Banque d’origine"}
+                    onChange={(value) => setReplacement((current) => ({
+                      ...current,
+                      banqueEmettriceId: value,
+                    }))}
+                    disabled={banks.isLoading}
+                  />
                 )}
               </>
             ) : null}
@@ -847,7 +850,7 @@ function newReplacement(): InstrumentDraft {
     dateInstrument: TODAY,
     dateEcheance: "",
     referenceInstrument: "",
-    banqueEmettrice: "",
+    banqueEmettriceId: "",
     compteTresorerieId: "",
   };
 }
@@ -866,6 +869,7 @@ function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
   }
   if (requiresPaymentReference(row.mode)
     && !row.referenceInstrument.trim()) return false;
+  if (showsOriginatingBank(row.mode) && !row.banqueEmettriceId) return false;
   return (row.mode !== "EFFET" && row.mode !== "CHEQUE") || Boolean(row.dateEcheance);
 }
 

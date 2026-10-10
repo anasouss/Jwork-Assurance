@@ -478,7 +478,10 @@ export type PaymentInstrument = {
   dateEcheance?: string | null;
   dateStatut?: string | null;
   referenceInstrument?: string | null;
+  banqueEmettriceId?: string | null;
+  banqueEmettriceCode?: string | null;
   banqueEmettrice?: string | null;
+  reglementBureau?: boolean;
   motifStatut?: string | null;
   instrumentRemplaceId?: string | null;
   modeInstrumentRemplace?: ClientPaymentMode | null;
@@ -589,7 +592,8 @@ export type CreateClientPaymentRequest = {
     dateInstrument?: string;
     dateEcheance?: string;
     referenceInstrument?: string;
-    banqueEmettrice?: string;
+    banqueEmettriceId?: string;
+    reglementBureau?: boolean;
     compteTresorerieId?: string;
     affectations: Array<{
       elementFacturableId?: string;
@@ -605,10 +609,21 @@ export type ReplacePaymentInstrumentRequest = {
   dateInstrument?: string;
   dateEcheance?: string;
   referenceInstrument?: string;
-  banqueEmettrice?: string;
+  banqueEmettriceId?: string;
   compteTresorerieId?: string;
   motif?: string;
 };
+
+export type BankReference = {
+  id: string;
+  code: string;
+  libelle: string;
+  aliases: string[];
+  actif: boolean;
+  ordre: number;
+};
+
+export type UpsertBankReferenceRequest = Omit<BankReference, "id">;
 
 export type TreasuryAccount = {
   id: string;
@@ -617,6 +632,8 @@ export type TreasuryAccount = {
   typeCompte: TreasuryAccountType;
   utilisateurTitulaireId?: string | null;
   utilisateurTitulaire?: string | null;
+  banqueId?: string | null;
+  banqueCode?: string | null;
   nomBanque?: string | null;
   rib?: string | null;
   devise: string;
@@ -630,7 +647,7 @@ export type UpsertTreasuryAccountRequest = {
   libelle: string;
   typeCompte: TreasuryAccountType;
   utilisateurTitulaireId?: string;
-  nomBanque?: string;
+  banqueId?: string;
   rib?: string;
   soldeInitial: number;
   actif: boolean;

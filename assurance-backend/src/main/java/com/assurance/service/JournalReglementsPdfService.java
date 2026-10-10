@@ -324,7 +324,7 @@ public class JournalReglementsPdfService {
                     TextAlignment.LEFT, background);
             addBody(table, modeLabel(instrument.getMode()), regular, TextAlignment.LEFT, background);
             addBody(table, value(instrument.getReferenceInstrument()), regular, TextAlignment.LEFT, background);
-            addBody(table, instrumentStatus(instrument.getStatut()), regular, TextAlignment.LEFT, background);
+            addBody(table, instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
             addBody(table, payment.getStatut() == StatutReglementClient.ANNULE ? "Annulé" : "Valide", regular,
                     TextAlignment.LEFT, background);
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
@@ -423,9 +423,10 @@ public class JournalReglementsPdfService {
         };
     }
 
-    private String instrumentStatus(StatutInstrumentReglement status) {
-        return switch (status) {
-            case EN_ATTENTE -> "En attente";
+    private String instrumentStatus(InstrumentReglementClient instrument) {
+        return switch (instrument.getStatut()) {
+            case EN_ATTENTE -> Boolean.TRUE.equals(instrument.getReglementBureau())
+                    ? "Règlement au bureau" : "À remettre";
             case REMIS_EN_BANQUE -> "Remis en banque";
             case CONFIRME -> "Confirmé";
             case REJETE -> "Rejeté";

@@ -43,8 +43,9 @@ public class CreerReglementClientRequest {
         @Size(max = 120)
         private String referenceInstrument;
 
-        @Size(max = 160)
-        private String banqueEmettrice;
+        private Long banqueEmettriceId;
+
+        private Boolean reglementBureau = false;
 
         private Long compteTresorerieId;
 

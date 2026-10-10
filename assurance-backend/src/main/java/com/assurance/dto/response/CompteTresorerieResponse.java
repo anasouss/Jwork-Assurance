@@ -15,6 +15,8 @@ public class CompteTresorerieResponse {
     private TypeCompteTresorerie typeCompte;
     private Long utilisateurTitulaireId;
     private String utilisateurTitulaire;
+    private Long banqueId;
+    private String banqueCode;
     private String nomBanque;
     private String rib;
     private String devise;

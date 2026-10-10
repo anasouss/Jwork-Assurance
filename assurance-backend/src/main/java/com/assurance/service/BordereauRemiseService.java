@@ -484,7 +484,8 @@ public class BordereauRemiseService {
                 .payeur(instrument.getReglement().getPayeurNom())
                 .mode(instrument.getMode())
                 .referenceInstrument(instrument.getReferenceInstrument())
-                .banqueEmettrice(instrument.getBanqueEmettrice())
+                .banqueEmettrice(instrument.getBanqueEmettriceReference() == null
+                        ? null : instrument.getBanqueEmettriceReference().getLibelle())
                 .dateReception(instrument.getDateInstrument())
                 .dateEcheance(instrument.getDateEcheance())
                 .montant(line.getMontant())

@@ -8,6 +8,7 @@ import type {
   BankStatementImportConfiguration,
   BankStatementImportPage,
   BankStatementImportProfile,
+  BankReference,
   ClientDocument,
   ClientDocumentPage,
   ClientDocumentSourcePage,
@@ -62,12 +63,35 @@ import type {
   TreasuryMovementPage,
   UpsertCompanyBordereauRequest,
   UpsertTreasuryAccountRequest,
+  UpsertBankReferenceRequest,
   SaveBankReconciliationsRequest,
 } from "./types";
 
 const unwrap = <T,>(response: ApiResponse<T>) => response.data;
 
 export const comptaApi = {
+  async banks(includeInactive = false) {
+    return unwrap(await apiFetch<ApiResponse<BankReference[]>>(
+      `/api/v1/compta/banques${buildQueryString({ inclureInactives: includeInactive })}`
+    )).map((bank) => ({ ...bank, id: String(bank.id) }));
+  },
+
+  async createBank(request: UpsertBankReferenceRequest) {
+    const bank = unwrap(await apiFetch<ApiResponse<BankReference>>(
+      "/api/v1/compta/banques",
+      { method: "POST", body: JSON.stringify(request) }
+    ));
+    return { ...bank, id: String(bank.id) };
+  },
+
+  async updateBank(id: string, request: UpsertBankReferenceRequest) {
+    const bank = unwrap(await apiFetch<ApiResponse<BankReference>>(
+      `/api/v1/compta/banques/${id}`,
+      { method: "PUT", body: JSON.stringify(request) }
+    ));
+    return { ...bank, id: String(bank.id) };
+  },
+
   async companies() {
     return unwrap(
       await apiFetch<ApiResponse<ReferenceOption[]>>("/api/v1/referentiel/compagnies-assurance")
@@ -1186,6 +1210,9 @@ function normalizePaymentInstrument(instrument: PaymentInstrument): PaymentInstr
     instrumentRemplaceId: instrument.instrumentRemplaceId == null
       ? null
       : String(instrument.instrumentRemplaceId),
+    banqueEmettriceId: instrument.banqueEmettriceId == null
+      ? null
+      : String(instrument.banqueEmettriceId),
     compteTresorerieId: instrument.compteTresorerieId == null
       ? null
       : String(instrument.compteTresorerieId),
@@ -1230,6 +1257,7 @@ function normalizeTreasuryAccount(account: TreasuryAccount): TreasuryAccount {
     utilisateurTitulaireId: account.utilisateurTitulaireId == null
       ? null
       : String(account.utilisateurTitulaireId),
+    banqueId: account.banqueId == null ? null : String(account.banqueId),
   };
 }
 

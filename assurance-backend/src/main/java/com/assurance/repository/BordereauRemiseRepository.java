@@ -17,7 +17,9 @@ import java.util.Optional;
 
 public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise, Long> {
 
-    @EntityGraph(attributePaths = {"compteDestination", "compteSource"})
+    @EntityGraph(attributePaths = {
+            "compteDestination", "compteDestination.banqueReference", "compteSource"
+    })
     @Query("""
             select b
             from BordereauRemise b
@@ -44,9 +46,11 @@ public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise
 
     @EntityGraph(attributePaths = {
             "compteDestination",
+            "compteDestination.banqueReference",
             "compteSource",
             "lignes",
             "lignes.instrument",
+            "lignes.instrument.banqueEmettriceReference",
             "lignes.instrument.reglement"
     })
     Optional<BordereauRemise> findByIdAndAgenceId(Long id, Long agenceId);
@@ -54,9 +58,11 @@ public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {
             "compteDestination",
+            "compteDestination.banqueReference",
             "compteSource",
             "lignes",
             "lignes.instrument",
+            "lignes.instrument.banqueEmettriceReference",
             "lignes.instrument.reglement"
     })
     @Query("""

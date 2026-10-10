@@ -100,6 +100,10 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     anyOf: ["tresorerie:view", "tresorerie:manage"],
   },
   {
+    matches: startsWith("/app/compta/parametres"),
+    anyOf: ["tresorerie:view", "tresorerie:manage"],
+  },
+  {
     matches: startsWith("/app/compta"),
     anyPrefix: MODULE_PERMISSION_PREFIXES.compta,
   },

@@ -6,6 +6,7 @@ import com.assurance.dto.response.MouvementTresorerieResponse;
 import com.assurance.dto.response.MouvementTresoreriePageResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.entity.Agence;
+import com.assurance.entity.Banque;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.LigneReleveBancaire;
@@ -43,6 +44,7 @@ public class TresorerieService {
     private final MouvementTresorerieRepository mouvementRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieAccessService accessService;
+    private final BanqueService banqueService;
 
     @Transactional(readOnly = true)
     public List<CompteTresorerieResponse> listAccounts(Long agenceId, boolean administration) {
@@ -346,22 +348,25 @@ public class TresorerieService {
             UpsertCompteTresorerieRequest request,
             String code
     ) {
-        if (request.getTypeCompte() == TypeCompteTresorerie.BANQUE
-                && trimToNull(request.getNomBanque()) == null) {
-            throw new BadRequestException("Le nom de la banque est obligatoire pour un compte bancaire");
+        Banque bank = null;
+        if (request.getTypeCompte() == TypeCompteTresorerie.BANQUE) {
+            if (request.getBanqueId() == null) {
+                throw new BadRequestException("La banque est obligatoire pour un compte bancaire");
+            }
+            bank = banqueService.requireActive(account.getAgence().getId(), request.getBanqueId());
         }
         Utilisateur owner = resolveCashOwner(account, request);
         account.setCode(code);
         account.setLibelle(request.getLibelle().trim());
         account.setTypeCompte(request.getTypeCompte());
         account.setUtilisateurTitulaire(owner);
-        account.setNomBanque(trimToNull(request.getNomBanque()));
+        account.setBanqueReference(bank);
         account.setRib(trimToNull(request.getRib()));
         account.setDevise("MAD");
         account.setSoldeInitial(money(request.getSoldeInitial()));
         account.setActif(request.getActif() == null || request.getActif());
         if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE) {
-            account.setNomBanque(null);
+            account.setBanqueReference(null);
             account.setRib(null);
         }
         return account;
@@ -378,7 +383,12 @@ public class TresorerieService {
                         ? null : account.getUtilisateurTitulaire().getId())
                 .utilisateurTitulaire(account.getUtilisateurTitulaire() == null
                         ? null : account.getUtilisateurTitulaire().getFullName())
-                .nomBanque(account.getNomBanque())
+                .banqueId(account.getBanqueReference() == null
+                        ? null : account.getBanqueReference().getId())
+                .banqueCode(account.getBanqueReference() == null
+                        ? null : account.getBanqueReference().getCode())
+                .nomBanque(account.getBanqueReference() == null
+                        ? null : account.getBanqueReference().getLibelle())
                 .rib(account.getRib())
                 .devise(account.getDevise())
                 .soldeInitial(money(account.getSoldeInitial()))

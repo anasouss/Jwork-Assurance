@@ -14,6 +14,7 @@ import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.dto.response.SourceDocumentClientResponse;
 import com.assurance.entity.AffectationReglementClient;
 import com.assurance.entity.Agence;
+import com.assurance.entity.Banque;
 import com.assurance.entity.Client;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.Contrat;
@@ -94,6 +95,12 @@ public class ReglementClientService {
             ModeReglementClient.CARTE,
             ModeReglementClient.PRELEVEMENT
     );
+    private static final Set<ModeReglementClient> ORIGINATING_BANK_MODES = Set.of(
+            ModeReglementClient.CHEQUE,
+            ModeReglementClient.EFFET,
+            ModeReglementClient.VIREMENT,
+            ModeReglementClient.VERSEMENT_BANCAIRE
+    );
 
     private final DocumentClientService documentClientService;
     private final DocumentClientRepository documentClientRepository;
@@ -110,6 +117,7 @@ public class ReglementClientService {
     private final TresorerieService tresorerieService;
     private final LigneBordereauRemiseRepository remittanceLineRepository;
     private final BordereauRemiseRepository remittanceRepository;
+    private final BanqueService banqueService;
 
     @Transactional(readOnly = true)
     public CreanceClientPageResponse searchReceivables(
@@ -748,6 +756,11 @@ public class ReglementClientService {
             );
         }
         if (pendingReplacement) {
+            if (!Boolean.TRUE.equals(replaced.getReglementBureau())) {
+                throw new BadRequestException(
+                        "Seul un règlement marqué au bureau peut être remplacé avant remise"
+                );
+            }
             ensureNotReservedByDraftRemittance(replaced);
             if (trimToNull(request.getMotif()) == null) {
                 throw new BadRequestException("Le motif du remplacement est obligatoire");
@@ -770,7 +783,8 @@ public class ReglementClientService {
         replacementRequest.setDateInstrument(request.getDateInstrument());
         replacementRequest.setDateEcheance(request.getDateEcheance());
         replacementRequest.setReferenceInstrument(request.getReferenceInstrument());
-        replacementRequest.setBanqueEmettrice(request.getBanqueEmettrice());
+        replacementRequest.setBanqueEmettriceId(request.getBanqueEmettriceId());
+        replacementRequest.setReglementBureau(false);
         replacementRequest.setCompteTresorerieId(request.getCompteTresorerieId());
         replacementRequest.setAffectations(replaced.getAffectations().stream()
                 .map(this::copyReplacementAllocation)
@@ -935,7 +949,13 @@ public class ReglementClientService {
                 .dateEcheance(instrument.getDateEcheance())
                 .dateStatut(instrument.getDateStatut())
                 .referenceInstrument(instrument.getReferenceInstrument())
-                .banqueEmettrice(instrument.getBanqueEmettrice())
+                .banqueEmettriceId(instrument.getBanqueEmettriceReference() == null
+                        ? null : instrument.getBanqueEmettriceReference().getId())
+                .banqueEmettriceCode(instrument.getBanqueEmettriceReference() == null
+                        ? null : instrument.getBanqueEmettriceReference().getCode())
+                .banqueEmettrice(instrument.getBanqueEmettriceReference() == null
+                        ? null : instrument.getBanqueEmettriceReference().getLibelle())
+                .reglementBureau(instrument.getReglementBureau())
                 .motifStatut(instrument.getMotifStatut())
                 .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
                         ? null : instrument.getInstrumentRemplace().getId())
@@ -1006,6 +1026,14 @@ public class ReglementClientService {
             throw new BadRequestException("Sélectionnez le compte bancaire crédité");
         }
         validateInstrumentReference(request);
+        Banque originatingBank = resolveOriginatingBank(agence.getId(), request);
+        if (Boolean.TRUE.equals(request.getReglementBureau())
+                && request.getMode() != ModeReglementClient.CHEQUE
+                && request.getMode() != ModeReglementClient.EFFET) {
+            throw new BadRequestException(
+                    "Le règlement au bureau est réservé aux chèques et effets"
+            );
+        }
         return InstrumentReglementClient.builder()
                 .agence(agence)
                 .reglement(payment)
@@ -1016,7 +1044,8 @@ public class ReglementClientService {
                         ? payment.getDateReglement() : request.getDateInstrument())
                 .dateEcheance(request.getDateEcheance())
                 .referenceInstrument(trimToNull(request.getReferenceInstrument()))
-                .banqueEmettrice(trimToNull(request.getBanqueEmettrice()))
+                .banqueEmettriceReference(originatingBank)
+                .reglementBureau(Boolean.TRUE.equals(request.getReglementBureau()))
                 .compteTresorerie(account)
                 .dateStatut(payment.getDateReglement())
                 .build();
@@ -1404,6 +1433,19 @@ public class ReglementClientService {
                 && request.getDateEcheance() == null) {
             throw new BadRequestException("La date d'échéance est obligatoire");
         }
+    }
+
+    private Banque resolveOriginatingBank(
+            Long agenceId,
+            CreerReglementClientRequest.Instrument request
+    ) {
+        if (!ORIGINATING_BANK_MODES.contains(request.getMode())) {
+            return null;
+        }
+        if (request.getBanqueEmettriceId() == null) {
+            throw new BadRequestException("Sélectionnez la banque d'origine du moyen de règlement");
+        }
+        return banqueService.requireActive(agenceId, request.getBanqueEmettriceId());
     }
 
     private void validateAllocations(
@@ -1924,7 +1966,13 @@ public class ReglementClientService {
                 .dateEcheance(instrument.getDateEcheance())
                 .dateStatut(instrument.getDateStatut())
                 .referenceInstrument(instrument.getReferenceInstrument())
-                .banqueEmettrice(instrument.getBanqueEmettrice())
+                .banqueEmettriceId(instrument.getBanqueEmettriceReference() == null
+                        ? null : instrument.getBanqueEmettriceReference().getId())
+                .banqueEmettriceCode(instrument.getBanqueEmettriceReference() == null
+                        ? null : instrument.getBanqueEmettriceReference().getCode())
+                .banqueEmettrice(instrument.getBanqueEmettriceReference() == null
+                        ? null : instrument.getBanqueEmettriceReference().getLibelle())
+                .reglementBureau(instrument.getReglementBureau())
                 .motifStatut(instrument.getMotifStatut())
                 .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
                         ? null : instrument.getInstrumentRemplace().getId())

@@ -67,8 +67,13 @@ public class InstrumentReglementClient extends BaseEntity {
     @Column(name = "reference_instrument", length = 120)
     private String referenceInstrument;
 
-    @Column(name = "banque_emettrice", length = 160)
-    private String banqueEmettrice;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "banque_emettrice_id")
+    private Banque banqueEmettriceReference;
+
+    @Column(name = "reglement_bureau", nullable = false)
+    @Builder.Default
+    private Boolean reglementBureau = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "compte_tresorerie_id")

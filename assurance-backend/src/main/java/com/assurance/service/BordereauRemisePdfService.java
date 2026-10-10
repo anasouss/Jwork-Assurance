@@ -158,7 +158,11 @@ public class BordereauRemisePdfService {
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(15);
         bank.addCell(infoCell("COMPTE DESTINATAIRE", destination.getLibelle(), regular, bold));
-        bank.addCell(infoCell("BANQUE / RIB", join(destination.getNomBanque(), destination.getRib()), regular, bold));
+        bank.addCell(infoCell("BANQUE / RIB", join(
+                destination.getBanqueReference() == null
+                        ? null : destination.getBanqueReference().getLibelle(),
+                destination.getRib()
+        ), regular, bold));
         bank.addCell(infoCell("RÉFÉRENCE BANCAIRE", value(slip.getReferenceBancaire()), regular, bold));
         document.add(bank);
     }
@@ -195,7 +199,8 @@ public class BordereauRemisePdfService {
             addBody(table, String.valueOf(index), regular, TextAlignment.CENTER, background);
             addBody(table, instrumentReference, bold, TextAlignment.LEFT, background);
             addBody(table, instrument.getReglement().getPayeurNom(), regular, TextAlignment.LEFT, background);
-            addBody(table, value(instrument.getBanqueEmettrice()), regular, TextAlignment.LEFT, background);
+            addBody(table, value(instrument.getBanqueEmettriceReference() == null
+                    ? null : instrument.getBanqueEmettriceReference().getLibelle()), regular, TextAlignment.LEFT, background);
             addBody(table, date(instrument.getDateInstrument()), regular, TextAlignment.CENTER, background);
             addBody(table, date(instrument.getDateEcheance()), regular, TextAlignment.CENTER, background);
             addBody(table, amount(line.getMontant()), bold, TextAlignment.RIGHT, background);

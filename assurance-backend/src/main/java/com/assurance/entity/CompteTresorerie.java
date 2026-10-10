@@ -57,8 +57,9 @@ public class CompteTresorerie extends AuditedEntity {
     @JoinColumn(name = "utilisateur_titulaire_id")
     private Utilisateur utilisateurTitulaire;
 
-    @Column(name = "nom_banque", length = 160)
-    private String nomBanque;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "banque_id")
+    private Banque banqueReference;
 
     @Column(length = 120)
     private String rib;

@@ -49,12 +49,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { BankSelect } from "../components/BankSelect";
 import {
   requiresBankAccountAtEntry,
   requiresPaymentReference,
@@ -81,8 +83,9 @@ type PaymentMethodDraft = {
   montant: string;
   dateEcheance: string;
   referenceInstrument: string;
-  banqueEmettrice: string;
+  banqueEmettriceId: string;
   compteTresorerieId: string;
+  reglementBureau: boolean;
 };
 
 const paymentModes: Array<{
@@ -127,6 +130,10 @@ export default function NouveauReglementClientPage() {
   const accounts = useQuery({
     queryKey: ["compta", "treasury-accounts"],
     queryFn: comptaApi.treasuryAccounts,
+  });
+  const banks = useQuery({
+    queryKey: ["compta", "banks", "active"],
+    queryFn: () => comptaApi.banks(),
   });
 
   const rows = orderedRows;
@@ -495,20 +502,18 @@ export default function NouveauReglementClientPage() {
                         />
                       ) : null}
                       {showsOriginatingBank(method.mode) ? (
-                        <div className="grid gap-1.5">
-                          <Label>
-                            {method.mode === "CHEQUE" || method.mode === "EFFET"
-                              ? "Banque émettrice"
-                              : "Banque d’origine"}
-                          </Label>
-                          <Input
-                            value={method.banqueEmettrice}
-                            onChange={(event) => updateMethod(
-                              method.key,
-                              { banqueEmettrice: event.target.value }
-                            )}
-                          />
-                        </div>
+                        <BankSelect
+                          banks={banks.data ?? []}
+                          value={method.banqueEmettriceId}
+                          label={method.mode === "CHEQUE" || method.mode === "EFFET"
+                            ? "Banque émettrice"
+                            : "Banque d’origine"}
+                          onChange={(value) => updateMethod(
+                            method.key,
+                            { banqueEmettriceId: value }
+                          )}
+                          disabled={banks.isLoading}
+                        />
                       ) : null}
                     </>
                   ) : null}
@@ -538,6 +543,17 @@ export default function NouveauReglementClientPage() {
                       </Button>
                     </div>
                   </div>
+
+                  {(method.mode === "CHEQUE" || method.mode === "EFFET") && (
+                    <div className="flex items-center gap-3 rounded-md border px-3 py-2">
+                      <Switch
+                        id={`office-payment-${method.key}`}
+                        checked={method.reglementBureau}
+                        onCheckedChange={(checked) => updateMethod(method.key, { reglementBureau: checked })}
+                      />
+                      <Label htmlFor={`office-payment-${method.key}`} className="cursor-pointer">Règlement au bureau</Label>
+                    </div>
+                  )}
 
                   {requiresBankAccountAtEntry(method.mode)
                     && !accounts.isLoading
@@ -854,7 +870,8 @@ function buildRequest(
       dateInstrument: dateReglement,
       dateEcheance: method.dateEcheance || undefined,
       referenceInstrument: method.referenceInstrument.trim() || undefined,
-      banqueEmettrice: method.banqueEmettrice.trim() || undefined,
+      banqueEmettriceId: method.banqueEmettriceId || undefined,
+      reglementBureau: method.reglementBureau,
       compteTresorerieId: method.mode === "ESPECES"
         ? undefined
         : method.compteTresorerieId || undefined,
@@ -887,8 +904,9 @@ function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
     montant: "",
     dateEcheance: "",
     referenceInstrument: "",
-    banqueEmettrice: "",
+    banqueEmettriceId: "",
     compteTresorerieId: "",
+    reglementBureau: false,
   };
 }
 
@@ -907,6 +925,7 @@ function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[]) {
   }
   if (requiresPaymentReference(method.mode)
     && !method.referenceInstrument.trim()) return false;
+  if (showsOriginatingBank(method.mode) && !method.banqueEmettriceId) return false;
   if ((method.mode === "CHEQUE" || method.mode === "EFFET")
     && !method.dateEcheance) return false;
   return true;

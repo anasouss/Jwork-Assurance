@@ -19,8 +19,7 @@ public class UpsertCompteTresorerieRequest {
     @NotNull
     private TypeCompteTresorerie typeCompte;
     private Long utilisateurTitulaireId;
-    @Size(max = 160)
-    private String nomBanque;
+    private Long banqueId;
     @Size(max = 120)
     private String rib;
     private BigDecimal soldeInitial = BigDecimal.ZERO;

@@ -86,6 +86,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             select instrument
             from InstrumentReglementClient instrument
             join instrument.reglement reglement
+            left join instrument.banqueEmettriceReference issuingBank
             where instrument.agence.id = :agenceId
               and instrument.statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
               and instrument.mode in :modes
@@ -95,7 +96,8 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                    or lower(reglement.numero) like lower(concat('%', :search, '%'))
                    or lower(reglement.payeurNom) like lower(concat('%', :search, '%'))
                    or lower(coalesce(instrument.referenceInstrument, '')) like lower(concat('%', :search, '%'))
-                   or lower(coalesce(instrument.banqueEmettrice, '')) like lower(concat('%', :search, '%')))
+                   or lower(coalesce(issuingBank.code, '')) like lower(concat('%', :search, '%'))
+                   or lower(coalesce(issuingBank.libelle, '')) like lower(concat('%', :search, '%')))
               and not exists (
                     select line.id
                     from LigneBordereauRemise line
@@ -150,6 +152,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             select instrument
             from InstrumentReglementClient instrument
             join instrument.reglement reglement
+            left join instrument.banqueEmettriceReference issuingBank
             where instrument.agence.id = :agenceId
               and instrument.statut = :statut
               and instrument.mode <> com.assurance.enums.ModeReglementClient.ESPECES
@@ -173,7 +176,8 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                     or lower(reglement.numero) like lower(concat('%', :search, '%'))
                     or lower(reglement.payeurNom) like lower(concat('%', :search, '%'))
                     or lower(coalesce(instrument.referenceInstrument, '')) like lower(concat('%', :search, '%'))
-                    or lower(coalesce(instrument.banqueEmettrice, '')) like lower(concat('%', :search, '%'))
+                    or lower(coalesce(issuingBank.code, '')) like lower(concat('%', :search, '%'))
+                    or lower(coalesce(issuingBank.libelle, '')) like lower(concat('%', :search, '%'))
               )
             order by
               case when instrument.statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE

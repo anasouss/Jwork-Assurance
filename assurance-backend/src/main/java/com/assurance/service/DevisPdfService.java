@@ -154,11 +154,18 @@ public class DevisPdfService {
         String cityAndDate = (agencyCity.isBlank() ? "" : agencyCity + " le ") + formatDateTime(contrat.getCreatedAt());
 
         Table infoHeader = new Table(new float[]{6, 4}).setWidth(UnitValue.createPercentValue(100));
-        infoHeader.addCell(new Cell()
+        Cell insuredCell = new Cell()
                 .add(new Paragraph().add(new Text("Assuré : ").setBold().setFontColor(ACCENT)).add(safe(insured)).setFontSize(10))
                 .add(new Paragraph().add(new Text("Adresse : ").setBold().setFontColor(ACCENT)).add(safe(clientAddress)).setFontSize(10))
                 .setBorder(new SolidBorder(SOFT_BORDER, 0.9f))
-                .setPadding(6));
+                .setPadding(6);
+        if (Boolean.TRUE.equals(contrat.getReductionSaharienne())) {
+            insuredCell.add(new Paragraph()
+                    .add(new Text("Réduction saharienne : ").setBold().setFontColor(ACCENT))
+                    .add(safe(value(contrat.getJustificatifSahara(), "Oui")))
+                    .setFontSize(10));
+        }
+        infoHeader.addCell(insuredCell);
         infoHeader.addCell(new Cell()
                 .add(new Paragraph("Devis N° " + safe(devisNumber)).setBold().setFontSize(10).setFontColor(ACCENT))
                 .add(new Paragraph(safe(cityAndDate)).setFontSize(10))

@@ -165,6 +165,16 @@ public class Contrat extends AuditedEntity {
     @Column(name = "taux_rc", precision = 14, scale = 4)
     private java.math.BigDecimal tauxRc;
 
+    @Builder.Default
+    @Column(name = "reduction_saharienne", nullable = false)
+    private Boolean reductionSaharienne = false;
+
+    @Column(name = "justificatif_sahara", length = 255)
+    private String justificatifSahara;
+
+    @Column(name = "coefficient_sahara", precision = 8, scale = 6)
+    private BigDecimal coefficientSahara;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "mode_saisie_garanties", nullable = false, length = 40)
     @Builder.Default

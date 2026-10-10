@@ -231,7 +231,7 @@ public class DataSeeder implements CommandLineRunner {
         seedParametreApplication("TAUX_TAXE_1", "DECIMAL", "0.155", "Taxe RC");
         seedParametreApplication("TAUX_TAXE_2", "DECIMAL", "0.14", "Taxe garanties");
         seedParametreApplication("TAUX_TAXE_PF", "DECIMAL", "0.015", "Taxe parafiscale");
-        seedParametreApplication("TAUX_RSS", "DECIMAL", "0.60", "Coefficient RC lorsque le client est saharien");
+        seedParametreApplication("TAUX_RSS", "DECIMAL", "0.60", "Coefficient RC des contrats avec reduction saharienne");
         seedParametreApplication("MULTIPLICATEUR_RC_DEFAUT", "DECIMAL", "1", "Multiplicateur RC par defaut");
         seedParametreApplication("MULTIPLICATEUR_RC_TPV", "DECIMAL", "1", "Multiplicateur RC TPV par defaut");
         seedParametreApplication("DR_MODE_VARIABLE", "BOOLEAN", "false", "Autorise le mode variable pour Defense et Recours");

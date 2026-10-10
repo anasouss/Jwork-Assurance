@@ -1,9 +1,10 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { EcheanceInput } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,6 +74,11 @@ export function ContractInfoSection({
   const selectedConvention = filteredConventions.find((item) => item.id === form.conventionId);
   const souscripteurIndex = form.clients.findIndex((client) => client.role === "SOUSCRIPTEUR");
   const souscripteur = souscripteurIndex >= 0 ? form.clients[souscripteurIndex] : undefined;
+  const proprietaire = form.clients.find((client) => client.role === "PROPRIETAIRE");
+  const proprietaireVille = (form.refs.villes.data ?? []).find(
+    (ville) => ville.id === proprietaire?.client.villeId
+  );
+  const reductionSaharienneEligible = Boolean(proprietaireVille?.saharienne);
   const categorieClientId = souscripteur?.client.categorieClientId ?? "";
   const showCategorieClient = form.typeContrat === "PARTICULIER" && !categorieClientId;
   const readOnlyConventionContext = form.typeContrat === "CONVENTION";
@@ -135,6 +141,19 @@ export function ContractInfoSection({
     selectedGroup?.membres,
   ]);
 
+  useEffect(() => {
+    if (form.reductionSaharienne && form.refs.villes.data && !reductionSaharienneEligible) {
+      form.setReductionSaharienne(false);
+      form.setJustificatifSahara("");
+    }
+  }, [
+    form.reductionSaharienne,
+    form.refs.villes.data,
+    form.setJustificatifSahara,
+    form.setReductionSaharienne,
+    reductionSaharienneEligible,
+  ]);
+
   return (
     <SectionCard
       title="Contrat"
@@ -168,6 +187,36 @@ export function ContractInfoSection({
               <SelectTrigger><SelectValue placeholder="Catégorie" /></SelectTrigger>
               <SelectContent>
                 {form.refs.categoriesClient.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
+        <Field label="Réduction saharienne" error={form.validationErrors.reductionSaharienne}>
+          <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
+            <span className="text-sm">Appliquer</span>
+            <Switch
+              className={reductionSaharienneEligible ? "cursor-pointer" : "cursor-not-allowed"}
+              checked={form.reductionSaharienne}
+              disabled={!reductionSaharienneEligible}
+              onCheckedChange={(checked) => {
+                form.setReductionSaharienne(checked);
+                if (!checked) {
+                  form.setJustificatifSahara("");
+                }
+              }}
+            />
+          </div>
+        </Field>
+        {form.reductionSaharienne ? (
+          <Field label="Justificatif Sahara" required error={form.validationErrors.justificatifSahara}>
+            <Select value={form.justificatifSahara} onValueChange={form.setJustificatifSahara}>
+              <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CNI">CNI</SelectItem>
+                <SelectItem value="Certificat de résidence">Certificat de résidence</SelectItem>
+                <SelectItem value="Certificat de présence au corps">Certificat de présence au corps</SelectItem>
+                <SelectItem value="Registre de commerce modèle J">Registre de commerce modèle J</SelectItem>
+                <SelectItem value="Autre">Autre</SelectItem>
               </SelectContent>
             </Select>
           </Field>

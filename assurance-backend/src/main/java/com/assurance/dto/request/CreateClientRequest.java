@@ -47,8 +47,6 @@ public class CreateClientRequest {
     private String patente;
     private String cnss;
     private Boolean conducteurHabituel;
-    private Boolean sahara;
-    private String justificatifSahara;
     private List<TelephoneInput> telephones;
     private AcquisitionClientRequest acquisition;
 

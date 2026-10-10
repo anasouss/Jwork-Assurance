@@ -29,7 +29,6 @@ export function emptyClient(role: ClientInput["role"] = "SOUSCRIPTEUR"): ClientI
     principalPourRole: role === "SOUSCRIPTEUR",
     client: {
       typeClient: role === "SOUSCRIPTEUR" ? "PERSONNE_MORALE" : "PERSONNE_PHYSIQUE",
-      sahara: false,
       telephones: [],
     },
   };
@@ -208,8 +207,6 @@ export function ClientSection({
                 telephone: found.telephone ?? undefined,
                 email: found.email ?? undefined,
                 conducteurHabituel: found.conducteurHabituel ?? client.client.conducteurHabituel,
-                sahara: found.sahara ?? false,
-                justificatifSahara: found.justificatifSahara ?? undefined,
                 telephones: found.telephones?.map((telephone) => ({
                   numero: telephone.numero,
                   principal: Boolean(telephone.principal),
@@ -320,8 +317,6 @@ export function ClientSection({
       telephones: proprietaire.client.telephones?.length ? proprietaire.client.telephones : souscripteur.client.telephones,
       email: proprietaire.client.email ?? souscripteur.client.email,
       conducteurHabituel: proprietaire.client.conducteurHabituel,
-      sahara: proprietaire.client.sahara,
-      justificatifSahara: proprietaire.client.justificatifSahara,
     };
     setClients(
       clients.map((client) =>
@@ -349,8 +344,6 @@ export function ClientSection({
         {visibleClients.map(({ item, index }) => {
           const morale = item.client.typeClient === "PERSONNE_MORALE";
           const isProprietaire = item.role === "PROPRIETAIRE";
-          const selectedVille = villes.find((ville) => ville.id === item.client.villeId);
-          const saharaAllowed = Boolean(selectedVille?.saharienne);
           const disabledByCopy = isProprietaire && sameAsSouscripteur;
           const showProprietaireConducteur = isProprietaire && !showProprietaireCategorie && requireDriverDetails;
           const proprietorIsDriver = showProprietaireConducteur && !morale && item.client.conducteurHabituel !== false;
@@ -482,7 +475,7 @@ export function ClientSection({
                     emptyText="Aucune ville trouvée"
                     invalidText="Ville invalide : choisissez une option existante."
                     options={villes.map((ville) => ({ value: ville.id, label: ville.libelle, keywords: ville.code }))}
-                    onValueChange={(value) => updateClient(index, { villeId: value, sahara: false, justificatifSahara: undefined })}
+                    onValueChange={(value) => updateClient(index, { villeId: value })}
                   />
                 </Field>
                 <Field label="Adresse" required error={errors[`clients.${index}.client.adresse`]}>
@@ -492,28 +485,6 @@ export function ClientSection({
               {isProprietaire ? (
                 <>
                   <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                    <div className="flex items-end gap-2 pb-2">
-                      <Checkbox
-                        checked={Boolean(item.client.sahara)}
-                        disabled={!saharaAllowed}
-                        onCheckedChange={(checked) => updateClient(index, { sahara: Boolean(checked) })}
-                      />
-                      <span className="text-sm text-foreground">Réduction saharienne</span>
-                    </div>
-                    {item.client.sahara ? (
-                      <Field label="Justificatif sahara">
-                        <Select value={item.client.justificatifSahara ?? ""} onValueChange={(value) => updateClient(index, { justificatifSahara: value })}>
-                          <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="CNI">CNI</SelectItem>
-                            <SelectItem value="Certificat de résidence">Certificat de résidence</SelectItem>
-                            <SelectItem value="Certificat de présence au corps">Certificat de présence au corps</SelectItem>
-                            <SelectItem value="Registre de commerce modèle J">Registre de commerce modèle J</SelectItem>
-                            <SelectItem value="Autre">Autre</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    ) : null}
                     <Field label="Email">
                       <Input type="email" value={item.client.email ?? ""} onChange={(event) => updateClient(index, { email: event.target.value })} />
                     </Field>

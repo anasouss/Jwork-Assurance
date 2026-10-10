@@ -64,6 +64,9 @@ public class ContratResponse {
     private String periodicite;
     private Fractionnement fractionnement;
     private BigDecimal tauxRc;
+    private Boolean reductionSaharienne;
+    private String justificatifSahara;
+    private BigDecimal coefficientSahara;
     private ModeSaisieGarantieContrat modeSaisieGaranties;
     private Boolean saisiePrimeNette;
     private Integer nombreVehicules;

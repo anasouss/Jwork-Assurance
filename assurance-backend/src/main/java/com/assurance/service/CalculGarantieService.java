@@ -449,19 +449,11 @@ public class CalculGarantieService {
     }
 
     private BigDecimal resolveCoefficientSahara(Contrat contrat) {
-        if (contrat == null || contrat.getClients() == null) {
+        if (contrat == null || !Boolean.TRUE.equals(contrat.getReductionSaharienne())) {
             return BigDecimal.ONE;
         }
-        boolean sahara = contrat.getClients().stream()
-                .map(ContratClient::getClient)
-                .filter(Objects::nonNull)
-                .map(Client::getSahara)
-                .anyMatch(Boolean.TRUE::equals);
-        if (!sahara) {
-            return BigDecimal.ONE;
-        }
-        Long agenceId = contrat.getAgence() == null ? null : contrat.getAgence().getId();
-        return parametreApplicationService.getDecimal(agenceId, "TAUX_RSS", BigDecimal.valueOf(0.60));
+        BigDecimal coefficient = contrat.getCoefficientSahara();
+        return coefficient == null ? BigDecimal.ONE : coefficient;
     }
 
     private boolean isUsageTpv(Contrat contrat, Usage usage) {

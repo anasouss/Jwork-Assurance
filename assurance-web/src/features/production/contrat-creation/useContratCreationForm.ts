@@ -66,6 +66,8 @@ export function useContratCreationForm(
   const [crmPartage, setCrmPartage] = useState(false);
   const [crmPartageValeur, setCrmPartageValeur] = useState("");
   const [tauxRc, setTauxRc] = useState("");
+  const [reductionSaharienne, setReductionSaharienne] = useState(false);
+  const [justificatifSahara, setJustificatifSahara] = useState("");
   const [assistanceEnabled, setAssistanceEnabled] = useState(false);
   const [assistanceDraft, setAssistanceDraft] = useState<AssistanceDraft>({ enabled: false });
   const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
@@ -320,6 +322,8 @@ export function useContratCreationForm(
     setCrmPartage(hydrated.crmPartage);
     setCrmPartageValeur(hydrated.crmPartageValeur);
     setTauxRc(hydrated.tauxRc);
+    setReductionSaharienne(hydrated.reductionSaharienne);
+    setJustificatifSahara(hydrated.justificatifSahara);
     setAssistanceEnabled(hydrated.assistanceEnabled);
     setAssistanceDraft(hydrated.assistanceDraft);
     setTargetAssistances(hydrated.targetAssistances);
@@ -426,6 +430,8 @@ export function useContratCreationForm(
     crmPartage: typeContrat === "FLOTTE" ? crmPartage : false,
     crmPartageValeur: typeContrat === "FLOTTE" && crmPartage ? crmPartageValeur : undefined,
     tauxRc: isFlotteLocationCategory ? positiveNumberOrUndefined(tauxRc) : undefined,
+    reductionSaharienne,
+    justificatifSahara: reductionSaharienne ? emptyToUndefined(justificatifSahara) : undefined,
     clients: clients.filter(shouldPersistClientInput).map((client) => {
       const safeClient = { ...client.client } as ClientInput["client"] & { agenceId?: string };
       delete safeClient.agenceId;
@@ -501,6 +507,8 @@ export function useContratCreationForm(
     crmPartageValeur,
     isFlotteLocationCategory,
     tauxRc,
+    reductionSaharienne,
+    justificatifSahara,
     assistanceEnabled,
     assistanceDraft,
     targetAssistances,
@@ -748,6 +756,20 @@ export function useContratCreationForm(
       toast.error(result.error.issues[0]?.message ?? "Formulaire incomplet");
       return false;
     }
+    if (reductionSaharienne) {
+      const proprietaire = request.clients.find((client) => client.role === "PROPRIETAIRE");
+      const ville = refs.villes.data?.find((item) => item.id === proprietaire?.client.villeId);
+      if (!ville?.saharienne) {
+        setValidationErrors({ reductionSaharienne: "Le propriétaire doit être domicilié dans une ville saharienne." });
+        toast.error("Le propriétaire doit être domicilié dans une ville saharienne.");
+        return false;
+      }
+      if (!justificatifSahara.trim()) {
+        setValidationErrors({ justificatifSahara: "Justificatif Sahara obligatoire." });
+        toast.error("Justificatif Sahara obligatoire.");
+        return false;
+      }
+    }
     if (typeContrat === "CONVENTION" && !conventionId) {
       setValidationErrors({});
       toast.error("Une convention est obligatoire pour un contrat convention");
@@ -966,6 +988,14 @@ export function useContratCreationForm(
       }
       if (isFlotteLocationCategory && !positiveNumberOrUndefined(tauxRc)) {
         nextErrors.tauxRc = "Taux RC obligatoire.";
+      }
+      if (reductionSaharienne) {
+        const proprietaire = request.clients.find((client) => client.role === "PROPRIETAIRE");
+        const ville = refs.villes.data?.find((item) => item.id === proprietaire?.client.villeId);
+        if (!ville?.saharienne) {
+          nextErrors.reductionSaharienne = "Le propriétaire doit être domicilié dans une ville saharienne.";
+        }
+        requireField("justificatifSahara", justificatifSahara, "Justificatif Sahara obligatoire.");
       }
       if (!isConventionInvoice && (typePayeurPrime === "MEMBRE_GROUPE" || typePayeurPrime === "TIERS_MANDATE") && !payeurPrimeClientId) {
         nextErrors.payeurPrimeClientId = "Payeur obligatoire.";
@@ -1439,6 +1469,10 @@ export function useContratCreationForm(
     setCrmPartageValeur,
     tauxRc,
     setTauxRc,
+    reductionSaharienne,
+    setReductionSaharienne,
+    justificatifSahara,
+    setJustificatifSahara,
     isFlotteLocationCategory,
     assistanceEnabled,
     setAssistanceEnabled,
@@ -1919,6 +1953,8 @@ function hydrateDraft(draft: ContratSummary) {
     crmPartage: Boolean(draft.crmPartage),
     crmPartageValeur: draft.crmPartageValeur ?? "",
     tauxRc: draft.tauxRc == null ? "" : String(draft.tauxRc),
+    reductionSaharienne: Boolean(draft.reductionSaharienne),
+    justificatifSahara: draft.justificatifSahara ?? "",
     assistanceEnabled: Boolean(draft.assistance) || Object.values(targetAssistances).some((assistance) => assistance.enabled),
     assistanceDraft,
     saisiePrimeNette: Boolean(draft.saisiePrimeNette),

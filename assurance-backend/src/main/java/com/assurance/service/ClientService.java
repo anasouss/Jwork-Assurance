@@ -104,9 +104,6 @@ public class ClientService {
         CategorieClient categorieClient = request.getCategorieClientId() == null ? null :
                 categorieClientRepository.findById(request.getCategorieClientId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
-        if (Boolean.TRUE.equals(request.getSahara()) && (ville == null || !Boolean.TRUE.equals(ville.getSaharienne()))) {
-            throw new BadRequestException("La reduction saharienne n'est disponible que pour une ville saharienne");
-        }
         String telephonePrincipal = resolveTelephonePrincipal(request);
         Client client = Client.builder()
                 .agence(agence)
@@ -136,8 +133,6 @@ public class ClientService {
                 .patente(request.getPatente())
                 .cnss(request.getCnss())
                 .conducteurHabituel(request.getConducteurHabituel() == null ? true : request.getConducteurHabituel())
-                .sahara(request.getSahara() == null ? false : request.getSahara())
-                .justificatifSahara(request.getJustificatifSahara())
                 .build();
         client = clientRepository.save(client);
         client.setCodeClient(generateClientCode(client.getId()));
@@ -247,8 +242,6 @@ public class ClientService {
                 .patente(client.getPatente())
                 .cnss(client.getCnss())
                 .conducteurHabituel(client.getConducteurHabituel())
-                .sahara(client.getSahara())
-                .justificatifSahara(client.getJustificatifSahara())
                 .actif(client.getActif())
                 .telephones(telephones)
                 .groupe(groupeClientService.activePrincipalMembership(
@@ -272,9 +265,6 @@ public class ClientService {
         CategorieClient categorieClient = request.getCategorieClientId() == null ? null :
                 categorieClientRepository.findById(request.getCategorieClientId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
-        if (Boolean.TRUE.equals(request.getSahara()) && (ville == null || !Boolean.TRUE.equals(ville.getSaharienne()))) {
-            throw new BadRequestException("La reduction saharienne n'est disponible que pour une ville saharienne");
-        }
         client.setClientParent(clientParent);
         client.setVille(ville);
         client.setCategorieClient(categorieClient);
@@ -304,8 +294,6 @@ public class ClientService {
         client.setPatente(request.getPatente());
         client.setCnss(request.getCnss());
         client.setConducteurHabituel(request.getConducteurHabituel() == null ? true : request.getConducteurHabituel());
-        client.setSahara(request.getSahara() == null ? false : request.getSahara());
-        client.setJustificatifSahara(request.getJustificatifSahara());
     }
 
     static String generateClientCode(Long clientId) {

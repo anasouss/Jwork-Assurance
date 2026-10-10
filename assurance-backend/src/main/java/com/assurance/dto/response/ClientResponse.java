@@ -46,8 +46,6 @@ public class ClientResponse {
     private String patente;
     private String cnss;
     private Boolean conducteurHabituel;
-    private Boolean sahara;
-    private String justificatifSahara;
     private Boolean actif;
     private List<TelephoneView> telephones;
     private GroupeView groupe;

@@ -196,7 +196,7 @@ public class PreTermeFlottePdfService {
         String cityAndDate = (agencyCity.isEmpty() ? "" : agencyCity + " le ") + formatDateTime(draft.getCreatedAt());
 
         Table infoHeader = new Table(new float[]{6, 4}).setWidth(UnitValue.createPercentValue(100));
-        infoHeader.addCell(new Cell()
+        Cell insuredCell = new Cell()
                 .add(new Paragraph()
                         .add(new Text("Assuré : ").setBold().setFontColor(ACCENT))
                         .add(client == null ? "" : clientLabel(client))
@@ -206,7 +206,14 @@ public class PreTermeFlottePdfService {
                         .add(client == null ? "" : clientAddress(client))
                         .setFontSize(10))
                 .setBorder(new SolidBorder(SOFT_BORDER, 0.9f))
-                .setPadding(6));
+                .setPadding(6);
+        if (Boolean.TRUE.equals(draft.getReductionSaharienne())) {
+            insuredCell.add(new Paragraph()
+                    .add(new Text("Réduction saharienne : ").setBold().setFontColor(ACCENT))
+                    .add(value(draft.getJustificatifSahara(), "Oui"))
+                    .setFontSize(10));
+        }
+        infoHeader.addCell(insuredCell);
         infoHeader.addCell(new Cell()
                 .add(new Paragraph(cityAndDate).setFontSize(10))
                 .setTextAlignment(TextAlignment.RIGHT)

@@ -139,13 +139,6 @@ public class Client extends BaseEntity {
     private Boolean conducteurHabituel = true;
 
     @Builder.Default
-    @Column(name = "sahara", nullable = false)
-    private Boolean sahara = false;
-
-    @Column(name = "justificatif_sahara", length = 255)
-    private String justificatifSahara;
-
-    @Builder.Default
     @Column(nullable = false)
     private Boolean actif = true;
 

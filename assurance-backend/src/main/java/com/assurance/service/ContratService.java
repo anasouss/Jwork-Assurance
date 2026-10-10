@@ -59,6 +59,7 @@ public class ContratService {
     private final ConventionRepository conventionRepository;
     private final CategorieClientRepository categorieClientRepository;
     private final ClientRepository clientRepository;
+    private final VilleRepository villeRepository;
     private final ContratRepository contratRepository;
     private final NumeroDossierSequenceRepository numeroDossierSequenceRepository;
     private final ContratClientRepository contratClientRepository;
@@ -80,6 +81,7 @@ public class ContratService {
     private final ClientService clientService;
     private final GroupeClientService groupeClientService;
     private final CalculGarantieService calculGarantieService;
+    private final ParametreApplicationService parametreApplicationService;
     private final QuittanceCalculService quittanceCalculService;
     private final ElementFacturableCibleService elementFacturableCibleService;
     private final MouvementContratService mouvementContratService;
@@ -703,6 +705,11 @@ public class ContratService {
                 .periodicite(request.getPeriodicite())
                 .fractionnement(request.getFractionnement())
                 .tauxRc(request.getTauxRc())
+                .reductionSaharienne(Boolean.TRUE.equals(request.getReductionSaharienne()))
+                .justificatifSahara(Boolean.TRUE.equals(request.getReductionSaharienne())
+                        ? blankToNull(request.getJustificatifSahara())
+                        : null)
+                .coefficientSahara(resolveCoefficientSahara(agence, request.getReductionSaharienne()))
                 .modeSaisieGaranties(modeSaisieGaranties)
                 .saisiePrimeNette(saisiePrimeNette)
                 .nombreVehicules(request.getNombreVehicules())
@@ -719,6 +726,7 @@ public class ContratService {
         contrat = contratRepository.save(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), Map.of(), true);
+        validateReductionSaharienne(contrat, true);
         synchronizeCategorieClient(contrat, true);
         validateUsageForClientCategory(contrat, usageContrat);
         applyContractBilling(contrat, request, true);
@@ -1174,6 +1182,7 @@ public class ContratService {
         contrat.setPeriodicite(blankToNull(request.getPeriodicite()));
         contrat.setFractionnement(request.getFractionnement());
         contrat.setTauxRc(request.getTauxRc());
+        applyReductionSaharienne(contrat, request);
         contrat.setModeSaisieGaranties(modeSaisieGaranties);
         contrat.setSaisiePrimeNette(saisiePrimeNette);
         contrat.setNombreVehicules(request.getNombreVehicules());
@@ -1185,6 +1194,66 @@ public class ContratService {
         contrat.setNotes(request.getNotes());
     }
 
+    private void applyReductionSaharienne(Contrat contrat, CreateContratRequest request) {
+        boolean enabled = Boolean.TRUE.equals(request.getReductionSaharienne());
+        if (!enabled) {
+            contrat.setReductionSaharienne(false);
+            contrat.setJustificatifSahara(null);
+            contrat.setCoefficientSahara(null);
+            return;
+        }
+
+        contrat.setReductionSaharienne(true);
+        contrat.setJustificatifSahara(blankToNull(request.getJustificatifSahara()));
+        if (contrat.getCoefficientSahara() == null) {
+            contrat.setCoefficientSahara(resolveCoefficientSahara(contrat.getAgence(), true));
+        }
+    }
+
+    private BigDecimal resolveCoefficientSahara(Agence agence, Boolean enabled) {
+        if (!Boolean.TRUE.equals(enabled)) {
+            return null;
+        }
+        Long agenceId = agence == null ? null : agence.getId();
+        BigDecimal coefficient = parametreApplicationService.getDecimal(
+                agenceId,
+                "TAUX_RSS",
+                BigDecimal.valueOf(0.60)
+        );
+        if (coefficient.compareTo(BigDecimal.ZERO) <= 0 || coefficient.compareTo(BigDecimal.ONE) > 0) {
+            throw new BadRequestException("Le coefficient de reduction saharienne doit etre compris entre 0 et 1");
+        }
+        return coefficient;
+    }
+
+    private void validateReductionSaharienne(Contrat contrat, boolean finalMode) {
+        if (!Boolean.TRUE.equals(contrat.getReductionSaharienne())) {
+            return;
+        }
+        if (finalMode && !hasText(contrat.getJustificatifSahara())) {
+            throw new BadRequestException("Le justificatif de la reduction saharienne est obligatoire");
+        }
+
+        ContratClient proprietaire = contrat.getClients().stream()
+                .filter(link -> link.getRole() == RoleClientContrat.PROPRIETAIRE)
+                .sorted(Comparator.comparing(
+                        link -> !Boolean.TRUE.equals(link.getPrincipalPourRole())
+                ))
+                .findFirst()
+                .orElse(null);
+        if (proprietaire == null) {
+            if (finalMode) {
+                throw new BadRequestException("Un proprietaire est obligatoire pour appliquer la reduction saharienne");
+            }
+            return;
+        }
+        if (proprietaire.getClient() == null
+                || proprietaire.getClient().getVille() == null
+                || !Boolean.TRUE.equals(proprietaire.getClient().getVille().getSaharienne())) {
+            throw new BadRequestException("La reduction saharienne exige un proprietaire domicilie dans une ville saharienne");
+        }
+    }
+
     private PersistedDraftGraph replaceDraftChildren(Contrat contrat, CreateContratRequest request, boolean finalMode) {
         Map<String, Client> existingClients = new HashMap<>();
         for (ContratClient link : contrat.getClients()) {
@@ -1194,6 +1263,7 @@ public class ContratService {
         clearDraftChildren(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
+        validateReductionSaharienne(contrat, finalMode);
         synchronizeCategorieClient(contrat, true);
         validateUsageForClientCategory(contrat, contrat.getUsage());
         applyContractBilling(contrat, request, finalMode);
@@ -4690,6 +4760,8 @@ public class ContratService {
         request.setPeriodicite(source.getPeriodicite());
         request.setFractionnement(source.getFractionnement());
         request.setTauxRc(source.getTauxRc());
+        request.setReductionSaharienne(source.getReductionSaharienne());
+        request.setJustificatifSahara(source.getJustificatifSahara());
         request.setModeSaisieGaranties(source.getModeSaisieGaranties());
         request.setSaisiePrimeNette(source.getSaisiePrimeNette());
         request.setNombreVehicules(vehicules.size());
@@ -4901,6 +4973,11 @@ public class ContratService {
                 .periodicite(request.getPeriodicite())
                 .fractionnement(request.getFractionnement())
                 .tauxRc(request.getTauxRc())
+                .reductionSaharienne(Boolean.TRUE.equals(request.getReductionSaharienne()))
+                .justificatifSahara(Boolean.TRUE.equals(request.getReductionSaharienne())
+                        ? blankToNull(request.getJustificatifSahara())
+                        : null)
+                .coefficientSahara(resolveCoefficientSahara(agence, request.getReductionSaharienne()))
                 .modeSaisieGaranties(modeSaisieGaranties)
                 .saisiePrimeNette(saisiePrimeNette)
                 .nombreVehicules(request.getNombreVehicules())
@@ -4913,6 +4990,7 @@ public class ContratService {
                 .build();
 
         buildPreviewClientLinks(contrat, request.getClients(), request.getAgenceId());
+        validateReductionSaharienne(contrat, true);
         synchronizeCategorieClient(contrat, false);
         validateUsageForClientCategory(contrat, usageContrat);
 
@@ -5022,13 +5100,17 @@ public class ContratService {
                 ? null
                 : categorieClientRepository.findByIdWithUsages(input.getClient().getCategorieClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", input.getClient().getCategorieClientId()));
+        Ville ville = input.getClient().getVilleId() == null
+                ? null
+                : villeRepository.findById(input.getClient().getVilleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Ville", input.getClient().getVilleId()));
         return Client.builder()
                 .typeClient(input.getClient().getTypeClient())
                 .prenom(input.getClient().getPrenom())
                 .nom(input.getClient().getNom())
                 .raisonSociale(input.getClient().getRaisonSociale())
                 .categorieClient(categorieClient)
-                .sahara(input.getClient().getSahara() == null ? false : input.getClient().getSahara())
+                .ville(ville)
                 .build();
     }
 
@@ -5582,6 +5664,9 @@ public class ContratService {
                 .periodicite(contrat.getPeriodicite())
                 .fractionnement(contrat.getFractionnement())
                 .tauxRc(contrat.getTauxRc())
+                .reductionSaharienne(contrat.getReductionSaharienne())
+                .justificatifSahara(contrat.getJustificatifSahara())
+                .coefficientSahara(contrat.getCoefficientSahara())
                 .modeSaisieGaranties(contrat.getModeSaisieGaranties())
                 .saisiePrimeNette(contrat.getSaisiePrimeNette())
                 .nombreVehicules(contrat.getNombreVehicules())

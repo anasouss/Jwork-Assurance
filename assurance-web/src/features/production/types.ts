@@ -446,8 +446,6 @@ export type ClientInput = {
     telephone?: string;
     email?: string;
     conducteurHabituel?: boolean;
-    sahara?: boolean;
-    justificatifSahara?: string;
     telephones?: { numero: string; principal?: boolean; whatsapp?: boolean }[];
     acquisition?: AcquisitionClient;
   };
@@ -890,6 +888,8 @@ export type CreateContratRequest = {
   modeFacturation?: ModeFacturationContrat;
   fractionnement?: "ANNUEL" | "SEMESTRIEL" | "TRIMESTRIEL" | "MENSUEL";
   tauxRc?: number;
+  reductionSaharienne?: boolean;
+  justificatifSahara?: string;
   modeSaisieGaranties?: ModeSaisieGaranties;
   saisiePrimeNette?: boolean;
   nombreVehicules?: number;
@@ -1364,6 +1364,9 @@ export type ContratSummary = {
   periodicite?: string | null;
   fractionnement?: string | null;
   tauxRc?: number | null;
+  reductionSaharienne?: boolean | null;
+  justificatifSahara?: string | null;
+  coefficientSahara?: number | null;
   modeSaisieGaranties?: ModeSaisieGaranties | null;
   saisiePrimeNette?: boolean | null;
   nombreVehicules?: number | null;

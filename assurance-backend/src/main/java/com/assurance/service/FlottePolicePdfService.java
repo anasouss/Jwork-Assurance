@@ -167,6 +167,12 @@ public class FlottePolicePdfService {
         Cell insuredCell = new Cell()
                 .add(labelValue("Assuré : ", clientName(subscriber)))
                 .add(labelValue("Adresse : ", clientAddress(subscriber)));
+        if (Boolean.TRUE.equals(contrat.getReductionSaharienne())) {
+            insuredCell.add(labelValue(
+                    "Réduction saharienne : ",
+                    value(contrat.getJustificatifSahara(), "Oui")
+            ));
+        }
         if (!subscriberPays) {
             insuredCell.add(labelValue("Payeur : ", value(contrat.getPayeurPrimeNom(), "-")));
         }

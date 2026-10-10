@@ -1666,7 +1666,6 @@ function emptyClientDraft(typeClient: TypeClient = "PERSONNE_MORALE"): ClientDra
   return {
     typeClient,
     conducteurHabituel: true,
-    sahara: false,
   };
 }
 

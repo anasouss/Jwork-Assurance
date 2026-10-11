@@ -1929,7 +1929,12 @@ public class ReglementClientService {
                         .build());
         sequence.setValeur(sequence.getValeur() + 1);
         sequenceRepository.save(sequence);
-        return "REG-" + agency.getCode() + "-" + year + "-" + String.format(Locale.ROOT, "%06d", sequence.getValeur());
+        return String.format(
+                Locale.ROOT,
+                "REG-%02d-%06d",
+                year % 100,
+                sequence.getValeur()
+        );
     }
 
     private ReglementClient findPayment(Long agenceId, Long paymentId) {

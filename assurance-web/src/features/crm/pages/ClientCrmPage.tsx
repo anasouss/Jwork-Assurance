@@ -5,15 +5,10 @@ import {
   ArrowRight,
   Building2,
   CalendarClock,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CircleDollarSign,
-  Eye,
-  FileText,
   Download,
   FolderOpen,
-  History,
   Megaphone,
   Paperclip,
   Plus,
@@ -39,19 +34,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { useAuthStore } from "@/store/auth-store";
 import { clientApi } from "@/features/production/api/clients";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
-import { formatMoney } from "@/features/production/utils/format";
 import { downloadBlob } from "@/lib/download";
-import { comptaApi } from "@/features/compta/api";
-import type { ClientDocument } from "@/features/compta/types";
-import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
-import { natureLabels, statusLabels } from "@/features/sinistre/format";
 import type {
   ClientInput,
   AcquisitionClient,
@@ -77,7 +66,6 @@ export default function ClientCrmPage() {
   const [collaborateurId, setCollaborateurId] = useState("TOUS");
   const [page, setPage] = useState(0);
   const selectedClientId = searchParams.get("clientId") ?? "";
-  const activeTab = normalizePortfolioTab(searchParams.get("tab"));
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
@@ -120,13 +108,8 @@ export default function ClientCrmPage() {
   };
 
   const selectClient = (clientId: string) => {
-    setSearchParams({ clientId, tab: "overview" });
+    setSearchParams({ clientId });
     setClientPickerOpen(false);
-  };
-
-  const changeTab = (tab: string) => {
-    if (!selectedClientId) return;
-    setSearchParams({ clientId: selectedClientId, tab });
   };
 
   return (
@@ -134,8 +117,12 @@ export default function ClientCrmPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">CRM</p>
-          <h1 className="text-2xl font-semibold">Portefeuille client</h1>
-          <p className="text-sm text-muted-foreground">Identité, organisation, contrats, documents et situation comptable.</p>
+          <h1 className="text-2xl font-semibold">{selectedClientId ? "Fiche client" : "Clients"}</h1>
+          <p className="text-sm text-muted-foreground">
+            {selectedClientId
+              ? "Informations, organisation, acquisition et conditions de paiement."
+              : "Recherchez, consultez et créez les clients de l’agence."}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canManageClients ? (
@@ -163,7 +150,7 @@ export default function ClientCrmPage() {
         <section className="mx-auto w-full max-w-5xl rounded-lg border bg-card">
           <div className="border-b p-5">
             <h2 className="text-lg font-semibold">Rechercher un client</h2>
-            <p className="text-sm text-muted-foreground">Sélectionnez le client dont vous souhaitez ouvrir le portefeuille.</p>
+            <p className="text-sm text-muted-foreground">Sélectionnez le client dont vous souhaitez consulter la fiche.</p>
           </div>
           <ClientPicker
             query={query}
@@ -188,8 +175,6 @@ export default function ClientCrmPage() {
       ) : detailQuery.data ? (
         <ClientDetail
           detail={detailQuery.data}
-          activeTab={activeTab}
-          onTabChange={changeTab}
           onAssignGroup={() => setAssignmentOpen(true)}
           canManageClients={canManageClients}
         />
@@ -624,14 +609,10 @@ function ClientDialog({
 
 function ClientDetail({
   detail,
-  activeTab,
-  onTabChange,
   onAssignGroup,
   canManageClients,
 }: {
   detail: Awaited<ReturnType<typeof clientApi.getClientCrm>>;
-  activeTab: PortfolioTab;
-  onTabChange: (tab: string) => void;
   onAssignGroup: () => void;
   canManageClients: boolean;
 }) {
@@ -661,47 +642,19 @@ function ClientDetail({
       (permission) => permissions.includes(permission),
     );
   });
-  const documentsQuery = useQuery({
-    queryKey: ["crm", "client-documents", client.id],
-    queryFn: () => comptaApi.searchClientDocuments({
-      payeurType: "CLIENT",
-      payeurId: client.id,
-      page: 0,
-      size: 8,
-    }),
-    enabled: activeTab === "documents" || activeTab === "accounting",
-  });
-  const sourcesQuery = useQuery({
-    queryKey: ["crm", "client-document-sources", client.id],
-    queryFn: () => comptaApi.searchClientDocumentSources({
-      payeurType: "CLIENT",
-      payeurId: client.id,
-      page: 0,
-      size: 8,
-    }),
-    enabled: activeTab === "accounting",
-  });
-  const claimsRequest = { clientId: client.id, page: 0, size: 25 };
   const paymentConditionsQuery = useQuery({
     queryKey: ["crm", "payment-conditions", "CLIENT", client.id],
     queryFn: () => clientApi.listPaymentConditions("CLIENT", client.id),
-    enabled: activeTab === "overview" || activeTab === "accounting",
   });
-  const claimsQuery = useQuery({
-    queryKey: sinistreKeys.list(claimsRequest),
-    queryFn: () => sinistreApi.list(claimsRequest),
-    enabled: activeTab === "claims" && canViewClaims,
-  });
-  const movements = detail.contrats.flatMap((contract) => contract.mouvements);
   const groupMembers = uniqueGroupMembers(detail.groupes, client.id);
   const accountingUrl = `/app/compta/releves-factures?payeurType=CLIENT&payeurId=${client.id}`;
-  const productionUrl = `/app/production/contrats?clientId=${encodeURIComponent(client.id)}&client=${encodeURIComponent(
-    client.codeClient || client.rc || client.cin || client.ice || client.nomAffichage || "",
-  )}`;
+  const productionUrl = `/app/production/portefeuille-clients/${client.id}`;
+  const claimsUrl = `/app/sinistre/dossiers?clientId=${client.id}`;
+  const activePaymentCondition = paymentConditionsQuery.data?.find((condition) => condition.statut === "ACTIVE");
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border bg-card">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/50 p-5 dark:border-blue-900 dark:bg-blue-950/20">
+    <section className="min-w-0 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-blue-100 bg-blue-50/50 p-5 dark:border-blue-900 dark:bg-blue-950/20">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom}</h2>
@@ -713,6 +666,9 @@ function ClientDetail({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild type="button" variant="outline" className="border-emerald-200 text-emerald-950 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-950/30">
+            <Link to={productionUrl}><FolderOpen className="size-4" />Portefeuille client</Link>
+          </Button>
           <Button asChild type="button" variant="outline" className="border-amber-200 text-amber-950 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-100 dark:hover:bg-amber-950/30">
             <Link to={accountingUrl}><ReceiptText className="size-4" />Relevés et factures</Link>
           </Button>
@@ -724,26 +680,15 @@ function ClientDetail({
         </div>
       </div>
 
-      <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Primes émises" value={money(detail.totalQuittances)} tone="emerald" />
-        <Metric label="Solde non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} tone="amber" />
-        <Metric label="Contrats" value={String(detail.contrats.length)} tone="blue" />
-        <Metric label="Mouvements" value={String(movements.length)} tone="violet" />
+      <div className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Code client" value={client.codeClient || "-"} tone="blue" />
+        <Metric label="Organisation" value={client.groupe?.libelle ?? "Indépendant"} tone="violet" />
+        <Metric label="Délai de paiement" value={`${activePaymentCondition?.delaiJours ?? 60} jours`} tone="amber" />
+        <Metric label="Contrats" value={String(detail.contrats.length)} tone="emerald" />
       </div>
 
-      <Tabs value={activeTab} onValueChange={onTabChange}>
-        <div className="overflow-x-auto border-y bg-slate-50/70 px-4 py-2 dark:bg-slate-950/30">
-          <TabsList className="w-max min-w-full justify-start bg-transparent">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-950 dark:data-[state=active]:bg-blue-900/50 dark:data-[state=active]:text-blue-100"><Eye className="size-4" />Vue d’ensemble</TabsTrigger>
-            <TabsTrigger value="contracts" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-950 dark:data-[state=active]:bg-emerald-900/50 dark:data-[state=active]:text-emerald-100"><FolderOpen className="size-4" />Contrats</TabsTrigger>
-            <TabsTrigger value="documents" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950 dark:data-[state=active]:bg-amber-900/50 dark:data-[state=active]:text-amber-100"><FileText className="size-4" />Documents</TabsTrigger>
-            <TabsTrigger value="accounting" className="data-[state=active]:bg-cyan-100 data-[state=active]:text-cyan-950 dark:data-[state=active]:bg-cyan-900/50 dark:data-[state=active]:text-cyan-100"><CircleDollarSign className="size-4" />Comptabilité</TabsTrigger>
-            <TabsTrigger value="claims" className="data-[state=active]:bg-red-100 data-[state=active]:text-red-950 dark:data-[state=active]:bg-red-900/40 dark:data-[state=active]:text-red-100"><ShieldCheck className="size-4" />Sinistres</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="overview" className="m-0 grid gap-5 p-5 lg:grid-cols-2">
-          <PortfolioSection title="Informations client" icon={<Users className="size-4" />} tone="blue">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PortfolioSection title="Informations client" icon={<Users className="size-4" />} tone="blue">
             <dl className="grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">
               <Info label="Identifiant" value={client.rc || client.cin || client.ice} />
               <Info label="Catégorie" value={client.categorieClientLibelle} />
@@ -752,8 +697,8 @@ function ClientDetail({
               <Info label="Email" value={client.email} />
               <Info label="Organisation" value={client.groupe?.libelle ?? "Client indépendant"} />
             </dl>
-          </PortfolioSection>
-          <PortfolioSection
+        </PortfolioSection>
+        <PortfolioSection
             title="Acquisition commerciale"
             icon={<Megaphone className="size-4" />}
             tone="cyan"
@@ -788,8 +733,8 @@ function ClientDetail({
             ) : (
               <EmptyState text="L’origine commerciale de ce client n’est pas renseignée." />
             )}
-          </PortfolioSection>
-          <PortfolioSection
+        </PortfolioSection>
+        <PortfolioSection
             title="Organisation et groupe"
             icon={<Building2 className="size-4" />}
             tone="violet"
@@ -806,8 +751,8 @@ function ClientDetail({
                 </div>
               </div>
             )) : <EmptyState text="Ce client n’est rattaché à aucun groupe." />}
-          </PortfolioSection>
-          <PortfolioSection
+        </PortfolioSection>
+        <PortfolioSection
             title="Conditions de paiement"
             icon={<CalendarClock className="size-4" />}
             tone="amber"
@@ -822,119 +767,30 @@ function ClientDetail({
               rows={paymentConditionsQuery.data ?? []}
               loading={paymentConditionsQuery.isLoading}
             />
-          </PortfolioSection>
-          <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />} tone="emerald">
+        </PortfolioSection>
+        <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />} tone="emerald">
             {groupMembers.length ? (
               <div className="divide-y">
                 {groupMembers.slice(0, 8).map((member) => (
-                  <Link key={member.clientId} to={`/app/crm?clientId=${member.clientId}&tab=overview`} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-blue-700">
+                  <Link key={member.clientId} to={`/app/crm?clientId=${member.clientId}`} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-blue-700">
                     <span><strong>{member.clientNom}</strong><span className="ml-2 text-muted-foreground">{label(member.typeRelation)}</span></span>
                     <ArrowRight className="size-4" />
                   </Link>
                 ))}
               </div>
             ) : <EmptyState text="Aucune autre entité liée." />}
-          </PortfolioSection>
-          <PortfolioSection title="Accès rapides" icon={<ArrowRight className="size-4" />} tone="amber">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <WorkspaceLink to={`/app/crm?clientId=${client.id}&tab=contracts`} icon={<FolderOpen className="size-4" />} title="Contrats et mouvements" detail={`${detail.contrats.length} contrat(s)`} tone="emerald" />
-              <WorkspaceLink to={accountingUrl} icon={<ReceiptText className="size-4" />} title="Relevés et factures" detail="Espace comptable du payeur" tone="amber" />
-            </div>
-          </PortfolioSection>
-        </TabsContent>
-
-        <TabsContent value="contracts" className="m-0 p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="font-semibold">Contrats et mouvements</h3><p className="text-sm text-muted-foreground">Historique de production associé à ce client comme assuré ou payeur.</p></div>
-            <Button asChild variant="outline" size="sm" className="border-emerald-200 text-emerald-950 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-950/30">
-              <Link to={productionUrl}><FolderOpen className="size-4" />Ouvrir la liste production</Link>
-            </Button>
-          </div>
-          <ContractsPortfolio contracts={detail.contrats} />
-        </TabsContent>
-
-        <TabsContent value="documents" className="m-0 grid gap-5 p-5 lg:grid-cols-[1.4fr_0.8fr]">
-          <PortfolioSection title="Documents comptables émis" icon={<FileText className="size-4" />} tone="amber" action={<Button asChild size="sm" variant="outline"><Link to={accountingUrl}>Gérer les documents</Link></Button>}>
-            <ClientDocuments rows={documentsQuery.data?.rows ?? []} loading={documentsQuery.isLoading} />
-          </PortfolioSection>
-          <PortfolioSection title="Pièces contractuelles" icon={<FolderOpen className="size-4" />} tone="blue">
-            <p className="mb-3 text-sm text-muted-foreground">Les justificatifs restent rattachés à leur contrat et à leur mouvement d’origine.</p>
-            <div className="divide-y">
-              {detail.contrats.map((contract) => (
-                <Link key={contract.id} to={`/app/production/contrats/${contract.id}`} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-blue-700">
-                  <span><strong>{contract.numeroDossier || `#${contract.id}`}</strong><span className="ml-2 text-muted-foreground">{contract.numeroPolice || "Sans police"}</span></span>
-                  <ArrowRight className="size-4" />
-                </Link>
-              ))}
-            </div>
-          </PortfolioSection>
-        </TabsContent>
-
-        <TabsContent value="accounting" className="m-0 grid gap-5 p-5">
-          <div className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Total émis" value={money(detail.totalQuittances)} tone="emerald" />
-            <Metric label="Non réglé" value={money(detail.totalImpayes)} alert={detail.totalImpayes > 0} tone="amber" />
-            <Metric label="À documenter" value={String(sourcesQuery.data?.page.totalElements ?? 0)} tone="blue" />
-            <Metric label="Documents émis" value={String(documentsQuery.data?.page.totalElements ?? 0)} tone="violet" />
-          </div>
-          <PortfolioSection title="Situation comptable" icon={<CircleDollarSign className="size-4" />} tone="cyan" action={<Button asChild><Link to={accountingUrl}>Ouvrir l’espace comptable <ArrowRight className="size-4" /></Link></Button>}>
-            <p className="text-sm text-muted-foreground">Les quittances validées, relevés, factures et crédits sont gérés dans l’espace comptable du payeur. Les montants affichés ici proviennent des quittances serveur.</p>
-          </PortfolioSection>
-        </TabsContent>
-
-        <TabsContent value="claims" className="m-0 p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="font-semibold">Dossiers sinistre</h3>
-              <p className="text-sm text-muted-foreground">
-                Déclarations et suivi financier de ce client assuré.
-              </p>
-            </div>
-            {canViewClaims ? (
-              <Button asChild variant="outline" size="sm">
-                <Link to="/app/sinistre/dossiers">
-                  Ouvrir le module Sinistres
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-          {!canViewClaims ? (
-            <EmptyState text="Vous n’avez pas l’autorisation de consulter les dossiers sinistre." />
-          ) : claimsQuery.isLoading ? (
+        </PortfolioSection>
+        <PortfolioSection title="Espaces liés" icon={<ArrowRight className="size-4" />} tone="amber">
             <div className="grid gap-2">
-              {Array.from({ length: 3 }, (_, index) => (
-                <Skeleton key={index} className="h-16 w-full" />
-              ))}
+              <WorkspaceLink to={productionUrl} icon={<FolderOpen className="size-4" />} title="Portefeuille client" detail={`${detail.contrats.length} contrat(s) en production`} tone="emerald" />
+              <WorkspaceLink to={accountingUrl} icon={<ReceiptText className="size-4" />} title="Relevés et factures" detail="Espace comptable du payeur" tone="amber" />
+              {canViewClaims ? (
+                <WorkspaceLink to={claimsUrl} icon={<ShieldCheck className="size-4" />} title="Dossiers sinistre" detail="Déclarations et suivi des dossiers" tone="blue" />
+              ) : null}
             </div>
-          ) : claimsQuery.data?.items.length ? (
-            <div className="divide-y rounded-md border">
-              {claimsQuery.data.items.map((claim) => (
-                <Link
-                  key={claim.id}
-                  to={`/app/sinistre/dossiers/${claim.id}`}
-                  className="grid gap-2 p-3 hover:bg-muted/50 sm:grid-cols-[minmax(180px,1fr)_160px_150px_150px_auto] sm:items-center"
-                >
-                  <div>
-                    <p className="font-medium">{claim.numeroSinistre}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {claim.numeroPolice || claim.numeroDossier || "Sans police"}
-                    </p>
-                  </div>
-                  <span className="text-sm">{natureLabels[claim.nature]}</span>
-                  <span className="text-sm">{dateLabel(claim.dateSinistre)}</span>
-                  <Badge variant="outline">{statusLabels[claim.statut]}</Badge>
-                  <span className="text-right text-sm font-medium">
-                    {money(claim.totalRegle)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <EmptyState text="Aucun dossier sinistre n’est rattaché à ce client." />
-          )}
-        </TabsContent>
-      </Tabs>
+        </PortfolioSection>
+      </div>
+
       <Dialog open={acquisitionOpen} onOpenChange={setAcquisitionOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -1206,13 +1062,6 @@ function paymentConditionTypeLabel(value: ClientPaymentCondition["typeJustificat
   return "Politique de l’agence";
 }
 
-type PortfolioTab = "overview" | "contracts" | "documents" | "accounting" | "claims";
-
-function normalizePortfolioTab(value: string | null): PortfolioTab {
-  const tabs: PortfolioTab[] = ["overview", "contracts", "documents", "accounting", "claims"];
-  return tabs.includes(value as PortfolioTab) ? value as PortfolioTab : "overview";
-}
-
 function uniqueGroupMembers(groups: GroupeClient[], currentClientId: string) {
   const members = new Map<string, GroupeClient["membres"][number]>();
   groups.forEach((group) => group.membres.forEach((member) => {
@@ -1257,152 +1106,28 @@ function WorkspaceLink({ to, icon, title, detail, tone }: {
   icon: ReactNode;
   title: string;
   detail: string;
-  tone: "emerald" | "amber";
+  tone: "blue" | "emerald" | "amber";
 }) {
-  const styles = tone === "emerald"
-    ? {
-        link: "hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30",
-        icon: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-      }
-    : {
-        link: "hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30",
-        icon: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-      };
+  const styles = {
+    blue: {
+      link: "hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30",
+      icon: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    },
+    emerald: {
+      link: "hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30",
+      icon: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    },
+    amber: {
+      link: "hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30",
+      icon: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    },
+  }[tone];
   return (
     <Link to={to} className={`flex min-w-0 items-center gap-3 rounded-md border p-3 transition-colors ${styles.link}`}>
       <span className={`grid size-9 shrink-0 place-items-center rounded-md ${styles.icon}`}>{icon}</span>
       <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{title}</strong><span className="block truncate text-xs text-muted-foreground">{detail}</span></span>
       <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
     </Link>
-  );
-}
-
-function ContractsPortfolio({ contracts }: {
-  contracts: Awaited<ReturnType<typeof clientApi.getClientCrm>>["contrats"];
-}) {
-  if (!contracts.length) return <EmptyState text="Aucun contrat n’est associé à ce client." />;
-
-  return (
-    <div className="grid gap-4">
-      {contracts.map((contract) => (
-        <section key={contract.id} className="min-w-0 overflow-hidden rounded-md border border-blue-100 dark:border-blue-900">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/25">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="grid size-9 shrink-0 place-items-center rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"><FolderOpen className="size-4" /></span>
-                <h4 className="text-base font-semibold">{contract.numeroDossier || `Contrat #${contract.id}`}</h4>
-                <Badge variant="outline" className="border-blue-200 bg-white/70 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">{contractTypeLabel(contract.typeContrat)}</Badge>
-                <StatusBadge status={contract.statut} />
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground"><strong className="font-medium text-foreground">{contract.numeroPolice || "Sans numéro de police"}</strong> · {contract.compagnie || "Compagnie non renseignée"}</p>
-            </div>
-            <Button asChild size="sm" variant="outline"><Link to={`/app/production/contrats/${contract.id}`}><Eye className="size-4" />Voir le contrat</Link></Button>
-          </div>
-          <dl className="grid gap-px border-b bg-border text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <ContractFact label="Période de couverture" value={`${dateLabel(contract.dateEffet)} au ${dateLabel(contract.dateEcheance)}`} tone="blue" />
-            <ContractFact label="Rôle du client" value={contractRoleLabel(contract.roleClient)} tone="violet" />
-            <ContractFact label="Mode de facturation" value={label(contract.modeFacturation)} tone="amber" />
-            <ContractFact label="Total des quittances" value={money(contract.primeTotale)} tone="emerald" />
-          </dl>
-          <details className="group" open={contracts.length === 1}>
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-emerald-50/35 px-4 py-3 font-medium hover:bg-emerald-50/70 dark:bg-emerald-950/10 dark:hover:bg-emerald-950/25">
-              <span className="flex items-center gap-2 text-emerald-950 dark:text-emerald-100"><History className="size-4 text-emerald-700 dark:text-emerald-300" />Historique des mouvements <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100">{contract.mouvements.length}</Badge></span>
-              <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
-            </summary>
-            {contract.mouvements.length ? (
-              <div className="overflow-x-auto border-t">
-                <table className="w-full min-w-[760px] text-sm">
-                  <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600 dark:bg-slate-950/40 dark:text-slate-300"><tr><th className="w-20 px-4 py-2">Ordre</th><th className="px-4 py-2">Événement contractuel</th><th className="px-4 py-2">Date d’effet</th><th className="px-4 py-2">Statut</th><th className="px-4 py-2 text-right">Impact financier</th><th className="w-14 px-4 py-2" /></tr></thead>
-                  <tbody>{contract.mouvements.map((movement, index) => (
-                    <tr key={movement.id} className="border-t first:border-t-0 hover:bg-muted/20">
-                      <td className="px-4 py-3"><span className="inline-grid min-w-8 place-items-center rounded-md bg-blue-50 px-2 py-1 font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-200">{movement.numeroMouvement || "-"}</span></td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">{movement.libelle || label(movement.categorie)}</span>
-                          {index === 0 ? <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-200">Dernier mouvement</Badge> : null}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{movement.code || label(movement.categorie)}</div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">{dateLabel(movement.dateEffet)}</td>
-                      <td className="px-4 py-3"><StatusBadge status={movement.statut} /></td>
-                      <td className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${financialImpactClass(movement.primeTotale)}`}>{money(movement.primeTotale)}</td>
-                      <td className="px-4 py-2"><Button asChild size="icon" variant="ghost" title="Voir ce mouvement"><Link aria-label={`Voir le mouvement ${movement.numeroMouvement || ""}`} to={`/app/production/contrats/${contract.id}?mouvementId=${movement.id}`}><Eye className="size-4" /></Link></Button></td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            ) : <div className="border-t p-5 text-sm text-muted-foreground">Aucun mouvement enregistré.</div>}
-          </details>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-type ContractFactTone = "blue" | "violet" | "amber" | "emerald";
-
-function ContractFact({ label: factLabel, value, tone }: { label: string; value: string; tone: ContractFactTone }) {
-  const styles: Record<ContractFactTone, string> = {
-    blue: "bg-blue-50/35 dark:bg-blue-950/15",
-    violet: "bg-violet-50/35 dark:bg-violet-950/15",
-    amber: "bg-amber-50/35 dark:bg-amber-950/15",
-    emerald: "bg-emerald-50/35 dark:bg-emerald-950/15",
-  };
-  return <div className={`px-4 py-3 ${styles[tone]}`}><dt className="text-xs text-muted-foreground">{factLabel}</dt><dd className="mt-1 font-medium">{value}</dd></div>;
-}
-
-function StatusBadge({ status }: { status?: string | null }) {
-  const normalized = status?.toUpperCase() ?? "";
-  const className = normalized.includes("ANNU") || normalized.includes("RESIL")
-    ? "bg-red-100 text-red-800 hover:bg-red-100"
-    : normalized.includes("VALID") || normalized.includes("ACTIF")
-      ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
-      : "bg-slate-100 text-slate-700 hover:bg-slate-100";
-  return <Badge className={className}>{statusLabel(status)}</Badge>;
-}
-
-function contractTypeLabel(type?: string | null) {
-  return type === "PARTICULIER" ? "Mono" : label(type);
-}
-
-function contractRoleLabel(role?: string | null) {
-  if (!role) return "-";
-  return role.split(",").map((value) => label(value.trim())).join(", ");
-}
-
-function financialImpactClass(value?: number | null) {
-  if ((value ?? 0) < 0) return "text-red-700 dark:text-red-400";
-  if ((value ?? 0) > 0) return "text-emerald-700 dark:text-emerald-400";
-  return "text-muted-foreground";
-}
-
-function statusLabel(status?: string | null) {
-  const normalized = status?.toUpperCase() ?? "";
-  if (normalized.includes("CANCEL") || normalized.includes("RESIL")) return "Résilié";
-  if (normalized.includes("VALID")) return "Validé";
-  if (normalized.includes("ACTIF")) return "Actif";
-  if (normalized.includes("DRAFT") || normalized.includes("BROUILLON")) return "Brouillon";
-  return label(status);
-}
-
-function ClientDocuments({ rows, loading }: { rows: ClientDocument[]; loading: boolean }) {
-  if (loading) return <div className="grid gap-2">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-11" />)}</div>;
-  if (!rows.length) return <EmptyState text="Aucun relevé ou facture n’a encore été émis pour ce client." />;
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[620px] text-sm">
-        <thead className="border-b bg-muted/35 text-left text-xs uppercase text-muted-foreground"><tr><th className="px-3 py-2">Document</th><th className="px-3 py-2">Émission</th><th className="px-3 py-2">Période</th><th className="px-3 py-2">Statut</th><th className="px-3 py-2 text-right">Total</th></tr></thead>
-        <tbody>{rows.map((document) => (
-          <tr key={document.id} className="border-b last:border-0">
-            <td className="px-3 py-3"><div className="font-medium">{document.numero}</div><div className="text-xs text-muted-foreground">{label(document.typeDocument)}</div></td>
-            <td className="whitespace-nowrap px-3 py-3">{dateLabel(document.dateEmission)}</td>
-            <td className="whitespace-nowrap px-3 py-3">{dateLabel(document.periodeDebut)} au {dateLabel(document.periodeFin)}</td>
-            <td className="px-3 py-3"><StatusBadge status={document.statut} /></td>
-            <td className="whitespace-nowrap px-3 py-3 text-right font-medium">{money(document.totalDocument)}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
   );
 }
 
@@ -1706,10 +1431,6 @@ function Field({
       {children}
     </label>
   );
-}
-
-function money(value?: number | null) {
-  return formatMoney(value);
 }
 
 function dateLabel(value?: string | null) {

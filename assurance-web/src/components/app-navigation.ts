@@ -72,7 +72,7 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "referentiel:view" },
   { module: "companies", title: "Grilles tarifaires", url: "/app/companies/grilles-tarifaires", icon: Calculator, permissions: ["grille-tarifaire:view", "grille-tarifaire:manage", "referentiel:manage"] },
   { module: "companies", title: "Contacts", url: "/app/companies/contacts", icon: Users, permissions: ["contact-compagnie:view", "contact-compagnie:manage"] },
-  { module: "crm", title: "Portefeuille client", url: "/app/crm", icon: Users, exact: true, permission: "client:view" },
+  { module: "crm", title: "Clients", url: "/app/crm", icon: Users, exact: true, permission: "client:view" },
   { module: "crm", title: "Paramètres", url: "/app/crm/parametres", icon: Settings, permission: "client:manage" },
   { module: "compta", title: "Tableau de bord", url: "/app/compta", icon: LayoutDashboard, exact: true, permissions: ["quittance:view", "reglement-client:view", "tresorerie:view", "bordereau-compagnie:view", "reglement-compagnie:view"] },
   { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },

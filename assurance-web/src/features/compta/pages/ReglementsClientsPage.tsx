@@ -170,10 +170,11 @@ export default function ReglementsClientsPage() {
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const payerKey = selectedRows[0] ? sourcePayerKey(selectedRows[0]) : null;
   const pageRows = result?.rows ?? [];
-  const pagePayerKeys = new Set(pageRows.map(sourcePayerKey));
+  const eligiblePageRows = pageRows.filter(isSelectableReceivable);
+  const pagePayerKeys = new Set(eligiblePageRows.map(sourcePayerKey));
   const selectablePageRows = payerKey
-    ? pageRows.filter((row) => sourcePayerKey(row) === payerKey)
-    : pagePayerKeys.size === 1 ? pageRows : [];
+    ? eligiblePageRows.filter((row) => sourcePayerKey(row) === payerKey)
+    : pagePayerKeys.size === 1 ? eligiblePageRows : [];
   const selectedOnPage = selectablePageRows.filter(
     (row) => Boolean(selected[receivableTargetKey(row)])
   ).length;
@@ -181,6 +182,9 @@ export default function ReglementsClientsPage() {
     && selectedOnPage === selectablePageRows.length;
 
   function toggle(row: ClientReceivable, checked: boolean) {
+    if (checked && !isSelectableReceivable(row)) {
+      return;
+    }
     if (checked && payerKey && sourcePayerKey(row) !== payerKey) {
       toast.error("Sélectionnez uniquement les éléments d’un même payeur");
       return;
@@ -461,56 +465,63 @@ export default function ReglementsClientsPage() {
                     <th className="px-3 py-3 text-left">Nature</th>
                     <SortableHeader label="Date" column="DATE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <SortableHeader label="TTC" column="TTC" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
-                    <SortableHeader label="Solde" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
+                    <SortableHeader label="Reste à affecter" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <th className="px-3 py-3 text-center">Statut</th>
                     <th className="w-16 px-3 py-3 text-center">Détail</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {showResults && receivables.isLoading ? <TableRowsSkeleton colSpan={11} rows={8} /> :
-                    (result?.rows ?? []).map((row) => (
-                      <tr key={receivableTargetKey(row)} className="hover:bg-muted/30">
-                        <td className="px-3 py-3 text-center">
-                          <Checkbox
-                            checked={Boolean(selected[receivableTargetKey(row)])}
-                            onCheckedChange={(value) => toggle(row, value === true)}
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <strong>
-                            {row.source.assureNom
-                              || row.source.souscripteurNom
-                              || row.source.payeurNom}
-                          </strong>
-                        </td>
-                        <td className="px-3 py-3 font-medium">{receivableDocumentReference(row)}</td>
-                        <td className="px-3 py-3">{receivableTypeLabel(row)}</td>
-                        <td className="px-3 py-3"><strong>{receivableCoverageReference(row)}</strong></td>
-                        <td className="px-3 py-3">
-                          <strong>{row.source.mouvement}</strong>
-                        </td>
-                        <td className="px-3 py-3">{date(row.source.dateEffet)}</td>
-                        <td className="px-3 py-3 text-right">{money(row.source.montantTtc)}</td>
-                        <td className="px-3 py-3 text-right font-semibold">{money(row.soldeOuvert)}</td>
-                        <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} /></td>
-                        <td className="px-2 py-2 text-center">
-                          {row.source.documentClientId ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              title="Voir les lignes de la facture"
-                              aria-label={`Voir le détail de ${row.source.reference || "la facture"}`}
-                              onClick={() => setDetailDocumentId(row.source.documentClientId ?? undefined)}
-                            >
-                              <Eye className="size-4" />
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    (result?.rows ?? []).map((row) => {
+                      const selectable = isSelectableReceivable(row);
+                      return (
+                        <tr key={receivableTargetKey(row)} className="hover:bg-muted/30">
+                          <td className="px-3 py-3 text-center">
+                            <Checkbox
+                              checked={Boolean(selected[receivableTargetKey(row)])}
+                              disabled={!selectable}
+                              aria-label={selectable
+                                ? "Sélectionner cet élément"
+                                : "Élément entièrement affecté à un règlement en cours"}
+                              onCheckedChange={(value) => toggle(row, value === true)}
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <strong>
+                              {row.source.assureNom
+                                || row.source.souscripteurNom
+                                || row.source.payeurNom}
+                            </strong>
+                          </td>
+                          <td className="px-3 py-3 font-medium">{receivableDocumentReference(row)}</td>
+                          <td className="px-3 py-3">{receivableTypeLabel(row)}</td>
+                          <td className="px-3 py-3"><strong>{receivableCoverageReference(row)}</strong></td>
+                          <td className="px-3 py-3">
+                            <strong>{row.source.mouvement}</strong>
+                          </td>
+                          <td className="px-3 py-3">{date(row.source.dateEffet)}</td>
+                          <td className="px-3 py-3 text-right">{money(row.source.montantTtc)}</td>
+                          <td className="px-3 py-3 text-right font-semibold">{money(row.soldeOuvert)}</td>
+                          <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} /></td>
+                          <td className="px-2 py-2 text-center">
+                            {row.source.documentClientId ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                title="Voir les lignes de la facture"
+                                aria-label={`Voir le détail de ${row.source.reference || "la facture"}`}
+                                onClick={() => setDetailDocumentId(row.source.documentClientId ?? undefined)}
+                              >
+                                <Eye className="size-4" />
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   {!showResults && (
                     <tr>
                       <td colSpan={11} className="px-4 py-12 text-center text-muted-foreground">
@@ -652,11 +663,17 @@ function StatusBadge({ value }: { value: ClientReceivable["statut"] }) {
   const labels: Record<ClientReceivable["statut"], string> = {
     IMPAYEE: "Impayée",
     PARTIELLEMENT_REGLEE: "Partielle",
-    COUVERTE_EN_ATTENTE: "En attente",
+    COUVERTE_EN_ATTENTE: "Encaissement en cours",
     PAYEE: "Payée",
   };
+  const styles: Record<ClientReceivable["statut"], string> = {
+    IMPAYEE: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
+    PARTIELLEMENT_REGLEE: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300",
+    COUVERTE_EN_ATTENTE: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-300",
+    PAYEE: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300",
+  };
   return (
-    <Badge variant={value === "IMPAYEE" ? "secondary" : "outline"}>
+    <Badge variant="outline" className={styles[value]}>
       {labels[value]}
     </Badge>
   );
@@ -795,6 +812,10 @@ function receivableTargetKey(row: ClientReceivable) {
     return `E:${row.source.elementFacturableId}`;
   }
   throw new Error("Créance sans cible de règlement");
+}
+
+function isSelectableReceivable(row: ClientReceivable) {
+  return row.soldeOuvert > 0 && row.statut !== "PAYEE";
 }
 
 function money(value: number) {

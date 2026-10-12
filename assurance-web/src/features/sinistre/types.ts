@@ -328,6 +328,7 @@ export type SinistreTreasuryAccount = {
   code: string;
   libelle: string;
   typeCompte: "CAISSE" | "BANQUE";
+  natureCaisse?: "INDIVIDUELLE" | "CENTRALE" | null;
   devise: string;
   soldeCourant: number;
 };

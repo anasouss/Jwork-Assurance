@@ -61,6 +61,10 @@ public class FlottePolicePdfService {
     private static final float SECTION_FONT_SIZE = 11f;
     private static final float TABLE_FONT_SIZE = 8.5f;
     private static final float TABLE_PADDING = 3f;
+    private static final int DENSE_TARIFF_ROW_THRESHOLD = 12;
+    private static final TableStyle DEFAULT_TABLE_STYLE = new TableStyle(TABLE_FONT_SIZE, TABLE_PADDING, 10f, false);
+    private static final TableStyle ANNEX_TABLE_STYLE = new TableStyle(TABLE_FONT_SIZE, TABLE_PADDING, 10f, true);
+    private static final TableStyle DENSE_TARIFF_STYLE = new TableStyle(8f, 2.2f, 9f, true);
 
     private final ContratService contratService;
 
@@ -80,7 +84,7 @@ public class FlottePolicePdfService {
 
             writeHeader(document, contrat, mouvement);
             writeContext(document, contrat, mouvement);
-            writeTariff(document, contrat);
+            writeTariff(document, contrat, false);
             writeLegend(document, contrat.getGaranties());
 
             int section = 2;
@@ -126,7 +130,7 @@ public class FlottePolicePdfService {
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMarginTop(0)
                 .setMarginBottom(7));
-        writeTariff(document, contrat);
+        writeTariff(document, contrat, true);
         writeLegend(document, contrat.getGaranties());
     }
 
@@ -198,8 +202,11 @@ public class FlottePolicePdfService {
         document.add(sectionTitle);
     }
 
-    private void writeTariff(Document document, ContratResponse contrat) {
+    private void writeTariff(Document document, ContratResponse contrat, boolean clientDocumentAnnex) {
         List<Target> targets = targets(contrat);
+        TableStyle tableStyle = clientDocumentAnnex && targets.size() >= DENSE_TARIFF_ROW_THRESHOLD
+                ? DENSE_TARIFF_STYLE
+                : clientDocumentAnnex ? ANNEX_TABLE_STYLE : DEFAULT_TABLE_STYLE;
         List<ContratResponse.GarantieView> guarantees = vehicleGuarantees(contrat.getGaranties());
         List<String> codes = guaranteeCodes(guarantees);
         boolean hasDcCapital = codes.contains("DC");
@@ -211,36 +218,38 @@ public class FlottePolicePdfService {
         int columnCount = 6 + (showPfOrPtc ? 1 : 0) + (showEnergy ? 1 : 0)
                 + valueColumns + guaranteeColumns;
         float[] widths = tariffWidths(codes.size(), hasDcCapital, showAssistance, showPfOrPtc, showEnergy);
-        Table table = new Table(widths).setWidth(UnitValue.createPercentValue(100));
+        Table table = new Table(widths)
+                .setWidth(UnitValue.createPercentValue(100))
+                .setKeepTogether(false);
 
-        addHeader(table, "Usage", 2, 1, HEADER_BG);
-        addHeader(table, "Marque", 2, 1, HEADER_BG);
-        addHeader(table, "N°\nd'immatric", 2, 1, HEADER_BG);
-        addHeader(table, "N°\nattestation", 2, 1, HEADER_BG);
-        addHeader(table, "Date de\nMC", 2, 1, HEADER_BG);
+        addHeader(table, "Usage", 2, 1, HEADER_BG, tableStyle);
+        addHeader(table, "Marque", 2, 1, HEADER_BG, tableStyle);
+        addHeader(table, "N°\nd'immatric", 2, 1, HEADER_BG, tableStyle);
+        addHeader(table, "N°\nattestation", 2, 1, HEADER_BG, tableStyle);
+        addHeader(table, "Date de\nMC", 2, 1, HEADER_BG, tableStyle);
         if (showPfOrPtc) {
-            addHeader(table, "PF/PTC", 2, 1, HEADER_BG);
+            addHeader(table, "PF/PTC", 2, 1, HEADER_BG, tableStyle);
         }
         if (showEnergy) {
-            addHeader(table, "ÉNERGIE", 2, 1, HEADER_BG);
+            addHeader(table, "ÉNERGIE", 2, 1, HEADER_BG, tableStyle);
         }
-        addHeader(table, "VALEURS", 1, valueColumns, HEADER_BG);
-        addHeader(table, "GARANTIES À ASSURER", 1, guaranteeColumns, GUARANTEE_GROUP_BG);
-        addHeader(table, "Montant total", 2, 1, HEADER_BG);
-        addHeader(table, "Valeur à\nneuf", 1, 1, HEADER_BG);
-        addHeader(table, "Valeur\nvénale", 1, 1, HEADER_BG);
-        addHeader(table, "Valeur des\nglaces", 1, 1, HEADER_BG);
+        addHeader(table, "VALEURS", 1, valueColumns, HEADER_BG, tableStyle);
+        addHeader(table, "GARANTIES À ASSURER", 1, guaranteeColumns, GUARANTEE_GROUP_BG, tableStyle);
+        addHeader(table, "Montant total", 2, 1, HEADER_BG, tableStyle);
+        addHeader(table, "Valeur à\nneuf", 1, 1, HEADER_BG, tableStyle);
+        addHeader(table, "Valeur\nvénale", 1, 1, HEADER_BG, tableStyle);
+        addHeader(table, "Valeur des\nglaces", 1, 1, HEADER_BG, tableStyle);
         if (hasDcCapital) {
-            addHeader(table, "Capital\nDC", 1, 1, HEADER_BG);
+            addHeader(table, "Capital\nDC", 1, 1, HEADER_BG, tableStyle);
         }
         if (codes.isEmpty() && !showAssistance) {
-            addHeader(table, "-", 1, 1, GUARANTEE_HEADER_BG);
+            addHeader(table, "-", 1, 1, GUARANTEE_HEADER_BG, tableStyle);
         } else {
-            codes.forEach(code -> addHeader(table, code, 1, 1, GUARANTEE_HEADER_BG));
+            codes.forEach(code -> addHeader(table, code, 1, 1, GUARANTEE_HEADER_BG, tableStyle));
         }
         if (showAssistance) {
-            addHeader(table, "ASSISTANCE", 1, 1, ASSISTANCE_BG);
-            addHeader(table, "PRIME\nTTC", 1, 1, ASSISTANCE_BG);
+            addHeader(table, "ASSISTANCE", 1, 1, ASSISTANCE_BG, tableStyle);
+            addHeader(table, "PRIME\nTTC", 1, 1, ASSISTANCE_BG, tableStyle);
         }
 
         BigDecimal rowsTotal = BigDecimal.ZERO;
@@ -251,42 +260,44 @@ public class FlottePolicePdfService {
             BigDecimal rowTotal = (summary == null ? BigDecimal.ZERO : zero(summary.getPrimeTotale())).add(assistancePrime);
             rowsTotal = rowsTotal.add(rowTotal);
 
-            table.addCell(valueCell(target.usageLabel(), TextAlignment.LEFT));
-            table.addCell(valueCell(target.marque(), TextAlignment.LEFT));
-            table.addCell(valueCell(target.immatriculation(), TextAlignment.CENTER));
-            table.addCell(valueCell(target.numeroAttestation(), TextAlignment.CENTER));
-            table.addCell(valueCell(formatDate(target.dateMiseEnCirculation()), TextAlignment.CENTER));
+            table.addCell(valueCell(target.usageLabel(), TextAlignment.LEFT, tableStyle));
+            table.addCell(valueCell(target.marque(), TextAlignment.LEFT, tableStyle));
+            table.addCell(valueCell(target.immatriculation(), TextAlignment.CENTER, tableStyle));
+            table.addCell(valueCell(target.numeroAttestation(), TextAlignment.CENTER, tableStyle));
+            table.addCell(valueCell(formatDate(target.dateMiseEnCirculation()), TextAlignment.CENTER, tableStyle));
             if (showPfOrPtc) {
-                table.addCell(valueCell(target.pfOuPtc(), TextAlignment.CENTER));
+                table.addCell(valueCell(target.pfOuPtc(), TextAlignment.CENTER, tableStyle));
             }
             if (showEnergy) {
-                table.addCell(valueCell(target.energie(), TextAlignment.CENTER));
+                table.addCell(valueCell(target.energie(), TextAlignment.CENTER, tableStyle));
             }
-            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurNeuf()), TextAlignment.CENTER));
-            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurVenale()), TextAlignment.CENTER));
-            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurGlace()), TextAlignment.CENTER));
+            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurNeuf()), TextAlignment.CENTER, tableStyle));
+            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurVenale()), TextAlignment.CENTER, tableStyle));
+            table.addCell(valueCell(formatMoneyOrEmpty(target.valeurGlace()), TextAlignment.CENTER, tableStyle));
             if (hasDcCapital) {
-                table.addCell(valueCell(formatMoneyOrEmpty(capitalFor(rowGuarantees, "DC")), TextAlignment.CENTER));
+                table.addCell(valueCell(formatMoneyOrEmpty(capitalFor(rowGuarantees, "DC")),
+                        TextAlignment.CENTER, tableStyle));
             }
             if (codes.isEmpty() && !showAssistance) {
-                table.addCell(valueCell("-", TextAlignment.CENTER));
+                table.addCell(valueCell("-", TextAlignment.CENTER, tableStyle));
             } else {
-                codes.forEach(code -> table.addCell(guaranteeCell(markerFor(rowGuarantees, code))));
+                codes.forEach(code -> table.addCell(guaranteeCell(markerFor(rowGuarantees, code), tableStyle)));
             }
             if (showAssistance) {
-                table.addCell(assistanceCell(assistanceFor(contrat, target)));
-                table.addCell(valueCell(formatMoneyOrEmpty(assistancePrime), TextAlignment.RIGHT)
+                table.addCell(assistanceCell(assistanceFor(contrat, target), tableStyle));
+                table.addCell(valueCell(formatMoneyOrEmpty(assistancePrime), TextAlignment.RIGHT, tableStyle)
                         .setBackgroundColor(ASSISTANCE_BG));
             }
-            table.addCell(valueCell(formatMoney(rowTotal), TextAlignment.RIGHT).setBold());
+            table.addCell(valueCell(formatMoney(rowTotal), TextAlignment.RIGHT, tableStyle).setBold());
         }
 
         table.addCell(new Cell(1, columnCount - 1)
                 .add(new Paragraph("TOTAL").setBold())
+                .setKeepTogether(tableStyle.keepTogether())
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBorder(new SolidBorder(BORDER, 1.2f))
-                .setPadding(TABLE_PADDING));
-        table.addCell(valueCell(formatMoney(rowsTotal), TextAlignment.RIGHT).setBold());
+                .setPadding(tableStyle.padding()));
+        table.addCell(valueCell(formatMoney(rowsTotal), TextAlignment.RIGHT, tableStyle).setBold());
         document.add(table);
     }
 
@@ -573,14 +584,26 @@ public class FlottePolicePdfService {
     }
 
     private void addHeader(Table table, String content, int rowSpan, int colSpan, DeviceRgb background) {
+        addHeader(table, content, rowSpan, colSpan, background, DEFAULT_TABLE_STYLE);
+    }
+
+    private void addHeader(
+            Table table,
+            String content,
+            int rowSpan,
+            int colSpan,
+            DeviceRgb background,
+            TableStyle style
+    ) {
         table.addHeaderCell(new Cell(rowSpan, colSpan)
-                .add(new Paragraph(safe(content)).setBold())
+                .add(new Paragraph(safe(content)).setBold().setFixedLeading(style.leading()))
+                .setKeepTogether(style.keepTogether())
                 .setTextAlignment(TextAlignment.CENTER)
                 .setVerticalAlignment(com.itextpdf.layout.property.VerticalAlignment.MIDDLE)
-                .setFontSize(TABLE_FONT_SIZE)
+                .setFontSize(style.fontSize())
                 .setBackgroundColor(background)
                 .setBorder(new SolidBorder(BORDER, 1f))
-                .setPadding(TABLE_PADDING));
+                .setPadding(style.padding()));
     }
 
     private Cell headerCell(String content, DeviceRgb background) {
@@ -590,13 +613,22 @@ public class FlottePolicePdfService {
     }
 
     private Cell valueCell(String content, TextAlignment alignment) {
-        return new Cell().add(new Paragraph(safe(content)))
-                .setTextAlignment(alignment).setFontSize(TABLE_FONT_SIZE)
-                .setBorder(new SolidBorder(BORDER, 1f)).setPadding(TABLE_PADDING);
+        return valueCell(content, alignment, DEFAULT_TABLE_STYLE);
+    }
+
+    private Cell valueCell(String content, TextAlignment alignment, TableStyle style) {
+        return new Cell().add(new Paragraph(safe(content)).setFixedLeading(style.leading()))
+                .setKeepTogether(style.keepTogether())
+                .setTextAlignment(alignment).setFontSize(style.fontSize())
+                .setBorder(new SolidBorder(BORDER, 1f)).setPadding(style.padding());
     }
 
     private Cell guaranteeCell(String content) {
-        Cell cell = valueCell(content, TextAlignment.CENTER).setBold();
+        return guaranteeCell(content, DEFAULT_TABLE_STYLE);
+    }
+
+    private Cell guaranteeCell(String content, TableStyle style) {
+        Cell cell = valueCell(content, TextAlignment.CENTER, style).setBold();
         if (!content.isBlank()) {
             cell.setBackgroundColor(SELECTED_BG);
         }
@@ -604,7 +636,11 @@ public class FlottePolicePdfService {
     }
 
     private Cell assistanceCell(String content) {
-        return valueCell(content, TextAlignment.CENTER).setBackgroundColor(ASSISTANCE_BG);
+        return assistanceCell(content, DEFAULT_TABLE_STYLE);
+    }
+
+    private Cell assistanceCell(String content, TableStyle style) {
+        return valueCell(content, TextAlignment.CENTER, style).setBackgroundColor(ASSISTANCE_BG);
     }
 
     private Cell withBold(Cell cell, boolean bold) {
@@ -709,6 +745,9 @@ public class FlottePolicePdfService {
 
     private static <T> List<T> list(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    private record TableStyle(float fontSize, float padding, float leading, boolean keepTogether) {
     }
 
     private record Target(

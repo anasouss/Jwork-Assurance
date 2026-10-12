@@ -61,7 +61,9 @@ export default function NouveauBordereauRemisePage() {
     (account) => account.actif && account.typeCompte === "BANQUE"
   ), [accounts.data]);
   const cashAccounts = useMemo(() => (accounts.data ?? []).filter(
-    (account) => account.actif && account.typeCompte === "CAISSE"
+    (account) => account.actif
+      && account.typeCompte === "CAISSE"
+      && account.natureCaisse === "CENTRALE"
   ), [accounts.data]);
   const selectedTotal = (selectedInstruments.data ?? [])
     .reduce((sum, instrument) => sum + instrument.montant, 0);

@@ -54,6 +54,7 @@ public class AdminService {
     private final AgencyLogoStorageService agencyLogoStorageService;
     private final AgencySignatureStorageService agencySignatureStorageService;
     private final AcquisitionClientService acquisitionClientService;
+    private final TresorerieService tresorerieService;
 
     @Transactional(readOnly = true)
     public List<AdminUtilisateurResponse> listPlatformAdmins() {
@@ -205,7 +206,9 @@ public class AdminService {
                 .telephone(blankToNull(request.getTelephone()))
                 .actif(request.getActif() == null || request.getActif())
                 .build();
-        return AdminUtilisateurResponse.from(utilisateurRepository.save(user));
+        user = utilisateurRepository.save(user);
+        tresorerieService.synchronizePersonalCashAccount(user);
+        return AdminUtilisateurResponse.from(user);
     }
 
     @Transactional
@@ -231,7 +234,9 @@ public class AdminService {
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        return AdminUtilisateurResponse.from(utilisateurRepository.save(user));
+        user = utilisateurRepository.save(user);
+        tresorerieService.synchronizePersonalCashAccount(user);
+        return AdminUtilisateurResponse.from(user);
     }
 
     @Transactional
@@ -247,6 +252,7 @@ public class AdminService {
         ensureManagedAgence(actor, user.getAgence());
         user.setActif(false);
         utilisateurRepository.save(user);
+        tresorerieService.synchronizePersonalCashAccount(user);
         refreshSessionRepository.revokeAllByUserId(id);
     }
 

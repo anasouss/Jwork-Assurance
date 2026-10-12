@@ -8,6 +8,7 @@ import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.SessionCaisse;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.NiveauAccesCompteTresorerie;
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.StatutSessionCaisse;
 import com.assurance.enums.TypeCompteTresorerie;
 import com.assurance.exception.BadRequestException;
@@ -129,6 +130,9 @@ public class SessionCaisseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Compte de trésorerie", accountId));
         if (account.getTypeCompte() != TypeCompteTresorerie.CAISSE) {
             throw new BadRequestException("Une session ne peut être ouverte que sur une caisse");
+        }
+        if (account.getNatureCaisse() != NatureCaisseTresorerie.INDIVIDUELLE) {
+            throw new BadRequestException("Une session ne peut être ouverte que sur une caisse individuelle");
         }
         if (!Boolean.TRUE.equals(account.getActif())) {
             throw new BadRequestException("Cette caisse est inactive");

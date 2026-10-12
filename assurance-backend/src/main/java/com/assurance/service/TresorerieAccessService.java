@@ -6,7 +6,9 @@ import com.assurance.dto.response.UtilisateurTresorerieResponse;
 import com.assurance.entity.AffectationCompteTresorerie;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.Utilisateur;
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.NiveauAccesCompteTresorerie;
+import com.assurance.enums.TypeCompteTresorerie;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AffectationCompteTresorerieRepository;
@@ -99,6 +101,11 @@ public class TresorerieAccessService {
             UpsertAffectationsCompteTresorerieRequest request
     ) {
         CompteTresorerie account = requireAccount(agenceId, compteId);
+        if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE) {
+            throw new BadRequestException(
+                    "Les accès aux caisses sont gérés automatiquement selon leur titulaire et leur nature"
+            );
+        }
         Map<Long, UpsertAffectationsCompteTresorerieRequest.Ligne> requested = new LinkedHashMap<>();
         for (UpsertAffectationsCompteTresorerieRequest.Ligne row : request.getAffectations()) {
             if (requested.putIfAbsent(row.getUtilisateurId(), row) != null) {
@@ -155,7 +162,8 @@ public class TresorerieAccessService {
                         .utilisateur(user)
                         .build());
         assignment.setNiveauAcces(NiveauAccesCompteTresorerie.SUPERVISION);
-        assignment.setActif(true);
+        assignment.setActif(Boolean.TRUE.equals(user.getActif())
+                && Boolean.TRUE.equals(account.getActif()));
         affectationRepository.save(assignment);
     }
 
@@ -165,6 +173,10 @@ public class TresorerieAccessService {
         if (owner == null) {
             return;
         }
+        NiveauAccesCompteTresorerie required = account.getNatureCaisse()
+                == NatureCaisseTresorerie.CENTRALE
+                ? NiveauAccesCompteTresorerie.SUPERVISION
+                : NiveauAccesCompteTresorerie.GESTION;
         AffectationCompteTresorerie assignment = affectationRepository
                 .findByCompteTresorerieIdAndUtilisateurId(account.getId(), owner.getId())
                 .orElseGet(() -> AffectationCompteTresorerie.builder()
@@ -172,11 +184,58 @@ public class TresorerieAccessService {
                         .compteTresorerie(account)
                         .utilisateur(owner)
                         .build());
-        if (assignment.getNiveauAcces() == null
-                || !assignment.getNiveauAcces().allows(NiveauAccesCompteTresorerie.UTILISATION)) {
-            assignment.setNiveauAcces(NiveauAccesCompteTresorerie.UTILISATION);
+        if (assignment.getNiveauAcces() != required) {
+            assignment.setNiveauAcces(required);
         }
-        assignment.setActif(true);
+        assignment.setActif(Boolean.TRUE.equals(owner.getActif())
+                && Boolean.TRUE.equals(account.getActif()));
+        affectationRepository.save(assignment);
+    }
+
+    @Transactional
+    public void synchronizeCentralCashAccess(Utilisateur user) {
+        List<AffectationCompteTresorerie> existing = affectationRepository
+                .findByUserAndCashNature(
+                        user.getId(),
+                        TypeCompteTresorerie.CAISSE,
+                        NatureCaisseTresorerie.CENTRALE
+                );
+        existing.forEach(assignment -> assignment.setActif(false));
+        affectationRepository.saveAll(existing);
+        if (user.getAgence() == null) {
+            return;
+        }
+        compteRepository.findByAgenceIdAndTypeCompteAndNatureCaisse(
+                user.getAgence().getId(),
+                TypeCompteTresorerie.CAISSE,
+                NatureCaisseTresorerie.CENTRALE
+        ).ifPresent(account -> saveCentralAssignment(account, user));
+    }
+
+    @Transactional
+    public void synchronizeCentralCashAccess(CompteTresorerie account) {
+        if (account.getNatureCaisse() != NatureCaisseTresorerie.CENTRALE) {
+            return;
+        }
+        utilisateurRepository.findByAgenceIdOrderByNomAscPrenomAsc(account.getAgence().getId())
+                .forEach(user -> saveCentralAssignment(account, user));
+    }
+
+    private void saveCentralAssignment(CompteTresorerie account, Utilisateur user) {
+        AffectationCompteTresorerie assignment = affectationRepository
+                .findByCompteTresorerieIdAndUtilisateurId(account.getId(), user.getId())
+                .orElseGet(() -> AffectationCompteTresorerie.builder()
+                        .agence(account.getAgence())
+                        .compteTresorerie(account)
+                        .utilisateur(user)
+                        .build());
+        boolean responsible = account.getUtilisateurTitulaire() != null
+                && account.getUtilisateurTitulaire().getId().equals(user.getId());
+        NiveauAccesCompteTresorerie required = responsible
+                ? NiveauAccesCompteTresorerie.SUPERVISION
+                : NiveauAccesCompteTresorerie.CONSULTATION;
+        assignment.setNiveauAcces(required);
+        assignment.setActif(Boolean.TRUE.equals(user.getActif()) && Boolean.TRUE.equals(account.getActif()));
         affectationRepository.save(assignment);
     }
 

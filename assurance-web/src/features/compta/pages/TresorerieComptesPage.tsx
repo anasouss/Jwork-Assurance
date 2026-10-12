@@ -44,6 +44,7 @@ import type {
   TreasuryAccount,
   TreasuryAccessLevel,
   TreasuryAccountType,
+  TreasuryCashNature,
   UpsertTreasuryAccountRequest,
 } from "../types";
 import { formatTreasuryMoney } from "./treasury-format";
@@ -56,6 +57,7 @@ export default function TresorerieComptesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<TreasuryAccount>();
   const [accountType, setAccountType] = useState<TreasuryAccountType>("CAISSE");
+  const [cashNature, setCashNature] = useState<TreasuryCashNature>("CENTRALE");
   const [accountCode, setAccountCode] = useState("");
   const [accountLabel, setAccountLabel] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
@@ -106,6 +108,7 @@ export default function TresorerieComptesPage() {
         code: accountCode.trim(),
         libelle: accountLabel.trim(),
         typeCompte: accountType,
+        natureCaisse: accountType === "CAISSE" ? cashNature : undefined,
         utilisateurTitulaireId: accountType === "CAISSE" ? ownerUserId : undefined,
         banqueId: accountType === "BANQUE" ? bankId || undefined : undefined,
         rib: rib.trim() || undefined,
@@ -169,7 +172,11 @@ export default function TresorerieComptesPage() {
 
   function openNewAccount() {
     setEditingAccount(undefined);
-    setAccountType("CAISSE");
+    const centralExists = (accounts.data ?? []).some((account) =>
+      account.typeCompte === "CAISSE" && account.natureCaisse === "CENTRALE"
+    );
+    setAccountType(centralExists ? "BANQUE" : "CAISSE");
+    setCashNature("CENTRALE");
     setAccountCode("");
     setAccountLabel("");
     setOwnerUserId("");
@@ -182,6 +189,7 @@ export default function TresorerieComptesPage() {
   function openAccount(account: TreasuryAccount) {
     setEditingAccount(account);
     setAccountType(account.typeCompte);
+    setCashNature(account.natureCaisse ?? "INDIVIDUELLE");
     setAccountCode(account.code);
     setAccountLabel(account.libelle);
     setOwnerUserId(account.utilisateurTitulaireId ?? "");
@@ -216,10 +224,29 @@ export default function TresorerieComptesPage() {
 
       <div className="grid gap-5">
         <AccountSection
-          title="Caisses"
-          description="Encaissements en espèces et suivi du solde comptable."
+          title="Caisse centrale"
+          description="Consolidation des fonds remis par les caissiers de l’agence."
           type="CAISSE"
-          accounts={(accounts.data ?? []).filter((account) => account.typeCompte === "CAISSE")}
+          accounts={(accounts.data ?? []).filter((account) =>
+            account.typeCompte === "CAISSE" && account.natureCaisse === "CENTRALE"
+          )}
+          loading={accounts.isLoading}
+          canManage={canManage}
+          onOpen={(account) => navigate(`/app/compta/tresorerie/comptes/${account.id}`)}
+          onEdit={openAccount}
+          onAssign={(account) => {
+            setAssignmentDraft({});
+            setAssignmentAccount(account);
+          }}
+          onToggle={setAccountToToggle}
+        />
+        <AccountSection
+          title="Caisses individuelles"
+          description="Une caisse créée automatiquement pour chaque utilisateur actif."
+          type="CAISSE"
+          accounts={(accounts.data ?? []).filter((account) =>
+            account.typeCompte === "CAISSE" && account.natureCaisse !== "CENTRALE"
+          )}
           loading={accounts.isLoading}
           canManage={canManage}
           onOpen={(account) => navigate(`/app/compta/tresorerie/comptes/${account.id}`)}
@@ -263,7 +290,7 @@ export default function TresorerieComptesPage() {
             <DialogDescription>
               {editingAccount
                 ? `${editingAccount.code} · ${editingAccount.libelle}`
-                : "Créez une caisse ou un compte bancaire pour l’agence."}
+                : "Créez la caisse centrale ou un compte bancaire pour l’agence."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
@@ -276,38 +303,67 @@ export default function TresorerieComptesPage() {
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CAISSE">Caisse</SelectItem>
+                  <SelectItem
+                    value="CAISSE"
+                    disabled={(accounts.data ?? []).some((account) =>
+                      account.typeCompte === "CAISSE"
+                        && account.natureCaisse === "CENTRALE"
+                    )}
+                  >
+                    Caisse centrale
+                  </SelectItem>
                   <SelectItem value="BANQUE">Banque</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {accountType === "CAISSE" && (
-              <div className="grid gap-2">
-                <Label>Caissier titulaire *</Label>
-                <Select value={ownerUserId} onValueChange={setOwnerUserId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choisir un utilisateur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(treasuryUsers.data ?? [])
-                      .filter((user) => user.actif)
-                      .map((user) => {
-                        const ownedElsewhere = (accounts.data ?? []).some(
-                          (account) => account.typeCompte === "CAISSE"
-                            && account.id !== editingAccount?.id
-                            && account.utilisateurTitulaireId === user.id
-                        );
-                        return (
-                          <SelectItem key={user.id} value={user.id} disabled={ownedElsewhere}>
-                            {user.nomComplet}{ownedElsewhere ? " · déjà affecté" : ""}
-                          </SelectItem>
-                        );
-                      })}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Les encaissements en espèces de cet utilisateur seront affectés automatiquement à cette caisse.
-                </p>
+              <div className="grid gap-3">
+                <div className="grid gap-2">
+                  <Label>Nature de la caisse</Label>
+                  <Select value={cashNature} disabled>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CENTRALE">Caisse centrale</SelectItem>
+                      <SelectItem value="INDIVIDUELLE">Caisse individuelle</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {cashNature === "CENTRALE"
+                      ? "La caisse centrale reçoit les remises des caisses individuelles."
+                      : "Cette caisse est gérée automatiquement avec son utilisateur."}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label>{cashNature === "CENTRALE" ? "Responsable *" : "Caissier titulaire *"}</Label>
+                  <Select value={ownerUserId} onValueChange={setOwnerUserId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un utilisateur" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(treasuryUsers.data ?? [])
+                        .filter((user) => user.actif)
+                        .map((user) => {
+                          const ownedElsewhere = cashNature === "INDIVIDUELLE"
+                            && (accounts.data ?? []).some(
+                              (account) => account.typeCompte === "CAISSE"
+                                && account.natureCaisse !== "CENTRALE"
+                                && account.id !== editingAccount?.id
+                                && account.utilisateurTitulaireId === user.id
+                            );
+                          return (
+                            <SelectItem key={user.id} value={user.id} disabled={ownedElsewhere}>
+                              {user.nomComplet}{ownedElsewhere ? " · déjà affecté" : ""}
+                            </SelectItem>
+                          );
+                        })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {cashNature === "CENTRALE"
+                      ? "Le responsable supervise les consolidations sans y recevoir automatiquement ses encaissements."
+                      : "Les encaissements en espèces de cet utilisateur seront affectés automatiquement à cette caisse."}
+                  </p>
+                </div>
               </div>
             )}
             <div className="grid gap-3 sm:grid-cols-2">
@@ -316,7 +372,7 @@ export default function TresorerieComptesPage() {
                 <Input
                   id="treasury-account-code"
                   value={accountCode}
-                  placeholder={accountType === "CAISSE" ? "CAISSE-PRINCIPALE" : "BANQUE-CIH"}
+                  placeholder={accountType === "CAISSE" ? "CAISSE-CENTRALE" : "BANQUE-CIH"}
                   onChange={(event) => setAccountCode(event.target.value)}
                 />
               </div>
@@ -325,7 +381,7 @@ export default function TresorerieComptesPage() {
                 <Input
                   id="treasury-account-label"
                   value={accountLabel}
-                  placeholder={accountType === "CAISSE" ? "Caisse principale" : "Compte courant"}
+                  placeholder={accountType === "CAISSE" ? "Caisse centrale" : "Compte courant"}
                   onChange={(event) => setAccountLabel(event.target.value)}
                 />
               </div>
@@ -586,7 +642,8 @@ function AccountSection({
                   </p>
                   {isCash && (
                     <p className="truncate text-xs text-muted-foreground">
-                      {account.utilisateurTitulaire ?? "Aucun caissier titulaire"}
+                      {account.natureCaisse === "CENTRALE" ? "Responsable : " : "Titulaire : "}
+                      {account.utilisateurTitulaire ?? "Non défini"}
                     </p>
                   )}
                 </div>
@@ -597,18 +654,20 @@ function AccountSection({
                 </Badge>
                 {canManage && (
                   <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title="Modifier le compte"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onEdit(account);
-                      }}
-                    >
-                      <Edit3 className="size-4" />
-                    </Button>
+                    {account.natureCaisse !== "INDIVIDUELLE" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        title="Modifier le compte"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEdit(account);
+                        }}
+                      >
+                        <Edit3 className="size-4" />
+                      </Button>
+                    )}
                     {!isCash && (
                       <Button
                         type="button"
@@ -623,20 +682,22 @@ function AccountSection({
                         <Users className="size-4" />
                       </Button>
                     )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title={account.actif ? "Désactiver le compte" : "Activer le compte"}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onToggle(account);
-                      }}
-                    >
-                      {account.actif
-                        ? <PowerOff className="size-4" />
-                        : <Power className="size-4" />}
-                    </Button>
+                    {account.natureCaisse !== "INDIVIDUELLE" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        title={account.actif ? "Désactiver le compte" : "Activer le compte"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggle(account);
+                        }}
+                      >
+                        {account.actif
+                          ? <PowerOff className="size-4" />
+                          : <Power className="size-4" />}
+                      </Button>
+                    )}
                   </>
                 )}
               </div>
@@ -649,7 +710,13 @@ function AccountSection({
                 <div className="text-xs text-muted-foreground">Solde comptable</div>
               </div>
               <div className="max-w-[45%] text-right text-xs text-muted-foreground">
-                <div>{isCash ? "Caisse" : "Compte bancaire"}</div>
+                <div>
+                  {isCash
+                    ? account.natureCaisse === "CENTRALE"
+                      ? "Caisse centrale"
+                      : "Caisse individuelle"
+                    : "Compte bancaire"}
+                </div>
                 {account.rib && <div className="truncate">{account.rib}</div>}
               </div>
             </div>

@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.TypeCompteTresorerie;
 import lombok.Builder;
 import lombok.Getter;
@@ -13,6 +14,7 @@ public class CompteTresorerieResponse {
     private String code;
     private String libelle;
     private TypeCompteTresorerie typeCompte;
+    private NatureCaisseTresorerie natureCaisse;
     private Long utilisateurTitulaireId;
     private String utilisateurTitulaire;
     private Long banqueId;

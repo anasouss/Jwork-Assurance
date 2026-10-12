@@ -111,7 +111,11 @@ export default function TresorerieCompteDetailPage() {
         />
         <Summary
           label="Type"
-          value={account?.typeCompte === "CAISSE" ? "Caisse" : "Compte bancaire"}
+          value={account?.typeCompte === "CAISSE"
+            ? account.natureCaisse === "CENTRALE"
+              ? "Caisse centrale"
+              : "Caisse individuelle"
+            : "Compte bancaire"}
           icon={account?.typeCompte === "CAISSE"
             ? <WalletCards className="size-4" />
             : <Landmark className="size-4" />}

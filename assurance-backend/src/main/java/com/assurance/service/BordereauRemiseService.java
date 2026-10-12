@@ -17,6 +17,7 @@ import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.LigneBordereauRemise;
 import com.assurance.entity.SequenceBordereauRemise;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.StatutBordereauRemise;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutLigneBordereauRemise;
@@ -312,6 +313,9 @@ public class BordereauRemiseService {
                 request.getCompteSourceId(),
                 TypeCompteTresorerie.CAISSE
         );
+        if (source.getNatureCaisse() != NatureCaisseTresorerie.CENTRALE) {
+            throw new BadRequestException("Un versement bancaire d'espèces doit provenir de la caisse centrale");
+        }
         if (!source.getDevise().equals(slip.getCompteDestination().getDevise())) {
             throw new BadRequestException("Les comptes source et destination doivent avoir la même devise");
         }

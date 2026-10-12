@@ -23,7 +23,7 @@ import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
 import { parseAccountingAmount } from "../format";
-import type { TreasuryOperation } from "../types";
+import type { TreasuryAccount, TreasuryOperation } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type EntryMode = "TRANSFERT" | "AJUSTEMENT";
@@ -402,7 +402,7 @@ function AccountSelect({
   onChange,
 }: {
   value: string;
-  accounts: Array<{ id: string; libelle: string; typeCompte: string }>;
+  accounts: TreasuryAccount[];
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
@@ -412,7 +412,11 @@ function AccountSelect({
       <SelectContent>
         {accounts.map((account) => (
           <SelectItem key={account.id} value={account.id}>
-            {account.libelle} · {account.typeCompte === "CAISSE" ? "Caisse" : "Banque"}
+            {account.libelle} · {account.typeCompte === "CAISSE"
+              ? account.natureCaisse === "CENTRALE"
+                ? "Caisse centrale"
+                : "Caisse individuelle"
+              : "Banque"}
           </SelectItem>
         ))}
       </SelectContent>

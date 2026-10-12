@@ -34,6 +34,7 @@ import com.assurance.entity.SequenceReglementClient;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutDocumentClient;
@@ -1219,6 +1220,10 @@ public class ReglementClientService {
                 ? TypeCompteTresorerie.CAISSE : TypeCompteTresorerie.BANQUE;
         if (account.getTypeCompte() != expectedType || !Boolean.TRUE.equals(account.getActif())) {
             throw new BadRequestException("Le type de compte ne correspond pas au moyen de règlement");
+        }
+        if (instrument.getMode() == ModeReglementClient.ESPECES
+                && account.getNatureCaisse() != NatureCaisseTresorerie.INDIVIDUELLE) {
+            throw new BadRequestException("Un règlement en espèces doit utiliser une caisse individuelle");
         }
         instrument.setCompteTresorerie(account);
         instrument.setStatut(StatutInstrumentReglement.CONFIRME);

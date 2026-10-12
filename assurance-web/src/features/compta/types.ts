@@ -436,6 +436,7 @@ export type PaymentInstrumentStatus =
   | "REMPLACE";
 export type PaymentAllocationStatus = "EN_ATTENTE" | "CONFIRMEE" | "ANNULEE";
 export type TreasuryAccountType = "CAISSE" | "BANQUE";
+export type TreasuryCashNature = "INDIVIDUELLE" | "CENTRALE";
 
 export type ClientReceivable = {
   source: ClientDocumentSource;
@@ -630,6 +631,7 @@ export type TreasuryAccount = {
   code: string;
   libelle: string;
   typeCompte: TreasuryAccountType;
+  natureCaisse?: TreasuryCashNature | null;
   utilisateurTitulaireId?: string | null;
   utilisateurTitulaire?: string | null;
   banqueId?: string | null;
@@ -646,6 +648,7 @@ export type UpsertTreasuryAccountRequest = {
   code: string;
   libelle: string;
   typeCompte: TreasuryAccountType;
+  natureCaisse?: TreasuryCashNature;
   utilisateurTitulaireId?: string;
   banqueId?: string;
   rib?: string;

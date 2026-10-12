@@ -14,6 +14,7 @@ import com.assurance.entity.InstrumentReglementCompagnie;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.NatureMouvementTresorerie;
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.NiveauAccesCompteTresorerie;
 import com.assurance.enums.SensMouvementTresorerie;
 import com.assurance.enums.TypeCompteTresorerie;
@@ -58,6 +59,12 @@ public class TresorerieService {
 
     @Transactional
     public CompteTresorerieResponse createAccount(Long agenceId, UpsertCompteTresorerieRequest request) {
+        if (request.getTypeCompte() == TypeCompteTresorerie.CAISSE
+                && request.getNatureCaisse() != NatureCaisseTresorerie.CENTRALE) {
+            throw new BadRequestException(
+                    "Les caisses individuelles sont créées automatiquement avec les utilisateurs"
+            );
+        }
         String code = normalizeCode(request.getCode());
         if (compteRepository.existsByAgenceIdAndCodeIgnoreCase(agenceId, code)) {
             throw new BadRequestException("Un compte de trésorerie utilise déjà ce code");
@@ -68,6 +75,7 @@ public class TresorerieService {
         account = compteRepository.save(account);
         accessService.assignCreatorAsSupervisor(account);
         accessService.ensureCashOwnerAccess(account);
+        accessService.synchronizeCentralCashAccess(account);
         return toResponse(account);
     }
 
@@ -78,6 +86,12 @@ public class TresorerieService {
             UpsertCompteTresorerieRequest request
     ) {
         CompteTresorerie account = requireAccount(agenceId, accountId);
+        if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE
+                && account.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE) {
+            throw new BadRequestException(
+                    "Une caisse individuelle est administrée depuis son utilisateur"
+            );
+        }
         Utilisateur formerOwner = account.getUtilisateurTitulaire();
         String code = normalizeCode(request.getCode());
         if (compteRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, accountId)) {
@@ -85,6 +99,12 @@ public class TresorerieService {
         }
         if (request.getTypeCompte() != account.getTypeCompte()) {
             throw new BadRequestException("Le type d'un compte de trésorerie ne peut pas être modifié");
+        }
+        NatureCaisseTresorerie requestedNature = resolveCashNature(account, request);
+        if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE
+                && account.getNatureCaisse() != null
+                && account.getNatureCaisse() != requestedNature) {
+            throw new BadRequestException("La nature d'une caisse ne peut pas être modifiée");
         }
         if (money(request.getSoldeInitial()).compareTo(money(account.getSoldeInitial())) != 0) {
             throw new BadRequestException(
@@ -98,6 +118,7 @@ public class TresorerieService {
             accessService.removeFormerCashOwnerUsage(account, formerOwner);
         }
         accessService.ensureCashOwnerAccess(account);
+        accessService.synchronizeCentralCashAccess(account);
         return toResponse(account);
     }
 
@@ -108,8 +129,16 @@ public class TresorerieService {
             Boolean active
     ) {
         CompteTresorerie account = requireAccount(agenceId, accountId);
+        if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE
+                && account.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE) {
+            throw new BadRequestException(
+                    "Le statut d'une caisse individuelle suit celui de son utilisateur"
+            );
+        }
         account.setActif(Boolean.TRUE.equals(active));
-        return toResponse(compteRepository.save(account));
+        account = compteRepository.save(account);
+        accessService.synchronizeCentralCashAccess(account);
+        return toResponse(account);
     }
 
     @Transactional(readOnly = true)
@@ -327,13 +356,14 @@ public class TresorerieService {
     public CompteTresorerie findCurrentUserCashAccount(Long agenceId) {
         Long userId = accessService.currentUserId();
         CompteTresorerie account = compteRepository
-                .findByAgenceIdAndUtilisateurTitulaireIdAndTypeCompteAndActifTrue(
+                .findByAgenceIdAndUtilisateurTitulaireIdAndTypeCompteAndNatureCaisseAndActifTrue(
                         agenceId,
                         userId,
-                        TypeCompteTresorerie.CAISSE
+                        TypeCompteTresorerie.CAISSE,
+                        NatureCaisseTresorerie.INDIVIDUELLE
                 )
                 .orElseThrow(() -> new BadRequestException(
-                        "Aucune caisse active n'est affectée à votre utilisateur"
+                        "Aucune caisse individuelle active n'est affectée à votre utilisateur"
                 ));
         accessService.requireAccess(
                 agenceId,
@@ -341,6 +371,61 @@ public class TresorerieService {
                 NiveauAccesCompteTresorerie.UTILISATION
         );
         return account;
+    }
+
+    @Transactional
+    public void synchronizePersonalCashAccount(Utilisateur user) {
+        List<CompteTresorerie> personalAccounts = compteRepository
+                .findByUtilisateurTitulaireIdAndTypeCompteAndNatureCaisse(
+                        user.getId(),
+                        TypeCompteTresorerie.CAISSE,
+                        NatureCaisseTresorerie.INDIVIDUELLE
+                );
+        CompteTresorerie current = user.getAgence() == null
+                ? null
+                : personalAccounts.stream()
+                        .filter(account -> user.getAgence().getId().equals(account.getAgence().getId()))
+                        .findFirst()
+                        .orElse(null);
+        Long currentAccountId = current == null ? null : current.getId();
+        personalAccounts.stream()
+                .filter(account -> currentAccountId == null || !account.getId().equals(currentAccountId))
+                .filter(account -> Boolean.TRUE.equals(account.getActif()))
+                .forEach(account -> account.setActif(false));
+        compteRepository.saveAll(personalAccounts);
+        personalAccounts.forEach(accessService::ensureCashOwnerAccess);
+        accessService.synchronizeCentralCashAccess(user);
+
+        if (user.getAgence() == null || !Boolean.TRUE.equals(user.getActif())) {
+            if (current != null && Boolean.TRUE.equals(current.getActif())) {
+                current.setActif(false);
+                current = compteRepository.save(current);
+                accessService.ensureCashOwnerAccess(current);
+            }
+            return;
+        }
+        if (current == null) {
+            String code = personalCashCode(user.getId());
+            if (compteRepository.existsByAgenceIdAndCodeIgnoreCase(user.getAgence().getId(), code)) {
+                code = code + "-P";
+            }
+            current = CompteTresorerie.builder()
+                    .agence(user.getAgence())
+                    .code(code)
+                    .libelle("Caisse - " + user.getFullName())
+                    .typeCompte(TypeCompteTresorerie.CAISSE)
+                    .natureCaisse(NatureCaisseTresorerie.INDIVIDUELLE)
+                    .utilisateurTitulaire(user)
+                    .devise("MAD")
+                    .soldeInitial(BigDecimal.ZERO)
+                    .actif(true)
+                    .build();
+        } else {
+            current.setLibelle("Caisse - " + user.getFullName());
+            current.setActif(true);
+        }
+        current = compteRepository.save(current);
+        accessService.ensureCashOwnerAccess(current);
     }
 
     private CompteTresorerie apply(
@@ -355,10 +440,12 @@ public class TresorerieService {
             }
             bank = banqueService.requireActive(account.getAgence().getId(), request.getBanqueId());
         }
-        Utilisateur owner = resolveCashOwner(account, request);
+        NatureCaisseTresorerie cashNature = resolveCashNature(account, request);
+        Utilisateur owner = resolveCashOwner(account, request, cashNature);
         account.setCode(code);
         account.setLibelle(request.getLibelle().trim());
         account.setTypeCompte(request.getTypeCompte());
+        account.setNatureCaisse(cashNature);
         account.setUtilisateurTitulaire(owner);
         account.setBanqueReference(bank);
         account.setRib(trimToNull(request.getRib()));
@@ -379,6 +466,7 @@ public class TresorerieService {
                 .code(account.getCode())
                 .libelle(account.getLibelle())
                 .typeCompte(account.getTypeCompte())
+                .natureCaisse(account.getNatureCaisse())
                 .utilisateurTitulaireId(account.getUtilisateurTitulaire() == null
                         ? null : account.getUtilisateurTitulaire().getId())
                 .utilisateurTitulaire(account.getUtilisateurTitulaire() == null
@@ -399,7 +487,8 @@ public class TresorerieService {
 
     private Utilisateur resolveCashOwner(
             CompteTresorerie account,
-            UpsertCompteTresorerieRequest request
+            UpsertCompteTresorerieRequest request,
+            NatureCaisseTresorerie cashNature
     ) {
         if (request.getTypeCompte() != TypeCompteTresorerie.CAISSE) {
             return null;
@@ -409,13 +498,36 @@ public class TresorerieService {
         }
         Long agenceId = account.getAgence().getId();
         Long userId = request.getUtilisateurTitulaireId();
-        boolean alreadyAssigned = account.getId() == null
-                ? compteRepository.existsByAgenceIdAndUtilisateurTitulaireId(agenceId, userId)
-                : compteRepository.existsByAgenceIdAndUtilisateurTitulaireIdAndIdNot(
+        if (cashNature == NatureCaisseTresorerie.CENTRALE) {
+            boolean centralExists = account.getId() == null
+                    ? compteRepository.existsByAgenceIdAndTypeCompteAndNatureCaisse(
+                            agenceId,
+                            TypeCompteTresorerie.CAISSE,
+                            NatureCaisseTresorerie.CENTRALE
+                    )
+                    : compteRepository.existsByAgenceIdAndTypeCompteAndNatureCaisseAndIdNot(
+                            agenceId,
+                            TypeCompteTresorerie.CAISSE,
+                            NatureCaisseTresorerie.CENTRALE,
+                            account.getId()
+                    );
+            if (centralExists) {
+                throw new BadRequestException("L'agence possède déjà une caisse centrale");
+            }
+        }
+        boolean alreadyAssigned = cashNature == NatureCaisseTresorerie.INDIVIDUELLE
+                && (account.getId() == null
+                ? compteRepository.existsByAgenceIdAndUtilisateurTitulaireIdAndNatureCaisse(
                         agenceId,
                         userId,
+                        NatureCaisseTresorerie.INDIVIDUELLE
+                )
+                : compteRepository.existsByAgenceIdAndUtilisateurTitulaireIdAndNatureCaisseAndIdNot(
+                        agenceId,
+                        userId,
+                        NatureCaisseTresorerie.INDIVIDUELLE,
                         account.getId()
-                );
+                ));
         if (alreadyAssigned) {
             throw new BadRequestException("Cet utilisateur possède déjà une caisse");
         }
@@ -426,6 +538,25 @@ public class TresorerieService {
                 .orElseThrow(() -> new BadRequestException(
                         "Le caissier titulaire doit être un utilisateur actif de l'agence"
                 ));
+    }
+
+    private NatureCaisseTresorerie resolveCashNature(
+            CompteTresorerie account,
+            UpsertCompteTresorerieRequest request
+    ) {
+        if (request.getTypeCompte() != TypeCompteTresorerie.CAISSE) {
+            return null;
+        }
+        if (request.getNatureCaisse() != null) {
+            return request.getNatureCaisse();
+        }
+        return account.getNatureCaisse() == null
+                ? NatureCaisseTresorerie.INDIVIDUELLE
+                : account.getNatureCaisse();
+    }
+
+    private String personalCashCode(Long userId) {
+        return "CAISSE-U" + String.format(Locale.ROOT, "%06d", userId);
     }
 
     private MouvementTresorerieResponse toResponse(MouvementTresorerie movement) {

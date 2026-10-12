@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.TypeCompteTresorerie;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,7 @@ public class UpsertCompteTresorerieRequest {
     private String libelle;
     @NotNull
     private TypeCompteTresorerie typeCompte;
+    private NatureCaisseTresorerie natureCaisse;
     private Long utilisateurTitulaireId;
     private Long banqueId;
     @Size(max = 120)

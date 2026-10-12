@@ -15,6 +15,7 @@ import com.assurance.entity.Utilisateur;
 import com.assurance.enums.NatureMouvementTresorerie;
 import com.assurance.enums.NiveauAccesCompteTresorerie;
 import com.assurance.enums.ModeReglementSinistre;
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.SensMouvementTresorerie;
 import com.assurance.enums.StatutOperationTresorerie;
 import com.assurance.enums.TypeOperationTresorerie;
@@ -104,7 +105,17 @@ public class OperationTresorerieService {
         CompteTresorerie source = requireActiveAccount(agenceId, request.getCompteSourceId());
         CompteTresorerie destination = requireActiveAccount(agenceId, request.getCompteDestinationId());
         accessService.requireAccess(agenceId, source.getId(), NiveauAccesCompteTresorerie.GESTION);
-        accessService.requireAccess(agenceId, destination.getId(), NiveauAccesCompteTresorerie.GESTION);
+        boolean centralCashDeposit = source.getTypeCompte() == com.assurance.enums.TypeCompteTresorerie.CAISSE
+                && source.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE
+                && destination.getTypeCompte() == com.assurance.enums.TypeCompteTresorerie.CAISSE
+                && destination.getNatureCaisse() == NatureCaisseTresorerie.CENTRALE;
+        accessService.requireAccess(
+                agenceId,
+                destination.getId(),
+                centralCashDeposit
+                        ? NiveauAccesCompteTresorerie.CONSULTATION
+                        : NiveauAccesCompteTresorerie.GESTION
+        );
         BigDecimal amount = positiveMoney(request.getMontant());
         requireSufficientBalance(source, amount);
 
@@ -390,8 +401,9 @@ public class OperationTresorerieService {
 
     private void validateClaimAccount(CompteTresorerie account, ModeReglementSinistre paymentMode) {
         if (paymentMode == ModeReglementSinistre.ESPECES
-                && account.getTypeCompte() != com.assurance.enums.TypeCompteTresorerie.CAISSE) {
-            throw new BadRequestException("Un règlement en espèces doit utiliser une caisse");
+                && (account.getTypeCompte() != com.assurance.enums.TypeCompteTresorerie.CAISSE
+                || account.getNatureCaisse() != NatureCaisseTresorerie.INDIVIDUELLE)) {
+            throw new BadRequestException("Un règlement en espèces doit utiliser une caisse individuelle");
         }
         if ((paymentMode == ModeReglementSinistre.VIREMENT
                 || paymentMode == ModeReglementSinistre.CHEQUE)

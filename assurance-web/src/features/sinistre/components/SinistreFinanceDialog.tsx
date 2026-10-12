@@ -95,7 +95,7 @@ export function SinistreFinanceDialog({
     Boolean(freeCounterpartyName.trim() && freeCounterpartyReason.trim());
   const compatibleAccounts = treasuryAccounts.filter((account) =>
     modeReglement === "ESPECES"
-      ? account.typeCompte === "CAISSE"
+      ? account.typeCompte === "CAISSE" && account.natureCaisse === "INDIVIDUELLE"
       : modeReglement === "VIREMENT" || modeReglement === "CHEQUE"
         ? account.typeCompte === "BANQUE"
         : true,

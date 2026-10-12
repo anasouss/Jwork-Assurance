@@ -1,5 +1,6 @@
 package com.assurance.entity;
 
+import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.TypeCompteTresorerie;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,10 +26,6 @@ import java.math.BigDecimal;
                 @UniqueConstraint(
                         name = "uk_compte_tresorerie_agence_code",
                         columnNames = {"agence_id", "code"}
-                ),
-                @UniqueConstraint(
-                        name = "uk_compte_tresorerie_titulaire",
-                        columnNames = "utilisateur_titulaire_id"
                 )
         },
         indexes = @Index(name = "idx_compte_tresorerie_agence_type", columnList = "agence_id,type_compte"))
@@ -52,6 +49,10 @@ public class CompteTresorerie extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "type_compte", nullable = false, length = 20)
     private TypeCompteTresorerie typeCompte;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "nature_caisse", length = 20)
+    private NatureCaisseTresorerie natureCaisse;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "utilisateur_titulaire_id")

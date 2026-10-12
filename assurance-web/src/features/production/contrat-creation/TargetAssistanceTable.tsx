@@ -5,9 +5,10 @@ import { EcheanceInput } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { resolveAssistanceDraftTotal, resolveAssistanceQuarterCount } from "../assistance-pricing";
 import { computeDateEcheanceFromCode, toDateOnly } from "../date";
 import type { AssistanceContrat, AssistanceDraft, ReferenceOption } from "../types";
-import { formatMoney } from "../utils/format";
+import { moneyAmount } from "../utils/format";
 import type { ContractTarget } from "./ContractTargetsSection";
 
 type TargetAssistanceTableProps = {
@@ -46,8 +47,12 @@ export function TargetAssistanceTable({
   const selectableProducts = selectedProduct && !filteredProducts.some((produit) => produit.id === selectedProduct.id)
     ? [selectedProduct, ...filteredProducts]
     : filteredProducts;
-  const prime = preview?.primeTotale;
-  const trimestres = preview?.trimestres;
+  const draftPrime = resolveAssistanceDraftTotal(selectedProduct, assistance.dateEffet, assistance.dateEcheance);
+  const previewMatchesProduct = String(preview?.produitAssistanceId ?? "") === selectedProductId;
+  const prime = draftPrime ?? (previewMatchesProduct ? preview?.primeTotale ?? undefined : undefined);
+  const trimestres = assistance.dateEffet || assistance.dateEcheance
+    ? resolveAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance)
+    : previewMatchesProduct ? preview?.trimestres ?? undefined : undefined;
 
   const updateDateEffet = (dateEffet?: string) => {
     onChange({
@@ -142,7 +147,7 @@ export function TargetAssistanceTable({
               </div>
             </ResponsiveRecordCell>
             <ResponsiveRecordCell label="Prime" valueClassName="text-right font-medium">
-              {assistance.enabled && prime != null ? formatMoney(prime) : "-"}
+              {assistance.enabled && prime != null ? moneyAmount(prime) : "-"}
             </ResponsiveRecordCell>
           </tr>
         </tbody>

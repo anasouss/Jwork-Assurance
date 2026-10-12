@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn } from "@/lib/utils";
 import { SectionCard } from "../components/SectionCard";
 import { emptyVehicule } from "../components/VehiculeSection";
+import { resolveAssistanceDraftTotal } from "../assistance-pricing";
 import { moneyAmount } from "../utils/format";
 import type { AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, RemorqueInput, VehiculeInput } from "../types";
 import type { ContratSectionKey } from "./useContratCreationForm";
@@ -234,8 +235,18 @@ export function ContractTargetsSection({
     remorqueTargets.find((target) => targetKey(target) === activeKey) ?? remorqueTargets[0];
   const activeVehiculePreview = previewForTarget(preview, targetPreview, activeVehiculeTarget);
   const activeRemorquePreview = previewForTarget(preview, targetPreview, activeRemorqueTarget);
-  const activeVehiculeAssistanceNet = activeVehiculePreview?.assistances?.[0]?.primeTotale ?? undefined;
-  const activeRemorqueAssistanceNet = activeRemorquePreview?.assistances?.[0]?.primeTotale ?? undefined;
+  const activeVehiculeAssistanceNet = assistanceTotalForTarget(
+    activeVehiculeTarget,
+    assistances,
+    produitsAssistance,
+    activeVehiculePreview
+  );
+  const activeRemorqueAssistanceNet = assistanceTotalForTarget(
+    activeRemorqueTarget,
+    assistances,
+    produitsAssistance,
+    activeRemorquePreview
+  );
   const targetActionText = targetActionMode === "calculate"
     ? {
         info: "Enregistrer informations",
@@ -949,6 +960,26 @@ function targetSaved(
   }
   const targetGaranties = selected.filter((item) => sameTarget(item, target));
   return targetGaranties.length > 0 && targetGaranties.every(isGuaranteeSelectionComplete);
+}
+
+function assistanceTotalForTarget(
+  target: Target | undefined,
+  assistances: Record<string, AssistanceDraft>,
+  products: ReferenceOption[],
+  preview: QuittancePreview | null | undefined
+) {
+  if (!target) return undefined;
+  const draft = assistances[targetKey(target)];
+  if (!draft?.enabled) return undefined;
+
+  const product = products.find((item) => item.id === draft.produitAssistanceId);
+  const draftTotal = resolveAssistanceDraftTotal(product, draft.dateEffet, draft.dateEcheance);
+  if (draftTotal != null) return draftTotal;
+
+  const previewAssistance = preview?.assistances?.[0];
+  return String(previewAssistance?.produitAssistanceId ?? "") === String(draft.produitAssistanceId ?? "")
+    ? previewAssistance?.primeTotale ?? undefined
+    : undefined;
 }
 
 function vehicleTargetLabel(vehicule: VehiculeInput, index: number) {

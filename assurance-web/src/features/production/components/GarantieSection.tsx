@@ -13,9 +13,10 @@ import { cn } from "@/lib/utils";
 import { MoneyInput } from "./MoneyInput";
 import { SectionCard } from "./SectionCard";
 import { computeDateEcheanceFromCode, toDateOnly } from "../date";
-import { formatMoney, money, moneyAmount, numberValue, roundMoney } from "../utils/format";
+import { money, moneyAmount, numberValue, roundMoney } from "../utils/format";
 import { validateValeurVenale } from "../utils/vehicle-validation";
 import type { AssistanceContrat, AssistanceDraft, GarantieInput, QuittancePreview, ReferenceOption, VehiculeInput } from "../types";
+import { resolveAssistanceDraftTotal, resolveAssistanceQuarterCount } from "../assistance-pricing";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 import { tariffSelectionLabel } from "../contrat-creation/tariff-selection-label";
 
@@ -767,8 +768,12 @@ function AssistanceTable({
   const selectableProducts = selectedProduct && !filteredProducts.some((produit) => produit.id === selectedProduct.id)
     ? [selectedProduct, ...filteredProducts]
     : filteredProducts;
-  const prime = preview?.primeTotale;
-  const trimestres = preview?.trimestres;
+  const draftPrime = resolveAssistanceDraftTotal(selectedProduct, assistance.dateEffet, assistance.dateEcheance);
+  const previewMatchesProduct = String(preview?.produitAssistanceId ?? "") === selectedProductId;
+  const prime = draftPrime ?? (previewMatchesProduct ? preview?.primeTotale ?? undefined : undefined);
+  const trimestres = assistance.dateEffet || assistance.dateEcheance
+    ? resolveAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance)
+    : previewMatchesProduct ? preview?.trimestres ?? undefined : undefined;
   const updateDateEffet = (dateEffet?: string) => {
     onChange({
       dateEffet,
@@ -873,7 +878,7 @@ function AssistanceTable({
               </div>
             </ResponsiveRecordCell>
             <ResponsiveRecordCell label="Prime" valueClassName="text-right font-medium">
-              {assistance.enabled && prime != null ? formatMoney(prime) : "-"}
+              {assistance.enabled && prime != null ? moneyAmount(prime) : "-"}
             </ResponsiveRecordCell>
           </tr>
         </tbody>

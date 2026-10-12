@@ -1,5 +1,5 @@
 import type { ReferenceOption } from "./types";
-import { numberValue } from "./utils/format";
+import { numberValue, roundMoney } from "./utils/format";
 
 export function resolveAssistanceTariffAmount(
   product: ReferenceOption | undefined,
@@ -13,6 +13,36 @@ export function resolveAssistanceTariffAmount(
     return datedAmount;
   }
   return numberValue(String(product?.[amountKey] ?? ""));
+}
+
+export function resolveAssistanceQuarterCount(dateEffet?: string, dateEcheance?: string) {
+  const start = parseDateOnly(dateEffet);
+  const end = parseDateOnly(dateEcheance);
+  if (!start || !end || end < start) {
+    return 4;
+  }
+
+  const endExclusive = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1);
+  let months = (endExclusive.getFullYear() - start.getFullYear()) * 12
+    + (endExclusive.getMonth() - start.getMonth());
+  const startPlusMonths = addMonthsClamped(start, months);
+  if (startPlusMonths < endExclusive) {
+    months += 1;
+  }
+
+  return Math.max(1, Math.min(4, Math.ceil(Math.max(1, months) / 3)));
+}
+
+export function resolveAssistanceDraftTotal(
+  product: ReferenceOption | undefined,
+  dateEffet?: string,
+  dateEcheance?: string
+) {
+  const annualTotal = resolveAssistanceTariffAmount(product, undefined, undefined, "montantTtc");
+  if (annualTotal == null) {
+    return undefined;
+  }
+  return roundMoney(annualTotal * resolveAssistanceQuarterCount(dateEffet, dateEcheance) / 4);
 }
 
 function resolveAssistanceTariff(tarifs: ReferenceOption[] | undefined, dateSouscription?: string) {
@@ -46,4 +76,10 @@ function parseDateOnly(value?: string) {
     return undefined;
   }
   return date;
+}
+
+function addMonthsClamped(date: Date, months: number) {
+  const targetMonth = date.getMonth() + months;
+  const lastDay = new Date(date.getFullYear(), targetMonth + 1, 0).getDate();
+  return new Date(date.getFullYear(), targetMonth, Math.min(date.getDate(), lastDay));
 }

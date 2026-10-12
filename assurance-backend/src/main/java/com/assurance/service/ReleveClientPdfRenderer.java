@@ -79,9 +79,9 @@ public class ReleveClientPdfRenderer {
     private static final float PAGE_MARGIN = 24f;
     private static final int DENSE_STATEMENT_LINE_THRESHOLD = 9;
     private static final float TABLE_FONT_SIZE = 7.5f;
-    private static final float DENSE_TABLE_FONT_SIZE = 6.6f;
+    private static final float DENSE_TABLE_FONT_SIZE = 7.1f;
     private static final float TABLE_CELL_PADDING = 4f;
-    private static final float DENSE_TABLE_CELL_PADDING = 2.5f;
+    private static final float DENSE_TABLE_CELL_PADDING = 3.1f;
     private static final String[] SMALL_NUMBERS = {
             "zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
             "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize"

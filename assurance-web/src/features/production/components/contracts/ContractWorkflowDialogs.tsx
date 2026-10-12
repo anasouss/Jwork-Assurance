@@ -1,4 +1,4 @@
-import { Building2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Building2, ShieldCheck } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,9 +69,20 @@ export function ContractWorkflowDialogs({
     <>
       <Dialog open={blockedEditDialog.open} onOpenChange={blockedEditDialog.onOpenChange}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Modification directe impossible</DialogTitle>
-            <DialogDescription>{blockedEditMessage(blockedEditDialog.reason)}</DialogDescription>
+          <DialogHeader className="rounded-md border border-amber-200 bg-amber-50 p-4 text-left dark:border-amber-900/70 dark:bg-amber-950/30">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                <AlertTriangle className="size-5" />
+              </span>
+              <div className="grid gap-1">
+                <DialogTitle className="text-amber-950 dark:text-amber-100">
+                  Modification directe impossible
+                </DialogTitle>
+                <DialogDescription className="text-amber-900/80 dark:text-amber-200/80">
+                  {blockedEditMessage(blockedEditDialog.reason)}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
           <DialogFooter className="sm:justify-between">
             <Button type="button" variant="outline" onClick={blockedEditDialog.onViewContract}>

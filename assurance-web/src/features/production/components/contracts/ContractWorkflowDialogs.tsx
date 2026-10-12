@@ -25,6 +25,15 @@ import type { AvenantDraftSummary } from "../../types";
 type RenewalTerm = "CABINET" | "COMPAGNIE";
 
 type ContractWorkflowDialogsProps = {
+  blockedEditDialog: {
+    open: boolean;
+    reason?: AvenantBlockReason | null;
+    canCreateAvenant: boolean;
+    onOpenChange: (open: boolean) => void;
+    onViewContract: () => void;
+    onViewPayments: () => void;
+    onCreateAvenant: () => void;
+  };
   deleteDialog: {
     open: boolean;
     title: string;
@@ -51,12 +60,39 @@ type ContractWorkflowDialogsProps = {
 };
 
 export function ContractWorkflowDialogs({
+  blockedEditDialog,
   deleteDialog,
   renewalDialog,
   draftDialog,
 }: ContractWorkflowDialogsProps) {
   return (
     <>
+      <Dialog open={blockedEditDialog.open} onOpenChange={blockedEditDialog.onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Modification directe impossible</DialogTitle>
+            <DialogDescription>{blockedEditMessage(blockedEditDialog.reason)}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-between">
+            <Button type="button" variant="outline" onClick={blockedEditDialog.onViewContract}>
+              Voir le contrat
+            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              {blockedEditDialog.reason === "REGLEMENT_EXISTANT" ? (
+                <Button type="button" variant="outline" onClick={blockedEditDialog.onViewPayments}>
+                  Voir les règlements
+                </Button>
+              ) : null}
+              {blockedEditDialog.canCreateAvenant ? (
+                <Button type="button" onClick={blockedEditDialog.onCreateAvenant}>
+                  Créer un avenant
+                </Button>
+              ) : null}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteDialog.open} onOpenChange={deleteDialog.onOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -154,6 +190,30 @@ export function ContractWorkflowDialogs({
       </AlertDialog>
     </>
   );
+}
+
+type AvenantBlockReason =
+  | "MOUVEMENT_ULTERIEUR"
+  | "REGLEMENT_EXISTANT"
+  | "DOCUMENT_CLIENT_EMIS"
+  | "CONTRAT_RENOUVELE"
+  | "CONTRAT_CLOS";
+
+function blockedEditMessage(reason?: AvenantBlockReason | null) {
+  switch (reason) {
+    case "REGLEMENT_EXISTANT":
+      return "Ce contrat possède déjà un règlement actif. Une modification directe altérerait l’historique comptable ; utilisez un avenant.";
+    case "DOCUMENT_CLIENT_EMIS":
+      return "Ce contrat figure déjà sur un relevé ou une facture émis. Utilisez un avenant afin de préserver le document comptable.";
+    case "MOUVEMENT_ULTERIEUR":
+      return "Ce contrat contient déjà un avenant ou un mouvement ultérieur. Rectifiez le dernier mouvement concerné ou créez un nouvel avenant.";
+    case "CONTRAT_RENOUVELE":
+      return "Ce contrat a déjà été renouvelé. Consultez le contrat renouvelé pour poursuivre les opérations.";
+    case "CONTRAT_CLOS":
+      return "Le statut actuel du contrat ne permet plus sa modification directe.";
+    default:
+      return "Ce contrat ne peut plus être modifié directement. Utilisez le workflow contractuel disponible pour préserver son historique.";
+  }
 }
 
 function RenewalChoice({

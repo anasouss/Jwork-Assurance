@@ -16,6 +16,34 @@ import java.util.Set;
 public interface AffectationReglementClientRepository extends JpaRepository<AffectationReglementClient, Long> {
 
     @Query("""
+            select distinct allocation.elementFacturable.contrat.id
+            from AffectationReglementClient allocation
+            where allocation.elementFacturable.contrat.agence.id = :agenceId
+              and allocation.elementFacturable.contrat.id in :contractIds
+              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
+            """)
+    List<Long> findContractIdsWithActiveDirectPayments(
+            @Param("agenceId") Long agenceId,
+            @Param("contractIds") Collection<Long> contractIds
+    );
+
+    @Query("""
+            select distinct line.elementFacturable.contrat.id
+            from AffectationReglementClient allocation
+            join allocation.documentClient document
+            join document.lignes line
+            where document.agence.id = :agenceId
+              and line.elementFacturable.contrat.id in :contractIds
+              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
+            """)
+    List<Long> findContractIdsWithActiveDocumentPayments(
+            @Param("agenceId") Long agenceId,
+            @Param("contractIds") Collection<Long> contractIds
+    );
+
+    @Query("""
             select a.elementFacturable.id, a.statut, sum(a.montant)
             from AffectationReglementClient a
             where a.elementFacturable.id in :elementIds

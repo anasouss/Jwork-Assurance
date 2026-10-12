@@ -40,6 +40,8 @@ class ContratSearchServiceTest {
     private VehiculeRepository vehiculeRepository;
     @Mock
     private AvenantDraftService avenantDraftService;
+    @Mock
+    private ContractDirectModificationPolicy directModificationPolicy;
 
     private ContratSearchService service;
 
@@ -51,7 +53,8 @@ class ContratSearchServiceTest {
                 mouvementContratRepository,
                 vehiculeRepository,
                 avenantDraftService,
-                new RenewalPolicy()
+                new RenewalPolicy(),
+                directModificationPolicy
         );
     }
 
@@ -122,6 +125,12 @@ class ContratSearchServiceTest {
         when(mouvementContratRepository.findByContratIdInOrderByCreatedAtDesc(ids)).thenReturn(List.of());
         when(vehiculeRepository.findByContratIdInOrderByCreatedAtAsc(ids)).thenReturn(List.of());
         when(avenantDraftService.listSummaries(7L, ids)).thenReturn(List.of());
+        when(directModificationPolicy.evaluateAll(eq(7L), any(), any())).thenAnswer(invocation -> {
+            List<Contrat> contracts = invocation.getArgument(1);
+            return contracts.stream()
+                    .map(contract -> ContractDirectModificationPolicy.Evaluation.permitted())
+                    .toList();
+        });
     }
 
     private Contrat contract(Long id, Contrat origin, String dossier) {

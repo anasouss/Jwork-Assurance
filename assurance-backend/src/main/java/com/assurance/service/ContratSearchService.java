@@ -50,6 +50,7 @@ public class ContratSearchService {
     private final VehiculeRepository vehiculeRepository;
     private final AvenantDraftService avenantDraftService;
     private final RenewalPolicy renewalPolicy;
+    private final ContractDirectModificationPolicy directModificationPolicy;
 
     @Transactional(readOnly = true)
     public PagedResponse<ContratListGroupResponse> searchContracts(
@@ -200,6 +201,12 @@ public class ContratSearchService {
                 .listSummaries(agenceId, ids)
                 .stream()
                 .collect(Collectors.groupingBy(AvenantDraftSummaryResponse::getContratId));
+        List<ContractDirectModificationPolicy.Evaluation> policyValues = directModificationPolicy
+                .evaluateAll(agenceId, contracts, movements.values().stream().flatMap(List::stream).toList());
+        Map<Long, ContractDirectModificationPolicy.Evaluation> modificationPolicies = new LinkedHashMap<>();
+        for (int index = 0; index < contracts.size(); index++) {
+            modificationPolicies.put(contracts.get(index).getId(), policyValues.get(index));
+        }
 
         return contracts.stream()
                 .map(contract -> toItem(
@@ -207,7 +214,8 @@ public class ContratSearchService {
                         clients.getOrDefault(contract.getId(), List.of()),
                         movements.getOrDefault(contract.getId(), List.of()),
                         vehicles.getOrDefault(contract.getId(), List.of()),
-                        drafts.getOrDefault(contract.getId(), List.of())
+                        drafts.getOrDefault(contract.getId(), List.of()),
+                        modificationPolicies.get(contract.getId())
                 ))
                 .toList();
     }
@@ -217,7 +225,8 @@ public class ContratSearchService {
             List<ContratClient> clients,
             List<MouvementContrat> movements,
             List<Vehicule> vehicles,
-            List<AvenantDraftSummaryResponse> drafts
+            List<AvenantDraftSummaryResponse> drafts,
+            ContractDirectModificationPolicy.Evaluation modificationPolicy
     ) {
         List<MouvementContrat> activeMovements = movements.stream()
                 .filter(movement -> movement.getStatut() != StatutMouvementContrat.ANNULE)
@@ -263,6 +272,8 @@ public class ContratSearchService {
                 .brouillon(contract.getBrouillon())
                 .prospection(contract.getProspection())
                 .premierTypeVehicule(firstVehicle == null ? null : firstVehicle.getTypeVehicule().name())
+                .modificationDirecteAutorisee(modificationPolicy != null && modificationPolicy.allowed())
+                .motifBlocageModificationDirecte(modificationPolicy == null ? null : modificationPolicy.reason())
                 .clients(clients.stream().map(this::toClientLink).toList())
                 .mouvements(movementViews)
                 .avenantDrafts(drafts)

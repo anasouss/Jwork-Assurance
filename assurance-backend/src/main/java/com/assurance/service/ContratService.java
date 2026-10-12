@@ -104,6 +104,7 @@ public class ContratService {
     private final EcheanceService echeanceService;
     private final AvenantExtensionGuaranteeValidator avenantExtensionGuaranteeValidator;
     private final RenewalPolicy renewalPolicy;
+    private final ContractDirectModificationPolicy directModificationPolicy;
 
     private void bindAgence(CreateContratRequest request, Long agenceId) {
         if (agenceId == null) {
@@ -893,6 +894,7 @@ public class ContratService {
             return contrat;
         }
         if (isCorrectionAffaireNouvelle(contrat)) {
+            directModificationPolicy.assertAllowed(agenceId, contrat);
             mouvementContratService.assertCorrectionInitialeAutorisee(contrat);
             return contrat;
         }

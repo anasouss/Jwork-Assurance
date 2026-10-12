@@ -14,6 +14,18 @@ import java.util.List;
 public interface LigneDocumentClientRepository extends JpaRepository<LigneDocumentClient, Long> {
 
     @Query("""
+            select distinct line.elementFacturable.contrat.id
+            from LigneDocumentClient line
+            where line.document.agence.id = :agenceId
+              and line.elementFacturable.contrat.id in :contractIds
+              and line.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
+            """)
+    List<Long> findContractIdsWithIssuedDocuments(
+            @Param("agenceId") Long agenceId,
+            @Param("contractIds") Collection<Long> contractIds
+    );
+
+    @Query("""
             select count(l)
             from LigneDocumentClient l
             where l.elementFacturable.mouvementContrat.id = :mouvementId

@@ -1518,6 +1518,14 @@ export type ContratListItem = {
   brouillon?: boolean | null;
   prospection?: boolean | null;
   premierTypeVehicule?: string | null;
+  modificationDirecteAutorisee?: boolean | null;
+  motifBlocageModificationDirecte?:
+    | "MOUVEMENT_ULTERIEUR"
+    | "REGLEMENT_EXISTANT"
+    | "DOCUMENT_CLIENT_EMIS"
+    | "CONTRAT_RENOUVELE"
+    | "CONTRAT_CLOS"
+    | null;
   clients?: {
     clientId: string;
     codeClient?: string | null;

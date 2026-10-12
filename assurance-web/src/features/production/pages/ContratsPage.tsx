@@ -380,6 +380,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const [draftChoiceCode, setDraftChoiceCode] = useState<string | null>(null);
   const [renewalDialogOpen, setRenewalDialogOpen] = useState(false);
   const [financialRecalculationOpen, setFinancialRecalculationOpen] = useState(false);
+  const [blockedEditOpen, setBlockedEditOpen] = useState(false);
   const [renewalTerm, setRenewalTerm] = useState<"CABINET" | "COMPAGNIE">("CABINET");
   const isFlotte = contrat.typeContrat === "FLOTTE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -409,11 +410,15 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const canCreateMovement = canCreateAvenant && !child && !terminal && !contrat.renouvele && isActiveContrat(contrat);
   const canRenew = canRenewContrat && !child && !terminal && !contrat.renouvele
     && isActiveContrat(contrat) && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
-  const canEditDirectly = (isDirectlyEditable(contrat) || isActiveContrat(contrat))
+  const canEditDirectly = contrat.modificationDirecteAutorisee !== false
+    && (isDirectlyEditable(contrat) || isActiveContrat(contrat))
     && (canUpdateContrat || canCreateContrat)
     && !child
     && !terminal
     && !hasActiveAvenants;
+  const canShowEdit = (canUpdateContrat || canCreateContrat) && !child;
+  const blockedEditReason = contrat.motifBlocageModificationDirecte
+    ?? fallbackDirectEditBlockReason(contrat, movement, hasActiveAvenants);
   const rectificationPath = movement.mouvementId && movement.code
     ? `${avenantPath(contrat, movement.code)}?mouvementId=${movement.mouvementId}`
     : null;
@@ -435,7 +440,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && !terminal
     && !movement.isSynthetic
     && movement.autoriseCarteVerte === true;
-  const hasPrimaryActions = canEditDirectly || canCreateMovement || canOpenAssistance || canOpenCarteVerte
+  const hasPrimaryActions = canShowEdit || canCreateMovement || canOpenAssistance || canOpenCarteVerte
     || canRecalculateFinancialHistory;
   const resolvedDeleteMode = resolveDeleteMode(contrat, movement, child);
   const deleteMode = resolvedDeleteMode === "CONTRAT" && canDeleteContrat
@@ -542,14 +547,17 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
               <DropdownMenuSeparator />
             </>
           ) : null}
-          {canEditDirectly ? (
-            <DropdownMenuItem asChild>
-              <Link to={editPath}>Modifier</Link>
-            </DropdownMenuItem>
-          ) : null}
           {canRectifyMovement && rectificationPath ? (
             <DropdownMenuItem asChild>
               <Link to={rectificationPath}>Modifier</Link>
+            </DropdownMenuItem>
+          ) : canShowEdit && canEditDirectly ? (
+            <DropdownMenuItem asChild>
+              <Link to={editPath}>Modifier</Link>
+            </DropdownMenuItem>
+          ) : canShowEdit ? (
+            <DropdownMenuItem onSelect={() => setBlockedEditOpen(true)}>
+              Modifier
             </DropdownMenuItem>
           ) : null}
           {canCreateMovement ? (
@@ -633,6 +641,15 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
         </DropdownMenuContent>
       </DropdownMenu>
       <ContractWorkflowDialogs
+        blockedEditDialog={{
+          open: blockedEditOpen,
+          reason: blockedEditReason,
+          canCreateAvenant: canCreateMovement,
+          onOpenChange: setBlockedEditOpen,
+          onViewContract: () => navigate(showContratPath(contrat, movement)),
+          onViewPayments: () => navigate(`/app/compta/reglements/historique?${new URLSearchParams({ search: mainClient(contrat) }).toString()}`),
+          onCreateAvenant: () => navigate(avenantPath(contrat, isFlotte ? "MOG_F" : "MOG_M")),
+        }}
         deleteDialog={{
           open: confirmDeleteOpen,
           title: deleteTitle,
@@ -699,6 +716,21 @@ function renewalDraftPath(contrat: ContratListItem) {
 function isDirectlyEditable(contrat: ContratListItem) {
   const statut = String(contrat.statut ?? "").toUpperCase();
   return statut.includes("DRAFT") && (Boolean(contrat.brouillon) || Boolean(contrat.prospection));
+}
+
+function fallbackDirectEditBlockReason(
+  contrat: ContratListItem,
+  movement: MovementLine,
+  hasActiveAvenants: boolean
+): ContratListItem["motifBlocageModificationDirecte"] {
+  if (hasActiveAvenants) return "MOUVEMENT_ULTERIEUR";
+  if (contrat.renouvele || String(contrat.statut ?? "").toUpperCase() === "RENEWED") {
+    return "CONTRAT_RENOUVELE";
+  }
+  if (isTerminalContratRow(contrat, movement) || !isActiveContrat(contrat)) {
+    return "CONTRAT_CLOS";
+  }
+  return null;
 }
 
 function isActiveContrat(contrat: ContratListItem) {

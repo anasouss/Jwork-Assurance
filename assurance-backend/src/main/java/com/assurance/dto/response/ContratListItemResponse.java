@@ -1,6 +1,7 @@
 package com.assurance.dto.response;
 
 import com.assurance.enums.ModeTermeRenouvellement;
+import com.assurance.enums.MotifBlocageModificationContrat;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
@@ -43,6 +44,8 @@ public class ContratListItemResponse {
     private Boolean brouillon;
     private Boolean prospection;
     private String premierTypeVehicule;
+    private Boolean modificationDirecteAutorisee;
+    private MotifBlocageModificationContrat motifBlocageModificationDirecte;
     private List<ClientLink> clients;
     private List<MovementSummary> mouvements;
     private List<AvenantDraftSummaryResponse> avenantDrafts;

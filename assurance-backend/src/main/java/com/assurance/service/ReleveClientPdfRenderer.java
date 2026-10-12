@@ -77,6 +77,11 @@ public class ReleveClientPdfRenderer {
     private static final SolidBorder TABLE_BORDER = new SolidBorder(BRAND_BLUE, 0.65f);
     private static final SolidBorder BODY_BORDER = new SolidBorder(BORDER_COLOR, 0.4f);
     private static final float PAGE_MARGIN = 24f;
+    private static final int DENSE_STATEMENT_LINE_THRESHOLD = 9;
+    private static final float TABLE_FONT_SIZE = 7.5f;
+    private static final float DENSE_TABLE_FONT_SIZE = 6.6f;
+    private static final float TABLE_CELL_PADDING = 4f;
+    private static final float DENSE_TABLE_CELL_PADDING = 2.5f;
     private static final String[] SMALL_NUMBERS = {
             "zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
             "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize"
@@ -112,11 +117,12 @@ public class ReleveClientPdfRenderer {
             if (!isInvoice(source)) {
                 writeClientReference(document, source, bold);
             }
-            writeDocumentLines(document, source, bold, bold, fleetAnnexes);
+            boolean denseStatement = isDenseStatement(source);
+            writeDocumentLines(document, source, bold, bold, fleetAnnexes, denseStatement);
             if (!isInvoice(source)) {
-                writeTotal(document, source, bold);
+                writeTotal(document, source, bold, denseStatement);
             }
-            writePaymentText(document, source, bold, italic);
+            writePaymentText(document, source, bold, italic, denseStatement);
             if (avecSignature && isInvoice(source)) {
                 writeSignature(document, source.getAgence(), true);
             }
@@ -276,14 +282,15 @@ public class ReleveClientPdfRenderer {
             DocumentClient source,
             PdfFont bold,
             PdfFont tableHeader,
-            Map<LigneDocumentClient, Integer> fleetAnnexes
+            Map<LigneDocumentClient, Integer> fleetAnnexes,
+            boolean denseStatement
     ) {
         if (isInvoice(source)) {
             writeInvoiceLines(document, source, bold, tableHeader, fleetAnnexes);
             return;
         }
 
-        writeStatementLines(document, source, bold, tableHeader, fleetAnnexes);
+        writeStatementLines(document, source, bold, tableHeader, fleetAnnexes, denseStatement);
     }
 
     private void writeStatementLines(
@@ -291,21 +298,24 @@ public class ReleveClientPdfRenderer {
             DocumentClient source,
             PdfFont bold,
             PdfFont tableHeader,
-            Map<LigneDocumentClient, Integer> fleetAnnexes
+            Map<LigneDocumentClient, Integer> fleetAnnexes,
+            boolean denseStatement
     ) {
+        float fontSize = denseStatement ? DENSE_TABLE_FONT_SIZE : TABLE_FONT_SIZE;
+        float cellPadding = denseStatement ? DENSE_TABLE_CELL_PADDING : TABLE_CELL_PADDING;
         Table table = new Table(new float[]{17, 9.5f, 6.2f, 6.2f, 8, 6.5f, 7.5f, 7, 9, 23})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setKeepTogether(false);
-        addHeader(table, "L’assuré", tableHeader);
-        addHeader(table, "Police", tableHeader);
-        addHeader(table, "Du", tableHeader);
-        addHeader(table, "Au", tableHeader);
-        addHeader(table, "Prime Nette", tableHeader);
-        addHeader(table, "Taxes", tableHeader);
-        addHeader(table, "Montant\nTTC", tableHeader);
-        addHeader(table, "Acompte", tableHeader);
-        addHeader(table, "Reste à payer", tableHeader);
-        addHeader(table, "Libellé", tableHeader);
+        addHeader(table, "L’assuré", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Police", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Du", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Au", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Prime Nette", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Taxes", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Montant\nTTC", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Acompte", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Reste à payer", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Libellé", tableHeader, fontSize, cellPadding);
 
         Map<Long, String> subscriberNames = subscriberNames(source);
         source.getLignes().stream()
@@ -316,7 +326,9 @@ public class ReleveClientPdfRenderer {
                         line,
                         bold,
                         fleetAnnexes.get(line),
-                        subscriberNames
+                        subscriberNames,
+                        fontSize,
+                        cellPadding
                 ));
         document.add(table);
     }
@@ -368,7 +380,9 @@ public class ReleveClientPdfRenderer {
             LigneDocumentClient line,
             PdfFont bold,
             Integer fleetAnnexNumber,
-            Map<Long, String> subscriberNames
+            Map<Long, String> subscriberNames,
+            float fontSize,
+            float cellPadding
     ) {
         BigDecimal balance = money(line.getDebit()).subtract(money(line.getCredit()));
         Contrat contract = contract(line);
@@ -376,16 +390,17 @@ public class ReleveClientPdfRenderer {
         String insuredName = subscriberName == null || subscriberName.isBlank()
                 ? source.getPayeurNom()
                 : subscriberName;
-        addValue(table, insuredName, TextAlignment.LEFT, null);
-        addValue(table, statementReference(line), TextAlignment.CENTER, null);
-        addValue(table, date(line.getDateOperation()), TextAlignment.CENTER, null);
-        addValue(table, date(line.getDateEcheance()), TextAlignment.CENTER, null);
-        addValue(table, amount(line.getPrimeNette()), TextAlignment.CENTER, null);
-        addValue(table, amount(line.getTaxes()), TextAlignment.CENTER, null);
-        addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, null);
-        addValue(table, positiveAmount(line.getCredit()), TextAlignment.CENTER, null);
-        addValue(table, amount(balance), TextAlignment.CENTER, bold);
-        addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null);
+        addValue(table, insuredName, TextAlignment.LEFT, null, fontSize, cellPadding);
+        addValue(table, statementReference(line), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, date(line.getDateOperation()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, date(line.getDateEcheance()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, amount(line.getPrimeNette()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, amount(line.getTaxes()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, positiveAmount(line.getCredit()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, amount(balance), TextAlignment.CENTER, bold, fontSize, cellPadding);
+        addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null,
+                fontSize, cellPadding);
     }
 
     private Map<Long, String> subscriberNames(DocumentClient source) {
@@ -495,35 +510,59 @@ public class ReleveClientPdfRenderer {
     }
 
     private void addHeader(Table table, String text, PdfFont font) {
+        addHeader(table, text, font, TABLE_FONT_SIZE, TABLE_CELL_PADDING);
+    }
+
+    private void addHeader(Table table, String text, PdfFont font, float fontSize, float cellPadding) {
         table.addHeaderCell(new Cell()
-                .add(new Paragraph(text).setFont(font).setFontSize(7.5f).setMargin(0))
+                .add(new Paragraph(text)
+                        .setFont(font)
+                        .setFontSize(fontSize)
+                        .setFixedLeading(fontSize + 1.2f)
+                        .setMargin(0))
                 .setFontColor(ColorConstants.WHITE)
                 .setBackgroundColor(TABLE_HEADER_BLUE)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(new SolidBorder(ColorConstants.WHITE, 0.35f))
-                .setPadding(4f));
+                .setPadding(cellPadding));
     }
 
     private void addValue(Table table, String text, TextAlignment alignment, PdfFont font) {
-        Paragraph paragraph = new Paragraph(value(text)).setFontSize(7.5f).setMargin(0);
+        addValue(table, text, alignment, font, TABLE_FONT_SIZE, TABLE_CELL_PADDING);
+    }
+
+    private void addValue(
+            Table table,
+            String text,
+            TextAlignment alignment,
+            PdfFont font,
+            float fontSize,
+            float cellPadding
+    ) {
+        Paragraph paragraph = new Paragraph(value(text))
+                .setFontSize(fontSize)
+                .setFixedLeading(fontSize + 1.4f)
+                .setMargin(0);
         if (font != null) {
             paragraph.setFont(font);
         }
         table.addCell(new Cell()
                 .add(paragraph)
+                .setKeepTogether(true)
                 .setTextAlignment(alignment)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(BODY_BORDER)
-                .setPadding(4f));
+                .setPadding(cellPadding));
     }
 
-    private void writeTotal(Document document, DocumentClient source, PdfFont bold) {
+    private void writeTotal(Document document, DocumentClient source, PdfFont bold, boolean denseStatement) {
         Table total = new Table(new float[]{1.55f, 1})
                 .setWidth(UnitValue.createPercentValue(31))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
+                .setKeepTogether(true)
                 .setMarginRight(0)
-                .setMarginTop(10);
+                .setMarginTop(denseStatement ? 6 : 10);
         addTotalRow(total, "Total TTC", source.getTotalDebit(), bold);
         addTotalRow(total, "Total acompte", source.getTotalCredit(), bold);
         addTotalRow(total, "Total à payer", source.getTotalDocument(), bold);
@@ -550,7 +589,13 @@ public class ReleveClientPdfRenderer {
                 .setPadding(4));
     }
 
-    private void writePaymentText(Document document, DocumentClient source, PdfFont bold, PdfFont italic) {
+    private void writePaymentText(
+            Document document,
+            DocumentClient source,
+            PdfFont bold,
+            PdfFont italic,
+            boolean denseStatement
+    ) {
         if (isInvoice(source)) {
             writeInvoiceClosing(document, source, bold, italic);
             return;
@@ -560,7 +605,7 @@ public class ReleveClientPdfRenderer {
                 .setFontSize(9.5f)
                 .setFontColor(BRAND_BLUE)
                 .setMarginLeft(0)
-                .setMarginTop(18)
+                .setMarginTop(denseStatement ? 10 : 18)
                 .setMarginBottom(3));
         document.add(new Paragraph(
                 "Dès réception de votre règlement, nous vous ferons parvenir la (les) quittance(s) correspondante(s)."
@@ -568,6 +613,12 @@ public class ReleveClientPdfRenderer {
                 .setFontSize(9.5f)
                 .setMarginLeft(0)
                 .setMarginTop(0));
+    }
+
+    private boolean isDenseStatement(DocumentClient source) {
+        return !isInvoice(source)
+                && source.getLignes() != null
+                && source.getLignes().size() >= DENSE_STATEMENT_LINE_THRESHOLD;
     }
 
     private void writeInvoiceClosing(Document document, DocumentClient source, PdfFont bold, PdfFont italic) {

@@ -46,7 +46,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -771,8 +771,13 @@ export function AuditPanel() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={AUDIT_ALL}>Tous les objets</SelectItem>
-              {AUDIT_ENTITY_TYPES.map((entityType) => (
-                <SelectItem key={entityType} value={entityType}>{auditEntityTypeLabel(entityType)}</SelectItem>
+              {AUDIT_ENTITY_GROUPS.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.types.map((entityType) => (
+                    <SelectItem key={entityType} value={entityType}>{auditEntityTypeLabel(entityType)}</SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
@@ -879,27 +884,16 @@ const EMPTY_AUDIT_FILTERS: AuditFilters = {
   dateTo: "",
 };
 
-const AUDIT_ENTITY_TYPES = [
-  "Contrat",
-  "Sinistre",
-  "DocumentClient",
-  "ReglementClient",
-  "BordereauCompagnie",
-  "ReglementCompagnie",
-  "CompteTresorerie",
-  "MouvementTresorerie",
-  "OperationTresorerie",
-  "BordereauRemise",
-  "RapprochementBancaire",
-  "ImportReleveBancaire",
-  "LigneReleveBancaire",
-  "ProfilImportReleveBancaire",
-  "SessionCaisse",
-  "AffectationCompteTresorerie",
-  "ConditionPaiementClient",
-  "AjustementTarifUsage",
-  "Vehicule",
-  "Remorque",
+const AUDIT_ENTITY_GROUPS = [
+  { label: "Administration", types: ["Agence", "Utilisateur", "Role", "ParametreApplication"] },
+  { label: "CRM", types: ["Client", "ClientTelephone", "GroupeClient", "GroupeClientMembre", "AcquisitionClient", "OrigineCommerciale", "ConditionPaiementClient"] },
+  { label: "Production", types: ["Contrat", "ContratClient", "Vehicule", "Remorque", "ContratGarantie", "AssistanceContrat", "MouvementContrat", "MouvementVehicule", "MouvementRemorque", "MouvementGarantie", "AvenantDraft", "Quittance", "LigneQuittance", "ElementFacturable", "ElementFacturableCible", "CarteVerte", "PieceJointe"] },
+  { label: "Tarification et référentiels", types: ["CompagnieAssurance", "CompagnieAssistance", "CompagnieGarantie", "ContactCompagnie", "BrancheAssurance", "Convention", "CategorieClient", "Usage", "Carburant", "Marque", "Carrosserie", "CategorieTransport", "SousClasse", "Garantie", "GroupeExclusionGarantie", "GroupeUsageAttestation", "GrilleTarifaire", "LigneGrilleTarifaire", "TarifUsage", "AjustementTarifUsage", "LigneAjustementTarifUsage", "CapitalResponsabiliteCivile", "FormuleGarantiePersonne", "ProduitAssistance", "TarifProduitAssistance", "RegleFiscale", "ApplicationRegleFiscaleQuittance", "TypeMouvementContrat", "TypePieceJointe", "Ville"] },
+  { label: "Sinistres", types: ["Sinistre", "SinistreCouverture", "SinistreGarantie", "SinistrePartie", "SinistreDocument", "SinistreEvenement", "ProvisionSinistre", "SinistreOperation", "MissionExpertise", "ExpertSinistre", "GarageSinistre", "ExigenceDocumentSinistre"] },
+  { label: "Comptabilité clients", types: ["DocumentClient", "LigneDocumentClient", "EcheanceFacturationConvention", "ReglementClient", "InstrumentReglementClient", "AffectationReglementClient"] },
+  { label: "Comptabilité compagnies", types: ["AffectationQuittanceCompagnie", "RegleAffectationQuittance", "BordereauCompagnie", "LigneBordereauCompagnie", "ReglementCompagnie", "InstrumentReglementCompagnie", "AffectationReglementCompagnie"] },
+  { label: "Trésorerie", types: ["Banque", "CompteTresorerie", "AffectationCompteTresorerie", "SessionCaisse", "MouvementTresorerie", "OperationTresorerie", "BordereauRemise", "LigneBordereauRemise", "ImportReleveBancaire", "LigneReleveBancaire", "ProfilImportReleveBancaire", "RapprochementBancaire"] },
+  { label: "Stock d’attestations", types: ["AttestationStock", "LotAttestation", "LivraisonAttestation", "LigneLivraisonAttestation", "MouvementStockAttestation", "SeuilStockAttestation"] },
 ] as const;
 
 function auditActionLabel(action: AdminAuditEvent["action"]) {
@@ -1010,12 +1004,18 @@ function auditChangedFields(event: AdminAuditEvent) {
   return Array.from(new Set([
     ...Object.keys(event.beforeData ?? {}),
     ...Object.keys(event.afterData ?? {}),
-  ])).sort((left, right) => auditFieldLabel(left).localeCompare(auditFieldLabel(right), "fr"));
+  ])).sort((left, right) => {
+    const priority = auditFieldPriority(left) - auditFieldPriority(right);
+    return priority || auditFieldLabel(left).localeCompare(auditFieldLabel(right), "fr");
+  });
 }
 
 function auditEventSummary(event: AdminAuditEvent) {
   const fields = auditChangedFields(event);
   const parent = auditParentContract(event);
+  if (isLegacyContractCountEvent(event, fields)) {
+    return "Mise à jour du parc · ancienne trace technique";
+  }
   if (event.entityType === "Vehicule" || event.entityType === "Remorque") {
     const object = event.entityType === "Vehicule" ? "Véhicule" : "Remorque";
     const action = auditTargetAction(event);
@@ -1038,6 +1038,19 @@ function auditEventSummary(event: AdminAuditEvent) {
 
 function auditEntityReference(event: AdminAuditEvent) {
   const snapshot = { ...(event.beforeData ?? {}), ...(event.afterData ?? {}) };
+  if (event.entityType === "Utilisateur") {
+    const fullName = [snapshot.prenom, snapshot.nom]
+      .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+      .join(" ");
+    if (fullName) return fullName;
+    if (typeof snapshot.email === "string" && snapshot.email.trim()) return snapshot.email.trim();
+  }
+  if (event.entityType === "Role") {
+    const roleName = typeof snapshot.nom === "string" ? snapshot.nom.trim() : "";
+    const roleCode = typeof snapshot.code === "string" ? snapshot.code.trim() : "";
+    if (roleCode && roleName) return `${roleCode} · ${roleName}`;
+    if (roleCode || roleName) return roleCode || roleName;
+  }
   if (event.entityType === "Vehicule" || event.entityType === "Remorque") {
     const registration = snapshot.immatriculation;
     return typeof registration === "string" && registration.trim()
@@ -1051,38 +1064,129 @@ function auditEntityReference(event: AdminAuditEvent) {
     const start = formatAuditValue(snapshot.dateDebut);
     return `${direction} ${value}${unit} · ${start}`;
   }
-  const candidates = [
+  const identifierCandidates = [
+    "numero",
     "numeroSinistre",
     "numeroDossier",
     "numeroPolice",
+    "numeroQuittance",
+    "numeroContratOuQuittance",
+    "referenceInstrument",
+    "referenceSource",
     "numeroDocument",
     "numeroBordereau",
     "immatriculation",
     "numeroAttestation",
     "reference",
+    "codeClient",
+    "code",
+  ];
+  for (const key of identifierCandidates) {
+    const value = snapshot[key];
+    if (typeof value === "string" && value.trim()) return `n° ${value.trim()}`;
+  }
+  const labelCandidates = [
+    "raisonSociale",
     "code",
     "libelle",
     "nom",
+    "produit",
+    "nomFichier",
   ];
-  for (const key of candidates) {
+  for (const key of labelCandidates) {
     const value = snapshot[key];
-    if (typeof value === "string" && value.trim()) return `n° ${value.trim()}`;
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  const relationCandidates = [
+    "garantie",
+    "contrat",
+    "sinistre",
+    "reglement",
+    "instrument",
+    "document",
+    "bordereau",
+    "compteTresorerie",
+  ];
+  for (const key of relationCandidates) {
+    const value = snapshot[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return formatAuditValue(value);
+    }
   }
   return event.entityId ? `#${event.entityId}` : "";
 }
 
 function auditEntityTypeLabel(entityType: string) {
+  const normalizedType = normalizeAuditEntityType(entityType);
   return ({
+    Agence: "Agence",
+    Banque: "Banque",
+    BrancheAssurance: "Branche d’assurance",
+    CategorieClient: "Catégorie client",
+    Client: "Client",
+    CompagnieAssistance: "Compagnie d’assistance",
+    CompagnieAssurance: "Compagnie d’assurance",
+    Convention: "Convention",
     Contrat: "Contrat",
+    ContratClient: "Lien client-contrat",
+    ContratGarantie: "Garantie du contrat",
+    AssistanceContrat: "Assistance du contrat",
+    MouvementContrat: "Mouvement du contrat",
+    MouvementVehicule: "Mouvement de véhicule",
+    MouvementRemorque: "Mouvement de remorque",
+    MouvementGarantie: "Mouvement de garantie",
+    Quittance: "Quittance",
+    LigneQuittance: "Ligne de quittance",
+    ElementFacturable: "Élément facturable",
+    ElementFacturableCible: "Cible de facturation",
+    CarteVerte: "Carte verte",
+    PieceJointe: "Pièce jointe",
+    AvenantDraft: "Brouillon d’avenant",
+    Garantie: "Garantie",
+    CompagnieGarantie: "Garantie de compagnie",
+    ContactCompagnie: "Contact compagnie",
+    CapitalResponsabiliteCivile: "Capital de responsabilité civile",
+    FormuleGarantiePersonne: "Formule de garantie personne",
+    GroupeExclusionGarantie: "Groupe d’exclusion de garanties",
+    GroupeUsageAttestation: "Groupe d’usage d’attestations",
+    GrilleTarifaire: "Grille tarifaire",
+    LigneGrilleTarifaire: "Ligne de grille tarifaire",
+    TarifUsage: "Tarif d’usage",
+    LigneAjustementTarifUsage: "Ligne d’ajustement tarifaire",
+    ProduitAssistance: "Produit d’assistance",
+    TarifProduitAssistance: "Tarif d’assistance",
+    GroupeClient: "Groupe client",
+    GroupeClientMembre: "Membre du groupe client",
+    ClientTelephone: "Téléphone client",
+    AcquisitionClient: "Acquisition commerciale",
+    OrigineCommerciale: "Origine commerciale",
+    Marque: "Marque",
+    Carrosserie: "Carrosserie",
+    Carburant: "Carburant",
+    CategorieTransport: "Catégorie de transport",
+    SousClasse: "Sous-classe",
+    Usage: "Usage",
+    Utilisateur: "Utilisateur",
+    Role: "Rôle",
+    Ville: "Ville",
     Sinistre: "Sinistre",
     DocumentClient: "Document client",
+    LigneDocumentClient: "Ligne de document client",
+    EcheanceFacturationConvention: "Échéance de facturation",
     ReglementClient: "Règlement client",
+    InstrumentReglementClient: "Moyen de règlement client",
+    AffectationReglementClient: "Affectation de règlement client",
     BordereauCompagnie: "Bordereau compagnie",
+    LigneBordereauCompagnie: "Ligne de bordereau compagnie",
     ReglementCompagnie: "Règlement compagnie",
+    InstrumentReglementCompagnie: "Moyen de règlement compagnie",
+    AffectationReglementCompagnie: "Affectation de règlement compagnie",
+    AffectationQuittanceCompagnie: "Affectation de quittance compagnie",
     CompteTresorerie: "Compte de trésorerie",
     MouvementTresorerie: "Mouvement de trésorerie",
     OperationTresorerie: "Opération de trésorerie",
     BordereauRemise: "Bordereau de remise",
+    LigneBordereauRemise: "Ligne de bordereau de remise",
     RapprochementBancaire: "Rapprochement bancaire",
     ImportReleveBancaire: "Import de relevé bancaire",
     LigneReleveBancaire: "Ligne de relevé bancaire",
@@ -1091,17 +1195,59 @@ function auditEntityTypeLabel(entityType: string) {
     AffectationCompteTresorerie: "Affectation de compte",
     ConditionPaiementClient: "Condition de paiement",
     AjustementTarifUsage: "Ajustement tarifaire",
+    ProvisionSinistre: "Provision de sinistre",
+    SinistreOperation: "Opération de sinistre",
+    SinistrePartie: "Partie impliquée",
+    SinistreGarantie: "Garantie du sinistre",
+    SinistreCouverture: "Couverture du sinistre",
+    SinistreDocument: "Document du sinistre",
+    SinistreEvenement: "Événement du sinistre",
+    MissionExpertise: "Mission d’expertise",
+    ExpertSinistre: "Expert",
+    GarageSinistre: "Garage",
+    AttestationStock: "Attestation en stock",
+    LotAttestation: "Lot d’attestations",
+    LivraisonAttestation: "Livraison d’attestations",
+    LigneLivraisonAttestation: "Ligne de livraison d’attestations",
+    MouvementStockAttestation: "Mouvement de stock d’attestations",
+    SeuilStockAttestation: "Seuil de stock d’attestations",
+    RegleFiscale: "Règle fiscale",
+    ParametreApplication: "Paramètre d’application",
+    TypePieceJointe: "Type de pièce jointe",
+    TypeMouvementContrat: "Type de mouvement de contrat",
+    ApplicationRegleFiscaleQuittance: "Application de règle fiscale",
+    RegleAffectationQuittance: "Règle d’affectation de quittance",
+    ExigenceDocumentSinistre: "Exigence documentaire de sinistre",
     Vehicule: "Véhicule",
     Remorque: "Remorque",
-  } as Record<string, string>)[entityType] ?? splitAuditIdentifier(entityType);
+  } as Record<string, string>)[normalizedType] ?? splitAuditIdentifier(normalizedType);
 }
 
 function auditFieldLabel(field: string) {
   return ({
     actif: "Actif",
     agence: "Agence",
+    role: "Rôle",
+    permissions: "Permissions",
+    aliases: "Alias",
+    usages: "Usages autorisés",
+    carrosseries: "Carrosseries autorisées",
+    carburants: "Carburants autorisés",
+    compagniesRestreintes: "Compagnies autorisées",
+    modesAutorises: "Modes de tarification autorisés",
+    modesTarificationMultiple: "Modes de tarification multiple",
+    sourcesValeurAutorisees: "Sources de valeur autorisées",
+    typesContratAutorises: "Types de contrat autorisés",
+    prenom: "Prénom",
+    nom: "Nom",
+    email: "E-mail",
+    telephone: "Téléphone",
+    password: "Mot de passe",
+    description: "Description",
+    systemRole: "Rôle système",
     client: "Client",
     statut: "Statut",
+    brancheAssurance: "Branche d’assurance",
     dateEffet: "Date d’effet",
     dateEcheance: "Date d’échéance",
     dateSinistre: "Date du sinistre",
@@ -1118,6 +1264,12 @@ function auditFieldLabel(field: string) {
     immatriculation: "Immatriculation",
     immatriculationProvisoire: "Immatriculation provisoire",
     contrat: "Contrat",
+    compagnieAssurance: "Compagnie d’assurance",
+    convention: "Convention",
+    categorieClient: "Catégorie client",
+    grilleTarifaire: "Grille tarifaire",
+    payeurPrime: "Payeur de la prime",
+    groupeFacturation: "Groupe de facturation",
     typeVehicule: "Type de véhicule",
     usage: "Usage",
     marque: "Marque",
@@ -1132,6 +1284,19 @@ function auditFieldLabel(field: string) {
     ptc: "PTC",
     crm: "CRM",
     coefficientProrata: "Coefficient de prorata",
+    assistance: "Assistance",
+    crmPartage: "CRM partagé",
+    crmPartageValeur: "Valeur du CRM partagé",
+    fractionnement: "Fractionnement",
+    modeFacturation: "Mode de facturation",
+    modeSaisieGaranties: "Mode de saisie des garanties",
+    periodicite: "Périodicité",
+    prospection: "Prospection",
+    renouvele: "Renouvelé",
+    saisiePrimeNette: "Saisie de la prime nette",
+    typeContrat: "Type de contrat",
+    typePayeurPrime: "Payeur de la prime",
+    typeRenouvellement: "Type de renouvellement",
     valeurVenale: "Valeur vénale",
     valeurNeuf: "Valeur à neuf",
     valeurGlace: "Valeur des glaces",
@@ -1153,6 +1318,12 @@ function auditFieldLabel(field: string) {
     notes: "Notes",
     commentaire: "Commentaire",
     circonstances: "Circonstances",
+    logoCheminStockage: "Fichier du logo",
+    logoTypeMime: "Format du logo",
+    logoNomFichier: "Nom du logo",
+    signatureCheminStockage: "Fichier de signature",
+    signatureTypeMime: "Format de signature",
+    signatureNomFichier: "Nom de la signature",
   } as Record<string, string>)[field] ?? splitAuditIdentifier(field);
 }
 
@@ -1176,16 +1347,18 @@ function formatAuditValue(value: unknown): string {
       return `${day}/${month}/${year}`;
     }
     if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return formatDateTime(value);
-    return AUDIT_VALUE_LABELS[value] ?? value;
+    if (AUDIT_VALUE_LABELS[value]) return AUDIT_VALUE_LABELS[value];
+    if (/^[A-Z][A-Z0-9_]*$/.test(value)) return splitAuditIdentifier(value);
+    return value;
   }
   if (Array.isArray(value)) return value.map(formatAuditValue).join(", ") || "-";
   if (typeof value === "object") {
     const reference = value as { type?: unknown; id?: unknown; label?: unknown };
     if (typeof reference.type === "string" && reference.id != null) {
-      const label = typeof reference.label === "string" && reference.label.trim()
-        ? ` · ${reference.label.trim()}`
-        : "";
-      return `${auditEntityTypeLabel(reference.type)} #${String(reference.id)}${label}`;
+      if (typeof reference.label === "string" && reference.label.trim()) {
+        return `${reference.label.trim()} (${auditEntityTypeLabel(reference.type)} #${String(reference.id)})`;
+      }
+      return `${auditEntityTypeLabel(reference.type)} #${String(reference.id)}`;
     }
     return JSON.stringify(value);
   }
@@ -1193,17 +1366,27 @@ function formatAuditValue(value: unknown): string {
 }
 
 function auditEntityUrl(event: AdminAuditEvent) {
-  if (event.entityType === "Vehicule" || event.entityType === "Remorque") {
-    const parent = auditParentContract(event);
-    return parent?.id ? `/app/production/contrats/${parent.id}` : null;
+  const parentContract = auditParentContract(event);
+  if (parentContract?.id) {
+    return `/app/production/contrats/${parentContract.id}`;
   }
   if (!event.entityId || event.action === "DELETED") return null;
   return ({
+    Agence: `/app/admin/agences`,
+    Utilisateur: `/app/admin/utilisateurs`,
+    Role: `/app/admin/roles/${event.entityId}`,
     Contrat: `/app/production/contrats/${event.entityId}`,
     Sinistre: `/app/sinistre/dossiers/${event.entityId}`,
     BordereauCompagnie: `/app/compta/bordereaux-compagnies/${event.entityId}`,
     CompteTresorerie: `/app/compta/tresorerie/comptes/${event.entityId}`,
   } as Record<string, string>)[event.entityType] ?? null;
+}
+
+function isLegacyContractCountEvent(event: AdminAuditEvent, fields: string[]) {
+  return event.entityType === "Contrat"
+    && event.action === "UPDATED"
+    && fields.length > 0
+    && fields.every((field) => field === "nombreVehicules" || field === "nombreRemorques");
 }
 
 function auditTargetAction(event: AdminAuditEvent) {
@@ -1217,6 +1400,32 @@ function auditTargetAction(event: AdminAuditEvent) {
     return `réactivé${feminineSuffix}`;
   }
   return `modifié${feminineSuffix}`;
+}
+
+function normalizeAuditEntityType(entityType: string) {
+  return entityType.split("$")[0]?.replace(/_\$\$_hibernate_proxy.*$/i, "") || entityType;
+}
+
+function auditFieldPriority(field: string) {
+  const priority = [
+    "numero",
+    "numeroDossier",
+    "numeroPolice",
+    "numeroSinistre",
+    "immatriculation",
+    "statut",
+    "contrat",
+    "client",
+    "compagnieAssurance",
+    "dateEffet",
+    "dateEcheance",
+    "dateOperation",
+    "montant",
+    "montantTotal",
+    "montantTtc",
+  ];
+  const index = priority.indexOf(field);
+  return index < 0 ? priority.length : index;
 }
 
 function auditParentContract(event: AdminAuditEvent) {
@@ -1234,12 +1443,13 @@ function auditParentContract(event: AdminAuditEvent) {
 }
 
 function auditOpenActionLabel(event: AdminAuditEvent) {
-  return event.entityType === "Vehicule" || event.entityType === "Remorque"
+  return auditParentContract(event)
     ? "Ouvrir le contrat"
     : "Ouvrir l’objet";
 }
 
 const AUDIT_VALUE_LABELS: Record<string, string> = {
+  "[REDACTED]": "Valeur masquée",
   HAUSSE: "Hausse",
   BAISSE: "Baisse",
   POURCENTAGE: "Pourcentage",
@@ -1251,6 +1461,57 @@ const AUDIT_VALUE_LABELS: Record<string, string> = {
   INACTIF: "Inactif",
   AUTOMOBILE: "Automobile",
   REMORQUE: "Remorque",
+  DRAFT: "Brouillon",
+  SUSPENDED: "Suspendu",
+  CANCELLED: "Résilié",
+  EXPIRED: "Expiré",
+  RENEWED: "Renouvelé",
+  PARTICULIER: "Particulier",
+  CONVENTION: "Convention",
+  FLOTTE: "Flotte",
+  MENSUEL: "Mensuel",
+  TRIMESTRIEL: "Trimestriel",
+  SEMESTRIEL: "Semestriel",
+  ANNUEL: "Annuel",
+  DIRECTE: "Directe",
+  CONSOLIDEE_GROUPE: "Consolidée par groupe",
+  MANUELLE: "Manuelle",
+  MANUELLE_AVEC_PRIME_NETTE: "Manuelle avec prime nette",
+  AUTOMATIQUE_GRILLE: "Automatique selon la grille",
+  SOUSCRIPTEUR: "Souscripteur",
+  TRESORERIE_GROUPE: "Trésorerie du groupe",
+  MEMBRE_GROUPE: "Membre du groupe",
+  TIERS_MANDATE: "Tiers mandaté",
+  EMIS: "Émis",
+  REMPLACE: "Remplacé",
+  ANNULE: "Annulé",
+  VALIDE: "Validé",
+  BROUILLON: "Brouillon",
+  DECLARE: "Déclaré",
+  DOSSIER_INCOMPLET: "Dossier incomplet",
+  TRANSMIS_COMPAGNIE: "Transmis à la compagnie",
+  EXPERTISE: "En expertise",
+  EN_ATTENTE_REGLEMENT: "En attente de règlement",
+  PARTIELLEMENT_REGLE: "Partiellement réglé",
+  REGLE: "Réglé",
+  CLOTURE: "Clôturé",
+  REJETE: "Rejeté",
+  ROUVERT: "Rouvert",
+  CAISSE: "Caisse",
+  BANQUE: "Banque",
+  INDIVIDUELLE: "Individuelle",
+  CENTRALE: "Centrale",
+  TRANSMIS: "Transmis",
+  DEPOSE: "Déposé",
+  PARTIELLEMENT_TRAITE: "Partiellement traité",
+  CONFIRMEE: "Confirmée",
+  ANNULEE: "Annulée",
+  OUVERTE: "Ouverte",
+  CLOTUREE: "Clôturée",
+  SUGGERE: "Suggéré",
+  SELECTIONNE: "Sélectionné",
+  ENTREE: "Entrée",
+  SORTIE: "Sortie",
 };
 
 function auditActorLabel(actorType: AdminAuditEvent["actorType"]) {

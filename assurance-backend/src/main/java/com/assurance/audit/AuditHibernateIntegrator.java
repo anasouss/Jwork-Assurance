@@ -27,6 +27,9 @@ public class AuditHibernateIntegrator implements Integrator {
         registry.appendListeners(EventType.POST_INSERT, listener);
         registry.appendListeners(EventType.POST_UPDATE, listener);
         registry.appendListeners(EventType.POST_DELETE, listener);
+        registry.appendListeners(EventType.POST_COLLECTION_RECREATE, listener);
+        registry.appendListeners(EventType.POST_COLLECTION_UPDATE, listener);
+        registry.appendListeners(EventType.POST_COLLECTION_REMOVE, listener);
     }
 
     @Override

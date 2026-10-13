@@ -702,7 +702,7 @@ export function AuditPanel() {
   const [draftFilters, setDraftFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
   const [page, setPage] = useState(0);
-  const [selectedEvent, setSelectedEvent] = useState<AdminAuditEvent | null>(null);
+  const [selectedOperation, setSelectedOperation] = useState<AuditOperation | null>(null);
   const events = useQuery({
     queryKey: ["admin", "audit", filters, page],
     queryFn: () => adminApi.auditEvents({
@@ -716,6 +716,7 @@ export function AuditPanel() {
     }),
     placeholderData: (previous) => previous,
   });
+  const operations = useMemo(() => groupAuditOperations(events.data?.items ?? []), [events.data?.items]);
 
   const applyFilters = () => {
     if (draftFilters.dateFrom && draftFilters.dateTo && draftFilters.dateFrom > draftFilters.dateTo) {
@@ -821,23 +822,23 @@ export function AuditPanel() {
           <TableBody>
             {events.isLoading ? (
               <TableRowsSkeleton rows={8} colSpan={6} />
-            ) : (events.data?.items ?? []).map((event: AdminAuditEvent) => (
-              <TableRow key={event.id}>
-                <TableCell className="whitespace-nowrap">{formatAuditDateTime(event.occurredAt)}</TableCell>
+            ) : operations.map((operation) => (
+              <TableRow key={operation.key}>
+                <TableCell className="whitespace-nowrap">{formatAuditDateTime(operation.occurredAt)}</TableCell>
                 <TableCell>
-                  <div className="font-medium">{event.actorName || auditActorLabel(event.actorType)}</div>
-                  {event.actorEmail && event.actorEmail !== event.actorName ? (
-                    <div className="text-xs text-muted-foreground">{event.actorEmail}</div>
+                  <div className="font-medium">{operation.actorName || auditActorLabel(operation.actorType)}</div>
+                  {operation.actorEmail && operation.actorEmail !== operation.actorName ? (
+                    <div className="text-xs text-muted-foreground">{operation.actorEmail}</div>
                   ) : null}
                 </TableCell>
-                <TableCell><Badge variant={auditActionVariant(event.action)}>{auditActionLabel(event.action)}</Badge></TableCell>
+                <TableCell><Badge variant={auditActionVariant(operation.action)}>{auditActionLabel(operation.action)}</Badge></TableCell>
                 <TableCell>
-                  <div className="font-medium">{auditEntityTypeLabel(event.entityType)}</div>
-                  <div className="text-xs text-muted-foreground">{auditEntityReference(event)}</div>
+                  <div className="font-medium">{auditOperationEntityLabel(operation)}</div>
+                  <div className="text-xs text-muted-foreground">{auditOperationReference(operation)}</div>
                 </TableCell>
-                <TableCell className="max-w-md">{auditEventSummary(event)}</TableCell>
+                <TableCell className="max-w-md">{auditOperationSummary(operation)}</TableCell>
                 <TableCell className="text-right">
-                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Voir le détail de l'événement ${event.id}`} onClick={() => setSelectedEvent(event)}>
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Voir le détail de l'opération ${operation.key}`} onClick={() => setSelectedOperation(operation)}>
                     <Eye className="size-4" />
                   </Button>
                 </TableCell>
@@ -861,7 +862,7 @@ export function AuditPanel() {
         onPageChange={setPage}
       />
 
-      <AuditEventDialog event={selectedEvent} onOpenChange={(open) => { if (!open) setSelectedEvent(null); }} />
+      <AuditOperationDialog operation={selectedOperation} onOpenChange={(open) => { if (!open) setSelectedOperation(null); }} />
     </div>
   );
 }
@@ -876,6 +877,18 @@ type AuditFilters = {
   dateTo: string;
 };
 
+type AuditOperation = {
+  key: string;
+  requestId?: string | null;
+  occurredAt: string;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  actorType: AdminAuditEvent["actorType"];
+  action: AdminAuditEvent["action"];
+  primary: AdminAuditEvent;
+  events: AdminAuditEvent[];
+};
+
 const EMPTY_AUDIT_FILTERS: AuditFilters = {
   search: "",
   action: AUDIT_ALL,
@@ -883,6 +896,89 @@ const EMPTY_AUDIT_FILTERS: AuditFilters = {
   dateFrom: "",
   dateTo: "",
 };
+
+const AUDIT_OPERATION_ROOT_TYPES = [
+  "Contrat",
+  "AvenantDraft",
+  "MouvementContrat",
+  "Sinistre",
+  "ReglementClient",
+  "DocumentClient",
+  "BordereauRemise",
+  "BordereauCompagnie",
+  "ReglementCompagnie",
+  "CompteTresorerie",
+  "Utilisateur",
+  "Agence",
+] as const;
+
+function groupAuditOperations(events: AdminAuditEvent[]): AuditOperation[] {
+  const grouped = new Map<string, AdminAuditEvent[]>();
+  events.forEach((event) => {
+    const requestId = event.requestId?.trim();
+    const key = requestId ? `request:${requestId}` : `event:${event.id}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), event]);
+  });
+
+  return Array.from(grouped, ([key, groupedEvents]) => {
+    const primary = [...groupedEvents].sort((left, right) => {
+      const score = auditOperationPrimaryScore(left, groupedEvents) - auditOperationPrimaryScore(right, groupedEvents);
+      return score || Date.parse(right.occurredAt) - Date.parse(left.occurredAt);
+    })[0];
+    const latest = [...groupedEvents].sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))[0];
+    return {
+      key,
+      requestId: latest.requestId,
+      occurredAt: latest.occurredAt,
+      actorName: latest.actorName,
+      actorEmail: latest.actorEmail,
+      actorType: latest.actorType,
+      action: primary.action,
+      primary,
+      events: groupedEvents,
+    };
+  });
+}
+
+function auditOperationPrimaryScore(event: AdminAuditEvent, operationEvents: AdminAuditEvent[]) {
+  const isContractCreation = operationEvents.some((item) => item.entityType === "Contrat" && item.action === "CREATED");
+  if (!isContractCreation && event.entityType === "MouvementContrat") {
+    return event.action === "CREATED" ? -30 : event.action === "UPDATED" ? -29 : -28;
+  }
+  if (!isContractCreation && event.entityType === "AvenantDraft") {
+    return event.action === "CREATED" ? -20 : event.action === "UPDATED" ? -19 : -18;
+  }
+  const rootIndex = AUDIT_OPERATION_ROOT_TYPES.indexOf(event.entityType as (typeof AUDIT_OPERATION_ROOT_TYPES)[number]);
+  const entityScore = rootIndex >= 0 ? rootIndex : AUDIT_OPERATION_ROOT_TYPES.length + 10;
+  const actionScore = event.action === "CREATED" ? 0 : event.action === "DELETED" ? 1 : 2;
+  return entityScore * 10 + actionScore;
+}
+
+function auditOperationSummary(operation: AuditOperation) {
+  if (operation.events.length === 1) return auditEventSummary(operation.primary);
+  const relatedCount = operation.events.length - 1;
+  if (isAvenantMovement(operation.primary)) {
+    const type = auditMovementTypeLabel(operation.primary);
+    return `${type ? `Avenant ${type.toLocaleLowerCase("fr")}` : "Avenant"} · ${relatedCount} événement${relatedCount > 1 ? "s" : ""} associé${relatedCount > 1 ? "s" : ""}`;
+  }
+  if (operation.primary.entityType === "Contrat" && operation.action === "CREATED") {
+    return `Contrat créé · ${relatedCount} événement${relatedCount > 1 ? "s" : ""} associé${relatedCount > 1 ? "s" : ""}`;
+  }
+  return `${auditEventSummary(operation.primary)} · ${relatedCount} événement${relatedCount > 1 ? "s" : ""} lié${relatedCount > 1 ? "s" : ""}`;
+}
+
+function auditOperationEntityLabel(operation: AuditOperation) {
+  return isAvenantMovement(operation.primary)
+    ? "Avenant"
+    : auditEntityTypeLabel(operation.primary.entityType);
+}
+
+function auditOperationReference(operation: AuditOperation) {
+  if (!isAvenantMovement(operation.primary)) return auditEntityReference(operation.primary);
+  const movementType = auditMovementTypeLabel(operation.primary);
+  const movementReference = auditEntityReference(operation.primary);
+  return movementType ? `${movementType} · ${movementReference}` : movementReference;
+}
 
 const AUDIT_ENTITY_GROUPS = [
   { label: "Administration", types: ["Agence", "Utilisateur", "Role", "ParametreApplication"] },
@@ -906,24 +1002,54 @@ function auditActionVariant(action: AdminAuditEvent["action"]): "success" | "inf
   return "info";
 }
 
-function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | null; onOpenChange: (open: boolean) => void }) {
-  const fields = event ? auditChangedFields(event) : [];
-  const entityUrl = event ? auditEntityUrl(event) : null;
+function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOperation | null; onOpenChange: (open: boolean) => void }) {
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [technicalOpen, setTechnicalOpen] = useState(false);
-  useEffect(() => setTechnicalOpen(false), [event?.id]);
+  const event = operation?.events.find((item) => item.id === selectedEventId) ?? operation?.primary ?? null;
+  const fields = event ? auditChangedFields(event) : [];
+  const entityUrl = operation ? auditEntityUrl(operation.primary) : null;
+  useEffect(() => {
+    setSelectedEventId(operation?.primary.id ?? null);
+    setTechnicalOpen(false);
+  }, [operation?.key, operation?.primary.id]);
   return (
-    <Dialog open={Boolean(event)} onOpenChange={onOpenChange}>
+    <Dialog open={Boolean(operation)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-4xl">
-        {event ? (
+        {operation && event ? (
           <>
             <DialogHeader>
-              <DialogTitle>{auditActionLabel(event.action)} · {auditEntityTypeLabel(event.entityType)} {auditEntityReference(event)}</DialogTitle>
+              <DialogTitle>{auditActionLabel(operation.action)} · {auditOperationEntityLabel(operation)} {auditOperationReference(operation)}</DialogTitle>
               <DialogDescription>
-                {formatAuditDateTime(event.occurredAt)} par {event.actorName || auditActorLabel(event.actorType)}
-                {event.actorEmail && event.actorEmail !== event.actorName ? ` · ${event.actorEmail}` : ""}
+                {formatAuditDateTime(operation.occurredAt)} par {operation.actorName || auditActorLabel(operation.actorType)}
+                {operation.actorEmail && operation.actorEmail !== operation.actorName ? ` · ${operation.actorEmail}` : ""}
               </DialogDescription>
             </DialogHeader>
             <div className="grid max-h-[65vh] gap-4 overflow-y-auto pr-1">
+              {operation.events.length > 1 ? (
+                <div className="grid gap-2">
+                  <div className="text-sm text-muted-foreground">
+                    Cette opération comprend {operation.events.length} événements techniques. Sélectionnez un élément pour consulter ses changements.
+                  </div>
+                  <div className="grid max-h-44 gap-1 overflow-y-auto rounded-md border p-1 sm:grid-cols-2">
+                    {operation.events.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`grid min-w-0 grid-cols-[auto_1fr] items-center gap-2 rounded px-2 py-2 text-left text-sm transition-colors hover:bg-muted ${item.id === event.id ? "bg-muted" : ""}`}
+                        onClick={() => setSelectedEventId(item.id)}
+                      >
+                        <Badge variant={auditActionVariant(item.action)}>{auditActionLabel(item.action)}</Badge>
+                        <span className="min-w-0 truncate">
+                          {auditEntityTypeLabel(item.entityType)} {auditEntityReference(item)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-sm font-medium">
+                    {auditActionLabel(event.action)} · {auditEntityTypeLabel(event.entityType)} {auditEntityReference(event)}
+                  </div>
+                </div>
+              ) : null}
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
@@ -958,11 +1084,13 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
                   <dl className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
                     <div><dt className="font-medium text-foreground">Source</dt><dd>{auditSourceLabel(event.source)}</dd></div>
                     <div><dt className="font-medium text-foreground">ID utilisateur</dt><dd>{event.actorUserId || "-"}</dd></div>
+                    <div><dt className="font-medium text-foreground">Événements liés</dt><dd>{operation.events.length}</dd></div>
+                    <div><dt className="font-medium text-foreground">ID de l’événement affiché</dt><dd>{event.id}</dd></div>
                     <div className="sm:col-span-2">
                       <dt className="font-medium text-foreground">Identifiant de requête</dt>
                       <dd className="mt-1 flex items-center gap-2">
-                        <span className="min-w-0 break-all font-mono">{event.requestId || "-"}</span>
-                        {event.requestId ? (
+                        <span className="min-w-0 break-all font-mono">{operation.requestId || "-"}</span>
+                        {operation.requestId ? (
                           <Button
                             type="button"
                             variant="ghost"
@@ -970,7 +1098,7 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
                             title="Copier l’identifiant"
                             aria-label="Copier l’identifiant de requête"
                             onClick={() => void navigator.clipboard
-                              .writeText(event.requestId ?? "")
+                              .writeText(operation.requestId ?? "")
                               .then(() => toast.success("Identifiant copié"))}
                           >
                             <ClipboardCopy className="size-4" />
@@ -988,7 +1116,7 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
                 <Button asChild>
                   <Link to={entityUrl} onClick={() => onOpenChange(false)}>
                     <ExternalLink className="size-4" />
-                    {auditOpenActionLabel(event)}
+                    {auditOpenActionLabel(operation.primary)}
                   </Link>
                 </Button>
               ) : null}
@@ -1021,6 +1149,20 @@ function auditEventSummary(event: AdminAuditEvent) {
     const action = auditTargetAction(event);
     return parent?.label ? `${object} ${action} · contrat ${parent.label}` : `${object} ${action}`;
   }
+  if (event.entityType === "ContratGarantie") {
+    const snapshot = auditSnapshot(event);
+    const target = auditGuaranteeTarget(snapshot);
+    if (event.action === "CREATED") {
+      return parent?.label
+        ? `Ajoutée à ${target} · contrat ${parent.label}`
+        : `Ajoutée à ${target}`;
+    }
+    if (event.action === "DELETED") {
+      return parent?.label
+        ? `Retirée de ${target} · contrat ${parent.label}`
+        : `Retirée de ${target}`;
+    }
+  }
   if (event.entityType === "AjustementTarifUsage" && event.action === "CREATED") {
     const snapshot = event.afterData ?? {};
     const direction = formatAuditValue(snapshot.sens).toLocaleLowerCase("fr");
@@ -1037,7 +1179,7 @@ function auditEventSummary(event: AdminAuditEvent) {
 }
 
 function auditEntityReference(event: AdminAuditEvent) {
-  const snapshot = { ...(event.beforeData ?? {}), ...(event.afterData ?? {}) };
+  const snapshot = auditSnapshot(event);
   if (event.entityType === "Utilisateur") {
     const fullName = [snapshot.prenom, snapshot.nom]
       .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
@@ -1050,6 +1192,10 @@ function auditEntityReference(event: AdminAuditEvent) {
     const roleCode = typeof snapshot.code === "string" ? snapshot.code.trim() : "";
     if (roleCode && roleName) return `${roleCode} · ${roleName}`;
     if (roleCode || roleName) return roleCode || roleName;
+  }
+  if (event.entityType === "ContratGarantie") {
+    const guarantee = auditReferenceLabel(snapshot.garantie) ?? "Garantie";
+    return `${guarantee} · ${auditGuaranteeTarget(snapshot)}`;
   }
   if (event.entityType === "Vehicule" || event.entityType === "Remorque") {
     const registration = snapshot.immatriculation;
@@ -1069,6 +1215,7 @@ function auditEntityReference(event: AdminAuditEvent) {
     "numeroSinistre",
     "numeroDossier",
     "numeroPolice",
+    "numeroMouvement",
     "numeroQuittance",
     "numeroContratOuQuittance",
     "referenceInstrument",
@@ -1290,6 +1437,8 @@ function auditFieldLabel(field: string) {
     fractionnement: "Fractionnement",
     modeFacturation: "Mode de facturation",
     modeSaisieGaranties: "Mode de saisie des garanties",
+    modeSelectionne: "Mode de tarification",
+    sourceValeurSelectionnee: "Source de la valeur assurée",
     periodicite: "Périodicité",
     prospection: "Prospection",
     renouvele: "Renouvelé",
@@ -1429,7 +1578,7 @@ function auditFieldPriority(field: string) {
 }
 
 function auditParentContract(event: AdminAuditEvent) {
-  const snapshot = { ...(event.beforeData ?? {}), ...(event.afterData ?? {}) };
+  const snapshot = auditSnapshot(event);
   const contract = snapshot.contrat;
   if (!contract || typeof contract !== "object" || Array.isArray(contract)) return null;
   const reference = contract as { type?: unknown; id?: unknown; label?: unknown };
@@ -1440,6 +1589,43 @@ function auditParentContract(event: AdminAuditEvent) {
       ? reference.label.trim()
       : `#${String(reference.id)}`,
   };
+}
+
+function auditSnapshot(event: AdminAuditEvent) {
+  return { ...(event.beforeData ?? {}), ...(event.afterData ?? {}) };
+}
+
+function isAvenantMovement(event: AdminAuditEvent) {
+  if (event.entityType !== "MouvementContrat") return false;
+  const reference = auditReferenceLabel(auditSnapshot(event).typeMouvement);
+  if (!reference) return false;
+  const code = reference.split("·", 1)[0]?.trim().toUpperCase();
+  return Boolean(code && code !== "AN" && code !== "REN");
+}
+
+function auditMovementTypeLabel(event: AdminAuditEvent) {
+  const reference = auditReferenceLabel(auditSnapshot(event).typeMouvement);
+  if (!reference) return null;
+  const [, ...labelParts] = reference.split("·");
+  return labelParts.join("·").trim() || reference;
+}
+
+function auditReferenceLabel(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const reference = value as { id?: unknown; label?: unknown };
+  return typeof reference.label === "string" && reference.label.trim()
+    ? reference.label.trim()
+    : reference.id != null ? `#${String(reference.id)}` : null;
+}
+
+function auditGuaranteeTarget(snapshot: Record<string, unknown>) {
+  const vehicle = auditReferenceLabel(snapshot.vehicule);
+  if (vehicle) return `véhicule ${vehicle}`;
+  const trailer = auditReferenceLabel(snapshot.remorque);
+  if (trailer) return `remorque ${trailer}`;
+  const client = auditReferenceLabel(snapshot.client);
+  if (client) return `assuré ${client}`;
+  return "le contrat";
 }
 
 function auditOpenActionLabel(event: AdminAuditEvent) {

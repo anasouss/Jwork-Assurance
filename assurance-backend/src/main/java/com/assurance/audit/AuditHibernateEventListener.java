@@ -413,7 +413,18 @@ public class AuditHibernateEventListener implements
             return joinReference(agence.getCode(), agence.getNom());
         }
         if (entity instanceof Contrat contrat) {
-            return firstNotBlank(contrat.getNumeroPolice(), contrat.getNumeroDossier());
+            return firstNotBlank(
+                    contrat.getNumeroPolice(),
+                    contrat.getNumeroDossier(),
+                    contrat.getNumeroContrat(),
+                    contrat.getNumeroDevis()
+            );
+        }
+        if (entity instanceof Vehicule vehicule) {
+            return firstNotBlank(vehicule.getImmatriculation(), vehicule.getImmatriculationProvisoire());
+        }
+        if (entity instanceof Remorque remorque) {
+            return firstNotBlank(remorque.getImmatriculation(), remorque.getNumeroAttestation());
         }
         if (entity instanceof GrilleTarifaire grille) {
             return grille.getLibelle();

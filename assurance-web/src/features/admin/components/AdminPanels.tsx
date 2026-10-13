@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
+  ChevronDown,
+  ClipboardCopy,
   Edit,
   ExternalLink,
   Eye,
@@ -33,6 +35,7 @@ import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
@@ -815,7 +818,7 @@ export function AuditPanel() {
               <TableRowsSkeleton rows={8} colSpan={6} />
             ) : (events.data?.items ?? []).map((event: AdminAuditEvent) => (
               <TableRow key={event.id}>
-                <TableCell className="whitespace-nowrap">{formatDateTime(event.occurredAt)}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatAuditDateTime(event.occurredAt)}</TableCell>
                 <TableCell>
                   <div className="font-medium">{event.actorName || auditActorLabel(event.actorType)}</div>
                   {event.actorEmail && event.actorEmail !== event.actorName ? (
@@ -895,6 +898,8 @@ const AUDIT_ENTITY_TYPES = [
   "AffectationCompteTresorerie",
   "ConditionPaiementClient",
   "AjustementTarifUsage",
+  "Vehicule",
+  "Remorque",
 ] as const;
 
 function auditActionLabel(action: AdminAuditEvent["action"]) {
@@ -910,6 +915,8 @@ function auditActionVariant(action: AdminAuditEvent["action"]): "success" | "inf
 function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | null; onOpenChange: (open: boolean) => void }) {
   const fields = event ? auditChangedFields(event) : [];
   const entityUrl = event ? auditEntityUrl(event) : null;
+  const [technicalOpen, setTechnicalOpen] = useState(false);
+  useEffect(() => setTechnicalOpen(false), [event?.id]);
   return (
     <Dialog open={Boolean(event)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-4xl">
@@ -918,9 +925,8 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
             <DialogHeader>
               <DialogTitle>{auditActionLabel(event.action)} · {auditEntityTypeLabel(event.entityType)} {auditEntityReference(event)}</DialogTitle>
               <DialogDescription>
-                {formatDateTime(event.occurredAt)} par {event.actorName || auditActorLabel(event.actorType)}
+                {formatAuditDateTime(event.occurredAt)} par {event.actorName || auditActorLabel(event.actorType)}
                 {event.actorEmail && event.actorEmail !== event.actorName ? ` · ${event.actorEmail}` : ""}
-                {event.actorUserId ? ` · ID ${event.actorUserId}` : ""}
               </DialogDescription>
             </DialogHeader>
             <div className="grid max-h-[65vh] gap-4 overflow-y-auto pr-1">
@@ -947,10 +953,40 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
                   </TableBody>
                 </Table>
               </div>
-              <dl className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div><dt className="font-medium text-foreground">Source</dt><dd>{auditSourceLabel(event.source)}</dd></div>
-                <div><dt className="font-medium text-foreground">Requête</dt><dd className="break-all font-mono">{event.requestId || "-"}</dd></div>
-              </dl>
+              <Collapsible open={technicalOpen} onOpenChange={setTechnicalOpen} className="rounded-md border bg-muted/20">
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="ghost" className="w-full justify-between rounded-md px-3">
+                    Informations techniques
+                    <ChevronDown className={`size-4 transition-transform ${technicalOpen ? "rotate-180" : ""}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="border-t px-3 py-3">
+                  <dl className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div><dt className="font-medium text-foreground">Source</dt><dd>{auditSourceLabel(event.source)}</dd></div>
+                    <div><dt className="font-medium text-foreground">ID utilisateur</dt><dd>{event.actorUserId || "-"}</dd></div>
+                    <div className="sm:col-span-2">
+                      <dt className="font-medium text-foreground">Identifiant de requête</dt>
+                      <dd className="mt-1 flex items-center gap-2">
+                        <span className="min-w-0 break-all font-mono">{event.requestId || "-"}</span>
+                        {event.requestId ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            title="Copier l’identifiant"
+                            aria-label="Copier l’identifiant de requête"
+                            onClick={() => void navigator.clipboard
+                              .writeText(event.requestId ?? "")
+                              .then(() => toast.success("Identifiant copié"))}
+                          >
+                            <ClipboardCopy className="size-4" />
+                          </Button>
+                        ) : null}
+                      </dd>
+                    </div>
+                  </dl>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
@@ -958,7 +994,7 @@ function AuditEventDialog({ event, onOpenChange }: { event: AdminAuditEvent | nu
                 <Button asChild>
                   <Link to={entityUrl} onClick={() => onOpenChange(false)}>
                     <ExternalLink className="size-4" />
-                    Ouvrir l’objet
+                    {auditOpenActionLabel(event)}
                   </Link>
                 </Button>
               ) : null}
@@ -979,6 +1015,20 @@ function auditChangedFields(event: AdminAuditEvent) {
 
 function auditEventSummary(event: AdminAuditEvent) {
   const fields = auditChangedFields(event);
+  const parent = auditParentContract(event);
+  if (event.entityType === "Vehicule" || event.entityType === "Remorque") {
+    const object = event.entityType === "Vehicule" ? "Véhicule" : "Remorque";
+    const action = auditTargetAction(event);
+    return parent?.label ? `${object} ${action} · contrat ${parent.label}` : `${object} ${action}`;
+  }
+  if (event.entityType === "AjustementTarifUsage" && event.action === "CREATED") {
+    const snapshot = event.afterData ?? {};
+    const direction = formatAuditValue(snapshot.sens).toLocaleLowerCase("fr");
+    const value = formatAuditValue(snapshot.valeur);
+    const unit = snapshot.typeCalcul === "POURCENTAGE" ? " %" : "";
+    const start = formatAuditValue(snapshot.dateDebut);
+    return `${direction.charAt(0).toUpperCase()}${direction.slice(1)} de ${value}${unit} · effet ${start}`;
+  }
   if (event.action === "CREATED") return `${fields.length} champ(s) enregistré(s)`;
   if (event.action === "DELETED") return "Enregistrement supprimé";
   if (!fields.length) return "Modification enregistrée";
@@ -988,12 +1038,27 @@ function auditEventSummary(event: AdminAuditEvent) {
 
 function auditEntityReference(event: AdminAuditEvent) {
   const snapshot = { ...(event.beforeData ?? {}), ...(event.afterData ?? {}) };
+  if (event.entityType === "Vehicule" || event.entityType === "Remorque") {
+    const registration = snapshot.immatriculation;
+    return typeof registration === "string" && registration.trim()
+      ? registration.trim()
+      : event.entityId ? `#${event.entityId}` : "";
+  }
+  if (event.entityType === "AjustementTarifUsage") {
+    const direction = formatAuditValue(snapshot.sens);
+    const value = formatAuditValue(snapshot.valeur);
+    const unit = snapshot.typeCalcul === "POURCENTAGE" ? " %" : "";
+    const start = formatAuditValue(snapshot.dateDebut);
+    return `${direction} ${value}${unit} · ${start}`;
+  }
   const candidates = [
     "numeroSinistre",
     "numeroDossier",
     "numeroPolice",
     "numeroDocument",
     "numeroBordereau",
+    "immatriculation",
+    "numeroAttestation",
     "reference",
     "code",
     "libelle",
@@ -1026,6 +1091,8 @@ function auditEntityTypeLabel(entityType: string) {
     AffectationCompteTresorerie: "Affectation de compte",
     ConditionPaiementClient: "Condition de paiement",
     AjustementTarifUsage: "Ajustement tarifaire",
+    Vehicule: "Véhicule",
+    Remorque: "Remorque",
   } as Record<string, string>)[entityType] ?? splitAuditIdentifier(entityType);
 }
 
@@ -1039,9 +1106,47 @@ function auditFieldLabel(field: string) {
     dateEcheance: "Date d’échéance",
     dateSinistre: "Date du sinistre",
     dateDeclaration: "Date de déclaration",
+    dateDebut: "Date de début",
+    datePremiereCirculation: "Date de première mise en circulation",
+    dateMiseEnCirculation: "Date de mise en circulation",
+    dateExpirationCarteGrise: "Expiration de la carte grise",
     numeroDossier: "N° dossier",
     numeroPolice: "N° police",
     numeroSinistre: "N° sinistre",
+    numeroAttestation: "N° attestation",
+    numeroRemorque: "N° remorque",
+    immatriculation: "Immatriculation",
+    immatriculationProvisoire: "Immatriculation provisoire",
+    contrat: "Contrat",
+    typeVehicule: "Type de véhicule",
+    usage: "Usage",
+    marque: "Marque",
+    marqueRemorque: "Marque de remorque",
+    carrosserie: "Carrosserie",
+    categorieTransport: "Catégorie de transport",
+    carburant: "Carburant",
+    puissanceFiscale: "Puissance fiscale",
+    nombrePlaces: "Nombre de places",
+    cylindree: "Cylindrée",
+    sousClasse: "Sous-classe",
+    ptc: "PTC",
+    crm: "CRM",
+    coefficientProrata: "Coefficient de prorata",
+    valeurVenale: "Valeur vénale",
+    valeurNeuf: "Valeur à neuf",
+    valeurGlace: "Valeur des glaces",
+    valeurAssuree: "Valeur assurée",
+    organismeCredit: "Organisme de crédit",
+    nomOrganismeCredit: "Nom de l’organisme de crédit",
+    montantCredit: "Montant du crédit",
+    dateFinCredit: "Fin du crédit",
+    motif: "Motif",
+    sens: "Sens",
+    typeCalcul: "Type de calcul",
+    typeOperation: "Type d’opération",
+    valeur: "Valeur",
+    nombreVehicules: "Nombre de véhicules",
+    nombreRemorques: "Nombre de remorques",
     montant: "Montant",
     montantTtc: "Montant TTC",
     primeTtc: "Prime TTC",
@@ -1062,20 +1167,25 @@ function splitAuditIdentifier(value: string) {
 function formatAuditValue(value: unknown): string {
   if (value === undefined || value === null || value === "") return "-";
   if (typeof value === "boolean") return value ? "Oui" : "Non";
-  if (typeof value === "number") return String(value);
+  if (typeof value === "number") {
+    return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 6 }).format(value);
+  }
   if (typeof value === "string") {
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
       const [year, month, day] = value.split("-");
       return `${day}/${month}/${year}`;
     }
     if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return formatDateTime(value);
-    return value;
+    return AUDIT_VALUE_LABELS[value] ?? value;
   }
   if (Array.isArray(value)) return value.map(formatAuditValue).join(", ") || "-";
   if (typeof value === "object") {
-    const reference = value as { type?: unknown; id?: unknown };
+    const reference = value as { type?: unknown; id?: unknown; label?: unknown };
     if (typeof reference.type === "string" && reference.id != null) {
-      return `${auditEntityTypeLabel(reference.type)} #${String(reference.id)}`;
+      const label = typeof reference.label === "string" && reference.label.trim()
+        ? ` · ${reference.label.trim()}`
+        : "";
+      return `${auditEntityTypeLabel(reference.type)} #${String(reference.id)}${label}`;
     }
     return JSON.stringify(value);
   }
@@ -1083,6 +1193,10 @@ function formatAuditValue(value: unknown): string {
 }
 
 function auditEntityUrl(event: AdminAuditEvent) {
+  if (event.entityType === "Vehicule" || event.entityType === "Remorque") {
+    const parent = auditParentContract(event);
+    return parent?.id ? `/app/production/contrats/${parent.id}` : null;
+  }
   if (!event.entityId || event.action === "DELETED") return null;
   return ({
     Contrat: `/app/production/contrats/${event.entityId}`,
@@ -1091,6 +1205,53 @@ function auditEntityUrl(event: AdminAuditEvent) {
     CompteTresorerie: `/app/compta/tresorerie/comptes/${event.entityId}`,
   } as Record<string, string>)[event.entityType] ?? null;
 }
+
+function auditTargetAction(event: AdminAuditEvent) {
+  const feminineSuffix = event.entityType === "Remorque" ? "e" : "";
+  if (event.action === "CREATED") return `ajouté${feminineSuffix}`;
+  if (event.action === "DELETED") return `supprimé${feminineSuffix}`;
+  if (event.beforeData?.actif === true && event.afterData?.actif === false) {
+    return `retiré${feminineSuffix}`;
+  }
+  if (event.beforeData?.actif === false && event.afterData?.actif === true) {
+    return `réactivé${feminineSuffix}`;
+  }
+  return `modifié${feminineSuffix}`;
+}
+
+function auditParentContract(event: AdminAuditEvent) {
+  const snapshot = { ...(event.beforeData ?? {}), ...(event.afterData ?? {}) };
+  const contract = snapshot.contrat;
+  if (!contract || typeof contract !== "object" || Array.isArray(contract)) return null;
+  const reference = contract as { type?: unknown; id?: unknown; label?: unknown };
+  if (reference.type !== "Contrat" || reference.id == null) return null;
+  return {
+    id: String(reference.id),
+    label: typeof reference.label === "string" && reference.label.trim()
+      ? reference.label.trim()
+      : `#${String(reference.id)}`,
+  };
+}
+
+function auditOpenActionLabel(event: AdminAuditEvent) {
+  return event.entityType === "Vehicule" || event.entityType === "Remorque"
+    ? "Ouvrir le contrat"
+    : "Ouvrir l’objet";
+}
+
+const AUDIT_VALUE_LABELS: Record<string, string> = {
+  HAUSSE: "Hausse",
+  BAISSE: "Baisse",
+  POURCENTAGE: "Pourcentage",
+  MONTANT_FIXE: "Montant fixe",
+  AJUSTEMENT: "Ajustement tarifaire",
+  ACTIVE: "Actif",
+  ACTIF: "Actif",
+  INACTIVE: "Inactif",
+  INACTIF: "Inactif",
+  AUTOMOBILE: "Automobile",
+  REMORQUE: "Remorque",
+};
 
 function auditActorLabel(actorType: AdminAuditEvent["actorType"]) {
   return ({ USER: "Utilisateur", SYSTEM: "Système", IMPORT: "Import" })[actorType];
@@ -1890,6 +2051,11 @@ function resourceLabel(resource: string) {
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatAuditDateTime(value?: string | null) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "medium" }).format(new Date(value));
 }
 
 function showError(error: unknown) {

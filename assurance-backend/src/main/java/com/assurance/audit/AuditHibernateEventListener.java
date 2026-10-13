@@ -1,14 +1,22 @@
 package com.assurance.audit;
 
 import com.assurance.entity.Agence;
+import com.assurance.entity.AuditTrackedEntity;
 import com.assurance.entity.AuditedEntity;
 import com.assurance.entity.BaseEntity;
+import com.assurance.entity.Carrosserie;
+import com.assurance.entity.Contrat;
+import com.assurance.entity.Marque;
+import com.assurance.entity.Remorque;
+import com.assurance.entity.Usage;
+import com.assurance.entity.Vehicule;
 import com.assurance.enums.AuditAction;
 import com.assurance.enums.AuditActorType;
 import com.assurance.security.AuditRequestContext;
 import com.assurance.security.TenantContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hibernate.Hibernate;
 import org.hibernate.collection.spi.PersistentCollection;
 import org.hibernate.event.spi.PostDeleteEvent;
 import org.hibernate.event.spi.PostDeleteEventListener;
@@ -65,6 +73,9 @@ public class AuditHibernateEventListener implements
             "secret",
             "authorization"
     );
+    private static final Map<String, Set<String>> DERIVED_PROPERTIES = Map.of(
+            "Contrat", Set.of("nombreVehicules", "nombreRemorques")
+    );
 
     private final ObjectMapper objectMapper;
 
@@ -74,10 +85,11 @@ public class AuditHibernateEventListener implements
 
     @Override
     public void onPostInsert(PostInsertEvent event) {
-        if (!(event.getEntity() instanceof AuditedEntity)) {
+        if (!isTracked(event.getEntity())) {
             return;
         }
         Map<String, Object> after = snapshot(
+                event.getEntity(),
                 event.getPersister().getPropertyNames(),
                 event.getState(),
                 null
@@ -88,16 +100,18 @@ public class AuditHibernateEventListener implements
 
     @Override
     public void onPostUpdate(PostUpdateEvent event) {
-        if (!(event.getEntity() instanceof AuditedEntity)) {
+        if (!isTracked(event.getEntity())) {
             return;
         }
         int[] dirtyProperties = event.getDirtyProperties();
         Map<String, Object> before = snapshot(
+                event.getEntity(),
                 event.getPersister().getPropertyNames(),
                 event.getOldState(),
                 dirtyProperties
         );
         Map<String, Object> after = snapshot(
+                event.getEntity(),
                 event.getPersister().getPropertyNames(),
                 event.getState(),
                 dirtyProperties
@@ -112,10 +126,11 @@ public class AuditHibernateEventListener implements
 
     @Override
     public void onPostDelete(PostDeleteEvent event) {
-        if (!(event.getEntity() instanceof AuditedEntity)) {
+        if (!isTracked(event.getEntity())) {
             return;
         }
         Map<String, Object> before = snapshot(
+                event.getEntity(),
                 event.getPersister().getPropertyNames(),
                 event.getDeletedState(),
                 null
@@ -146,7 +161,7 @@ public class AuditHibernateEventListener implements
                 ? AuditActorType.USER
                 : "IMPORT".equalsIgnoreCase(source) ? AuditActorType.IMPORT : AuditActorType.SYSTEM;
         LocalDateTime occurredAt = LocalDateTime.now();
-        String entityType = entity.getClass().getSimpleName();
+        String entityType = entityType(entity);
         String beforeJson = toJson(before);
         String afterJson = toJson(after);
 
@@ -169,27 +184,33 @@ public class AuditHibernateEventListener implements
         });
     }
 
-    private Map<String, Object> snapshot(String[] names, Object[] state, int[] includedIndexes) {
+    private Map<String, Object> snapshot(
+            Object entity,
+            String[] names,
+            Object[] state,
+            int[] includedIndexes
+    ) {
         Map<String, Object> values = new LinkedHashMap<>();
         if (state == null) {
             return values;
         }
         if (includedIndexes == null) {
             for (int index = 0; index < names.length; index++) {
-                addValue(values, names[index], state[index]);
+                addValue(values, entity, names[index], state[index]);
             }
             return values;
         }
         for (int index : includedIndexes) {
             if (index >= 0 && index < names.length && index < state.length) {
-                addValue(values, names[index], state[index]);
+                addValue(values, entity, names[index], state[index]);
             }
         }
         return values;
     }
 
-    private void addValue(Map<String, Object> values, String property, Object value) {
+    private void addValue(Map<String, Object> values, Object entity, String property, Object value) {
         if (TECHNICAL_PROPERTIES.contains(property)
+                || DERIVED_PROPERTIES.getOrDefault(entityType(entity), Set.of()).contains(property)
                 || value instanceof Collection<?>
                 || value instanceof PersistentCollection<?>) {
             return;
@@ -217,14 +238,61 @@ public class AuditHibernateEventListener implements
         }
         if (value instanceof BaseEntity entity) {
             Map<String, Object> reference = new LinkedHashMap<>();
-            reference.put("type", value.getClass().getSimpleName());
+            reference.put("type", Hibernate.getClass(value).getSimpleName());
             reference.put("id", entity.getId());
+            String label = referenceLabel(entity);
+            if (label != null && !label.isBlank()) {
+                reference.put("label", label);
+            }
             return reference;
         }
         if (value instanceof byte[]) {
             return "[BINARY]";
         }
         return String.valueOf(value);
+    }
+
+    private boolean isTracked(Object entity) {
+        return entity instanceof AuditedEntity || entity instanceof AuditTrackedEntity;
+    }
+
+    private String entityType(Object entity) {
+        return Hibernate.getClass(entity).getSimpleName();
+    }
+
+    private String referenceLabel(BaseEntity entity) {
+        if (entity instanceof Contrat contrat) {
+            return firstNotBlank(contrat.getNumeroPolice(), contrat.getNumeroDossier());
+        }
+        if (entity instanceof Usage usage) {
+            return joinReference(usage.getCode(), usage.getLibelle());
+        }
+        if (entity instanceof Marque marque) {
+            return marque.getLibelle();
+        }
+        if (entity instanceof Carrosserie carrosserie) {
+            return carrosserie.getLibelle();
+        }
+        return null;
+    }
+
+    private String joinReference(String code, String label) {
+        if (code == null || code.isBlank()) {
+            return label;
+        }
+        if (label == null || label.isBlank() || code.equalsIgnoreCase(label)) {
+            return code;
+        }
+        return code + " - " + label;
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private void removeUnchangedValues(Map<String, Object> before, Map<String, Object> after) {
@@ -244,6 +312,16 @@ public class AuditHibernateEventListener implements
         }
         if (entity instanceof Agence agence && agence.getId() != null) {
             return agence.getId();
+        }
+        if (entity instanceof Vehicule vehicule
+                && vehicule.getContrat() != null
+                && vehicule.getContrat().getAgence() != null) {
+            return vehicule.getContrat().getAgence().getId();
+        }
+        if (entity instanceof Remorque remorque
+                && remorque.getContrat() != null
+                && remorque.getContrat().getAgence() != null) {
+            return remorque.getContrat().getAgence().getId();
         }
         if (state == null) {
             return null;

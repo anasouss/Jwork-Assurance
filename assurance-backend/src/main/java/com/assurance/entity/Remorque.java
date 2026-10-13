@@ -26,7 +26,7 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Remorque extends BaseEntity {
+public class Remorque extends BaseEntity implements AuditTrackedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contrat_id", nullable = false)

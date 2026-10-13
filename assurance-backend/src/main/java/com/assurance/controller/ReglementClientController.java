@@ -5,11 +5,13 @@ import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
+import com.assurance.dto.request.UpdateReglementClientPolicyRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
+import com.assurance.dto.response.ReglementClientPolicyResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.UtilisateurTresorerieResponse;
 import com.assurance.enums.ModeReglementClient;
@@ -126,6 +128,25 @@ public class ReglementClientController {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.selectedReceivables(
                 TenantContext.getCurrentAgence(),
                 request
+        )));
+    }
+
+    @GetMapping("/politique")
+    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:view', 'PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<ReglementClientPolicyResponse>> paymentPolicy() {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.paymentPolicy(
+                TenantContext.getCurrentAgence()
+        )));
+    }
+
+    @PutMapping("/politique")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<ReglementClientPolicyResponse>> updatePaymentPolicy(
+            @Valid @RequestBody UpdateReglementClientPolicyRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.updatePaymentPolicy(
+                TenantContext.getCurrentAgence(),
+                request.getCreditNonAffecteMaximum()
         )));
     }
 

@@ -35,6 +35,16 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -114,6 +124,7 @@ export default function NouveauReglementClientPage() {
   const [notes, setNotes] = useState("");
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([]);
   const [activePaymentMode, setActivePaymentMode] = useState<ClientPaymentMode | null>(null);
+  const [creditConfirmationOpen, setCreditConfirmationOpen] = useState(false);
   const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
   const [excludedTargetKeys, setExcludedTargetKeys] = useState<Set<string>>(new Set());
   const dragSensors = useSensors(
@@ -135,12 +146,19 @@ export default function NouveauReglementClientPage() {
     queryKey: ["compta", "banks", "active"],
     queryFn: () => comptaApi.banks(),
   });
+  const paymentPolicy = useQuery({
+    queryKey: ["compta", "client-payment-policy"],
+    queryFn: comptaApi.clientPaymentPolicy,
+  });
 
   const rows = orderedRows;
   const selectedTotal = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const allocatedAmounts = allocationByReceivable(rows, paymentTotal);
   const remainingAmount = round(selectedTotal - paymentTotal);
+  const unallocatedCredit = Math.max(0, round(-remainingAmount));
+  const maximumUnallocatedCredit = paymentPolicy.data?.creditNonAffecteMaximum ?? 100;
+  const creditExceedsMaximum = unallocatedCredit > maximumUnallocatedCredit + 0.001;
   const activeBankAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "BANQUE"
   );
@@ -194,6 +212,8 @@ export default function NouveauReglementClientPage() {
     && rows.length > 0
     && methods.length > 0
     && paymentTotal > 0
+    && paymentPolicy.isSuccess
+    && !creditExceedsMaximum
     && methods.every((method) => methodValid(method, accounts.data ?? []));
 
   function updateMethod(key: string, patch: Partial<PaymentMethodDraft>) {
@@ -311,10 +331,12 @@ export default function NouveauReglementClientPage() {
           tone="payment"
         />
         <SummaryCell
-          label="Solde restant"
-          value={money(remainingAmount)}
-          detail={remainingAmount < -0.001 ? "Crédit client non affecté" : undefined}
-          tone={remainingAmount < 0 ? "credit" : "balance"}
+          label={unallocatedCredit > 0.001 ? "Crédit client non affecté" : "Solde restant"}
+          value={unallocatedCredit > 0.001 ? `+${money(unallocatedCredit)}` : money(remainingAmount)}
+          detail={unallocatedCredit > 0.001
+            ? `Maximum autorisé : ${money(maximumUnallocatedCredit)}`
+            : undefined}
+          tone={creditExceedsMaximum ? "danger" : unallocatedCredit > 0.001 ? "credit" : "balance"}
         />
       </section>
 
@@ -580,8 +602,15 @@ export default function NouveauReglementClientPage() {
       </section>
 
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t py-4">
-        <div className="text-sm text-muted-foreground">
-          {remainingAmount > 0.001
+        <div className={creditExceedsMaximum || paymentPolicy.isError
+          ? "text-sm font-medium text-destructive"
+          : "text-sm text-muted-foreground"}
+        >
+          {paymentPolicy.isError
+            ? "Impossible de vérifier la limite du crédit client. Réessayez avant d’enregistrer."
+            : creditExceedsMaximum
+            ? `Crédit non affecté supérieur au maximum autorisé de ${money(maximumUnallocatedCredit)}`
+            : remainingAmount > 0.001
             ? `Paiement partiel · reste ${money(remainingAmount)}`
             : remainingAmount < -0.001
               ? `Crédit client non affecté · ${money(Math.abs(remainingAmount))}`
@@ -593,13 +622,39 @@ export default function NouveauReglementClientPage() {
           </Button>
           <Button
             disabled={!canSubmit || createPayment.isPending}
-            onClick={() => createPayment.mutate()}
+            onClick={() => {
+              if (unallocatedCredit > 0.001) {
+                setCreditConfirmationOpen(true);
+              } else {
+                createPayment.mutate();
+              }
+            }}
           >
             <Banknote className="size-4" />
             Enregistrer le règlement
           </Button>
         </div>
       </footer>
+
+      <AlertDialog open={creditConfirmationOpen} onOpenChange={setCreditConfirmationOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer le crédit client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous encaissez {money(paymentTotal)} MAD, dont {money(unallocatedCredit)} MAD restera non affecté au crédit du client.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Revenir au règlement</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={createPayment.isPending}
+              onClick={() => createPayment.mutate()}
+            >
+              Confirmer et enregistrer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -801,19 +856,21 @@ function SummaryCell(props: {
   label: string;
   value: string;
   detail?: string;
-  tone: "quittance" | "payment" | "balance" | "credit";
+  tone: "quittance" | "payment" | "balance" | "credit" | "danger";
 }) {
   const surfaceClasses = {
     quittance: "bg-orange-50/50 dark:bg-orange-950/15",
     payment: "bg-emerald-50/50 dark:bg-emerald-950/15",
     balance: "bg-amber-50/50 dark:bg-amber-950/15",
     credit: "bg-sky-50/60 dark:bg-sky-950/20",
+    danger: "bg-red-50/60 dark:bg-red-950/20",
   }[props.tone];
   const valueClasses = {
     quittance: "text-orange-800 dark:text-orange-300",
     payment: "text-emerald-800 dark:text-emerald-300",
     balance: "text-amber-800 dark:text-amber-300",
     credit: "text-sky-800 dark:text-sky-300",
+    danger: "text-red-700 dark:text-red-300",
   }[props.tone];
   return (
     <div className={`border-b px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 ${surfaceClasses}`}>

@@ -21,6 +21,7 @@ import type {
   CreateClientDocumentRequest,
   CreateInvoiceFromStatementRequest,
   ClientPayment,
+  ClientPaymentPolicy,
   ClientPaymentPage,
   ClientReceivable,
   ClientReceivablePage,
@@ -526,6 +527,22 @@ export const comptaApi = {
         body: JSON.stringify(request),
       }
     )).map(normalizeClientReceivable);
+  },
+
+  async clientPaymentPolicy() {
+    return unwrap(await apiFetch<ApiResponse<ClientPaymentPolicy>>(
+      "/api/v1/compta/reglements-clients/politique"
+    ));
+  },
+
+  async updateClientPaymentPolicy(creditNonAffecteMaximum: number) {
+    return unwrap(await apiFetch<ApiResponse<ClientPaymentPolicy>>(
+      "/api/v1/compta/reglements-clients/politique",
+      {
+        method: "PUT",
+        body: JSON.stringify({ creditNonAffecteMaximum }),
+      }
+    ));
   },
 
   async clientPayments(params: {

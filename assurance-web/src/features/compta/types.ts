@@ -577,6 +577,10 @@ export type ClientPayment = {
   instruments: PaymentInstrument[];
 };
 
+export type ClientPaymentPolicy = {
+  creditNonAffecteMaximum: number;
+};
+
 export type ClientPaymentPage = {
   page: PageInfo;
   rows: ClientPayment[];

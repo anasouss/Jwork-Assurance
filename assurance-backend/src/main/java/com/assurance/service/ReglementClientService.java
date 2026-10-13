@@ -9,6 +9,7 @@ import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
+import com.assurance.dto.response.ReglementClientPolicyResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.dto.response.SourceDocumentClientResponse;
@@ -90,6 +91,8 @@ import java.util.stream.Collectors;
 public class ReglementClientService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private static final BigDecimal DEFAULT_MAX_UNALLOCATED_CREDIT = new BigDecimal("100.00");
+    private static final String MAX_UNALLOCATED_CREDIT_PARAMETER = "REGLEMENT_CLIENT_CREDIT_NON_AFFECTE_MAX";
     private static final Set<ModeReglementClient> BANK_ACCOUNT_REQUIRED_MODES = Set.of(
             ModeReglementClient.VIREMENT,
             ModeReglementClient.VERSEMENT_BANCAIRE,
@@ -119,6 +122,35 @@ public class ReglementClientService {
     private final LigneBordereauRemiseRepository remittanceLineRepository;
     private final BordereauRemiseRepository remittanceRepository;
     private final BanqueService banqueService;
+    private final ParametreApplicationService parametreApplicationService;
+
+    @Transactional(readOnly = true)
+    public ReglementClientPolicyResponse paymentPolicy(Long agenceId) {
+        return ReglementClientPolicyResponse.builder()
+                .creditNonAffecteMaximum(maxUnallocatedCredit(agenceId))
+                .build();
+    }
+
+    @Transactional
+    public ReglementClientPolicyResponse updatePaymentPolicy(
+            Long agenceId,
+            BigDecimal creditNonAffecteMaximum
+    ) {
+        if (creditNonAffecteMaximum == null || creditNonAffecteMaximum.signum() < 0) {
+            throw new BadRequestException("Le crédit client non affecté maximal doit être positif ou nul");
+        }
+        BigDecimal maximum = money(creditNonAffecteMaximum);
+        parametreApplicationService.setValeur(
+                agenceId,
+                MAX_UNALLOCATED_CREDIT_PARAMETER,
+                "DECIMAL",
+                maximum.toPlainString(),
+                "Crédit client non affecté maximal autorisé lors d'un règlement"
+        );
+        return ReglementClientPolicyResponse.builder()
+                .creditNonAffecteMaximum(maximum)
+                .build();
+    }
 
     @Transactional(readOnly = true)
     public CreanceClientPageResponse searchReceivables(
@@ -581,6 +613,15 @@ public class ReglementClientService {
         if (totalAllocated.compareTo(totalPayment) > 0) {
             throw new BadRequestException("Le montant affecté dépasse le total des moyens de règlement");
         }
+        BigDecimal unallocatedCredit = money(totalPayment.subtract(totalAllocated));
+        BigDecimal maximumUnallocatedCredit = maxUnallocatedCredit(agenceId);
+        if (unallocatedCredit.compareTo(maximumUnallocatedCredit) > 0) {
+            throw new BadRequestException(
+                    "Le crédit client non affecté de " + unallocatedCredit.toPlainString()
+                            + " MAD dépasse le maximum autorisé de "
+                            + maximumUnallocatedCredit.toPlainString() + " MAD"
+            );
+        }
 
         ReglementClient payment = ReglementClient.builder()
                 .agence(agence)
@@ -591,7 +632,7 @@ public class ReglementClientService {
                 .payeurNom(payer.name())
                 .statut(StatutReglementClient.VALIDE)
                 .montantTotal(totalPayment)
-                .montantNonAffecte(totalPayment.subtract(totalAllocated))
+                .montantNonAffecte(unallocatedCredit)
                 .notes(trimToNull(request.getNotes()))
                 .creePar(user)
                 .build();
@@ -2040,6 +2081,17 @@ public class ReglementClientService {
 
     private BigDecimal money(BigDecimal value) {
         return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal maxUnallocatedCredit(Long agenceId) {
+        BigDecimal configured = parametreApplicationService.getDecimal(
+                agenceId,
+                MAX_UNALLOCATED_CREDIT_PARAMETER,
+                DEFAULT_MAX_UNALLOCATED_CREDIT
+        );
+        return configured == null || configured.signum() < 0
+                ? DEFAULT_MAX_UNALLOCATED_CREDIT
+                : money(configured);
     }
 
     private String normalizeSearch(String value) {

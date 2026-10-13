@@ -1,4 +1,4 @@
-import { Banknote, Landmark } from "lucide-react";
+import { Banknote, Landmark, ReceiptText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -14,6 +14,12 @@ const settings = [
     description: "Référentiel des banques utilisé par les règlements et les comptes de trésorerie.",
     href: "/app/compta/parametres/banques",
     icon: Landmark,
+  },
+  {
+    title: "Règlements clients",
+    description: "Règles d’encaissement et limite du crédit client non affecté.",
+    href: "/app/compta/parametres/reglements-clients",
+    icon: ReceiptText,
   },
 ];
 

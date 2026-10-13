@@ -256,10 +256,8 @@ public class AuditHibernateEventListener implements
     ) {
         Long agencyId = resolveAgencyId(entity, propertyNames, state);
         Long userId = TenantContext.getCurrentUser();
-        String source = AuditRequestContext.getSource();
-        if (source == null || source.isBlank()) {
-            source = "SYSTEM";
-        }
+        String requestSource = AuditRequestContext.getSource();
+        String source = requestSource == null || requestSource.isBlank() ? "SYSTEM" : requestSource;
         AuditActorType actorType = userId != null
                 ? AuditActorType.USER
                 : "IMPORT".equalsIgnoreCase(source) ? AuditActorType.IMPORT : AuditActorType.SYSTEM;

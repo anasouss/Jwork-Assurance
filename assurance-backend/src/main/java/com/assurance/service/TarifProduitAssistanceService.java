@@ -27,11 +27,6 @@ public class TarifProduitAssistanceService {
         return candidates.stream()
                 .filter(tarif -> tarif.getDateFin() == null || !tarif.getDateFin().isBefore(reference))
                 .findFirst()
-                .or(() -> candidates.stream().findFirst())
-                .or(() -> tarifProduitAssistanceRepository
-                        .findByProduitAssistanceAndActifTrueOrderByDateDebutDescCreatedAtDesc(produitAssistance)
-                        .stream()
-                        .findFirst())
                 .orElse(null);
     }
 }

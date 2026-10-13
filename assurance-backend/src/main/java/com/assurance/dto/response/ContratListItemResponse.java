@@ -30,6 +30,10 @@ public class ContratListItemResponse {
     private Long compagnieAssuranceId;
     private String compagnieCode;
     private String compagnieLibelle;
+    private Long compagnieAssistanceId;
+    private String compagnieAssistanceCode;
+    private String compagnieAssistanceLibelle;
+    private String produitAssistanceLibelle;
     private Long conventionId;
     private String conventionCode;
     private String conventionLibelle;

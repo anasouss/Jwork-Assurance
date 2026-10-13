@@ -383,6 +383,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const [blockedEditOpen, setBlockedEditOpen] = useState(false);
   const [renewalTerm, setRenewalTerm] = useState<"CABINET" | "COMPAGNIE">("CABINET");
   const isFlotte = contrat.typeContrat === "FLOTTE";
+  const isTravelAssistance = normalize(contrat.brancheAssuranceCode) === "ASSISTANCE";
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const carteVertePath = `/app/production/contrats/${contrat.id}/cartes-vertes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -407,7 +408,8 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     const statut = String(item.statut ?? "").trim().toUpperCase();
     return !isInitialContractMovement(item) && statut !== "ANNULE";
   });
-  const canCreateMovement = canCreateAvenant && !child && !terminal && !contrat.renouvele && isActiveContrat(contrat);
+  const canCreateMovement = !isTravelAssistance
+    && canCreateAvenant && !child && !terminal && !contrat.renouvele && isActiveContrat(contrat);
   const canRenew = canRenewContrat && !child && !terminal && !contrat.renouvele
     && isActiveContrat(contrat) && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
   const canEditDirectly = contrat.modificationDirecteAutorisee !== false
@@ -416,7 +418,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && !child
     && !terminal
     && !hasActiveAvenants;
-  const canShowEdit = (canUpdateContrat || canCreateContrat) && !child;
+  const canShowEdit = !isTravelAssistance && (canUpdateContrat || canCreateContrat) && !child;
   const blockedEditReason = contrat.motifBlocageModificationDirecte
     ?? fallbackDirectEditBlockReason(contrat, movement, hasActiveAvenants);
   const rectificationPath = movement.mouvementId && movement.code
@@ -871,19 +873,31 @@ function mainClient(contrat: ContratListItem) {
 }
 
 function branchLabel(contrat: ContratListItem) {
+  if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") return "Assistance";
   return contrat.premierTypeVehicule
     ? VEHICLE_TYPE_LABELS[contrat.premierTypeVehicule] ?? contrat.premierTypeVehicule
     : "-";
 }
 
 function productLabel(contrat: ContratListItem) {
+  if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
+    return contrat.produitAssistanceLibelle ?? "Assistance voyage";
+  }
   if (contrat.typeContrat === "PARTICULIER") return "Mono";
   if (contrat.typeContrat === "FLOTTE") return "Flotte";
   return "Convention";
 }
 
 function companyLabel(contrat: ContratListItem) {
-  return String(contrat.compagnieCode ?? contrat.compagnieLibelle ?? contrat.compagnieAssuranceId ?? "-");
+  return String(
+    contrat.compagnieCode
+    ?? contrat.compagnieLibelle
+    ?? contrat.compagnieAssistanceCode
+    ?? contrat.compagnieAssistanceLibelle
+    ?? contrat.compagnieAssuranceId
+    ?? contrat.compagnieAssistanceId
+    ?? "-"
+  );
 }
 
 function conventionLabel(contrat: ContratListItem) {

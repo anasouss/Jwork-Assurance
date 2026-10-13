@@ -1836,12 +1836,13 @@ public class ReferentielController {
     private void applyProduitAssistanceRequest(ProduitAssistance produit, UpsertProduitAssistanceRequest request) {
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", request.getCompagnieAssistanceId()));
-        CategorieClient categorieClient = request.getCategorieClientId() == null ? null :
+        boolean voyage = "Assistance Voyage".equalsIgnoreCase(request.getType());
+        CategorieClient categorieClient = voyage || request.getCategorieClientId() == null ? null :
                 categorieClientRepository.findByIdWithUsages(request.getCategorieClientId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
 
         Set<Usage> usages = new LinkedHashSet<>();
-        if (request.getUsageIds() != null && !request.getUsageIds().isEmpty()) {
+        if (!voyage && request.getUsageIds() != null && !request.getUsageIds().isEmpty()) {
             List<Usage> foundUsages = usageRepository.findAllById(request.getUsageIds());
             if (foundUsages.size() != request.getUsageIds().size()) {
                 throw new ResourceNotFoundException("Usage", request.getUsageIds());
@@ -1867,6 +1868,18 @@ public class ReferentielController {
         produit.setLibelle(request.getLibelle().trim());
         produit.setType(blankToNull(request.getType()));
         produit.setPrestations(richTextSanitizer.sanitize(request.getPrestations()));
+        String codePromo = voyage ? blankToNull(request.getCodePromo()) : null;
+        BigDecimal tauxReduction = voyage ? request.getTauxReductionPromo() : null;
+        if (tauxReduction != null
+                && (tauxReduction.compareTo(BigDecimal.ZERO) < 0
+                || tauxReduction.compareTo(new BigDecimal("100")) > 0)) {
+            throw new BadRequestException("Le taux de réduction doit être compris entre 0 et 100");
+        }
+        if (codePromo != null && (tauxReduction == null || tauxReduction.compareTo(BigDecimal.ZERO) <= 0)) {
+            throw new BadRequestException("Un taux de réduction positif est obligatoire avec le code promo");
+        }
+        produit.setCodePromo(codePromo == null ? null : codePromo.toUpperCase(Locale.ROOT));
+        produit.setTauxReductionPromo(codePromo == null ? null : tauxReduction);
         if (produit.getUsages() == null) {
             produit.setUsages(new LinkedHashSet<>());
         }
@@ -2014,6 +2027,8 @@ public class ReferentielController {
                 .putValue("usageIds", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getId).toList())
                 .putValue("usageCodes", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getCode).toList())
                 .putValue("prestations", produit.getPrestations())
+                .putValue("codePromo", produit.getCodePromo())
+                .putValue("tauxReductionPromo", produit.getTauxReductionPromo())
                 .putValue("montantHt", tarif != null ? tarif.getMontantHt() : null)
                 .putValue("montantTtc", tarif != null ? tarif.getMontantTtc() : null)
                 .putValue("dateDebutTarif", tarif != null ? tarif.getDateDebut() : null)

@@ -133,10 +133,11 @@ public class ClientController {
     @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ClientResponse>> search(
             @RequestParam(required = false) String cin,
+            @RequestParam(required = false) String passport,
             @RequestParam(required = false) String rc
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                clientService.searchByIdentity(TenantContext.getCurrentAgence(), cin, rc).orElse(null)
+                clientService.searchByIdentity(TenantContext.getCurrentAgence(), cin, passport, rc).orElse(null)
         ));
     }
 

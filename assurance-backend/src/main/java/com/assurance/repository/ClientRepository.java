@@ -15,6 +15,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 
     Optional<Client> findByAgenceIdAndId(Long agenceId, Long id);
     Optional<Client> findFirstByAgenceIdAndCinIgnoreCase(Long agenceId, String cin);
+    Optional<Client> findFirstByAgenceIdAndPassportIgnoreCase(Long agenceId, String passport);
     Optional<Client> findFirstByAgenceIdAndRcIgnoreCase(Long agenceId, String rc);
     List<Client> findByAgenceIdAndClientParentId(Long agenceId, Long clientParentId);
 
@@ -31,6 +32,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
                     or lower(concat(coalesce(client.nom, ''), ' ', coalesce(client.prenom, ''))) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.codeClient, '')) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.cin, '')) like lower(concat('%', :query, '%'))
+                    or lower(coalesce(client.passport, '')) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.rc, '')) like lower(concat('%', :query, '%'))
                     or lower(coalesce(client.ice, '')) like lower(concat('%', :query, '%'))
               )

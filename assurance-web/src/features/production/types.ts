@@ -34,6 +34,8 @@ export type UpsertProduitAssistanceRequest = {
   libelle: string;
   type?: string;
   prestations?: string;
+  codePromo?: string;
+  tauxReductionPromo?: number;
   usageIds?: string[];
   actif?: boolean;
 };
@@ -434,6 +436,8 @@ export type ClientInput = {
     raisonSociale?: string;
     cin?: string;
     cinValidite?: string;
+    passport?: string;
+    nationalite?: string;
     rc?: string;
     ice?: string;
     numeroPermis?: string;
@@ -449,6 +453,43 @@ export type ClientInput = {
     telephones?: { numero: string; principal?: boolean; whatsapp?: boolean }[];
     acquisition?: AcquisitionClient;
   };
+};
+
+export type AssistanceVoyagePersonRequest = {
+  clientId?: string;
+  client?: ClientInput["client"];
+};
+
+export type CreateAssistanceVoyageRequest = {
+  compagnieAssistanceId: string;
+  produitAssistanceId: string;
+  dateEffet: string;
+  dureeMois: number;
+  numeroContrat: string;
+  codePromo?: string;
+  souscripteur: AssistanceVoyagePersonRequest;
+  assures: AssistanceVoyagePersonRequest[];
+  assureIdentiqueSouscripteur?: boolean;
+  payeurIndex?: number;
+};
+
+export type AssistanceVoyageCreationResponse = {
+  contratId: string;
+  assistanceId: string;
+  numeroDossier: string;
+  numeroContrat: string;
+  dateEffet: string;
+  dateEcheance: string;
+  primeNette: number;
+  primeTotale: number;
+  montantReduction: number;
+};
+
+export type AssistanceVoyageQuote = {
+  dateEcheance: string;
+  primeNette: number;
+  primeTotale: number;
+  montantReduction: number;
 };
 
 export type ClientResponse = ClientInput["client"] & {
@@ -756,6 +797,10 @@ export type AssistanceContrat = {
   dateEcheance?: string | null;
   echeanceCode?: string | null;
   numeroContratOuQuittance?: string | null;
+  duree?: number | null;
+  unite?: string | null;
+  codePromo?: string | null;
+  montantReduction?: number | null;
   trimestres?: number | null;
   prorataRatio?: number | null;
   primeNette?: number | null;
@@ -1330,6 +1375,9 @@ export type ContratSummary = {
   typeContrat: TypeContrat;
   statut: string;
   agenceId?: string;
+  brancheAssuranceId?: string | null;
+  brancheAssuranceCode?: string | null;
+  brancheAssuranceLibelle?: string | null;
   compagnieAssuranceId?: string;
   conventionId?: string | null;
   categorieClientId?: string | null;
@@ -1504,6 +1552,10 @@ export type ContratListItem = {
   compagnieAssuranceId?: string | null;
   compagnieCode?: string | null;
   compagnieLibelle?: string | null;
+  compagnieAssistanceId?: string | null;
+  compagnieAssistanceCode?: string | null;
+  compagnieAssistanceLibelle?: string | null;
+  produitAssistanceLibelle?: string | null;
   conventionId?: string | null;
   conventionCode?: string | null;
   conventionLibelle?: string | null;

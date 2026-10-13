@@ -352,7 +352,11 @@ export default function AssistanceProductsSettingsPage() {
               </Select>
             </Field>
             <Field label="Type">
-              <Select value={productPayload.type || NONE} onValueChange={(value) => setProductPayload((current) => ({ ...current, type: value === NONE ? undefined : value }))}>
+              <Select value={productPayload.type || NONE} onValueChange={(value) => setProductPayload((current) => ({
+                ...current,
+                type: value === NONE ? undefined : value,
+                ...(value === "Assistance Voyage" ? { categorieClientId: undefined, usageIds: [] } : {}),
+              }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Aucun</SelectItem>
@@ -365,7 +369,7 @@ export default function AssistanceProductsSettingsPage() {
             <Field label="Produit" required>
               <Input value={productPayload.libelle} onChange={(event) => setProductPayload((current) => ({ ...current, libelle: event.target.value }))} />
             </Field>
-            <Field label="Catégorie client">
+            {productPayload.type !== "Assistance Voyage" ? <Field label="Catégorie client">
               <Select value={productPayload.categorieClientId || NONE} onValueChange={(value) => {
                 const categorieClientId = value === NONE ? undefined : value;
                 const allowedUsages = usagesForCategory(usages.data ?? [], categories.data ?? [], categorieClientId);
@@ -384,14 +388,40 @@ export default function AssistanceProductsSettingsPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </Field>
-            <Field label="Usages couverts">
+            </Field> : null}
+            {productPayload.type !== "Assistance Voyage" ? <Field label="Usages couverts">
               <UsagesMultiSelect
                 usages={productUsages}
                 value={productPayload.usageIds ?? []}
                 onChange={(usageIds) => setProductPayload((current) => ({ ...current, usageIds }))}
               />
-            </Field>
+            </Field> : null}
+            {productPayload.type === "Assistance Voyage" ? (
+              <>
+                <Field label="Code promo">
+                  <Input
+                    value={productPayload.codePromo ?? ""}
+                    onChange={(event) => setProductPayload((current) => ({
+                      ...current,
+                      codePromo: event.target.value.toUpperCase(),
+                    }))}
+                  />
+                </Field>
+                <Field label="Réduction promo (%)">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    value={productPayload.tauxReductionPromo ?? ""}
+                    onChange={(event) => setProductPayload((current) => ({
+                      ...current,
+                      tauxReductionPromo: event.target.value === "" ? undefined : Number(event.target.value),
+                    }))}
+                  />
+                </Field>
+              </>
+            ) : null}
             <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-neutral-700 dark:bg-neutral-950/70">
               <Checkbox checked={productPayload.actif !== false} onCheckedChange={(value) => setProductPayload((current) => ({ ...current, actif: Boolean(value) }))} />
               <span>Actif</span>
@@ -425,10 +455,10 @@ export default function AssistanceProductsSettingsPage() {
             <Field label="Date fin">
               <DatePicker date={tarifPayload.dateFin} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateFin: toDateOnly(date) }))} />
             </Field>
-            <Field label="Montant HT" required>
+            <Field label={refString(tarifProduct ?? {}, "type") === "Assistance Voyage" ? "Montant annuel HT" : "Montant HT"} required>
               <MoneyInput value={tarifPayload.montantHt} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantHt: value ?? 0 }))} />
             </Field>
-            <Field label="Montant TTC" required>
+            <Field label={refString(tarifProduct ?? {}, "type") === "Assistance Voyage" ? "Montant annuel TTC" : "Montant TTC"} required>
               <MoneyInput value={tarifPayload.montantTtc} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantTtc: value ?? 0 }))} />
             </Field>
             <div className="flex gap-2 md:col-span-4">
@@ -504,6 +534,8 @@ function productToPayload(product: ReferenceOption): UpsertProduitAssistanceRequ
     libelle: product.libelle,
     type: refString(product, "type") || undefined,
     prestations: refString(product, "prestations") || undefined,
+    codePromo: refString(product, "codePromo") || undefined,
+    tauxReductionPromo: refNumber(product, "tauxReductionPromo") ?? undefined,
     usageIds: refArray(product, "usageIds"),
     actif: product.actif !== false,
   };

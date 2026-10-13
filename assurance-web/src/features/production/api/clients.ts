@@ -26,7 +26,7 @@ type GroupeClientRequest = {
 };
 
 export const clientApi = {
-  async searchClient(params: { cin?: string; rc?: string }) {
+  async searchClient(params: { cin?: string; passport?: string; rc?: string }) {
     return unwrap(
       await apiFetch<ApiResponse<ClientResponse | null>>(
         `/api/v1/clients/search${buildQueryString(params)}`

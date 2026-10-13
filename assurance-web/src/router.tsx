@@ -51,6 +51,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/ContratCreationPage")),
       },
       {
+        path: "production/ajouter-dossier/assistance-voyage",
+        lazy: lazyRoute(() => import("@/features/production/pages/AssistanceVoyageCreationPage")),
+      },
+      {
         path: "production/prospection",
         lazy: lazyRoute(() => import("@/features/production/pages/ProspectionPage")),
       },

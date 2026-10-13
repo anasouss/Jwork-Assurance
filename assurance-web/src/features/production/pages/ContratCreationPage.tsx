@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowRight, Building2, Car, FilePlus2, Users } from "lucide-react";
+import { ArrowRight, Building2, Car, FilePlus2, Plane, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,9 +16,26 @@ export default function ContratCreationPage() {
   const location = useLocation();
   const prospectionMode = location.pathname.includes("/prospection");
   const [assurance, setAssurance] = useState(prospectionMode ? "automobile" : "");
+  const [assistanceType, setAssistanceType] = useState("");
+  const [compagnieAssistanceId, setCompagnieAssistanceId] = useState("");
+  const [produitAssistanceId, setProduitAssistanceId] = useState("");
   const [typeContrat, setTypeContrat] = useState<TypeContrat | "">(prospectionMode ? "FLOTTE" : "");
   const [categorieClientId, setCategorieClientId] = useState("");
   const form = useContratCreationForm((typeContrat || "PARTICULIER") as TypeContrat, undefined, { prospectionMode });
+  const assistanceCompanies = useQuery({
+    queryKey: ["referentiel", "compagnies-assistance", "entry"],
+    queryFn: () => referenceApi.list("compagnies-assistance"),
+    staleTime: 60_000,
+  });
+  const assistanceProducts = useQuery({
+    queryKey: ["referentiel", "produits-assistance", "entry", compagnieAssistanceId, assistanceType],
+    queryFn: () => referenceApi.list("produits-assistance", {
+      compagnieAssistanceId,
+      type: assistanceType,
+    }),
+    enabled: Boolean(compagnieAssistanceId && assistanceType),
+    staleTime: 60_000,
+  });
   const categoriesClient = form.refs.categoriesClient.data ?? [];
   const categoriesClientBlocked = typeContrat === "PARTICULIER" && !form.refs.categoriesClient.isLoading && !form.refs.categoriesClient.isError && categoriesClient.length === 0;
 
@@ -83,17 +100,18 @@ export default function ContratCreationPage() {
     configured: conventionGrilleConfigured,
   });
 
-  const canStart =
-    assurance === "automobile" &&
-    Boolean(typeContrat) &&
-    (typeContrat !== "PARTICULIER" || Boolean(categorieClientId)) &&
-    (typeContrat !== "CONVENTION" || Boolean(
-      form.compagnieAssuranceId
-      && form.conventionId
-      && form.usageId
-      && (!selectedUsage?.bySousClasse || selectedSousClasse)
-      && !conventionStartBlockedReason
-    ));
+  const canStart = assurance === "assistance"
+    ? assistanceType === "Assistance Voyage" && Boolean(compagnieAssistanceId && produitAssistanceId)
+    : assurance === "automobile"
+      && Boolean(typeContrat)
+      && (typeContrat !== "PARTICULIER" || Boolean(categorieClientId))
+      && (typeContrat !== "CONVENTION" || Boolean(
+        form.compagnieAssuranceId
+        && form.conventionId
+        && form.usageId
+        && (!selectedUsage?.bySousClasse || selectedSousClasse)
+        && !conventionStartBlockedReason
+      ));
 
   const createDraftMutation = useMutation({
     mutationFn: contractCreationApi.createContratDraft,
@@ -117,6 +135,10 @@ export default function ContratCreationPage() {
   });
 
   const handleStart = () => {
+    if (assurance === "assistance" && assistanceType === "Assistance Voyage") {
+      navigate(`/app/production/ajouter-dossier/assistance-voyage?compagnieId=${encodeURIComponent(compagnieAssistanceId)}&produitId=${encodeURIComponent(produitAssistanceId)}`);
+      return;
+    }
     if (!typeContrat) {
       return;
     }
@@ -158,10 +180,14 @@ export default function ContratCreationPage() {
               <Select disabled={prospectionMode} value={assurance} onValueChange={(value) => {
                 setAssurance(value);
                 setTypeContrat("");
+                setAssistanceType("");
+                setCompagnieAssistanceId("");
+                setProduitAssistanceId("");
               }}>
                 <SelectTrigger><SelectValue placeholder="Choisir une option" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="automobile">Automobile</SelectItem>
+                  <SelectItem value="assistance">Assistance</SelectItem>
                   <SelectItem value="risques-divers" disabled>Risques divers</SelectItem>
                 </SelectContent>
               </Select>
@@ -194,6 +220,58 @@ export default function ContratCreationPage() {
                   </SelectContent>
                 </Select>
               </Field>
+            ) : null}
+
+            {assurance === "assistance" ? (
+              <Field label="Type d’assistance">
+                <Select value={assistanceType} onValueChange={(value) => {
+                  setAssistanceType(value);
+                  setCompagnieAssistanceId("");
+                  setProduitAssistanceId("");
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Choisir une option" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Assistance Voyage">
+                      <span className="inline-flex items-center gap-2"><Plane className="size-4" /> Assistance voyage</span>
+                    </SelectItem>
+                    <SelectItem value="Assistance Automobile" disabled>
+                      Assistance automobile - depuis un dossier automobile
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+
+            {assurance === "assistance" && assistanceType === "Assistance Voyage" ? (
+              <>
+                <Field label="Compagnie d’assistance">
+                  <Select value={compagnieAssistanceId} onValueChange={(value) => {
+                    setCompagnieAssistanceId(value);
+                    setProduitAssistanceId("");
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Choisir une compagnie" /></SelectTrigger>
+                    <SelectContent>
+                      {(assistanceCompanies.data ?? []).map((company) => (
+                        <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Produit">
+                  <Select
+                    value={produitAssistanceId}
+                    onValueChange={setProduitAssistanceId}
+                    disabled={!compagnieAssistanceId || assistanceProducts.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choisir un produit" /></SelectTrigger>
+                    <SelectContent>
+                      {(assistanceProducts.data ?? []).map((product) => (
+                        <SelectItem key={product.id} value={product.id}>{product.libelle}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </>
             ) : null}
           </div>
 

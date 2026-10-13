@@ -24,6 +24,10 @@ public class AssistanceContratResponse {
     private LocalDate dateEcheance;
     private String echeanceCode;
     private String numeroContratOuQuittance;
+    private Integer duree;
+    private String unite;
+    private String codePromo;
+    private BigDecimal montantReduction;
     private Integer trimestres;
     private BigDecimal prorataRatio;
     private BigDecimal primeNette;

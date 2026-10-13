@@ -95,6 +95,12 @@ public class AssistanceContrat extends BaseEntity {
     @Column(name = "type_quittance", length = 40)
     private String typeQuittance;
 
+    @Column(name = "code_promo", length = 60)
+    private String codePromo;
+
+    @Column(name = "montant_reduction", precision = 14, scale = 2)
+    private BigDecimal montantReduction;
+
     @Column(name = "prime_nette", precision = 14, scale = 2)
     private BigDecimal primeNette;
 

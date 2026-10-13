@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Set;
 
 @Data
@@ -18,6 +19,8 @@ public class UpsertProduitAssistanceRequest {
 
     private String type;
     private String prestations;
+    private String codePromo;
+    private BigDecimal tauxReductionPromo;
     private Set<Long> usageIds;
     private Boolean actif;
 }

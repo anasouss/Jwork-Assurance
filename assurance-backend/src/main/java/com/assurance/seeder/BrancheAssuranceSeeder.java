@@ -19,6 +19,7 @@ public class BrancheAssuranceSeeder implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         seed("AUTOMOBILE", "Automobile");
+        seed("ASSISTANCE", "Assistance");
         seed("RISQUES_DIVERS", "Risques divers");
     }
 

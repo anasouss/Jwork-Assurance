@@ -7,12 +7,14 @@ import com.assurance.dto.response.PageMetadata;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
+import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
+import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.VehiculeRepository;
 import com.assurance.service.renewal.RenewalPolicy;
@@ -45,6 +47,7 @@ public class ContratSearchService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final ContratRepository contratRepository;
+    private final AssistanceContratRepository assistanceContratRepository;
     private final ContratClientRepository contratClientRepository;
     private final MouvementContratRepository mouvementContratRepository;
     private final VehiculeRepository vehiculeRepository;
@@ -197,6 +200,10 @@ public class ContratSearchService {
                 vehiculeRepository.findByContratIdInOrderByCreatedAtAsc(ids),
                 vehicle -> vehicle.getContrat().getId()
         );
+        Map<Long, List<AssistanceContrat>> assistances = groupByContract(
+                assistanceContratRepository.findByContratIdInAndActifTrueOrderByCreatedAtDesc(ids),
+                assistance -> assistance.getContrat().getId()
+        );
         Map<Long, List<AvenantDraftSummaryResponse>> drafts = avenantDraftService
                 .listSummaries(agenceId, ids)
                 .stream()
@@ -214,6 +221,7 @@ public class ContratSearchService {
                         clients.getOrDefault(contract.getId(), List.of()),
                         movements.getOrDefault(contract.getId(), List.of()),
                         vehicles.getOrDefault(contract.getId(), List.of()),
+                        assistances.getOrDefault(contract.getId(), List.of()),
                         drafts.getOrDefault(contract.getId(), List.of()),
                         modificationPolicies.get(contract.getId())
                 ))
@@ -225,6 +233,7 @@ public class ContratSearchService {
             List<ContratClient> clients,
             List<MouvementContrat> movements,
             List<Vehicule> vehicles,
+            List<AssistanceContrat> assistances,
             List<AvenantDraftSummaryResponse> drafts,
             ContractDirectModificationPolicy.Evaluation modificationPolicy
     ) {
@@ -242,6 +251,7 @@ public class ContratSearchService {
                 .filter(vehicle -> !Boolean.FALSE.equals(vehicle.getActif()))
                 .findFirst()
                 .orElse(null);
+        AssistanceContrat firstAssistance = assistances.stream().findFirst().orElse(null);
 
         return ContratListItemResponse.builder()
                 .id(contract.getId())
@@ -258,6 +268,13 @@ public class ContratSearchService {
                 .compagnieAssuranceId(contract.getCompagnieAssurance() == null ? null : contract.getCompagnieAssurance().getId())
                 .compagnieCode(contract.getCompagnieAssurance() == null ? null : contract.getCompagnieAssurance().getCode())
                 .compagnieLibelle(contract.getCompagnieAssurance() == null ? null : contract.getCompagnieAssurance().getNom())
+                .compagnieAssistanceId(firstAssistance == null || firstAssistance.getCompagnieAssistance() == null
+                        ? null : firstAssistance.getCompagnieAssistance().getId())
+                .compagnieAssistanceCode(firstAssistance == null || firstAssistance.getCompagnieAssistance() == null
+                        ? null : firstAssistance.getCompagnieAssistance().getCode())
+                .compagnieAssistanceLibelle(firstAssistance == null || firstAssistance.getCompagnieAssistance() == null
+                        ? null : firstAssistance.getCompagnieAssistance().getNom())
+                .produitAssistanceLibelle(firstAssistance == null ? null : firstAssistance.getProduit())
                 .conventionId(contract.getConvention() == null ? null : contract.getConvention().getId())
                 .conventionCode(contract.getConvention() == null ? null : contract.getConvention().getCode())
                 .conventionLibelle(contract.getConvention() == null ? null : contract.getConvention().getIntitule())

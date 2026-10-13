@@ -1,6 +1,8 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.dto.request.CreateAssistanceVoyageRequest;
+import com.assurance.dto.request.QuoteAssistanceVoyageRequest;
 import com.assurance.dto.request.CreateRenouvellementDraftRequest;
 import com.assurance.dto.request.FinalizeRenouvellementRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
@@ -12,6 +14,8 @@ import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
+import com.assurance.dto.response.AssistanceVoyageCreationResponse;
+import com.assurance.dto.response.AssistanceVoyageQuoteResponse;
 import com.assurance.dto.response.CarteVerteContextResponse;
 import com.assurance.dto.response.CarteVerteResponse;
 import com.assurance.dto.response.ContratActionsResponse;
@@ -29,6 +33,7 @@ import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
+import com.assurance.service.AssistanceVoyageService;
 import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
 import com.assurance.service.ContratService;
@@ -68,6 +73,7 @@ public class ContratController {
     private final ContratSearchService contratSearchService;
     private final ContratActionService contratActionService;
     private final AssistanceContratService assistanceContratService;
+    private final AssistanceVoyageService assistanceVoyageService;
     private final CarteVerteService carteVerteService;
     private final DevisPdfService devisPdfService;
     private final FlottePolicePdfService flottePolicePdfService;
@@ -84,6 +90,25 @@ public class ContratController {
                 contratService.create(TenantContext.getCurrentAgence(), request),
                 "Contrat cree"
         ));
+    }
+
+    @PostMapping("/assistance-voyage")
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
+    public ResponseEntity<ApiResponse<AssistanceVoyageCreationResponse>> createTravelAssistance(
+            @Valid @RequestBody CreateAssistanceVoyageRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceVoyageService.create(TenantContext.getCurrentAgence(), request),
+                "Assistance voyage créée"
+        ));
+    }
+
+    @PostMapping("/assistance-voyage/tarification")
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
+    public ResponseEntity<ApiResponse<AssistanceVoyageQuoteResponse>> quoteTravelAssistance(
+            @Valid @RequestBody QuoteAssistanceVoyageRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(assistanceVoyageService.quote(request)));
     }
 
     @PostMapping("/drafts")

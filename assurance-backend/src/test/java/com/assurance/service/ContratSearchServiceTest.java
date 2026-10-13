@@ -7,6 +7,7 @@ import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
+import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.VehiculeRepository;
 import com.assurance.service.renewal.RenewalPolicy;
@@ -33,6 +34,8 @@ class ContratSearchServiceTest {
     @Mock
     private ContratRepository contratRepository;
     @Mock
+    private AssistanceContratRepository assistanceContratRepository;
+    @Mock
     private ContratClientRepository contratClientRepository;
     @Mock
     private MouvementContratRepository mouvementContratRepository;
@@ -49,6 +52,7 @@ class ContratSearchServiceTest {
     void setUp() {
         service = new ContratSearchService(
                 contratRepository,
+                assistanceContratRepository,
                 contratClientRepository,
                 mouvementContratRepository,
                 vehiculeRepository,
@@ -124,6 +128,7 @@ class ContratSearchServiceTest {
         when(contratClientRepository.findByContratIdIn(ids)).thenReturn(List.of());
         when(mouvementContratRepository.findByContratIdInOrderByCreatedAtDesc(ids)).thenReturn(List.of());
         when(vehiculeRepository.findByContratIdInOrderByCreatedAtAsc(ids)).thenReturn(List.of());
+        when(assistanceContratRepository.findByContratIdInAndActifTrueOrderByCreatedAtDesc(ids)).thenReturn(List.of());
         when(avenantDraftService.listSummaries(7L, ids)).thenReturn(List.of());
         when(directModificationPolicy.evaluateAll(eq(7L), any(), any())).thenAnswer(invocation -> {
             List<Contrat> contracts = invocation.getArgument(1);

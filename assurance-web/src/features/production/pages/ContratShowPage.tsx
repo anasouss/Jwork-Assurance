@@ -81,7 +81,10 @@ export default function ContratShowPage() {
   const proprietaire = clientByRole(contrat, "PROPRIETAIRE") ?? souscripteur;
   const conducteur = clientByRole(contrat, "CONDUCTEUR")
     ?? (proprietaire?.conducteurHabituel ? proprietaire : null);
-  const compagnie = optionLabel(compagniesQuery.data, contrat.compagnieAssuranceId);
+  const travelAssistance = isTravelAssistanceContract(contrat);
+  const compagnie = travelAssistance
+    ? text(contrat.assistances?.[0]?.compagnieAssistanceLibelle)
+    : optionLabel(compagniesQuery.data, contrat.compagnieAssuranceId);
   const convention = optionLabel(conventionsQuery.data, contrat.conventionId);
   const selectedMouvement = mouvementId ? contrat.mouvements?.find((mouvement) => String(mouvement.id) === String(mouvementId)) : null;
   const isVehicleReplacement = String(selectedMouvement?.code ?? "").toUpperCase() === "CHV_M";
@@ -147,7 +150,9 @@ export default function ContratShowPage() {
             <div>
               <p className="text-[9px] font-bold uppercase text-emerald-700">Fiche synthèse</p>
               <h1 className="mt-0.5 text-lg font-bold">Dossier N° {dossier}</h1>
-              <p className="text-[10px] text-slate-600">{productLabel(contrat)} · Automobile</p>
+              <p className="text-[10px] text-slate-600">
+                {productLabel(contrat)} · {travelAssistance ? "Assistance" : "Automobile"}
+              </p>
             </div>
             <div className="text-right text-sm">
               <p className="font-semibold">{text(contrat.numeroPolice)}</p>
@@ -164,10 +169,10 @@ export default function ContratShowPage() {
                 ["Produit", productLabel(contrat)],
                 ["Compagnie", compagnie],
                 ...(contrat.typeContrat === "CONVENTION" ? [["Convention", convention] as [string, ReactNode]] : []),
-                ["N° attestation", firstAttestation(contrat)],
+                ...(!travelAssistance ? [["N° attestation", firstAttestation(contrat)] as [string, ReactNode]] : []),
                 ["Date d'effet", formatDate(selectedMouvement?.dateEffet ?? contrat.dateEffet)],
                 ["Date d'échéance", formatDate(selectedMouvement?.dateEcheance ?? contrat.dateEcheance)],
-                ["Fractionnement", text(contrat.fractionnement)],
+                ...(!travelAssistance ? [["Fractionnement", text(contrat.fractionnement)] as [string, ReactNode]] : []),
                 ...(contrat.reductionSaharienne
                   ? [["Réduction saharienne", contrat.justificatifSahara ?? "Oui"] as [string, ReactNode]]
                   : []),
@@ -511,6 +516,9 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
             <TableHead>Compagnie</TableHead>
             <TableHead>Produit</TableHead>
             <TableHead>Période</TableHead>
+            <TableHead>Durée</TableHead>
+            <TableHead>Code promo</TableHead>
+            <TableHead className="text-right">Réduction</TableHead>
             <TableHead className="text-right">Prime TTC</TableHead>
           </TableRow>
         </TableHeader>
@@ -521,6 +529,9 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
               <TableCell>{text(assistance.compagnieAssistanceLibelle)}</TableCell>
               <TableCell>{text(assistance.produit)}</TableCell>
               <TableCell>{formatDate(assistance.dateEffet)} au {formatDate(assistance.dateEcheance)}</TableCell>
+              <TableCell>{assistanceDuration(assistance)}</TableCell>
+              <TableCell>{text(assistance.codePromo)}</TableCell>
+              <TableCell className="text-right">{assistance.montantReduction ? moneyAmount(assistance.montantReduction) : "-"}</TableCell>
               <TableCell className="text-right font-semibold">{moneyAmount(assistance.primeTotale)}</TableCell>
             </TableRow>
           ))}
@@ -528,6 +539,17 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
       </Table>
     </Section>
   );
+}
+
+function assistanceDuration(assistance: AssistanceContrat) {
+  if (!assistance.duree) return "-";
+  if (assistance.unite === "MOIS") {
+    if (assistance.duree === 12) return "1 an";
+    if (assistance.duree > 12 && assistance.duree % 12 === 0) return `${assistance.duree / 12} ans`;
+    return `${assistance.duree} mois`;
+  }
+  if (assistance.unite === "TRIMESTRE") return `${assistance.duree} trimestre${assistance.duree > 1 ? "s" : ""}`;
+  return `${assistance.duree} ${assistance.unite ?? ""}`.trim();
 }
 
 function GarantiesTable({
@@ -932,13 +954,24 @@ function clientIdentity(client?: ClientResponse | null) {
   if (client.typeClient === "PERSONNE_MORALE") {
     return [client.rc ? `RC ${client.rc}` : null, client.ice ? `ICE ${client.ice}` : null].filter(Boolean).join(" · ") || "-";
   }
-  return [client.cin ? `CIN ${client.cin}` : null, client.numeroPermis ? `Permis ${client.numeroPermis}` : null].filter(Boolean).join(" · ") || "-";
+  return [
+    client.cin ? `CIN ${client.cin}` : null,
+    client.passport ? `Passeport ${client.passport}` : null,
+    client.numeroPermis ? `Permis ${client.numeroPermis}` : null,
+  ].filter(Boolean).join(" · ") || "-";
 }
 
 function productLabel(contrat: ContratSummary) {
+  if (isTravelAssistanceContract(contrat)) {
+    return contrat.assistances?.[0]?.produit || "Assistance voyage";
+  }
   if (contrat.typeContrat === "CONVENTION") return "Convention";
   if (contrat.typeContrat === "FLOTTE") return "Flotte";
   return "Mono";
+}
+
+function isTravelAssistanceContract(contrat: ContratSummary) {
+  return String(contrat.brancheAssuranceCode ?? "").trim().toUpperCase() === "ASSISTANCE";
 }
 
 function payerTypeLabel(type?: ContratSummary["typePayeurPrime"]) {
@@ -1111,15 +1144,16 @@ async function generateContratPdfBlob(params: {
     || Boolean(params.contrat.saisiePrimeNette);
   drawPdfHeader(ctx, params);
   drawPdfSection(ctx, "CONTRAT", () => {
+    const travelAssistance = isTravelAssistanceContract(params.contrat);
     drawPdfInfoGrid(ctx, [
       ["Nature", params.mouvement?.libelle ?? latestEvent(params.contrat)],
       ["Produit", productLabel(params.contrat)],
       ["Compagnie", params.compagnie],
       ...(params.contrat.typeContrat === "CONVENTION" ? [["Convention", params.convention] as [string, string]] : []),
-      ["N° attestation", firstAttestation(params.contrat)],
+      ...(!travelAssistance ? [["N° attestation", firstAttestation(params.contrat)] as [string, string]] : []),
       ["Date d'effet", formatDate(params.mouvement?.dateEffet ?? params.contrat.dateEffet)],
       ["Date d'échéance", formatDate(params.mouvement?.dateEcheance ?? params.contrat.dateEcheance)],
-      ["Fractionnement", text(params.contrat.fractionnement)],
+      ...(!travelAssistance ? [["Fractionnement", text(params.contrat.fractionnement)] as [string, string]] : []),
       ...(params.contrat.reductionSaharienne
         ? [["Réduction saharienne", params.contrat.justificatifSahara ?? "Oui"] as [string, string]]
         : []),
@@ -1255,7 +1289,11 @@ function drawPdfHeader(ctx: PdfContext, params: { contrat: ContratSummary; dossi
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(71, 85, 105);
   pdf.setFontSize(7.5);
-  pdf.text(pdfSafe(`${productLabel(params.contrat)} · Automobile`), ctx.x, ctx.y);
+  pdf.text(
+    pdfSafe(`${productLabel(params.contrat)} · ${isTravelAssistanceContract(params.contrat) ? "Assistance" : "Automobile"}`),
+    ctx.x,
+    ctx.y
+  );
   pdf.setFontSize(10.5);
   pdf.text("Police N°", ctx.x + ctx.width, ctx.y, { align: "right" });
   ctx.y += 5;

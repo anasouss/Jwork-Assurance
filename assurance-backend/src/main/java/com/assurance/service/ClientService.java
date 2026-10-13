@@ -71,12 +71,16 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<ClientResponse> searchByIdentity(Long agenceId, String cin, String rc) {
+    public Optional<ClientResponse> searchByIdentity(Long agenceId, String cin, String passport, String rc) {
         if (agenceId == null) {
             throw new BadRequestException("L'agence est obligatoire");
         }
         if (cin != null && !cin.isBlank()) {
             return clientRepository.findFirstByAgenceIdAndCinIgnoreCase(agenceId, cin.trim())
+                    .map(this::toResponse);
+        }
+        if (passport != null && !passport.isBlank()) {
+            return clientRepository.findFirstByAgenceIdAndPassportIgnoreCase(agenceId, passport.trim())
                     .map(this::toResponse);
         }
         if (rc != null && !rc.isBlank()) {
@@ -189,6 +193,13 @@ public class ClientService {
                     .filter(existing -> !existing.getId().equals(currentClientId))
                     .ifPresent(existing -> {
                         throw new BadRequestException("Un client avec ce RC existe déjà");
+                    });
+        }
+        if (request.getPassport() != null && !request.getPassport().isBlank()) {
+            clientRepository.findFirstByAgenceIdAndPassportIgnoreCase(agenceId, request.getPassport().trim())
+                    .filter(existing -> !existing.getId().equals(currentClientId))
+                    .ifPresent(existing -> {
+                        throw new BadRequestException("Un client avec ce passeport existe déjà");
                     });
         }
     }

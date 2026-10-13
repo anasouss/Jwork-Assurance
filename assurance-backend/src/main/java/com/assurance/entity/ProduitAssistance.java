@@ -52,6 +52,12 @@ public class ProduitAssistance extends BaseEntity {
     @Column(length = 2000)
     private String prestations;
 
+    @Column(name = "code_promo", length = 60)
+    private String codePromo;
+
+    @Column(name = "taux_reduction_promo", precision = 7, scale = 4)
+    private java.math.BigDecimal tauxReductionPromo;
+
     @ManyToMany
     @JoinTable(
             name = "produit_assistance_usages",

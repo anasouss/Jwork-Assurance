@@ -1194,9 +1194,9 @@ function AuditTimelineItem({
           <span className="flex size-7 items-center justify-center rounded-full border bg-background text-xs font-semibold">{index + 1}</span>
           <span className="grid min-w-0 gap-1">
             <span className="flex flex-wrap items-center gap-2">
-              <Badge variant={auditActionVariant(item.event.action)}>{auditActionLabel(item.event.action)}</Badge>
+              <Badge variant={auditActionVariant(item.event.action)}>{auditTimelineActionLabel(item.event)}</Badge>
               <span className="font-medium">
-                {auditEntityTypeLabel(item.event.entityType)} {auditEntityReference(item.event)}
+                {auditTimelineObjectLabel(item.event)}
               </span>
             </span>
             <span className="text-xs text-muted-foreground">{auditBusinessItemSummary(item)}</span>
@@ -1218,8 +1218,8 @@ function AuditTimelineItem({
               {visibleFields.map((field) => (
                 <TableRow key={field}>
                   <TableCell className="font-medium">{auditFieldLabel(field)}</TableCell>
-                  <TableCell className="max-w-72 break-words text-muted-foreground">{formatAuditValue(item.event.beforeData?.[field])}</TableCell>
-                  <TableCell className="max-w-72 break-words">{formatAuditValue(item.event.afterData?.[field])}</TableCell>
+                  <TableCell className="max-w-72 break-words text-muted-foreground">{formatAuditFieldValue(field, item.event.beforeData?.[field])}</TableCell>
+                  <TableCell className="max-w-72 break-words">{formatAuditFieldValue(field, item.event.afterData?.[field])}</TableCell>
                 </TableRow>
               ))}
               {!fields.length ? (
@@ -1264,10 +1264,43 @@ function auditOperationDescription(operation: AuditOperation, items: AuditBusine
 }
 
 function auditBusinessItemSummary(item: AuditBusinessItem) {
+  if (item.event.entityType === "ContratGarantie") {
+    const snapshot = auditSnapshot(item.event);
+    const target = auditGuaranteeTarget(snapshot);
+    const automatic = isAutomaticRcGuarantee(item.event);
+    const assignment = `${automatic ? "Affectée automatiquement" : "Ajoutée"} à ${target}`;
+    return snapshot.prime == null
+      ? `${assignment} · prime non calculée à cette étape`
+      : `${assignment} · prime nette ${formatAuditFieldValue("prime", snapshot.prime)}`;
+  }
   if (item.rawEvents.length > 1 && item.event.action === "CREATED") {
     return "Création et configuration initiale";
   }
   return auditEventSummary(item.event);
+}
+
+function isAutomaticRcGuarantee(event: AdminAuditEvent) {
+  if (event.entityType !== "ContratGarantie") return false;
+  const guarantee = auditReferenceLabel(auditSnapshot(event).garantie);
+  return Boolean(guarantee && /^RC(?:\s|[-·]|$)/i.test(guarantee));
+}
+
+function auditTimelineActionLabel(event: AdminAuditEvent) {
+  const isAddedContractElement = event.action === "CREATED"
+    && ["ContratClient", "ContratGarantie", "Vehicule", "Remorque", "AssistanceContrat"].includes(event.entityType);
+  if (isAddedContractElement) return "Ajout";
+  if (event.action === "DELETED" && ["ContratGarantie", "Vehicule", "Remorque", "AssistanceContrat"].includes(event.entityType)) {
+    return "Retrait";
+  }
+  return auditActionLabel(event.action);
+}
+
+function auditTimelineObjectLabel(event: AdminAuditEvent) {
+  if (event.entityType === "ContratGarantie") {
+    return auditReferenceLabel(auditSnapshot(event).garantie) ?? "Garantie";
+  }
+  const reference = auditEntityReference(event);
+  return `${auditEntityTypeLabel(event.entityType)}${reference ? ` ${reference}` : ""}`;
 }
 
 function auditChangedFields(event: AdminAuditEvent) {
@@ -1605,6 +1638,11 @@ function auditFieldLabel(field: string) {
     nombreRemorques: "Nombre de remorques",
     montant: "Montant",
     montantTtc: "Montant TTC",
+    capital: "Capital assuré",
+    taux: "Taux",
+    prime: "Prime nette",
+    tauxFranchise: "Taux de franchise",
+    franchiseMinimale: "Franchise minimale",
     primeTtc: "Prime TTC",
     notes: "Notes",
     commentaire: "Commentaire",
@@ -1654,6 +1692,14 @@ function formatAuditValue(value: unknown): string {
     return JSON.stringify(value);
   }
   return String(value);
+}
+
+function formatAuditFieldValue(field: string, value: unknown) {
+  if (["prime", "capital", "franchiseMinimale", "montant", "montantTotal", "montantTtc", "primeTtc"].includes(field)
+      && typeof value === "number") {
+    return `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} MAD`;
+  }
+  return formatAuditValue(value);
 }
 
 function auditEntityUrl(event: AdminAuditEvent) {
@@ -1706,6 +1752,14 @@ function auditFieldPriority(field: string) {
     "immatriculation",
     "statut",
     "contrat",
+    "garantie",
+    "vehicule",
+    "remorque",
+    "prime",
+    "taux",
+    "capital",
+    "tauxFranchise",
+    "franchiseMinimale",
     "client",
     "compagnieAssurance",
     "dateEffet",
@@ -1741,15 +1795,15 @@ function isAvenantMovement(event: AdminAuditEvent) {
   if (event.entityType !== "MouvementContrat") return false;
   const reference = auditReferenceLabel(auditSnapshot(event).typeMouvement);
   if (!reference) return false;
-  const code = reference.split("·", 1)[0]?.trim().toUpperCase();
+  const code = reference.split(/\s+(?:-|·)\s+/, 1)[0]?.trim().toUpperCase();
   return Boolean(code && code !== "AN" && code !== "REN");
 }
 
 function auditMovementTypeLabel(event: AdminAuditEvent) {
   const reference = auditReferenceLabel(auditSnapshot(event).typeMouvement);
   if (!reference) return null;
-  const [, ...labelParts] = reference.split("·");
-  return labelParts.join("·").trim() || reference;
+  const [, ...labelParts] = reference.split(/\s+(?:-|·)\s+/);
+  return labelParts.join(" - ").trim() || reference;
 }
 
 function auditReferenceLabel(value: unknown) {

@@ -58,12 +58,15 @@ public class ContratSearchService {
     @Transactional(readOnly = true)
     public PagedResponse<ContratListGroupResponse> searchContracts(
             Long agenceId,
+            Long brancheId,
             TypeContrat typeContrat,
             String typeDate,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
             Long compagnieId,
+            Long compagnieAssistanceId,
+            Long produitAssistanceId,
             String numeroPolice,
             Long clientId,
             Long contratId,
@@ -73,12 +76,15 @@ public class ContratSearchService {
         Long currentContractId = resolveCurrentContractId(agenceId, contratId);
         Page<Long> leafIds = contratRepository.searchCurrentContractIds(
                 agenceId,
+                brancheId,
                 typeContrat,
                 normalizeDateType(typeDate),
                 dateDu,
                 dateAu,
                 normalize(search),
                 compagnieId,
+                compagnieAssistanceId,
+                produitAssistanceId,
                 normalize(numeroPolice),
                 clientId,
                 currentContractId,

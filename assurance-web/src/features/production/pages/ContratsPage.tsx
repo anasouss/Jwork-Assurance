@@ -53,15 +53,6 @@ type MovementLine = {
   isSynthetic?: boolean;
 };
 
-const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  AUTOMOBILE: "Automobile",
-  CAMION: "Camion",
-  MOTO: "Moto",
-  BUS: "Bus",
-  TRACTEUR: "Tracteur",
-  AUTRE: "Autre",
-};
-
 export default function ContratsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [initialFilters] = useState<ContractFilters>(() => contractFiltersFromSearchParams(searchParams));
@@ -73,27 +64,55 @@ export default function ContratsPage() {
   const [filters, setFilters] = useState<ContractFilters>(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState<ContractFilters>(initialFilters);
   const canCreateContrat = useAuthStore((state) => state.user?.permissions?.includes("contrat:create") ?? false);
+  const branches = useQuery({
+    queryKey: referenceKeys.list("branches-assurance"),
+    queryFn: () => referenceApi.list("branches-assurance"),
+  });
+  const insuranceCompanies = useQuery({
+    queryKey: referenceKeys.list("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
+  });
+  const assistanceCompanies = useQuery({
+    queryKey: referenceKeys.list("compagnies-assistance"),
+    queryFn: () => referenceApi.list("compagnies-assistance"),
+  });
+  const selectedBranch = (branches.data ?? []).find((branch) => branch.id === filters.brancheId);
+  const selectedAppliedBranch = (branches.data ?? []).find((branch) => branch.id === appliedFilters.brancheId);
+  const assistanceBranch = normalize(selectedBranch?.code) === "ASSISTANCE";
+  const appliedAssistanceBranch = normalize(selectedAppliedBranch?.code) === "ASSISTANCE";
+  const assistanceProducts = useQuery({
+    queryKey: referenceKeys.list("produits-assistance", {
+      compagnieAssistanceId: assistanceBranch && filters.compagnieId !== "ALL" ? filters.compagnieId : undefined,
+      type: "Assistance Voyage",
+    }),
+    queryFn: () => referenceApi.list("produits-assistance", {
+      compagnieAssistanceId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+      type: "Assistance Voyage",
+    }),
+    enabled: assistanceBranch,
+  });
   const listParams = useMemo(() => ({
-    typeContrat: appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
+    brancheId: appliedFilters.brancheId === "ALL" ? undefined : appliedFilters.brancheId,
+    typeContrat: appliedAssistanceBranch || appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
     typeDate: appliedFilters.typeDate,
     dateDu: appliedFilters.du,
     dateAu: appliedFilters.au,
     search: appliedFilters.codeClient.trim() || undefined,
-    compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
+    compagnieId: !appliedAssistanceBranch && appliedFilters.compagnieId !== "ALL" ? appliedFilters.compagnieId : undefined,
+    compagnieAssistanceId: appliedAssistanceBranch && appliedFilters.compagnieId !== "ALL" ? appliedFilters.compagnieId : undefined,
+    produitAssistanceId: appliedAssistanceBranch && appliedFilters.produitAssistanceId !== "ALL"
+      ? appliedFilters.produitAssistanceId
+      : undefined,
     numeroPolice: appliedFilters.numeroPolice.trim() || undefined,
     clientId: appliedFilters.clientId || undefined,
     contratId: appliedFilters.contratId || undefined,
     page,
     size: 25,
-  }), [appliedFilters, page]);
+  }), [appliedAssistanceBranch, appliedFilters, page]);
   const contrats = useQuery({
     queryKey: contractKeys.list(listParams),
     queryFn: () => contractApi.listContrats(listParams),
     placeholderData: (previous) => previous,
-  });
-  const companies = useQuery({
-    queryKey: referenceKeys.list("compagnies-assurance"),
-    queryFn: () => referenceApi.list("compagnies-assurance"),
   });
   const rows = useMemo(
     () => (contrats.data?.items ?? []).map((group) => ({
@@ -140,17 +159,38 @@ export default function ContratsPage() {
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.1fr_1.1fr_1fr_1fr_1fr_1fr_1fr_auto]"
+            className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5"
             onSubmit={(event) => {
               event.preventDefault();
               applyFilters(filters);
             }}
           >
-            <FilterField label="Type de contrat">
-              <Select value={filters.typeContrat} onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as ContractFilters["typeContrat"] }))}>
+            <FilterField label="Branche">
+              <Select value={filters.brancheId} onValueChange={(value) => setFilters((current) => ({
+                ...current,
+                brancheId: value,
+                typeContrat: "ALL",
+                compagnieId: "ALL",
+                produitAssistanceId: "ALL",
+              }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">Tous les contrats</SelectItem>
+                  <SelectItem value="ALL">Toutes les branches</SelectItem>
+                  {(branches.data ?? []).map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Type de contrat">
+              <Select
+                disabled={assistanceBranch}
+                value={assistanceBranch ? "ALL" : filters.typeContrat}
+                onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as ContractFilters["typeContrat"] }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous les types</SelectItem>
                   <SelectItem value="PARTICULIER">Mono</SelectItem>
                   <SelectItem value="CONVENTION">Convention</SelectItem>
                   <SelectItem value="FLOTTE">Flotte</SelectItem>
@@ -172,24 +212,44 @@ export default function ContratsPage() {
             <FilterField label="Au">
               <DatePicker date={filters.au} onSelect={(date) => setFilters((current) => ({ ...current, au: toDateOnly(date) }))} />
             </FilterField>
-            <FilterField label="Code / client">
+            <FilterField label="Client / dossier">
               <Input value={filters.codeClient} onChange={(event) => setFilters((current) => ({ ...current, codeClient: event.target.value, clientId: "" }))} />
             </FilterField>
             <FilterField label="Compagnie">
-              <Select value={filters.compagnieId} onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}>
+              <Select value={filters.compagnieId} onValueChange={(value) => setFilters((current) => ({
+                ...current,
+                compagnieId: value,
+                produitAssistanceId: "ALL",
+              }))}>
                 <SelectTrigger><SelectValue placeholder="Toutes" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Toutes</SelectItem>
-                  {(companies.data ?? []).map((company) => (
+                  {(assistanceBranch ? assistanceCompanies.data ?? [] : insuranceCompanies.data ?? []).map((company) => (
                     <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </FilterField>
+            {assistanceBranch ? (
+              <FilterField label="Produit d’assistance">
+                <Select
+                  value={filters.produitAssistanceId}
+                  onValueChange={(value) => setFilters((current) => ({ ...current, produitAssistanceId: value }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Tous" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les produits</SelectItem>
+                    {(assistanceProducts.data ?? []).map((product) => (
+                      <SelectItem key={product.id} value={product.id}>{product.libelle}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            ) : null}
             <FilterField label="Numéro de police">
               <Input value={filters.numeroPolice} onChange={(event) => setFilters((current) => ({ ...current, numeroPolice: event.target.value }))} />
             </FilterField>
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2 2xl:col-span-1">
               <Button
                 type="submit"
                 className="h-9 px-4"
@@ -226,7 +286,7 @@ export default function ContratsPage() {
                   </TableHeaderCell>
                   <TableHeaderCell className="w-10" />
                   <TableHeaderCell>Code client</TableHeaderCell>
-                  <TableHeaderCell>Assuré</TableHeaderCell>
+                  <TableHeaderCell>Souscripteur</TableHeaderCell>
                   <TableHeaderCell>Branche</TableHeaderCell>
                   <TableHeaderCell>Produit</TableHeaderCell>
                   <TableHeaderCell>Mouvement N°</TableHeaderCell>
@@ -326,7 +386,7 @@ function ContratRow({
   return (
     <tr className={cn("border-b transition-colors hover:bg-muted/40", child && "bg-emerald-100/70 hover:bg-emerald-100 dark:bg-emerald-950/25 dark:hover:bg-emerald-950/35")}>
       <TableCellStrong>{dossierNumber(contrat)}</TableCellStrong>
-      <td className="px-2 py-2 text-center"><TypeBadge type={contrat.typeContrat} /></td>
+      <td className="px-2 py-2 text-center"><TypeBadge contrat={contrat} /></td>
       <TableCell>{clientCode(contrat)}</TableCell>
       <TableCell className="font-medium uppercase">{mainClient(contrat)}</TableCell>
       <TableCell className="uppercase">{branchLabel(contrat)}</TableCell>
@@ -873,10 +933,7 @@ function mainClient(contrat: ContratListItem) {
 }
 
 function branchLabel(contrat: ContratListItem) {
-  if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") return "Assistance";
-  return contrat.premierTypeVehicule
-    ? VEHICLE_TYPE_LABELS[contrat.premierTypeVehicule] ?? contrat.premierTypeVehicule
-    : "-";
+  return contrat.brancheAssuranceLibelle ?? contrat.brancheAssuranceCode ?? "-";
 }
 
 function productLabel(contrat: ContratListItem) {
@@ -916,7 +973,11 @@ function statusLabel(contrat: ContratListItem, movement: MovementLine) {
   return movement.statut ?? contrat.statut;
 }
 
-function TypeBadge({ type }: { type: ContratListItem["typeContrat"] }) {
+function TypeBadge({ contrat }: { contrat: ContratListItem }) {
+  if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
+    return <Badge className="min-w-5 justify-center rounded bg-cyan-700 px-1.5 py-0.5 text-white hover:bg-cyan-700">V</Badge>;
+  }
+  const { typeContrat: type } = contrat;
   const label = type === "PARTICULIER" ? "P" : type === "FLOTTE" ? "F" : "C";
   const className = type === "PARTICULIER"
     ? "bg-sky-600 text-white hover:bg-sky-600"

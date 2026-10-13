@@ -104,8 +104,24 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and renewal.agence.id = :agenceId
                       and renewal.prospection = false
               )
-              and (:typeContrat is null or c.typeContrat = :typeContrat)
+              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:typeContrat is null or (
+                    c.typeContrat = :typeContrat
+                    and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
+              ))
               and (:compagnieId is null or compagnie.id = :compagnieId)
+              and (:compagnieAssistanceId is null or exists (
+                    select assistance.id from AssistanceContrat assistance
+                    where assistance.contrat = c
+                      and assistance.actif = true
+                      and assistance.compagnieAssistance.id = :compagnieAssistanceId
+              ))
+              and (:produitAssistanceId is null or exists (
+                    select assistance.id from AssistanceContrat assistance
+                    where assistance.contrat = c
+                      and assistance.actif = true
+                      and assistance.produitAssistance.id = :produitAssistanceId
+              ))
               and (:contratId is null or c.id = :contratId)
               and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
@@ -123,6 +139,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                         where cc.contrat = c and (
                             lower(coalesce(cc.client.codeClient, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.cin, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.passport, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.rc, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.ice, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
@@ -138,6 +155,17 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                             lower(coalesce(v.immatriculation, '')) like concat('%', :search, '%') or
                             lower(coalesce(v.immatriculationProvisoire, '')) like concat('%', :search, '%')
                         )
+                    ) or
+                    exists (
+                        select assistance.id from AssistanceContrat assistance
+                        where assistance.contrat = c
+                          and assistance.actif = true
+                          and (
+                              lower(coalesce(assistance.numeroContratOuQuittance, '')) like concat('%', :search, '%') or
+                              lower(coalesce(assistance.compagnieAssistance.code, '')) like concat('%', :search, '%') or
+                              lower(coalesce(assistance.compagnieAssistance.nom, '')) like concat('%', :search, '%') or
+                              lower(coalesce(assistance.produit, '')) like concat('%', :search, '%')
+                          )
                     )
               )
               and (:dateDu is null or
@@ -161,8 +189,24 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and renewal.agence.id = :agenceId
                       and renewal.prospection = false
               )
-              and (:typeContrat is null or c.typeContrat = :typeContrat)
+              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:typeContrat is null or (
+                    c.typeContrat = :typeContrat
+                    and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
+              ))
               and (:compagnieId is null or compagnie.id = :compagnieId)
+              and (:compagnieAssistanceId is null or exists (
+                    select assistance.id from AssistanceContrat assistance
+                    where assistance.contrat = c
+                      and assistance.actif = true
+                      and assistance.compagnieAssistance.id = :compagnieAssistanceId
+              ))
+              and (:produitAssistanceId is null or exists (
+                    select assistance.id from AssistanceContrat assistance
+                    where assistance.contrat = c
+                      and assistance.actif = true
+                      and assistance.produitAssistance.id = :produitAssistanceId
+              ))
               and (:contratId is null or c.id = :contratId)
               and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
@@ -180,6 +224,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                         where cc.contrat = c and (
                             lower(coalesce(cc.client.codeClient, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.cin, '')) like concat('%', :search, '%') or
+                            lower(coalesce(cc.client.passport, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.rc, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.ice, '')) like concat('%', :search, '%') or
                             lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%') or
@@ -195,6 +240,17 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                             lower(coalesce(v.immatriculation, '')) like concat('%', :search, '%') or
                             lower(coalesce(v.immatriculationProvisoire, '')) like concat('%', :search, '%')
                         )
+                    ) or
+                    exists (
+                        select assistance.id from AssistanceContrat assistance
+                        where assistance.contrat = c
+                          and assistance.actif = true
+                          and (
+                              lower(coalesce(assistance.numeroContratOuQuittance, '')) like concat('%', :search, '%') or
+                              lower(coalesce(assistance.compagnieAssistance.code, '')) like concat('%', :search, '%') or
+                              lower(coalesce(assistance.compagnieAssistance.nom, '')) like concat('%', :search, '%') or
+                              lower(coalesce(assistance.produit, '')) like concat('%', :search, '%')
+                          )
                     )
               )
               and (:dateDu is null or
@@ -206,12 +262,15 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             """)
     Page<Long> searchCurrentContractIds(
             @Param("agenceId") Long agenceId,
+            @Param("brancheId") Long brancheId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("typeDate") String typeDate,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("search") String search,
             @Param("compagnieId") Long compagnieId,
+            @Param("compagnieAssistanceId") Long compagnieAssistanceId,
+            @Param("produitAssistanceId") Long produitAssistanceId,
             @Param("numeroPolice") String numeroPolice,
             @Param("clientId") Long clientId,
             @Param("contratId") Long contratId,

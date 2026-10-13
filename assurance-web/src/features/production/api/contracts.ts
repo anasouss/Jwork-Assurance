@@ -14,12 +14,15 @@ import type {
 import { unwrapApiResponse as unwrap } from "./response";
 
 export type ContractListParams = {
+  brancheId?: string;
   typeContrat?: TypeContrat;
   typeDate?: "EFFET" | "ECHEANCE";
   dateDu?: string;
   dateAu?: string;
   search?: string;
   compagnieId?: string;
+  compagnieAssistanceId?: string;
+  produitAssistanceId?: string;
   numeroPolice?: string;
   clientId?: string;
   contratId?: string;

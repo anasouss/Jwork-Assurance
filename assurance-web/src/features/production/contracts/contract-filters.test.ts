@@ -14,24 +14,28 @@ describe("contract filter URL state", () => {
 
   it("round-trips active filters and trims free text", () => {
     const params = contractFiltersToSearchParams({
+      brancheId: "3",
       typeContrat: "CONVENTION",
       typeDate: "ECHEANCE",
       du: "2026-01-01",
       au: "2026-12-31",
       codeClient: "  C000123  ",
       compagnieId: "4",
+      produitAssistanceId: "12",
       numeroPolice: "  P-42 ",
       clientId: "9",
       contratId: "27",
     });
 
     expect(contractFiltersFromSearchParams(params)).toEqual({
+      brancheId: "3",
       typeContrat: "CONVENTION",
       typeDate: "ECHEANCE",
       du: "2026-01-01",
       au: "2026-12-31",
       codeClient: "C000123",
       compagnieId: "4",
+      produitAssistanceId: "12",
       numeroPolice: "P-42",
       clientId: "9",
       contratId: "27",

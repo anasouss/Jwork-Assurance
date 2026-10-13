@@ -67,9 +67,9 @@ class ContratSearchServiceTest {
         Contrat original = contract(1L, null, "D-1");
         Contrat renewal = contract(2L, original, "D-2");
         when(contratRepository.searchCurrentContractIds(
-                eq(7L), eq(TypeContrat.CONVENTION), eq("EFFET"),
+                eq(7L), eq(5L), eq(TypeContrat.CONVENTION), eq("EFFET"),
                 eq(LocalDate.of(2026, 1, 1)), eq(LocalDate.of(2026, 12, 31)),
-                eq("client"), eq(4L), eq("p-1"), eq(9L), eq(2L), any(Pageable.class)
+                eq("client"), eq(4L), eq(6L), eq(8L), eq("p-1"), eq(9L), eq(2L), any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(2L)));
         when(contratRepository.findByAgenceIdAndIdIn(7L, List.of(2L))).thenReturn(List.of(renewal));
         when(contratRepository.findByAgenceIdAndIdIn(7L, List.of(1L))).thenReturn(List.of(original));
@@ -77,12 +77,15 @@ class ContratSearchServiceTest {
 
         var response = service.searchContracts(
                 7L,
+                5L,
                 TypeContrat.CONVENTION,
                 "EFFET",
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2026, 12, 31),
                 " Client ",
                 4L,
+                6L,
+                8L,
                 " P-1 ",
                 9L,
                 2L,

@@ -240,12 +240,15 @@ public class ContratController {
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<ApiResponse<PagedResponse<ContratListGroupResponse>>> list(
+            @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(defaultValue = "EFFET") String typeDate,
             @RequestParam(required = false) LocalDate dateDu,
             @RequestParam(required = false) LocalDate dateAu,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long compagnieAssistanceId,
+            @RequestParam(required = false) Long produitAssistanceId,
             @RequestParam(required = false) String numeroPolice,
             @RequestParam(required = false) Long clientId,
             @RequestParam(required = false) Long contratId,
@@ -254,12 +257,15 @@ public class ContratController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(contratSearchService.searchContracts(
                 TenantContext.getCurrentAgence(),
+                brancheId,
                 typeContrat,
                 typeDate,
                 dateDu,
                 dateAu,
                 search,
                 compagnieId,
+                compagnieAssistanceId,
+                produitAssistanceId,
                 numeroPolice,
                 clientId,
                 contratId,

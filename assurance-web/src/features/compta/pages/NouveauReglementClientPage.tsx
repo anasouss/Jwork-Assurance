@@ -194,7 +194,6 @@ export default function NouveauReglementClientPage() {
     && rows.length > 0
     && methods.length > 0
     && paymentTotal > 0
-    && paymentTotal <= selectedTotal + 0.001
     && methods.every((method) => methodValid(method, accounts.data ?? []));
 
   function updateMethod(key: string, patch: Partial<PaymentMethodDraft>) {
@@ -312,9 +311,10 @@ export default function NouveauReglementClientPage() {
           tone="payment"
         />
         <SummaryCell
-          label={remainingAmount >= 0 ? "Solde restant" : "Dépassement"}
-          value={money(Math.abs(remainingAmount))}
-          tone={remainingAmount < 0 ? "danger" : "balance"}
+          label="Solde restant"
+          value={money(remainingAmount)}
+          detail={remainingAmount < -0.001 ? "Crédit client non affecté" : undefined}
+          tone={remainingAmount < 0 ? "credit" : "balance"}
         />
       </section>
 
@@ -584,7 +584,7 @@ export default function NouveauReglementClientPage() {
           {remainingAmount > 0.001
             ? `Paiement partiel · reste ${money(remainingAmount)}`
             : remainingAmount < -0.001
-              ? `Le montant dépasse le solde de ${money(Math.abs(remainingAmount))}`
+              ? `Crédit client non affecté · ${money(Math.abs(remainingAmount))}`
               : "Le règlement couvre la sélection"}
         </div>
         <div className="flex gap-2">
@@ -801,19 +801,19 @@ function SummaryCell(props: {
   label: string;
   value: string;
   detail?: string;
-  tone: "quittance" | "payment" | "balance" | "danger";
+  tone: "quittance" | "payment" | "balance" | "credit";
 }) {
   const surfaceClasses = {
     quittance: "bg-orange-50/50 dark:bg-orange-950/15",
     payment: "bg-emerald-50/50 dark:bg-emerald-950/15",
     balance: "bg-amber-50/50 dark:bg-amber-950/15",
-    danger: "bg-red-50/50 dark:bg-red-950/15",
+    credit: "bg-sky-50/60 dark:bg-sky-950/20",
   }[props.tone];
   const valueClasses = {
     quittance: "text-orange-800 dark:text-orange-300",
     payment: "text-emerald-800 dark:text-emerald-300",
     balance: "text-amber-800 dark:text-amber-300",
-    danger: "text-red-700 dark:text-red-300",
+    credit: "text-sky-800 dark:text-sky-300",
   }[props.tone];
   return (
     <div className={`border-b px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 ${surfaceClasses}`}>

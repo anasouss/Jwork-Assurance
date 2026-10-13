@@ -68,12 +68,12 @@ export default function ClientPaymentSettingsPage() {
 
       <section className="max-w-3xl overflow-hidden rounded-md border bg-card">
         <div className="border-b bg-muted/30 px-4 py-3">
-          <h2 className="font-semibold">Crédit client non affecté</h2>
+          <h2 className="font-semibold">Reste à affecter</h2>
         </div>
         <div className="grid gap-4 p-4">
           <div className="grid max-w-md gap-2">
             <Label htmlFor="maximum-unallocated-credit">
-              Montant maximal autorisé (MAD)
+              Montant maximal restant à affecter (MAD)
             </Label>
             <MoneyInput
               id="maximum-unallocated-credit"
@@ -83,7 +83,7 @@ export default function ClientPaymentSettingsPage() {
               className="text-right tabular-nums"
             />
             <p className="text-sm text-muted-foreground">
-              Un règlement est bloqué lorsque le montant restant au crédit du client dépasse cette limite.
+              Un règlement est bloqué lorsque le montant restant à affecter dépasse cette limite.
               Saisissez 0 pour interdire tout dépassement.
             </p>
           </div>

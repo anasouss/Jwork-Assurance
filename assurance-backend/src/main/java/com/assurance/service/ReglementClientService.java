@@ -137,7 +137,7 @@ public class ReglementClientService {
             BigDecimal creditNonAffecteMaximum
     ) {
         if (creditNonAffecteMaximum == null || creditNonAffecteMaximum.signum() < 0) {
-            throw new BadRequestException("Le crédit client non affecté maximal doit être positif ou nul");
+            throw new BadRequestException("Le montant maximal restant à affecter doit être positif ou nul");
         }
         BigDecimal maximum = money(creditNonAffecteMaximum);
         parametreApplicationService.setValeur(
@@ -145,7 +145,7 @@ public class ReglementClientService {
                 MAX_UNALLOCATED_CREDIT_PARAMETER,
                 "DECIMAL",
                 maximum.toPlainString(),
-                "Crédit client non affecté maximal autorisé lors d'un règlement"
+                "Montant maximal restant à affecter lors d'un règlement client"
         );
         return ReglementClientPolicyResponse.builder()
                 .creditNonAffecteMaximum(maximum)
@@ -617,7 +617,7 @@ public class ReglementClientService {
         BigDecimal maximumUnallocatedCredit = maxUnallocatedCredit(agenceId);
         if (unallocatedCredit.compareTo(maximumUnallocatedCredit) > 0) {
             throw new BadRequestException(
-                    "Le crédit client non affecté de " + unallocatedCredit.toPlainString()
+                    "Le montant restant à affecter de " + unallocatedCredit.toPlainString()
                             + " MAD dépasse le maximum autorisé de "
                             + maximumUnallocatedCredit.toPlainString() + " MAD"
             );

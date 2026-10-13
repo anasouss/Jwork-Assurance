@@ -331,7 +331,7 @@ export default function NouveauReglementClientPage() {
           tone="payment"
         />
         <SummaryCell
-          label={unallocatedCredit > 0.001 ? "Crédit client non affecté" : "Solde restant"}
+          label={unallocatedCredit > 0.001 ? "Reste à affecter" : "Reste à payer"}
           value={unallocatedCredit > 0.001 ? `+${money(unallocatedCredit)}` : money(remainingAmount)}
           detail={unallocatedCredit > 0.001
             ? `Maximum autorisé : ${money(maximumUnallocatedCredit)}`
@@ -607,13 +607,13 @@ export default function NouveauReglementClientPage() {
           : "text-sm text-muted-foreground"}
         >
           {paymentPolicy.isError
-            ? "Impossible de vérifier la limite du crédit client. Réessayez avant d’enregistrer."
+            ? "Impossible de vérifier la limite du montant restant à affecter. Réessayez avant d’enregistrer."
             : creditExceedsMaximum
-            ? `Crédit non affecté supérieur au maximum autorisé de ${money(maximumUnallocatedCredit)}`
+            ? `Reste à affecter supérieur au maximum autorisé de ${money(maximumUnallocatedCredit)}`
             : remainingAmount > 0.001
             ? `Paiement partiel · reste ${money(remainingAmount)}`
             : remainingAmount < -0.001
-              ? `Crédit client non affecté · ${money(Math.abs(remainingAmount))}`
+              ? `Reste à affecter · ${money(Math.abs(remainingAmount))}`
               : "Le règlement couvre la sélection"}
         </div>
         <div className="flex gap-2">
@@ -639,9 +639,10 @@ export default function NouveauReglementClientPage() {
       <AlertDialog open={creditConfirmationOpen} onOpenChange={setCreditConfirmationOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer le crédit client</AlertDialogTitle>
+            <AlertDialogTitle>Confirmer le reste à affecter</AlertDialogTitle>
             <AlertDialogDescription>
-              Vous encaissez {money(paymentTotal)} MAD, dont {money(unallocatedCredit)} MAD restera non affecté au crédit du client.
+              Vous encaissez {money(paymentTotal)} MAD, dont {money(unallocatedCredit)} MAD restera
+              à affecter au compte du client.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

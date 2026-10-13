@@ -17,7 +17,7 @@ const settings = [
   },
   {
     title: "Règlements clients",
-    description: "Règles d’encaissement et limite du crédit client non affecté.",
+    description: "Règles d’encaissement et limite du montant restant à affecter.",
     href: "/app/compta/parametres/reglements-clients",
     icon: ReceiptText,
   },

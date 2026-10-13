@@ -124,8 +124,12 @@ public class AssistanceVoyageService {
         Pricing pricing = price(produit, tarif, request.getDureeMois(), request.getCodePromo());
         LocalDate dateEcheance = request.getDateEffet().plusMonths(request.getDureeMois()).minusDays(1);
 
-        Client souscripteur = resolvePerson(agenceId, request.getSouscripteur(), "souscripteur");
-        List<Client> assures = Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur())
+        Client souscripteur = resolvePerson(agenceId, request.getSouscripteur(), "souscripteur", true);
+        boolean souscripteurAssure = Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur());
+        if (souscripteurAssure && souscripteur.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE) {
+            throw new BadRequestException("Une personne morale ne peut pas être une personne assurée");
+        }
+        List<Client> assures = souscripteurAssure
                 ? List.of(souscripteur)
                 : resolveInsuredPeople(agenceId, request.getAssures());
         Client payeur = resolvePayer(request.getPayeurIndex(), souscripteur, assures);
@@ -273,7 +277,7 @@ public class AssistanceVoyageService {
         for (CreateAssistanceVoyageRequest.Personne request : requests == null
                 ? List.<CreateAssistanceVoyageRequest.Personne>of()
                 : requests) {
-            Client client = resolvePerson(agenceId, request, "assuré");
+            Client client = resolvePerson(agenceId, request, "assuré", false);
             unique.put(client.getId(), client);
         }
         if (unique.isEmpty()) {
@@ -285,7 +289,8 @@ public class AssistanceVoyageService {
     private Client resolvePerson(
             Long agenceId,
             CreateAssistanceVoyageRequest.Personne person,
-            String role
+            String role,
+            boolean allowLegalEntity
     ) {
         if (person == null) {
             throw new BadRequestException("Les informations du " + role + " sont obligatoires");
@@ -295,16 +300,25 @@ public class AssistanceVoyageService {
             client = clientRepository.findByAgenceIdAndId(agenceId, person.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Client", person.getClientId()));
         } else {
-            validateNewPerson(person.getClient(), role);
+            validateNewPerson(person.getClient(), role, allowLegalEntity);
             client = clientService.createEntity(agenceId, person.getClient());
         }
-        validatePersonProfile(client, role);
+        validatePersonProfile(client, role, allowLegalEntity);
         return client;
     }
 
-    private void validateNewPerson(CreateClientRequest request, String role) {
+    private void validateNewPerson(CreateClientRequest request, String role, boolean allowLegalEntity) {
         if (request == null) {
             throw new BadRequestException("Sélectionnez ou renseignez le " + role);
+        }
+        if (request.getTypeClient() == TypeClient.PERSONNE_MORALE) {
+            if (!allowLegalEntity) {
+                throw new BadRequestException("Le " + role + " doit être une personne physique");
+            }
+            if (!hasText(request.getRaisonSociale()) || !hasText(request.getRc())) {
+                throw new BadRequestException("La raison sociale et le RC du " + role + " sont obligatoires");
+            }
+            return;
         }
         if (request.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE) {
             throw new BadRequestException("Le " + role + " doit être une personne physique");
@@ -314,7 +328,19 @@ public class AssistanceVoyageService {
         }
     }
 
-    private void validatePersonProfile(Client client, String role) {
+    private void validatePersonProfile(Client client, String role, boolean allowLegalEntity) {
+        if (client.getTypeClient() == TypeClient.PERSONNE_MORALE) {
+            if (!allowLegalEntity
+                    || !hasText(client.getRaisonSociale())
+                    || !hasText(client.getRc())
+                    || !hasText(client.getAdresse())
+                    || client.getVille() == null
+                    || !hasText(client.getTelephone())) {
+                throw new BadRequestException("Le profil du " + role
+                        + " doit contenir la raison sociale, le RC, l'adresse et le téléphone");
+            }
+            return;
+        }
         if (client.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE
                 || !hasText(client.getPrenom())
                 || !hasText(client.getNom())

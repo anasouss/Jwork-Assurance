@@ -216,6 +216,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                     q.elementFacturable is null
                     or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
               )
+              and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
+              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
@@ -291,6 +293,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                     q.elementFacturable is null
                     or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
               )
+              and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
+              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
               and (:compagnieId is null or ca.id = :compagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
@@ -352,6 +356,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             """)
     Page<Quittance> searchForAffectation(
             @Param("agenceId") Long agenceId,
+            @Param("brancheId") Long brancheId,
             @Param("compagnieId") Long compagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("avecQuittance") Boolean avecQuittance,

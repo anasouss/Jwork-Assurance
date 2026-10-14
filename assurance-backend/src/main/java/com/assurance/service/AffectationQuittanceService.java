@@ -104,6 +104,7 @@ public class AffectationQuittanceService {
     @Transactional(readOnly = true)
     public AffectationQuittancePageResponse search(
             Long agenceId,
+            Long brancheId,
             Long compagnieId,
             TypeContrat typeContrat,
             Boolean avecQuittance,
@@ -118,6 +119,7 @@ public class AffectationQuittanceService {
         String normalizedSearch = normalizeSearch(search);
         Page<Quittance> result = quittanceRepository.searchForAffectation(
                 agenceId,
+                brancheId,
                 compagnieId,
                 typeContrat,
                 avecQuittance,
@@ -184,6 +186,7 @@ public class AffectationQuittanceService {
     @Transactional(readOnly = true)
     public byte[] export(
             Long agenceId,
+            Long brancheId,
             Long compagnieId,
             TypeContrat typeContrat,
             Boolean avecQuittance,
@@ -192,7 +195,8 @@ public class AffectationQuittanceService {
             String search
     ) {
         validateTenant(agenceId);
-        if (compagnieId == null
+        if (brancheId == null
+                && compagnieId == null
                 && typeContrat == null
                 && avecQuittance == null
                 && dateDu == null
@@ -210,6 +214,7 @@ public class AffectationQuittanceService {
         do {
             result = search(
                     agenceId,
+                    brancheId,
                     compagnieId,
                     typeContrat,
                     avecQuittance,

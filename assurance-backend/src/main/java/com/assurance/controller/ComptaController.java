@@ -76,6 +76,7 @@ public class ComptaController {
     @GetMapping("/quittances")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<AffectationQuittancePageResponse>> quittances(
+            @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) Boolean avecQuittance,
@@ -87,6 +88,7 @@ public class ComptaController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(affectationQuittanceService.search(
                 TenantContext.getCurrentAgence(),
+                brancheId,
                 compagnieId,
                 typeContrat,
                 avecQuittance,
@@ -101,6 +103,7 @@ public class ComptaController {
     @GetMapping("/quittances/export")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<byte[]> exportQuittances(
+            @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) Boolean avecQuittance,
@@ -110,6 +113,7 @@ public class ComptaController {
     ) {
         byte[] file = affectationQuittanceService.export(
                 TenantContext.getCurrentAgence(),
+                brancheId,
                 compagnieId,
                 typeContrat,
                 avecQuittance,

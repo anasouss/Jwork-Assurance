@@ -163,6 +163,7 @@ export const comptaApi = {
   },
 
   async searchQuittances(params: {
+    brancheId?: string;
     compagnieId?: string;
     typeContrat?: TypeContrat;
     avecQuittance?: boolean;
@@ -181,6 +182,7 @@ export const comptaApi = {
   },
 
   async exportQuittances(params: {
+    brancheId?: string;
     compagnieId?: string;
     typeContrat?: TypeContrat;
     avecQuittance?: boolean;

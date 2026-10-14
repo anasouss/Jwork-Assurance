@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Plane, Plus, Trash2 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -449,10 +450,10 @@ function PersonEditor(props: {
               />
             </Field>
           ) : null}
-          <Field label="Civilité" required>
+          <Field label="Genre" required>
             <Select disabled={locked} value={props.value.genre} onValueChange={(value) => update({ genre: value as PersonDraft["genre"] })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="HOMME">Monsieur</SelectItem><SelectItem value="FEMME">Madame</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="HOMME">Homme</SelectItem><SelectItem value="FEMME">Femme</SelectItem></SelectContent>
             </Select>
           </Field>
           <Field label="Prénom" required><Input readOnly={locked} value={props.value.prenom} onChange={(event) => update({ prenom: event.target.value })} /></Field>
@@ -464,10 +465,15 @@ function PersonEditor(props: {
         </>
       )}
       <Field label="Ville" required>
-        <Select disabled={locked} value={props.value.villeId} onValueChange={(villeId) => update({ villeId })}>
-          <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-          <SelectContent>{props.cities.map((city) => <SelectItem key={city.id} value={city.id}>{city.libelle}</SelectItem>)}</SelectContent>
-        </Select>
+        <AutocompleteSelect
+          value={props.value.villeId}
+          disabled={locked}
+          placeholder="Ville"
+          emptyText="Aucune ville trouvée"
+          invalidText="Ville invalide : choisissez une option existante."
+          options={props.cities.map((city) => ({ value: city.id, label: city.libelle, keywords: city.code }))}
+          onValueChange={(villeId) => update({ villeId })}
+        />
       </Field>
       <Field label="Adresse" required><Input readOnly={locked} value={props.value.adresse} onChange={(event) => update({ adresse: event.target.value })} /></Field>
       <Field label="Téléphone" required><Input readOnly={locked} value={props.value.telephone} onChange={(event) => update({ telephone: event.target.value })} /></Field>

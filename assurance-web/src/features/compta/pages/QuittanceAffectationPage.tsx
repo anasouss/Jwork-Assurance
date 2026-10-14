@@ -32,6 +32,7 @@ import type {
 type QuittancePresence = "AVEC_QUITTANCE" | "SANS_QUITTANCE";
 
 type Filters = {
+  brancheId: "ALL" | string;
   compagnieId: "ALL" | string;
   typeContrat: "ALL" | TypeContrat;
   nature: QuittancePresence;
@@ -41,6 +42,7 @@ type Filters = {
 };
 
 const DEFAULT_FILTERS: Filters = {
+  brancheId: "ALL",
   compagnieId: "ALL",
   typeContrat: "ALL",
   nature: "SANS_QUITTANCE",
@@ -80,8 +82,16 @@ export default function QuittanceAffectationPage() {
     queryKey: referenceKeys.list("compagnies-assurance"),
     queryFn: comptaApi.companies,
   });
+  const branches = useQuery({
+    queryKey: referenceKeys.list("branches-assurance"),
+    queryFn: comptaApi.insuranceBranches,
+  });
+  const insuranceBranches = (branches.data ?? []).filter(
+    (branch) => branch.code?.trim().toUpperCase() !== "ASSISTANCE"
+  );
   const params = useMemo(
     () => !searched ? null : ({
+      brancheId: appliedFilters.brancheId === "ALL" ? undefined : appliedFilters.brancheId,
       compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
       typeContrat: appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
       avecQuittance: appliedFilters.nature === "AVEC_QUITTANCE",
@@ -235,7 +245,18 @@ export default function QuittanceAffectationPage() {
               </Select>
             </FilterField>
             <FilterField label="Branche">
-              <Input readOnly value="Automobile" />
+              <Select
+                value={filters.brancheId}
+                onValueChange={(value) => setFilters((current) => ({ ...current, brancheId: value }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Toutes les branches</SelectItem>
+                  {insuranceBranches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FilterField>
             <FilterField label="Type de contrat">
               <Select
@@ -644,6 +665,7 @@ function searchStateFromUrl(params: URLSearchParams) {
   const typeContrat = params.get("typeContrat");
   const nature = params.get("nature");
   const filters: Filters = {
+    brancheId: params.get("brancheId") || "ALL",
     compagnieId: params.get("compagnieId") || "ALL",
     typeContrat: typeContrat === "PARTICULIER" || typeContrat === "CONVENTION" || typeContrat === "FLOTTE"
       ? typeContrat
@@ -654,7 +676,7 @@ function searchStateFromUrl(params: URLSearchParams) {
     search: params.get("search")?.trim() || "",
   };
   const requestedPage = Number.parseInt(params.get("page") || "1", 10);
-  const searched = ["compagnieId", "typeContrat", "nature", "dateDu", "dateAu", "search"]
+  const searched = ["brancheId", "compagnieId", "typeContrat", "nature", "dateDu", "dateAu", "search"]
     .some((key) => params.has(key));
   return {
     filters,
@@ -665,6 +687,7 @@ function searchStateFromUrl(params: URLSearchParams) {
 
 function toUrlParams(filters: Filters, page: number) {
   const params = new URLSearchParams();
+  if (filters.brancheId !== "ALL") params.set("brancheId", filters.brancheId);
   if (filters.compagnieId !== "ALL") params.set("compagnieId", filters.compagnieId);
   if (filters.typeContrat !== "ALL") params.set("typeContrat", filters.typeContrat);
   params.set("nature", filters.nature);
@@ -681,6 +704,7 @@ function validDateParam(value: string | null) {
 
 function toApiFilters(filters: Filters) {
   return {
+    brancheId: filters.brancheId === "ALL" ? undefined : filters.brancheId,
     compagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
     typeContrat: filters.typeContrat === "ALL" ? undefined : filters.typeContrat,
     avecQuittance: filters.nature === "AVEC_QUITTANCE",

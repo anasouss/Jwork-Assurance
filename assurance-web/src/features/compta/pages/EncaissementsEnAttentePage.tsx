@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Banknote, Eye, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -47,28 +47,30 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 
 export default function EncaissementsEnAttentePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const initialSearch = searchParams.get("search")?.trim() ?? "";
-  const initialMode = searchParams.get("mode");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlState = collectionQueueStateFromParams(searchParams);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
   const canReplacePayment = permissions.includes("reglement-client:manage");
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<StatusFilter>("EN_ATTENTE");
-  const [mode, setMode] = useState<ModeFilter>(
-    initialMode === "CHEQUE" || initialMode === "EFFET" ? initialMode : "ALL"
-  );
-  const [search, setSearch] = useState(initialSearch);
-  const [appliedSearch, setAppliedSearch] = useState(initialSearch);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(0);
-  const [sortBy, setSortBy] = useState<InstrumentSortBy>("DUE");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("ASC");
+  const { status, mode, search: appliedSearch, dateFrom, dateTo, page, sortBy, sortDirection } = urlState;
+  const [search, setSearch] = useState(appliedSearch);
   const [selectedInstruments, setSelectedInstruments] = useState<PaymentInstrument[]>([]);
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacementDate, setReplacementDate] = useState(TODAY);
   const [replacementReason, setReplacementReason] = useState("");
+
+  useEffect(() => {
+    setSearch(appliedSearch);
+  }, [appliedSearch]);
+
+  useEffect(() => {
+    setSelectedInstruments([]);
+  }, [status, mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection]);
+
+  function updateUrl(patch: Partial<CollectionQueueUrlState>) {
+    setSearchParams(collectionQueueSearchParams({ ...urlState, ...patch }), { replace: true });
+  }
 
   const instruments = useQuery({
     queryKey: ["compta", "treasury", "collection-queue", status, mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection, page],
@@ -107,31 +109,20 @@ export default function EncaissementsEnAttentePage() {
   });
 
   function applyFilters() {
-    setAppliedSearch(search.trim());
-    setPage(0);
+    updateUrl({ search: search.trim(), page: 0 });
   }
 
   function resetFilters() {
-    setStatus("EN_ATTENTE");
-    setMode("ALL");
     setSearch("");
-    setAppliedSearch("");
-    setDateFrom("");
-    setDateTo("");
-    setPage(0);
-    setSortBy("DUE");
-    setSortDirection("ASC");
     setSelectedInstruments([]);
+    setSearchParams(new URLSearchParams(), { replace: true });
   }
 
   function changeSort(column: InstrumentSortBy) {
-    if (sortBy === column) {
-      setSortDirection((current) => current === "ASC" ? "DESC" : "ASC");
-    } else {
-      setSortBy(column);
-      setSortDirection(column === "AMOUNT" || column === "RECEIVED" ? "DESC" : "ASC");
-    }
-    setPage(0);
+    const nextDirection = sortBy === column
+      ? sortDirection === "ASC" ? "DESC" : "ASC"
+      : column === "AMOUNT" || column === "RECEIVED" ? "DESC" : "ASC";
+    updateUrl({ sortBy: column, sortDirection: nextDirection, page: 0 });
     setSelectedInstruments([]);
   }
 
@@ -193,7 +184,7 @@ export default function EncaissementsEnAttentePage() {
       <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[190px_210px_1fr_170px_170px_auto]">
         <div className="grid gap-2">
           <Label>Étape</Label>
-          <Select value={status} onValueChange={(value) => { setStatus(value as StatusFilter); setPage(0); setSelectedInstruments([]); }}>
+          <Select value={status} onValueChange={(value) => updateUrl({ status: value as StatusFilter, page: 0 })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="EN_ATTENTE">En attente</SelectItem>
@@ -204,7 +195,7 @@ export default function EncaissementsEnAttentePage() {
         </div>
         <div className="grid gap-2">
           <Label>Mode</Label>
-          <Select value={mode} onValueChange={(value) => { setMode(value as ModeFilter); setPage(0); setSelectedInstruments([]); }}>
+          <Select value={mode} onValueChange={(value) => updateUrl({ mode: value as ModeFilter, page: 0 })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tous les modes</SelectItem>
@@ -219,8 +210,22 @@ export default function EncaissementsEnAttentePage() {
           <Label htmlFor="collection-search">Payeur, règlement, banque ou référence</Label>
           <Input id="collection-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} />
         </div>
-        <div className="grid gap-2"><Label>{dateLabel} du</Label><DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} /></div>
-        <div className="grid gap-2"><Label>{dateLabel} au</Label><DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} /></div>
+        <div className="grid gap-2">
+          <Label>{dateLabel} du</Label>
+          <DatePicker
+            date={dateFrom}
+            maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined}
+            onSelect={(value) => updateUrl({ dateFrom: toDateOnly(value) ?? "", page: 0 })}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label>{dateLabel} au</Label>
+          <DatePicker
+            date={dateTo}
+            minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined}
+            onSelect={(value) => updateUrl({ dateTo: toDateOnly(value) ?? "", page: 0 })}
+          />
+        </div>
         <div className="flex items-end gap-2">
           <Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button>
           <Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button>
@@ -309,7 +314,7 @@ export default function EncaissementsEnAttentePage() {
             </tbody>
           </table>
         </div>
-        {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={setPage} />}
+        {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={(nextPage) => updateUrl({ page: nextPage })} />}
       </section>
 
       <Dialog open={Boolean(instrumentToReplace)} onOpenChange={(open) => !open && setInstrumentToReplace(undefined)}>
@@ -458,4 +463,72 @@ function isSelectableForSlip(instrument: PaymentInstrument) {
   return instrument.statut === "EN_ATTENTE"
     && !instrument.bordereauRemiseId
     && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET");
+}
+
+type CollectionQueueUrlState = {
+  status: StatusFilter;
+  mode: ModeFilter;
+  search: string;
+  dateFrom: string;
+  dateTo: string;
+  page: number;
+  sortBy: InstrumentSortBy;
+  sortDirection: SortDirection;
+};
+
+function collectionQueueStateFromParams(params: URLSearchParams): CollectionQueueUrlState {
+  return {
+    status: isStatusFilter(params.get("statut")) ? params.get("statut") as StatusFilter : "EN_ATTENTE",
+    mode: isModeFilter(params.get("mode")) ? params.get("mode") as ModeFilter : "ALL",
+    search: params.get("search")?.trim() ?? "",
+    dateFrom: validQueueDate(params.get("dateDu")),
+    dateTo: validQueueDate(params.get("dateAu")),
+    page: queuePageFromParam(params.get("page")),
+    sortBy: isInstrumentSort(params.get("tri")) ? params.get("tri") as InstrumentSortBy : "DUE",
+    sortDirection: params.get("ordre") === "DESC" ? "DESC" : "ASC",
+  };
+}
+
+function collectionQueueSearchParams(state: CollectionQueueUrlState) {
+  const params = new URLSearchParams();
+  if (state.status !== "EN_ATTENTE") params.set("statut", state.status);
+  if (state.mode !== "ALL") params.set("mode", state.mode);
+  if (state.search) params.set("search", state.search);
+  if (state.dateFrom) params.set("dateDu", state.dateFrom);
+  if (state.dateTo) params.set("dateAu", state.dateTo);
+  if (state.page > 0) params.set("page", String(state.page + 1));
+  if (state.sortBy !== "DUE") params.set("tri", state.sortBy);
+  if (state.sortDirection !== "ASC") params.set("ordre", state.sortDirection);
+  return params;
+}
+
+function isStatusFilter(value: string | null): value is StatusFilter {
+  return value === "EN_ATTENTE" || value === "REMIS_EN_BANQUE" || value === "REJETE";
+}
+
+function isModeFilter(value: string | null): value is ModeFilter {
+  return value === "ALL"
+    || value === "CHEQUE"
+    || value === "EFFET"
+    || value === "VIREMENT"
+    || value === "VERSEMENT_BANCAIRE";
+}
+
+function isInstrumentSort(value: string | null): value is InstrumentSortBy {
+  return value === "REFERENCE"
+    || value === "PAYER"
+    || value === "PAYMENT"
+    || value === "MODE"
+    || value === "RECEIVED"
+    || value === "DUE"
+    || value === "AMOUNT";
+}
+
+function validQueueDate(value: string | null) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function queuePageFromParam(value: string | null) {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isInteger(page) && page > 0 ? page - 1 : 0;
 }

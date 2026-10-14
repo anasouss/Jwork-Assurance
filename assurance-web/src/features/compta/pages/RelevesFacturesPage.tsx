@@ -313,6 +313,19 @@ export default function RelevesFacturesPage() {
     updateUrl({ sourceFilters, sourcePage: 0 });
   }
 
+  function changeSourceFilters(next: SourceFilters) {
+    const discreteFilterChanged = next.brancheId !== sourceFilters.brancheId
+      || next.compagnieId !== sourceFilters.compagnieId
+      || next.typeContrat !== sourceFilters.typeContrat
+      || next.documentState !== sourceFilters.documentState
+      || next.dateDu !== sourceFilters.dateDu
+      || next.dateAu !== sourceFilters.dateAu;
+    setSourceFilters(next);
+    if (discreteFilterChanged) {
+      updateUrl({ sourceFilters: next, sourcePage: 0 });
+    }
+  }
+
   function resetSourceFilters() {
     setSourceFilters(SOURCE_DEFAULTS);
     updateUrl({ sourceFilters: SOURCE_DEFAULTS, sourcePage: 0 });
@@ -320,6 +333,17 @@ export default function RelevesFacturesPage() {
 
   function applyDocumentFilters() {
     updateUrl({ documentFilters, documentPage: 0 });
+  }
+
+  function changeDocumentFilters(next: DocumentFilters) {
+    const discreteFilterChanged = next.type !== documentFilters.type
+      || next.statut !== documentFilters.statut
+      || next.dateDu !== documentFilters.dateDu
+      || next.dateAu !== documentFilters.dateAu;
+    setDocumentFilters(next);
+    if (discreteFilterChanged) {
+      updateUrl({ documentFilters: next, documentPage: 0 });
+    }
   }
 
   function resetDocumentFilters() {
@@ -412,7 +436,7 @@ export default function RelevesFacturesPage() {
               changePayer(undefined, mode);
             }}
             onPayerSelect={(value) => changePayer(payerSearch.resolve(value))}
-            onChange={setSourceFilters}
+            onChange={changeSourceFilters}
             onApply={applySourceFilters}
             onReset={resetSourceFilters}
           />
@@ -563,7 +587,7 @@ export default function RelevesFacturesPage() {
         <div className="grid gap-4">
           <DocumentSearch
             filters={documentFilters}
-            onChange={setDocumentFilters}
+            onChange={changeDocumentFilters}
             onApply={applyDocumentFilters}
             onReset={resetDocumentFilters}
           />

@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AuditEventResponse;
+import com.assurance.dto.response.AuditOperationResponse;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.enums.AuditAction;
 import com.assurance.security.TenantContext;
@@ -40,6 +41,35 @@ public class AuditEventController {
             @RequestParam(defaultValue = "25") int size
     ) {
         return ResponseEntity.ok(ApiResponse.success(auditEventService.search(
+                TenantContext.getCurrentAgence(),
+                entityType,
+                entityId,
+                action,
+                actorUserId,
+                dateFrom,
+                dateTo,
+                search,
+                page,
+                size
+        )));
+    }
+
+    @GetMapping("/operations")
+    @PreAuthorize("hasAuthority('PERM_audit:view')")
+    public ResponseEntity<ApiResponse<PagedResponse<AuditOperationResponse>>> searchOperations(
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) String entityId,
+            @RequestParam(required = false) AuditAction action,
+            @RequestParam(required = false) Long actorUserId,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(auditEventService.searchOperations(
                 TenantContext.getCurrentAgence(),
                 entityType,
                 entityId,

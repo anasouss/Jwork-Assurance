@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.dto.response.AuditEventResponse;
+import com.assurance.dto.response.AuditOperationResponse;
 import com.assurance.dto.response.PageMetadata;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.entity.AuditEvent;
@@ -21,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -94,6 +98,89 @@ public class AuditEventService {
                         .toList())
                 .page(PageMetadata.from(result))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<AuditOperationResponse> searchOperations(
+            Long agenceId,
+            String entityType,
+            String entityId,
+            AuditAction action,
+            Long actorUserId,
+            LocalDateTime dateFrom,
+            LocalDateTime dateTo,
+            String search,
+            int page,
+            int size
+    ) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        Page<String> keys = auditEventRepository.searchOperationKeys(
+                agenceId,
+                normalize(entityType, false),
+                normalize(entityId, false),
+                action == null ? null : action.name(),
+                actorUserId,
+                dateFrom,
+                dateTo,
+                normalize(search, true),
+                PageRequest.of(safePage, safeSize)
+        );
+        if (keys.isEmpty()) {
+            return PagedResponse.<AuditOperationResponse>builder()
+                    .items(List.of())
+                    .page(PageMetadata.from(keys))
+                    .build();
+        }
+
+        List<String> requestIds = keys.getContent().stream()
+                .filter(key -> key.startsWith("request:"))
+                .map(key -> key.substring("request:".length()))
+                .toList();
+        List<Long> eventIds = keys.getContent().stream()
+                .filter(key -> key.startsWith("event:"))
+                .map(key -> Long.parseLong(key.substring("event:".length())))
+                .toList();
+        List<AuditEvent> operationEvents = auditEventRepository.findAllForOperations(
+                agenceId,
+                requestIds.isEmpty() ? List.of("__none__") : requestIds,
+                eventIds.isEmpty() ? List.of(-1L) : eventIds
+        );
+        Map<Long, Utilisateur> actors = loadActors(operationEvents);
+        Map<String, List<AuditEventResponse>> eventsByKey = new LinkedHashMap<>();
+        keys.getContent().forEach(key -> eventsByKey.put(key, new ArrayList<>()));
+        operationEvents.forEach(event -> {
+            String key = operationKey(event);
+            List<AuditEventResponse> groupedEvents = eventsByKey.get(key);
+            if (groupedEvents != null) {
+                groupedEvents.add(toResponse(event, actors.get(event.getActorUserId())));
+            }
+        });
+
+        return PagedResponse.<AuditOperationResponse>builder()
+                .items(eventsByKey.entrySet().stream()
+                        .map(entry -> AuditOperationResponse.builder()
+                                .key(entry.getKey())
+                                .events(entry.getValue())
+                                .build())
+                        .toList())
+                .page(PageMetadata.from(keys))
+                .build();
+    }
+
+    private Map<Long, Utilisateur> loadActors(List<AuditEvent> events) {
+        return utilisateurRepository.findAllById(events.stream()
+                        .map(AuditEvent::getActorUserId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Utilisateur::getId, Function.identity()));
+    }
+
+    private String operationKey(AuditEvent event) {
+        return StringUtils.hasText(event.getRequestId())
+                ? "request:" + event.getRequestId()
+                : "event:" + event.getId();
     }
 
     private AuditEventResponse toResponse(AuditEvent event, Utilisateur actor) {

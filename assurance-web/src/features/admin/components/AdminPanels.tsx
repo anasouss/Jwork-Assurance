@@ -56,6 +56,7 @@ import { AgencyImageUploadField } from "./AgencyImageUploadField";
 import type {
   AdminAgency,
   AdminAuditEvent,
+  AdminAuditOperation,
   AdminPermission,
   AdminRole,
   AdminUser,
@@ -703,9 +704,9 @@ export function AuditPanel() {
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
   const [page, setPage] = useState(0);
   const [selectedOperation, setSelectedOperation] = useState<AuditOperation | null>(null);
-  const events = useQuery({
+  const operationsQuery = useQuery({
     queryKey: ["admin", "audit", filters, page],
-    queryFn: () => adminApi.auditEvents({
+    queryFn: () => adminApi.auditOperations({
       search: filters.search.trim() || undefined,
       action: filters.action === AUDIT_ALL ? undefined : filters.action,
       entityType: filters.entityType === AUDIT_ALL ? undefined : filters.entityType,
@@ -716,7 +717,10 @@ export function AuditPanel() {
     }),
     placeholderData: (previous) => previous,
   });
-  const operations = useMemo(() => groupAuditOperations(events.data?.items ?? []), [events.data?.items]);
+  const operations = useMemo(
+    () => (operationsQuery.data?.items ?? []).map(toAuditOperation),
+    [operationsQuery.data?.items],
+  );
 
   const applyFilters = () => {
     if (draftFilters.dateFrom && draftFilters.dateTo && draftFilters.dateFrom > draftFilters.dateTo) {
@@ -820,7 +824,7 @@ export function AuditPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {events.isLoading ? (
+            {operationsQuery.isLoading ? (
               <TableRowsSkeleton rows={8} colSpan={6} />
             ) : operations.map((operation) => (
               <TableRow key={operation.key}>
@@ -844,7 +848,7 @@ export function AuditPanel() {
                 </TableCell>
               </TableRow>
             ))}
-            {!events.isLoading && !(events.data?.items.length ?? 0) ? (
+            {!operationsQuery.isLoading && !(operationsQuery.data?.items.length ?? 0) ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   Aucun événement d’audit trouvé.
@@ -855,10 +859,10 @@ export function AuditPanel() {
         </Table>
       </div>
       <ServerPagination
-        page={events.data?.page.number ?? page}
-        totalPages={events.data?.page.totalPages ?? 1}
-        totalElements={events.data?.page.totalElements}
-        loading={events.isFetching}
+        page={operationsQuery.data?.page.number ?? page}
+        totalPages={operationsQuery.data?.page.totalPages ?? 1}
+        totalElements={operationsQuery.data?.page.totalElements}
+        loading={operationsQuery.isFetching}
         onPageChange={setPage}
       />
 
@@ -918,32 +922,23 @@ const AUDIT_OPERATION_ROOT_TYPES = [
   "Agence",
 ] as const;
 
-function groupAuditOperations(events: AdminAuditEvent[]): AuditOperation[] {
-  const grouped = new Map<string, AdminAuditEvent[]>();
-  events.forEach((event) => {
-    const requestId = event.requestId?.trim();
-    const key = requestId ? `request:${requestId}` : `event:${event.id}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), event]);
-  });
-
-  return Array.from(grouped, ([key, groupedEvents]) => {
-    const primary = [...groupedEvents].sort((left, right) => {
-      const score = auditOperationPrimaryScore(left, groupedEvents) - auditOperationPrimaryScore(right, groupedEvents);
-      return score || Date.parse(right.occurredAt) - Date.parse(left.occurredAt);
-    })[0];
-    const latest = [...groupedEvents].sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))[0];
-    return {
-      key,
-      requestId: latest.requestId,
-      occurredAt: latest.occurredAt,
-      actorName: latest.actorName,
-      actorEmail: latest.actorEmail,
-      actorType: latest.actorType,
-      action: primary.action,
-      primary,
-      events: groupedEvents,
-    };
-  });
+function toAuditOperation(group: AdminAuditOperation): AuditOperation {
+  const primary = [...group.events].sort((left, right) => {
+    const score = auditOperationPrimaryScore(left, group.events) - auditOperationPrimaryScore(right, group.events);
+    return score || Date.parse(right.occurredAt) - Date.parse(left.occurredAt);
+  })[0];
+  const latest = [...group.events].sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))[0];
+  return {
+    key: group.key,
+    requestId: latest.requestId,
+    occurredAt: latest.occurredAt,
+    actorName: latest.actorName,
+    actorEmail: latest.actorEmail,
+    actorType: latest.actorType,
+    action: primary.action,
+    primary,
+    events: group.events,
+  };
 }
 
 function auditOperationPrimaryScore(event: AdminAuditEvent, operationEvents: AdminAuditEvent[]) {
@@ -963,6 +958,27 @@ function auditOperationPrimaryScore(event: AdminAuditEvent, operationEvents: Adm
 function auditOperationSummary(operation: AuditOperation) {
   if (operation.events.length === 1) return auditEventSummary(operation.primary);
   const businessItems = groupAuditBusinessItems(operation);
+  if (isInvoiceCreatedFromPayment(operation)) {
+    const lineCount = businessItems.filter((item) => item.event.entityType === "LigneDocumentClient").length;
+    const transferredCount = businessItems.filter((item) => isTransferredDirectAllocation(item.event, operation)).length;
+    const total = auditSnapshot(operation.primary).totalDocument;
+    return [
+      "Facture créée depuis un règlement",
+      `${lineCount} ligne${lineCount > 1 ? "s" : ""}`,
+      transferredCount ? `${transferredCount} affectation${transferredCount > 1 ? "s" : ""} transférée${transferredCount > 1 ? "s" : ""}` : null,
+      typeof total === "number" ? formatAuditFieldValue("totalDocument", total) : null,
+    ].filter((part): part is string => Boolean(part)).join(" · ");
+  }
+  if (operation.primary.entityType === "DocumentClient") {
+    const kind = auditDocumentKind(operation.primary);
+    const lineCount = businessItems.filter((item) => item.event.entityType === "LigneDocumentClient").length;
+    const total = auditSnapshot(operation.primary).totalDocument;
+    return [
+      `${kind} ${operation.action === "CREATED" ? "créé" : operation.action === "DELETED" ? "supprimé" : "modifié"}`,
+      lineCount ? `${lineCount} ligne${lineCount > 1 ? "s" : ""}` : null,
+      typeof total === "number" ? formatAuditFieldValue("totalDocument", total) : null,
+    ].filter((part): part is string => Boolean(part)).join(" · ");
+  }
   if (isAvenantMovement(operation.primary)) {
     const type = auditMovementTypeLabel(operation.primary);
     return type ? `Avenant · ${type}` : "Avenant enregistré";
@@ -1031,6 +1047,8 @@ function auditContractCreationSummary(operation: AuditOperation, items = groupAu
 }
 
 function auditOperationEntityLabel(operation: AuditOperation) {
+  if (isInvoiceCreatedFromPayment(operation)) return "Facture client";
+  if (operation.primary.entityType === "DocumentClient") return auditDocumentKind(operation.primary);
   return isAvenantMovement(operation.primary)
     ? "Avenant"
     : auditEntityTypeLabel(operation.primary.entityType);
@@ -1096,6 +1114,7 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
                     <AuditTimelineItem
                       key={item.key}
                       item={item}
+                      operation={operation}
                       index={index}
                       defaultOpen={item.event.entityType === operation.primary.entityType && item.event.entityId === operation.primary.entityId}
                     />
@@ -1172,10 +1191,12 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
 
 function AuditTimelineItem({
   item,
+  operation,
   index,
   defaultOpen,
 }: {
   item: AuditBusinessItem;
+  operation: AuditOperation;
   index: number;
   defaultOpen: boolean;
 }) {
@@ -1194,12 +1215,12 @@ function AuditTimelineItem({
           <span className="flex size-7 items-center justify-center rounded-full border bg-background text-xs font-semibold">{index + 1}</span>
           <span className="grid min-w-0 gap-1">
             <span className="flex flex-wrap items-center gap-2">
-              <Badge variant={auditActionVariant(item.event.action)}>{auditTimelineActionLabel(item.event)}</Badge>
+              <Badge variant={auditActionVariant(item.event.action)}>{auditTimelineActionLabel(item.event, operation)}</Badge>
               <span className="font-medium">
-                {auditTimelineObjectLabel(item.event)}
+                {auditTimelineObjectLabel(item.event, operation)}
               </span>
             </span>
-            <span className="text-xs text-muted-foreground">{auditBusinessItemSummary(item)}</span>
+            <span className="text-xs text-muted-foreground">{auditBusinessItemSummary(item, operation)}</span>
           </span>
           <ChevronDown className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
@@ -1239,6 +1260,13 @@ function AuditTimelineItem({
 }
 
 function auditOperationTitle(operation: AuditOperation) {
+  if (isInvoiceCreatedFromPayment(operation)) {
+    return `Création de la facture · ${auditEntityReference(operation.primary)}`;
+  }
+  if (operation.primary.entityType === "DocumentClient") {
+    const action = operation.action === "CREATED" ? "Création" : operation.action === "DELETED" ? "Suppression" : "Modification";
+    return `${action} ${auditDocumentKind(operation.primary, true)} · ${auditEntityReference(operation.primary)}`;
+  }
   if (operation.primary.entityType === "Contrat" && operation.action === "CREATED") {
     return `Création du contrat · ${auditEntityReference(operation.primary)}`;
   }
@@ -1250,6 +1278,31 @@ function auditOperationTitle(operation: AuditOperation) {
 }
 
 function auditOperationDescription(operation: AuditOperation, items: AuditBusinessItem[]) {
+  if (isInvoiceCreatedFromPayment(operation)) {
+    const lines = items.filter((item) => item.event.entityType === "LigneDocumentClient");
+    const replacedAllocations = items.filter((item) => isTransferredDirectAllocation(item.event, operation));
+    const paidQuittances = items.filter((item) => isQuittanceMarkedPaid(item.event, operation));
+    const total = auditSnapshot(operation.primary).totalDocument;
+    const parts = [
+      `${lines.length} ligne${lines.length > 1 ? "s" : ""} facturée${lines.length > 1 ? "s" : ""}`,
+      replacedAllocations.length
+        ? `${replacedAllocations.length} affectation${replacedAllocations.length > 1 ? "s" : ""} directe${replacedAllocations.length > 1 ? "s" : ""} transférée${replacedAllocations.length > 1 ? "s" : ""}`
+        : null,
+      paidQuittances.length
+        ? `${paidQuittances.length} quittance${paidQuittances.length > 1 ? "s" : ""} marquée${paidQuittances.length > 1 ? "s" : ""} comme payée${paidQuittances.length > 1 ? "s" : ""}`
+        : null,
+    ].filter((part): part is string => Boolean(part));
+    const amount = typeof total === "number" ? ` pour ${formatAuditFieldValue("totalDocument", total)}` : "";
+    return `Facture ${auditEntityReference(operation.primary)} créée depuis un règlement${amount} · ${parts.join(" · ")}.`;
+  }
+  if (operation.primary.entityType === "DocumentClient") {
+    const kind = auditDocumentKind(operation.primary);
+    const lineCount = items.filter((item) => item.event.entityType === "LigneDocumentClient").length;
+    const total = auditSnapshot(operation.primary).totalDocument;
+    const action = operation.action === "CREATED" ? "créé" : operation.action === "DELETED" ? "supprimé" : "modifié";
+    const amount = typeof total === "number" ? ` · total ${formatAuditFieldValue("totalDocument", total)}` : "";
+    return `${kind} ${auditEntityReference(operation.primary)} ${action} · ${lineCount} ligne${lineCount > 1 ? "s" : ""}${amount}.`;
+  }
   if (operation.primary.entityType === "Contrat" && operation.action === "CREATED") {
     const summary = auditContractCreationSummary(operation, items).replace(/^Contrat créé/, "");
     return `Contrat ${auditEntityReference(operation.primary)} créé${summary}.`;
@@ -1263,9 +1316,36 @@ function auditOperationDescription(operation: AuditOperation, items: AuditBusine
   return `${auditOperationEntityLabel(operation)}${reference ? ` ${reference}` : ""} · ${auditEventSummary(operation.primary)}.`;
 }
 
-function auditBusinessItemSummary(item: AuditBusinessItem) {
+function auditBusinessItemSummary(item: AuditBusinessItem, operation: AuditOperation) {
+  const snapshot = auditSnapshot(item.event);
+  if (item.event.entityType === "LigneDocumentClient") {
+    const movement = typeof snapshot.mouvement === "string" ? snapshot.mouvement.trim() : "";
+    const amount = snapshot.montantTtc;
+    return [
+      "Élément ajouté au document",
+      movement || null,
+      typeof amount === "number" ? formatAuditFieldValue("montantTtc", amount) : null,
+    ].filter((part): part is string => Boolean(part)).join(" · ");
+  }
+  if (isTransferredDirectAllocation(item.event, operation)) {
+    const invoice = operation.events.find((event) => event.entityType === "DocumentClient" && event.action === "CREATED");
+    const amount = snapshot.montant;
+    return [
+      `Affectation directe transférée vers la facture ${invoice ? auditEntityReference(invoice) : ""}`.trim(),
+      typeof amount === "number" ? formatAuditFieldValue("montant", amount) : null,
+    ].filter((part): part is string => Boolean(part)).join(" · ");
+  }
+  if (item.event.entityType === "AffectationReglementClient" && item.event.action === "CREATED" && snapshot.documentClient) {
+    const amount = snapshot.montant;
+    return [
+      "Règlement affecté au nouveau document",
+      typeof amount === "number" ? formatAuditFieldValue("montant", amount) : null,
+    ].filter((part): part is string => Boolean(part)).join(" · ");
+  }
+  if (isQuittanceMarkedPaid(item.event, operation)) {
+    return "Statut recalculé automatiquement après l’affectation du règlement";
+  }
   if (item.event.entityType === "ContratGarantie") {
-    const snapshot = auditSnapshot(item.event);
     const target = auditGuaranteeTarget(snapshot);
     const automatic = isAutomaticRcGuarantee(item.event);
     const assignment = `${automatic ? "Affectée automatiquement" : "Ajoutée"} à ${target}`;
@@ -1285,7 +1365,10 @@ function isAutomaticRcGuarantee(event: AdminAuditEvent) {
   return Boolean(guarantee && /^RC(?:\s|[-·]|$)/i.test(guarantee));
 }
 
-function auditTimelineActionLabel(event: AdminAuditEvent) {
+function auditTimelineActionLabel(event: AdminAuditEvent, operation: AuditOperation) {
+  if (isTransferredDirectAllocation(event, operation)) return "Transfert";
+  if (isQuittanceMarkedPaid(event, operation)) return "Mise à jour automatique";
+  if (event.entityType === "LigneDocumentClient" && event.action === "CREATED") return "Ajout";
   const isAddedContractElement = event.action === "CREATED"
     && ["ContratClient", "ContratGarantie", "Vehicule", "Remorque", "AssistanceContrat"].includes(event.entityType);
   if (isAddedContractElement) return "Ajout";
@@ -1295,12 +1378,58 @@ function auditTimelineActionLabel(event: AdminAuditEvent) {
   return auditActionLabel(event.action);
 }
 
-function auditTimelineObjectLabel(event: AdminAuditEvent) {
+function auditTimelineObjectLabel(event: AdminAuditEvent, operation: AuditOperation) {
+  const snapshot = auditSnapshot(event);
+  if (event.entityType === "LigneDocumentClient") {
+    const documentKind = auditDocumentKind(operation.primary).toLocaleLowerCase("fr");
+    const order = typeof snapshot.ordre === "number" ? `Ligne ${snapshot.ordre}` : `Ligne de ${documentKind}`;
+    const reference = typeof snapshot.numeroQuittance === "string" && snapshot.numeroQuittance.trim()
+      ? ` · quittance ${snapshot.numeroQuittance.trim()}`
+      : "";
+    return `${order}${reference}`;
+  }
+  if (isTransferredDirectAllocation(event, operation)) {
+    const instrument = auditReferenceLabel(snapshot.instrument);
+    return instrument ? `Ancienne affectation · ${instrument}` : "Ancienne affectation directe";
+  }
+  if (event.entityType === "AffectationReglementClient" && event.action === "CREATED" && snapshot.documentClient) {
+    const document = auditReferenceLabel(snapshot.documentClient);
+    return document ? `Affectation à ${document}` : "Affectation à la facture";
+  }
   if (event.entityType === "ContratGarantie") {
-    return auditReferenceLabel(auditSnapshot(event).garantie) ?? "Garantie";
+    return auditReferenceLabel(snapshot.garantie) ?? "Garantie";
   }
   const reference = auditEntityReference(event);
   return `${auditEntityTypeLabel(event.entityType)}${reference ? ` ${reference}` : ""}`;
+}
+
+function isInvoiceCreatedFromPayment(operation: AuditOperation) {
+  return operation.events.some((event) => event.entityType === "DocumentClient" && event.action === "CREATED")
+    && operation.events.some((event) => event.entityType === "LigneDocumentClient" && event.action === "CREATED")
+    && operation.events.some((event) => event.entityType === "AffectationReglementClient");
+}
+
+function auditDocumentKind(event: AdminAuditEvent, withArticle = false) {
+  const type = auditSnapshot(event).typeDocument;
+  const label = type === "FACTURE" ? "Facture" : type === "RELEVE" ? "Relevé" : "Document client";
+  if (!withArticle) return label;
+  return label === "Facture" ? "de la facture" : label === "Relevé" ? "du relevé" : "du document client";
+}
+
+function isTransferredDirectAllocation(event: AdminAuditEvent, operation: AuditOperation) {
+  return isInvoiceCreatedFromPayment(operation)
+    && event.entityType === "AffectationReglementClient"
+    && event.action === "UPDATED"
+    && event.afterData?.statut === "ANNULEE"
+    && event.beforeData?.statut !== "ANNULEE";
+}
+
+function isQuittanceMarkedPaid(event: AdminAuditEvent, operation: AuditOperation) {
+  return isInvoiceCreatedFromPayment(operation)
+    && event.entityType === "Quittance"
+    && event.action === "UPDATED"
+    && event.beforeData?.payee === false
+    && event.afterData?.payee === true;
 }
 
 function auditChangedFields(event: AdminAuditEvent) {
@@ -1638,6 +1767,22 @@ function auditFieldLabel(field: string) {
     nombreRemorques: "Nombre de remorques",
     montant: "Montant",
     montantTtc: "Montant TTC",
+    montantTotal: "Montant total",
+    montantNonAffecte: "Montant non affecté",
+    totalDebit: "Total débit",
+    totalCredit: "Total crédit",
+    totalDocument: "Total du document",
+    debit: "Débit",
+    credit: "Crédit",
+    primeNette: "Prime nette",
+    taxes: "Taxes",
+    accessoires: "Accessoires",
+    ordre: "N° de ligne",
+    typeDocument: "Type de document",
+    documentClient: "Document client",
+    elementFacturable: "Élément facturable",
+    instrument: "Moyen de règlement",
+    payee: "Payée",
     capital: "Capital assuré",
     taux: "Taux",
     prime: "Prime nette",
@@ -1695,7 +1840,7 @@ function formatAuditValue(value: unknown): string {
 }
 
 function formatAuditFieldValue(field: string, value: unknown) {
-  if (["prime", "capital", "franchiseMinimale", "montant", "montantTotal", "montantTtc", "primeTtc"].includes(field)
+  if (["prime", "capital", "franchiseMinimale", "montant", "montantTotal", "montantNonAffecte", "montantTtc", "primeTtc", "primeNette", "taxes", "accessoires", "debit", "credit", "totalDebit", "totalCredit", "totalDocument"].includes(field)
       && typeof value === "number") {
     return `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} MAD`;
   }
@@ -1866,6 +2011,8 @@ const AUDIT_VALUE_LABELS: Record<string, string> = {
   TIERS_MANDATE: "Tiers mandaté",
   EMIS: "Émis",
   REMPLACE: "Remplacé",
+  FACTURE: "Facture",
+  RELEVE: "Relevé",
   ANNULE: "Annulé",
   VALIDE: "Validé",
   BROUILLON: "Brouillon",

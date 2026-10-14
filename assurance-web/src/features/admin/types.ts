@@ -75,6 +75,16 @@ export type AdminAuditPage = {
   };
 };
 
+export type AdminAuditOperation = {
+  key: string;
+  events: AdminAuditEvent[];
+};
+
+export type AdminAuditOperationPage = {
+  items: AdminAuditOperation[];
+  page: AdminAuditPage["page"];
+};
+
 export type AdminAgency = {
   id: string;
   code: string;

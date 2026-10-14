@@ -3,6 +3,7 @@ import type { ApiResponse } from "@/lib/types";
 import type {
   AdminAgency,
   AdminAuditPage,
+  AdminAuditOperationPage,
   AdminPermission,
   AdminRole,
   AdminUser,
@@ -27,6 +28,20 @@ export const adminApi = {
   }) {
     return unwrap(await apiFetch<ApiResponse<AdminAuditPage>>(
       `/api/v1/audit-events${buildQueryString(params)}`
+    ));
+  },
+
+  async auditOperations(params: {
+    search?: string;
+    action?: "CREATED" | "UPDATED" | "DELETED";
+    entityType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    size?: number;
+  }) {
+    return unwrap(await apiFetch<ApiResponse<AdminAuditOperationPage>>(
+      `/api/v1/audit-events/operations${buildQueryString(params)}`
     ));
   },
 

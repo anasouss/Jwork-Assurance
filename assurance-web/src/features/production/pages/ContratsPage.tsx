@@ -182,21 +182,22 @@ export default function ContratsPage() {
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label="Type de contrat">
-              <Select
-                disabled={assistanceBranch}
-                value={assistanceBranch ? "ALL" : filters.typeContrat}
-                onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as ContractFilters["typeContrat"] }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tous les types</SelectItem>
-                  <SelectItem value="PARTICULIER">Mono</SelectItem>
-                  <SelectItem value="CONVENTION">Convention</SelectItem>
-                  <SelectItem value="FLOTTE">Flotte</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
+            {!assistanceBranch ? (
+              <FilterField label="Type de contrat">
+                <Select
+                  value={filters.typeContrat}
+                  onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as ContractFilters["typeContrat"] }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les types</SelectItem>
+                    <SelectItem value="PARTICULIER">Mono</SelectItem>
+                    <SelectItem value="CONVENTION">Convention</SelectItem>
+                    <SelectItem value="FLOTTE">Flotte</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            ) : null}
             <FilterField label="Type de date">
               <Select value={filters.typeDate} onValueChange={(value) => setFilters((current) => ({ ...current, typeDate: value as ContractFilters["typeDate"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -215,7 +216,7 @@ export default function ContratsPage() {
             <FilterField label="Client / dossier">
               <Input value={filters.codeClient} onChange={(event) => setFilters((current) => ({ ...current, codeClient: event.target.value, clientId: "" }))} />
             </FilterField>
-            <FilterField label="Compagnie">
+            <FilterField label={assistanceBranch ? "Compagnie d’assistance" : "Compagnie d’assurance"}>
               <Select value={filters.compagnieId} onValueChange={(value) => setFilters((current) => ({
                 ...current,
                 compagnieId: value,
@@ -246,7 +247,7 @@ export default function ContratsPage() {
                 </Select>
               </FilterField>
             ) : null}
-            <FilterField label="Numéro de police">
+            <FilterField label={assistanceBranch ? "N° de contrat d’assistance" : "N° de police / contrat"}>
               <Input value={filters.numeroPolice} onChange={(event) => setFilters((current) => ({ ...current, numeroPolice: event.target.value }))} />
             </FilterField>
             <div className="flex items-end gap-2 2xl:col-span-1">

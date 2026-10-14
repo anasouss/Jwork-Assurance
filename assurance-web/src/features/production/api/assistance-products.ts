@@ -54,9 +54,17 @@ export const assistanceProductApi = {
     );
   },
 
-  async deleteProduct(id: string) {
+  async deactivateProduct(id: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/produits-assistance/${id}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
+  async deleteProductPermanently(id: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/produits-assistance/${id}/permanent`, {
         method: "DELETE",
       })
     );

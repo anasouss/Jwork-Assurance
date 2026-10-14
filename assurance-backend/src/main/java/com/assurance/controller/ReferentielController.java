@@ -114,6 +114,7 @@ public class ReferentielController {
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final TarifProduitAssistanceRepository tarifProduitAssistanceRepository;
+    private final AssistanceContratRepository assistanceContratRepository;
     private final AgenceRepository agenceRepository;
     private final RichTextSanitizer richTextSanitizer;
     private final GrilleTarifaireCatalogueService grilleTarifaireCatalogueService;
@@ -503,6 +504,20 @@ public class ReferentielController {
         produit.setActif(false);
         produitAssistanceRepository.save(produit);
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Produit d'assistance desactive"));
+    }
+
+    @DeleteMapping("/produits-assistance/{id}/permanent")
+    @Transactional
+    public ResponseEntity<ApiResponse<Void>> deleteProduitAssistancePermanently(@PathVariable Long id) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        if (assistanceContratRepository.existsByProduitOrTarifProduit(id)) {
+            throw new BadRequestException(
+                    "Ce produit est deja utilise par un contrat et ne peut pas etre supprime. Desactivez-le plutot."
+            );
+        }
+        produitAssistanceRepository.delete(produit);
+        return ResponseEntity.ok(ApiResponse.success((Void) null, "Produit d'assistance supprime"));
     }
 
     @GetMapping("/produits-assistance/{id}/tarifs")

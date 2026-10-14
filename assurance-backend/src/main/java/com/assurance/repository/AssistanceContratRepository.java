@@ -17,6 +17,17 @@ import java.time.LocalDate;
 
 public interface AssistanceContratRepository extends JpaRepository<AssistanceContrat, Long> {
     @Query("""
+            select case when count(a.id) > 0 then true else false end
+            from AssistanceContrat a
+            left join a.produitAssistance produit
+            left join a.tarifProduitAssistance tarif
+            left join tarif.produitAssistance produitTarif
+            where produit.id = :produitId
+               or produitTarif.id = :produitId
+            """)
+    boolean existsByProduitOrTarifProduit(@Param("produitId") Long produitId);
+
+    @Query("""
             select a.mouvementContrat.id, coalesce(sum(a.primeTotale), 0)
             from AssistanceContrat a
             where a.mouvementContrat.id in :mouvementIds and a.actif = true

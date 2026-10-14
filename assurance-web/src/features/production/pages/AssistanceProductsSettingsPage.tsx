@@ -1,9 +1,19 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Check, ChevronsUpDown, Edit, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronsUpDown, Edit, Plus, PowerOff, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TableRowActions } from "@/components/shared/table-row-actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -63,6 +73,7 @@ export default function AssistanceProductsSettingsPage() {
     direction: "asc",
   });
   const [editingProduct, setEditingProduct] = useState<ReferenceOption | null>(null);
+  const [productToDelete, setProductToDelete] = useState<ReferenceOption | null>(null);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [productPayload, setProductPayload] = useState<UpsertProduitAssistanceRequest>(emptyProduct(""));
   const [tarifProduct, setTarifProduct] = useState<ReferenceOption | null>(null);
@@ -168,11 +179,21 @@ export default function AssistanceProductsSettingsPage() {
     onError: showError,
   });
 
-  const deleteProduct = useMutation({
-    mutationFn: (id: string) => assistanceProductApi.deleteProduct(id),
+  const deactivateProduct = useMutation({
+    mutationFn: (id: string) => assistanceProductApi.deactivateProduct(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
       toast.success("Produit d'assistance désactivé");
+    },
+    onError: showError,
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: (id: string) => assistanceProductApi.deleteProductPermanently(id),
+    onSuccess: async () => {
+      setProductToDelete(null);
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
+      toast.success("Produit d'assistance supprimé");
     },
     onError: showError,
   });
@@ -324,10 +345,17 @@ export default function AssistanceProductsSettingsPage() {
                         },
                         {
                           label: "Désactiver",
+                          icon: PowerOff,
+                          destructive: true,
+                          disabled: product.actif === false || deactivateProduct.isPending,
+                          onSelect: () => deactivateProduct.mutate(product.id),
+                        },
+                        {
+                          label: "Supprimer définitivement",
                           icon: Trash2,
                           destructive: true,
-                          disabled: product.actif === false || deleteProduct.isPending,
-                          onSelect: () => deleteProduct.mutate(product.id),
+                          disabled: deleteProduct.isPending,
+                          onSelect: () => setProductToDelete(product),
                         },
                       ]}
                     />
@@ -343,6 +371,27 @@ export default function AssistanceProductsSettingsPage() {
           </Table>
         </div>
       </section>
+
+      <AlertDialog open={Boolean(productToDelete)} onOpenChange={(open) => { if (!open) setProductToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer définitivement ce produit ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {productToDelete?.libelle} sera supprimé avec ses tarifs. Cette action est possible uniquement si le produit n’a jamais été utilisé dans un contrat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={deleteProduct.isPending}
+              onClick={() => productToDelete && deleteProduct.mutate(productToDelete.id)}
+            >
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={productDialogOpen} onOpenChange={(open) => { setProductDialogOpen(open); if (!open) setEditingProduct(null); }}>
         <DialogContent className="sm:max-w-4xl">

@@ -56,6 +56,7 @@ export default function AssistanceProductsSettingsPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("compagnieId") || ALL);
   const [selectedType, setSelectedType] = useState(searchParams.get("type") || ALL);
   const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get("categorieId") || ALL);
+  const voyageListSelected = selectedType === "Assistance Voyage";
   const deferredProductSearch = useDeferredValue(productSearch.trim());
   const [productSort, setProductSort] = useState<{ key: ProductSortKey; direction: ProductSortDirection }>({
     key: "PRODUCT",
@@ -79,9 +80,9 @@ export default function AssistanceProductsSettingsPage() {
     recherche: deferredProductSearch || undefined,
     compagnieAssistanceId: selectedCompanyId === ALL ? undefined : selectedCompanyId,
     type: selectedType === ALL ? undefined : selectedType,
-    categorieClientId: selectedCategoryId === ALL ? undefined : selectedCategoryId,
+    categorieClientId: voyageListSelected || selectedCategoryId === ALL ? undefined : selectedCategoryId,
     includeInactive: "true",
-  }), [deferredProductSearch, selectedCategoryId, selectedCompanyId, selectedType]);
+  }), [deferredProductSearch, selectedCategoryId, selectedCompanyId, selectedType, voyageListSelected]);
 
   const products = useQuery({
     queryKey: ["referentiel", "produits-assistance", "settings", productFilters],
@@ -113,9 +114,9 @@ export default function AssistanceProductsSettingsPage() {
     if (productSearch.trim()) params.set("recherche", productSearch.trim());
     if (selectedCompanyId !== ALL) params.set("compagnieId", selectedCompanyId);
     if (selectedType !== ALL) params.set("type", selectedType);
-    if (selectedCategoryId !== ALL) params.set("categorieId", selectedCategoryId);
+    if (!voyageListSelected && selectedCategoryId !== ALL) params.set("categorieId", selectedCategoryId);
     setSearchParams(params, { replace: true });
-  }, [productSearch, selectedCategoryId, selectedCompanyId, selectedType, setSearchParams]);
+  }, [productSearch, selectedCategoryId, selectedCompanyId, selectedType, setSearchParams, voyageListSelected]);
 
   useEffect(() => {
     if (!productDialogOpen) return;
@@ -207,7 +208,7 @@ export default function AssistanceProductsSettingsPage() {
         <div>
           <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Assistance</p>
           <h1 className="text-xl font-semibold tracking-tight">Produits assistance</h1>
-          <p className="text-sm text-muted-foreground">Produits par compagnie, catégorie, usages couverts et périodes tarifaires.</p>
+          <p className="text-sm text-muted-foreground">Produits par compagnie, type et périodes tarifaires.</p>
         </div>
         <Button onClick={() => { setEditingProduct(null); setProductDialogOpen(true); }}>
           <Plus className="size-4" />
@@ -236,7 +237,10 @@ export default function AssistanceProductsSettingsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedType} onValueChange={setSelectedType}>
+          <Select value={selectedType} onValueChange={(value) => {
+            setSelectedType(value);
+            if (value === "Assistance Voyage") setSelectedCategoryId(ALL);
+          }}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -247,17 +251,19 @@ export default function AssistanceProductsSettingsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Toutes les catégories</SelectItem>
-              {(categories.data ?? []).map((category) => (
-                <SelectItem key={category.id} value={category.id}>{category.libelle}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!voyageListSelected ? (
+            <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Toutes les catégories</SelectItem>
+                {(categories.data ?? []).map((category) => (
+                  <SelectItem key={category.id} value={category.id}>{category.libelle}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
         </div>
 
         <div className="overflow-x-auto rounded-md border">
@@ -282,16 +288,21 @@ export default function AssistanceProductsSettingsPage() {
                   <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Chargement des produits...</TableCell>
                 </TableRow>
               ) : null}
-              {filteredProducts.map((product) => (
-                <TableRow key={product.id}>
+              {filteredProducts.map((product) => {
+                const voyage = isVoyageProduct(product);
+                return <TableRow key={product.id}>
                   <TableCell>
                     <div className="font-medium">{product.libelle}</div>
                   </TableCell>
                   <TableCell>{refString(product, "compagnieAssistanceLibelle") || "-"}</TableCell>
                   <TableCell>{refString(product, "type") || "-"}</TableCell>
-                  <TableCell>{refString(product, "categorieClientLibelle") || "Toutes"}</TableCell>
+                  <TableCell className={cn(voyage && "text-muted-foreground")}>
+                    {voyage ? "Non applicable" : refString(product, "categorieClientLibelle") || "Toutes"}
+                  </TableCell>
                   <TableCell className="max-w-64">
-                    <span className="line-clamp-2 text-xs text-muted-foreground">{refArray(product, "usageCodes").join(", ") || "Tous les usages"}</span>
+                    <span className="line-clamp-2 text-xs text-muted-foreground">
+                      {voyage ? "Non applicable" : refArray(product, "usageCodes").join(", ") || "Tous les usages"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">{money(refNumber(product, "montantHt"))}</TableCell>
                   <TableCell className="text-right font-medium">{money(refNumber(product, "montantTtc"))}</TableCell>
@@ -321,8 +332,8 @@ export default function AssistanceProductsSettingsPage() {
                       ]}
                     />
                   </TableCell>
-                </TableRow>
-              ))}
+                </TableRow>;
+              })}
               {!products.isLoading && filteredProducts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Aucun produit assistance.</TableCell>
@@ -556,19 +567,24 @@ function submitProduct(
   payload: UpsertProduitAssistanceRequest,
   mutate: (variables: { id?: string; value: UpsertProduitAssistanceRequest }) => void
 ) {
+  const voyage = payload.type === "Assistance Voyage";
   const value = {
     ...payload,
     libelle: payload.libelle.trim(),
     type: cleanOptional(payload.type),
     prestations: cleanOptional(payload.prestations),
-    categorieClientId: cleanOptional(payload.categorieClientId),
-    usageIds: payload.usageIds ?? [],
+    categorieClientId: voyage ? undefined : cleanOptional(payload.categorieClientId),
+    usageIds: voyage ? [] : payload.usageIds ?? [],
   };
   if (!value.compagnieAssistanceId || !value.libelle) {
     toast.error("Compagnie assistance et produit sont obligatoires.");
     return;
   }
   mutate({ id: editing?.id, value });
+}
+
+function isVoyageProduct(product: ReferenceOption) {
+  return refString(product, "type").toLocaleLowerCase("fr") === "assistance voyage".toLocaleLowerCase("fr");
 }
 
 function submitTarif(

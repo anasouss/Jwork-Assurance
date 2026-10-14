@@ -899,6 +899,10 @@ type AuditBusinessItem = {
   rawEvents: AdminAuditEvent[];
 };
 
+type AuditTimelineEntry =
+  | { kind: "item"; key: string; item: AuditBusinessItem }
+  | { kind: "document-lines"; key: string; items: AuditBusinessItem[] };
+
 const EMPTY_AUDIT_FILTERS: AuditFilters = {
   search: "",
   action: AUDIT_ALL,
@@ -1086,6 +1090,7 @@ function auditActionVariant(action: AdminAuditEvent["action"]): "success" | "inf
 function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOperation | null; onOpenChange: (open: boolean) => void }) {
   const [technicalOpen, setTechnicalOpen] = useState(false);
   const businessItems = useMemo(() => operation ? groupAuditBusinessItems(operation) : [], [operation]);
+  const timelineEntries = useMemo(() => groupAuditTimelineEntries(businessItems), [businessItems]);
   const entityUrl = operation ? auditEntityUrl(operation.primary) : null;
   useEffect(() => {
     setTechnicalOpen(false);
@@ -1110,13 +1115,19 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
               <section className="grid gap-2" aria-labelledby="audit-operation-timeline">
                 <h3 id="audit-operation-timeline" className="text-sm font-semibold">Déroulement de l’opération</h3>
                 <div className="border-y">
-                  {businessItems.map((item, index) => (
+                  {timelineEntries.map((entry, index) => entry.kind === "document-lines" ? (
+                    <AuditDocumentLinesTimelineItem
+                      key={entry.key}
+                      items={entry.items}
+                      index={index}
+                    />
+                  ) : (
                     <AuditTimelineItem
-                      key={item.key}
-                      item={item}
+                      key={entry.key}
+                      item={entry.item}
                       operation={operation}
                       index={index}
-                      defaultOpen={item.event.entityType === operation.primary.entityType && item.event.entityId === operation.primary.entityId}
+                      defaultOpen={entry.item.event.entityType === operation.primary.entityType && entry.item.event.entityId === operation.primary.entityId}
                     />
                   ))}
                 </div>
@@ -1186,6 +1197,110 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function groupAuditTimelineEntries(items: AuditBusinessItem[]): AuditTimelineEntry[] {
+  const documentLines = items.filter((item) => item.event.entityType === "LigneDocumentClient");
+  if (!documentLines.length) {
+    return items.map((item) => ({ kind: "item", key: item.key, item }));
+  }
+  const groups = new Map<string, AuditBusinessItem[]>();
+  documentLines.forEach((item) => {
+    const key = auditDocumentLineGroupKey(item);
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  });
+  const emitted = new Set<string>();
+  return items.flatMap((item): AuditTimelineEntry[] => {
+    if (item.event.entityType === "LigneDocumentClient") {
+      const key = auditDocumentLineGroupKey(item);
+      if (emitted.has(key)) return [];
+      emitted.add(key);
+      return [{ kind: "document-lines", key, items: groups.get(key) ?? [item] }];
+    }
+    return [{ kind: "item", key: item.key, item }];
+  });
+}
+
+function auditDocumentLineGroupKey(item: AuditBusinessItem) {
+  const document = auditSnapshot(item.event).document;
+  const documentId = document && typeof document === "object" && !Array.isArray(document)
+    ? String((document as { id?: unknown }).id ?? "unknown")
+    : "unknown";
+  return `document-lines:${documentId}`;
+}
+
+function AuditDocumentLinesTimelineItem({
+  items,
+  index,
+}: {
+  items: AuditBusinessItem[];
+  index: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const document = auditReferenceLabel(auditSnapshot(items[0].event).document);
+  const total = items.reduce((sum, item) => {
+    const amount = auditSnapshot(item.event).montantTtc;
+    return sum + (typeof amount === "number" ? amount : 0);
+  }, 0);
+  const hasAmounts = items.some((item) => typeof auditSnapshot(item.event).montantTtc === "number");
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b last:border-b-0">
+      <CollapsibleTrigger asChild>
+        <button type="button" className="grid w-full grid-cols-[2rem_1fr_auto] items-center gap-3 px-2 py-3 text-left hover:bg-muted/50">
+          <span className="flex size-7 items-center justify-center rounded-full border bg-background text-xs font-semibold">{index + 1}</span>
+          <span className="grid min-w-0 gap-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <Badge variant="success">Ajout</Badge>
+              <span className="font-medium">
+                {items.length} ligne{items.length > 1 ? "s" : ""} ajoutée{items.length > 1 ? "s" : ""}
+                {document ? ` à ${document}` : " au document"}
+              </span>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {hasAmounts ? `Total des lignes · ${formatAuditFieldValue("montantTtc", total)}` : "Détail des éléments facturés"}
+            </span>
+          </span>
+          <ChevronDown className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pb-3 pl-[3.25rem] pr-2">
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
+              <TableRow>
+                <TableHead className="w-20">Ligne</TableHead>
+                <TableHead>Quittance</TableHead>
+                <TableHead>Nature</TableHead>
+                <TableHead className="text-right">Montant TTC</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item, itemIndex) => {
+                const snapshot = auditSnapshot(item.event);
+                const order = typeof snapshot.ordre === "number" ? snapshot.ordre : itemIndex + 1;
+                const quittance = typeof snapshot.numeroQuittance === "string" && snapshot.numeroQuittance.trim()
+                  ? snapshot.numeroQuittance.trim()
+                  : "-";
+                const movement = typeof snapshot.mouvement === "string" && snapshot.mouvement.trim()
+                  ? snapshot.mouvement.trim()
+                  : "-";
+                return (
+                  <TableRow key={item.key}>
+                    <TableCell className="font-medium">{order}</TableCell>
+                    <TableCell>{quittance}</TableCell>
+                    <TableCell>{movement}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatAuditFieldValue("montantTtc", snapshot.montantTtc)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

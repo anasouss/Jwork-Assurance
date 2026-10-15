@@ -13,6 +13,13 @@ public class UpsertTarifProduitAssistanceRequest {
 
     private LocalDate dateFin;
 
+    private Integer ageMin;
+
+    private Integer ageMax;
+
+    @NotNull
+    private Integer dureeMois;
+
     @NotNull
     private BigDecimal montantHt;
 

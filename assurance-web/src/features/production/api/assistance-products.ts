@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   ReferenceOption,
   UpsertCompagnieAssistanceRequest,
+  UpsertCodePromoAssistanceRequest,
   UpsertProduitAssistanceRequest,
   UpsertTarifProduitAssistanceRequest,
 } from "../types";
@@ -97,6 +98,38 @@ export const assistanceProductApi = {
   async deleteProductRate(productId: string, rateId: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/produits-assistance/${productId}/tarifs/${rateId}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
+  async listPromoCodes(productId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption[]>>(`/api/v1/referentiel/produits-assistance/${productId}/codes-promo`)
+    );
+  },
+
+  async createPromoCode(productId: string, payload: UpsertCodePromoAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/produits-assistance/${productId}/codes-promo`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async updatePromoCode(productId: string, promoId: string, payload: UpsertCodePromoAssistanceRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption>>(`/api/v1/referentiel/produits-assistance/${productId}/codes-promo/${promoId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async deletePromoCode(productId: string, promoId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/referentiel/produits-assistance/${productId}/codes-promo/${promoId}`, {
         method: "DELETE",
       })
     );

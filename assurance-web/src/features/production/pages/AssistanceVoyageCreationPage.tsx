@@ -86,19 +86,34 @@ export default function AssistanceVoyageCreationPage() {
   const subscriberCanBeInsured = subscriber.typeClient === "PERSONNE_PHYSIQUE";
   const subscriberIsInsured = sameInsured && subscriberCanBeInsured;
   const effectiveInsured = subscriberIsInsured ? [subscriber] : insuredPeople;
+  const insuredBirthDates = effectiveInsured.map((person) => person.dateNaissance).filter(Boolean);
   const selectedCompany = (companies.data ?? []).find((company) => company.id === compagnieId);
   const selectedProduct = (products.data ?? []).find((product) => product.id === produitId);
+  const durationOptions = travelDurationOptions(selectedProduct);
   const expiryDate = calculateExpiryDate(dateEffet, Number(dureeMois));
+
+  useEffect(() => {
+    if (selectedProduct && !durationOptions.some((option) => option.value === dureeMois)) {
+      setDureeMois(durationOptions[0]?.value ?? "12");
+    }
+  }, [dureeMois, durationOptions, selectedProduct]);
   const quote = useQuery({
-    queryKey: ["assistance-voyage", "quote", compagnieId, produitId, dateEffet, dureeMois, codePromo.trim()],
+    queryKey: ["assistance-voyage", "quote", compagnieId, produitId, dateEffet, dureeMois, codePromo.trim(), insuredBirthDates],
     queryFn: () => assistanceVoyageApi.quote({
       compagnieAssistanceId: compagnieId,
       produitAssistanceId: produitId,
       dateEffet,
       dureeMois: Number(dureeMois),
       codePromo: codePromo.trim() || undefined,
+      datesNaissanceAssures: insuredBirthDates,
     }),
-    enabled: Boolean(compagnieId && produitId && dateEffet && dureeMois),
+    enabled: Boolean(
+      compagnieId
+      && produitId
+      && dateEffet
+      && dureeMois
+      && insuredBirthDates.length === effectiveInsured.length
+    ),
     retry: false,
   });
 
@@ -243,12 +258,9 @@ export default function AssistanceVoyageCreationPage() {
             <Select value={dureeMois} onValueChange={setDureeMois}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="6">6 mois</SelectItem>
-                <SelectItem value="12">1 an</SelectItem>
-                <SelectItem value="24">2 ans</SelectItem>
-                <SelectItem value="36">3 ans</SelectItem>
-                <SelectItem value="48">4 ans</SelectItem>
-                <SelectItem value="60">5 ans</SelectItem>
+                {durationOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
@@ -277,10 +289,25 @@ export default function AssistanceVoyageCreationPage() {
         </div>
 
         {quote.data ? (
-          <div className="mt-4 grid overflow-hidden rounded-md border sm:grid-cols-3">
-            <Summary label="Prime nette (MAD)" value={money(quote.data.primeNette)} />
-            <Summary label="Réduction (MAD)" value={money(quote.data.montantReduction)} />
-            <Summary label="Prime TTC (MAD)" value={money(quote.data.primeTotale)} strong />
+          <div className="mt-4 grid gap-3">
+            <div className="grid overflow-hidden rounded-md border sm:grid-cols-3">
+              <Summary label="Prime nette (MAD)" value={money(quote.data.primeNette)} />
+              <Summary label="Réduction (MAD)" value={money(quote.data.montantReduction)} />
+              <Summary label="Prime TTC (MAD)" value={money(quote.data.primeTotale)} strong />
+            </div>
+            {quote.data.lignes.length > 1 ? (
+              <div className="overflow-hidden rounded-md border">
+                {quote.data.lignes.map((line) => (
+                  <div key={line.assureIndex} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 border-b px-3 py-2 text-sm last:border-b-0">
+                    <span className="truncate font-medium">
+                      {personName(effectiveInsured[line.assureIndex]) || `Assuré ${line.assureIndex + 1}`}
+                    </span>
+                    <span className="text-muted-foreground">{line.age} ans</span>
+                    <span className="tabular-nums">{money(line.primeTotale)} MAD</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
         {quote.isError ? (
@@ -638,6 +665,24 @@ function calculateExpiryDate(start: string, months: number) {
   const expiration = new Date(Date.UTC(targetYear, normalizedMonth, Math.min(day, lastDay)));
   expiration.setUTCDate(expiration.getUTCDate() - 1);
   return expiration.toISOString().slice(0, 10);
+}
+
+function travelDurationOptions(product?: ReferenceOption) {
+  const configured = Array.isArray(product?.dureesTarifaires)
+    ? product.dureesTarifaires.map(Number).filter(Number.isFinite)
+    : [];
+  const options: Array<{ value: string; label: string }> = [];
+  if (configured.includes(6)) options.push({ value: "6", label: "6 mois" });
+  if (configured.includes(12)) {
+    options.push(
+      { value: "12", label: "1 an" },
+      { value: "24", label: "2 ans" },
+      { value: "36", label: "3 ans" },
+      { value: "48", label: "4 ans" },
+      { value: "60", label: "5 ans" },
+    );
+  }
+  return options.length > 0 ? options : [{ value: "12", label: "1 an" }];
 }
 
 function money(value: number) {

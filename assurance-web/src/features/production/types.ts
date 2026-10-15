@@ -34,8 +34,6 @@ export type UpsertProduitAssistanceRequest = {
   libelle: string;
   type?: string;
   prestations?: string;
-  codePromo?: string;
-  tauxReductionPromo?: number;
   usageIds?: string[];
   actif?: boolean;
 };
@@ -51,8 +49,19 @@ export type UpsertCategorieClientRequest = {
 export type UpsertTarifProduitAssistanceRequest = {
   dateDebut: string;
   dateFin?: string;
+  ageMin?: number;
+  ageMax?: number;
+  dureeMois: 6 | 12;
   montantHt: number;
   montantTtc: number;
+  actif?: boolean;
+};
+
+export type UpsertCodePromoAssistanceRequest = {
+  code: string;
+  tauxReduction: number;
+  dateDebut: string;
+  dateFin?: string;
   actif?: boolean;
 };
 
@@ -490,6 +499,14 @@ export type AssistanceVoyageQuote = {
   primeNette: number;
   primeTotale: number;
   montantReduction: number;
+  lignes: Array<{
+    assureIndex: number;
+    age: number;
+    tarifId: string;
+    primeNette: number;
+    primeTotale: number;
+    montantReduction: number;
+  }>;
 };
 
 export type ClientResponse = ClientInput["client"] & {
@@ -806,6 +823,17 @@ export type AssistanceContrat = {
   primeNette?: number | null;
   primeTotale?: number | null;
   elementFacturableId?: string | null;
+  lignesTarification?: Array<{
+    assureId: string;
+    assureNom: string;
+    age: number;
+    dureeTarifMois: number;
+    ageMin?: number | null;
+    ageMax?: number | null;
+    primeNette: number;
+    primeTotale: number;
+    montantReduction: number;
+  }>;
 };
 
 export type AssistanceContratContext = {

@@ -340,7 +340,11 @@ public class AssistanceContratService {
     }
 
     private AssistanceContratResponse toResponse(AssistanceContrat assistance) {
-        int trimestres = assistance.getDuree() == null ? resolveAssistanceQuarterCount(assistance.getDateEffet(), assistance.getDateEcheance()) : assistance.getDuree();
+        int trimestres = "MOIS".equalsIgnoreCase(assistance.getUnite()) && assistance.getDuree() != null
+                ? Math.max(1, (int) Math.ceil(assistance.getDuree() / 3.0))
+                : assistance.getDuree() == null
+                        ? resolveAssistanceQuarterCount(assistance.getDateEffet(), assistance.getDateEcheance())
+                        : assistance.getDuree();
         BigDecimal prorata = BigDecimal.valueOf(trimestres).divide(BigDecimal.valueOf(4), 8, RoundingMode.HALF_UP);
         return toResponse(assistance, trimestres, prorata);
     }
@@ -371,6 +375,20 @@ public class AssistanceContratService {
                 .primeNette(assistance.getPrimeNette())
                 .primeTotale(assistance.getPrimeTotale())
                 .elementFacturableId(assistance.getElementFacturable() != null ? assistance.getElementFacturable().getId() : null)
+                .lignesTarification(assistance.getLignesTarification() == null ? List.of()
+                        : assistance.getLignesTarification().stream()
+                                .map(line -> AssistanceContratResponse.LigneTarification.builder()
+                                        .assureId(line.getAssure().getId())
+                                        .assureNom(line.getAssure().getNomAffichage())
+                                        .age(line.getAge())
+                                        .dureeTarifMois(line.getTarifProduitAssistance().getDureeMois())
+                                        .ageMin(line.getTarifProduitAssistance().getAgeMin())
+                                        .ageMax(line.getTarifProduitAssistance().getAgeMax())
+                                        .primeNette(line.getPrimeNette())
+                                        .primeTotale(line.getPrimeTotale())
+                                        .montantReduction(line.getMontantReduction())
+                                        .build())
+                                .toList())
                 .build();
     }
 

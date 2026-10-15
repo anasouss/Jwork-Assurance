@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Check, ChevronsUpDown, Edit, Plus, PowerOff, Search, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronsUpDown, Edit, Plus, PowerOff, Search, Tags, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import {
@@ -48,6 +48,7 @@ import { Field } from "../components/Field";
 import { MoneyInput } from "../components/MoneyInput";
 import type {
   ReferenceOption,
+  UpsertCodePromoAssistanceRequest,
   UpsertProduitAssistanceRequest,
   UpsertTarifProduitAssistanceRequest,
 } from "../types";
@@ -80,6 +81,8 @@ export default function AssistanceProductsSettingsPage() {
   const [tariffSort, setTariffSort] = useState<{ column: TariffSortColumn; direction: ProductSortDirection }>({ column: "PERIOD", direction: "desc" });
   const [editingTarif, setEditingTarif] = useState<ReferenceOption | null>(null);
   const [tarifPayload, setTarifPayload] = useState<UpsertTarifProduitAssistanceRequest>(emptyTarif());
+  const [editingPromo, setEditingPromo] = useState<ReferenceOption | null>(null);
+  const [promoPayload, setPromoPayload] = useState<UpsertCodePromoAssistanceRequest>(emptyPromo());
 
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assistance", "settings"],
@@ -120,6 +123,13 @@ export default function AssistanceProductsSettingsPage() {
     staleTime: 30_000,
   });
 
+  const promos = useQuery({
+    queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "codes-promo"],
+    queryFn: () => tarifProduct ? assistanceProductApi.listPromoCodes(tarifProduct.id) : Promise.resolve([]),
+    enabled: Boolean(tarifProduct && isVoyageProduct(tarifProduct)),
+    staleTime: 30_000,
+  });
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (productSearch.trim()) params.set("recherche", productSearch.trim());
@@ -138,6 +148,10 @@ export default function AssistanceProductsSettingsPage() {
   useEffect(() => {
     setTarifPayload(editingTarif ? tarifToPayload(editingTarif) : emptyTarif());
   }, [editingTarif, tarifProduct]);
+
+  useEffect(() => {
+    setPromoPayload(editingPromo ? promoToPayload(editingPromo) : emptyPromo());
+  }, [editingPromo, tarifProduct]);
 
   const filteredProducts = useMemo(() => {
     return [...(products.data ?? [])].sort((left, right) => {
@@ -219,6 +233,30 @@ export default function AssistanceProductsSettingsPage() {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance"] });
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "tarifs"] });
       toast.success("Tarif assistance supprimé");
+    },
+    onError: showError,
+  });
+
+  const savePromo = useMutation({
+    mutationFn: ({ productId, promoId, value }: { productId: string; promoId?: string; value: UpsertCodePromoAssistanceRequest }) =>
+      promoId
+        ? assistanceProductApi.updatePromoCode(productId, promoId, value)
+        : assistanceProductApi.createPromoCode(productId, value),
+    onSuccess: async () => {
+      setEditingPromo(null);
+      setPromoPayload(emptyPromo());
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "codes-promo"] });
+      toast.success("Code promo enregistré");
+    },
+    onError: showError,
+  });
+
+  const deletePromo = useMutation({
+    mutationFn: ({ productId, promoId }: { productId: string; promoId: string }) =>
+      assistanceProductApi.deletePromoCode(productId, promoId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "codes-promo"] });
+      toast.success("Code promo désactivé");
     },
     onError: showError,
   });
@@ -325,18 +363,22 @@ export default function AssistanceProductsSettingsPage() {
                       {voyage ? "Non applicable" : refArray(product, "usageCodes").join(", ") || "Tous les usages"}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">{money(refNumber(product, "montantHt"))}</TableCell>
-                  <TableCell className="text-right font-medium">{money(refNumber(product, "montantTtc"))}</TableCell>
-                  <TableCell>{periodLabel(product)}</TableCell>
+                  <TableCell className="text-right">{voyage ? "-" : money(refNumber(product, "montantHt"))}</TableCell>
+                  <TableCell className="text-right font-medium">{voyage ? "-" : money(refNumber(product, "montantTtc"))}</TableCell>
+                  <TableCell>{voyage ? `${refNumber(product, "nombreTarifs") ?? 0} tarif(s)` : periodLabel(product)}</TableCell>
                   <TableCell>{product.actif === false ? "Non" : "Oui"}</TableCell>
                   <TableCell className="text-right">
                     <TableRowActions
                       label={`Actions ${product.libelle}`}
                       actions={[
                         {
-                          label: "Tarifs",
+                          label: voyage ? "Tarifs et promotions" : "Tarifs",
                           icon: CalendarDays,
-                          onSelect: () => { setTarifProduct(product); setEditingTarif(null); },
+                          onSelect: () => {
+                            setTarifProduct(product);
+                            setEditingTarif(null);
+                            setEditingPromo(null);
+                          },
                         },
                         {
                           label: "Modifier",
@@ -456,32 +498,6 @@ export default function AssistanceProductsSettingsPage() {
                 onChange={(usageIds) => setProductPayload((current) => ({ ...current, usageIds }))}
               />
             </Field> : null}
-            {productPayload.type === "Assistance Voyage" ? (
-              <>
-                <Field label="Code promo">
-                  <Input
-                    value={productPayload.codePromo ?? ""}
-                    onChange={(event) => setProductPayload((current) => ({
-                      ...current,
-                      codePromo: event.target.value.toUpperCase(),
-                    }))}
-                  />
-                </Field>
-                <Field label="Réduction promo (%)">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="0.01"
-                    value={productPayload.tauxReductionPromo ?? ""}
-                    onChange={(event) => setProductPayload((current) => ({
-                      ...current,
-                      tauxReductionPromo: event.target.value === "" ? undefined : Number(event.target.value),
-                    }))}
-                  />
-                </Field>
-              </>
-            ) : null}
             <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-neutral-700 dark:bg-neutral-950/70">
               <Checkbox checked={productPayload.actif !== false} onCheckedChange={(value) => setProductPayload((current) => ({ ...current, actif: Boolean(value) }))} />
               <span>Actif</span>
@@ -502,12 +518,17 @@ export default function AssistanceProductsSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(tarifProduct)} onOpenChange={(open) => { if (!open) { setTarifProduct(null); setEditingTarif(null); } }}>
-        <DialogContent className="sm:max-w-4xl">
+      <Dialog open={Boolean(tarifProduct)} onOpenChange={(open) => { if (!open) { setTarifProduct(null); setEditingTarif(null); setEditingPromo(null); } }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
           <DialogHeader>
-            <DialogTitle>Tarifs produit assistance</DialogTitle>
+            <DialogTitle>{tarifProduct && isVoyageProduct(tarifProduct) ? "Tarifs et promotions" : "Tarifs produit assistance"}</DialogTitle>
             <DialogDescription>{tarifProduct?.libelle} - {refString(tarifProduct ?? {}, "compagnieAssistanceLibelle")}</DialogDescription>
           </DialogHeader>
+          <section className="grid gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="size-4" />
+              <h3 className="font-semibold">Grille tarifaire</h3>
+            </div>
           <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
             <Field label="Date début" required>
               <DatePicker date={tarifPayload.dateDebut} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateDebut: toDateOnly(date) ?? "" }))} />
@@ -515,15 +536,30 @@ export default function AssistanceProductsSettingsPage() {
             <Field label="Date fin">
               <DatePicker date={tarifPayload.dateFin} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateFin: toDateOnly(date) }))} />
             </Field>
-            <Field label={refString(tarifProduct ?? {}, "type") === "Assistance Voyage" ? "Montant annuel HT" : "Montant HT"} required>
+            {tarifProduct && isVoyageProduct(tarifProduct) ? <Field label="Base de durée" required>
+              <Select value={String(tarifPayload.dureeMois)} onValueChange={(value) => setTarifPayload((current) => ({ ...current, dureeMois: Number(value) as 6 | 12 }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">6 mois</SelectItem>
+                  <SelectItem value="12">Annuelle (1 à 5 ans)</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field> : null}
+            {tarifProduct && isVoyageProduct(tarifProduct) ? <Field label="Âge minimum">
+              <Input type="number" min={0} max={120} value={tarifPayload.ageMin ?? ""} onChange={(event) => setTarifPayload((current) => ({ ...current, ageMin: optionalNumber(event.target.value) }))} />
+            </Field> : null}
+            {tarifProduct && isVoyageProduct(tarifProduct) ? <Field label="Âge maximum">
+              <Input type="number" min={0} max={120} value={tarifPayload.ageMax ?? ""} onChange={(event) => setTarifPayload((current) => ({ ...current, ageMax: optionalNumber(event.target.value) }))} />
+            </Field> : null}
+            <Field label="Prime nette" required>
               <MoneyInput value={tarifPayload.montantHt} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantHt: value ?? 0 }))} />
             </Field>
-            <Field label={refString(tarifProduct ?? {}, "type") === "Assistance Voyage" ? "Montant annuel TTC" : "Montant TTC"} required>
+            <Field label="TTC" required>
               <MoneyInput value={tarifPayload.montantTtc} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantTtc: value ?? 0 }))} />
             </Field>
             <div className="flex gap-2 md:col-span-4">
               <Button disabled={saveTarif.isPending || !tarifProduct} onClick={() => submitTarif(tarifProduct, editingTarif, tarifPayload, saveTarif.mutate)}>
-                {editingTarif ? "Mettre à jour" : "Ajouter période"}
+                {editingTarif ? "Mettre à jour" : "Ajouter le tarif"}
               </Button>
               <Button variant="outline" onClick={() => { setEditingTarif(null); setTarifPayload(emptyTarif()); }}>Réinitialiser</Button>
             </div>
@@ -533,7 +569,9 @@ export default function AssistanceProductsSettingsPage() {
               <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
                 <TableRow className="hover:bg-amber-600">
                   <SortableTableHead column="PERIOD" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))}>Période</SortableTableHead>
-                  <SortableTableHead column="HT" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))} align="right">Montant HT</SortableTableHead>
+                  {tarifProduct && isVoyageProduct(tarifProduct) ? <TableHead>Durée</TableHead> : null}
+                  {tarifProduct && isVoyageProduct(tarifProduct) ? <TableHead>Tranche d’âge</TableHead> : null}
+                  <SortableTableHead column="HT" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))} align="right">Prime nette</SortableTableHead>
                   <SortableTableHead column="TTC" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))} align="right">Montant TTC</SortableTableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -542,6 +580,8 @@ export default function AssistanceProductsSettingsPage() {
                 {sortedTariffs.map((tarif) => (
                   <TableRow key={tarif.id}>
                     <TableCell>{periodLabelFromDates(refString(tarif, "dateDebut"), refString(tarif, "dateFin"))}</TableCell>
+                    {tarifProduct && isVoyageProduct(tarifProduct) ? <TableCell>{durationBaseLabel(refNumber(tarif, "dureeMois"))}</TableCell> : null}
+                    {tarifProduct && isVoyageProduct(tarifProduct) ? <TableCell>{ageRangeLabel(refNumber(tarif, "ageMin"), refNumber(tarif, "ageMax"))}</TableCell> : null}
                     <TableCell className="text-right">{money(refNumber(tarif, "montantHt"))}</TableCell>
                     <TableCell className="text-right font-medium">{money(refNumber(tarif, "montantTtc"))}</TableCell>
                     <TableCell className="text-right">
@@ -567,12 +607,78 @@ export default function AssistanceProductsSettingsPage() {
                 ))}
                 {!tarifs.isLoading && (tarifs.data ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Aucun tarif pour ce produit.</TableCell>
+                    <TableCell colSpan={tarifProduct && isVoyageProduct(tarifProduct) ? 6 : 4} className="py-8 text-center text-muted-foreground">Aucun tarif pour ce produit.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
             </Table>
           </div>
+          </section>
+
+          {tarifProduct && isVoyageProduct(tarifProduct) ? (
+            <section className="grid gap-3 border-t pt-4">
+              <div className="flex items-center gap-2">
+                <Tags className="size-4" />
+                <h3 className="font-semibold">Codes promo</h3>
+              </div>
+              <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
+                <Field label="Code" required>
+                  <Input value={promoPayload.code} onChange={(event) => setPromoPayload((current) => ({ ...current, code: event.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Réduction (%)" required>
+                  <Input type="number" min={0.01} max={100} step="0.01" value={promoPayload.tauxReduction || ""} onChange={(event) => setPromoPayload((current) => ({ ...current, tauxReduction: Number(event.target.value) }))} />
+                </Field>
+                <Field label="Date début" required>
+                  <DatePicker date={promoPayload.dateDebut} onSelect={(date) => setPromoPayload((current) => ({ ...current, dateDebut: toDateOnly(date) ?? "" }))} />
+                </Field>
+                <Field label="Date fin">
+                  <DatePicker date={promoPayload.dateFin} onSelect={(date) => setPromoPayload((current) => ({ ...current, dateFin: toDateOnly(date) }))} />
+                </Field>
+                <label className="flex min-h-9 items-center gap-2 rounded-md border px-3 text-sm">
+                  <Checkbox checked={promoPayload.actif !== false} onCheckedChange={(value) => setPromoPayload((current) => ({ ...current, actif: Boolean(value) }))} />
+                  <span>Actif</span>
+                </label>
+                <div className="flex gap-2 md:col-span-4">
+                  <Button disabled={savePromo.isPending} onClick={() => submitPromo(tarifProduct, editingPromo, promoPayload, savePromo.mutate)}>
+                    {editingPromo ? "Mettre à jour" : "Ajouter le code"}
+                  </Button>
+                  <Button variant="outline" onClick={() => { setEditingPromo(null); setPromoPayload(emptyPromo()); }}>Réinitialiser</Button>
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
+                    <TableRow className="hover:bg-amber-600">
+                      <TableHead>Code</TableHead>
+                      <TableHead className="text-right">Réduction</TableHead>
+                      <TableHead>Période</TableHead>
+                      <TableHead>État</TableHead>
+                      <TableHead className="w-20 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(promos.data ?? []).map((promo) => (
+                      <TableRow key={promo.id}>
+                        <TableCell className="font-medium">{promo.code || promo.libelle}</TableCell>
+                        <TableCell className="text-right">{money(refNumber(promo, "tauxReduction"))} %</TableCell>
+                        <TableCell>{periodLabelFromDates(refString(promo, "dateDebut"), refString(promo, "dateFin"))}</TableCell>
+                        <TableCell>{promo.actif === false ? "Inactif" : "Actif"}</TableCell>
+                        <TableCell className="text-right">
+                          <TableRowActions label={`Actions code ${promo.code || promo.libelle}`} actions={[
+                            { label: "Modifier le code", icon: Edit, onSelect: () => setEditingPromo(promo) },
+                            { label: "Désactiver le code", icon: PowerOff, destructive: true, disabled: promo.actif === false || deletePromo.isPending, onSelect: () => deletePromo.mutate({ productId: tarifProduct.id, promoId: promo.id }) },
+                          ]} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!promos.isLoading && (promos.data ?? []).length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Aucun code promo pour ce produit.</TableCell></TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
@@ -584,7 +690,11 @@ function emptyProduct(compagnieAssistanceId: string): UpsertProduitAssistanceReq
 }
 
 function emptyTarif(): UpsertTarifProduitAssistanceRequest {
-  return { dateDebut: "", montantHt: 0, montantTtc: 0, actif: true };
+  return { dateDebut: "", dureeMois: 12, montantHt: 0, montantTtc: 0, actif: true };
+}
+
+function emptyPromo(): UpsertCodePromoAssistanceRequest {
+  return { code: "", tauxReduction: 0, dateDebut: toDateOnly(new Date()) ?? "", actif: true };
 }
 
 function productToPayload(product: ReferenceOption): UpsertProduitAssistanceRequest {
@@ -594,8 +704,6 @@ function productToPayload(product: ReferenceOption): UpsertProduitAssistanceRequ
     libelle: product.libelle,
     type: refString(product, "type") || undefined,
     prestations: refString(product, "prestations") || undefined,
-    codePromo: refString(product, "codePromo") || undefined,
-    tauxReductionPromo: refNumber(product, "tauxReductionPromo") ?? undefined,
     usageIds: refArray(product, "usageIds"),
     actif: product.actif !== false,
   };
@@ -605,9 +713,22 @@ function tarifToPayload(tarif: ReferenceOption): UpsertTarifProduitAssistanceReq
   return {
     dateDebut: refString(tarif, "dateDebut"),
     dateFin: refString(tarif, "dateFin") || undefined,
+    ageMin: refNumber(tarif, "ageMin"),
+    ageMax: refNumber(tarif, "ageMax"),
+    dureeMois: refNumber(tarif, "dureeMois") === 6 ? 6 : 12,
     montantHt: refNumber(tarif, "montantHt") ?? 0,
     montantTtc: refNumber(tarif, "montantTtc") ?? 0,
     actif: tarif.actif !== false,
+  };
+}
+
+function promoToPayload(promo: ReferenceOption): UpsertCodePromoAssistanceRequest {
+  return {
+    code: promo.code || promo.libelle,
+    tauxReduction: refNumber(promo, "tauxReduction") ?? 0,
+    dateDebut: refString(promo, "dateDebut"),
+    dateFin: refString(promo, "dateFin") || undefined,
+    actif: promo.actif !== false,
   };
 }
 
@@ -643,11 +764,53 @@ function submitTarif(
   mutate: (variables: { productId: string; tarifId?: string; value: UpsertTarifProduitAssistanceRequest }) => void
 ) {
   if (!product) return;
-  if (!payload.dateDebut || payload.montantHt < 0 || payload.montantTtc < 0) {
-    toast.error("Date début et montants positifs sont obligatoires.");
+  if (!payload.dateDebut || payload.montantHt < 0 || payload.montantTtc < payload.montantHt) {
+    toast.error("La date, une prime nette positive et un TTC supérieur ou égal sont obligatoires.");
+    return;
+  }
+  if (payload.ageMin != null && payload.ageMax != null && payload.ageMin > payload.ageMax) {
+    toast.error("La tranche d’âge est invalide.");
     return;
   }
   mutate({ productId: product.id, tarifId: editing?.id, value: { ...payload, dateFin: payload.dateFin || undefined } });
+}
+
+function submitPromo(
+  product: ReferenceOption,
+  editing: ReferenceOption | null,
+  payload: UpsertCodePromoAssistanceRequest,
+  mutate: (variables: { productId: string; promoId?: string; value: UpsertCodePromoAssistanceRequest }) => void
+) {
+  if (!payload.code.trim() || !payload.dateDebut || payload.tauxReduction <= 0 || payload.tauxReduction > 100) {
+    toast.error("Le code, la période et une réduction entre 0 et 100 % sont obligatoires.");
+    return;
+  }
+  if (payload.dateFin && payload.dateFin < payload.dateDebut) {
+    toast.error("La date de fin doit être postérieure à la date de début.");
+    return;
+  }
+  mutate({
+    productId: product.id,
+    promoId: editing?.id,
+    value: { ...payload, code: payload.code.trim().toUpperCase(), dateFin: payload.dateFin || undefined },
+  });
+}
+
+function optionalNumber(value: string) {
+  if (value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function durationBaseLabel(months?: number) {
+  return months === 6 ? "6 mois" : "Annuelle";
+}
+
+function ageRangeLabel(min?: number, max?: number) {
+  if (min == null && max == null) return "Tous les âges";
+  if (min == null) return `≤ ${max} ans`;
+  if (max == null) return `≥ ${min} ans`;
+  return `${min} à ${max} ans`;
 }
 
 function UsagesMultiSelect({

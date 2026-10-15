@@ -517,6 +517,7 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
             <TableHead>Produit</TableHead>
             <TableHead>Période</TableHead>
             <TableHead>Durée</TableHead>
+            <TableHead>Personnes assurées</TableHead>
             <TableHead>Code promo</TableHead>
             <TableHead className="text-right">Réduction</TableHead>
             <TableHead className="text-right">Prime TTC</TableHead>
@@ -530,6 +531,15 @@ function AssistancesSection({ assistances }: { assistances: AssistanceContrat[] 
               <TableCell>{text(assistance.produit)}</TableCell>
               <TableCell>{formatDate(assistance.dateEffet)} au {formatDate(assistance.dateEcheance)}</TableCell>
               <TableCell>{assistanceDuration(assistance)}</TableCell>
+              <TableCell>
+                {assistance.lignesTarification?.length ? (
+                  <div className="grid gap-0.5">
+                    {assistance.lignesTarification.map((line) => (
+                      <span key={line.assureId}>{line.assureNom} · {line.age} ans · {moneyAmount(line.primeTotale)}</span>
+                    ))}
+                  </div>
+                ) : "-"}
+              </TableCell>
               <TableCell>{text(assistance.codePromo)}</TableCell>
               <TableCell className="text-right">{assistance.montantReduction ? moneyAmount(assistance.montantReduction) : "-"}</TableCell>
               <TableCell className="text-right font-semibold">{moneyAmount(assistance.primeTotale)}</TableCell>

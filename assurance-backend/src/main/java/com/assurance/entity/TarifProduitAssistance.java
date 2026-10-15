@@ -38,6 +38,15 @@ public class TarifProduitAssistance extends BaseEntity {
     @Column(name = "date_fin")
     private LocalDate dateFin;
 
+    @Column(name = "age_min")
+    private Integer ageMin;
+
+    @Column(name = "age_max")
+    private Integer ageMax;
+
+    @Column(name = "duree_mois", nullable = false)
+    private Integer dureeMois;
+
     @Column(name = "montant_ht", nullable = false, precision = 14, scale = 2)
     private BigDecimal montantHt;
 

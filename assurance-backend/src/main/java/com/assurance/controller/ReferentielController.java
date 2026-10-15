@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.dto.request.UpsertCategorieClientRequest;
+import com.assurance.dto.request.UpsertCodePromoAssistanceRequest;
 import com.assurance.dto.request.UpsertCategorieTransportRequest;
 import com.assurance.dto.request.UpsertCompagnieAssistanceRequest;
 import com.assurance.dto.request.UpsertCodeReferenceRequest;
@@ -27,6 +28,7 @@ import com.assurance.dto.response.GrilleTarifaireCatalogueResponse;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.entity.CategorieClient;
+import com.assurance.entity.CodePromoAssistance;
 import com.assurance.entity.CategorieTransport;
 import com.assurance.entity.Carburant;
 import com.assurance.entity.Carrosserie;
@@ -114,6 +116,7 @@ public class ReferentielController {
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final TarifProduitAssistanceRepository tarifProduitAssistanceRepository;
+    private final CodePromoAssistanceRepository codePromoAssistanceRepository;
     private final AssistanceContratRepository assistanceContratRepository;
     private final AgenceRepository agenceRepository;
     private final RichTextSanitizer richTextSanitizer;
@@ -583,6 +586,71 @@ public class ReferentielController {
         tarif.setActif(false);
         tarifProduitAssistanceRepository.save(tarif);
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Tarif assistance supprime"));
+    }
+
+    @GetMapping("/produits-assistance/{id}/codes-promo")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> codesPromoAssistance(@PathVariable Long id) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        return ResponseEntity.ok(ApiResponse.success(codePromoAssistanceRepository
+                .findByProduitAssistanceOrderByDateDebutDescCreatedAtDesc(produit)
+                .stream()
+                .map(this::toCodePromoAssistanceResponse)
+                .toList()));
+    }
+
+    @PostMapping("/produits-assistance/{id}/codes-promo")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createCodePromoAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertCodePromoAssistanceRequest request
+    ) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        CodePromoAssistance promo = new CodePromoAssistance();
+        applyCodePromoAssistanceRequest(promo, produit, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toCodePromoAssistanceResponse(codePromoAssistanceRepository.save(promo)),
+                "Code promo assistance cree"
+        ));
+    }
+
+    @PutMapping("/produits-assistance/{produitId}/codes-promo/{promoId}")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateCodePromoAssistance(
+            @PathVariable Long produitId,
+            @PathVariable Long promoId,
+            @Valid @RequestBody UpsertCodePromoAssistanceRequest request
+    ) {
+        ProduitAssistance produit = produitAssistanceRepository.findById(produitId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", produitId));
+        CodePromoAssistance promo = codePromoAssistanceRepository.findById(promoId)
+                .orElseThrow(() -> new ResourceNotFoundException("CodePromoAssistance", promoId));
+        if (promo.getProduitAssistance() == null || !promo.getProduitAssistance().getId().equals(produitId)) {
+            throw new BadRequestException("Code promo incompatible avec le produit selectionne");
+        }
+        applyCodePromoAssistanceRequest(promo, produit, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                toCodePromoAssistanceResponse(codePromoAssistanceRepository.save(promo)),
+                "Code promo assistance modifie"
+        ));
+    }
+
+    @DeleteMapping("/produits-assistance/{produitId}/codes-promo/{promoId}")
+    @Transactional
+    public ResponseEntity<ApiResponse<Void>> deleteCodePromoAssistance(
+            @PathVariable Long produitId,
+            @PathVariable Long promoId
+    ) {
+        CodePromoAssistance promo = codePromoAssistanceRepository.findById(promoId)
+                .orElseThrow(() -> new ResourceNotFoundException("CodePromoAssistance", promoId));
+        if (promo.getProduitAssistance() == null || !promo.getProduitAssistance().getId().equals(produitId)) {
+            throw new BadRequestException("Code promo incompatible avec le produit selectionne");
+        }
+        promo.setActif(false);
+        codePromoAssistanceRepository.save(promo);
+        return ResponseEntity.ok(ApiResponse.success((Void) null, "Code promo assistance desactive"));
     }
 
     @GetMapping("/grilles-tarifaires")
@@ -1883,18 +1951,6 @@ public class ReferentielController {
         produit.setLibelle(request.getLibelle().trim());
         produit.setType(blankToNull(request.getType()));
         produit.setPrestations(richTextSanitizer.sanitize(request.getPrestations()));
-        String codePromo = voyage ? blankToNull(request.getCodePromo()) : null;
-        BigDecimal tauxReduction = voyage ? request.getTauxReductionPromo() : null;
-        if (tauxReduction != null
-                && (tauxReduction.compareTo(BigDecimal.ZERO) < 0
-                || tauxReduction.compareTo(new BigDecimal("100")) > 0)) {
-            throw new BadRequestException("Le taux de réduction doit être compris entre 0 et 100");
-        }
-        if (codePromo != null && (tauxReduction == null || tauxReduction.compareTo(BigDecimal.ZERO) <= 0)) {
-            throw new BadRequestException("Un taux de réduction positif est obligatoire avec le code promo");
-        }
-        produit.setCodePromo(codePromo == null ? null : codePromo.toUpperCase(Locale.ROOT));
-        produit.setTauxReductionPromo(codePromo == null ? null : tauxReduction);
         if (produit.getUsages() == null) {
             produit.setUsages(new LinkedHashSet<>());
         }
@@ -1937,12 +1993,96 @@ public class ReferentielController {
         if (request.getMontantHt().compareTo(BigDecimal.ZERO) < 0 || request.getMontantTtc().compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("Les montants d'assistance doivent etre positifs");
         }
+        if (request.getMontantTtc().compareTo(request.getMontantHt()) < 0) {
+            throw new BadRequestException("Le montant TTC ne peut pas etre inferieur au montant net");
+        }
+        if (request.getAgeMin() != null && request.getAgeMin() < 0
+                || request.getAgeMax() != null && request.getAgeMax() < 0
+                || request.getAgeMin() != null && request.getAgeMax() != null
+                && request.getAgeMin() > request.getAgeMax()) {
+            throw new BadRequestException("La tranche d'age est invalide");
+        }
+        if ("Assistance Voyage".equalsIgnoreCase(produit.getType())
+                && request.getDureeMois() != 6
+                && request.getDureeMois() != 12) {
+            throw new BadRequestException("La base tarifaire doit etre 6 mois ou annuelle");
+        }
+        validateTarifOverlap(tarif, produit, request);
         tarif.setProduitAssistance(produit);
         tarif.setDateDebut(request.getDateDebut());
         tarif.setDateFin(request.getDateFin());
+        tarif.setAgeMin(request.getAgeMin());
+        tarif.setAgeMax(request.getAgeMax());
+        tarif.setDureeMois(request.getDureeMois());
         tarif.setMontantHt(request.getMontantHt());
         tarif.setMontantTtc(request.getMontantTtc());
         tarif.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private void applyCodePromoAssistanceRequest(
+            CodePromoAssistance promo,
+            ProduitAssistance produit,
+            UpsertCodePromoAssistanceRequest request
+    ) {
+        if (!"Assistance Voyage".equalsIgnoreCase(produit.getType())) {
+            throw new BadRequestException("Les codes promo sont reserves aux produits Assistance Voyage");
+        }
+        if (request.getDateFin() != null && request.getDateFin().isBefore(request.getDateDebut())) {
+            throw new BadRequestException("La date fin doit etre superieure ou egale a la date debut");
+        }
+        String code = request.getCode().trim().toUpperCase(Locale.ROOT);
+        boolean overlap = codePromoAssistanceRepository
+                .findByProduitAssistanceOrderByDateDebutDescCreatedAtDesc(produit)
+                .stream()
+                .filter(existing -> !Objects.equals(existing.getId(), promo.getId()))
+                .filter(existing -> Boolean.TRUE.equals(existing.getActif()))
+                .filter(existing -> existing.getCode().equalsIgnoreCase(code))
+                .anyMatch(existing -> dateRangesOverlap(
+                        request.getDateDebut(), request.getDateFin(), existing.getDateDebut(), existing.getDateFin()
+                ));
+        if (overlap && !Boolean.FALSE.equals(request.getActif())) {
+            throw new BadRequestException("Ce code promo existe deja sur une periode qui se chevauche");
+        }
+        promo.setProduitAssistance(produit);
+        promo.setCode(code);
+        promo.setTauxReduction(request.getTauxReduction());
+        promo.setDateDebut(request.getDateDebut());
+        promo.setDateFin(request.getDateFin());
+        promo.setActif(request.getActif() == null ? true : request.getActif());
+    }
+
+    private void validateTarifOverlap(
+            TarifProduitAssistance tarif,
+            ProduitAssistance produit,
+            UpsertTarifProduitAssistanceRequest request
+    ) {
+        boolean overlap = tarifProduitAssistanceRepository
+                .findByProduitAssistanceOrderByDateDebutDescCreatedAtDesc(produit)
+                .stream()
+                .filter(existing -> !Objects.equals(existing.getId(), tarif.getId()))
+                .filter(existing -> Boolean.TRUE.equals(existing.getActif()))
+                .filter(existing -> Objects.equals(existing.getDureeMois(), request.getDureeMois()))
+                .filter(existing -> dateRangesOverlap(
+                        request.getDateDebut(), request.getDateFin(), existing.getDateDebut(), existing.getDateFin()
+                ))
+                .anyMatch(existing -> numberRangesOverlap(
+                        request.getAgeMin(), request.getAgeMax(), existing.getAgeMin(), existing.getAgeMax()
+                ));
+        if (overlap && !Boolean.FALSE.equals(request.getActif())) {
+            throw new BadRequestException("Un tarif actif couvre deja cette duree, cette tranche d'age et cette periode");
+        }
+    }
+
+    private boolean dateRangesOverlap(LocalDate start1, LocalDate end1, LocalDate start2, LocalDate end2) {
+        return (end1 == null || !end1.isBefore(start2)) && (end2 == null || !end2.isBefore(start1));
+    }
+
+    private boolean numberRangesOverlap(Integer min1, Integer max1, Integer min2, Integer max2) {
+        int start1 = min1 == null ? 0 : min1;
+        int end1 = max1 == null ? Integer.MAX_VALUE : max1;
+        int start2 = min2 == null ? 0 : min2;
+        int end2 = max2 == null ? Integer.MAX_VALUE : max2;
+        return start1 <= end2 && start2 <= end1;
     }
 
     private Map<String, Object> toLigneResponse(LigneGrilleTarifaire ligne) {
@@ -2042,12 +2182,21 @@ public class ReferentielController {
                 .putValue("usageIds", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getId).toList())
                 .putValue("usageCodes", produit.getUsages() == null ? List.of() : produit.getUsages().stream().map(Usage::getCode).toList())
                 .putValue("prestations", produit.getPrestations())
-                .putValue("codePromo", produit.getCodePromo())
-                .putValue("tauxReductionPromo", produit.getTauxReductionPromo())
                 .putValue("montantHt", tarif != null ? tarif.getMontantHt() : null)
                 .putValue("montantTtc", tarif != null ? tarif.getMontantTtc() : null)
                 .putValue("dateDebutTarif", tarif != null ? tarif.getDateDebut() : null)
                 .putValue("dateFinTarif", tarif != null ? tarif.getDateFin() : null)
+                .putValue("nombreTarifs", produit.getTarifs() == null ? 0 : produit.getTarifs().stream()
+                        .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                        .count())
+                .putValue("dureesTarifaires", produit.getTarifs() == null ? List.of()
+                        : produit.getTarifs().stream()
+                                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                                .map(TarifProduitAssistance::getDureeMois)
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .sorted()
+                                .toList())
                 .putValue("actif", produit.getActif())
                 .map();
     }
@@ -2072,9 +2221,23 @@ public class ReferentielController {
                 .putValue("produitAssistanceId", tarif.getProduitAssistance() != null ? tarif.getProduitAssistance().getId() : null)
                 .putValue("dateDebut", tarif.getDateDebut())
                 .putValue("dateFin", tarif.getDateFin())
+                .putValue("ageMin", tarif.getAgeMin())
+                .putValue("ageMax", tarif.getAgeMax())
+                .putValue("dureeMois", tarif.getDureeMois())
                 .putValue("montantHt", tarif.getMontantHt())
                 .putValue("montantTtc", tarif.getMontantTtc())
                 .putValue("actif", tarif.getActif())
+                .map();
+    }
+
+    private Map<String, Object> toCodePromoAssistanceResponse(CodePromoAssistance promo) {
+        return option(promo.getId(), promo.getCode(), promo.getCode())
+                .putValue("produitAssistanceId", promo.getProduitAssistance() != null
+                        ? promo.getProduitAssistance().getId() : null)
+                .putValue("tauxReduction", promo.getTauxReduction())
+                .putValue("dateDebut", promo.getDateDebut())
+                .putValue("dateFin", promo.getDateFin())
+                .putValue("actif", promo.getActif())
                 .map();
     }
 

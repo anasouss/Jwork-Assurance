@@ -14,6 +14,7 @@ export const assistanceVoyageApi = {
     dateEffet: string;
     dureeMois: number;
     codePromo?: string;
+    datesNaissanceAssures: string[];
   }) {
     return unwrap(await apiFetch<ApiResponse<AssistanceVoyageQuote>>(
       "/api/v1/contrats/assistance-voyage/tarification",

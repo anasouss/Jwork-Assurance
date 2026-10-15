@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -33,4 +34,19 @@ public class AssistanceContratResponse {
     private BigDecimal primeNette;
     private BigDecimal primeTotale;
     private Long elementFacturableId;
+    private List<LigneTarification> lignesTarification;
+
+    @Data
+    @Builder
+    public static class LigneTarification {
+        private Long assureId;
+        private String assureNom;
+        private Integer age;
+        private Integer dureeTarifMois;
+        private Integer ageMin;
+        private Integer ageMax;
+        private BigDecimal primeNette;
+        private BigDecimal primeTotale;
+        private BigDecimal montantReduction;
+    }
 }

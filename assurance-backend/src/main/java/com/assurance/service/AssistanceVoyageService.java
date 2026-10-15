@@ -9,11 +9,13 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.Client;
+import com.assurance.entity.CodePromoAssistance;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.MouvementContrat;
+import com.assurance.entity.LigneTarificationAssistance;
 import com.assurance.entity.ProduitAssistance;
 import com.assurance.entity.TarifProduitAssistance;
 import com.assurance.entity.TypeMouvementContrat;
@@ -37,6 +39,7 @@ import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.MouvementContratRepository;
+import com.assurance.repository.LigneTarificationAssistanceRepository;
 import com.assurance.repository.ProduitAssistanceRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,14 +71,19 @@ public class AssistanceVoyageService {
     private final ClientRepository clientRepository;
     private final ClientService clientService;
     private final TarifProduitAssistanceService tarifProduitAssistanceService;
+    private final CodePromoAssistanceService codePromoAssistanceService;
     private final TypeMouvementContratRepository typeMouvementContratRepository;
     private final MouvementContratRepository mouvementContratRepository;
     private final AssistanceContratRepository assistanceContratRepository;
     private final ElementFacturableRepository elementFacturableRepository;
+    private final LigneTarificationAssistanceRepository ligneTarificationAssistanceRepository;
 
     @Transactional(readOnly = true)
     public AssistanceVoyageQuoteResponse quote(QuoteAssistanceVoyageRequest request) {
         validateDuration(request.getDureeMois());
+        if (request.getDatesNaissanceAssures() == null || request.getDatesNaissanceAssures().isEmpty()) {
+            throw new BadRequestException("Au moins une date de naissance d'assuré est obligatoire");
+        }
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
                 .orElseThrow(() -> new BadRequestException("Compagnie d'assistance inactive ou introuvable"));
@@ -82,19 +91,28 @@ public class AssistanceVoyageService {
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
                 .orElseThrow(() -> new BadRequestException("Produit d'assistance inactif ou introuvable"));
         validateProduct(compagnie, produit);
-        TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveTarifForDate(
+        Pricing pricing = price(
                 produit,
-                request.getDateEffet()
+                request.getDateEffet(),
+                request.getDureeMois(),
+                request.getDatesNaissanceAssures(),
+                request.getCodePromo()
         );
-        if (tarif == null) {
-            throw new BadRequestException("Aucun tarif actif ne couvre la date d'effet sélectionnée");
-        }
-        Pricing pricing = price(produit, tarif, request.getDureeMois(), request.getCodePromo());
         return AssistanceVoyageQuoteResponse.builder()
                 .dateEcheance(request.getDateEffet().plusMonths(request.getDureeMois()).minusDays(1))
                 .primeNette(pricing.net())
                 .primeTotale(pricing.total())
                 .montantReduction(pricing.reduction())
+                .lignes(pricing.lines().stream()
+                        .map(line -> AssistanceVoyageQuoteResponse.Ligne.builder()
+                                .assureIndex(line.insuredIndex())
+                                .age(line.age())
+                                .tarifId(line.tariff().getId())
+                                .primeNette(line.net())
+                                .primeTotale(line.total())
+                                .montantReduction(line.reduction())
+                                .build())
+                        .toList())
                 .build();
     }
 
@@ -117,11 +135,6 @@ public class AssistanceVoyageService {
                 .orElseThrow(() -> new BadRequestException("Produit d'assistance inactif ou introuvable"));
         validateProduct(compagnie, produit);
 
-        TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveTarifForDate(produit, request.getDateEffet());
-        if (tarif == null) {
-            throw new BadRequestException("Aucun tarif actif ne couvre la date d'effet sélectionnée");
-        }
-        Pricing pricing = price(produit, tarif, request.getDureeMois(), request.getCodePromo());
         LocalDate dateEcheance = request.getDateEffet().plusMonths(request.getDureeMois()).minusDays(1);
 
         Client souscripteur = resolvePerson(agenceId, request.getSouscripteur(), "souscripteur", true);
@@ -132,6 +145,13 @@ public class AssistanceVoyageService {
         List<Client> assures = souscripteurAssure
                 ? List.of(souscripteur)
                 : resolveInsuredPeople(agenceId, request.getAssures());
+        Pricing pricing = price(
+                produit,
+                request.getDateEffet(),
+                request.getDureeMois(),
+                assures.stream().map(Client::getDateNaissance).toList(),
+                request.getCodePromo()
+        );
         Client payeur = resolvePayer(request.getPayeurIndex(), souscripteur, assures);
 
         Contrat contrat = Contrat.builder()
@@ -195,7 +215,7 @@ public class AssistanceVoyageService {
                 .mouvementContrat(mouvement)
                 .compagnieAssistance(compagnie)
                 .produitAssistance(produit)
-                .tarifProduitAssistance(tarif)
+                .tarifProduitAssistance(singleTariff(pricing.lines()))
                 .produit(produit.getLibelle())
                 .dateSouscription(LocalDate.now())
                 .dateEffet(request.getDateEffet())
@@ -212,6 +232,21 @@ public class AssistanceVoyageService {
                 .primeTotale(pricing.total())
                 .actif(true)
                 .build());
+
+        for (PricingLine line : pricing.lines()) {
+            ligneTarificationAssistanceRepository.save(LigneTarificationAssistance.builder()
+                    .assistanceContrat(assistance)
+                    .assure(assures.get(line.insuredIndex()))
+                    .tarifProduitAssistance(line.tariff())
+                    .age(line.age())
+                    .coefficientDuree(line.durationCoefficient())
+                    .montantBaseHt(line.baseNet())
+                    .montantBaseTtc(line.baseTotal())
+                    .montantReduction(line.reduction())
+                    .primeNette(line.net())
+                    .primeTotale(line.total())
+                    .build());
+        }
 
         ElementFacturable element = elementFacturableRepository.save(ElementFacturable.builder()
                 .agence(agence)
@@ -377,31 +412,66 @@ public class AssistanceVoyageService {
 
     private Pricing price(
             ProduitAssistance produit,
-            TarifProduitAssistance tarif,
+            LocalDate effectiveDate,
             int durationMonths,
+            List<LocalDate> birthDates,
             String submittedPromo
     ) {
-        BigDecimal durationRatio = BigDecimal.valueOf(durationMonths)
-                .divide(BigDecimal.valueOf(12), 8, RoundingMode.HALF_UP);
-        BigDecimal baseNet = money(tarif.getMontantHt().multiply(durationRatio));
-        BigDecimal baseTotal = money(tarif.getMontantTtc().multiply(durationRatio));
-        String promo = normalizedPromo(submittedPromo);
-        if (promo == null) {
-            return new Pricing(baseNet, baseTotal, ZERO);
+        CodePromoAssistance promo = codePromoAssistanceService.resolve(produit, submittedPromo, effectiveDate);
+        BigDecimal factor = promo == null
+                ? BigDecimal.ONE
+                : BigDecimal.ONE.subtract(
+                        promo.getTauxReduction().divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
+                );
+        BigDecimal durationCoefficient = durationMonths == 6
+                ? BigDecimal.ONE
+                : BigDecimal.valueOf(durationMonths / 12L);
+        List<PricingLine> lines = new ArrayList<>();
+        for (int index = 0; index < birthDates.size(); index++) {
+            LocalDate birthDate = birthDates.get(index);
+            if (birthDate == null || birthDate.isAfter(effectiveDate)) {
+                throw new BadRequestException("Date de naissance invalide pour l'assuré " + (index + 1));
+            }
+            int age = Period.between(birthDate, effectiveDate).getYears();
+            TarifProduitAssistance tariff = tarifProduitAssistanceService.resolveTravelTarif(
+                    produit,
+                    effectiveDate,
+                    durationMonths,
+                    age
+            );
+            if (tariff == null) {
+                throw new BadRequestException("Aucun tarif actif pour l'assuré " + (index + 1)
+                        + " (" + age + " ans, " + durationLabel(durationMonths) + ")");
+            }
+            BigDecimal baseNet = money(tariff.getMontantHt().multiply(durationCoefficient));
+            BigDecimal baseTotal = money(tariff.getMontantTtc().multiply(durationCoefficient));
+            BigDecimal net = money(baseNet.multiply(factor));
+            BigDecimal total = money(baseTotal.multiply(factor));
+            lines.add(new PricingLine(
+                    index,
+                    age,
+                    tariff,
+                    durationCoefficient,
+                    baseNet,
+                    baseTotal,
+                    net,
+                    total,
+                    money(baseTotal.subtract(total))
+            ));
         }
-        if (!promo.equalsIgnoreCase(produit.getCodePromo()) || produit.getTauxReductionPromo() == null) {
-            throw new BadRequestException("Code promo invalide pour ce produit");
-        }
-        BigDecimal factor = BigDecimal.ONE.subtract(
-                produit.getTauxReductionPromo().divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
-        );
-        BigDecimal discountedNet = money(baseNet.multiply(factor));
-        BigDecimal discountedTotal = money(baseTotal.multiply(factor));
-        return new Pricing(discountedNet, discountedTotal, money(baseTotal.subtract(discountedTotal)));
+        BigDecimal net = lines.stream().map(PricingLine::net).reduce(ZERO, BigDecimal::add);
+        BigDecimal total = lines.stream().map(PricingLine::total).reduce(ZERO, BigDecimal::add);
+        BigDecimal reduction = lines.stream().map(PricingLine::reduction).reduce(ZERO, BigDecimal::add);
+        return new Pricing(money(net), money(total), money(reduction), lines);
     }
 
     private String durationLabel(int months) {
         return months == 6 ? "6 mois" : (months / 12) + " an" + (months > 12 ? "s" : "");
+    }
+
+    private TarifProduitAssistance singleTariff(List<PricingLine> lines) {
+        TarifProduitAssistance first = lines.get(0).tariff();
+        return lines.stream().allMatch(line -> line.tariff().getId().equals(first.getId())) ? first : null;
     }
 
     private String normalizedPromo(String value) {
@@ -416,6 +486,19 @@ public class AssistanceVoyageService {
         return value != null && !value.isBlank();
     }
 
-    private record Pricing(BigDecimal net, BigDecimal total, BigDecimal reduction) {
+    private record Pricing(BigDecimal net, BigDecimal total, BigDecimal reduction, List<PricingLine> lines) {
+    }
+
+    private record PricingLine(
+            int insuredIndex,
+            int age,
+            TarifProduitAssistance tariff,
+            BigDecimal durationCoefficient,
+            BigDecimal baseNet,
+            BigDecimal baseTotal,
+            BigDecimal net,
+            BigDecimal total,
+            BigDecimal reduction
+    ) {
     }
 }

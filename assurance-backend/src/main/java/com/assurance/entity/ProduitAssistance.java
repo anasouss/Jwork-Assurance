@@ -52,12 +52,6 @@ public class ProduitAssistance extends BaseEntity {
     @Column(length = 2000)
     private String prestations;
 
-    @Column(name = "code_promo", length = 60)
-    private String codePromo;
-
-    @Column(name = "taux_reduction_promo", precision = 7, scale = 4)
-    private java.math.BigDecimal tauxReductionPromo;
-
     @ManyToMany
     @JoinTable(
             name = "produit_assistance_usages",
@@ -72,6 +66,11 @@ public class ProduitAssistance extends BaseEntity {
     @OrderBy("dateDebut DESC, id DESC")
     @Builder.Default
     private List<TarifProduitAssistance> tarifs = new ArrayList<>();
+
+    @OneToMany(mappedBy = "produitAssistance", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OrderBy("dateDebut DESC, id DESC")
+    @Builder.Default
+    private List<CodePromoAssistance> codesPromo = new ArrayList<>();
 
     @Builder.Default
     @Column(nullable = false)

@@ -10,6 +10,8 @@ import java.util.List;
 public interface TarifProduitAssistanceRepository extends JpaRepository<TarifProduitAssistance, Long> {
     List<TarifProduitAssistance> findByProduitAssistanceAndActifTrueOrderByDateDebutDescCreatedAtDesc(ProduitAssistance produitAssistance);
 
+    List<TarifProduitAssistance> findByProduitAssistanceOrderByDateDebutDescCreatedAtDesc(ProduitAssistance produitAssistance);
+
     List<TarifProduitAssistance> findByProduitAssistanceAndActifTrueAndDateDebutLessThanEqualOrderByDateDebutDescCreatedAtDesc(
             ProduitAssistance produitAssistance,
             LocalDate referenceDate

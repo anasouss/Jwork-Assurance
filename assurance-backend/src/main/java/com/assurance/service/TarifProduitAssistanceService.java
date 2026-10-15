@@ -50,7 +50,7 @@ public class TarifProduitAssistanceService {
                 .filter(tarif -> tarif.getAgeMin() == null || age >= tarif.getAgeMin())
                 .filter(tarif -> tarif.getAgeMax() == null || age <= tarif.getAgeMax())
                 .min(Comparator
-                        .comparingInt((TarifProduitAssistance tarif) -> tariff.getDureeMois() == null ? 1 : 0)
+                        .comparingInt((TarifProduitAssistance tarif) -> tarif.getDureeMois() == null ? 1 : 0)
                         .thenComparingInt(this::ageRangeWidth)
                         .thenComparing(TarifProduitAssistance::getDateDebut, Comparator.reverseOrder())
                         .thenComparing(TarifProduitAssistance::getId, Comparator.nullsLast(Comparator.reverseOrder())))

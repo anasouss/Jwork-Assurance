@@ -21,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -190,12 +191,10 @@ public class BordereauRemiseController {
         ), "Instrument rejeté"));
     }
 
-    @PostMapping("/{id}/annulation")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
-    public ResponseEntity<ApiResponse<BordereauRemiseResponse>> cancel(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.cancel(
-                TenantContext.getCurrentAgence(),
-                id
-        ), "Bordereau annulé"));
+    public ResponseEntity<ApiResponse<Void>> deleteDraft(@PathVariable Long id) {
+        bordereauRemiseService.deleteDraft(TenantContext.getCurrentAgence(), id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Bordereau en instance supprimé"));
     }
 }

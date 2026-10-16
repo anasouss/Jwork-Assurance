@@ -778,11 +778,11 @@ export const comptaApi = {
     )));
   },
 
-  async cancelRemittanceSlip(id: string) {
-    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
-      `/api/v1/compta/tresorerie/bordereaux-remise/${id}/annulation`,
-      { method: "POST" }
-    )));
+  async deleteRemittanceSlipDraft(id: string) {
+    return unwrap(await apiFetch<ApiResponse<void>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}`,
+      { method: "DELETE" }
+    ));
   },
 
   async companyBordereauSources(params: {

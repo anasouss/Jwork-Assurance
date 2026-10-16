@@ -97,7 +97,7 @@ export default function InstrumentsTresoreriePage() {
             <SelectItem value="CLOTURE">Clôturés</SelectItem><SelectItem value="ANNULE">Annulés</SelectItem>
           </SelectContent>
         </Select></div>
-        <div className="grid gap-2"><Label htmlFor="slip-search">N° bordereau, référence ou banque</Label><Input id="slip-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
+        <div className="grid gap-2"><Label htmlFor="slip-search">Réf. interne, n° banque ou compte</Label><Input id="slip-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
         <div className="grid gap-2"><Label>Date du</Label><DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} /></div>
         <div className="grid gap-2"><Label>Date au</Label><DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} /></div>
         <div className="flex items-end gap-2"><Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button><Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button></div>
@@ -105,22 +105,22 @@ export default function InstrumentsTresoreriePage() {
 
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="border-b px-4 py-3"><h2 className="font-semibold">Tous les bordereaux</h2><p className="text-sm text-muted-foreground">Ouvrez un bordereau pour enregistrer sa remise ou le résultat de ses instruments.</p></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-sm">
+        <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-sm">
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
-            <th className="px-4 py-3 text-left">N° bordereau</th><th className="px-4 py-3 text-left">Type</th>
+            <th className="px-4 py-3 text-left">Réf. interne</th><th className="px-4 py-3 text-left">N° banque</th><th className="px-4 py-3 text-left">Type</th>
             <th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Remis le</th>
             <th className="px-4 py-3 text-left">Destination</th><th className="px-4 py-3 text-center">Instruments</th>
             <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-left">Statut</th><th className="w-16 px-4 py-3"><span className="sr-only">Détail</span></th>
           </tr></thead>
           <tbody className="divide-y">
-            {slips.isLoading ? <TableRowsSkeleton colSpan={9} rows={6} /> : (slips.data?.rows ?? []).map((slip) => <tr key={slip.id} className="hover:bg-muted/30">
-              <td className="px-4 py-3 font-semibold">{slip.numero}</td><td className="px-4 py-3">{TYPE_LABELS[slip.type]}</td>
+            {slips.isLoading ? <TableRowsSkeleton colSpan={10} rows={6} /> : (slips.data?.rows ?? []).map((slip) => <tr key={slip.id} className="hover:bg-muted/30">
+              <td className="px-4 py-3 font-semibold">{slip.numero}</td><td className="px-4 py-3">{slip.referenceBancaire || "-"}</td><td className="px-4 py-3">{TYPE_LABELS[slip.type]}</td>
               <td className="px-4 py-3">{formatTreasuryDate(slip.dateBordereau)}</td><td className="px-4 py-3">{formatTreasuryDate(slip.dateDepot)}</td>
               <td className="px-4 py-3">{slip.compteDestination}</td><td className="px-4 py-3 text-center">{slip.type === "VERSEMENT_ESPECES" ? "-" : slip.nombreLignes}</td>
               <td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(slip.montantTotal)}</td><td className="px-4 py-3"><StatusBadge status={slip.statut} /></td>
               <td className="px-4 py-3"><Button asChild size="icon" variant="ghost" title="Voir le bordereau"><Link to={`/app/compta/tresorerie/bordereaux-remise/${slip.id}`}><Eye className="size-4" /></Link></Button></td>
             </tr>)}
-            {!slips.isLoading && (slips.data?.rows.length ?? 0) === 0 && <tr><td colSpan={9} className="px-4 py-14 text-center text-muted-foreground">Aucun bordereau ne correspond aux filtres.</td></tr>}
+            {!slips.isLoading && (slips.data?.rows.length ?? 0) === 0 && <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Aucun bordereau ne correspond aux filtres.</td></tr>}
           </tbody>
         </table></div>
         {slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={setPage} />}

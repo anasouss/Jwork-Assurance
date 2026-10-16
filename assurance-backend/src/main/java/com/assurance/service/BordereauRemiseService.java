@@ -220,9 +220,7 @@ public class BordereauRemiseService {
             throw new BadRequestException("La date de remise ne peut pas précéder la date du bordereau");
         }
         slip.setDateDepot(request.getDateDepot());
-        if (request.getReferenceBancaire() != null) {
-            slip.setReferenceBancaire(trimToNull(request.getReferenceBancaire()));
-        }
+        slip.setReferenceBancaire(request.getReferenceBancaire().trim());
         if (slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES) {
             depositCash(agenceId, slip);
         } else {
@@ -288,13 +286,13 @@ public class BordereauRemiseService {
     }
 
     @Transactional
-    public BordereauRemiseResponse cancel(Long agenceId, Long id) {
+    public void deleteDraft(Long agenceId, Long id) {
         BordereauRemise slip = findForUpdate(agenceId, id);
         if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
-            throw new BadRequestException("Seul un bordereau en instance peut être annulé");
+            throw new BadRequestException("Seul un bordereau en instance peut être supprimé définitivement");
         }
-        slip.setStatut(StatutBordereauRemise.ANNULE);
-        return toResponse(bordereauRepository.saveAndFlush(slip), true);
+        bordereauRepository.delete(slip);
+        bordereauRepository.flush();
     }
 
     private void configureCashSlip(

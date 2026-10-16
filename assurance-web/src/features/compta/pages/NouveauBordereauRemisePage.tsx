@@ -107,12 +107,18 @@ export default function NouveauBordereauRemisePage() {
           });
     },
     onSuccess: async (created) => {
-      toast.success(`${created.numero} créé`);
+      toast.success(`${created.numero} enregistré en instance`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
       ]);
-      navigate(`/app/compta/tresorerie/bordereaux-remise/${created.id}`);
+      try {
+        const pdf = await comptaApi.remittanceSlipPdf(created.id);
+        window.location.assign(URL.createObjectURL(pdf));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Prévisualisation du PDF impossible");
+        navigate(`/app/compta/tresorerie/bordereaux-remise/${created.id}`, { replace: true });
+      }
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
   });

@@ -120,7 +120,7 @@ public class BordereauRemisePdfService {
                 .setFontSize(15)
                 .setFontColor(INK)
                 .setMargin(0));
-        title.add(new Paragraph(slip.getNumero())
+        title.add(new Paragraph("Réf. interne : " + slip.getNumero())
                 .setFont(bold)
                 .setFontSize(12)
                 .setFontColor(ACCENT)
@@ -163,7 +163,7 @@ public class BordereauRemisePdfService {
                         ? null : destination.getBanqueReference().getLibelle(),
                 destination.getRib()
         ), regular, bold));
-        bank.addCell(infoCell("RÉFÉRENCE BANCAIRE", value(slip.getReferenceBancaire()), regular, bold));
+        bank.addCell(infoCell("N° BORDEREAU BANQUE", value(slip.getReferenceBancaire()), regular, bold));
         document.add(bank);
     }
 

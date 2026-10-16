@@ -31,4 +31,14 @@ export const assistanceVoyageApi = {
       }
     ));
   },
+
+  async update(contratId: string, request: CreateAssistanceVoyageRequest) {
+    return unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
+      `/api/v1/contrats/${contratId}/assistance-voyage`,
+      {
+        method: "PUT",
+        body: JSON.stringify(request),
+      }
+    ));
+  },
 };

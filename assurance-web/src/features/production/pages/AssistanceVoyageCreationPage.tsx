@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Plane, Plus, Trash2 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,10 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { contractKeys } from "@/lib/query-keys";
 import { assistanceVoyageApi } from "../api/assistance-voyage";
 import { clientApi } from "../api/clients";
+import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
@@ -51,9 +53,12 @@ const today = new Date().toISOString().slice(0, 10);
 
 export default function AssistanceVoyageCreationPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { contratId } = useParams<{ contratId: string }>();
+  const editing = Boolean(contratId);
   const [searchParams] = useSearchParams();
-  const compagnieId = searchParams.get("compagnieId") ?? "";
-  const produitId = searchParams.get("produitId") ?? "";
+  const [compagnieId, setCompagnieId] = useState(searchParams.get("compagnieId") ?? "");
+  const [produitId, setProduitId] = useState(searchParams.get("produitId") ?? "");
   const [subscriber, setSubscriber] = useState(emptyPerson());
   const [sameInsured, setSameInsured] = useState(true);
   const [insuredPeople, setInsuredPeople] = useState<PersonDraft[]>([emptyPerson()]);
@@ -62,6 +67,13 @@ export default function AssistanceVoyageCreationPage() {
   const [dureeMois, setDureeMois] = useState("12");
   const [codePromo, setCodePromo] = useState("");
   const [payer, setPayer] = useState("subscriber");
+  const hydratedContractRef = useRef<string | null>(null);
+
+  const existingContract = useQuery({
+    queryKey: contractKeys.detail(contratId ?? ""),
+    queryFn: () => contractApi.getContrat(contratId!),
+    enabled: editing,
+  });
 
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assistance", "travel-contract"],
@@ -93,6 +105,37 @@ export default function AssistanceVoyageCreationPage() {
   const expiryDate = calculateExpiryDate(dateEffet, Number(dureeMois));
 
   useEffect(() => {
+    const contract = existingContract.data;
+    if (!contratId || !contract || hydratedContractRef.current === contratId) return;
+    const assistance = contract.assistances?.[0];
+    const subscriberLink = contract.clients?.find((link) => link.role === "SOUSCRIPTEUR");
+    const subscriberClient = subscriberLink?.client;
+    const insuredLinks = (contract.clients ?? []).filter((link) => link.role === "BENEFICIAIRE");
+    const insuredClients = insuredLinks.flatMap((link) => link.client ? [link.client] : []);
+    if (!assistance || !subscriberClient || insuredClients.length === 0) return;
+
+    const subscriberDraft = personFromClient(subscriberClient, identityTypeFor(subscriberClient));
+    const subscriberIsInsured = insuredClients.some((client) => client.id === subscriberClient.id);
+    setSubscriber(subscriberDraft);
+    setSameInsured(subscriberIsInsured);
+    setInsuredPeople(subscriberIsInsured
+      ? [emptyPerson()]
+      : insuredClients.map((client) => personFromClient(client, identityTypeFor(client))));
+    setCompagnieId(assistance.compagnieAssistanceId ?? "");
+    setProduitId(assistance.produitAssistanceId ?? "");
+    setNumeroContrat(contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
+    setDateEffet(assistance.dateEffet ?? contract.dateEffet ?? today);
+    setDureeMois(String(assistance.duree ?? 12));
+    setCodePromo(assistance.codePromo ?? "");
+    const payerClientId = contract.payeurPrimeClientId;
+    const payerIndex = payerClientId
+      ? insuredClients.findIndex((client) => client.id === payerClientId)
+      : -1;
+    setPayer(payerIndex >= 0 && !subscriberIsInsured ? `insured-${payerIndex}` : "subscriber");
+    hydratedContractRef.current = contratId;
+  }, [contratId, existingContract.data]);
+
+  useEffect(() => {
     if (selectedProduct && !durationOptions.some((option) => option.value === dureeMois)) {
       setDureeMois(durationOptions[0]?.value ?? "12");
     }
@@ -117,25 +160,35 @@ export default function AssistanceVoyageCreationPage() {
     retry: false,
   });
 
-  const create = useMutation({
-    mutationFn: () => assistanceVoyageApi.create({
-      compagnieAssistanceId: compagnieId,
-      produitAssistanceId: produitId,
-      dateEffet,
-      dureeMois: Number(dureeMois),
-      numeroContrat: numeroContrat.trim(),
-      codePromo: codePromo.trim() || undefined,
-      souscripteur: personRequest(subscriber),
-      assures: subscriberIsInsured ? [] : insuredPeople.map(personRequest),
-      assureIdentiqueSouscripteur: subscriberIsInsured,
-      payeurIndex: payer === "subscriber" ? -1 : Number(payer.replace("insured-", "")),
-    }),
-    onSuccess: (created) => {
-      toast.success(`Dossier ${created.numeroDossier} créé`);
-      navigate(`/app/production/contrats/${created.contratId}`);
+  const save = useMutation({
+    mutationFn: () => {
+      const request = {
+        compagnieAssistanceId: compagnieId,
+        produitAssistanceId: produitId,
+        dateEffet,
+        dureeMois: Number(dureeMois),
+        numeroContrat: numeroContrat.trim(),
+        codePromo: codePromo.trim() || undefined,
+        souscripteur: personRequest(subscriber),
+        assures: subscriberIsInsured ? [] : insuredPeople.map(personRequest),
+        assureIdentiqueSouscripteur: subscriberIsInsured,
+        payeurIndex: payer === "subscriber" ? -1 : Number(payer.replace("insured-", "")),
+      };
+      return contratId
+        ? assistanceVoyageApi.update(contratId, request)
+        : assistanceVoyageApi.create(request);
+    },
+    onSuccess: async (saved) => {
+      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      toast.success(editing ? `Dossier ${saved.numeroDossier} modifié` : `Dossier ${saved.numeroDossier} créé`);
+      navigate(`/app/production/contrats/${saved.contratId}`);
     },
     onError: (error) => toast.error(
-      error instanceof Error ? error.message : "Création de l’assistance voyage impossible"
+      error instanceof Error
+        ? error.message
+        : editing
+          ? "Modification de l’assistance voyage impossible"
+          : "Création de l’assistance voyage impossible"
     ),
   });
 
@@ -150,15 +203,23 @@ export default function AssistanceVoyageCreationPage() {
     && effectiveInsured.every(validPerson)
   );
 
+  if (editing && existingContract.isLoading) {
+    return <div className="flex min-h-48 items-center justify-center"><Loader2 className="size-6 animate-spin" /></div>;
+  }
+
+  if (editing && existingContract.isError) {
+    return <p className="text-sm font-medium text-destructive">Chargement du dossier impossible.</p>;
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Production</p>
-          <h1 className="text-xl font-semibold">Nouvelle assistance voyage</h1>
+          <h1 className="text-xl font-semibold">{editing ? "Modifier l’assistance voyage" : "Nouvelle assistance voyage"}</h1>
         </div>
         <Button asChild variant="outline">
-          <Link to="/app/production/ajouter-dossier">
+          <Link to={editing ? "/app/production/contrats" : "/app/production/ajouter-dossier"}>
             <ArrowLeft className="size-4" />
             Retour
           </Link>
@@ -318,15 +379,17 @@ export default function AssistanceVoyageCreationPage() {
       </SectionCard>
 
       <footer className="flex justify-end gap-2 border-t py-4">
-        <Button asChild variant="outline"><Link to="/app/production/ajouter-dossier">Annuler</Link></Button>
+        <Button asChild variant="outline">
+          <Link to={editing && contratId ? `/app/production/contrats/${contratId}` : "/app/production/ajouter-dossier"}>Annuler</Link>
+        </Button>
         <Button
           type="button"
-          disabled={!canSubmit || create.isPending}
-          onClick={() => create.mutate()}
+          disabled={!canSubmit || save.isPending}
+          onClick={() => save.mutate()}
           className="bg-emerald-600 text-white hover:bg-emerald-700"
         >
           <Plane className="size-4" />
-          {create.isPending ? "Enregistrement..." : "Créer le dossier"}
+          {save.isPending ? "Enregistrement..." : editing ? "Enregistrer les modifications" : "Créer le dossier"}
         </Button>
       </footer>
     </div>
@@ -621,6 +684,10 @@ function personFromClient(client: ClientResponse, documentType: IdentityType): P
     telephone: client.telephone ?? "",
     email: client.email ?? "",
   };
+}
+
+function identityTypeFor(client: ClientResponse): IdentityType {
+  return client.passport && !client.cin ? "PASSEPORT" : "CIN";
 }
 
 function validPerson(person: PersonDraft) {

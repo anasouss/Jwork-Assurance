@@ -103,6 +103,18 @@ public class ContratController {
         ));
     }
 
+    @PutMapping("/{id}/assistance-voyage")
+    @PreAuthorize("hasAuthority('PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceVoyageCreationResponse>> updateTravelAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateAssistanceVoyageRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceVoyageService.update(TenantContext.getCurrentAgence(), id, request),
+                "Assistance voyage modifiée"
+        ));
+    }
+
     @PostMapping("/assistance-voyage/tarification")
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<AssistanceVoyageQuoteResponse>> quoteTravelAssistance(

@@ -479,7 +479,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && !child
     && !terminal
     && !hasActiveAvenants;
-  const canShowEdit = !isTravelAssistance && (canUpdateContrat || canCreateContrat) && !child;
+  const canShowEdit = (canUpdateContrat || (!isTravelAssistance && canCreateContrat)) && !child;
   const blockedEditReason = contrat.motifBlocageModificationDirecte
     ?? fallbackDirectEditBlockReason(contrat, movement, hasActiveAvenants);
   const rectificationPath = movement.mouvementId && movement.code
@@ -763,6 +763,9 @@ function showContratPath(contrat: ContratListItem, movement: MovementLine) {
 }
 
 function editContratPath(contrat: ContratListItem) {
+  if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
+    return `/app/production/contrats/${contrat.id}/assistance-voyage/modifier`;
+  }
   if (contrat.contratOrigineId) return renewalDraftPath(contrat);
   if (contrat.prospection && contrat.typeContrat === "FLOTTE") return `/app/production/prospection/devis/flotte/${contrat.id}`;
   if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;

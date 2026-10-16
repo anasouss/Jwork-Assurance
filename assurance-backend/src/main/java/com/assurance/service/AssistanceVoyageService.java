@@ -77,6 +77,7 @@ public class AssistanceVoyageService {
     private final AssistanceContratRepository assistanceContratRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final LigneTarificationAssistanceRepository ligneTarificationAssistanceRepository;
+    private final ContractDirectModificationPolicy directModificationPolicy;
 
     @Transactional(readOnly = true)
     public AssistanceVoyageQuoteResponse quote(QuoteAssistanceVoyageRequest request) {
@@ -268,6 +269,145 @@ public class AssistanceVoyageService {
                 .build());
         assistance.setElementFacturable(element);
         assistanceContratRepository.save(assistance);
+
+        return AssistanceVoyageCreationResponse.builder()
+                .contratId(contrat.getId())
+                .assistanceId(assistance.getId())
+                .numeroDossier(contrat.getNumeroDossier())
+                .numeroContrat(contrat.getNumeroContrat())
+                .dateEffet(contrat.getDateEffet())
+                .dateEcheance(contrat.getDateEcheance())
+                .primeNette(pricing.net())
+                .primeTotale(pricing.total())
+                .montantReduction(pricing.reduction())
+                .build();
+    }
+
+    @Transactional
+    public AssistanceVoyageCreationResponse update(
+            Long agenceId,
+            Long contratId,
+            CreateAssistanceVoyageRequest request
+    ) {
+        validateRequest(request);
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (contrat.getBrancheAssurance() == null
+                || !"ASSISTANCE".equalsIgnoreCase(contrat.getBrancheAssurance().getCode())) {
+            throw new BadRequestException("Ce dossier n'est pas une assistance voyage");
+        }
+        directModificationPolicy.assertAllowed(agenceId, contrat);
+        if (contratRepository.existsByAgenceIdAndNumeroContratAndIdNot(
+                agenceId,
+                request.getNumeroContrat().trim(),
+                contratId
+        )) {
+            throw new BadRequestException("Numéro de contrat déjà utilisé pour cette agence");
+        }
+
+        AssistanceContrat assistance = assistanceContratRepository
+                .findByContratIdAndActifTrueOrderByCreatedAtDesc(contratId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Aucune assistance voyage active n'est liée à ce dossier"));
+        ElementFacturable element = assistance.getElementFacturable();
+        if (element == null || element.getStatut() != StatutElementFacturable.A_QUITTANCER) {
+            throw new BadRequestException("Cette assistance a déjà été quittancée et ne peut plus être modifiée directement");
+        }
+
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
+                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                .orElseThrow(() -> new BadRequestException("Compagnie d'assistance inactive ou introuvable"));
+        ProduitAssistance produit = produitAssistanceRepository.findById(request.getProduitAssistanceId())
+                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                .orElseThrow(() -> new BadRequestException("Produit d'assistance inactif ou introuvable"));
+        validateProduct(compagnie, produit);
+
+        Client souscripteur = resolvePerson(agenceId, request.getSouscripteur(), "souscripteur", true);
+        boolean souscripteurAssure = Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur());
+        if (souscripteurAssure && souscripteur.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE) {
+            throw new BadRequestException("Une personne morale ne peut pas être une personne assurée");
+        }
+        List<Client> assures = souscripteurAssure
+                ? List.of(souscripteur)
+                : resolveInsuredPeople(agenceId, request.getAssures());
+        Pricing pricing = price(
+                produit,
+                request.getDateEffet(),
+                request.getDureeMois(),
+                assures.stream().map(Client::getDateNaissance).toList(),
+                request.getCodePromo()
+        );
+        Client payeur = resolvePayer(request.getPayeurIndex(), souscripteur, assures);
+        LocalDate dateEcheance = request.getDateEffet().plusMonths(request.getDureeMois()).minusDays(1);
+
+        contrat.setNumeroContrat(request.getNumeroContrat().trim());
+        contrat.setNumeroPolice(request.getNumeroContrat().trim());
+        contrat.setDateEffet(request.getDateEffet());
+        contrat.setDateEcheance(dateEcheance);
+        contrat.setPeriodicite(durationLabel(request.getDureeMois()));
+        contrat.setTypePayeurPrime(payeur.getId().equals(souscripteur.getId())
+                ? TypePayeurPrime.SOUSCRIPTEUR
+                : TypePayeurPrime.TIERS_MANDATE);
+        contrat.setPayeurPrime(payeur.getId().equals(souscripteur.getId()) ? null : payeur);
+        contratRepository.save(contrat);
+
+        contratClientRepository.deleteByContratId(contratId);
+        contratClientRepository.flush();
+        contrat.getClients().clear();
+        linkClient(contrat, souscripteur, RoleClientContrat.SOUSCRIPTEUR, true);
+        for (int index = 0; index < assures.size(); index++) {
+            linkClient(contrat, assures.get(index), RoleClientContrat.BENEFICIAIRE, index == 0);
+        }
+
+        MouvementContrat mouvement = assistance.getMouvementContrat();
+        if (mouvement == null) {
+            throw new BadRequestException("Le mouvement initial de l'assistance est introuvable");
+        }
+        mouvement.setDateEffet(request.getDateEffet());
+        mouvement.setDateEcheance(dateEcheance);
+        mouvementContratRepository.save(mouvement);
+
+        assistance.setCompagnieAssistance(compagnie);
+        assistance.setProduitAssistance(produit);
+        assistance.setTarifProduitAssistance(singleTariff(pricing.lines()));
+        assistance.setProduit(produit.getLibelle());
+        assistance.setDateEffet(request.getDateEffet());
+        assistance.setDateEcheance(dateEcheance);
+        assistance.setDuree(request.getDureeMois());
+        assistance.setUnite("MOIS");
+        assistance.setNumeroPoliceContrat(request.getNumeroContrat().trim());
+        assistance.setNumeroContratOuQuittance(request.getNumeroContrat().trim());
+        assistance.setCodePromo(normalizedPromo(request.getCodePromo()));
+        assistance.setMontantReduction(pricing.reduction());
+        assistance.setPrimeNette(pricing.net());
+        assistance.setPrimeTotale(pricing.total());
+        assistanceContratRepository.save(assistance);
+
+        ligneTarificationAssistanceRepository.deleteByAssistanceContratId(assistance.getId());
+        ligneTarificationAssistanceRepository.flush();
+        for (PricingLine line : pricing.lines()) {
+            ligneTarificationAssistanceRepository.save(LigneTarificationAssistance.builder()
+                    .assistanceContrat(assistance)
+                    .assure(assures.get(line.insuredIndex()))
+                    .tarifProduitAssistance(line.tariff())
+                    .age(line.age())
+                    .coefficientDuree(line.durationCoefficient())
+                    .montantBaseHt(line.baseNet())
+                    .montantBaseTtc(line.baseTotal())
+                    .montantReduction(line.reduction())
+                    .primeNette(line.net())
+                    .primeTotale(line.total())
+                    .build());
+        }
+
+        element.setLibelle("Assistance voyage - " + produit.getLibelle());
+        element.setDateDebut(request.getDateEffet());
+        element.setDateFin(dateEcheance);
+        element.setPrimeNette(pricing.net());
+        element.setTaxe(pricing.total().subtract(pricing.net()).max(ZERO));
+        element.setPrimeTotale(pricing.total());
+        elementFacturableRepository.save(element);
 
         return AssistanceVoyageCreationResponse.builder()
                 .contratId(contrat.getId())

@@ -25,8 +25,8 @@ const TYPE_LABELS: Record<RemittanceSlipType, string> = {
 };
 
 const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
-  BROUILLON: "En instance",
-  DEPOSE: "Remis",
+  BROUILLON: "Provisoire",
+  DEPOSE: "Remis à la banque",
   PARTIELLEMENT_TRAITE: "Partiellement traité",
   CLOTURE: "Clôturé",
   ANNULE: "Annulé",
@@ -92,8 +92,8 @@ export default function InstrumentsTresoreriePage() {
         </Select></div>
         <div className="grid gap-2"><Label>Statut</Label><Select value={status} onValueChange={(value) => { setStatus(value as StatusFilter); setPage(0); }}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
-            <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">En instance</SelectItem>
-            <SelectItem value="DEPOSE">Remis</SelectItem><SelectItem value="PARTIELLEMENT_TRAITE">Partiellement traités</SelectItem>
+            <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">Provisoires</SelectItem>
+            <SelectItem value="DEPOSE">Remis à la banque</SelectItem><SelectItem value="PARTIELLEMENT_TRAITE">Partiellement traités</SelectItem>
             <SelectItem value="CLOTURE">Clôturés</SelectItem><SelectItem value="ANNULE">Annulés</SelectItem>
           </SelectContent>
         </Select></div>

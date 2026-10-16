@@ -26,8 +26,8 @@ import type { RemittanceSlipLine } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY } from "./treasury-format";
 
 const STATUS_LABELS = {
-  BROUILLON: "En instance",
-  DEPOSE: "Remis",
+  BROUILLON: "Provisoire",
+  DEPOSE: "Remis à la banque",
   PARTIELLEMENT_TRAITE: "Partiellement traité",
   CLOTURE: "Clôturé",
   ANNULE: "Annulé",
@@ -68,7 +68,7 @@ export default function BordereauRemiseDetailPage() {
       referenceBancaire: depositReference.trim(),
     }),
     onSuccess: async () => {
-      toast.success("Bordereau remis");
+      toast.success("Bordereau remis à la banque");
       setDepositOpen(false);
       await invalidate();
     },
@@ -77,7 +77,7 @@ export default function BordereauRemiseDetailPage() {
   const deleteDraft = useMutation({
     mutationFn: () => comptaApi.deleteRemittanceSlipDraft(bordereauId),
     onSuccess: async () => {
-      toast.success("Bordereau en instance supprimé");
+      toast.success("Bordereau provisoire supprimé");
       setDeleteOpen(false);
       navigate("/app/compta/tresorerie/bordereaux-remise", { replace: true });
       await invalidate();
@@ -174,7 +174,7 @@ export default function BordereauRemiseDetailPage() {
             <Button disabled={!canManage} onClick={() => {
               setDepositReference(data.referenceBancaire ?? "");
               setDepositOpen(true);
-            }}><Send className="size-4" /> Marquer comme remis</Button>
+            }}><Send className="size-4" /> Remettre à la banque</Button>
           </>}
           {data.operationTresorerieId && <Button asChild variant="outline"><Link to={`/app/compta/tresorerie/operations?search=${data.numero}`}><Landmark className="size-4" /> Voir l’opération</Link></Button>}
         </div>
@@ -194,7 +194,7 @@ export default function BordereauRemiseDetailPage() {
       </section>}
 
       {instrumentSlip && <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Instruments remis</h2><p className="text-sm text-muted-foreground">Chaque ligne conserve son propre résultat d’encaissement.</p></div>
+        <div className="border-b px-4 py-3"><h2 className="font-semibold">Instruments du bordereau</h2><p className="text-sm text-muted-foreground">Chaque ligne conserve son état de remise et son résultat d’encaissement.</p></div>
         <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-sm">
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
             <th className="px-4 py-3 text-left">Référence</th><th className="px-4 py-3 text-left">Payeur</th>
@@ -225,7 +225,7 @@ export default function BordereauRemiseDetailPage() {
       </section>}
 
       <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Confirmer la remise</DialogTitle><DialogDescription>{instrumentSlip ? "Les instruments passeront au statut remis en banque." : "Le transfert de la caisse vers la banque sera enregistré."}</DialogDescription></DialogHeader>
+        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Confirmer la remise à la banque</DialogTitle><DialogDescription>{instrumentSlip ? "Les instruments passeront au statut remis en banque." : "Le transfert de la caisse vers la banque sera enregistré."}</DialogDescription></DialogHeader>
           <div className="grid gap-4"><div className="grid gap-2"><Label>Date de remise</Label><DatePicker date={depositDate} onSelect={(value) => setDepositDate(toDateOnly(value) ?? "")} /></div>
             <div className="grid gap-2"><Label htmlFor="deposit-reference">N° bordereau banque *</Label><Input id="deposit-reference" value={depositReference} onChange={(event) => setDepositReference(event.target.value)} /></div></div>
           <DialogFooter><Button variant="outline" onClick={() => setDepositOpen(false)}>Annuler</Button><Button disabled={!depositDate || !depositReference.trim() || deposit.isPending} onClick={() => deposit.mutate()}>Confirmer la remise</Button></DialogFooter>
@@ -235,7 +235,7 @@ export default function BordereauRemiseDetailPage() {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce bordereau en instance ?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer ce bordereau provisoire ?</AlertDialogTitle>
             <AlertDialogDescription>
               Cette préparation sera supprimée définitivement. Les instruments redeviendront disponibles pour un autre bordereau.
             </AlertDialogDescription>

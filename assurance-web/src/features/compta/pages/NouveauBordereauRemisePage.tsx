@@ -107,7 +107,7 @@ export default function NouveauBordereauRemisePage() {
           });
     },
     onSuccess: async (created) => {
-      toast.success(`${created.numero} enregistré en instance`);
+      toast.success(`Bordereau provisoire ${created.numero} créé`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
@@ -246,7 +246,7 @@ export default function NouveauBordereauRemisePage() {
               </div>
               <div className="flex justify-end p-4">
                 <Button disabled={!canManage || !selectionValid} onClick={() => setCreationDialogOpen(true)}>
-                  <Plus className="size-4" /> Créer le bordereau
+                  <Plus className="size-4" /> Créer le bordereau provisoire
                 </Button>
               </div>
             </>
@@ -255,7 +255,7 @@ export default function NouveauBordereauRemisePage() {
           {type === "VERSEMENT_ESPECES" && (
             <div className="flex justify-end bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
               <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}>
-                <Banknote className="size-4" /> Créer le bordereau
+                <Banknote className="size-4" /> Créer le bordereau provisoire
               </Button>
             </div>
           )}
@@ -265,7 +265,7 @@ export default function NouveauBordereauRemisePage() {
       <Dialog open={creationDialogOpen} onOpenChange={setCreationDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Créer le bordereau de {type === "EFFET" ? "remise d’effets" : "remise de chèques"}</DialogTitle>
+            <DialogTitle>Créer le bordereau provisoire de {type === "EFFET" ? "remise d’effets" : "remise de chèques"}</DialogTitle>
             <DialogDescription>
               Confirmez les informations du bordereau pour {selectedIds.length} instrument(s), soit {formatTreasuryMoney(selectedTotal)}.
             </DialogDescription>
@@ -292,7 +292,7 @@ export default function NouveauBordereauRemisePage() {
             </Button>
             <Button disabled={!selectionValid || !destinationId || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}>
               <Plus className="size-4" />
-              {createSlip.isPending ? "Création..." : "Créer le bordereau"}
+              {createSlip.isPending ? "Création..." : "Créer le bordereau provisoire"}
             </Button>
           </DialogFooter>
         </DialogContent>

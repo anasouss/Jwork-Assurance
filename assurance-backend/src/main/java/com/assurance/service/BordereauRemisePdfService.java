@@ -278,7 +278,7 @@ public class BordereauRemisePdfService {
                     .setFont(bold).setFontSize(12).setFontColor(ColorConstants.RED)
                     .setTextAlignment(TextAlignment.CENTER).setMarginTop(12));
         } else if (slip.getStatut() == StatutBordereauRemise.BROUILLON) {
-            document.add(new Paragraph("BROUILLON - NON ENCORE DÉPOSÉ")
+            document.add(new Paragraph("BORDEREAU PROVISOIRE - NON ENCORE REMIS À LA BANQUE")
                     .setFont(bold).setFontSize(9).setFontColor(ACCENT)
                     .setTextAlignment(TextAlignment.CENTER).setMarginTop(12));
         }
@@ -354,8 +354,8 @@ public class BordereauRemisePdfService {
 
     private String statusLabel(StatutBordereauRemise status) {
         return switch (status) {
-            case BROUILLON -> "BROUILLON";
-            case DEPOSE -> "DÉPOSÉ";
+            case BROUILLON -> "PROVISOIRE";
+            case DEPOSE -> "REMIS À LA BANQUE";
             case PARTIELLEMENT_TRAITE -> "PARTIELLEMENT TRAITÉ";
             case CLOTURE -> "CLÔTURÉ";
             case ANNULE -> "ANNULÉ";

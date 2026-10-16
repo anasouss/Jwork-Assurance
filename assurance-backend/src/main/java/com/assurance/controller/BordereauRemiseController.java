@@ -134,7 +134,7 @@ public class BordereauRemiseController {
         return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.create(
                 TenantContext.getCurrentAgence(),
                 request
-        ), "Bordereau de remise créé"));
+        ), "Bordereau provisoire créé"));
     }
 
     @PostMapping("/versements-especes")
@@ -145,7 +145,7 @@ public class BordereauRemiseController {
         return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.createCashDeposit(
                 TenantContext.getCurrentAgence(),
                 request
-        ), "Bordereau de versement d'espèces créé"));
+        ), "Bordereau provisoire de versement d'espèces créé"));
     }
 
     @PostMapping("/{id}/depot")
@@ -158,7 +158,7 @@ public class BordereauRemiseController {
                 TenantContext.getCurrentAgence(),
                 id,
                 request
-        ), "Bordereau remis"));
+        ), "Bordereau remis à la banque"));
     }
 
     @PostMapping("/{bordereauId}/lignes/{lineId}/encaissement")
@@ -195,6 +195,6 @@ public class BordereauRemiseController {
     @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
     public ResponseEntity<ApiResponse<Void>> deleteDraft(@PathVariable Long id) {
         bordereauRemiseService.deleteDraft(TenantContext.getCurrentAgence(), id);
-        return ResponseEntity.ok(ApiResponse.success(null, "Bordereau en instance supprimé"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Bordereau provisoire supprimé"));
     }
 }

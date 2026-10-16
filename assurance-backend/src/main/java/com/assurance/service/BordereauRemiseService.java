@@ -214,7 +214,7 @@ public class BordereauRemiseService {
     ) {
         BordereauRemise slip = findForUpdate(agenceId, id);
         if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
-            throw new BadRequestException("Seul un bordereau en instance peut être remis");
+            throw new BadRequestException("Seul un bordereau provisoire peut être remis à la banque");
         }
         if (request.getDateDepot().isBefore(slip.getDateBordereau())) {
             throw new BadRequestException("La date de remise ne peut pas précéder la date du bordereau");
@@ -289,7 +289,7 @@ public class BordereauRemiseService {
     public void deleteDraft(Long agenceId, Long id) {
         BordereauRemise slip = findForUpdate(agenceId, id);
         if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
-            throw new BadRequestException("Seul un bordereau en instance peut être supprimé définitivement");
+            throw new BadRequestException("Seul un bordereau provisoire peut être supprimé définitivement");
         }
         bordereauRepository.delete(slip);
         bordereauRepository.flush();

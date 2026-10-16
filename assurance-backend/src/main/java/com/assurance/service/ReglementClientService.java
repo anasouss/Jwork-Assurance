@@ -1620,7 +1620,7 @@ public class ReglementClientService {
                 Set.of(StatutBordereauRemise.BROUILLON)
         ).isEmpty()) {
             throw new BadRequestException(
-                    "L'instrument appartient à un bordereau en instance. Remettez ou annulez ce bordereau"
+                    "L'instrument appartient à un bordereau provisoire. Remettez ou supprimez ce bordereau"
             );
         }
     }

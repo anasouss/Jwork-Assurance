@@ -1354,8 +1354,8 @@ function AuditTimelineItem({
               {visibleFields.map((field) => (
                 <TableRow key={field}>
                   <TableCell className="font-medium">{auditFieldLabel(field)}</TableCell>
-                  <TableCell className="max-w-72 break-words text-muted-foreground">{formatAuditFieldValue(field, item.event.beforeData?.[field])}</TableCell>
-                  <TableCell className="max-w-72 break-words">{formatAuditFieldValue(field, item.event.afterData?.[field])}</TableCell>
+                  <TableCell className="max-w-72 break-words text-muted-foreground">{formatAuditFieldValue(field, item.event.beforeData?.[field], item.event.entityType)}</TableCell>
+                  <TableCell className="max-w-72 break-words">{formatAuditFieldValue(field, item.event.afterData?.[field], item.event.entityType)}</TableCell>
                 </TableRow>
               ))}
               {!fields.length ? (
@@ -1954,7 +1954,16 @@ function formatAuditValue(value: unknown): string {
   return String(value);
 }
 
-function formatAuditFieldValue(field: string, value: unknown) {
+function formatAuditFieldValue(field: string, value: unknown, entityType?: string) {
+  if (field === "statut" && entityType === "BordereauRemise" && typeof value === "string") {
+    return ({
+      BROUILLON: "Provisoire",
+      DEPOSE: "Remis à la banque",
+      PARTIELLEMENT_TRAITE: "Partiellement traité",
+      CLOTURE: "Clôturé",
+      ANNULE: "Annulé",
+    } as Record<string, string>)[value] ?? formatAuditValue(value);
+  }
   if (["prime", "capital", "franchiseMinimale", "montant", "montantTotal", "montantNonAffecte", "montantTtc", "primeTtc", "primeNette", "taxes", "accessoires", "debit", "credit", "totalDebit", "totalCredit", "totalDocument"].includes(field)
       && typeof value === "number") {
     return `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} MAD`;

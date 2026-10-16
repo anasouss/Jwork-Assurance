@@ -405,7 +405,7 @@ function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
     return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200">Remis en banque</Badge>;
   }
   if (instrument.bordereauRemiseId) {
-    return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200">Bordereau en instance {instrument.numeroBordereauRemise}</Badge>;
+    return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200">Bordereau provisoire {instrument.numeroBordereauRemise}</Badge>;
   }
   if (instrument.mode === "CHEQUE" || instrument.mode === "EFFET") {
     if (instrument.reglementBureau && instrument.dateEcheance && instrument.dateEcheance < TODAY) {

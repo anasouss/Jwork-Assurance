@@ -496,10 +496,12 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";
   const canDownload = canViewContrat && !isTerminalMovementCode(movement.code);
   const canOpenAssistance = canManageAssistance
+    && !isTravelAssistance
     && !terminal
     && !movement.isSynthetic
     && movement.autoriseAssistance === true;
   const canOpenCarteVerte = canManageCarteVerte
+    && !isTravelAssistance
     && !terminal
     && !movement.isSynthetic
     && movement.autoriseCarteVerte === true;

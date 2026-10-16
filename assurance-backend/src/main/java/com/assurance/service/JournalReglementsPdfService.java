@@ -116,7 +116,7 @@ public class JournalReglementsPdfService {
             writeFilters(document, dateDu, dateAu, selectedUser, mode, statutReglement, regular, bold);
             writeOverview(document, instruments, regular, bold);
             writeModeSummary(document, instruments, regular, bold);
-            writeDetails(document, instruments, regular, bold);
+            writeDetails(document, instruments, selectedUser == null, regular, bold);
 
             document.close();
             return output.toByteArray();
@@ -295,16 +295,22 @@ public class JournalReglementsPdfService {
     private void writeDetails(
             Document document,
             List<InstrumentReglementClient> instruments,
+            boolean showUser,
             PdfFont regular,
             PdfFont bold
     ) {
         document.add(sectionTitle("Détail des règlements", bold));
-        Table table = new Table(new float[]{1.05f, 1.65f, 0.85f, 1.35f, 0.8f, 1.05f, 0.85f, 1.1f, 0.85f})
+        float[] columns = showUser
+                ? new float[]{1.05f, 1.65f, 0.85f, 1.35f, 0.8f, 1.05f, 0.85f, 1.1f, 0.85f}
+                : new float[]{1.05f, 1.8f, 0.9f, 0.85f, 1.1f, 0.9f, 1.15f, 0.9f};
+        Table table = new Table(columns)
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "N° RÈGLEMENT", bold, TextAlignment.LEFT);
         addHeader(table, "PAYEUR", bold, TextAlignment.LEFT);
         addHeader(table, "DATE RÈGLEMENT", bold, TextAlignment.CENTER);
-        addHeader(table, "UTILISATEUR", bold, TextAlignment.LEFT);
+        if (showUser) {
+            addHeader(table, "UTILISATEUR", bold, TextAlignment.LEFT);
+        }
         addHeader(table, "MODE", bold, TextAlignment.LEFT);
         addHeader(table, "RÉFÉRENCE", bold, TextAlignment.LEFT);
         addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
@@ -318,8 +324,10 @@ public class JournalReglementsPdfService {
             addBody(table, payment.getNumero(), bold, TextAlignment.LEFT, background);
             addBody(table, payment.getPayeurNom(), regular, TextAlignment.LEFT, background);
             addBody(table, date(payment.getDateReglement()), regular, TextAlignment.CENTER, background);
-            addBody(table, payment.getCreePar() == null ? "-" : payment.getCreePar().getFullName(), regular,
-                    TextAlignment.LEFT, background);
+            if (showUser) {
+                addBody(table, payment.getCreePar() == null ? "-" : payment.getCreePar().getFullName(), regular,
+                        TextAlignment.LEFT, background);
+            }
             addBody(table, modeLabel(instrument.getMode()), regular, TextAlignment.LEFT, background);
             addBody(table, value(instrument.getReferenceInstrument()), regular, TextAlignment.LEFT, background);
             addBody(table, instrumentDueDate(instrument), regular, TextAlignment.CENTER, background);
@@ -329,7 +337,7 @@ public class JournalReglementsPdfService {
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
         }
         if (instruments.isEmpty()) {
-            table.addCell(new Cell(1, 9)
+            table.addCell(new Cell(1, showUser ? 9 : 8)
                     .add(new Paragraph("Aucun règlement pour les critères sélectionnés")
                             .setFont(regular).setFontSize(8).setMargin(0))
                     .setTextAlignment(TextAlignment.CENTER)

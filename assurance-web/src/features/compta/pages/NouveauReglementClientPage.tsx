@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   closestCenter,
@@ -127,6 +127,8 @@ export default function NouveauReglementClientPage() {
   const [creditConfirmationOpen, setCreditConfirmationOpen] = useState(false);
   const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
   const [excludedTargetKeys, setExcludedTargetKeys] = useState<Set<string>>(new Set());
+  const [recentlyMovedId, setRecentlyMovedId] = useState<string>();
+  const movedHighlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -177,6 +179,10 @@ export default function NouveauReglementClientPage() {
       (row) => !excludedTargetKeys.has(receivableTargetKey(row))
     ));
   }, [receivables.data, excludedTargetKeys]);
+
+  useEffect(() => () => {
+    if (movedHighlightTimer.current) clearTimeout(movedHighlightTimer.current);
+  }, []);
 
   useEffect(() => {
     if (methods.length === 0) {
@@ -250,11 +256,15 @@ export default function NouveauReglementClientPage() {
 
   function reorderReceivables(event: DragEndEvent) {
     if (!event.over || event.active.id === event.over.id) return;
+    const movedId = String(event.active.id);
     setOrderedRows((current) => {
       const from = current.findIndex((row) => receivableTargetKey(row) === event.active.id);
       const to = current.findIndex((row) => receivableTargetKey(row) === event.over?.id);
       return from < 0 || to < 0 ? current : arrayMove(current, from, to);
     });
+    setRecentlyMovedId(movedId);
+    if (movedHighlightTimer.current) clearTimeout(movedHighlightTimer.current);
+    movedHighlightTimer.current = setTimeout(() => setRecentlyMovedId(undefined), 900);
   }
 
   function removeReceivable(row: ClientReceivable) {
@@ -374,6 +384,7 @@ export default function NouveauReglementClientPage() {
                       row={row}
                       priority={index + 1}
                       allocatedAmount={allocatedAmounts.get(receivableTargetKey(row)) ?? 0}
+                      recentlyMoved={recentlyMovedId === receivableTargetKey(row)}
                       onRemove={() => removeReceivable(row)}
                     />
                   ))}
@@ -664,6 +675,7 @@ function SortableReceivableRow(props: {
   row: ClientReceivable;
   priority: number;
   allocatedAmount: number;
+  recentlyMoved: boolean;
   onRemove: () => void;
 }) {
   const id = receivableTargetKey(props.row);
@@ -676,6 +688,7 @@ function SortableReceivableRow(props: {
     transform,
     transition,
     isDragging,
+    isOver,
   } = useSortable({ id });
 
   return (
@@ -683,14 +696,18 @@ function SortableReceivableRow(props: {
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={isDragging
-        ? "relative z-10 bg-amber-50 shadow-md dark:bg-amber-950/30"
-        : "odd:bg-background even:bg-muted/20 hover:bg-amber-50/40 dark:hover:bg-amber-950/10"}
+        ? "relative z-10 bg-amber-100 shadow-md dark:bg-amber-950/40"
+        : isOver
+          ? "bg-sky-50 shadow-[inset_0_2px_0_0_rgb(56_189_248)] dark:bg-sky-950/35"
+          : props.recentlyMoved
+            ? "bg-emerald-50 transition-colors duration-700 dark:bg-emerald-950/30"
+            : "odd:bg-background even:bg-muted/20 hover:bg-amber-50/40 dark:hover:bg-amber-950/10"}
     >
-      <td className="px-3 py-3">
+      <td className="px-3 py-1.5">
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="flex size-9 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex size-8 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`Déplacer la quittance en priorité ${props.priority}`}
             title="Modifier la priorité"
             {...attributes}
@@ -703,10 +720,10 @@ function SortableReceivableRow(props: {
           </span>
         </div>
       </td>
-      <td className="px-4 py-3 font-medium">{receivableDocumentReference(props.row)}</td>
-      <td className="px-4 py-3">{receivableTypeLabel(props.row)}</td>
-      <td className="px-4 py-3 font-medium">{receivableCoverageReference(props.row)}</td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-1.5 font-medium">{receivableDocumentReference(props.row)}</td>
+      <td className="px-4 py-1.5">{receivableTypeLabel(props.row)}</td>
+      <td className="px-4 py-1.5 font-medium">{receivableCoverageReference(props.row)}</td>
+      <td className="px-4 py-1.5">
         <div className="font-medium">{props.row.source.mouvement}</div>
         {props.row.source.documentClientId ? (
           <div className="mt-0.5 text-xs text-muted-foreground">
@@ -714,11 +731,11 @@ function SortableReceivableRow(props: {
           </div>
         ) : null}
       </td>
-      <td className="whitespace-nowrap px-4 py-3">{date(props.row.source.dateEffet)}</td>
-      <td className="px-4 py-3 text-right font-semibold tabular-nums">
+      <td className="whitespace-nowrap px-4 py-1.5">{date(props.row.source.dateEffet)}</td>
+      <td className="px-4 py-1.5 text-right font-semibold tabular-nums">
         {money(props.row.soldeOuvert)}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-1.5 text-right leading-tight">
         <div className={isFullyAllocated
           ? "font-semibold tabular-nums text-emerald-700 dark:text-emerald-300"
           : isAllocated
@@ -736,12 +753,12 @@ function SortableReceivableRow(props: {
           {isFullyAllocated ? "Soldé" : isAllocated ? "Partiel" : "En attente"}
         </div>
       </td>
-      <td className="px-2 py-3 text-center">
+      <td className="px-2 py-1.5 text-center">
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+          className="size-8 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
           aria-label={`Retirer ${props.row.source.mouvement} du règlement`}
           title="Retirer du règlement"
           onClick={props.onRemove}

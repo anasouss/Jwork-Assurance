@@ -557,9 +557,9 @@ export default function RelevesFacturesPage() {
                         <MoneyCell value={row.montantTtc} strong />
                         <td className="px-3 py-3 text-right">
                           <div className="font-semibold tabular-nums">{formatAmount(row.soldeRestant)}</div>
-                          <Badge variant="outline" className="mt-1">
-                            {row.montantRegle > 0 ? "Partiel" : "Impayé"}
-                          </Badge>
+                          {row.montantRegle > 0 ? (
+                            <Badge variant="outline" className="mt-1">Partiel</Badge>
+                          ) : null}
                         </td>
                         <td className="px-3 py-3">
                           <DocumentTypeBadges documents={row.documents} />

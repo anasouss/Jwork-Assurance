@@ -181,7 +181,9 @@ export default function AssistanceVoyageCreationPage() {
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
       toast.success(editing ? `Dossier ${saved.numeroDossier} modifié` : `Dossier ${saved.numeroDossier} créé`);
-      navigate(`/app/production/contrats/${saved.contratId}`);
+      navigate(editing
+        ? `/app/production/contrats/${saved.contratId}`
+        : `/app/production/contrats/${saved.contratId}/pieces-jointes`);
     },
     onError: (error) => toast.error(
       error instanceof Error

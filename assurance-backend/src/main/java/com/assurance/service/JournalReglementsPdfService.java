@@ -299,38 +299,37 @@ public class JournalReglementsPdfService {
             PdfFont bold
     ) {
         document.add(sectionTitle("Détail des règlements", bold));
-        Table table = new Table(new float[]{0.9f, 0.7f, 1.05f, 1.45f, 1.2f, 0.8f, 1, 1.05f, 0.8f, 0.8f})
+        Table table = new Table(new float[]{1.05f, 1.65f, 0.85f, 1.35f, 0.8f, 1.05f, 0.85f, 1.1f, 0.85f})
                 .setWidth(UnitValue.createPercentValue(100));
-        addHeader(table, "SAISI LE", bold, TextAlignment.CENTER);
-        addHeader(table, "DATE RÈGL.", bold, TextAlignment.CENTER);
         addHeader(table, "N° RÈGLEMENT", bold, TextAlignment.LEFT);
         addHeader(table, "PAYEUR", bold, TextAlignment.LEFT);
+        addHeader(table, "DATE RÈGLEMENT", bold, TextAlignment.CENTER);
         addHeader(table, "UTILISATEUR", bold, TextAlignment.LEFT);
         addHeader(table, "MODE", bold, TextAlignment.LEFT);
         addHeader(table, "RÉFÉRENCE", bold, TextAlignment.LEFT);
-        addHeader(table, "STATUT MOYEN", bold, TextAlignment.LEFT);
-        addHeader(table, "RÈGLEMENT", bold, TextAlignment.LEFT);
+        addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
+        addHeader(table, "STATUT", bold, TextAlignment.LEFT);
         addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
 
         int index = 0;
         for (InstrumentReglementClient instrument : instruments) {
             ReglementClient payment = instrument.getReglement();
             DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
-            addBody(table, dateTime(payment.getCreatedAt()), regular, TextAlignment.CENTER, background);
-            addBody(table, date(payment.getDateReglement()), regular, TextAlignment.CENTER, background);
             addBody(table, payment.getNumero(), bold, TextAlignment.LEFT, background);
             addBody(table, payment.getPayeurNom(), regular, TextAlignment.LEFT, background);
+            addBody(table, date(payment.getDateReglement()), regular, TextAlignment.CENTER, background);
             addBody(table, payment.getCreePar() == null ? "-" : payment.getCreePar().getFullName(), regular,
                     TextAlignment.LEFT, background);
             addBody(table, modeLabel(instrument.getMode()), regular, TextAlignment.LEFT, background);
             addBody(table, value(instrument.getReferenceInstrument()), regular, TextAlignment.LEFT, background);
-            addBody(table, instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
-            addBody(table, payment.getStatut() == StatutReglementClient.ANNULE ? "Annulé" : "Valide", regular,
-                    TextAlignment.LEFT, background);
+            addBody(table, instrumentDueDate(instrument), regular, TextAlignment.CENTER, background);
+            addBody(table, payment.getStatut() == StatutReglementClient.ANNULE
+                    ? "Annulé"
+                    : instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
         }
         if (instruments.isEmpty()) {
-            table.addCell(new Cell(1, 10)
+            table.addCell(new Cell(1, 9)
                     .add(new Paragraph("Aucun règlement pour les critères sélectionnés")
                             .setFont(regular).setFontSize(8).setMargin(0))
                     .setTextAlignment(TextAlignment.CENTER)
@@ -434,12 +433,15 @@ public class JournalReglementsPdfService {
         };
     }
 
-    private String date(LocalDate date) {
-        return date == null ? "-" : DATE_FORMAT.format(date);
+    private String instrumentDueDate(InstrumentReglementClient instrument) {
+        return instrument.getMode() == ModeReglementClient.CHEQUE
+                || instrument.getMode() == ModeReglementClient.EFFET
+                ? date(instrument.getDateEcheance())
+                : "-";
     }
 
-    private String dateTime(LocalDateTime dateTime) {
-        return dateTime == null ? "-" : DATE_TIME_FORMAT.format(dateTime);
+    private String date(LocalDate date) {
+        return date == null ? "-" : DATE_FORMAT.format(date);
     }
 
     private String amount(BigDecimal number) {

@@ -31,11 +31,16 @@ type EntryMode = "TRANSFERT" | "AJUSTEMENT";
 export default function OperationsTresoreriePage() {
   const [searchParams] = useSearchParams();
   const initialAccountId = searchParams.get("compteId") || "";
+  const initialDestinationType = searchParams.get("destinationType") === "CAISSE"
+    || searchParams.get("destinationType") === "BANQUE"
+    ? searchParams.get("destinationType") as "CAISSE" | "BANQUE"
+    : "";
+  const initialDestinationId = searchParams.get("destinationId") || "";
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<EntryMode>("TRANSFERT");
   const [sourceId, setSourceId] = useState(initialAccountId);
-  const [destinationType, setDestinationType] = useState<"CAISSE" | "BANQUE" | "">("");
-  const [destinationId, setDestinationId] = useState("");
+  const [destinationType, setDestinationType] = useState<"CAISSE" | "BANQUE" | "">(initialDestinationType);
+  const [destinationId, setDestinationId] = useState(initialDestinationId);
   const [adjustmentAccountId, setAdjustmentAccountId] = useState(initialAccountId);
   const [direction, setDirection] = useState<"ENTREE" | "SORTIE">("ENTREE");
   const [amount, setAmount] = useState("");

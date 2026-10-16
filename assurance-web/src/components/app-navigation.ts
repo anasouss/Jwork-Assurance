@@ -79,7 +79,7 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "compta", title: "Relevés et factures", url: "/app/compta/releves-factures", icon: FileText, permission: "quittance:view" },
   { module: "compta", title: "Facturation conventions", url: "/app/compta/facturation-conventions", icon: ReceiptText, permission: "quittance:view" },
   { module: "compta", title: "Encaissements en attente", url: "/app/compta/tresorerie/encaissements-en-attente", icon: Hourglass, permission: "tresorerie:view" },
-  { module: "compta", title: "Bordereaux de remise", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText, permission: "tresorerie:view" },
+  { module: "compta", title: "Bordereaux bancaires", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText, permission: "tresorerie:view" },
   { module: "compta", title: "Bordereaux compagnies", url: "/app/compta/bordereaux-compagnies", icon: Building2, permission: "bordereau-compagnie:view" },
   { module: "compta", title: "Paramètres", url: "/app/compta/parametres", icon: Settings, permission: "tresorerie:view" },
   { module: "admin", title: "Utilisateurs", url: "/app/admin/utilisateurs", icon: Users, permissions: ["user:view", "user:manage", "config:view", "config:manage"] },

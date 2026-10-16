@@ -69,7 +69,7 @@ const groups: ComptaGroup[] = [
         permission: "tresorerie:view",
       },
       {
-        title: "Bordereaux de remise",
+        title: "Bordereaux bancaires",
         icon: ScrollText,
         href: "/app/compta/tresorerie/bordereaux-remise",
         permission: "tresorerie:view",

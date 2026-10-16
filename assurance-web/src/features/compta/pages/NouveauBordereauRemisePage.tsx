@@ -36,7 +36,7 @@ export default function NouveauBordereauRemisePage() {
     (searchParams.get("instrumentIds") ?? "").split(",").filter((id) => /^\d+$/.test(id))
   )], [searchParams]);
   const [type, setType] = useState<RemittanceSlipType | "">(initialType);
-  const [sourceId, setSourceId] = useState("");
+  const [sourceId, setSourceId] = useState(searchParams.get("sourceId") || "");
   const [destinationId, setDestinationId] = useState("");
   const [cashAmount, setCashAmount] = useState<number>();
   const [slipDate, setSlipDate] = useState(TODAY);
@@ -80,6 +80,17 @@ export default function NouveauBordereauRemisePage() {
       setDestinationId("");
     }
   }, [bankAccounts, destinationId]);
+
+  useEffect(() => {
+    if (accounts.isLoading) return;
+    if (cashAccounts.length === 1) {
+      setSourceId(cashAccounts[0].id);
+      return;
+    }
+    if (sourceId && !cashAccounts.some((account) => account.id === sourceId)) {
+      setSourceId("");
+    }
+  }, [accounts.isLoading, cashAccounts, sourceId]);
 
   const createSlip = useMutation({
     mutationFn: () => {

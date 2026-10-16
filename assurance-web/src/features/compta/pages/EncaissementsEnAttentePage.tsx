@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Banknote, Eye, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Banknote, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -31,19 +31,12 @@ import { SortIcon } from "@/components/ui/sort-icon";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
-import type { ClientPaymentMode, PaymentInstrument, PaymentInstrumentStatus } from "../types";
+import type { ClientPaymentMode, PaymentInstrument } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
-type StatusFilter = Extract<PaymentInstrumentStatus, "EN_ATTENTE" | "REMIS_EN_BANQUE" | "REJETE">;
-type ModeFilter = Extract<ClientPaymentMode, "CHEQUE" | "EFFET" | "VIREMENT" | "VERSEMENT_BANCAIRE"> | "ALL";
+type ModeFilter = Extract<ClientPaymentMode, "ESPECES" | "CHEQUE" | "EFFET" | "VIREMENT" | "VERSEMENT_BANCAIRE"> | "ALL";
 type InstrumentSortBy = "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" | "DUE" | "AMOUNT";
 type SortDirection = "ASC" | "DESC";
-
-const STATUS_LABELS: Record<StatusFilter, string> = {
-  EN_ATTENTE: "En attente",
-  REMIS_EN_BANQUE: "Remis en banque",
-  REJETE: "Rejetés",
-};
 
 export default function EncaissementsEnAttentePage() {
   const navigate = useNavigate();
@@ -53,7 +46,7 @@ export default function EncaissementsEnAttentePage() {
   const canManage = permissions.includes("tresorerie:manage");
   const canReplacePayment = permissions.includes("reglement-client:manage");
   const queryClient = useQueryClient();
-  const { status, mode, search: appliedSearch, dateFrom, dateTo, page, sortBy, sortDirection } = urlState;
+  const { mode, search: appliedSearch, dateFrom, dateTo, page, sortBy, sortDirection } = urlState;
   const [search, setSearch] = useState(appliedSearch);
   const [selectedInstruments, setSelectedInstruments] = useState<PaymentInstrument[]>([]);
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
@@ -66,16 +59,16 @@ export default function EncaissementsEnAttentePage() {
 
   useEffect(() => {
     setSelectedInstruments([]);
-  }, [status, mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection]);
+  }, [mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection]);
 
   function updateUrl(patch: Partial<CollectionQueueUrlState>) {
     setSearchParams(collectionQueueSearchParams({ ...urlState, ...patch }), { replace: true });
   }
 
   const instruments = useQuery({
-    queryKey: ["compta", "treasury", "collection-queue", status, mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection, page],
+    queryKey: ["compta", "treasury", "collection-queue", mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection, page],
     queryFn: () => comptaApi.paymentInstruments({
-      statut: status,
+      statut: "EN_ATTENTE",
       mode: mode === "ALL" ? undefined : mode,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
@@ -85,6 +78,12 @@ export default function EncaissementsEnAttentePage() {
       page,
       size: TREASURY_PAGE_SIZE,
     }),
+    enabled: mode !== "ESPECES",
+  });
+  const accounts = useQuery({
+    queryKey: ["compta", "treasury-accounts"],
+    queryFn: comptaApi.treasuryAccounts,
+    enabled: mode === "ALL" || mode === "ESPECES",
   });
 
   const replaceWithCash = useMutation({
@@ -118,6 +117,17 @@ export default function EncaissementsEnAttentePage() {
     setSearchParams(new URLSearchParams(), { replace: true });
   }
 
+  function changeMode(nextMode: ModeFilter) {
+    const supportsDueDate = nextMode === "CHEQUE" || nextMode === "EFFET";
+    updateUrl({
+      mode: nextMode,
+      search: appliedSearch,
+      dateFrom: supportsDueDate ? dateFrom : "",
+      dateTo: supportsDueDate ? dateTo : "",
+      page: 0,
+    });
+  }
+
   function changeSort(column: InstrumentSortBy) {
     const nextDirection = sortBy === column
       ? sortDirection === "ASC" ? "DESC" : "ASC"
@@ -126,7 +136,19 @@ export default function EncaissementsEnAttentePage() {
     setSelectedInstruments([]);
   }
 
-  const dateLabel = status === "EN_ATTENTE" ? "Échéance" : "Statut";
+  const cashSearch = appliedSearch.toLocaleLowerCase("fr");
+  const cashAccounts = (accounts.data ?? []).filter((account) => {
+    if (!account.actif || account.typeCompte !== "CAISSE" || account.soldeCourant <= 0) return false;
+    if (!cashSearch) return true;
+    return [account.code, account.libelle, account.utilisateurTitulaire]
+      .some((value) => value?.toLocaleLowerCase("fr").includes(cashSearch));
+  });
+  const centralCashAccount = (accounts.data ?? []).find((account) =>
+    account.actif && account.typeCompte === "CAISSE" && account.natureCaisse === "CENTRALE"
+  );
+  const showCashWorkflow = mode === "ALL" || mode === "ESPECES";
+  const showInstrumentWorkflow = mode !== "ESPECES";
+  const showDueDateFilters = mode === "CHEQUE" || mode === "EFFET";
   const rows = instruments.data?.rows ?? [];
   const selectedMode = selectedInstruments[0]?.mode;
   const pageSelectable = rows.filter((instrument) => isSelectableForSlip(instrument)
@@ -174,31 +196,23 @@ export default function EncaissementsEnAttentePage() {
         <div>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
           <h1 className="mt-1 text-xl font-semibold">Encaissements en attente</h1>
-          <p className="text-sm text-muted-foreground">Suivez chaque moyen de paiement jusqu’à sa remise ou son rapprochement.</p>
+          <p className="text-sm text-muted-foreground">Espèces en caisse et moyens de paiement restant à traiter.</p>
         </div>
         <Button asChild variant="outline">
-          <Link to="/app/compta/tresorerie/bordereaux-remise"><Eye className="size-4" /> Bordereaux de remise</Link>
+          <Link to="/app/compta/tresorerie/bordereaux-remise"><Eye className="size-4" /> Bordereaux bancaires</Link>
         </Button>
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[190px_210px_1fr_170px_170px_auto]">
-        <div className="grid gap-2">
-          <Label>Étape</Label>
-          <Select value={status} onValueChange={(value) => updateUrl({ status: value as StatusFilter, page: 0 })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="EN_ATTENTE">En attente</SelectItem>
-              <SelectItem value="REMIS_EN_BANQUE">Remis en banque</SelectItem>
-              <SelectItem value="REJETE">Rejetés</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <section className={`grid gap-3 rounded-md border bg-card p-4 ${showDueDateFilters
+        ? "xl:grid-cols-[210px_1fr_170px_170px_auto]"
+        : "xl:grid-cols-[210px_1fr_auto]"}`}>
         <div className="grid gap-2">
           <Label>Mode</Label>
-          <Select value={mode} onValueChange={(value) => updateUrl({ mode: value as ModeFilter, page: 0 })}>
+          <Select value={mode} onValueChange={(value) => changeMode(value as ModeFilter)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tous les modes</SelectItem>
+              <SelectItem value="ESPECES">Espèces</SelectItem>
               <SelectItem value="CHEQUE">Chèques</SelectItem>
               <SelectItem value="EFFET">Effets</SelectItem>
               <SelectItem value="VIREMENT">Virements</SelectItem>
@@ -207,36 +221,99 @@ export default function EncaissementsEnAttentePage() {
           </Select>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="collection-search">Payeur, règlement, banque ou référence</Label>
+          <Label htmlFor="collection-search">Payeur, règlement, caisse, banque ou référence</Label>
           <Input id="collection-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} />
         </div>
-        <div className="grid gap-2">
-          <Label>{dateLabel} du</Label>
-          <DatePicker
-            date={dateFrom}
-            maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined}
-            onSelect={(value) => updateUrl({ dateFrom: toDateOnly(value) ?? "", page: 0 })}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>{dateLabel} au</Label>
-          <DatePicker
-            date={dateTo}
-            minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined}
-            onSelect={(value) => updateUrl({ dateTo: toDateOnly(value) ?? "", page: 0 })}
-          />
-        </div>
+        {showDueDateFilters && (
+          <>
+            <div className="grid gap-2">
+              <Label>Échéance du</Label>
+              <DatePicker
+                date={dateFrom}
+                maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined}
+                onSelect={(value) => updateUrl({ dateFrom: toDateOnly(value) ?? "", page: 0 })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Échéance au</Label>
+              <DatePicker
+                date={dateTo}
+                minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined}
+                onSelect={(value) => updateUrl({ dateTo: toDateOnly(value) ?? "", page: 0 })}
+              />
+            </div>
+          </>
+        )}
         <div className="flex items-end gap-2">
           <Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button>
           <Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-md border bg-card">
+      {showCashWorkflow && <section className="overflow-hidden rounded-md border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="font-semibold">Espèces en caisse</h2>
+          <p className="text-sm text-muted-foreground">Espèces détenues en caisse et pas encore versées en banque.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-emerald-700 text-xs uppercase text-white"><tr>
+              <th className="px-4 py-3 text-left">Caisse</th>
+              <th className="px-4 py-3 text-left">Responsable</th>
+              <th className="px-4 py-3 text-left">Situation</th>
+              <th className="px-4 py-3 text-right">Solde</th>
+              <th className="w-64 px-4 py-3 text-right">Action suivante</th>
+            </tr></thead>
+            <tbody className="divide-y">
+              {accounts.isLoading ? <TableRowsSkeleton colSpan={5} rows={2} /> : cashAccounts.map((account) => {
+                const central = account.natureCaisse === "CENTRALE";
+                return <tr key={account.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-2.5 font-semibold">{account.libelle}</td>
+                  <td className="px-4 py-2.5">{account.utilisateurTitulaire || (central ? "Caisse centrale" : "-")}</td>
+                  <td className="px-4 py-2.5">
+                    <Badge className={central
+                      ? "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200"
+                      : "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200"}
+                    >{central ? "À verser en banque" : "À remettre à la caisse centrale"}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatTreasuryMoney(account.soldeCourant)}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    {central ? (
+                      canManage ? (
+                        <Button asChild size="sm">
+                          <Link to={`/app/compta/tresorerie/bordereaux-remise/nouveau?type=VERSEMENT_ESPECES&sourceId=${account.id}`}>
+                            <Landmark className="size-4" /> Préparer le versement
+                          </Link>
+                        </Button>
+                      ) : <Button size="sm" disabled><Landmark className="size-4" /> Préparer le versement</Button>
+                    ) : centralCashAccount ? (
+                      canManage ? (
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={`/app/compta/tresorerie/operations?compteId=${account.id}&destinationType=CAISSE&destinationId=${centralCashAccount.id}`}>
+                            <ArrowRightLeft className="size-4" /> Remettre à la caisse centrale
+                          </Link>
+                        </Button>
+                      ) : <Button size="sm" variant="outline" disabled><ArrowRightLeft className="size-4" /> Remettre à la caisse centrale</Button>
+                    ) : <span className="text-sm text-destructive">Caisse centrale non configurée</span>}
+                  </td>
+                </tr>;
+              })}
+              {!accounts.isLoading && !accounts.isError && cashAccounts.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">Aucune espèce en caisse.</td></tr>
+              )}
+              {accounts.isError && (
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-destructive">Chargement des caisses impossible.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>}
+
+      {showInstrumentWorkflow && <section className="overflow-hidden rounded-md border bg-card">
         <div className="border-b px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold">{STATUS_LABELS[status]}</h2>
+              <h2 className="font-semibold">Moyens de paiement en attente</h2>
               <p className="text-sm text-muted-foreground">Une ligne correspond à un moyen de paiement et à sa prochaine action.</p>
             </div>
             {selectedInstruments.length > 0 && (
@@ -315,7 +392,7 @@ export default function EncaissementsEnAttentePage() {
           </table>
         </div>
         {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={(nextPage) => updateUrl({ page: nextPage })} />}
-      </section>
+      </section>}
 
       <Dialog open={Boolean(instrumentToReplace)} onOpenChange={(open) => !open && setInstrumentToReplace(undefined)}>
         <DialogContent>
@@ -367,6 +444,7 @@ export default function EncaissementsEnAttentePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
@@ -466,7 +544,6 @@ function isSelectableForSlip(instrument: PaymentInstrument) {
 }
 
 type CollectionQueueUrlState = {
-  status: StatusFilter;
   mode: ModeFilter;
   search: string;
   dateFrom: string;
@@ -477,12 +554,13 @@ type CollectionQueueUrlState = {
 };
 
 function collectionQueueStateFromParams(params: URLSearchParams): CollectionQueueUrlState {
+  const mode = isModeFilter(params.get("mode")) ? params.get("mode") as ModeFilter : "ALL";
+  const supportsDueDate = mode === "CHEQUE" || mode === "EFFET";
   return {
-    status: isStatusFilter(params.get("statut")) ? params.get("statut") as StatusFilter : "EN_ATTENTE",
-    mode: isModeFilter(params.get("mode")) ? params.get("mode") as ModeFilter : "ALL",
+    mode,
     search: params.get("search")?.trim() ?? "",
-    dateFrom: validQueueDate(params.get("dateDu")),
-    dateTo: validQueueDate(params.get("dateAu")),
+    dateFrom: supportsDueDate ? validQueueDate(params.get("dateDu")) : "",
+    dateTo: supportsDueDate ? validQueueDate(params.get("dateAu")) : "",
     page: queuePageFromParam(params.get("page")),
     sortBy: isInstrumentSort(params.get("tri")) ? params.get("tri") as InstrumentSortBy : "DUE",
     sortDirection: params.get("ordre") === "DESC" ? "DESC" : "ASC",
@@ -491,7 +569,6 @@ function collectionQueueStateFromParams(params: URLSearchParams): CollectionQueu
 
 function collectionQueueSearchParams(state: CollectionQueueUrlState) {
   const params = new URLSearchParams();
-  if (state.status !== "EN_ATTENTE") params.set("statut", state.status);
   if (state.mode !== "ALL") params.set("mode", state.mode);
   if (state.search) params.set("search", state.search);
   if (state.dateFrom) params.set("dateDu", state.dateFrom);
@@ -502,12 +579,9 @@ function collectionQueueSearchParams(state: CollectionQueueUrlState) {
   return params;
 }
 
-function isStatusFilter(value: string | null): value is StatusFilter {
-  return value === "EN_ATTENTE" || value === "REMIS_EN_BANQUE" || value === "REJETE";
-}
-
 function isModeFilter(value: string | null): value is ModeFilter {
   return value === "ALL"
+    || value === "ESPECES"
     || value === "CHEQUE"
     || value === "EFFET"
     || value === "VIREMENT"

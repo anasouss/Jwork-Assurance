@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, Plus, RotateCcw, Search } from "lucide-react";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -33,15 +33,20 @@ const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
 };
 
 export default function InstrumentsTresoreriePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
-  const [type, setType] = useState<TypeFilter>("ALL");
-  const [status, setStatus] = useState<StatusFilter>("ALL");
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(0);
+  const type = parseTypeFilter(searchParams.get("type"));
+  const status = parseStatusFilter(searchParams.get("statut"));
+  const appliedSearch = searchParams.get("search") ?? "";
+  const dateFrom = parseDateFilter(searchParams.get("dateDu"));
+  const dateTo = parseDateFilter(searchParams.get("dateAu"));
+  const page = parsePage(searchParams.get("page"));
+  const [search, setSearch] = useState(appliedSearch);
+
+  useEffect(() => {
+    setSearch(appliedSearch);
+  }, [appliedSearch]);
   const slips = useQuery({
     queryKey: ["compta", "treasury", "remittance-slips", type, status, appliedSearch, dateFrom, dateTo, page],
     queryFn: () => comptaApi.remittanceSlips({
@@ -56,18 +61,20 @@ export default function InstrumentsTresoreriePage() {
   });
 
   function applyFilters() {
-    setAppliedSearch(search.trim());
-    setPage(0);
+    updateFilter("search", search.trim());
   }
 
   function resetFilters() {
-    setType("ALL");
-    setStatus("ALL");
     setSearch("");
-    setAppliedSearch("");
-    setDateFrom("");
-    setDateTo("");
-    setPage(0);
+    setSearchParams({}, { replace: true });
+  }
+
+  function updateFilter(name: string, value: string, resetPage = true) {
+    const next = new URLSearchParams(searchParams);
+    if (!value || value === "ALL" || (name === "page" && value === "0")) next.delete(name);
+    else next.set(name, value);
+    if (resetPage) next.delete("page");
+    setSearchParams(next, { replace: true });
   }
 
   return (
@@ -75,7 +82,7 @@ export default function InstrumentsTresoreriePage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-          <h1 className="mt-1 text-xl font-semibold">Bordereaux de remise</h1>
+          <h1 className="mt-1 text-xl font-semibold">Bordereaux bancaires</h1>
           <p className="text-sm text-muted-foreground">Suivi des remises de chèques, effets et versements d’espèces.</p>
         </div>
         {canManage ? <Button asChild>
@@ -84,13 +91,13 @@ export default function InstrumentsTresoreriePage() {
       </header>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[190px_210px_1fr_170px_170px_auto]">
-        <div className="grid gap-2"><Label>Type</Label><Select value={type} onValueChange={(value) => { setType(value as TypeFilter); setPage(0); }}>
+        <div className="grid gap-2"><Label>Type</Label><Select value={type} onValueChange={(value) => updateFilter("type", value)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Tous les types</SelectItem><SelectItem value="CHEQUE">Chèques</SelectItem>
             <SelectItem value="EFFET">Effets</SelectItem><SelectItem value="VERSEMENT_ESPECES">Versements d’espèces</SelectItem>
           </SelectContent>
         </Select></div>
-        <div className="grid gap-2"><Label>Statut</Label><Select value={status} onValueChange={(value) => { setStatus(value as StatusFilter); setPage(0); }}>
+        <div className="grid gap-2"><Label>Statut</Label><Select value={status} onValueChange={(value) => updateFilter("statut", value)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">Provisoires</SelectItem>
             <SelectItem value="DEPOSE">Remis à la banque</SelectItem><SelectItem value="PARTIELLEMENT_TRAITE">Partiellement traités</SelectItem>
@@ -98,8 +105,8 @@ export default function InstrumentsTresoreriePage() {
           </SelectContent>
         </Select></div>
         <div className="grid gap-2"><Label htmlFor="slip-search">Réf. interne, n° banque ou compte</Label><Input id="slip-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
-        <div className="grid gap-2"><Label>Date du</Label><DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} /></div>
-        <div className="grid gap-2"><Label>Date au</Label><DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} /></div>
+        <div className="grid gap-2"><Label>Date du</Label><DatePicker date={dateFrom} onSelect={(value) => updateFilter("dateDu", toDateOnly(value) ?? "")} /></div>
+        <div className="grid gap-2"><Label>Date au</Label><DatePicker date={dateTo} onSelect={(value) => updateFilter("dateAu", toDateOnly(value) ?? "")} /></div>
         <div className="flex items-end gap-2"><Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button><Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button></div>
       </section>
 
@@ -123,11 +130,34 @@ export default function InstrumentsTresoreriePage() {
             {!slips.isLoading && (slips.data?.rows.length ?? 0) === 0 && <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Aucun bordereau ne correspond aux filtres.</td></tr>}
           </tbody>
         </table></div>
-        {slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={setPage} />}
+        {slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={(nextPage) => updateFilter("page", String(nextPage), false)} />}
       </section>
 
     </div>
   );
+}
+
+function parseTypeFilter(value: string | null): TypeFilter {
+  return value === "CHEQUE" || value === "EFFET" || value === "VERSEMENT_ESPECES" ? value : "ALL";
+}
+
+function parseStatusFilter(value: string | null): StatusFilter {
+  return value === "BROUILLON"
+    || value === "DEPOSE"
+    || value === "PARTIELLEMENT_TRAITE"
+    || value === "CLOTURE"
+    || value === "ANNULE"
+    ? value
+    : "ALL";
+}
+
+function parseDateFilter(value: string | null) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function parsePage(value: string | null) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function StatusBadge({ status }: { status: RemittanceSlipStatus }) {

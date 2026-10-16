@@ -612,6 +612,13 @@ export const comptaApi = {
     )));
   },
 
+  async validateClientPayments(ids: string[]) {
+    return unwrap(await apiFetch<ApiResponse<ClientPayment[]>>(
+      "/api/v1/compta/reglements-clients/validation-groupee",
+      { method: "POST", body: JSON.stringify({ reglementIds: ids }) }
+    )).map(normalizeClientPayment);
+  },
+
   async createInvoiceFromClientPayment(id: string) {
     return normalizeClientDocument(unwrap(await apiFetch<ApiResponse<ClientDocument>>(
       `/api/v1/compta/reglements-clients/${id}/facture`,

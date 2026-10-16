@@ -757,15 +757,43 @@ public class ReglementClientService {
 
     @Transactional
     public ReglementClientResponse validatePending(Long agenceId, Long userId, Long paymentId) {
+        Utilisateur validator = findValidator(userId);
+        return validatePendingLocked(agenceId, validator, paymentId);
+    }
+
+    @Transactional
+    public List<ReglementClientResponse> validatePendingBatch(
+            Long agenceId,
+            Long userId,
+            List<Long> paymentIds
+    ) {
+        List<Long> distinctPaymentIds = paymentIds.stream().distinct().sorted().toList();
+        if (distinctPaymentIds.size() != paymentIds.size()) {
+            throw new BadRequestException("La sélection contient des règlements en double");
+        }
+        Utilisateur validator = findValidator(userId);
+        return distinctPaymentIds.stream()
+                .map(paymentId -> validatePendingLocked(agenceId, validator, paymentId))
+                .toList();
+    }
+
+    private Utilisateur findValidator(Long userId) {
+        return utilisateurRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
+    }
+
+    private ReglementClientResponse validatePendingLocked(
+            Long agenceId,
+            Utilisateur validator,
+            Long paymentId
+    ) {
         ReglementClient payment = reglementRepository.findByIdAndAgenceIdForUpdate(paymentId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
         loadPaymentInstruments(payment, agenceId);
         requirePending(payment);
-        if (payment.getCreePar().getId().equals(userId)) {
+        if (payment.getCreePar().getId().equals(validator.getId())) {
             throw new BadRequestException("Le créateur du règlement ne peut pas le valider");
         }
-        Utilisateur validator = utilisateurRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
         LocalDate operationDate = LocalDate.now();
         List<Long> elementIds = new ArrayList<>();
         List<Long> documentIds = new ArrayList<>();

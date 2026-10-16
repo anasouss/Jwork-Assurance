@@ -6,6 +6,7 @@ import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.request.UpdateReglementClientPolicyRequest;
+import com.assurance.dto.request.ValiderReglementsClientsRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
@@ -274,6 +275,18 @@ public class ReglementClientController {
                 TenantContext.getCurrentUser(),
                 paymentId
         ), "Règlement client validé"));
+    }
+
+    @PostMapping("/validation-groupee")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:validate')")
+    public ResponseEntity<ApiResponse<List<ReglementClientResponse>>> validateBatch(
+            @Valid @RequestBody ValiderReglementsClientsRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.validatePendingBatch(
+                TenantContext.getCurrentAgence(),
+                TenantContext.getCurrentUser(),
+                request.getReglementIds()
+        ), "Règlements clients validés"));
     }
 
     @PostMapping("/{paymentId}/facture")

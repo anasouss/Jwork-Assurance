@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, Eye, Pencil, Search, XCircle } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,22 +39,18 @@ export default function ValidationReglementsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [dateFrom, setDateFrom] = useState(searchParams.get("dateDu") ?? TODAY);
-  const [dateTo, setDateTo] = useState(searchParams.get("dateAu") ?? TODAY);
+  const [date, setDate] = useState(searchParams.get("date") ?? searchParams.get("dateDu") ?? TODAY);
   const [appliedSearch, setAppliedSearch] = useState(searchParams.get("search") ?? "");
-  const [appliedDateFrom, setAppliedDateFrom] = useState(searchParams.get("dateDu") ?? TODAY);
-  const [appliedDateTo, setAppliedDateTo] = useState(searchParams.get("dateAu") ?? TODAY);
+  const [appliedDate, setAppliedDate] = useState(searchParams.get("date") ?? searchParams.get("dateDu") ?? TODAY);
   const [paymentToValidate, setPaymentToValidate] = useState<ClientPayment>();
-  const [bulkValidationOpen, setBulkValidationOpen] = useState(false);
-  const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set());
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [cancelReason, setCancelReason] = useState("");
 
   const payments = useQuery({
-    queryKey: ["compta", "client-payments", "validation", appliedSearch, appliedDateFrom, appliedDateTo, page],
+    queryKey: ["compta", "client-payments", "validation", appliedSearch, appliedDate, page],
     queryFn: () => comptaApi.clientPayments({
-      dateDu: appliedDateFrom,
-      dateAu: appliedDateTo,
+      dateDu: appliedDate,
+      dateAu: appliedDate,
       search: appliedSearch || undefined,
       statut: "A_VALIDER",
       sortBy: "dateReglement",
@@ -69,19 +64,7 @@ export default function ValidationReglementsPage() {
     mutationFn: () => comptaApi.validateClientPayment(paymentToValidate!.id),
     onSuccess: async (payment) => {
       setPaymentToValidate(undefined);
-      setSelectedPaymentIds(new Set());
       toast.success(`Règlement ${payment.numero} validé`);
-      await invalidatePayments(queryClient);
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Validation impossible"),
-  });
-
-  const validatePayments = useMutation({
-    mutationFn: () => comptaApi.validateClientPayments([...selectedPaymentIds]),
-    onSuccess: async (validatedPayments) => {
-      setBulkValidationOpen(false);
-      setSelectedPaymentIds(new Set());
-      toast.success(`${validatedPayments.length} règlement(s) validé(s)`);
       await invalidatePayments(queryClient);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Validation impossible"),
@@ -92,7 +75,6 @@ export default function ValidationReglementsPage() {
     onSuccess: async (payment) => {
       setPaymentToCancel(undefined);
       setCancelReason("");
-      setSelectedPaymentIds(new Set());
       toast.success(`Règlement ${payment.numero} annulé`);
       await invalidatePayments(queryClient);
     },
@@ -100,48 +82,20 @@ export default function ValidationReglementsPage() {
   });
 
   function applyFilters() {
-    if (!dateFrom || !dateTo || dateFrom > dateTo) {
-      toast.error("Renseignez une période valide");
+    if (!date) {
+      toast.error("Renseignez la date de l’état");
       return;
     }
     const normalizedSearch = search.trim();
     setAppliedSearch(normalizedSearch);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
+    setAppliedDate(date);
     setPage(0);
-    setSelectedPaymentIds(new Set());
-    const next = new URLSearchParams({ dateDu: dateFrom, dateAu: dateTo });
+    const next = new URLSearchParams({ date });
     if (normalizedSearch) next.set("search", normalizedSearch);
     setSearchParams(next, { replace: true });
   }
 
-  const visibleEligiblePayments = useMemo(
-    () => (payments.data?.rows ?? []).filter((payment) => payment.creeParId !== user?.id),
-    [payments.data?.rows, user?.id]
-  );
-  const allVisibleSelected = visibleEligiblePayments.length > 0
-    && visibleEligiblePayments.every((payment) => selectedPaymentIds.has(payment.id));
-  const someVisibleSelected = visibleEligiblePayments.some((payment) => selectedPaymentIds.has(payment.id));
-  const selectedPayments = (payments.data?.rows ?? []).filter((payment) => selectedPaymentIds.has(payment.id));
-  const selectedTotal = selectedPayments.reduce((sum, payment) => sum + payment.montantTotal, 0);
-
-  function toggleAllVisible(checked: boolean) {
-    setSelectedPaymentIds(checked
-      ? new Set(visibleEligiblePayments.map((payment) => payment.id))
-      : new Set());
-  }
-
-  function togglePayment(paymentId: string, checked: boolean) {
-    setSelectedPaymentIds((current) => {
-      const next = new Set(current);
-      if (checked) next.add(paymentId);
-      else next.delete(paymentId);
-      return next;
-    });
-  }
-
   function changePage(nextPage: number) {
-    setSelectedPaymentIds(new Set());
     setPage(nextPage);
   }
 
@@ -150,9 +104,9 @@ export default function ValidationReglementsPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Comptabilité</div>
-          <h1 className="mt-1 text-xl font-semibold">Validation des règlements</h1>
+          <h1 className="mt-1 text-xl font-semibold">État des encaissements</h1>
           <p className="text-sm text-muted-foreground">
-            Contrôlez les règlements saisis avant leur prise en compte comptable.
+            Contrôlez et validez les règlements saisis pour la journée sélectionnée.
           </p>
         </div>
         <Button asChild variant="outline">
@@ -163,7 +117,7 @@ export default function ValidationReglementsPage() {
         </Button>
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_180px_180px_auto]">
+      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_200px_auto]">
         <div className="grid gap-2">
           <Label htmlFor="pending-payment-search">Payeur ou numéro</Label>
           <Input
@@ -174,12 +128,8 @@ export default function ValidationReglementsPage() {
           />
         </div>
         <div className="grid gap-2">
-          <Label>Date du</Label>
-          <DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Date au</Label>
-          <DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} />
+          <Label>Date de l’état</Label>
+          <DatePicker date={date} onSelect={(value) => setDate(toDateOnly(value) ?? "")} />
         </div>
         <div className="flex items-end">
           <Button size="icon" title="Rechercher" onClick={applyFilters}>
@@ -189,36 +139,10 @@ export default function ValidationReglementsPage() {
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b px-4 py-2">
-          <div className="text-sm text-muted-foreground">
-            {selectedPaymentIds.size > 0
-              ? `${selectedPaymentIds.size} règlement(s) sélectionné(s)`
-              : "Sélectionnez les règlements contrôlés à valider."}
-          </div>
-          {canValidate && (
-            <Button
-              size="sm"
-              disabled={selectedPaymentIds.size === 0}
-              onClick={() => setBulkValidationOpen(true)}
-            >
-              <CheckCircle2 className="size-4" />
-              Valider la sélection ({selectedPaymentIds.size})
-            </Button>
-          )}
-        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white">
               <tr>
-                <th className="w-12 px-4 py-3 text-center">
-                  <Checkbox
-                    aria-label="Sélectionner tous les règlements affichés"
-                    checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
-                    disabled={!canValidate || visibleEligiblePayments.length === 0}
-                    onCheckedChange={(checked) => toggleAllVisible(checked === true)}
-                    className="border-white/80 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-orange-700"
-                  />
-                </th>
                 <th className="px-4 py-3 text-left">N° règlement</th>
                 <th className="px-4 py-3 text-left">Date</th>
                 <th className="px-4 py-3 text-left">Payeur</th>
@@ -229,22 +153,11 @@ export default function ValidationReglementsPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {payments.isLoading ? <TableRowsSkeleton colSpan={8} rows={6} /> : null}
+              {payments.isLoading ? <TableRowsSkeleton colSpan={7} rows={6} /> : null}
               {!payments.isLoading && (payments.data?.rows ?? []).map((payment) => {
                 const ownPayment = payment.creeParId === user?.id;
                 return (
                   <tr key={payment.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-2.5 text-center">
-                      <Checkbox
-                        aria-label={`Sélectionner le règlement ${payment.numero}`}
-                        checked={selectedPaymentIds.has(payment.id)}
-                        disabled={!canValidate || ownPayment}
-                        title={ownPayment
-                          ? "Le créateur ne peut pas valider son propre règlement"
-                          : "Sélectionner le règlement"}
-                        onCheckedChange={(checked) => togglePayment(payment.id, checked === true)}
-                      />
-                    </td>
                     <td className="px-4 py-2.5 font-semibold">{payment.numero}</td>
                     <td className="px-4 py-2.5">{formatDate(payment.dateReglement)}</td>
                     <td className="px-4 py-2.5">{payment.payeurNom}</td>
@@ -306,8 +219,8 @@ export default function ValidationReglementsPage() {
               })}
               {!payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
-                    Aucun règlement à valider pour cette période.
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                    Aucun règlement à valider pour cette date.
                   </td>
                 </tr>
               ) : null}
@@ -337,27 +250,6 @@ export default function ValidationReglementsPage() {
             <AlertDialogCancel disabled={validatePayment.isPending}>Annuler</AlertDialogCancel>
             <AlertDialogAction disabled={validatePayment.isPending} onClick={() => validatePayment.mutate()}>
               Valider le règlement
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={bulkValidationOpen} onOpenChange={setBulkValidationOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Valider la sélection</AlertDialogTitle>
-            <AlertDialogDescription>
-              Vous allez valider {selectedPaymentIds.size} règlement(s) pour un total de {formatAccountingAmount(selectedTotal)}.
-              Les espèces seront comptabilisées immédiatement. Les chèques et effets conserveront leur circuit d’encaissement.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={validatePayments.isPending}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={validatePayments.isPending || selectedPaymentIds.size === 0}
-              onClick={() => validatePayments.mutate()}
-            >
-              Valider {selectedPaymentIds.size} règlement(s)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

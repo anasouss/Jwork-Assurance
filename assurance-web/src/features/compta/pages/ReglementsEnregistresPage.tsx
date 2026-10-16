@@ -340,9 +340,9 @@ export default function ReglementsEnregistresPage() {
           </Button>
           {(canValidate || canCreate) && (
             <Button asChild variant="outline">
-              <Link to="/app/compta/reglements/validation">
+              <Link to="/app/compta/reglements/etat-encaissements">
                 <ShieldCheck className="size-4" />
-                Règlements à valider
+                État des encaissements
               </Link>
             </Button>
           )}

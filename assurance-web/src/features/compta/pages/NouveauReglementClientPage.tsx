@@ -240,7 +240,7 @@ export default function NouveauReglementClientPage() {
         queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
       ]);
-      navigate("/app/compta/reglements/validation", { replace: true });
+      navigate(`/app/compta/reglements/etat-encaissements?date=${payment.dateReglement}`, { replace: true });
     },
     onError: (error) => toast.error(
       error instanceof Error ? error.message : "Règlement impossible"
@@ -370,7 +370,7 @@ export default function NouveauReglementClientPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link to={editing ? "/app/compta/reglements/validation" : "/app/compta/reglements"}>
+          <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : "/app/compta/reglements"}>
             <ArrowLeft className="size-4" />
             {editing ? "Retour aux règlements à valider" : "Retour aux montants à encaisser"}
           </Link>
@@ -677,7 +677,7 @@ export default function NouveauReglementClientPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link to={editing ? "/app/compta/reglements/validation" : "/app/compta/reglements"}>Annuler</Link>
+            <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : "/app/compta/reglements"}>Annuler</Link>
           </Button>
           <Button
             disabled={!canSubmit || savePayment.isPending}

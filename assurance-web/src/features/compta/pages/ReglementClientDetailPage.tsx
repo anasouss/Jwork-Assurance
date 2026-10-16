@@ -65,7 +65,7 @@ export default function ReglementClientDetailPage() {
         <div>
           <Button asChild variant="ghost" className="mb-2 -ml-3">
             <Link to={data.statut === "A_VALIDER"
-              ? "/app/compta/reglements/validation"
+              ? `/app/compta/reglements/etat-encaissements?date=${data.dateReglement}`
               : "/app/compta/reglements/historique"}
             >
               <ArrowLeft className="size-4" />

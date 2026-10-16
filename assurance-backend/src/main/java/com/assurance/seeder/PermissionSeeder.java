@@ -45,6 +45,7 @@ public class PermissionSeeder implements CommandLineRunner {
             permission("quittance:manage", "Gerer les regles de quittance", "quittance"),
             permission("reglement-client:view", "Consulter les règlements clients", "reglement-client"),
             permission("reglement-client:create", "Enregistrer un règlement client", "reglement-client"),
+            permission("reglement-client:validate", "Valider un règlement client", "reglement-client"),
             permission("reglement-client:manage", "Annuler et corriger les règlements clients", "reglement-client"),
             permission("tresorerie:view", "Consulter la trésorerie", "tresorerie"),
             permission("tresorerie:manage", "Gérer les comptes et opérations de trésorerie", "tresorerie"),

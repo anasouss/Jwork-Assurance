@@ -427,7 +427,7 @@ export type ClientPaymentMode =
   | "CARTE"
   | "PRELEVEMENT";
 
-export type ClientPaymentStatus = "VALIDE" | "ANNULE";
+export type ClientPaymentStatus = "A_VALIDER" | "VALIDE" | "ANNULE";
 export type PaymentInstrumentStatus =
   | "EN_ATTENTE"
   | "REMIS_EN_BANQUE"
@@ -573,7 +573,11 @@ export type ClientPayment = {
   montantTotal: number;
   montantNonAffecte: number;
   notes?: string | null;
+  creeParId: string;
   creePar: string;
+  valideParId?: string | null;
+  validePar?: string | null;
+  dateValidation?: string | null;
   instruments: PaymentInstrument[];
 };
 

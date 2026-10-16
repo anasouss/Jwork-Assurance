@@ -20,7 +20,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             from AffectationReglementClient allocation
             where allocation.elementFacturable.contrat.agence.id = :agenceId
               and allocation.elementFacturable.contrat.id in :contractIds
-              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and allocation.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
             """)
     List<Long> findContractIdsWithActiveDirectPayments(
@@ -35,7 +35,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             join document.lignes line
             where document.agence.id = :agenceId
               and line.elementFacturable.contrat.id in :contractIds
-              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and allocation.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
             """)
     List<Long> findContractIdsWithActiveDocumentPayments(
@@ -47,7 +47,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             select a.elementFacturable.id, a.statut, sum(a.montant)
             from AffectationReglementClient a
             where a.elementFacturable.id in :elementIds
-              and a.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and a.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and a.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
             group by a.elementFacturable.id, a.statut
             """)
@@ -57,7 +57,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             select a.documentClient.id, a.statut, sum(a.montant)
             from AffectationReglementClient a
             where a.documentClient.id in :documentIds
-              and a.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and a.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and a.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
             group by a.documentClient.id, a.statut
             """)
@@ -68,7 +68,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             from AffectationReglementClient a
             where a.documentClient.id in :documentIds
               and a.elementFacturable is null
-              and a.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and a.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and a.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
             group by a.documentClient.id, a.statut
             """)
@@ -87,7 +87,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             select count(allocation) > 0
             from AffectationReglementClient allocation
             where allocation.elementFacturable.id in :elementIds
-              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and allocation.statut in :statuts
             """)
     boolean existsActiveByElementFacturableIds(
@@ -107,7 +107,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             where allocation.elementFacturable.id in :elementIds
               and allocation.instrument.reglement.agence.id = :agenceId
               and allocation.instrument.reglement.id = :paymentId
-              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and allocation.statut in :statuts
             """)
     List<AffectationReglementClient> findActiveDirectByPaymentAndElementIdsForUpdate(
@@ -123,7 +123,7 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
             where allocation.elementFacturable.id in :elementIds
               and allocation.instrument.reglement.agence.id = :agenceId
               and allocation.instrument.reglement.id <> :paymentId
-              and allocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and allocation.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
               and allocation.statut in :statuts
             """)
     boolean existsActiveDirectByElementIdsFromOtherPayment(

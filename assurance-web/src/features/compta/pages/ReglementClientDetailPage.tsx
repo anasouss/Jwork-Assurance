@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
 import type {
@@ -37,6 +38,9 @@ const ALLOCATION_STATUS_LABELS: Record<PaymentAllocationStatus, string> = {
 
 export default function ReglementClientDetailPage() {
   const { reglementId = "" } = useParams();
+  const user = useAuthStore((state) => state.user);
+  const canEdit = user?.permissions.includes("reglement-client:create")
+    || user?.permissions.includes("reglement-client:manage");
   const payment = useQuery({
     queryKey: ["compta", "client-payment", reglementId],
     queryFn: () => comptaApi.clientPayment(reglementId),
@@ -60,7 +64,10 @@ export default function ReglementClientDetailPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Button asChild variant="ghost" className="mb-2 -ml-3">
-            <Link to="/app/compta/reglements/historique">
+            <Link to={data.statut === "A_VALIDER"
+              ? "/app/compta/reglements/validation"
+              : "/app/compta/reglements/historique"}
+            >
               <ArrowLeft className="size-4" />
               Retour aux règlements
             </Link>
@@ -69,17 +76,36 @@ export default function ReglementClientDetailPage() {
           <h1 className="mt-1 text-xl font-semibold">{data.numero}</h1>
           <p className="text-sm text-muted-foreground">Détail du règlement client.</p>
         </div>
-        <Badge variant={data.statut === "VALIDE" ? "default" : "destructive"}>
-          {data.statut === "VALIDE" ? "Validé" : "Annulé"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {data.statut === "A_VALIDER" && data.creeParId === user?.id && canEdit && (
+            <Button asChild variant="outline">
+              <Link to={`/app/compta/reglements/${data.id}/modifier`}>
+                <Pencil className="size-4" />
+                Modifier
+              </Link>
+            </Button>
+          )}
+          <Badge variant={data.statut === "VALIDE"
+            ? "default"
+            : data.statut === "ANNULE" ? "destructive" : "secondary"}
+          >
+            {data.statut === "VALIDE" ? "Validé" : data.statut === "ANNULE" ? "Annulé" : "À valider"}
+          </Badge>
+        </div>
       </header>
 
-      <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 lg:grid-cols-6">
         <Summary label="Payeur" value={data.payeurNom} />
         <Summary label="Date" value={formatDate(data.dateReglement)} />
         <Summary label="Montant total" value={formatAccountingAmount(data.montantTotal)} strong />
         <Summary label="Non affecté" value={formatAccountingAmount(data.montantNonAffecte)} />
         <Summary label="Créé par" value={data.creePar || "-"} />
+        <Summary
+          label="Validation"
+          value={data.validePar
+            ? `${data.validePar}${data.dateValidation ? ` · ${formatDateTime(data.dateValidation)}` : ""}`
+            : data.statut === "A_VALIDER" ? "En attente" : "-"}
+        />
       </section>
 
       {data.notes && (
@@ -135,7 +161,11 @@ export default function ReglementClientDetailPage() {
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(instrument.montant)}</td>
                   <td className="px-4 py-3 text-center">
                     <Badge variant={instrument.statut === "REJETE" ? "destructive" : "outline"}>
-                      {INSTRUMENT_STATUS_LABELS[instrument.statut]}
+                      {data.statut === "A_VALIDER"
+                        ? "À valider"
+                        : data.statut === "ANNULE"
+                          ? "Annulé"
+                          : INSTRUMENT_STATUS_LABELS[instrument.statut]}
                     </Badge>
                     {instrument.motifStatut && (
                       <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>
@@ -178,7 +208,13 @@ export default function ReglementClientDetailPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(allocation.montant)}</td>
                   <td className="px-4 py-3 text-center">
-                    <Badge variant="outline">{ALLOCATION_STATUS_LABELS[allocation.statut]}</Badge>
+                    <Badge variant="outline">
+                      {data.statut === "A_VALIDER"
+                        ? "Réservée"
+                        : data.statut === "ANNULE"
+                          ? "Annulée"
+                          : ALLOCATION_STATUS_LABELS[allocation.statut]}
+                    </Badge>
                   </td>
                 </tr>
               ))}
@@ -199,7 +235,7 @@ function Summary({ label, value, strong = false }: { label: string; value: strin
   return (
     <div className="min-w-0 border-b p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
       <div className="text-xs uppercase text-muted-foreground">{label}</div>
-      <div className={`mt-1 truncate ${strong ? "text-lg font-semibold" : "font-medium"}`}>{value}</div>
+      <div className={`mt-1 break-words ${strong ? "text-lg font-semibold" : "font-medium"}`}>{value}</div>
     </div>
   );
 }
@@ -208,4 +244,9 @@ function formatDate(value?: string | null) {
   if (!value) return "-";
   const [year, month, day] = value.slice(0, 10).split("-");
   return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function formatDateTime(value: string) {
+  const [datePart, timePart = ""] = value.split("T");
+  return `${formatDate(datePart)} ${timePart.slice(0, 5)}`.trim();
 }

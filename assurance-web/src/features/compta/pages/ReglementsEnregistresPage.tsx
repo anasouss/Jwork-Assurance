@@ -10,9 +10,11 @@ import {
   Eye,
   FileText,
   MoreHorizontal,
+  Pencil,
   ReceiptText,
   RotateCcw,
   Search,
+  ShieldCheck,
   XCircle,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -94,7 +96,10 @@ export default function ReglementsEnregistresPage() {
   const initialDateFrom = searchParams.get("dateDu") ?? "";
   const initialDateTo = searchParams.get("dateAu") ?? "";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const canManage = permissions.includes("reglement-client:manage");
+  const canCreate = permissions.includes("reglement-client:create") || canManage;
+  const canValidate = permissions.includes("reglement-client:validate");
   const canIssueInvoice = permissions.includes("quittance:create")
     || permissions.includes("quittance:manage");
   const queryClient = useQueryClient();
@@ -333,6 +338,14 @@ export default function ReglementsEnregistresPage() {
             <BookOpenText className="size-4" />
             Journal des règlements
           </Button>
+          {(canValidate || canCreate) && (
+            <Button asChild variant="outline">
+              <Link to="/app/compta/reglements/validation">
+                <ShieldCheck className="size-4" />
+                Règlements à valider
+              </Link>
+            </Button>
+          )}
           <Button asChild variant="outline">
             <Link to="/app/compta/reglements">
               <ReceiptText className="size-4" />
@@ -420,20 +433,21 @@ export default function ReglementsEnregistresPage() {
                       {payment.instruments.map((instrument) => (
                         <span key={instrument.id} className="inline-flex items-center gap-1.5">
                           <Badge variant="outline">{MODE_LABELS[instrument.mode]}</Badge>
-                          <InstrumentStatusBadge value={instrument.statut} />
+                          {payment.statut === "VALIDE" && (
+                            <InstrumentStatusBadge value={instrument.statut} />
+                          )}
                         </span>
                       ))}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <Badge variant={payment.statut === "VALIDE" ? "default" : "destructive"}>
-                      {payment.statut === "VALIDE" ? "Validé" : "Annulé"}
-                    </Badge>
+                    <PaymentStatusBadge value={payment.statut} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end">
                       <PaymentActionsMenu
                         payment={payment}
+                        canEdit={canCreate && payment.creeParId === currentUserId}
                         canManage={canManage}
                         canIssueInvoice={canIssueInvoice}
                         pdfLoading={openingPaymentId === payment.id}
@@ -537,6 +551,7 @@ export default function ReglementsEnregistresPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Tous les statuts</SelectItem>
+                  <SelectItem value="A_VALIDER">À valider</SelectItem>
                   <SelectItem value="VALIDE">Validés</SelectItem>
                   <SelectItem value="ANNULE">Annulés</SelectItem>
                 </SelectContent>
@@ -790,6 +805,7 @@ function AccountSelect({
 
 function PaymentActionsMenu({
   payment,
+  canEdit,
   canManage,
   canIssueInvoice,
   pdfLoading,
@@ -799,6 +815,7 @@ function PaymentActionsMenu({
   onReplace,
 }: {
   payment: ClientPayment;
+  canEdit: boolean;
   canManage: boolean;
   canIssueInvoice: boolean;
   pdfLoading: boolean;
@@ -814,7 +831,8 @@ function PaymentActionsMenu({
     && canIssueInvoice
     && hasDirectActiveAllocations(payment);
   const canReplaceInstrument = rejectedInstruments.length > 0;
-  const canCancelPayment = payment.statut === "VALIDE" && canManage;
+  const canModifyPayment = payment.statut === "A_VALIDER" && canEdit;
+  const canCancelPayment = payment.statut !== "ANNULE" && canManage;
 
   return (
     <DropdownMenu>
@@ -834,6 +852,14 @@ function PaymentActionsMenu({
           <Eye className="size-4" />
           {pdfLoading ? "Ouverture..." : "Prévisualiser le PDF"}
         </DropdownMenuItem>
+        {canModifyPayment && (
+          <DropdownMenuItem asChild>
+            <Link to={`/app/compta/reglements/${payment.id}/modifier`}>
+              <Pencil className="size-4" />
+              Modifier
+            </Link>
+          </DropdownMenuItem>
+        )}
         {canCreateInvoice && (
           <DropdownMenuItem onSelect={onInvoice}>
             <FileText className="size-4" />
@@ -861,6 +887,12 @@ function PaymentActionsMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function PaymentStatusBadge({ value }: { value: ClientPayment["statut"] }) {
+  if (value === "A_VALIDER") return <Badge variant="secondary">À valider</Badge>;
+  if (value === "VALIDE") return <Badge variant="default">Validé</Badge>;
+  return <Badge variant="destructive">Annulé</Badge>;
 }
 
 function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }) {

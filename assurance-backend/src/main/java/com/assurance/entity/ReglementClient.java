@@ -34,6 +34,7 @@ import java.util.List;
         ),
         indexes = {
                 @Index(name = "idx_reglement_client_agence_date", columnList = "agence_id,date_reglement"),
+                @Index(name = "idx_reglement_client_agence_statut_date", columnList = "agence_id,statut,date_reglement"),
                 @Index(name = "idx_reglement_client_client", columnList = "client_payeur_id"),
                 @Index(name = "idx_reglement_client_groupe", columnList = "groupe_payeur_id")
         }
@@ -69,7 +70,7 @@ public class ReglementClient extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private StatutReglementClient statut = StatutReglementClient.VALIDE;
+    private StatutReglementClient statut = StatutReglementClient.A_VALIDER;
 
     @Column(name = "montant_total", nullable = false, precision = 16, scale = 2)
     private BigDecimal montantTotal;
@@ -83,6 +84,13 @@ public class ReglementClient extends AuditedEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cree_par_id", nullable = false)
     private Utilisateur creePar;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "valide_par_id")
+    private Utilisateur validePar;
+
+    @Column(name = "date_validation")
+    private LocalDateTime dateValidation;
 
     @Column(name = "date_annulation")
     private LocalDateTime dateAnnulation;

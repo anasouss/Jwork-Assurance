@@ -333,7 +333,9 @@ public class JournalReglementsPdfService {
             addBody(table, instrumentDueDate(instrument), regular, TextAlignment.CENTER, background);
             addBody(table, payment.getStatut() == StatutReglementClient.ANNULE
                     ? "Annulé"
-                    : instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
+                    : payment.getStatut() == StatutReglementClient.A_VALIDER
+                        ? "À valider"
+                        : instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
         }
         if (instruments.isEmpty()) {
@@ -415,7 +417,11 @@ public class JournalReglementsPdfService {
         if (status == null) {
             return "Tous les statuts";
         }
-        return status == StatutReglementClient.VALIDE ? "Valides" : "Annulés";
+        return switch (status) {
+            case A_VALIDER -> "À valider";
+            case VALIDE -> "Validés";
+            case ANNULE -> "Annulés";
+        };
     }
 
     private String modeLabel(ModeReglementClient mode) {

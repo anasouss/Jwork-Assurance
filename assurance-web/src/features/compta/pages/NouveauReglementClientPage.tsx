@@ -33,7 +33,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -79,6 +79,7 @@ import {
   receivableTypeLabel,
 } from "../receivable-display";
 import type {
+  ClientPayment,
   ClientPaymentMode,
   ClientReceivable,
   CreateClientPaymentRequest,
@@ -111,13 +112,23 @@ const paymentModes: Array<{
 ];
 
 export default function NouveauReglementClientPage() {
+  const { reglementId } = useParams();
+  const editing = Boolean(reglementId);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const canCreate = permissions.includes("reglement-client:create")
     || permissions.includes("reglement-client:manage");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const selection = selectionFromParams(searchParams);
+  const payment = useQuery({
+    queryKey: ["compta", "client-payment", reglementId],
+    queryFn: () => comptaApi.clientPayment(reglementId!),
+    enabled: editing,
+  });
+  const selection = editing && payment.data
+    ? selectionFromPayment(payment.data)
+    : selectionFromParams(searchParams);
   const hasSelection = selection.elementFacturableIds.length > 0
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
@@ -129,14 +140,18 @@ export default function NouveauReglementClientPage() {
   const [excludedTargetKeys, setExcludedTargetKeys] = useState<Set<string>>(new Set());
   const [recentlyMovedId, setRecentlyMovedId] = useState<string>();
   const movedHighlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initializedPaymentId = useRef<string | null>(null);
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const receivables = useQuery({
-    queryKey: ["compta", "client-receivable-selection", selection],
-    queryFn: () => comptaApi.selectedClientReceivables(selection),
+    queryKey: ["compta", "client-receivable-selection", selection, reglementId],
+    queryFn: () => comptaApi.selectedClientReceivables({
+      ...selection,
+      reglementIdExclu: reglementId,
+    }),
     enabled: hasSelection,
     staleTime: 0,
   });
@@ -180,6 +195,23 @@ export default function NouveauReglementClientPage() {
     ));
   }, [receivables.data, excludedTargetKeys]);
 
+  useEffect(() => {
+    if (!payment.data || initializedPaymentId.current === payment.data.id) return;
+    initializedPaymentId.current = payment.data.id;
+    setDateReglement(payment.data.dateReglement);
+    setNotes(payment.data.notes ?? "");
+    setMethods(payment.data.instruments.map((instrument) => ({
+      key: instrument.id,
+      mode: instrument.mode,
+      montant: money(instrument.montant),
+      dateEcheance: instrument.dateEcheance ?? "",
+      referenceInstrument: instrument.referenceInstrument ?? "",
+      banqueEmettriceId: instrument.banqueEmettriceId ?? "",
+      compteTresorerieId: instrument.compteTresorerieId ?? "",
+      reglementBureau: Boolean(instrument.reglementBureau),
+    })));
+  }, [payment.data]);
+
   useEffect(() => () => {
     if (movedHighlightTimer.current) clearTimeout(movedHighlightTimer.current);
   }, []);
@@ -192,21 +224,23 @@ export default function NouveauReglementClientPage() {
     }
   }, [activePaymentMode, methods]);
 
-  const createPayment = useMutation({
-    mutationFn: () => comptaApi.createClientPayment(buildRequest(
-      rows,
-      methods,
-      dateReglement,
-      notes
-    )),
+  const savePayment = useMutation({
+    mutationFn: () => {
+      const request = buildRequest(rows, methods, dateReglement, notes);
+      return editing
+        ? comptaApi.updateClientPayment(reglementId!, request)
+        : comptaApi.createClientPayment(request);
+    },
     onSuccess: async (payment) => {
-      toast.success(`Règlement ${payment.numero} enregistré`);
+      toast.success(editing
+        ? `Règlement ${payment.numero} modifié`
+        : `Règlement ${payment.numero} enregistré et envoyé pour validation`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
       ]);
-      navigate("/app/compta/reglements/historique", { replace: true });
+      navigate("/app/compta/reglements/validation", { replace: true });
     },
     onError: (error) => toast.error(
       error instanceof Error ? error.message : "Règlement impossible"
@@ -273,7 +307,7 @@ export default function NouveauReglementClientPage() {
       return;
     }
 
-    if (row.source.documentClientId && row.source.elementFacturableId) {
+    if (editing || (row.source.documentClientId && row.source.elementFacturableId)) {
       setExcludedTargetKeys((current) => {
         const next = new Set(current);
         next.add(receivableTargetKey(row));
@@ -298,6 +332,18 @@ export default function NouveauReglementClientPage() {
     setSearchParams(nextParams, { replace: true });
   }
 
+  if (editing && payment.isLoading) {
+    return <div className="py-16 text-center text-sm text-muted-foreground">Chargement du règlement...</div>;
+  }
+  if (editing && (payment.isError || !payment.data)) {
+    return <InvalidSelection message="Le règlement à modifier est introuvable." />;
+  }
+  if (editing && payment.data?.statut !== "A_VALIDER") {
+    return <InvalidSelection message="Seul un règlement à valider peut être modifié." />;
+  }
+  if (editing && payment.data?.creeParId !== currentUserId) {
+    return <InvalidSelection message="Seul le créateur peut modifier ce règlement à valider." />;
+  }
   if (!hasSelection) {
     return <InvalidSelection message="Aucun élément à encaisser n’a été sélectionné." />;
   }
@@ -314,7 +360,9 @@ export default function NouveauReglementClientPage() {
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">
             Comptabilité
           </div>
-          <h1 className="mt-1 text-xl font-semibold">Enregistrer un règlement</h1>
+          <h1 className="mt-1 text-xl font-semibold">
+            {editing ? `Modifier ${payment.data?.numero ?? "le règlement"}` : "Enregistrer un règlement"}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {receivables.isLoading
               ? "Chargement de la sélection..."
@@ -322,9 +370,9 @@ export default function NouveauReglementClientPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link to="/app/compta/reglements">
+          <Link to={editing ? "/app/compta/reglements/validation" : "/app/compta/reglements"}>
             <ArrowLeft className="size-4" />
-            Retour aux montants à encaisser
+            {editing ? "Retour aux règlements à valider" : "Retour aux montants à encaisser"}
           </Link>
         </Button>
       </header>
@@ -336,7 +384,7 @@ export default function NouveauReglementClientPage() {
           tone="quittance"
         />
         <SummaryCell
-          label="Total des encaissements"
+          label="Total du règlement"
           value={money(paymentTotal)}
           tone="payment"
         />
@@ -410,7 +458,7 @@ export default function NouveauReglementClientPage() {
         <div className="grid gap-4 bg-muted/10 p-4">
           <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label>Date d’encaissement</Label>
+              <Label>Date du règlement</Label>
               <DatePicker
                 date={dateReglement}
                 onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
@@ -629,20 +677,20 @@ export default function NouveauReglementClientPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link to="/app/compta/reglements">Annuler</Link>
+            <Link to={editing ? "/app/compta/reglements/validation" : "/app/compta/reglements"}>Annuler</Link>
           </Button>
           <Button
-            disabled={!canSubmit || createPayment.isPending}
+            disabled={!canSubmit || savePayment.isPending}
             onClick={() => {
               if (unallocatedCredit > 0.001) {
                 setCreditConfirmationOpen(true);
               } else {
-                createPayment.mutate();
+                savePayment.mutate();
               }
             }}
           >
             <Banknote className="size-4" />
-            Enregistrer le règlement
+            {editing ? "Enregistrer les modifications" : "Enregistrer pour validation"}
           </Button>
         </div>
       </footer>
@@ -659,8 +707,8 @@ export default function NouveauReglementClientPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Revenir au règlement</AlertDialogCancel>
             <AlertDialogAction
-              disabled={createPayment.isPending}
-              onClick={() => createPayment.mutate()}
+              disabled={savePayment.isPending}
+              onClick={() => savePayment.mutate()}
             >
               Confirmer et enregistrer
             </AlertDialogAction>
@@ -905,6 +953,23 @@ function selectionFromParams(params: URLSearchParams) {
   return {
     elementFacturableIds: uniqueIds(params.getAll("element")),
     documentClientIds: uniqueIds(params.getAll("document")),
+  };
+}
+
+function selectionFromPayment(payment: ClientPayment) {
+  return {
+    elementFacturableIds: uniqueIds(payment.instruments.flatMap((instrument) =>
+      instrument.affectations.flatMap((allocation) =>
+        allocation.elementFacturableId && !allocation.documentClientId
+          ? [allocation.elementFacturableId]
+          : []
+      )
+    )),
+    documentClientIds: uniqueIds(payment.instruments.flatMap((instrument) =>
+      instrument.affectations.flatMap((allocation) =>
+        allocation.documentClientId ? [allocation.documentClientId] : []
+      )
+    )),
   };
 }
 

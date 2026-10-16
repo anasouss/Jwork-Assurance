@@ -16,7 +16,7 @@ import java.util.Optional;
 public interface ReglementClientRepository extends JpaRepository<ReglementClient, Long> {
 
     @EntityGraph(attributePaths = {
-            "clientPayeur", "groupePayeur", "creePar", "instruments",
+            "clientPayeur", "groupePayeur", "creePar", "validePar", "instruments",
             "instruments.compteTresorerie", "instruments.banqueEmettriceReference"
     })
     @Query("""
@@ -25,6 +25,7 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
             where r.agence.id = :agenceId
               and (:dateDu is null or r.dateReglement >= :dateDu)
               and (:dateAu is null or r.dateReglement <= :dateAu)
+              and (:statut is null or r.statut = :statut)
               and (:search is null
                    or lower(r.numero) like concat('%', :search, '%')
                    or lower(r.payeurNom) like concat('%', :search, '%'))
@@ -33,13 +34,14 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
+            @Param("statut") com.assurance.enums.StatutReglementClient statut,
             @Param("search") String search,
             Pageable pageable
     );
 
     @EntityGraph(attributePaths = {
             "clientPayeur", "clientPayeur.ville", "groupePayeur", "groupePayeur.clientTresorerie",
-            "groupePayeur.clientTresorerie.ville", "creePar", "instruments",
+            "groupePayeur.clientTresorerie.ville", "creePar", "validePar", "instruments",
             "instruments.compteTresorerie", "instruments.banqueEmettriceReference"
     })
     Optional<ReglementClient> findByIdAndAgenceId(Long id, Long agenceId);
@@ -47,7 +49,7 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {
             "clientPayeur", "clientPayeur.ville", "groupePayeur", "groupePayeur.clientTresorerie",
-            "groupePayeur.clientTresorerie.ville", "creePar", "instruments",
+            "groupePayeur.clientTresorerie.ville", "creePar", "validePar", "instruments",
             "instruments.compteTresorerie", "instruments.banqueEmettriceReference"
     })
     @Query("""

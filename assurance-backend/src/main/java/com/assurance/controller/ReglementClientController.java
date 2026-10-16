@@ -158,6 +158,7 @@ public class ReglementClientController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) StatutReglementClient statut,
             @RequestParam(defaultValue = "dateReglement") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
@@ -167,6 +168,7 @@ public class ReglementClientController {
                 TenantContext.getCurrentAgence(),
                 dateDu,
                 dateAu,
+                statut,
                 search,
                 sortBy,
                 sortDirection,
@@ -246,6 +248,32 @@ public class ReglementClientController {
                 TenantContext.getCurrentUser(),
                 request
         ), "Règlement client enregistré"));
+    }
+
+    @PutMapping("/{paymentId}")
+    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<ReglementClientResponse>> update(
+            @PathVariable Long paymentId,
+            @Valid @RequestBody CreerReglementClientRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.updatePending(
+                TenantContext.getCurrentAgence(),
+                TenantContext.getCurrentUser(),
+                paymentId,
+                request
+        ), "Règlement à valider modifié"));
+    }
+
+    @PostMapping("/{paymentId}/validation")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:validate')")
+    public ResponseEntity<ApiResponse<ReglementClientResponse>> validate(
+            @PathVariable Long paymentId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.validatePending(
+                TenantContext.getCurrentAgence(),
+                TenantContext.getCurrentUser(),
+                paymentId
+        ), "Règlement client validé"));
     }
 
     @PostMapping("/{paymentId}/facture")

@@ -521,6 +521,7 @@ export const comptaApi = {
   async selectedClientReceivables(request: {
     elementFacturableIds: string[];
     documentClientIds: string[];
+    reglementIdExclu?: string;
   }) {
     return unwrap(await apiFetch<ApiResponse<ClientReceivable[]>>(
       "/api/v1/compta/reglements-clients/creances/selection",
@@ -551,6 +552,7 @@ export const comptaApi = {
     dateDu?: string;
     dateAu?: string;
     search?: string;
+    statut?: ClientPayment["statut"];
     sortBy?: "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
     sortDirection?: "asc" | "desc";
     page: number;
@@ -593,6 +595,20 @@ export const comptaApi = {
     return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
       "/api/v1/compta/reglements-clients",
       { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async updateClientPayment(id: string, request: CreateClientPaymentRequest) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/${id}`,
+      { method: "PUT", body: JSON.stringify(request) }
+    )));
+  },
+
+  async validateClientPayment(id: string) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/${id}/validation`,
+      { method: "POST" }
     )));
   },
 
@@ -1214,6 +1230,8 @@ function normalizeClientPayment(payment: ClientPayment): ClientPayment {
   return {
     ...payment,
     id: String(payment.id),
+    creeParId: String(payment.creeParId),
+    valideParId: payment.valideParId == null ? null : String(payment.valideParId),
     clientPayeurId: payment.clientPayeurId == null ? null : String(payment.clientPayeurId),
     groupePayeurId: payment.groupePayeurId == null ? null : String(payment.groupePayeurId),
     instruments: payment.instruments.map(normalizePaymentInstrument),

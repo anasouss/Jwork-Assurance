@@ -25,7 +25,11 @@ public class ReglementClientResponse {
     private BigDecimal montantTotal;
     private BigDecimal montantNonAffecte;
     private String notes;
+    private Long creeParId;
     private String creePar;
+    private Long valideParId;
+    private String validePar;
+    private java.time.LocalDateTime dateValidation;
     private List<Instrument> instruments;
 
     @Getter

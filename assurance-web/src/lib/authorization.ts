@@ -79,7 +79,12 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
   },
   {
     matches: startsWith("/app/compta/reglements"),
-    anyOf: ["reglement-client:view", "reglement-client:create", "reglement-client:manage"],
+    anyOf: [
+      "reglement-client:view",
+      "reglement-client:create",
+      "reglement-client:validate",
+      "reglement-client:manage",
+    ],
   },
   {
     matches: startsWith("/app/compta/bordereaux-compagnies"),

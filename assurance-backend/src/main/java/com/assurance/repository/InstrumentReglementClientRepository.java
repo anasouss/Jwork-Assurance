@@ -88,6 +88,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             join instrument.reglement reglement
             left join instrument.banqueEmettriceReference issuingBank
             where instrument.agence.id = :agenceId
+              and reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
               and instrument.statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
               and instrument.mode in :modes
               and (:dateDu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
@@ -154,6 +155,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             join instrument.reglement reglement
             left join instrument.banqueEmettriceReference issuingBank
             where instrument.agence.id = :agenceId
+              and reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
               and instrument.statut = :statut
               and instrument.mode <> com.assurance.enums.ModeReglementClient.ESPECES
               and (:mode is null or instrument.mode = :mode)

@@ -93,8 +93,6 @@ const MODE_LABELS: Record<ClientPaymentMode, string> = {
 export default function ReglementsEnregistresPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get("search")?.trim() ?? "";
-  const initialDateFrom = searchParams.get("dateDu") ?? "";
-  const initialDateTo = searchParams.get("dateAu") ?? "";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const currentUserId = useAuthStore((state) => state.user?.id);
   const canManage = permissions.includes("reglement-client:manage");
@@ -108,10 +106,6 @@ export default function ReglementsEnregistresPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState(initialSearch);
   const [appliedSearch, setAppliedSearch] = useState(initialSearch);
-  const [dateFrom, setDateFrom] = useState(initialDateFrom);
-  const [dateTo, setDateTo] = useState(initialDateTo);
-  const [appliedDateFrom, setAppliedDateFrom] = useState(initialDateFrom);
-  const [appliedDateTo, setAppliedDateTo] = useState(initialDateTo);
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
@@ -125,20 +119,15 @@ export default function ReglementsEnregistresPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
-  const hasAppliedPeriod = Boolean(appliedDateFrom && appliedDateTo);
-
   const payments = useQuery({
-    queryKey: ["compta", "client-payments", appliedSearch, appliedDateFrom, appliedDateTo, sortBy, sortDirection, page],
+    queryKey: ["compta", "client-payments", appliedSearch, sortBy, sortDirection, page],
     queryFn: () => comptaApi.clientPayments({
       search: appliedSearch || undefined,
-      dateDu: appliedDateFrom,
-      dateAu: appliedDateTo,
       sortBy,
       sortDirection,
       page,
       size: PAGE_SIZE,
     }),
-    enabled: hasAppliedPeriod,
   });
 
   const accounts = useQuery({
@@ -225,10 +214,6 @@ export default function ReglementsEnregistresPage() {
   function resetFilters() {
     setSearch("");
     setAppliedSearch("");
-    setDateFrom("");
-    setDateTo("");
-    setAppliedDateFrom("");
-    setAppliedDateTo("");
     setSortBy("dateReglement");
     setSortDirection("desc");
     setPage(0);
@@ -236,23 +221,11 @@ export default function ReglementsEnregistresPage() {
   }
 
   function applyFilters() {
-    if (!dateFrom || !dateTo) {
-      toast.error("Renseignez la date de début et la date de fin");
-      return;
-    }
-    if (dateFrom > dateTo) {
-      toast.error("La date de début doit précéder la date de fin");
-      return;
-    }
     const nextSearch = search.trim();
     setAppliedSearch(nextSearch);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
     setPage(0);
     const next = new URLSearchParams();
     if (nextSearch) next.set("search", nextSearch);
-    next.set("dateDu", dateFrom);
-    next.set("dateAu", dateTo);
     setSearchParams(next, { replace: true });
   }
 
@@ -355,7 +328,7 @@ export default function ReglementsEnregistresPage() {
         </div>
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_180px_180px_auto]">
+      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_auto]">
         <div className="grid gap-2">
           <Label htmlFor="payment-search">Payeur, numéro ou référence</Label>
           <Input
@@ -366,26 +339,6 @@ export default function ReglementsEnregistresPage() {
               if (event.key === "Enter") {
                 applyFilters();
               }
-            }}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Date du</Label>
-          <DatePicker
-            date={dateFrom}
-            onSelect={(value) => {
-              setDateFrom(toDateOnly(value) ?? "");
-              setPage(0);
-            }}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label>Date au</Label>
-          <DatePicker
-            date={dateTo}
-            onSelect={(value) => {
-              setDateTo(toDateOnly(value) ?? "");
-              setPage(0);
             }}
           />
         </div>
@@ -418,9 +371,9 @@ export default function ReglementsEnregistresPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {hasAppliedPeriod && payments.isLoading ? (
+              {payments.isLoading ? (
                 <TableRowsSkeleton colSpan={7} rows={8} />
-              ) : hasAppliedPeriod ? (payments.data?.rows ?? []).map((payment) => (
+              ) : (payments.data?.rows ?? []).map((payment) => (
                 <tr key={payment.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-semibold">{payment.numero}</td>
                   <td className="px-4 py-3">{formatDate(payment.dateReglement)}</td>
@@ -462,14 +415,8 @@ export default function ReglementsEnregistresPage() {
                     </div>
                   </td>
                 </tr>
-              )) : null}
-              {!hasAppliedPeriod ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                    Renseignez une période puis lancez la recherche.
-                  </td>
-                </tr>
-              ) : !payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
+              ))}
+              {!payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun règlement ne correspond à la recherche.
@@ -479,7 +426,7 @@ export default function ReglementsEnregistresPage() {
             </tbody>
           </table>
         </div>
-        {hasAppliedPeriod && payments.data && (
+        {payments.data && (
           <ServerPagination
             page={payments.data.page.number}
             totalPages={payments.data.page.totalPages}

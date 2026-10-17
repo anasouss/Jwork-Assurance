@@ -57,7 +57,6 @@ import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.LigneBordereauRemiseRepository;
-import com.assurance.repository.BordereauRemiseRepository;
 import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.SequenceReglementClientRepository;
@@ -120,7 +119,6 @@ public class ReglementClientService {
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieService tresorerieService;
     private final LigneBordereauRemiseRepository remittanceLineRepository;
-    private final BordereauRemiseRepository remittanceRepository;
     private final BanqueService banqueService;
     private final ParametreApplicationService parametreApplicationService;
 
@@ -1092,7 +1090,7 @@ public class ReglementClientService {
     @Transactional(readOnly = true)
     public InstrumentReglementPageResponse searchInstruments(
             Long agenceId,
-            StatutInstrumentReglement status,
+            Collection<StatutInstrumentReglement> statuses,
             ModeReglementClient mode,
             LocalDate dateDu,
             LocalDate dateAu,
@@ -1107,7 +1105,7 @@ public class ReglementClientService {
         }
         Page<InstrumentReglementClient> result = instrumentRepository.searchByStatus(
                 agenceId,
-                status,
+                statuses,
                 mode,
                 dateDu,
                 dateAu,
@@ -1611,7 +1609,6 @@ public class ReglementClientService {
         line.setDateTraitement(operationDate);
         line.setMotifRejet(reason);
         remittanceLineRepository.save(line);
-        recomputeRemittanceStatus(line.getBordereau());
     }
 
     private void ensureNotReservedByDraftRemittance(InstrumentReglementClient instrument) {
@@ -1623,21 +1620,6 @@ public class ReglementClientService {
                     "L'instrument appartient à un bordereau provisoire. Remettez ou supprimez ce bordereau"
             );
         }
-    }
-
-    private void recomputeRemittanceStatus(BordereauRemise remittance) {
-        long settled = remittance.getLignes().stream()
-                .filter(line -> line.getStatut() == StatutLigneBordereauRemise.ENCAISSEE
-                        || line.getStatut() == StatutLigneBordereauRemise.REJETEE)
-                .count();
-        if (settled == remittance.getLignes().size()) {
-            remittance.setStatut(StatutBordereauRemise.CLOTURE);
-        } else if (settled > 0) {
-            remittance.setStatut(StatutBordereauRemise.PARTIELLEMENT_TRAITE);
-        } else {
-            remittance.setStatut(StatutBordereauRemise.DEPOSE);
-        }
-        remittanceRepository.save(remittance);
     }
 
     private void refreshAfterInstrumentTransition(InstrumentReglementClient instrument) {

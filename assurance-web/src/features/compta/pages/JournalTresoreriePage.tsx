@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
+import type { TreasuryMovement } from "../types";
 import {
   formatTreasuryDate,
   formatTreasuryMoney,
@@ -145,13 +146,14 @@ export default function JournalTresoreriePage() {
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <Table className="min-w-[950px]">
+        <Table className="min-w-[1050px]">
             <TableHeader className="bg-orange-600 text-xs uppercase text-white">
               <TableRow className="hover:bg-orange-600">
                 <TableHead className="px-4 text-white">Date</TableHead>
                 <TableHead className="px-4 text-white">Compte</TableHead>
                 <TableHead className="px-4 text-white">Libellé</TableHead>
                 <TableHead className="px-4 text-white">Référence</TableHead>
+                <TableHead className="px-4 text-white">Mode de paiement</TableHead>
                 <TableHead className="px-4 text-white">Opération</TableHead>
                 <TableHead className="px-4 text-right text-white">Entrée</TableHead>
                 <TableHead className="px-4 text-right text-white">Sortie</TableHead>
@@ -159,13 +161,14 @@ export default function JournalTresoreriePage() {
             </TableHeader>
             <TableBody>
               {movements.isLoading ? (
-                <TableRowsSkeleton colSpan={7} rows={8} />
+                <TableRowsSkeleton colSpan={8} rows={8} />
               ) : (movements.data?.rows ?? []).map((movement) => (
                 <TableRow key={movement.id}>
                   <TableCell className="px-4 py-3">{formatTreasuryDate(movement.dateOperation)}</TableCell>
                   <TableCell className="px-4 py-3 font-semibold">{movement.compteTresorerie}</TableCell>
                   <TableCell className="px-4 py-3">{movement.libelle}</TableCell>
                   <TableCell className="px-4 py-3">{movement.reference || "-"}</TableCell>
+                  <TableCell className="px-4 py-3">{paymentModeLabel(movement.modePaiement)}</TableCell>
                   <TableCell className="px-4 py-3">{movement.numeroOperationTresorerie || "-"}</TableCell>
                   <TableCell className="px-4 py-3 text-right text-emerald-700">
                     {movement.sens === "ENTREE" ? (
@@ -187,7 +190,7 @@ export default function JournalTresoreriePage() {
               ))}
               {!movements.isLoading && (movements.data?.rows.length ?? 0) === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun mouvement ne correspond aux filtres.
                   </TableCell>
                 </TableRow>
@@ -206,4 +209,19 @@ export default function JournalTresoreriePage() {
       </section>
     </div>
   );
+}
+
+function paymentModeLabel(mode: TreasuryMovement["modePaiement"]) {
+  if (!mode) return "-";
+  const labels = {
+    ESPECES: "Espèces",
+    CHEQUE: "Chèque",
+    EFFET: "Effet",
+    VIREMENT: "Virement",
+    VERSEMENT_BANCAIRE: "Versement bancaire",
+    CARTE: "Carte",
+    PRELEVEMENT: "Prélèvement",
+    COMPENSATION: "Compensation",
+  } satisfies Record<NonNullable<TreasuryMovement["modePaiement"]>, string>;
+  return labels[mode];
 }

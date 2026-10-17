@@ -126,10 +126,10 @@ public class BordereauRemisePdfService {
                 .setFontColor(ACCENT)
                 .setMarginTop(5)
                 .setMarginBottom(0));
-        title.add(new Paragraph(statusLabel(slip.getStatut()))
+        title.add(new Paragraph(statusLabel(slip))
                 .setFont(regular)
                 .setFontSize(8)
-                .setFontColor(statusColor(slip.getStatut()))
+                        .setFontColor(statusColor(slip))
                 .setMarginTop(4)
                 .setMarginBottom(0));
         header.addCell(title);
@@ -352,8 +352,13 @@ public class BordereauRemisePdfService {
         };
     }
 
-    private String statusLabel(StatutBordereauRemise status) {
-        return switch (status) {
+    private String statusLabel(BordereauRemise slip) {
+        if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES
+                && (slip.getStatut() == StatutBordereauRemise.PARTIELLEMENT_TRAITE
+                || slip.getStatut() == StatutBordereauRemise.CLOTURE)) {
+            return "REMIS À LA BANQUE";
+        }
+        return switch (slip.getStatut()) {
             case BROUILLON -> "PROVISOIRE";
             case DEPOSE -> "REMIS À LA BANQUE";
             case PARTIELLEMENT_TRAITE -> "PARTIELLEMENT TRAITÉ";
@@ -362,8 +367,13 @@ public class BordereauRemisePdfService {
         };
     }
 
-    private DeviceRgb statusColor(StatutBordereauRemise status) {
-        return switch (status) {
+    private DeviceRgb statusColor(BordereauRemise slip) {
+        if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES
+                && (slip.getStatut() == StatutBordereauRemise.PARTIELLEMENT_TRAITE
+                || slip.getStatut() == StatutBordereauRemise.CLOTURE)) {
+            return new DeviceRgb(37, 99, 235);
+        }
+        return switch (slip.getStatut()) {
             case CLOTURE -> SUCCESS;
             case ANNULE -> new DeviceRgb(220, 38, 38);
             case BROUILLON -> ACCENT;

@@ -640,7 +640,8 @@ export const comptaApi = {
   },
 
   async paymentInstruments(params: {
-    statut: PaymentInstrument["statut"];
+    statut?: PaymentInstrument["statut"];
+    statuts?: PaymentInstrument["statut"][];
     mode?: PaymentInstrument["mode"];
     dateDu?: string;
     dateAu?: string;

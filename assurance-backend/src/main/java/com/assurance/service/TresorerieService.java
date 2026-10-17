@@ -568,6 +568,7 @@ public class TresorerieService {
                         ? null : movement.getInstrumentReglement().getId())
                 .instrumentReglementCompagnieId(movement.getInstrumentReglementCompagnie() == null
                         ? null : movement.getInstrumentReglementCompagnie().getId())
+                .modePaiement(resolvePaymentMode(movement))
                 .operationTresorerieId(movement.getOperationTresorerie() == null
                         ? null : movement.getOperationTresorerie().getId())
                 .numeroOperationTresorerie(movement.getOperationTresorerie() == null
@@ -582,6 +583,16 @@ public class TresorerieService {
                 .reference(movement.getReference())
                 .libelle(movement.getLibelle())
                 .build();
+    }
+
+    private String resolvePaymentMode(MouvementTresorerie movement) {
+        if (movement.getInstrumentReglement() != null) {
+            return movement.getInstrumentReglement().getMode().name();
+        }
+        if (movement.getInstrumentReglementCompagnie() != null) {
+            return movement.getInstrumentReglementCompagnie().getMode().name();
+        }
+        return null;
     }
 
     private CompteTresorerie requireAccount(Long agenceId, Long accountId) {

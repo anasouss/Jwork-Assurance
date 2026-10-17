@@ -459,7 +459,7 @@ public class BordereauRemiseService {
                 .id(slip.getId())
                 .numero(slip.getNumero())
                 .type(slip.getType())
-                .statut(slip.getStatut())
+                .statut(responseStatus(slip))
                 .dateBordereau(slip.getDateBordereau())
                 .dateDepot(slip.getDateDepot())
                 .compteDestinationId(slip.getCompteDestination().getId())
@@ -474,6 +474,15 @@ public class BordereauRemiseService {
                 .createdAt(slip.getCreatedAt())
                 .lignes(lines)
                 .build();
+    }
+
+    private StatutBordereauRemise responseStatus(BordereauRemise slip) {
+        if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES
+                && (slip.getStatut() == StatutBordereauRemise.PARTIELLEMENT_TRAITE
+                || slip.getStatut() == StatutBordereauRemise.CLOTURE)) {
+            return StatutBordereauRemise.DEPOSE;
+        }
+        return slip.getStatut();
     }
 
     private BordereauRemiseResponse.Ligne toLineResponse(LigneBordereauRemise line) {

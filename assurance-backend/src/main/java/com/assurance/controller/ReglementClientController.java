@@ -327,7 +327,8 @@ public class ReglementClientController {
     @GetMapping("/instruments")
     @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> instruments(
-            @RequestParam(defaultValue = "EN_ATTENTE") StatutInstrumentReglement statut,
+            @RequestParam(required = false) StatutInstrumentReglement statut,
+            @RequestParam(required = false) List<StatutInstrumentReglement> statuts,
             @RequestParam(required = false) ModeReglementClient mode,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
@@ -341,7 +342,9 @@ public class ReglementClientController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.searchInstruments(
                 TenantContext.getCurrentAgence(),
-                statut,
+                statuts == null || statuts.isEmpty()
+                        ? List.of(statut == null ? StatutInstrumentReglement.EN_ATTENTE : statut)
+                        : statuts,
                 mode,
                 dateDu,
                 dateAu,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowRightLeft, Banknote, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Banknote, Ban, CheckCircle2, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -51,6 +51,10 @@ export default function EncaissementsEnAttentePage() {
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacementDate, setReplacementDate] = useState(TODAY);
   const [replacementReason, setReplacementReason] = useState("");
+  const [instrumentToProcess, setInstrumentToProcess] = useState<PaymentInstrument>();
+  const [instrumentAction, setInstrumentAction] = useState<"SETTLE" | "REJECT">("SETTLE");
+  const [operationDate, setOperationDate] = useState(TODAY);
+  const [rejectionReason, setRejectionReason] = useState("");
   const [slipDialogOpen, setSlipDialogOpen] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [slipDate, setSlipDate] = useState(TODAY);
@@ -72,7 +76,7 @@ export default function EncaissementsEnAttentePage() {
   const instruments = useQuery({
     queryKey: ["compta", "treasury", "collection-queue", mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection, page],
     queryFn: () => comptaApi.paymentInstruments({
-      statut: "EN_ATTENTE",
+      statuts: ["EN_ATTENTE", "REMIS_EN_BANQUE"],
       mode: mode === "ALL" ? undefined : mode,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
@@ -121,6 +125,30 @@ export default function EncaissementsEnAttentePage() {
       error instanceof Error ? error.message : "Remplacement impossible"
     ),
   });
+
+  const processInstrument = useMutation({
+    mutationFn: () => comptaApi.changePaymentInstrumentStatus(instrumentToProcess!.id, {
+      statut: instrumentAction === "SETTLE" ? "CONFIRME" : "REJETE",
+      dateOperation: operationDate,
+      motif: instrumentAction === "REJECT" ? rejectionReason.trim() : undefined,
+    }),
+    onSuccess: async () => {
+      toast.success(instrumentAction === "SETTLE" ? "Instrument encaissé" : "Rejet enregistré");
+      setInstrumentToProcess(undefined);
+      setRejectionReason("");
+      await queryClient.invalidateQueries({ queryKey: ["compta"] });
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Traitement impossible"
+    ),
+  });
+
+  function openInstrumentAction(instrument: PaymentInstrument, action: "SETTLE" | "REJECT") {
+    setInstrumentToProcess(instrument);
+    setInstrumentAction(action);
+    setOperationDate(TODAY);
+    setRejectionReason("");
+  }
 
   const createRemittanceSlip = useMutation({
     mutationFn: () => {
@@ -446,6 +474,8 @@ export default function EncaissementsEnAttentePage() {
                     <InstrumentAction
                       instrument={instrument}
                       canReplace={canReplacePayment}
+                      canManage={canManage}
+                      onProcess={(action) => openInstrumentAction(instrument, action)}
                       onReplace={() => {
                         setInstrumentToReplace(instrument);
                         setReplacementDate(TODAY);
@@ -560,6 +590,42 @@ export default function EncaissementsEnAttentePage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={Boolean(instrumentToProcess)} onOpenChange={(open) => !open && setInstrumentToProcess(undefined)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{instrumentAction === "SETTLE" ? "Confirmer l’encaissement" : "Enregistrer le rejet"}</DialogTitle>
+            <DialogDescription>
+              {instrumentToProcess?.referenceInstrument || instrumentToProcess?.numeroReglement} · {formatTreasuryMoney(instrumentToProcess?.montant ?? 0)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Date d’opération</Label>
+              <DatePicker date={operationDate} onSelect={(value) => setOperationDate(toDateOnly(value) ?? "")} />
+            </div>
+            {instrumentAction === "REJECT" && (
+              <div className="grid gap-2">
+                <Label htmlFor="instrument-rejection-reason">Motif du rejet</Label>
+                <Textarea
+                  id="instrument-rejection-reason"
+                  value={rejectionReason}
+                  onChange={(event) => setRejectionReason(event.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={processInstrument.isPending} onClick={() => setInstrumentToProcess(undefined)}>Annuler</Button>
+            <Button
+              disabled={!operationDate || (instrumentAction === "REJECT" && !rejectionReason.trim()) || processInstrument.isPending}
+              onClick={() => processInstrument.mutate()}
+            >
+              {instrumentAction === "SETTLE" ? "Confirmer" : "Enregistrer le rejet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
@@ -612,9 +678,11 @@ function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
   return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">À rapprocher</Badge>;
 }
 
-function InstrumentAction({ instrument, canReplace, onReplace }: {
+function InstrumentAction({ instrument, canReplace, canManage, onProcess, onReplace }: {
   instrument: PaymentInstrument;
   canReplace: boolean;
+  canManage: boolean;
+  onProcess: (action: "SETTLE" | "REJECT") => void;
   onReplace: () => void;
 }) {
   const replaceable = canReplace
@@ -640,6 +708,17 @@ function InstrumentAction({ instrument, canReplace, onReplace }: {
       {instrument.bordereauRemiseId && (
         <DropdownMenuItem asChild>
           <Link to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>Voir le bordereau <ArrowRight className="size-4" /></Link>
+        </DropdownMenuItem>
+      )}
+      {instrument.statut === "REMIS_EN_BANQUE" && canManage && <DropdownMenuSeparator />}
+      {instrument.statut === "REMIS_EN_BANQUE" && canManage && (
+        <DropdownMenuItem onSelect={() => onProcess("SETTLE")}>
+          <CheckCircle2 className="size-4" /> Confirmer l’encaissement
+        </DropdownMenuItem>
+      )}
+      {instrument.statut === "REMIS_EN_BANQUE" && canManage && (
+        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => onProcess("REJECT")}>
+          <Ban className="size-4" /> Enregistrer le rejet
         </DropdownMenuItem>
       )}
       {replaceable && <DropdownMenuSeparator />}

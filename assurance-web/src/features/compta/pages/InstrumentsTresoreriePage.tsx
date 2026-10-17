@@ -38,7 +38,7 @@ const TYPE_LABELS: Record<RemittanceSlipType, string> = {
 const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
   BROUILLON: "Provisoire",
   DEPOSE: "Remis à la banque",
-  PARTIELLEMENT_TRAITE: "Partiellement traité",
+  PARTIELLEMENT_TRAITE: "Remis à la banque",
   CLOTURE: "Clôturé",
   ANNULE: "Annulé",
 };
@@ -119,7 +119,7 @@ export default function InstrumentsTresoreriePage() {
         <div className="grid gap-2"><Label>Statut</Label><Select value={status} onValueChange={(value) => updateFilter("statut", value)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">Provisoires</SelectItem>
-            <SelectItem value="DEPOSE">Remis à la banque</SelectItem><SelectItem value="PARTIELLEMENT_TRAITE">Partiellement traités</SelectItem>
+            <SelectItem value="DEPOSE">Remis à la banque</SelectItem>
             <SelectItem value="CLOTURE">Clôturés</SelectItem><SelectItem value="ANNULE">Annulés</SelectItem>
           </SelectContent>
         </Select></div>
@@ -130,7 +130,7 @@ export default function InstrumentsTresoreriePage() {
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Tous les bordereaux</h2><p className="text-sm text-muted-foreground">Ouvrez un bordereau pour enregistrer sa remise ou le résultat de ses instruments.</p></div>
+        <div className="border-b px-4 py-3"><h2 className="font-semibold">Tous les bordereaux</h2><p className="text-sm text-muted-foreground">Ouvrez un bordereau pour consulter sa remise et les instruments associés.</p></div>
         <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-sm">
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
             <th className="px-4 py-3 text-left">Réf. interne</th><th className="px-4 py-3 text-left">N° banque</th><th className="px-4 py-3 text-left">Type</th>
@@ -196,9 +196,9 @@ function parseTypeFilter(value: string | null): TypeFilter {
 }
 
 function parseStatusFilter(value: string | null): StatusFilter {
+  if (value === "PARTIELLEMENT_TRAITE") return "DEPOSE";
   return value === "BROUILLON"
     || value === "DEPOSE"
-    || value === "PARTIELLEMENT_TRAITE"
     || value === "CLOTURE"
     || value === "ANNULE"
     ? value
@@ -218,7 +218,7 @@ function StatusBadge({ status }: { status: RemittanceSlipStatus }) {
   const className = {
     BROUILLON: "bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200",
     DEPOSE: "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200",
-    PARTIELLEMENT_TRAITE: "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200",
+    PARTIELLEMENT_TRAITE: "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200",
     CLOTURE: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-200",
     ANNULE: "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-200",
   }[status];

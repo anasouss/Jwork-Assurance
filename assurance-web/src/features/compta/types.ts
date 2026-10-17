@@ -670,6 +670,7 @@ export type TreasuryMovement = {
   compteTresorerie: string;
   instrumentReglementId?: string | null;
   instrumentReglementCompagnieId?: string | null;
+  modePaiement?: ClientPaymentMode | CompanyPaymentMode | null;
   operationTresorerieId?: string | null;
   numeroOperationTresorerie?: string | null;
   sessionCaisseId?: string | null;

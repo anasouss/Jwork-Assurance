@@ -156,23 +156,11 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             left join instrument.banqueEmettriceReference issuingBank
             where instrument.agence.id = :agenceId
               and reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
-              and instrument.statut = :statut
+              and instrument.statut in :statuts
               and instrument.mode <> com.assurance.enums.ModeReglementClient.ESPECES
               and (:mode is null or instrument.mode = :mode)
-              and (
-                    :dateDu is null
-                    or (:statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
-                        and coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
-                    or (:statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
-                        and instrument.dateStatut >= :dateDu)
-              )
-              and (
-                    :dateAu is null
-                    or (:statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
-                        and coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)
-                    or (:statut <> com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
-                        and instrument.dateStatut <= :dateAu)
-              )
+              and (:dateDu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
+              and (:dateAu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)
               and (
                     :search is null
                     or lower(reglement.numero) like lower(concat('%', :search, '%'))
@@ -214,7 +202,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             """)
     Page<InstrumentReglementClient> searchByStatus(
             @Param("agenceId") Long agenceId,
-            @Param("statut") StatutInstrumentReglement statut,
+            @Param("statuts") Collection<StatutInstrumentReglement> statuts,
             @Param("mode") ModeReglementClient mode,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,

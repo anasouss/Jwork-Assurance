@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, ArrowRightLeft, Banknote, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -55,6 +55,7 @@ export default function EncaissementsEnAttentePage() {
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [slipDate, setSlipDate] = useState(TODAY);
   const [slipNotes, setSlipNotes] = useState("");
+  const pdfWindowRef = useRef<Window | null>(null);
 
   useEffect(() => {
     setSearch(appliedSearch);
@@ -145,13 +146,37 @@ export default function EncaissementsEnAttentePage() {
       await queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] });
       try {
         const pdf = await comptaApi.remittanceSlipPdf(created.id);
-        window.location.assign(URL.createObjectURL(pdf));
+        const url = URL.createObjectURL(pdf);
+        if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
+          pdfWindowRef.current.location.href = url;
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch (error) {
+        if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
+          pdfWindowRef.current.location.href = `/app/compta/tresorerie/bordereaux-remise/${created.id}`;
+        }
         toast.error(error instanceof Error ? error.message : "Prévisualisation du PDF impossible");
+      } finally {
+        pdfWindowRef.current = null;
       }
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Création du bordereau impossible"),
+    onError: (error) => {
+      pdfWindowRef.current?.close();
+      pdfWindowRef.current = null;
+      toast.error(error instanceof Error ? error.message : "Création du bordereau impossible");
+    },
   });
+
+  function submitRemittanceSlip() {
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
+      return;
+    }
+    previewWindow.opener = null;
+    pdfWindowRef.current = previewWindow;
+    createRemittanceSlip.mutate();
+  }
 
   function applyFilters() {
     updateUrl({ search: search.trim(), page: 0 });
@@ -475,7 +500,7 @@ export default function EncaissementsEnAttentePage() {
             <Button variant="outline" disabled={createRemittanceSlip.isPending} onClick={() => setSlipDialogOpen(false)}>Annuler</Button>
             <Button
               disabled={!destinationAccountId || !slipDate || selectedInstruments.length === 0 || createRemittanceSlip.isPending}
-              onClick={() => createRemittanceSlip.mutate()}
+              onClick={submitRemittanceSlip}
             >
               <Plus className="size-4" />
               {createRemittanceSlip.isPending ? "Création..." : "Créer le bordereau"}

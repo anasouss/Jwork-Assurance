@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Banknote, FileClock, Plus, ReceiptText } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -42,6 +42,7 @@ export default function NouveauBordereauRemisePage() {
   const [slipDate, setSlipDate] = useState(TODAY);
   const [notes, setNotes] = useState("");
   const [creationDialogOpen, setCreationDialogOpen] = useState(false);
+  const pdfWindowRef = useRef<Window | null>(null);
 
   const instrumentType = type === "CHEQUE" || type === "EFFET";
   const accounts = useQuery({
@@ -125,14 +126,39 @@ export default function NouveauBordereauRemisePage() {
       ]);
       try {
         const pdf = await comptaApi.remittanceSlipPdf(created.id);
-        window.location.assign(URL.createObjectURL(pdf));
+        const url = URL.createObjectURL(pdf);
+        if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
+          pdfWindowRef.current.location.href = url;
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Prévisualisation du PDF impossible");
-        navigate(`/app/compta/tresorerie/bordereaux-remise/${created.id}`, { replace: true });
+        if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
+          pdfWindowRef.current.location.href = `/app/compta/tresorerie/bordereaux-remise/${created.id}`;
+        } else {
+          navigate(`/app/compta/tresorerie/bordereaux-remise/${created.id}`, { replace: true });
+        }
+      } finally {
+        pdfWindowRef.current = null;
       }
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
+    onError: (error) => {
+      pdfWindowRef.current?.close();
+      pdfWindowRef.current = null;
+      toast.error(error instanceof Error ? error.message : "Création impossible");
+    },
   });
+
+  function submitSlip() {
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
+      return;
+    }
+    previewWindow.opener = null;
+    pdfWindowRef.current = previewWindow;
+    createSlip.mutate();
+  }
 
   function changeType(nextType: RemittanceSlipType) {
     setCreationDialogOpen(false);
@@ -265,7 +291,7 @@ export default function NouveauBordereauRemisePage() {
 
           {type === "VERSEMENT_ESPECES" && (
             <div className="flex justify-end bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
-              <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}>
+              <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={submitSlip}>
                 <Banknote className="size-4" /> Créer le bordereau provisoire
               </Button>
             </div>
@@ -301,7 +327,7 @@ export default function NouveauBordereauRemisePage() {
             <Button variant="outline" disabled={createSlip.isPending} onClick={() => setCreationDialogOpen(false)}>
               Annuler
             </Button>
-            <Button disabled={!selectionValid || !destinationId || !slipDate || createSlip.isPending} onClick={() => createSlip.mutate()}>
+            <Button disabled={!selectionValid || !destinationId || !slipDate || createSlip.isPending} onClick={submitSlip}>
               <Plus className="size-4" />
               {createSlip.isPending ? "Création..." : "Créer le bordereau provisoire"}
             </Button>

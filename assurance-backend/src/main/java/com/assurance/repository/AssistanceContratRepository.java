@@ -4,18 +4,85 @@ import com.assurance.entity.AssistanceContrat;
 import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 
 public interface AssistanceContratRepository extends JpaRepository<AssistanceContrat, Long> {
+    @Query("""
+            select a.id
+            from AssistanceContrat a
+            left join a.compagnieAssistance compagnie
+            left join a.produitAssistance produit
+            left join a.vehicule vehicule
+            where a.contrat.agence.id = :agenceId
+              and a.actif = true
+              and a.contrat.prospection = false
+              and a.contrat.brouillon = false
+              and a.contrat.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and a.dateEcheance between :dateDu and :dateAu
+              and (:compagnieId is null or compagnie.id = :compagnieId)
+              and (:produitId is null or produit.id = :produitId)
+              and (:typeAssistance is null or lower(produit.type) = :typeAssistance)
+              and (:search is null
+                   or lower(coalesce(a.numeroDossier, '')) like concat('%', :search, '%')
+                   or lower(coalesce(a.numeroContratOuQuittance, '')) like concat('%', :search, '%')
+                   or lower(coalesce(a.numeroPoliceContrat, '')) like concat('%', :search, '%')
+                   or lower(coalesce(a.produit, '')) like concat('%', :search, '%')
+                   or lower(coalesce(compagnie.nom, '')) like concat('%', :search, '%')
+                   or lower(coalesce(vehicule.immatriculation, '')) like concat('%', :search, '%')
+                   or exists (select cc.id from ContratClient cc
+                              where cc.contrat = a.contrat
+                                and (lower(coalesce(cc.client.codeClient, '')) like concat('%', :search, '%')
+                                     or lower(coalesce(cc.client.rc, '')) like concat('%', :search, '%')
+                                     or lower(coalesce(cc.client.cin, '')) like concat('%', :search, '%')
+                                     or lower(coalesce(cc.client.ice, '')) like concat('%', :search, '%')
+                                     or lower(coalesce(cc.client.raisonSociale, '')) like concat('%', :search, '%')
+                                     or lower(coalesce(cc.client.nom, '')) like concat('%', :search, '%')
+                                     or lower(coalesce(cc.client.prenom, '')) like concat('%', :search, '%'))))
+            order by a.dateEcheance asc, a.id asc
+            """)
+    Page<Long> findEcheanceIds(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu,
+            @Param("compagnieId") Long compagnieId,
+            @Param("produitId") Long produitId,
+            @Param("typeAssistance") String typeAssistance,
+            @Param("search") String search,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {
+            "brancheAssurance",
+            "contrat",
+            "contrat.brancheAssurance",
+            "contrat.clients",
+            "contrat.clients.client",
+            "compagnieAssistance",
+            "produitAssistance",
+            "vehicule"
+    })
+    @Query("""
+            select distinct a
+            from AssistanceContrat a
+            where a.contrat.agence.id = :agenceId
+              and a.id in :ids
+            """)
+    List<AssistanceContrat> findEcheancesByAgenceIdAndIdIn(
+            @Param("agenceId") Long agenceId,
+            @Param("ids") Collection<Long> ids
+    );
+
     @Query("""
             select case when count(a.id) > 0 then true else false end
             from AssistanceContrat a

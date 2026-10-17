@@ -34,22 +34,28 @@ import { referenceApi } from "../api/references";
 import { FinalizeRenewalDialog, PreTermePdfDialog } from "../components/echeances/PreTermeDialogs";
 import { usePreTermeActions } from "../components/echeances/usePreTermeActions";
 import { toDateOnly } from "../date";
-import type { EcheanceAutomobileRow, TypeContrat } from "../types";
+import type { EcheanceAssistanceRow, EcheanceAutomobileRow, TypeContrat } from "../types";
 import { useAuthStore } from "@/store/auth-store";
 
 type EcheanceFilters = {
+  branche: "AUTOMOBILE" | "ASSISTANCE";
   dateDu?: string;
   dateAu?: string;
   compagnieId: "ALL" | string;
+  produitId: "ALL" | string;
   typeContrat: "ALL" | TypeContrat;
+  typeAssistance: "ALL" | "Assistance Automobile" | "Assistance Voyage";
   search: string;
 };
 
 type EcheanceSearchParams = {
+  branche: EcheanceFilters["branche"];
   dateDu: string;
   dateAu: string;
   compagnieId?: string;
+  produitId?: string;
   typeContrat?: TypeContrat;
+  typeAssistance?: string;
   search?: string;
 };
 
@@ -59,8 +65,11 @@ type SortKey = keyof Pick<
 >;
 
 const DEFAULT_FILTERS: EcheanceFilters = {
+  branche: "AUTOMOBILE",
   compagnieId: "ALL",
+  produitId: "ALL",
   typeContrat: "ALL",
+  typeAssistance: "ALL",
   search: "",
 };
 const PAGE_SIZE = 25;
@@ -77,6 +86,7 @@ export default function EcheancesPage() {
   const [renewalRow, setRenewalRow] = useState<EcheanceAutomobileRow | null>(null);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canRenew = permissions.includes("contrat:renew") || permissions.includes("contrat:update");
+  const canEditAssistance = permissions.includes("contrat:update");
   const preTermeActions = usePreTermeActions();
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
     key: "dateEcheance",
@@ -84,8 +94,20 @@ export default function EcheancesPage() {
   });
 
   const companies = useQuery({
-    queryKey: referenceKeys.list("compagnies-assurance"),
-    queryFn: () => referenceApi.list("compagnies-assurance"),
+    queryKey: referenceKeys.list(filters.branche === "ASSISTANCE" ? "compagnies-assistance" : "compagnies-assurance"),
+    queryFn: () => referenceApi.list(filters.branche === "ASSISTANCE" ? "compagnies-assistance" : "compagnies-assurance"),
+  });
+
+  const assistanceProducts = useQuery({
+    queryKey: referenceKeys.list("produits-assistance", {
+      compagnieAssistanceId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+      type: filters.typeAssistance === "ALL" ? undefined : filters.typeAssistance,
+    }),
+    queryFn: () => referenceApi.list("produits-assistance", {
+      compagnieAssistanceId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+      type: filters.typeAssistance === "ALL" ? undefined : filters.typeAssistance,
+    }),
+    enabled: filters.branche === "ASSISTANCE",
   });
 
   const searchParams = useMemo(() => {
@@ -95,18 +117,41 @@ export default function EcheancesPage() {
     return { ...toSearchParams(appliedFilters), page, size: PAGE_SIZE };
   }, [appliedFilters, page, searched]);
 
-  const echeances = useQuery({
+  const automobileEcheances = useQuery({
     queryKey: contractKeys.dueDates(searchParams),
     queryFn: () => {
-      if (!searchParams) {
+      if (!searchParams || searchParams.branche !== "AUTOMOBILE") {
         throw new Error("Parametres echeances manquants");
       }
-      return contractApi.searchEcheancesAutomobile(searchParams);
+      return contractApi.searchEcheancesAutomobile({
+        ...automobileApiParams(searchParams),
+        page,
+        size: PAGE_SIZE,
+      });
     },
-    enabled: Boolean(searchParams),
+    enabled: searchParams?.branche === "AUTOMOBILE",
   });
 
-  const rows = useMemo(() => sortRows(echeances.data?.rows ?? [], sort), [echeances.data?.rows, sort]);
+  const assistanceEcheances = useQuery({
+    queryKey: ["contrats", "echeances", "assistance", searchParams],
+    queryFn: () => {
+      if (!searchParams || searchParams.branche !== "ASSISTANCE") {
+        throw new Error("Parametres echeances assistance manquants");
+      }
+      return contractApi.searchEcheancesAssistance({
+        ...assistanceApiParams(searchParams),
+        page,
+        size: PAGE_SIZE,
+      });
+    },
+    enabled: searchParams?.branche === "ASSISTANCE",
+  });
+
+  const rows = useMemo(
+    () => sortRows(automobileEcheances.data?.rows ?? [], sort),
+    [automobileEcheances.data?.rows, sort]
+  );
+  const activeQuery = appliedFilters.branche === "ASSISTANCE" ? assistanceEcheances : automobileEcheances;
   const canSearch = Boolean(filters.dateDu && filters.dateAu);
   const hasDateError = Boolean(filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu);
 
@@ -146,8 +191,11 @@ export default function EcheancesPage() {
     }
     setExporting(true);
     try {
-      const blob = await contractApi.exportEcheancesAutomobile(toSearchParams(appliedFilters));
-      downloadBlob(blob, `echeances-automobile-${searchParams.dateDu}-${searchParams.dateAu}.xls`);
+      const blob = searchParams.branche === "ASSISTANCE"
+        ? await contractApi.exportEcheancesAssistance(assistanceApiParams(searchParams))
+        : await contractApi.exportEcheancesAutomobile(automobileApiParams(searchParams));
+      const branchName = searchParams.branche === "ASSISTANCE" ? "assistance" : "automobile";
+      downloadBlob(blob, `echeances-${branchName}-${searchParams.dateDu}-${searchParams.dateAu}.xls`);
     } catch (error) {
       console.error("Export des echeances impossible", error);
     } finally {
@@ -155,7 +203,7 @@ export default function EcheancesPage() {
     }
   }
 
-  const pageInfo = echeances.data?.page;
+  const pageInfo = activeQuery.data?.page;
   const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
   const currentPage = Math.min(pageInfo?.number ?? page, totalPages - 1);
 
@@ -166,7 +214,26 @@ export default function EcheancesPage() {
           Gestion des échéances
         </div>
         <CardContent className="grid gap-4 p-5">
-          <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_1.3fr_auto_auto]">
+          <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-2 xl:grid-cols-4">
+            <FilterField label="Branche" tone="emerald">
+              <Select
+                value={filters.branche}
+                onValueChange={(value) => setFilters((current) => ({
+                  ...current,
+                  branche: value as EcheanceFilters["branche"],
+                  compagnieId: "ALL",
+                  produitId: "ALL",
+                  typeContrat: "ALL",
+                  typeAssistance: "ALL",
+                }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AUTOMOBILE">Automobile</SelectItem>
+                  <SelectItem value="ASSISTANCE">Assistance</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
             <FilterField label="Date du" tone="emerald">
               <DatePicker
                 date={filters.dateDu}
@@ -182,7 +249,11 @@ export default function EcheancesPage() {
             <FilterField label="Compagnie" tone="emerald">
               <Select
                 value={filters.compagnieId}
-                onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}
+                onValueChange={(value) => setFilters((current) => ({
+                  ...current,
+                  compagnieId: value,
+                  produitId: "ALL",
+                }))}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -193,25 +264,63 @@ export default function EcheancesPage() {
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label="Type contrat" tone="emerald">
-              <Select
-                value={filters.typeContrat}
-                onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as EcheanceFilters["typeContrat"] }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tous les types</SelectItem>
-                  <SelectItem value="PARTICULIER">Mono</SelectItem>
-                  <SelectItem value="CONVENTION">Convention</SelectItem>
-                  <SelectItem value="FLOTTE">Flotte</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="RC / CIN / Nom" tone="emerald">
+            {filters.branche === "ASSISTANCE" ? (
+              <FilterField label="Type d’assistance" tone="emerald">
+                <Select
+                  value={filters.typeAssistance}
+                  onValueChange={(value) => setFilters((current) => ({
+                    ...current,
+                    typeAssistance: value as EcheanceFilters["typeAssistance"],
+                    produitId: "ALL",
+                  }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les types</SelectItem>
+                    <SelectItem value="Assistance Automobile">Assistance automobile</SelectItem>
+                    <SelectItem value="Assistance Voyage">Assistance voyage</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            ) : (
+              <FilterField label="Type contrat" tone="emerald">
+                <Select
+                  value={filters.typeContrat}
+                  onValueChange={(value) => setFilters((current) => ({ ...current, typeContrat: value as EcheanceFilters["typeContrat"] }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les types</SelectItem>
+                    <SelectItem value="PARTICULIER">Mono</SelectItem>
+                    <SelectItem value="CONVENTION">Convention</SelectItem>
+                    <SelectItem value="FLOTTE">Flotte</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            )}
+            {filters.branche === "ASSISTANCE" ? (
+              <FilterField label="Produit" tone="emerald">
+                <Select
+                  value={filters.produitId}
+                  onValueChange={(value) => setFilters((current) => ({ ...current, produitId: value }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les produits</SelectItem>
+                    {(assistanceProducts.data ?? []).map((product) => (
+                      <SelectItem key={product.id} value={product.id}>{product.libelle}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            ) : null}
+            <FilterField label={filters.branche === "ASSISTANCE" ? "Client / contrat / produit" : "RC / CIN / Nom"} tone="emerald">
               <Input
                 value={filters.search}
                 onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-                placeholder="Rechercher par RC, CIN ou nom"
+                placeholder={filters.branche === "ASSISTANCE"
+                  ? "Client, contrat, produit ou véhicule"
+                  : "Rechercher par RC, CIN ou nom"}
               />
             </FilterField>
             <div className="flex items-end">
@@ -232,7 +341,7 @@ export default function EcheancesPage() {
               </Button>
             </div>
             {hasDateError ? (
-              <p className="text-sm font-medium text-red-600 md:col-span-2 xl:col-span-7">
+              <p className="text-sm font-medium text-red-600 md:col-span-2 xl:col-span-8">
                 La date du doit être inférieure ou égale à la date au.
               </p>
             ) : null}
@@ -246,7 +355,7 @@ export default function EcheancesPage() {
             <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-emerald-950 dark:text-emerald-100">
-                  Tableau des échéances automobile
+                  Échéances {appliedFilters.branche === "ASSISTANCE" ? "assistance" : "automobile"}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   Période : <strong>{formatDateIso(appliedFilters.dateDu)}</strong> →{" "}
@@ -258,20 +367,29 @@ export default function EcheancesPage() {
                   type="button"
                   size="sm"
                   className="bg-green-600 hover:bg-green-700"
-                  disabled={!rows.length || exporting}
+                  disabled={!(activeQuery.data?.rows.length) || exporting}
                   onClick={exportRows}
                 >
                   <Download className="size-4" />
                   {exporting ? "Export..." : "Exporter Excel"}
                 </Button>
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                  {echeances.data?.summary.contratCount ?? rows.length} contrat(s)
+                  {activeQuery.data?.summary.contratCount ?? 0}{" "}
+                  {appliedFilters.branche === "ASSISTANCE" ? "échéance(s)" : "contrat(s)"}
                 </span>
               </div>
             </div>
 
             <div className="overflow-x-auto p-4">
-              <table className="w-full min-w-[1260px] border-collapse text-sm">
+              {appliedFilters.branche === "ASSISTANCE" ? (
+                <AssistanceEcheanceTable
+                  rows={assistanceEcheances.data?.rows ?? []}
+                  loading={assistanceEcheances.isLoading}
+                  error={assistanceEcheances.isError}
+                  canEdit={canEditAssistance}
+                />
+              ) : (
+                <table className="w-full min-w-[1260px] border-collapse text-sm">
                 <thead className="bg-emerald-700 text-xs uppercase text-white">
                   <tr>
                     <SortableTh label="Dossier" column="dossier" sort={sort} onSort={updateSort} />
@@ -288,9 +406,9 @@ export default function EcheancesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {echeances.isLoading ? (
+                  {automobileEcheances.isLoading ? (
                     <TableRowsSkeleton rows={8} colSpan={11} />
-                  ) : echeances.isError ? (
+                  ) : automobileEcheances.isError ? (
                     <tr>
                       <td colSpan={11} className="px-3 py-8 text-center text-red-600">
                         Impossible de charger les échéances.
@@ -317,11 +435,12 @@ export default function EcheancesPage() {
                   )}
                 </tbody>
               </table>
+              )}
             </div>
             <ServerPagination
               page={currentPage}
               totalPages={totalPages}
-              loading={echeances.isLoading}
+              loading={activeQuery.isLoading}
               showCurrentPage
               className="border-t px-4 py-3"
               labelClassName="text-xs"
@@ -445,6 +564,108 @@ function EcheanceTableRow({
   );
 }
 
+function AssistanceEcheanceTable({
+  rows,
+  loading,
+  error,
+  canEdit,
+}: {
+  rows: EcheanceAssistanceRow[];
+  loading: boolean;
+  error: boolean;
+  canEdit: boolean;
+}) {
+  return (
+    <table className="w-full min-w-[1180px] border-collapse text-sm">
+      <thead className="bg-emerald-700 text-xs uppercase text-white">
+        <tr>
+          <th className="px-3 py-3 text-left font-bold">Dossier</th>
+          <th className="px-3 py-3 text-left font-bold">Client</th>
+          <th className="px-3 py-3 text-left font-bold">Contrat assistance</th>
+          <th className="px-3 py-3 text-left font-bold">Type</th>
+          <th className="px-3 py-3 text-left font-bold">Produit</th>
+          <th className="px-3 py-3 text-left font-bold">Compagnie</th>
+          <th className="px-3 py-3 text-left font-bold">Véhicule</th>
+          <th className="px-3 py-3 text-left font-bold">Date d’effet</th>
+          <th className="px-3 py-3 text-left font-bold">Échéance</th>
+          <th className="px-3 py-3 text-left font-bold">Téléphone</th>
+          <th className="px-3 py-3 text-center font-bold">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {loading ? (
+          <TableRowsSkeleton rows={8} colSpan={11} />
+        ) : error ? (
+          <tr>
+            <td colSpan={11} className="px-3 py-8 text-center text-red-600">
+              Impossible de charger les échéances assistance.
+            </td>
+          </tr>
+        ) : rows.length ? (
+          rows.map((row) => (
+            <tr key={row.assistanceId} className="border-b transition-colors hover:bg-emerald-50/60 dark:hover:bg-emerald-950/25">
+              <td className="px-3 py-2">{text(row.dossier)}</td>
+              <td className="px-3 py-2">
+                <div className="font-semibold uppercase">{text(row.client)}</div>
+                <div className="text-xs text-muted-foreground">Code : {text(row.codeClient)}</div>
+              </td>
+              <td className="px-3 py-2 font-semibold">{text(row.numeroContrat)}</td>
+              <td className="px-3 py-2">{text(row.typeAssistance)}</td>
+              <td className="px-3 py-2">{text(row.produit)}</td>
+              <td className="px-3 py-2">{text(row.compagnie)}</td>
+              <td className="px-3 py-2">{text(row.immatriculation)}</td>
+              <td className="px-3 py-2">{formatDate(row.dateEffet)}</td>
+              <td className="px-3 py-2 font-semibold">{formatDate(row.dateEcheance)}</td>
+              <td className="px-3 py-2">{text(row.telephone)}</td>
+              <td className="px-3 py-2 text-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" size="icon" variant="outline" className="size-8 border-blue-500 text-blue-600">
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canEdit ? (
+                      <DropdownMenuItem asChild>
+                        <Link to={assistanceEditPath(row)}>
+                          <FilePenLine className="size-4" />
+                          Modifier
+                        </Link>
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem asChild>
+                      <Link to={`/app/production/contrats/${row.contratId}/pieces-jointes`}>
+                        <FileText className="size-4" />
+                        Pièces jointes
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
+              Aucun contrat assistance ne correspond aux filtres.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+function assistanceEditPath(row: EcheanceAssistanceRow) {
+  if (row.assistanceLiee) {
+    return `/app/production/contrats/${row.contratId}/assistance`;
+  }
+  const type = row.typeAssistance?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() ?? "";
+  return type.includes("VOYAGE")
+    ? `/app/production/contrats/${row.contratId}/assistance-voyage/modifier`
+    : `/app/production/contrats/${row.contratId}/assistance-automobile/modifier`;
+}
+
 function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
   const message = text(row.observation);
   const normalizedMessage = message
@@ -565,11 +786,41 @@ function parseObservationAlert(value: string) {
 
 function toSearchParams(filters: EcheanceFilters): EcheanceSearchParams {
   return {
+    branche: filters.branche,
     dateDu: filters.dateDu ?? "",
     dateAu: filters.dateAu ?? "",
     compagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
-    typeContrat: filters.typeContrat === "ALL" ? undefined : filters.typeContrat,
+    produitId: filters.branche === "ASSISTANCE" && filters.produitId !== "ALL"
+      ? filters.produitId
+      : undefined,
+    typeContrat: filters.branche === "AUTOMOBILE" && filters.typeContrat !== "ALL"
+      ? filters.typeContrat
+      : undefined,
+    typeAssistance: filters.branche === "ASSISTANCE" && filters.typeAssistance !== "ALL"
+      ? filters.typeAssistance
+      : undefined,
     search: filters.search.trim() || undefined,
+  };
+}
+
+function automobileApiParams(params: EcheanceSearchParams) {
+  return {
+    dateDu: params.dateDu,
+    dateAu: params.dateAu,
+    compagnieId: params.compagnieId,
+    typeContrat: params.typeContrat,
+    search: params.search,
+  };
+}
+
+function assistanceApiParams(params: EcheanceSearchParams) {
+  return {
+    dateDu: params.dateDu,
+    dateAu: params.dateAu,
+    compagnieId: params.compagnieId,
+    produitId: params.produitId,
+    typeAssistance: params.typeAssistance,
+    search: params.search,
   };
 }
 
@@ -579,10 +830,13 @@ function initialEcheanceState(params: URLSearchParams): {
   page: number;
 } {
   const filters: EcheanceFilters = {
+    branche: params.get("branche") === "ASSISTANCE" ? "ASSISTANCE" : "AUTOMOBILE",
     dateDu: params.get("dateDu") ?? undefined,
     dateAu: params.get("dateAu") ?? undefined,
     compagnieId: params.get("compagnieId") || "ALL",
+    produitId: params.get("produitId") || "ALL",
     typeContrat: toTypeContratFilter(params.get("typeContrat")),
+    typeAssistance: toTypeAssistanceFilter(params.get("typeAssistance")),
     search: params.get("search") ?? "",
   };
   return {
@@ -594,10 +848,19 @@ function initialEcheanceState(params: URLSearchParams): {
 
 function toUrlParams(filters: EcheanceFilters, page: number) {
   const params = new URLSearchParams();
+  if (filters.branche === "ASSISTANCE") params.set("branche", filters.branche);
   if (filters.dateDu) params.set("dateDu", filters.dateDu);
   if (filters.dateAu) params.set("dateAu", filters.dateAu);
   if (filters.compagnieId !== "ALL") params.set("compagnieId", filters.compagnieId);
-  if (filters.typeContrat !== "ALL") params.set("typeContrat", filters.typeContrat);
+  if (filters.branche === "ASSISTANCE" && filters.produitId !== "ALL") {
+    params.set("produitId", filters.produitId);
+  }
+  if (filters.branche === "AUTOMOBILE" && filters.typeContrat !== "ALL") {
+    params.set("typeContrat", filters.typeContrat);
+  }
+  if (filters.branche === "ASSISTANCE" && filters.typeAssistance !== "ALL") {
+    params.set("typeAssistance", filters.typeAssistance);
+  }
   if (filters.search.trim()) params.set("search", filters.search.trim());
   if (page > 0) params.set("page", String(page + 1));
   return params;
@@ -610,6 +873,10 @@ function positivePageIndex(value: string | null) {
 
 function toTypeContratFilter(value: string | null): EcheanceFilters["typeContrat"] {
   return value === "PARTICULIER" || value === "CONVENTION" || value === "FLOTTE" ? value : "ALL";
+}
+
+function toTypeAssistanceFilter(value: string | null): EcheanceFilters["typeAssistance"] {
+  return value === "Assistance Automobile" || value === "Assistance Voyage" ? value : "ALL";
 }
 
 function sortRows(rows: EcheanceAutomobileRow[], sort: { key: SortKey; direction: "asc" | "desc" }) {

@@ -26,6 +26,7 @@ import com.assurance.dto.response.ContratActionsResponse;
 import com.assurance.dto.response.ContratListGroupResponse;
 import com.assurance.dto.response.ContratListItemResponse;
 import com.assurance.dto.response.ContratResponse;
+import com.assurance.dto.response.EcheanceAssistanceResponse;
 import com.assurance.dto.response.EcheanceAutomobileResponse;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.dto.response.QuittanceResponse;
@@ -468,6 +469,57 @@ public class ContratController {
         );
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=echeances-automobile-" + dateDu + "-" + dateAu + ".xls")
+                .contentType(MediaType.parseMediaType("application/vnd.ms-excel"))
+                .body(export);
+    }
+
+    @GetMapping("/echeances/assistance")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
+    public ResponseEntity<ApiResponse<EcheanceAssistanceResponse>> echeancesAssistance(
+            @RequestParam LocalDate dateDu,
+            @RequestParam LocalDate dateAu,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long produitId,
+            @RequestParam(required = false) String typeAssistance,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "25") Integer size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(echeanceProductionService.searchAssistance(
+                TenantContext.getCurrentAgence(),
+                dateDu,
+                dateAu,
+                compagnieId,
+                produitId,
+                typeAssistance,
+                search,
+                page,
+                size
+        )));
+    }
+
+    @GetMapping("/echeances/assistance/export")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
+    public ResponseEntity<byte[]> exportEcheancesAssistance(
+            @RequestParam LocalDate dateDu,
+            @RequestParam LocalDate dateAu,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long produitId,
+            @RequestParam(required = false) String typeAssistance,
+            @RequestParam(required = false) String search
+    ) {
+        byte[] export = echeanceProductionService.exportAssistance(
+                TenantContext.getCurrentAgence(),
+                dateDu,
+                dateAu,
+                compagnieId,
+                produitId,
+                typeAssistance,
+                search
+        );
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=echeances-assistance-"
+                        + dateDu + "-" + dateAu + ".xls")
                 .contentType(MediaType.parseMediaType("application/vnd.ms-excel"))
                 .body(export);
     }

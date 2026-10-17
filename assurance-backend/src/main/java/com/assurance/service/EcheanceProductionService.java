@@ -1,6 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.dto.response.EcheanceAssistanceResponse;
 import com.assurance.dto.response.EcheanceAutomobileResponse;
+import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Client;
 import com.assurance.entity.ClientTelephone;
 import com.assurance.entity.Contrat;
@@ -11,6 +13,7 @@ import com.assurance.enums.TypeContrat;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeClient;
 import com.assurance.exception.BadRequestException;
+import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.service.renewal.RenewalPolicy;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +45,94 @@ public class EcheanceProductionService {
     private static final int EXPORT_PAGE_SIZE = 500;
 
     private final ContratRepository contratRepository;
+    private final AssistanceContratRepository assistanceContratRepository;
     private final RenewalPolicy renewalPolicy;
+
+    public EcheanceAssistanceResponse searchAssistance(
+            Long agenceId,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            Long compagnieId,
+            Long produitId,
+            String typeAssistance,
+            String search,
+            Integer page,
+            Integer size
+    ) {
+        validateDates(dateDu, dateAu);
+        Page<Long> idsPage = assistanceContratRepository.findEcheanceIds(
+                agenceId,
+                dateDu,
+                dateAu,
+                compagnieId,
+                produitId,
+                normalizedAssistanceType(typeAssistance),
+                searchFilter(search),
+                PageRequest.of(safePage(page), safeSize(size))
+        );
+        List<EcheanceAssistanceResponse.Row> rows = toAssistanceRows(agenceId, idsPage.getContent());
+        return EcheanceAssistanceResponse.builder()
+                .dateDu(dateDu)
+                .dateAu(dateAu)
+                .compagnieId(compagnieId)
+                .produitId(produitId)
+                .typeAssistance(typeAssistance)
+                .search(safe(search))
+                .summary(assistanceSummary(rows, idsPage.getTotalElements()))
+                .page(assistancePageInfo(idsPage))
+                .rows(rows)
+                .build();
+    }
+
+    public byte[] exportAssistance(
+            Long agenceId,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            Long compagnieId,
+            Long produitId,
+            String typeAssistance,
+            String search
+    ) {
+        validateDates(dateDu, dateAu);
+        StringBuilder html = new StringBuilder();
+        html.append("<!doctype html><html><head><meta charset=\"utf-8\"></head><body><table>");
+        appendRow(html, List.of(
+                "Dossier", "Client", "Code client", "N contrat assistance", "Type assistance",
+                "Produit", "Compagnie", "Immatriculation", "Date effet", "Date echeance", "Telephone"
+        ), true);
+        int page = 0;
+        Page<Long> idsPage;
+        do {
+            idsPage = assistanceContratRepository.findEcheanceIds(
+                    agenceId,
+                    dateDu,
+                    dateAu,
+                    compagnieId,
+                    produitId,
+                    normalizedAssistanceType(typeAssistance),
+                    searchFilter(search),
+                    PageRequest.of(page, EXPORT_PAGE_SIZE)
+            );
+            for (EcheanceAssistanceResponse.Row row : toAssistanceRows(agenceId, idsPage.getContent())) {
+                appendRow(html, List.of(
+                        safe(row.getDossier()),
+                        safe(row.getClient()),
+                        safe(row.getCodeClient()),
+                        safe(row.getNumeroContrat()),
+                        safe(row.getTypeAssistance()),
+                        safe(row.getProduit()),
+                        safe(row.getCompagnie()),
+                        safe(row.getImmatriculation()),
+                        formatDate(row.getDateEffet()),
+                        formatDate(row.getDateEcheance()),
+                        safe(row.getTelephone())
+                ), false);
+            }
+            page++;
+        } while (idsPage.hasNext());
+        html.append("</table></body></html>");
+        return html.toString().getBytes(StandardCharsets.UTF_8);
+    }
 
     public EcheanceAutomobileResponse searchAutomobile(
             Long agenceId,
@@ -442,6 +532,117 @@ public class EcheanceProductionService {
 
     private static final class AlertAccumulator {
         private boolean expired;
+    }
+
+    private List<EcheanceAssistanceResponse.Row> toAssistanceRows(Long agenceId, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<Long, AssistanceContrat> byId = new HashMap<>();
+        for (AssistanceContrat assistance
+                : assistanceContratRepository.findEcheancesByAgenceIdAndIdIn(agenceId, ids)) {
+            byId.put(assistance.getId(), assistance);
+        }
+        return ids.stream()
+                .map(byId::get)
+                .filter(assistance -> assistance != null)
+                .map(this::toAssistanceRow)
+                .toList();
+    }
+
+    private EcheanceAssistanceResponse.Row toAssistanceRow(AssistanceContrat assistance) {
+        Contrat contrat = assistance.getContrat();
+        ContratClient link = souscripteur(contrat);
+        Client client = link == null ? null : link.getClient();
+        String typeAssistance = assistance.getProduitAssistance() == null
+                ? null
+                : assistance.getProduitAssistance().getType();
+        boolean assistanceLiee = contrat.getBrancheAssurance() == null
+                || !"ASSISTANCE".equalsIgnoreCase(contrat.getBrancheAssurance().getCode());
+        return EcheanceAssistanceResponse.Row.builder()
+                .assistanceId(assistance.getId())
+                .contratId(contrat.getId())
+                .dossier(firstNonBlank(
+                        assistance.getNumeroDossier(),
+                        contrat.getNumeroDossier(),
+                        contrat.getNumeroContrat(),
+                        "#" + contrat.getId()
+                ))
+                .client(firstNonBlank(client == null ? null : client.getNomAffichage(), "-"))
+                .codeClient(firstNonBlank(
+                        client == null ? null : client.getCodeClient(),
+                        client == null ? null : client.getRc(),
+                        client == null ? null : client.getCin(),
+                        client == null ? null : client.getIce(),
+                        "-"
+                ))
+                .numeroContrat(firstNonBlank(
+                        assistance.getNumeroContratOuQuittance(),
+                        assistance.getNumeroPoliceContrat(),
+                        "-"
+                ))
+                .typeAssistance(firstNonBlank(
+                        typeAssistance,
+                        assistance.getVehicule() == null ? "Assistance" : "Assistance Automobile"
+                ))
+                .produit(firstNonBlank(
+                        assistance.getProduit(),
+                        assistance.getProduitAssistance() == null
+                                ? null
+                                : assistance.getProduitAssistance().getLibelle(),
+                        "-"
+                ))
+                .compagnieId(assistance.getCompagnieAssistance() == null
+                        ? null
+                        : assistance.getCompagnieAssistance().getId())
+                .compagnie(firstNonBlank(
+                        assistance.getCompagnieAssistance() == null
+                                ? null
+                                : assistance.getCompagnieAssistance().getNom(),
+                        "-"
+                ))
+                .immatriculation(firstNonBlank(
+                        assistance.getVehicule() == null
+                                ? null
+                                : assistance.getVehicule().getImmatriculation(),
+                        "-"
+                ))
+                .dateEffet(assistance.getDateEffet())
+                .dateEcheance(assistance.getDateEcheance())
+                .telephone(primaryPhone(client))
+                .assistanceLiee(assistanceLiee)
+                .build();
+    }
+
+    private EcheanceAssistanceResponse.Summary assistanceSummary(
+            List<EcheanceAssistanceResponse.Row> rows,
+            long totalElements
+    ) {
+        Set<Long> compagnies = new LinkedHashSet<>();
+        for (EcheanceAssistanceResponse.Row row : rows) {
+            if (row.getCompagnieId() != null) {
+                compagnies.add(row.getCompagnieId());
+            }
+        }
+        return EcheanceAssistanceResponse.Summary.builder()
+                .contratCount(totalElements)
+                .compagnieCount(compagnies.size())
+                .build();
+    }
+
+    private EcheanceAssistanceResponse.PageInfo assistancePageInfo(Page<Long> page) {
+        return EcheanceAssistanceResponse.PageInfo.builder()
+                .number(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .first(page.isFirst())
+                .last(page.isLast())
+                .build();
+    }
+
+    private String normalizedAssistanceType(String value) {
+        return hasText(value) ? value.trim().toLowerCase(Locale.ROOT) : null;
     }
 
     private EcheanceAutomobileResponse.Summary summary(List<EcheanceAutomobileResponse.Row> rows, long totalElements) {

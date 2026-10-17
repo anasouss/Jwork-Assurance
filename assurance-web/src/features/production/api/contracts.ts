@@ -5,6 +5,7 @@ import type {
   ContratListItem,
   ContratSummary,
   EcheanceAutomobileResponse,
+  EcheanceAssistanceResponse,
   FinancialHistoryRecalculation,
   PagedResponse,
   ProductionRegisterResponse,
@@ -176,11 +177,11 @@ export const contractApi = {
     page?: number;
     size?: number;
   }) {
-    return unwrap(
+    return normalizeAutomobileEcheances(unwrap(
       await apiFetch<ApiResponse<EcheanceAutomobileResponse>>(
         `/api/v1/contrats/echeances/automobile${buildQueryString(params)}`
       )
-    );
+    ));
   },
 
   async exportEcheancesAutomobile(params: {
@@ -192,6 +193,36 @@ export const contractApi = {
   }) {
     return apiFetchBlob(
       `/api/v1/contrats/echeances/automobile/export${buildQueryString(params)}`
+    );
+  },
+
+  async searchEcheancesAssistance(params: {
+    dateDu: string;
+    dateAu: string;
+    compagnieId?: string;
+    produitId?: string;
+    typeAssistance?: string;
+    search?: string;
+    page?: number;
+    size?: number;
+  }) {
+    return normalizeAssistanceEcheances(unwrap(
+      await apiFetch<ApiResponse<EcheanceAssistanceResponse>>(
+        `/api/v1/contrats/echeances/assistance${buildQueryString(params)}`
+      )
+    ));
+  },
+
+  async exportEcheancesAssistance(params: {
+    dateDu: string;
+    dateAu: string;
+    compagnieId?: string;
+    produitId?: string;
+    typeAssistance?: string;
+    search?: string;
+  }) {
+    return apiFetchBlob(
+      `/api/v1/contrats/echeances/assistance/export${buildQueryString(params)}`
     );
   },
 
@@ -231,3 +262,34 @@ export const contractApi = {
     });
   },
 };
+
+function normalizeAutomobileEcheances(response: EcheanceAutomobileResponse): EcheanceAutomobileResponse {
+  return {
+    ...response,
+    compagnieId: nullableId(response.compagnieId),
+    produitId: nullableId(response.produitId),
+    rows: response.rows.map((row) => ({
+      ...row,
+      contratId: String(row.contratId),
+      compagnieId: nullableId(row.compagnieId),
+      preTermeDraftId: nullableId(row.preTermeDraftId),
+    })),
+  };
+}
+
+function normalizeAssistanceEcheances(response: EcheanceAssistanceResponse): EcheanceAssistanceResponse {
+  return {
+    ...response,
+    compagnieId: nullableId(response.compagnieId),
+    rows: response.rows.map((row) => ({
+      ...row,
+      assistanceId: String(row.assistanceId),
+      contratId: String(row.contratId),
+      compagnieId: nullableId(row.compagnieId),
+    })),
+  };
+}
+
+function nullableId(value: string | number | null | undefined) {
+  return value == null ? null : String(value);
+}

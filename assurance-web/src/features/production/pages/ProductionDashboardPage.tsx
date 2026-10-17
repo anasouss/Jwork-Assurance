@@ -38,7 +38,11 @@ export default function ProductionDashboardPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const [echeanceDialogOpen, setEcheanceDialogOpen] = useState(false);
   const [portfolioDialogOpen, setPortfolioDialogOpen] = useState(false);
-  const [echeanceFilters, setEcheanceFilters] = useState<{ dateDu?: string; dateAu?: string }>({});
+  const [echeanceFilters, setEcheanceFilters] = useState<{
+    branche: "AUTOMOBILE" | "ASSISTANCE";
+    dateDu?: string;
+    dateAu?: string;
+  }>({ branche: "AUTOMOBILE" });
 
   const allActions: ProductionAction[] = [
     { title: "Ajouter un dossier", icon: FilePlus2, href: "/app/production/ajouter-dossier", permission: "contrat:create", primary: true },
@@ -59,7 +63,7 @@ export default function ProductionDashboardPage() {
       return;
     }
     const params = new URLSearchParams({
-      nature: "AUTOMOBILE",
+      branche: echeanceFilters.branche,
       dateDu: echeanceFilters.dateDu ?? "",
       dateAu: echeanceFilters.dateAu ?? "",
     });
@@ -138,9 +142,19 @@ export default function ProductionDashboardPage() {
           </DialogHeader>
           <div className="grid gap-4">
             <div className="grid gap-3 md:grid-cols-3">
-              <EcheanceNatureCard title="Automobile" status="Actif" active />
+              <EcheanceNatureCard
+                title="Automobile"
+                status="Actif"
+                active={echeanceFilters.branche === "AUTOMOBILE"}
+                onSelect={() => setEcheanceFilters((current) => ({ ...current, branche: "AUTOMOBILE" }))}
+              />
               <EcheanceNatureCard title="Risques divers" status="À venir" disabled />
-              <EcheanceNatureCard title="Assistance" status="À venir" disabled />
+              <EcheanceNatureCard
+                title="Assistance"
+                status="Actif"
+                active={echeanceFilters.branche === "ASSISTANCE"}
+                onSelect={() => setEcheanceFilters((current) => ({ ...current, branche: "ASSISTANCE" }))}
+              />
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-1.5 text-xs font-semibold uppercase text-emerald-950 dark:text-emerald-300">
@@ -181,13 +195,29 @@ export default function ProductionDashboardPage() {
   );
 }
 
-function EcheanceNatureCard({ title, status, active, disabled }: { title: string; status: string; active?: boolean; disabled?: boolean }) {
+function EcheanceNatureCard({
+  title,
+  status,
+  active,
+  disabled,
+  onSelect,
+}: {
+  title: string;
+  status: string;
+  active?: boolean;
+  disabled?: boolean;
+  onSelect?: () => void;
+}) {
   return (
-    <div
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onSelect}
       className={cn(
-        "flex min-h-24 items-center justify-between gap-3 rounded-md border p-4",
+        "flex min-h-24 items-center justify-between gap-3 rounded-md border p-4 text-left transition-colors",
         active && "border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100",
-        disabled && "border-dashed bg-muted/20 text-muted-foreground dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400"
+        !active && !disabled && "hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20",
+        disabled && "cursor-not-allowed border-dashed bg-muted/20 text-muted-foreground dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400"
       )}
     >
       <span className="flex min-w-0 items-center gap-2">
@@ -197,6 +227,6 @@ function EcheanceNatureCard({ title, status, active, disabled }: { title: string
       <span className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold", disabled ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200")}>
         {status}
       </span>
-    </div>
+    </button>
   );
 }

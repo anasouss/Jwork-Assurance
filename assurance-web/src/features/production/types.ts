@@ -1139,6 +1139,46 @@ export type EcheanceAutomobileResponse = {
   rows: EcheanceAutomobileRow[];
 };
 
+export type EcheanceAssistanceRow = {
+  assistanceId: string;
+  contratId: string;
+  dossier?: string | null;
+  client?: string | null;
+  codeClient?: string | null;
+  numeroContrat?: string | null;
+  typeAssistance?: string | null;
+  produit?: string | null;
+  compagnieId?: string | null;
+  compagnie?: string | null;
+  immatriculation?: string | null;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+  telephone?: string | null;
+  assistanceLiee: boolean;
+};
+
+export type EcheanceAssistanceResponse = {
+  dateDu: string;
+  dateAu: string;
+  compagnieId?: string | null;
+  produitId?: string | null;
+  typeAssistance?: string | null;
+  search?: string | null;
+  summary: {
+    contratCount: number;
+    compagnieCount: number;
+  };
+  page: {
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
+  };
+  rows: EcheanceAssistanceRow[];
+};
+
 export type UpsertGrilleTarifaireRequest = {
   compagnieAssuranceId: string;
   libelle: string;

@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Eye, RotateCcw, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, RotateCcw, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -10,8 +21,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toDateOnly } from "@/features/production/date";
+import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
-import type { RemittanceSlipStatus, RemittanceSlipType } from "../types";
+import type { RemittanceSlip, RemittanceSlipStatus, RemittanceSlipType } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type TypeFilter = RemittanceSlipType | "ALL";
@@ -32,7 +44,10 @@ const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
 };
 
 export default function InstrumentsTresoreriePage() {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const canManage = permissions.includes("tresorerie:manage");
   const type = parseTypeFilter(searchParams.get("type"));
   const status = parseStatusFilter(searchParams.get("statut"));
   const appliedSearch = searchParams.get("search") ?? "";
@@ -40,6 +55,7 @@ export default function InstrumentsTresoreriePage() {
   const dateTo = parseDateFilter(searchParams.get("dateAu"));
   const page = parsePage(searchParams.get("page"));
   const [search, setSearch] = useState(appliedSearch);
+  const [deleteTarget, setDeleteTarget] = useState<RemittanceSlip>();
 
   useEffect(() => {
     setSearch(appliedSearch);
@@ -55,6 +71,15 @@ export default function InstrumentsTresoreriePage() {
       page,
       size: TREASURY_PAGE_SIZE,
     }),
+  });
+  const deleteDraft = useMutation({
+    mutationFn: (id: string) => comptaApi.deleteRemittanceSlipDraft(id),
+    onSuccess: async () => {
+      setDeleteTarget(undefined);
+      toast.success("Bordereau provisoire supprimé");
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Suppression impossible"),
   });
 
   function applyFilters() {
@@ -111,7 +136,7 @@ export default function InstrumentsTresoreriePage() {
             <th className="px-4 py-3 text-left">Réf. interne</th><th className="px-4 py-3 text-left">N° banque</th><th className="px-4 py-3 text-left">Type</th>
             <th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Remis le</th>
             <th className="px-4 py-3 text-left">Destination</th><th className="px-4 py-3 text-center">Instruments</th>
-            <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-left">Statut</th><th className="w-16 px-4 py-3"><span className="sr-only">Détail</span></th>
+            <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-left">Statut</th><th className="w-24 px-4 py-3"><span className="sr-only">Actions</span></th>
           </tr></thead>
           <tbody className="divide-y">
             {slips.isLoading ? <TableRowsSkeleton colSpan={10} rows={6} /> : (slips.data?.rows ?? []).map((slip) => <tr key={slip.id} className="hover:bg-muted/30">
@@ -119,13 +144,48 @@ export default function InstrumentsTresoreriePage() {
               <td className="px-4 py-3">{formatTreasuryDate(slip.dateBordereau)}</td><td className="px-4 py-3">{formatTreasuryDate(slip.dateDepot)}</td>
               <td className="px-4 py-3">{slip.compteDestination}</td><td className="px-4 py-3 text-center">{slip.type === "VERSEMENT_ESPECES" ? "-" : slip.nombreLignes}</td>
               <td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(slip.montantTotal)}</td><td className="px-4 py-3"><StatusBadge status={slip.statut} /></td>
-              <td className="px-4 py-3"><Button asChild size="icon" variant="ghost" title="Voir le bordereau"><Link to={`/app/compta/tresorerie/bordereaux-remise/${slip.id}`}><Eye className="size-4" /></Link></Button></td>
+              <td className="px-4 py-3"><div className="flex justify-end gap-1">
+                <Button asChild size="icon" variant="ghost" title="Voir le bordereau"><Link to={`/app/compta/tresorerie/bordereaux-remise/${slip.id}`}><Eye className="size-4" /></Link></Button>
+                {slip.statut === "BROUILLON" ? (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    title="Supprimer le bordereau provisoire"
+                    disabled={!canManage || deleteDraft.isPending}
+                    onClick={() => setDeleteTarget(slip)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                ) : null}
+              </div></td>
             </tr>)}
             {!slips.isLoading && (slips.data?.rows.length ?? 0) === 0 && <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Aucun bordereau ne correspond aux filtres.</td></tr>}
           </tbody>
         </table></div>
         {slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={(nextPage) => updateFilter("page", String(nextPage), false)} />}
       </section>
+
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le bordereau {deleteTarget?.numero} ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le bordereau provisoire sera supprimé définitivement. Ses instruments redeviendront disponibles dans les encaissements en attente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteDraft.isPending}>Retour</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!deleteTarget || deleteDraft.isPending}
+              onClick={() => deleteTarget && deleteDraft.mutate(deleteTarget.id)}
+            >
+              {deleteDraft.isPending ? "Suppression..." : "Supprimer définitivement"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

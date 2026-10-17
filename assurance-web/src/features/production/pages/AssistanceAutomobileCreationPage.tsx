@@ -66,48 +66,49 @@ export default function AssistanceAutomobileCreationPage() {
     queryFn: clientApi.listGroupesClients,
     staleTime: 60_000,
   });
+  const selectedCompany = (companies.data ?? []).find((item) => item.id === compagnieId);
+  const insured = clients.find((item) => item.role === "PROPRIETAIRE");
+  const subscriber = clients.find((item) => item.role === "SOUSCRIPTEUR");
+  const sameInsured = insured?.sameAsRole === "SOUSCRIPTEUR"
+    || Boolean(insured?.clientId && subscriber?.clientId && insured.clientId === subscriber.clientId);
+  const categorieClientId = insured?.client.categorieClientId || "";
+  const availableCategories = categories.data ?? [];
+  const availableUsages = useMemo(() => {
+    const category = (categories.data ?? []).find((item) => item.id === categorieClientId);
+    if (!category) return [];
+    const categoryIds = stringArray(category?.usageIds);
+    return (usages.data ?? []).filter((usage) => categoryIds.length === 0 || categoryIds.includes(usage.id));
+  }, [categorieClientId, categories.data, usages.data]);
+  const selectedUsage = availableUsages.find((item) => item.id === vehicule.usageId);
   const products = useQuery({
-    queryKey: ["referentiel", "produits-assistance", "automobile-contract", compagnieId],
+    queryKey: [
+      "referentiel",
+      "produits-assistance",
+      "automobile-contract",
+      compagnieId,
+      categorieClientId,
+      vehicule.usageId,
+    ],
     queryFn: () => referenceApi.list("produits-assistance", {
       compagnieAssistanceId: compagnieId,
       type: "Assistance Automobile",
+      categorieClientId,
+      usageId: vehicule.usageId,
     }),
-    enabled: Boolean(compagnieId),
+    enabled: Boolean(compagnieId && categorieClientId && vehicule.usageId),
     staleTime: 60_000,
   });
+  const selectedProduct = (products.data ?? []).find((item) => item.id === produitId);
   const tariffs = useQuery({
     queryKey: ["referentiel", "produits-assistance", produitId, "tarifs", "automobile-contract"],
     queryFn: () => assistanceProductApi.listProductRates(produitId),
     enabled: Boolean(produitId),
     staleTime: 30_000,
   });
-
-  const selectedCompany = (companies.data ?? []).find((item) => item.id === compagnieId);
-  const selectedProduct = (products.data ?? []).find((item) => item.id === produitId);
-  const insured = clients.find((item) => item.role === "PROPRIETAIRE");
-  const subscriber = clients.find((item) => item.role === "SOUSCRIPTEUR");
-  const sameInsured = insured?.sameAsRole === "SOUSCRIPTEUR"
-    || Boolean(insured?.clientId && subscriber?.clientId && insured.clientId === subscriber.clientId);
-  const configuredCategoryId = optionalString(selectedProduct?.categorieClientId) ?? "";
-  const categorieClientId = configuredCategoryId || insured?.client.categorieClientId || "";
-  const availableCategories = useMemo(() => {
-    const requiredId = optionalString(selectedProduct?.categorieClientId);
-    return requiredId ? (categories.data ?? []).filter((item) => item.id === requiredId) : (categories.data ?? []);
-  }, [categories.data, selectedProduct]);
   const durationOptions = useMemo(
     () => assistanceDurationOptions(tariffs.data ?? [], dateEffet),
     [dateEffet, tariffs.data],
   );
-  const availableUsages = useMemo(() => {
-    const category = (categories.data ?? []).find((item) => item.id === categorieClientId);
-    const categoryIds = stringArray(category?.usageIds);
-    const productIds = stringArray(selectedProduct?.usageIds);
-    return (usages.data ?? []).filter((usage) =>
-      (categoryIds.length === 0 || categoryIds.includes(usage.id))
-      && (productIds.length === 0 || productIds.includes(usage.id)),
-    );
-  }, [categorieClientId, categories.data, selectedProduct, usages.data]);
-  const selectedUsage = availableUsages.find((item) => item.id === vehicule.usageId);
 
   useEffect(() => {
     if (selectedProduct && !tariffs.isLoading && !durationOptions.some((option) => option.value === dureeMois)) {
@@ -116,20 +117,19 @@ export default function AssistanceAutomobileCreationPage() {
   }, [dureeMois, durationOptions, selectedProduct, tariffs.isLoading]);
 
   useEffect(() => {
-    if (!configuredCategoryId || insured?.client.categorieClientId === configuredCategoryId) return;
-    setClients((current) => current.map((item) =>
-      item.role === "PROPRIETAIRE" || (sameInsured && item.role === "SOUSCRIPTEUR")
-        ? { ...item, client: { ...item.client, categorieClientId: configuredCategoryId } }
-        : item,
-    ));
-  }, [configuredCategoryId, insured?.client.categorieClientId, sameInsured]);
-
-  useEffect(() => {
-    if (vehicule.usageId && categorieClientId && selectedProduct && usages.isSuccess
+    if (vehicule.usageId && categorieClientId && usages.isSuccess
       && !availableUsages.some((item) => item.id === vehicule.usageId)) {
       setVehicule((current) => ({ ...current, usageId: undefined, categorieTransportId: undefined }));
     }
-  }, [availableUsages, categorieClientId, selectedProduct, usages.isSuccess, vehicule.usageId]);
+  }, [availableUsages, categorieClientId, usages.isSuccess, vehicule.usageId]);
+
+  useEffect(() => {
+    if (!produitId || !products.isSuccess) return;
+    if (!(products.data ?? []).some((product) => product.id === produitId)) {
+      setProduitId("");
+      setDureeMois("");
+    }
+  }, [produitId, products.data, products.isSuccess]);
 
   useEffect(() => {
     const contract = existingContract.data;
@@ -228,7 +228,7 @@ export default function AssistanceAutomobileCreationPage() {
         villes={cities.data ?? []}
         categoriesClient={availableCategories}
         groupesClients={groups.data ?? []}
-        showProprietaireCategorie={!configuredCategoryId}
+        showProprietaireCategorie
         requireDriverDetails={false}
         requireDriverPermitValidity={false}
         secondaryTitle="Assuré"
@@ -259,7 +259,33 @@ export default function AssistanceAutomobileCreationPage() {
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Compagnie d’assistance" required><Input readOnly value={selectedCompany?.libelle ?? ""} /></Field>
-          <Field label="Produit d’assistance" required><Input readOnly value={selectedProduct?.libelle ?? ""} /></Field>
+          <Field label="Produit d’assistance" required>
+            <Select
+              value={produitId}
+              onValueChange={(value) => {
+                setProduitId(value);
+                setDureeMois("");
+              }}
+              disabled={!categorieClientId || !vehicule.usageId || products.isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={categorieClientId && vehicule.usageId
+                  ? "Choisir un produit"
+                  : "Renseigner la catégorie et l’usage"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {(products.data ?? []).map((product) => (
+                  <SelectItem key={product.id} value={product.id}>{product.libelle}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {categorieClientId && vehicule.usageId && products.isSuccess && products.data.length === 0 ? (
+              <p className="mt-1 text-xs text-destructive">
+                Aucun produit compatible avec cette catégorie et cet usage.
+              </p>
+            ) : null}
+          </Field>
           <Field label="N° de contrat" required><Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} /></Field>
           <Field label="Durée" required>
             <Select value={dureeMois} onValueChange={setDureeMois} disabled={durationOptions.length === 0}>

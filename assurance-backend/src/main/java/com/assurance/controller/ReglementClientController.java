@@ -4,6 +4,7 @@ import com.assurance.dto.request.AnnulerReglementClientRequest;
 import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
+import com.assurance.dto.request.RepresenterInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.request.UpdateReglementClientPolicyRequest;
 import com.assurance.dto.request.ValiderReglementsClientsRequest;
@@ -330,6 +331,7 @@ public class ReglementClientController {
             @RequestParam(required = false) StatutInstrumentReglement statut,
             @RequestParam(required = false) List<StatutInstrumentReglement> statuts,
             @RequestParam(required = false) ModeReglementClient mode,
+            @RequestParam(required = false) List<ModeReglementClient> modes,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false)
@@ -345,7 +347,9 @@ public class ReglementClientController {
                 statuts == null || statuts.isEmpty()
                         ? List.of(statut == null ? StatutInstrumentReglement.EN_ATTENTE : statut)
                         : statuts,
-                mode,
+                modes == null || modes.isEmpty()
+                        ? mode == null ? List.of(ModeReglementClient.values()) : List.of(mode)
+                        : modes,
                 dateDu,
                 dateAu,
                 search,
@@ -380,5 +384,18 @@ public class ReglementClientController {
                 instrumentId,
                 request
         ), "Instrument remplacé"));
+    }
+
+    @PostMapping("/instruments/{instrumentId}/representation")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<ReglementClientResponse>> representInstrument(
+            @PathVariable Long instrumentId,
+            @Valid @RequestBody RepresenterInstrumentReglementRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.representInstrument(
+                TenantContext.getCurrentAgence(),
+                instrumentId,
+                request
+        ), "Instrument prêt pour une nouvelle remise"));
     }
 }

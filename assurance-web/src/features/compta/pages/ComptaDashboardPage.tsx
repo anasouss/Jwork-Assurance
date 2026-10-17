@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import {
   Archive,
+  CircleAlert,
   Building2,
   FileCheck2,
   FileText,
@@ -84,6 +85,12 @@ const groups: ComptaGroup[] = [
         title: "Journal de trésorerie",
         icon: Landmark,
         href: "/app/compta/tresorerie/journal",
+        permission: "tresorerie:view",
+      },
+      {
+        title: "Impayés clients",
+        icon: CircleAlert,
+        href: "/app/compta/tresorerie/impayes-clients",
         permission: "tresorerie:view",
       },
     ],

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowRightLeft, Banknote, Ban, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Banknote, Ban, CircleAlert, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -294,9 +294,14 @@ export default function EncaissementsEnAttentePage() {
           <h1 className="mt-1 text-xl font-semibold">Encaissements en attente</h1>
           <p className="text-sm text-muted-foreground">Espèces en caisse et moyens de paiement restant à traiter.</p>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/app/compta/tresorerie/bordereaux-remise"><Eye className="size-4" /> Bordereaux bancaires</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to="/app/compta/tresorerie/impayes-clients"><CircleAlert className="size-4" /> Impayés clients</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/app/compta/tresorerie/bordereaux-remise"><Eye className="size-4" /> Bordereaux bancaires</Link>
+          </Button>
+        </div>
       </header>
 
       <section className={`grid gap-3 rounded-md border bg-card p-4 ${showDueDateFilters
@@ -591,9 +596,9 @@ export default function EncaissementsEnAttentePage() {
       <Dialog open={Boolean(instrumentToProcess)} onOpenChange={(open) => !open && setInstrumentToProcess(undefined)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Retour bancaire impayé</DialogTitle>
+            <DialogTitle>Rejet bancaire</DialogTitle>
             <DialogDescription>
-              Le chèque ou l’effet a été retourné par la banque. {instrumentToProcess?.referenceInstrument || instrumentToProcess?.numeroReglement} · {formatTreasuryMoney(instrumentToProcess?.montant ?? 0)}
+              Le chèque ou l’effet a été retourné impayé par la banque. {instrumentToProcess?.referenceInstrument || instrumentToProcess?.numeroReglement} · {formatTreasuryMoney(instrumentToProcess?.montant ?? 0)}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -602,7 +607,7 @@ export default function EncaissementsEnAttentePage() {
               <DatePicker date={operationDate} onSelect={(value) => setOperationDate(toDateOnly(value) ?? "")} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="instrument-rejection-reason">Motif du retour</Label>
+              <Label htmlFor="instrument-rejection-reason">Motif du rejet</Label>
               <Textarea
                 id="instrument-rejection-reason"
                 value={rejectionReason}
@@ -616,7 +621,7 @@ export default function EncaissementsEnAttentePage() {
               disabled={!operationDate || !rejectionReason.trim() || processInstrument.isPending}
               onClick={() => processInstrument.mutate()}
             >
-              Enregistrer l’impayé
+              Enregistrer le rejet
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -709,7 +714,7 @@ function InstrumentAction({ instrument, canReplace, canManage, onProcess, onRepl
       {instrument.statut === "REMIS_EN_BANQUE" && canManage && <DropdownMenuSeparator />}
       {instrument.statut === "REMIS_EN_BANQUE" && canManage && (
         <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onProcess}>
-          <Ban className="size-4" /> Enregistrer un impayé
+          <Ban className="size-4" /> Enregistrer un rejet bancaire
         </DropdownMenuItem>
       )}
       {replaceable && <DropdownMenuSeparator />}

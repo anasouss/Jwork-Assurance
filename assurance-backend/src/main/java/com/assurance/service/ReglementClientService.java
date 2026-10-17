@@ -4,6 +4,7 @@ import com.assurance.dto.request.AnnulerReglementClientRequest;
 import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
+import com.assurance.dto.request.RepresenterInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
@@ -1068,6 +1069,64 @@ public class ReglementClientService {
         return toResponse(payment);
     }
 
+    @Transactional
+    public ReglementClientResponse representInstrument(
+            Long agenceId,
+            Long instrumentId,
+            RepresenterInstrumentReglementRequest request
+    ) {
+        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(
+                        instrumentId,
+                        agenceId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Instrument de règlement",
+                        instrumentId
+                ));
+        if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
+            throw new BadRequestException("Le règlement doit être validé avant la représentation");
+        }
+        if (instrument.getStatut() != StatutInstrumentReglement.REJETE) {
+            throw new BadRequestException("Seul un instrument impayé peut être représenté");
+        }
+        if (instrument.getMode() != ModeReglementClient.CHEQUE
+                && instrument.getMode() != ModeReglementClient.EFFET) {
+            throw new BadRequestException("Seuls les chèques et effets peuvent être représentés");
+        }
+        if (request.getDateRepresentation().isAfter(LocalDate.now())) {
+            throw new BadRequestException("La date de représentation ne peut pas être future");
+        }
+        if (instrument.getDateStatut() != null
+                && request.getDateRepresentation().isBefore(instrument.getDateStatut())) {
+            throw new BadRequestException("La représentation ne peut pas précéder le rejet bancaire");
+        }
+        validateReplacementBalances(instrument.getAffectations());
+        instrument.setStatut(StatutInstrumentReglement.EN_ATTENTE);
+        instrument.setDateStatut(request.getDateRepresentation());
+        instrument.setMotifStatut("Représentation : " + request.getMotif().trim());
+        instrument.setCompteTresorerie(null);
+        instrument.setReglementBureau(false);
+        instrument.getAffectations().forEach(allocation ->
+                allocation.setStatut(StatutAffectationReglement.EN_ATTENTE));
+        ReglementClient payment = reglementRepository.saveAndFlush(instrument.getReglement());
+        refreshUnallocatedAmount(payment);
+        recalculatePaymentFlags(
+                instrument.getAffectations().stream()
+                        .map(AffectationReglementClient::getElementFacturable)
+                        .filter(Objects::nonNull)
+                        .map(ElementFacturable::getId)
+                        .distinct()
+                        .toList(),
+                instrument.getAffectations().stream()
+                        .map(AffectationReglementClient::getDocumentClient)
+                        .filter(Objects::nonNull)
+                        .map(DocumentClient::getId)
+                        .distinct()
+                        .toList()
+        );
+        return toResponse(payment);
+    }
+
     @Transactional(readOnly = true)
     public List<ReglementClientResponse.Instrument> pendingInstruments(Long agenceId) {
         return instrumentRepository.findByAgenceIdAndStatutInOrderByDateEcheanceAscIdAsc(
@@ -1091,7 +1150,7 @@ public class ReglementClientService {
     public InstrumentReglementPageResponse searchInstruments(
             Long agenceId,
             Collection<StatutInstrumentReglement> statuses,
-            ModeReglementClient mode,
+            Collection<ModeReglementClient> modes,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
@@ -1106,7 +1165,7 @@ public class ReglementClientService {
         Page<InstrumentReglementClient> result = instrumentRepository.searchByStatus(
                 agenceId,
                 statuses,
-                mode,
+                modes,
                 dateDu,
                 dateAu,
                 search == null || search.isBlank() ? null : search.trim(),
@@ -1117,6 +1176,15 @@ public class ReglementClientService {
         Map<Long, LigneBordereauRemise> remittanceLines = activeRemittanceLines(
                 result.getContent().stream().map(InstrumentReglementClient::getId).toList()
         );
+        if (!result.getContent().isEmpty()
+                && statuses.contains(StatutInstrumentReglement.REJETE)) {
+            remittanceLineRepository.findHistoryByInstrumentIds(
+                            result.getContent().stream().map(InstrumentReglementClient::getId).toList()
+                    ).forEach(line -> remittanceLines.putIfAbsent(
+                            line.getInstrument().getId(),
+                            line
+                    ));
+        }
         return InstrumentReglementPageResponse.builder()
                 .page(SourceDocumentClientPageResponse.PageInfo.builder()
                         .number(result.getNumber())
@@ -1137,7 +1205,7 @@ public class ReglementClientService {
 
     private String instrumentSortBy(String sortBy) {
         return switch (sortBy == null ? "" : sortBy.trim().toUpperCase(Locale.ROOT)) {
-            case "REFERENCE", "PAYER", "PAYMENT", "MODE", "RECEIVED", "AMOUNT" ->
+            case "REFERENCE", "PAYER", "PAYMENT", "MODE", "RECEIVED", "STATUS_DATE", "AMOUNT" ->
                     sortBy.trim().toUpperCase(Locale.ROOT);
             default -> "DUE";
         };
@@ -1197,7 +1265,7 @@ public class ReglementClientService {
 
     private Map<Long, LigneBordereauRemise> activeRemittanceLines(List<Long> instrumentIds) {
         if (instrumentIds.isEmpty()) {
-            return Map.of();
+            return new LinkedHashMap<>();
         }
         return remittanceLineRepository.findActiveByInstrumentIds(
                         instrumentIds,

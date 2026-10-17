@@ -18,6 +18,10 @@ public interface LigneBordereauRemiseRepository extends JpaRepository<LigneBorde
             from LigneBordereauRemise l
             where l.instrument.id in :instrumentIds
               and l.bordereau.statut in :statuts
+              and l.statut in (
+                  com.assurance.enums.StatutLigneBordereauRemise.PREPAREE,
+                  com.assurance.enums.StatutLigneBordereauRemise.REMISE
+              )
             """)
     boolean existsActiveByInstrumentIds(
             @Param("instrumentIds") Collection<Long> instrumentIds,
@@ -30,6 +34,10 @@ public interface LigneBordereauRemiseRepository extends JpaRepository<LigneBorde
             from LigneBordereauRemise l
             where l.instrument.id = :instrumentId
               and l.bordereau.statut in :statuts
+              and l.statut in (
+                  com.assurance.enums.StatutLigneBordereauRemise.PREPAREE,
+                  com.assurance.enums.StatutLigneBordereauRemise.REMISE
+              )
             order by l.id desc
             """)
     List<LigneBordereauRemise> findActiveByInstrumentId(
@@ -43,6 +51,10 @@ public interface LigneBordereauRemiseRepository extends JpaRepository<LigneBorde
             from LigneBordereauRemise l
             where l.instrument.id in :instrumentIds
               and l.bordereau.statut in :statuts
+              and l.statut in (
+                  com.assurance.enums.StatutLigneBordereauRemise.PREPAREE,
+                  com.assurance.enums.StatutLigneBordereauRemise.REMISE
+              )
             order by l.id desc
             """)
     List<LigneBordereauRemise> findActiveByInstrumentIds(
@@ -61,6 +73,19 @@ public interface LigneBordereauRemiseRepository extends JpaRepository<LigneBorde
             """)
     List<LigneBordereauRemise> findHistoryByInstrumentId(
             @Param("instrumentId") Long instrumentId
+    );
+
+    @EntityGraph(attributePaths = {"bordereau", "instrument"})
+    @Query("""
+            select l
+            from LigneBordereauRemise l
+            where l.instrument.id in :instrumentIds
+              and l.bordereau.statut <> com.assurance.enums.StatutBordereauRemise.ANNULE
+              and l.statut <> com.assurance.enums.StatutLigneBordereauRemise.PREPAREE
+            order by l.id desc
+            """)
+    List<LigneBordereauRemise> findHistoryByInstrumentIds(
+            @Param("instrumentIds") Collection<Long> instrumentIds
     );
 
     @EntityGraph(attributePaths = {"bordereau", "instrument", "instrument.reglement"})

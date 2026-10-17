@@ -643,10 +643,11 @@ export const comptaApi = {
     statut?: PaymentInstrument["statut"];
     statuts?: PaymentInstrument["statut"][];
     mode?: PaymentInstrument["mode"];
+    modes?: PaymentInstrument["mode"][];
     dateDu?: string;
     dateAu?: string;
     search?: string;
-    sortBy?: "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" | "DUE" | "AMOUNT";
+    sortBy?: "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" | "STATUS_DATE" | "DUE" | "AMOUNT";
     sortDirection?: "ASC" | "DESC";
     page: number;
     size: number;
@@ -681,6 +682,16 @@ export const comptaApi = {
   ) {
     return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
       `/api/v1/compta/reglements-clients/instruments/${id}/remplacement`,
+      { method: "POST", body: JSON.stringify(request) }
+    )));
+  },
+
+  async representPaymentInstrument(
+    id: string,
+    request: { dateRepresentation: string; motif: string }
+  ) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/instruments/${id}/representation`,
       { method: "POST", body: JSON.stringify(request) }
     )));
   },

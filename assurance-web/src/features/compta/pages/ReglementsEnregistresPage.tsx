@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   useMutation,
   useQuery,
@@ -119,6 +119,7 @@ export default function ReglementsEnregistresPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
+  const replacementTargetId = searchParams.get("remplacer");
   const payments = useQuery({
     queryKey: ["compta", "client-payments", appliedSearch, sortBy, sortDirection, page],
     queryFn: () => comptaApi.clientPayments({
@@ -138,6 +139,20 @@ export default function ReglementsEnregistresPage() {
     queryKey: ["compta", "banks", "active"],
     queryFn: () => comptaApi.banks(),
   });
+
+  useEffect(() => {
+    if (!replacementTargetId || instrumentToReplace || !payments.data) return;
+    const target = payments.data.rows
+      .flatMap((payment) => payment.instruments)
+      .find((instrument) => instrument.id === replacementTargetId
+        && instrument.statut === "REJETE");
+    if (!target) return;
+    setInstrumentToReplace(target);
+    setReplacement(newReplacement());
+    const next = new URLSearchParams(searchParams);
+    next.delete("remplacer");
+    setSearchParams(next, { replace: true });
+  }, [instrumentToReplace, payments.data, replacementTargetId, searchParams, setSearchParams]);
 
   const journalUsers = useQuery({
     queryKey: ["compta", "client-payment-journal-users"],

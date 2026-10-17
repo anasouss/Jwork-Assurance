@@ -44,7 +44,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
               and reglement.createdAt < :saisiAvant
               and instrument.statut <> com.assurance.enums.StatutInstrumentReglement.REMPLACE
               and (:utilisateurId is null or reglement.creePar.id = :utilisateurId)
-              and (:mode is null or instrument.mode = :mode)
+              and instrument.mode in :modes
               and (:statutReglement is null or reglement.statut = :statutReglement)
             order by reglement.createdAt asc, reglement.numero asc, instrument.id asc
             """)
@@ -53,7 +53,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             @Param("saisiDu") LocalDateTime saisiDu,
             @Param("saisiAvant") LocalDateTime saisiAvant,
             @Param("utilisateurId") Long utilisateurId,
-            @Param("mode") ModeReglementClient mode,
+            @Param("modes") Collection<ModeReglementClient> modes,
             @Param("statutReglement") StatutReglementClient statutReglement
     );
 
@@ -107,6 +107,10 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                           com.assurance.enums.StatutBordereauRemise.BROUILLON,
                           com.assurance.enums.StatutBordereauRemise.DEPOSE,
                           com.assurance.enums.StatutBordereauRemise.PARTIELLEMENT_TRAITE
+                      )
+                      and line.statut in (
+                          com.assurance.enums.StatutLigneBordereauRemise.PREPAREE,
+                          com.assurance.enums.StatutLigneBordereauRemise.REMISE
                       )
               )
             order by coalesce(instrument.dateEcheance, instrument.dateInstrument) asc, instrument.id asc
@@ -190,6 +194,10 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                    then instrument.dateInstrument end asc,
               case when :sortBy = 'RECEIVED' and :sortDirection = 'DESC'
                    then instrument.dateInstrument end desc,
+              case when :sortBy = 'STATUS_DATE' and :sortDirection = 'ASC'
+                   then instrument.dateStatut end asc,
+              case when :sortBy = 'STATUS_DATE' and :sortDirection = 'DESC'
+                   then instrument.dateStatut end desc,
               case when :sortBy = 'DUE' and :sortDirection = 'ASC'
                    then coalesce(instrument.dateEcheance, instrument.dateInstrument) end asc,
               case when :sortBy = 'DUE' and :sortDirection = 'DESC'

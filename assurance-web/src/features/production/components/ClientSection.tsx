@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -375,10 +376,10 @@ export function ClientSection({
                 ) : null}
               </div>
               {isProprietaire ? (
-                <label className="mb-4 flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="mb-4 flex items-center gap-2 text-sm font-medium">
+                  <Switch
                     checked={sameAsSouscripteur}
-                    onCheckedChange={(checked) => copySouscripteurToProprietaire(Boolean(checked))}
+                    onCheckedChange={copySouscripteurToProprietaire}
                   />
                   {sameAsSubscriberLabel}
                 </label>

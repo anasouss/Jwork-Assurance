@@ -3,6 +3,7 @@ package com.assurance.service;
 import com.assurance.entity.Contrat;
 import com.assurance.enums.StatutContrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.service.renewal.RenewalPolicy;
 import org.junit.jupiter.api.Test;
@@ -25,13 +26,20 @@ class EcheanceProductionServiceTest {
     @Mock
     private ContratRepository contratRepository;
 
+    @Mock
+    private AssistanceContratRepository assistanceContratRepository;
+
     private final RenewalPolicy renewalPolicy = new RenewalPolicy();
 
     private EcheanceProductionService service;
 
     @Test
     void exposesSavedPreTermDraftAndCompanyTermEligibility() {
-        service = new EcheanceProductionService(contratRepository, renewalPolicy);
+        service = new EcheanceProductionService(
+                contratRepository,
+                assistanceContratRepository,
+                renewalPolicy
+        );
         LocalDate dateDu = LocalDate.of(2026, 12, 1);
         LocalDate dateAu = LocalDate.of(2026, 12, 31);
         Contrat source = Contrat.builder()

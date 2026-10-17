@@ -267,7 +267,6 @@ function normalizeAutomobileEcheances(response: EcheanceAutomobileResponse): Ech
   return {
     ...response,
     compagnieId: nullableId(response.compagnieId),
-    produitId: nullableId(response.produitId),
     rows: response.rows.map((row) => ({
       ...row,
       contratId: String(row.contratId),
@@ -281,6 +280,7 @@ function normalizeAssistanceEcheances(response: EcheanceAssistanceResponse): Ech
   return {
     ...response,
     compagnieId: nullableId(response.compagnieId),
+    produitId: nullableId(response.produitId),
     rows: response.rows.map((row) => ({
       ...row,
       assistanceId: String(row.assistanceId),

@@ -414,7 +414,7 @@ public class ReglementClientPdfService {
         }
         if (payment.getInstruments().stream().anyMatch(instrument ->
                 instrument.getStatut() == StatutInstrumentReglement.REJETE)) {
-            return "INSTRUMENT REJETÉ";
+            return "INSTRUMENT IMPAYÉ";
         }
         return "ENREGISTRÉ";
     }
@@ -437,7 +437,7 @@ public class ReglementClientPdfService {
                     ? "Règlement au bureau" : "À remettre";
             case REMIS_EN_BANQUE -> "Remis en banque";
             case CONFIRME -> "Confirmé";
-            case REJETE -> "Rejeté";
+            case REJETE -> "Impayé";
             case REMPLACE -> "Remplacé";
         };
     }

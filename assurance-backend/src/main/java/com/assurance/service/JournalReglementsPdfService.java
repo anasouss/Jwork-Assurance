@@ -265,7 +265,7 @@ public class JournalReglementsPdfService {
         addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
         addHeader(table, "EN COURS", bold, TextAlignment.RIGHT);
         addHeader(table, "CONFIRMÉ", bold, TextAlignment.RIGHT);
-        addHeader(table, "REJETÉ", bold, TextAlignment.RIGHT);
+        addHeader(table, "IMPAYÉ", bold, TextAlignment.RIGHT);
 
         int index = 0;
         for (ModeReglementClient mode : ModeReglementClient.values()) {
@@ -442,7 +442,7 @@ public class JournalReglementsPdfService {
                     ? "Règlement au bureau" : "À remettre";
             case REMIS_EN_BANQUE -> "Remis en banque";
             case CONFIRME -> "Confirmé";
-            case REJETE -> "Rejeté";
+            case REJETE -> "Impayé";
             case REMPLACE -> "Remplacé";
         };
     }

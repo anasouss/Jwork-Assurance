@@ -35,7 +35,7 @@ const LINE_STATUS_LABELS = {
   PREPAREE: "Préparée",
   REMISE: "Remise",
   ENCAISSEE: "Encaissée",
-  REJETEE: "Rejetée",
+  REJETEE: "Impayée",
 } as const;
 
 export default function BordereauRemiseDetailPage() {

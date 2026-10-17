@@ -26,7 +26,7 @@ const INSTRUMENT_STATUS_LABELS: Record<PaymentInstrumentStatus, string> = {
   EN_ATTENTE: "En attente",
   REMIS_EN_BANQUE: "Remis en banque",
   CONFIRME: "Confirmé",
-  REJETE: "Rejeté",
+  REJETE: "Impayé",
   REMPLACE: "Remplacé",
 };
 

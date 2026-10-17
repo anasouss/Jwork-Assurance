@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowRightLeft, Banknote, Ban, CheckCircle2, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Banknote, Ban, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -52,7 +52,6 @@ export default function EncaissementsEnAttentePage() {
   const [replacementDate, setReplacementDate] = useState(TODAY);
   const [replacementReason, setReplacementReason] = useState("");
   const [instrumentToProcess, setInstrumentToProcess] = useState<PaymentInstrument>();
-  const [instrumentAction, setInstrumentAction] = useState<"SETTLE" | "REJECT">("SETTLE");
   const [operationDate, setOperationDate] = useState(TODAY);
   const [rejectionReason, setRejectionReason] = useState("");
   const [slipDialogOpen, setSlipDialogOpen] = useState(false);
@@ -128,12 +127,12 @@ export default function EncaissementsEnAttentePage() {
 
   const processInstrument = useMutation({
     mutationFn: () => comptaApi.changePaymentInstrumentStatus(instrumentToProcess!.id, {
-      statut: instrumentAction === "SETTLE" ? "CONFIRME" : "REJETE",
+      statut: "REJETE",
       dateOperation: operationDate,
-      motif: instrumentAction === "REJECT" ? rejectionReason.trim() : undefined,
+      motif: rejectionReason.trim(),
     }),
     onSuccess: async () => {
-      toast.success(instrumentAction === "SETTLE" ? "Instrument encaissé" : "Rejet enregistré");
+      toast.success("Impayé enregistré");
       setInstrumentToProcess(undefined);
       setRejectionReason("");
       await queryClient.invalidateQueries({ queryKey: ["compta"] });
@@ -143,9 +142,8 @@ export default function EncaissementsEnAttentePage() {
     ),
   });
 
-  function openInstrumentAction(instrument: PaymentInstrument, action: "SETTLE" | "REJECT") {
+  function openInstrumentAction(instrument: PaymentInstrument) {
     setInstrumentToProcess(instrument);
-    setInstrumentAction(action);
     setOperationDate(TODAY);
     setRejectionReason("");
   }
@@ -475,7 +473,7 @@ export default function EncaissementsEnAttentePage() {
                       instrument={instrument}
                       canReplace={canReplacePayment}
                       canManage={canManage}
-                      onProcess={(action) => openInstrumentAction(instrument, action)}
+                      onProcess={() => openInstrumentAction(instrument)}
                       onReplace={() => {
                         setInstrumentToReplace(instrument);
                         setReplacementDate(TODAY);
@@ -593,9 +591,9 @@ export default function EncaissementsEnAttentePage() {
       <Dialog open={Boolean(instrumentToProcess)} onOpenChange={(open) => !open && setInstrumentToProcess(undefined)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{instrumentAction === "SETTLE" ? "Confirmer l’encaissement" : "Enregistrer le rejet"}</DialogTitle>
+            <DialogTitle>Retour bancaire impayé</DialogTitle>
             <DialogDescription>
-              {instrumentToProcess?.referenceInstrument || instrumentToProcess?.numeroReglement} · {formatTreasuryMoney(instrumentToProcess?.montant ?? 0)}
+              Le chèque ou l’effet a été retourné par la banque. {instrumentToProcess?.referenceInstrument || instrumentToProcess?.numeroReglement} · {formatTreasuryMoney(instrumentToProcess?.montant ?? 0)}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -603,24 +601,22 @@ export default function EncaissementsEnAttentePage() {
               <Label>Date d’opération</Label>
               <DatePicker date={operationDate} onSelect={(value) => setOperationDate(toDateOnly(value) ?? "")} />
             </div>
-            {instrumentAction === "REJECT" && (
-              <div className="grid gap-2">
-                <Label htmlFor="instrument-rejection-reason">Motif du rejet</Label>
-                <Textarea
-                  id="instrument-rejection-reason"
-                  value={rejectionReason}
-                  onChange={(event) => setRejectionReason(event.target.value)}
-                />
-              </div>
-            )}
+            <div className="grid gap-2">
+              <Label htmlFor="instrument-rejection-reason">Motif du retour</Label>
+              <Textarea
+                id="instrument-rejection-reason"
+                value={rejectionReason}
+                onChange={(event) => setRejectionReason(event.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" disabled={processInstrument.isPending} onClick={() => setInstrumentToProcess(undefined)}>Annuler</Button>
             <Button
-              disabled={!operationDate || (instrumentAction === "REJECT" && !rejectionReason.trim()) || processInstrument.isPending}
+              disabled={!operationDate || !rejectionReason.trim() || processInstrument.isPending}
               onClick={() => processInstrument.mutate()}
             >
-              {instrumentAction === "SETTLE" ? "Confirmer" : "Enregistrer le rejet"}
+              Enregistrer l’impayé
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -658,7 +654,7 @@ function CollectionSortHeader(props: {
 
 function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
   if (instrument.statut === "REJETE") {
-    return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-200">Rejeté</Badge>;
+    return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-200">Impayé</Badge>;
   }
   if (instrument.statut === "REMIS_EN_BANQUE") {
     return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200">Remis en banque</Badge>;
@@ -682,7 +678,7 @@ function InstrumentAction({ instrument, canReplace, canManage, onProcess, onRepl
   instrument: PaymentInstrument;
   canReplace: boolean;
   canManage: boolean;
-  onProcess: (action: "SETTLE" | "REJECT") => void;
+  onProcess: () => void;
   onReplace: () => void;
 }) {
   const replaceable = canReplace
@@ -712,13 +708,8 @@ function InstrumentAction({ instrument, canReplace, canManage, onProcess, onRepl
       )}
       {instrument.statut === "REMIS_EN_BANQUE" && canManage && <DropdownMenuSeparator />}
       {instrument.statut === "REMIS_EN_BANQUE" && canManage && (
-        <DropdownMenuItem onSelect={() => onProcess("SETTLE")}>
-          <CheckCircle2 className="size-4" /> Confirmer l’encaissement
-        </DropdownMenuItem>
-      )}
-      {instrument.statut === "REMIS_EN_BANQUE" && canManage && (
-        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => onProcess("REJECT")}>
-          <Ban className="size-4" /> Enregistrer le rejet
+        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onProcess}>
+          <Ban className="size-4" /> Enregistrer un impayé
         </DropdownMenuItem>
       )}
       {replaceable && <DropdownMenuSeparator />}

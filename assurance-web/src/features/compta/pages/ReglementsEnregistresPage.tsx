@@ -300,7 +300,7 @@ export default function ReglementsEnregistresPage() {
           </div>
           <h1 className="mt-1 text-xl font-semibold">Règlements enregistrés</h1>
           <p className="text-sm text-muted-foreground">
-            Historique, annulations et remplacement des moyens de paiement rejetés.
+            Historique, annulations et remplacement des moyens de paiement impayés.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -610,7 +610,7 @@ export default function ReglementsEnregistresPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remplacer le moyen de paiement rejeté</DialogTitle>
+            <DialogTitle>Remplacer le moyen de paiement impayé</DialogTitle>
             <DialogDescription>
               Le montant et les affectations sont conservés :{" "}
               {formatAccountingAmount(instrumentToReplace?.montant)}
@@ -847,7 +847,7 @@ function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }
     EN_ATTENTE: "En attente",
     REMIS_EN_BANQUE: "Remis en banque",
     CONFIRME: "Confirmé",
-    REJETE: "Rejeté",
+    REJETE: "Impayé",
     REMPLACE: "Remplacé",
   };
   const variant = value === "REJETE"

@@ -55,8 +55,16 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/production/pages/AssistanceVoyageCreationPage")),
       },
       {
+        path: "production/ajouter-dossier/assistance-automobile",
+        lazy: lazyRoute(() => import("@/features/production/pages/AssistanceAutomobileCreationPage")),
+      },
+      {
         path: "production/contrats/:contratId/assistance-voyage/modifier",
         lazy: lazyRoute(() => import("@/features/production/pages/AssistanceVoyageCreationPage")),
+      },
+      {
+        path: "production/contrats/:contratId/assistance-automobile/modifier",
+        lazy: lazyRoute(() => import("@/features/production/pages/AssistanceAutomobileCreationPage")),
       },
       {
         path: "production/prospection",

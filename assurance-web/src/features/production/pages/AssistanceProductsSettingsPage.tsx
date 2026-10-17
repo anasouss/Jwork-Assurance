@@ -126,7 +126,7 @@ export default function AssistanceProductsSettingsPage() {
   const promos = useQuery({
     queryKey: ["referentiel", "produits-assistance", tarifProduct?.id, "codes-promo"],
     queryFn: () => tarifProduct ? assistanceProductApi.listPromoCodes(tarifProduct.id) : Promise.resolve([]),
-    enabled: Boolean(tarifProduct && isVoyageProduct(tarifProduct)),
+    enabled: Boolean(tarifProduct),
     staleTime: 30_000,
   });
 
@@ -521,7 +521,7 @@ export default function AssistanceProductsSettingsPage() {
       <Dialog open={Boolean(tarifProduct)} onOpenChange={(open) => { if (!open) { setTarifProduct(null); setEditingTarif(null); setEditingPromo(null); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
           <DialogHeader>
-            <DialogTitle>{tarifProduct && isVoyageProduct(tarifProduct) ? "Tarifs et promotions" : "Tarifs produit assistance"}</DialogTitle>
+            <DialogTitle>Tarifs et promotions</DialogTitle>
             <DialogDescription>{tarifProduct?.libelle} - {refString(tarifProduct ?? {}, "compagnieAssistanceLibelle")}</DialogDescription>
           </DialogHeader>
           <section className="grid gap-3">
@@ -537,14 +537,16 @@ export default function AssistanceProductsSettingsPage() {
               <DatePicker date={tarifPayload.dateFin} onSelect={(date) => setTarifPayload((current) => ({ ...current, dateFin: toDateOnly(date) }))} />
             </Field>
             {tarifProduct && isVoyageProduct(tarifProduct) ? <Field label="Base de durée" required>
-              <Select value={String(tarifPayload.dureeMois)} onValueChange={(value) => setTarifPayload((current) => ({ ...current, dureeMois: Number(value) as 6 | 12 }))}>
+              <Select value={String(tarifPayload.dureeMois)} onValueChange={(value) => setTarifPayload((current) => ({ ...current, dureeMois: Number(value) }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="6">6 mois</SelectItem>
                   <SelectItem value="12">Annuelle (1 à 5 ans)</SelectItem>
                 </SelectContent>
               </Select>
-            </Field> : null}
+            </Field> : <Field label="Durée (mois)" required>
+              <Input type="number" min={1} value={tarifPayload.dureeMois} onChange={(event) => setTarifPayload((current) => ({ ...current, dureeMois: Math.max(1, Number(event.target.value) || 1) }))} />
+            </Field>}
             {tarifProduct && isVoyageProduct(tarifProduct) ? <Field label="Âge minimum">
               <Input type="number" min={0} max={120} value={tarifPayload.ageMin ?? ""} onChange={(event) => setTarifPayload((current) => ({ ...current, ageMin: optionalNumber(event.target.value) }))} />
             </Field> : null}
@@ -569,7 +571,7 @@ export default function AssistanceProductsSettingsPage() {
               <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
                 <TableRow className="hover:bg-amber-600">
                   <SortableTableHead column="PERIOD" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))}>Période</SortableTableHead>
-                  {tarifProduct && isVoyageProduct(tarifProduct) ? <TableHead>Durée</TableHead> : null}
+                  <TableHead>Durée</TableHead>
                   {tarifProduct && isVoyageProduct(tarifProduct) ? <TableHead>Tranche d’âge</TableHead> : null}
                   <SortableTableHead column="HT" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))} align="right">Prime nette</SortableTableHead>
                   <SortableTableHead column="TTC" activeColumn={tariffSort.column} direction={tariffSort.direction} onSort={(column) => setTariffSort((current) => nextTableSort(current, column))} align="right">Montant TTC</SortableTableHead>
@@ -580,7 +582,7 @@ export default function AssistanceProductsSettingsPage() {
                 {sortedTariffs.map((tarif) => (
                   <TableRow key={tarif.id}>
                     <TableCell>{periodLabelFromDates(refString(tarif, "dateDebut"), refString(tarif, "dateFin"))}</TableCell>
-                    {tarifProduct && isVoyageProduct(tarifProduct) ? <TableCell>{durationBaseLabel(refNumber(tarif, "dureeMois"))}</TableCell> : null}
+                    <TableCell>{durationLabel(refNumber(tarif, "dureeMois"))}</TableCell>
                     {tarifProduct && isVoyageProduct(tarifProduct) ? <TableCell>{ageRangeLabel(refNumber(tarif, "ageMin"), refNumber(tarif, "ageMax"))}</TableCell> : null}
                     <TableCell className="text-right">{money(refNumber(tarif, "montantHt"))}</TableCell>
                     <TableCell className="text-right font-medium">{money(refNumber(tarif, "montantTtc"))}</TableCell>
@@ -607,7 +609,7 @@ export default function AssistanceProductsSettingsPage() {
                 ))}
                 {!tarifs.isLoading && (tarifs.data ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={tarifProduct && isVoyageProduct(tarifProduct) ? 6 : 4} className="py-8 text-center text-muted-foreground">Aucun tarif pour ce produit.</TableCell>
+                    <TableCell colSpan={tarifProduct && isVoyageProduct(tarifProduct) ? 6 : 5} className="py-8 text-center text-muted-foreground">Aucun tarif pour ce produit.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -615,7 +617,7 @@ export default function AssistanceProductsSettingsPage() {
           </div>
           </section>
 
-          {tarifProduct && isVoyageProduct(tarifProduct) ? (
+          {tarifProduct ? (
             <section className="grid gap-3 border-t pt-4">
               <div className="flex items-center gap-2">
                 <Tags className="size-4" />
@@ -715,7 +717,7 @@ function tarifToPayload(tarif: ReferenceOption): UpsertTarifProduitAssistanceReq
     dateFin: refString(tarif, "dateFin") || undefined,
     ageMin: refNumber(tarif, "ageMin"),
     ageMax: refNumber(tarif, "ageMax"),
-    dureeMois: refNumber(tarif, "dureeMois") === 6 ? 6 : 12,
+    dureeMois: refNumber(tarif, "dureeMois") ?? 12,
     montantHt: refNumber(tarif, "montantHt") ?? 0,
     montantTtc: refNumber(tarif, "montantTtc") ?? 0,
     actif: tarif.actif !== false,
@@ -802,8 +804,10 @@ function optionalNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function durationBaseLabel(months?: number) {
-  return months === 6 ? "6 mois" : "Annuelle";
+function durationLabel(months?: number) {
+  if (months === 12) return "1 an";
+  if (months && months > 12 && months % 12 === 0) return `${months / 12} ans`;
+  return months ? `${months} mois` : "-";
 }
 
 function ageRangeLabel(min?: number, max?: number) {

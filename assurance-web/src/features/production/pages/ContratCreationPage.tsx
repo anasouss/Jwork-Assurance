@@ -101,7 +101,7 @@ export default function ContratCreationPage() {
   });
 
   const canStart = assurance === "assistance"
-    ? assistanceType === "Assistance Voyage" && Boolean(compagnieAssistanceId && produitAssistanceId)
+    ? Boolean(assistanceType && compagnieAssistanceId && produitAssistanceId)
     : assurance === "automobile"
       && Boolean(typeContrat)
       && (typeContrat !== "PARTICULIER" || Boolean(categorieClientId))
@@ -137,6 +137,10 @@ export default function ContratCreationPage() {
   const handleStart = () => {
     if (assurance === "assistance" && assistanceType === "Assistance Voyage") {
       navigate(`/app/production/ajouter-dossier/assistance-voyage?compagnieId=${encodeURIComponent(compagnieAssistanceId)}&produitId=${encodeURIComponent(produitAssistanceId)}`);
+      return;
+    }
+    if (assurance === "assistance" && assistanceType === "Assistance Automobile") {
+      navigate(`/app/production/ajouter-dossier/assistance-automobile?compagnieId=${encodeURIComponent(compagnieAssistanceId)}&produitId=${encodeURIComponent(produitAssistanceId)}`);
       return;
     }
     if (!typeContrat) {
@@ -234,15 +238,15 @@ export default function ContratCreationPage() {
                     <SelectItem value="Assistance Voyage">
                       <span className="inline-flex items-center gap-2"><Plane className="size-4" /> Assistance voyage</span>
                     </SelectItem>
-                    <SelectItem value="Assistance Automobile" disabled>
-                      Assistance automobile - depuis un dossier automobile
+                    <SelectItem value="Assistance Automobile">
+                      <span className="inline-flex items-center gap-2"><Car className="size-4" /> Assistance automobile</span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
             ) : null}
 
-            {assurance === "assistance" && assistanceType === "Assistance Voyage" ? (
+            {assurance === "assistance" && assistanceType ? (
               <>
                 <Field label="Compagnie d’assistance">
                   <Select value={compagnieAssistanceId} onValueChange={(value) => {

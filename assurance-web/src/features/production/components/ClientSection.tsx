@@ -45,6 +45,9 @@ export function ClientSection({
   showProprietaireCategorie = false,
   requireDriverDetails = true,
   requireDriverPermitValidity = true,
+  secondaryTitle = "Propriétaire",
+  secondaryIdentityLabel = "Identité propriétaire",
+  sameAsSubscriberLabel = "Le propriétaire est-il lui-même le souscripteur ?",
   errors = {},
   onSaveSection,
   savedSections = {},
@@ -62,6 +65,9 @@ export function ClientSection({
   showProprietaireCategorie?: boolean;
   requireDriverDetails?: boolean;
   requireDriverPermitValidity?: boolean;
+  secondaryTitle?: string;
+  secondaryIdentityLabel?: string;
+  sameAsSubscriberLabel?: string;
   errors?: Record<string, string>;
   onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
   savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
@@ -356,7 +362,7 @@ export function ClientSection({
           return (
             <div key={index} className="rounded-lg border p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-sm font-medium">{item.role === "SOUSCRIPTEUR" ? "Identité souscripteur" : item.role === "PROPRIETAIRE" ? "Identité propriétaire" : item.role}</div>
+                <div className="text-sm font-medium">{item.role === "SOUSCRIPTEUR" ? "Identité souscripteur" : item.role === "PROPRIETAIRE" ? secondaryIdentityLabel : item.role}</div>
                 {clients.length > 1 && item.role !== "SOUSCRIPTEUR" && item.role !== "PROPRIETAIRE" ? (
                   <Button
                     type="button"
@@ -374,7 +380,7 @@ export function ClientSection({
                     checked={sameAsSouscripteur}
                     onCheckedChange={(checked) => copySouscripteurToProprietaire(Boolean(checked))}
                   />
-                  Le propriétaire est-il lui-même le souscripteur ?
+                  {sameAsSubscriberLabel}
                 </label>
               ) : null}
               <div className={`grid gap-3 md:grid-cols-2 ${isProprietaire && showProprietaireCategorie ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
@@ -692,7 +698,7 @@ export function ClientSection({
       </SectionCard>
 
       <SectionCard
-        title="Propriétaire"
+        title={secondaryTitle}
         badge={savedSections.proprietaire ? "Validé" : "Obligatoire"}
         tone="production"
         defaultOpen={false}

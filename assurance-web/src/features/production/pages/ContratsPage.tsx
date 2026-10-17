@@ -777,6 +777,9 @@ function editContratPath(contrat: ContratListItem) {
   if (normalize(contrat.typeAssistance) === "ASSISTANCE VOYAGE") {
     return `/app/production/contrats/${contrat.id}/assistance-voyage/modifier`;
   }
+  if (normalize(contrat.typeAssistance) === "ASSISTANCE AUTOMOBILE") {
+    return `/app/production/contrats/${contrat.id}/assistance-automobile/modifier`;
+  }
   if (contrat.contratOrigineId) return renewalDraftPath(contrat);
   if (contrat.prospection && contrat.typeContrat === "FLOTTE") return `/app/production/prospection/devis/flotte/${contrat.id}`;
   if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;

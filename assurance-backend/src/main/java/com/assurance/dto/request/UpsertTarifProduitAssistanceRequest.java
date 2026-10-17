@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -18,6 +19,7 @@ public class UpsertTarifProduitAssistanceRequest {
     private Integer ageMax;
 
     @NotNull
+    @Min(1)
     private Integer dureeMois;
 
     @NotNull

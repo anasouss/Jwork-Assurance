@@ -57,6 +57,27 @@ public class TarifProduitAssistanceService {
                 .orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public TarifProduitAssistance resolveAutomobileTarif(
+            ProduitAssistance produitAssistance,
+            LocalDate referenceDate,
+            int requestedDurationMonths
+    ) {
+        List<TarifProduitAssistance> candidates = tarifProduitAssistanceRepository
+                .findByProduitAssistanceAndActifTrueAndDateDebutLessThanEqualOrderByDateDebutDescCreatedAtDesc(
+                        produitAssistance,
+                        referenceDate
+                );
+        return candidates.stream()
+                .filter(tarif -> tarif.getDateFin() == null || !tarif.getDateFin().isBefore(referenceDate))
+                .filter(tarif -> tarif.getDureeMois() != null && tarif.getDureeMois() == requestedDurationMonths)
+                .filter(tarif -> tarif.getAgeMin() == null && tarif.getAgeMax() == null)
+                .min(Comparator
+                        .comparing(TarifProduitAssistance::getDateDebut, Comparator.reverseOrder())
+                        .thenComparing(TarifProduitAssistance::getId, Comparator.nullsLast(Comparator.reverseOrder())))
+                .orElse(null);
+    }
+
     private int ageRangeWidth(TarifProduitAssistance tarif) {
         int min = tarif.getAgeMin() == null ? 0 : tarif.getAgeMin();
         int max = tarif.getAgeMax() == null ? 200 : tarif.getAgeMax();

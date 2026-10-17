@@ -51,7 +51,7 @@ export type UpsertTarifProduitAssistanceRequest = {
   dateFin?: string;
   ageMin?: number;
   ageMax?: number;
-  dureeMois: 6 | 12;
+  dureeMois: number;
   montantHt: number;
   montantTtc: number;
   actif?: boolean;
@@ -507,6 +507,44 @@ export type AssistanceVoyageQuote = {
     primeTotale: number;
     montantReduction: number;
   }>;
+};
+
+export type AssistanceAutomobileVehicleRequest = {
+  typeVehicule: VehiculeInput["typeVehicule"];
+  usageId: string;
+  marqueId?: string;
+  marqueLibelle?: string;
+  carrosserieId?: string;
+  carrosserieLibelle?: string;
+  categorieTransportId?: string;
+  immatriculation: string;
+  datePremiereCirculation?: string;
+  dateExpirationCarteGrise: string;
+  nombrePlaces: string;
+};
+
+export type CreateAssistanceAutomobileRequest = {
+  compagnieAssistanceId: string;
+  produitAssistanceId: string;
+  dateEffet: string;
+  dureeMois: number;
+  numeroContrat: string;
+  codePromo?: string;
+  souscripteur: AssistanceVoyagePersonRequest;
+  assure?: AssistanceVoyagePersonRequest;
+  assureIdentiqueSouscripteur?: boolean;
+  assurePayeur?: boolean;
+  vehicule: AssistanceAutomobileVehicleRequest;
+};
+
+export type AssistanceAutomobileCreationResponse = AssistanceVoyageCreationResponse;
+
+export type AssistanceAutomobileQuote = {
+  tarifId: string;
+  dateEcheance: string;
+  primeNette: number;
+  primeTotale: number;
+  montantReduction: number;
 };
 
 export type ClientResponse = ClientInput["client"] & {

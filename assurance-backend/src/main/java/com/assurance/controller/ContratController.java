@@ -1,7 +1,9 @@
 package com.assurance.controller;
 
-import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.dto.request.CreateAssistanceAutomobileRequest;
 import com.assurance.dto.request.CreateAssistanceVoyageRequest;
+import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.dto.request.QuoteAssistanceAutomobileRequest;
 import com.assurance.dto.request.QuoteAssistanceVoyageRequest;
 import com.assurance.dto.request.CreateRenouvellementDraftRequest;
 import com.assurance.dto.request.FinalizeRenouvellementRequest;
@@ -12,6 +14,8 @@ import com.assurance.dto.request.RegistreProductionFilter;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.ApiResponse;
+import com.assurance.dto.response.AssistanceAutomobileCreationResponse;
+import com.assurance.dto.response.AssistanceAutomobileQuoteResponse;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.AssistanceVoyageCreationResponse;
@@ -33,6 +37,7 @@ import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
+import com.assurance.service.AssistanceAutomobileService;
 import com.assurance.service.AssistanceVoyageService;
 import com.assurance.service.CarteVerteService;
 import com.assurance.service.ContratActionService;
@@ -73,6 +78,7 @@ public class ContratController {
     private final ContratSearchService contratSearchService;
     private final ContratActionService contratActionService;
     private final AssistanceContratService assistanceContratService;
+    private final AssistanceAutomobileService assistanceAutomobileService;
     private final AssistanceVoyageService assistanceVoyageService;
     private final CarteVerteService carteVerteService;
     private final DevisPdfService devisPdfService;
@@ -121,6 +127,37 @@ public class ContratController {
             @Valid @RequestBody QuoteAssistanceVoyageRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(assistanceVoyageService.quote(request)));
+    }
+
+    @PostMapping("/assistance-automobile")
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
+    public ResponseEntity<ApiResponse<AssistanceAutomobileCreationResponse>> createAutomobileAssistance(
+            @Valid @RequestBody CreateAssistanceAutomobileRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceAutomobileService.create(TenantContext.getCurrentAgence(), request),
+                "Assistance automobile créée"
+        ));
+    }
+
+    @PutMapping("/{id}/assistance-automobile")
+    @PreAuthorize("hasAuthority('PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceAutomobileCreationResponse>> updateAutomobileAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateAssistanceAutomobileRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceAutomobileService.update(TenantContext.getCurrentAgence(), id, request),
+                "Assistance automobile modifiée"
+        ));
+    }
+
+    @PostMapping("/assistance-automobile/tarification")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceAutomobileQuoteResponse>> quoteAutomobileAssistance(
+            @Valid @RequestBody QuoteAssistanceAutomobileRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(assistanceAutomobileService.quote(request)));
     }
 
     @PostMapping("/drafts")

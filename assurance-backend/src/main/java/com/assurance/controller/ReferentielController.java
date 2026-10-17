@@ -2007,6 +2007,10 @@ public class ReferentielController {
                 && request.getDureeMois() != 12) {
             throw new BadRequestException("La base tarifaire doit etre 6 mois ou annuelle");
         }
+        if ("Assistance Automobile".equalsIgnoreCase(produit.getType())
+                && (request.getAgeMin() != null || request.getAgeMax() != null)) {
+            throw new BadRequestException("Une tranche d'age ne s'applique pas a l'assistance automobile");
+        }
         validateTarifOverlap(tarif, produit, request);
         tarif.setProduitAssistance(produit);
         tarif.setDateDebut(request.getDateDebut());

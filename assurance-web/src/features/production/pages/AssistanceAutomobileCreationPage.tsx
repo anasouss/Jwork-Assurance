@@ -88,7 +88,8 @@ export default function AssistanceAutomobileCreationPage() {
   const subscriber = clients.find((item) => item.role === "SOUSCRIPTEUR");
   const sameInsured = insured?.sameAsRole === "SOUSCRIPTEUR"
     || Boolean(insured?.clientId && subscriber?.clientId && insured.clientId === subscriber.clientId);
-  const categorieClientId = insured?.client.categorieClientId ?? "";
+  const configuredCategoryId = optionalString(selectedProduct?.categorieClientId) ?? "";
+  const categorieClientId = configuredCategoryId || insured?.client.categorieClientId || "";
   const availableCategories = useMemo(() => {
     const requiredId = optionalString(selectedProduct?.categorieClientId);
     return requiredId ? (categories.data ?? []).filter((item) => item.id === requiredId) : (categories.data ?? []);
@@ -113,6 +114,15 @@ export default function AssistanceAutomobileCreationPage() {
       setDureeMois(durationOptions[0]?.value ?? "");
     }
   }, [dureeMois, durationOptions, selectedProduct, tariffs.isLoading]);
+
+  useEffect(() => {
+    if (!configuredCategoryId || insured?.client.categorieClientId === configuredCategoryId) return;
+    setClients((current) => current.map((item) =>
+      item.role === "PROPRIETAIRE" || (sameInsured && item.role === "SOUSCRIPTEUR")
+        ? { ...item, client: { ...item.client, categorieClientId: configuredCategoryId } }
+        : item,
+    ));
+  }, [configuredCategoryId, insured?.client.categorieClientId, sameInsured]);
 
   useEffect(() => {
     if (vehicule.usageId && categorieClientId && selectedProduct && usages.isSuccess
@@ -218,7 +228,7 @@ export default function AssistanceAutomobileCreationPage() {
         villes={cities.data ?? []}
         categoriesClient={availableCategories}
         groupesClients={groups.data ?? []}
-        showProprietaireCategorie
+        showProprietaireCategorie={!configuredCategoryId}
         requireDriverDetails={false}
         requireDriverPermitValidity={false}
         secondaryTitle="Assuré"

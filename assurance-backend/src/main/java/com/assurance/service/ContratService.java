@@ -1427,12 +1427,15 @@ public class ContratService {
             List<DraftAssistanceSnapshot> snapshots
     ) {
         List<AssistanceContrat> restored = new ArrayList<>();
+        BrancheAssurance brancheAssistance = brancheAssuranceRepository.findByCodeIgnoreCase("ASSISTANCE")
+                .orElseThrow(() -> new BadRequestException("La branche Assistance n'est pas configurée"));
         for (DraftAssistanceSnapshot snapshot : snapshots) {
             if (snapshot.vehiculeIndex() < 0 || snapshot.vehiculeIndex() >= vehicules.size()) {
                 continue;
             }
             Vehicule vehicule = vehicules.get(snapshot.vehiculeIndex());
             AssistanceContrat assistance = AssistanceContrat.builder()
+                    .brancheAssurance(brancheAssistance)
                     .contrat(contrat)
                     .vehicule(vehicule)
                     .compagnieAssuranceContrat(firstNonNull(snapshot.compagnieAssuranceContrat(), contrat.getCompagnieAssurance()))
@@ -5819,6 +5822,15 @@ public class ContratService {
                         : assistance.getDuree();
         BigDecimal prorata = BigDecimal.valueOf(trimestres).divide(BigDecimal.valueOf(4), 8, RoundingMode.HALF_UP);
         return AssistanceContratResponse.builder()
+                .brancheAssuranceId(assistance.getBrancheAssurance() == null
+                        ? null : assistance.getBrancheAssurance().getId())
+                .brancheAssuranceCode(assistance.getBrancheAssurance() == null
+                        ? "ASSISTANCE" : assistance.getBrancheAssurance().getCode())
+                .brancheAssuranceLibelle(assistance.getBrancheAssurance() == null
+                        ? "Assistance" : assistance.getBrancheAssurance().getLibelle())
+                .typeAssistance(assistance.getProduitAssistance() == null
+                        ? "Assistance Automobile"
+                        : assistance.getProduitAssistance().getType())
                 .id(assistance.getId())
                 .contratId(assistance.getContrat() != null ? assistance.getContrat().getId() : null)
                 .mouvementContratId(assistance.getMouvementContrat() != null ? assistance.getMouvementContrat().getId() : null)

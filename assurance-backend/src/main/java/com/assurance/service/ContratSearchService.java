@@ -8,6 +8,7 @@ import com.assurance.dto.response.PagedResponse;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.AssistanceContrat;
+import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.StatutMouvementContrat;
@@ -15,6 +16,7 @@ import com.assurance.enums.TypeContrat;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.AssistanceContratRepository;
+import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.VehiculeRepository;
 import com.assurance.service.renewal.RenewalPolicy;
@@ -48,6 +50,7 @@ public class ContratSearchService {
 
     private final ContratRepository contratRepository;
     private final AssistanceContratRepository assistanceContratRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final ContratClientRepository contratClientRepository;
     private final MouvementContratRepository mouvementContratRepository;
     private final VehiculeRepository vehiculeRepository;
@@ -73,10 +76,22 @@ public class ContratSearchService {
             Integer page,
             Integer size
     ) {
+        BrancheAssurance assistanceBranch = resolveAssistanceBranch(brancheId);
+        boolean assistanceView = assistanceBranch != null;
+        AssistanceDisplayFilter assistanceFilter = new AssistanceDisplayFilter(
+                compagnieAssistanceId,
+                produitAssistanceId,
+                normalize(numeroPolice),
+                normalizeDateType(typeDate),
+                dateDu,
+                dateAu,
+                assistanceView
+        );
         Long currentContractId = resolveCurrentContractId(agenceId, contratId);
         Page<Long> leafIds = contratRepository.searchCurrentContractIds(
                 agenceId,
                 brancheId,
+                assistanceView,
                 typeContrat,
                 normalizeDateType(typeDate),
                 dateDu,
@@ -91,11 +106,26 @@ public class ContratSearchService {
                 pageRequest(page, size)
         );
         Map<Long, Contrat> contractsById = loadRenewalChains(agenceId, leafIds.getContent());
-        List<ContratListGroupResponse> groups = buildGroups(agenceId, leafIds.getContent(), contractsById);
+        List<ContratListGroupResponse> groups = buildGroups(
+                agenceId,
+                leafIds.getContent(),
+                contractsById,
+                assistanceBranch,
+                assistanceFilter
+        );
         return PagedResponse.<ContratListGroupResponse>builder()
                 .items(groups)
                 .page(PageMetadata.from(leafIds))
                 .build();
+    }
+
+    private BrancheAssurance resolveAssistanceBranch(Long brancheId) {
+        if (brancheId == null) {
+            return null;
+        }
+        return brancheAssuranceRepository.findById(brancheId)
+                .filter(branch -> "ASSISTANCE".equalsIgnoreCase(branch.getCode()))
+                .orElse(null);
     }
 
     private Long resolveCurrentContractId(Long agenceId, Long contratId) {
@@ -146,7 +176,9 @@ public class ContratSearchService {
         Map<Long, Contrat> contractsById = loadContracts(agenceId, ids.getContent());
         List<ContratListItemResponse> items = mapItems(
                 agenceId,
-                ids.getContent().stream().map(contractsById::get).filter(java.util.Objects::nonNull).toList()
+                ids.getContent().stream().map(contractsById::get).filter(java.util.Objects::nonNull).toList(),
+                null,
+                AssistanceDisplayFilter.none()
         );
         return PagedResponse.<ContratListItemResponse>builder()
                 .items(items)
@@ -157,10 +189,17 @@ public class ContratSearchService {
     private List<ContratListGroupResponse> buildGroups(
             Long agenceId,
             List<Long> leafIds,
-            Map<Long, Contrat> contractsById
+            Map<Long, Contrat> contractsById,
+            BrancheAssurance assistanceBranch,
+            AssistanceDisplayFilter assistanceFilter
     ) {
         List<Contrat> allContracts = new ArrayList<>(contractsById.values());
-        Map<Long, ContratListItemResponse> itemsById = mapItems(agenceId, allContracts).stream()
+        Map<Long, ContratListItemResponse> itemsById = mapItems(
+                agenceId,
+                allContracts,
+                assistanceBranch,
+                assistanceFilter
+        ).stream()
                 .collect(Collectors.toMap(
                         ContratListItemResponse::getId,
                         Function.identity(),
@@ -174,7 +213,8 @@ public class ContratSearchService {
             Contrat current = contractsById.get(leafId);
             while (current != null && visited.add(current.getId())) {
                 ContratListItemResponse item = itemsById.get(current.getId());
-                if (item != null) {
+                if (item != null && (assistanceBranch == null
+                        || "ASSISTANCE".equalsIgnoreCase(item.getBrancheAssuranceCode()))) {
                     chain.add(item);
                 }
                 current = current.getContratOrigine() == null
@@ -189,7 +229,12 @@ public class ContratSearchService {
         return groups;
     }
 
-    private List<ContratListItemResponse> mapItems(Long agenceId, List<Contrat> contracts) {
+    private List<ContratListItemResponse> mapItems(
+            Long agenceId,
+            List<Contrat> contracts,
+            BrancheAssurance assistanceBranch,
+            AssistanceDisplayFilter assistanceFilter
+    ) {
         if (contracts.isEmpty()) {
             return List.of();
         }
@@ -229,7 +274,9 @@ public class ContratSearchService {
                         vehicles.getOrDefault(contract.getId(), List.of()),
                         assistances.getOrDefault(contract.getId(), List.of()),
                         drafts.getOrDefault(contract.getId(), List.of()),
-                        modificationPolicies.get(contract.getId())
+                        modificationPolicies.get(contract.getId()),
+                        assistanceBranch,
+                        assistanceFilter
                 ))
                 .toList();
     }
@@ -241,7 +288,9 @@ public class ContratSearchService {
             List<Vehicule> vehicles,
             List<AssistanceContrat> assistances,
             List<AvenantDraftSummaryResponse> drafts,
-            ContractDirectModificationPolicy.Evaluation modificationPolicy
+            ContractDirectModificationPolicy.Evaluation modificationPolicy,
+            BrancheAssurance assistanceBranch,
+            AssistanceDisplayFilter assistanceFilter
     ) {
         List<MouvementContrat> activeMovements = movements.stream()
                 .filter(movement -> movement.getStatut() != StatutMouvementContrat.ANNULE)
@@ -257,20 +306,35 @@ public class ContratSearchService {
                 .filter(vehicle -> !Boolean.FALSE.equals(vehicle.getActif()))
                 .findFirst()
                 .orElse(null);
-        AssistanceContrat firstAssistance = assistances.stream().findFirst().orElse(null);
+        AssistanceContrat firstAssistance = assistances.stream()
+                .filter(assistanceFilter::matches)
+                .findFirst()
+                .orElse(null);
+        boolean linkedAssistanceView = assistanceBranch != null
+                && firstAssistance != null
+                && (contract.getBrancheAssurance() == null
+                    || !"ASSISTANCE".equalsIgnoreCase(contract.getBrancheAssurance().getCode()));
 
         return ContratListItemResponse.builder()
                 .id(contract.getId())
                 .numeroContrat(contract.getNumeroContrat())
                 .numeroDevis(contract.getNumeroDevis())
                 .numeroDossier(contract.getNumeroDossier())
-                .numeroPolice(contract.getNumeroPolice())
+                .numeroPolice(linkedAssistanceView
+                        ? firstAssistance.getNumeroContratOuQuittance()
+                        : contract.getNumeroPolice())
                 .createdAt(contract.getCreatedAt())
                 .typeContrat(contract.getTypeContrat())
                 .statut(contract.getStatut())
-                .brancheAssuranceId(contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getId())
-                .brancheAssuranceCode(contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getCode())
-                .brancheAssuranceLibelle(contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getLibelle())
+                .brancheAssuranceId(linkedAssistanceView
+                        ? assistanceBranch.getId()
+                        : contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getId())
+                .brancheAssuranceCode(linkedAssistanceView
+                        ? assistanceBranch.getCode()
+                        : contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getCode())
+                .brancheAssuranceLibelle(linkedAssistanceView
+                        ? assistanceBranch.getLibelle()
+                        : contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getLibelle())
                 .compagnieAssuranceId(contract.getCompagnieAssurance() == null ? null : contract.getCompagnieAssurance().getId())
                 .compagnieCode(contract.getCompagnieAssurance() == null ? null : contract.getCompagnieAssurance().getCode())
                 .compagnieLibelle(contract.getCompagnieAssurance() == null ? null : contract.getCompagnieAssurance().getNom())
@@ -281,6 +345,11 @@ public class ContratSearchService {
                 .compagnieAssistanceLibelle(firstAssistance == null || firstAssistance.getCompagnieAssistance() == null
                         ? null : firstAssistance.getCompagnieAssistance().getNom())
                 .produitAssistanceLibelle(firstAssistance == null ? null : firstAssistance.getProduit())
+                .typeAssistance(linkedAssistanceView
+                        ? "Assistance Automobile"
+                        : firstAssistance == null || firstAssistance.getProduitAssistance() == null
+                                ? null : firstAssistance.getProduitAssistance().getType())
+                .assistanceLiee(linkedAssistanceView)
                 .conventionId(contract.getConvention() == null ? null : contract.getConvention().getId())
                 .conventionCode(contract.getConvention() == null ? null : contract.getConvention().getCode())
                 .conventionLibelle(contract.getConvention() == null ? null : contract.getConvention().getIntitule())
@@ -288,8 +357,8 @@ public class ContratSearchService {
                 .renouvele(contract.getRenouvele())
                 .modeTermeRenouvellement(contract.getModeTermeRenouvellement())
                 .renouvellementTermeCompagnieEligible(renewalPolicy.isCompanyTermEligible(contract))
-                .dateEffet(contract.getDateEffet())
-                .dateEcheance(contract.getDateEcheance())
+                .dateEffet(linkedAssistanceView ? firstAssistance.getDateEffet() : contract.getDateEffet())
+                .dateEcheance(linkedAssistanceView ? firstAssistance.getDateEcheance() : contract.getDateEcheance())
                 .typeRenouvellement(contract.getTypeRenouvellement())
                 .modeSaisieGaranties(contract.getModeSaisieGaranties())
                 .brouillon(contract.getBrouillon())
@@ -384,6 +453,43 @@ public class ContratSearchService {
 
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private record AssistanceDisplayFilter(
+            Long compagnieId,
+            Long produitId,
+            String numero,
+            String typeDate,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            boolean coverageFilters
+    ) {
+        private static AssistanceDisplayFilter none() {
+            return new AssistanceDisplayFilter(null, null, null, "EFFET", null, null, false);
+        }
+
+        private boolean matches(AssistanceContrat assistance) {
+            if (compagnieId != null && (assistance.getCompagnieAssistance() == null
+                    || !compagnieId.equals(assistance.getCompagnieAssistance().getId()))) {
+                return false;
+            }
+            if (produitId != null && (assistance.getProduitAssistance() == null
+                    || !produitId.equals(assistance.getProduitAssistance().getId()))) {
+                return false;
+            }
+            if (!coverageFilters) {
+                return true;
+            }
+            if (numero != null && (assistance.getNumeroContratOuQuittance() == null
+                    || !assistance.getNumeroContratOuQuittance().toLowerCase(Locale.ROOT).contains(numero))) {
+                return false;
+            }
+            LocalDate referenceDate = "ECHEANCE".equals(typeDate)
+                    ? assistance.getDateEcheance()
+                    : assistance.getDateEffet();
+            return (dateDu == null || referenceDate != null && !referenceDate.isBefore(dateDu))
+                    && (dateAu == null || referenceDate != null && !referenceDate.isAfter(dateAu));
+        }
     }
 
 }

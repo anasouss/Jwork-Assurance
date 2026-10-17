@@ -79,7 +79,7 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
 
     List<AssistanceContrat> findByContratIdAndActifTrueOrderByCreatedAtDesc(Long contratId);
 
-    @EntityGraph(attributePaths = {"compagnieAssistance", "produitAssistance"})
+    @EntityGraph(attributePaths = {"brancheAssurance", "compagnieAssistance", "produitAssistance"})
     List<AssistanceContrat> findByContratIdInAndActifTrueOrderByCreatedAtDesc(Collection<Long> contratIds);
 
     List<AssistanceContrat> findByMouvementContratIdOrderByCreatedAtDesc(Long mouvementContratId);
@@ -96,6 +96,7 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
     Optional<AssistanceContrat> findByElementFacturableId(Long elementFacturableId);
 
     @EntityGraph(attributePaths = {
+            "brancheAssurance",
             "compagnieAssistance",
             "produitAssistance",
             "elementFacturable",

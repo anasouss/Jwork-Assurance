@@ -8,6 +8,7 @@ import com.assurance.enums.TypeContrat;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.AssistanceContratRepository;
+import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.VehiculeRepository;
 import com.assurance.service.renewal.RenewalPolicy;
@@ -36,6 +37,8 @@ class ContratSearchServiceTest {
     @Mock
     private AssistanceContratRepository assistanceContratRepository;
     @Mock
+    private BrancheAssuranceRepository brancheAssuranceRepository;
+    @Mock
     private ContratClientRepository contratClientRepository;
     @Mock
     private MouvementContratRepository mouvementContratRepository;
@@ -53,6 +56,7 @@ class ContratSearchServiceTest {
         service = new ContratSearchService(
                 contratRepository,
                 assistanceContratRepository,
+                brancheAssuranceRepository,
                 contratClientRepository,
                 mouvementContratRepository,
                 vehiculeRepository,
@@ -67,7 +71,7 @@ class ContratSearchServiceTest {
         Contrat original = contract(1L, null, "D-1");
         Contrat renewal = contract(2L, original, "D-2");
         when(contratRepository.searchCurrentContractIds(
-                eq(7L), eq(5L), eq(TypeContrat.CONVENTION), eq("EFFET"),
+                eq(7L), eq(5L), eq(false), eq(TypeContrat.CONVENTION), eq("EFFET"),
                 eq(LocalDate.of(2026, 1, 1)), eq(LocalDate.of(2026, 12, 31)),
                 eq("client"), eq(4L), eq(6L), eq(8L), eq("p-1"), eq(9L), eq(2L), any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(2L)));

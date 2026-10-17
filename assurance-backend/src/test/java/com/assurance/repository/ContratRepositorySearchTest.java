@@ -44,6 +44,7 @@ class ContratRepositorySearchTest {
         var contracts = repository.searchCurrentContractIds(
                 agence.getId(),
                 null,
+                false,
                 null,
                 "EFFET",
                 null,
@@ -93,6 +94,7 @@ class ContratRepositorySearchTest {
         var contracts = repository.searchCurrentContractIds(
                 -1L,
                 -2L,
+                false,
                 TypeContrat.CONVENTION,
                 "EFFET",
                 LocalDate.of(2026, 1, 1),

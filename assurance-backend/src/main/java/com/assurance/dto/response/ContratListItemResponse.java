@@ -34,6 +34,8 @@ public class ContratListItemResponse {
     private String compagnieAssistanceCode;
     private String compagnieAssistanceLibelle;
     private String produitAssistanceLibelle;
+    private String typeAssistance;
+    private Boolean assistanceLiee;
     private Long conventionId;
     private String conventionCode;
     private String conventionLibelle;

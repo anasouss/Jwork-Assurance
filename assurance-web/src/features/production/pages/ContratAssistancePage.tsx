@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, Trash2 } from "lucide-react";
+import { Pencil, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -39,6 +39,7 @@ export default function ContratAssistancePage() {
   const mouvementId = numericParam(searchParams.get("mouvementId"));
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>({});
+  const [editingAssistanceId, setEditingAssistanceId] = useState<string | null>(null);
   const [assistanceToDelete, setAssistanceToDelete] = useState<AssistanceContratContext["assistances"][number] | null>(null);
   const contextQuery = useQuery({
     queryKey: ["contrat-assistance", contratId, mouvementId, form.dateSouscription],
@@ -46,6 +47,7 @@ export default function ContratAssistancePage() {
     enabled: Boolean(contratId),
   });
   const context = contextQuery.data;
+  const editingAssistance = context?.assistances.find((assistance) => assistance.id === editingAssistanceId);
 
   const selectedVehicle = useMemo(
     () => context?.vehiculesEligibles.find((vehicule) => vehicule.id === form.vehiculeId),
@@ -67,7 +69,9 @@ export default function ContratAssistancePage() {
   useEffect(() => {
     if (!context) return;
     setForm((current) => ({
-      vehiculeId: context.vehiculesEligibles.some((vehicule) => vehicule.id === current.vehiculeId)
+      vehiculeId: editingAssistance?.vehiculeId === current.vehiculeId
+        ? current.vehiculeId
+        : context.vehiculesEligibles.some((vehicule) => vehicule.id === current.vehiculeId)
         ? current.vehiculeId
         : context.vehiculesEligibles[0]?.id,
       numeroContratOuQuittance: current.numeroContratOuQuittance,
@@ -77,7 +81,7 @@ export default function ContratAssistancePage() {
       compagnieAssistanceId: current.compagnieAssistanceId,
       produitAssistanceId: current.produitAssistanceId,
     }));
-  }, [context]);
+  }, [context, editingAssistance?.vehiculeId]);
 
   useEffect(() => {
     if (form.produitAssistanceId && !filteredProducts.some((product) => product.id === form.produitAssistanceId)) {
@@ -88,13 +92,14 @@ export default function ContratAssistancePage() {
   const saveMutation = useMutation({
     mutationFn: (request: UpsertAssistanceContratRequest) => contractServiceApi.saveAssistance(contratId, request),
     onSuccess: async () => {
+      setEditingAssistanceId(null);
       setForm((current) => ({
         dateEffet: current.dateEffet,
         dateSouscription: current.dateSouscription,
         echeanceCode: current.echeanceCode,
       }));
       await queryClient.invalidateQueries({ queryKey: ["contrat-assistance", contratId] });
-      toast.success("Assistance enregistrée");
+      toast.success(editingAssistanceId ? "Assistance modifiée" : "Assistance enregistrée");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
@@ -103,6 +108,10 @@ export default function ContratAssistancePage() {
     mutationFn: (assistanceId: string) => contractServiceApi.deleteAssistance(contratId, assistanceId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["contrat-assistance", contratId] });
+      if (editingAssistanceId === assistanceToDelete?.id) {
+        setEditingAssistanceId(null);
+        setForm({});
+      }
       setAssistanceToDelete(null);
       toast.success("Assistance supprimée");
     },
@@ -123,7 +132,7 @@ export default function ContratAssistancePage() {
       return;
     }
     saveMutation.mutate({
-      mouvementContratId: context?.mouvementContratId ?? mouvementId,
+      mouvementContratId: editingAssistance?.mouvementContratId ?? context?.mouvementContratId ?? mouvementId,
       vehiculeId: form.vehiculeId,
       compagnieAssistanceId: form.compagnieAssistanceId,
       produitAssistanceId: form.produitAssistanceId,
@@ -132,6 +141,19 @@ export default function ContratAssistancePage() {
       echeanceCode: form.echeanceCode,
       numeroContratOuQuittance: form.numeroContratOuQuittance,
       typeQuittance: "ASSISTANCE",
+    });
+  }
+
+  function editAssistance(assistance: AssistanceContratContext["assistances"][number]) {
+    setEditingAssistanceId(assistance.id);
+    setForm({
+      vehiculeId: assistance.vehiculeId ?? undefined,
+      numeroContratOuQuittance: assistance.numeroContratOuQuittance ?? undefined,
+      dateEffet: assistance.dateEffet ?? undefined,
+      dateSouscription: assistance.dateSouscription ?? undefined,
+      echeanceCode: assistance.echeanceCode ?? context?.echeanceCode ?? undefined,
+      compagnieAssistanceId: assistance.compagnieAssistanceId ?? undefined,
+      produitAssistanceId: assistance.produitAssistanceId ?? undefined,
     });
   }
 
@@ -152,7 +174,7 @@ export default function ContratAssistancePage() {
 
       <Card className="border-border/70 shadow-none">
         <CardHeader className="border-b bg-emerald-50/70 py-3 dark:bg-emerald-950/30">
-          <CardTitle className="text-sm">Assistance</CardTitle>
+          <CardTitle className="text-sm">{editingAssistance ? "Modifier l’assistance automobile" : "Nouvelle assistance automobile"}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 p-4">
           {contextQuery.isLoading ? (
@@ -191,7 +213,9 @@ export default function ContratAssistancePage() {
                   <Input value={form.numeroContratOuQuittance ?? ""} onChange={(event) => setForm((current) => ({ ...current, numeroContratOuQuittance: event.target.value }))} />
                 </Field>
                 <Field label="Véhicule" required>
-                  {(context?.vehiculesEligibles ?? []).length === 1 ? (
+                  {editingAssistance ? (
+                    <Input value={editingAssistance.vehiculeImmatriculation ?? `Véhicule #${editingAssistance.vehiculeId}`} disabled />
+                  ) : (context?.vehiculesEligibles ?? []).length === 1 ? (
                     <Input value={vehicleLabel(context!.vehiculesEligibles[0])} disabled />
                   ) : (
                     <Select value={form.vehiculeId} disabled={(context?.vehiculesEligibles ?? []).length === 0} onValueChange={(value) => setForm((current) => ({ ...current, vehiculeId: value, produitAssistanceId: undefined }))}>
@@ -233,19 +257,32 @@ export default function ContratAssistancePage() {
                 </div>
               ) : null}
 
-              {(context?.vehiculesEligibles ?? []).length === 0 ? (
+              {(context?.vehiculesEligibles ?? []).length === 0 && !editingAssistance ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Aucun véhicule éligible. Les véhicules déjà liés à une assistance active ne sont pas proposés.
                 </div>
               ) : null}
 
               <div className="flex justify-end gap-2">
+                {editingAssistance ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingAssistanceId(null);
+                      setForm({});
+                    }}
+                  >
+                    <X className="size-4" />
+                    Annuler la modification
+                  </Button>
+                ) : null}
                 <Button asChild type="button" variant="destructive">
                   <Link to="/app/production/contrats">Annuler</Link>
                 </Button>
-                <Button type="button" disabled={saveMutation.isPending || (context?.vehiculesEligibles ?? []).length === 0} onClick={submit}>
+                <Button type="button" disabled={saveMutation.isPending || (!editingAssistance && (context?.vehiculesEligibles ?? []).length === 0)} onClick={submit}>
                   <Save className="size-4" />
-                  Enregistrer
+                  {editingAssistance ? "Enregistrer les modifications" : "Enregistrer"}
                 </Button>
               </div>
             </>
@@ -283,6 +320,17 @@ export default function ContratAssistancePage() {
                     <td className="px-3 py-2 text-right">{money(assistance.primeNette)}</td>
                     <td className="px-3 py-2 text-right">{money(assistance.primeTotale)}</td>
                     <td className="px-3 py-2 text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-sky-600"
+                        disabled={saveMutation.isPending || deleteMutation.isPending}
+                        title="Modifier l’assistance"
+                        onClick={() => editAssistance(assistance)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
                       <Button
                         type="button"
                         variant="ghost"

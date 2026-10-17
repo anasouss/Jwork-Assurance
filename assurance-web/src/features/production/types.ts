@@ -799,6 +799,10 @@ export type AssistanceInput = Omit<AssistanceDraft, "assistanceId" | "modified" 
 };
 
 export type AssistanceContrat = {
+  brancheAssuranceId?: string | null;
+  brancheAssuranceCode?: string | null;
+  brancheAssuranceLibelle?: string | null;
+  typeAssistance?: string | null;
   id: string;
   contratId: string;
   mouvementContratId?: string | null;
@@ -1584,6 +1588,8 @@ export type ContratListItem = {
   compagnieAssistanceCode?: string | null;
   compagnieAssistanceLibelle?: string | null;
   produitAssistanceLibelle?: string | null;
+  typeAssistance?: string | null;
+  assistanceLiee?: boolean | null;
   conventionId?: string | null;
   conventionCode?: string | null;
   conventionLibelle?: string | null;

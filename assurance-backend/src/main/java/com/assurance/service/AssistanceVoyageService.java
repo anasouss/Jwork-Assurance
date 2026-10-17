@@ -212,6 +212,7 @@ public class AssistanceVoyageService {
                 .build());
 
         AssistanceContrat assistance = assistanceContratRepository.save(AssistanceContrat.builder()
+                .brancheAssurance(branche)
                 .contrat(contrat)
                 .mouvementContrat(mouvement)
                 .compagnieAssistance(compagnie)
@@ -369,6 +370,7 @@ public class AssistanceVoyageService {
         mouvementContratRepository.save(mouvement);
 
         assistance.setCompagnieAssistance(compagnie);
+        assistance.setBrancheAssurance(contrat.getBrancheAssurance());
         assistance.setProduitAssistance(produit);
         assistance.setTarifProduitAssistance(singleTariff(pricing.lines()));
         assistance.setProduit(produit.getLibelle());

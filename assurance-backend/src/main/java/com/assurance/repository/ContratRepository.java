@@ -104,7 +104,26 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and renewal.agence.id = :agenceId
                       and renewal.prospection = false
               )
-              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:brancheId is null
+                   or (:includeLinkedAssistance = false and c.brancheAssurance.id = :brancheId)
+                   or (:includeLinkedAssistance = true and exists (
+                        select linkedAssistance.id from AssistanceContrat linkedAssistance
+                        where linkedAssistance.contrat = c
+                          and linkedAssistance.actif = true
+                          and linkedAssistance.brancheAssurance.id = :brancheId
+                          and (:compagnieAssistanceId is null
+                               or linkedAssistance.compagnieAssistance.id = :compagnieAssistanceId)
+                          and (:produitAssistanceId is null
+                               or linkedAssistance.produitAssistance.id = :produitAssistanceId)
+                          and (:numeroPolice is null
+                               or lower(coalesce(linkedAssistance.numeroContratOuQuittance, '')) like concat('%', :numeroPolice, '%'))
+                          and (:dateDu is null
+                               or (:typeDate = 'EFFET' and linkedAssistance.dateEffet >= :dateDu)
+                               or (:typeDate = 'ECHEANCE' and linkedAssistance.dateEcheance >= :dateDu))
+                          and (:dateAu is null
+                               or (:typeDate = 'EFFET' and linkedAssistance.dateEffet <= :dateAu)
+                               or (:typeDate = 'ECHEANCE' and linkedAssistance.dateEcheance <= :dateAu))
+                   )))
               and (:typeContrat is null or (
                     c.typeContrat = :typeContrat
                     and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
@@ -123,7 +142,9 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and assistance.produitAssistance.id = :produitAssistanceId
               ))
               and (:contratId is null or c.id = :contratId)
-              and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
+              and (:numeroPolice is null
+                   or :includeLinkedAssistance = true
+                   or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
                     select 1 from ContratClient cc
                     where cc.contrat = c and cc.client.id = :clientId
@@ -168,12 +189,18 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                           )
                     )
               )
-              and (:dateDu is null or
-                    (:typeDate = 'EFFET' and c.dateEffet >= :dateDu) or
-                    (:typeDate = 'ECHEANCE' and c.dateEcheance >= :dateDu))
-              and (:dateAu is null or
-                    (:typeDate = 'EFFET' and c.dateEffet <= :dateAu) or
-                    (:typeDate = 'ECHEANCE' and c.dateEcheance <= :dateAu))
+              and (:dateDu is null
+                   or (:includeLinkedAssistance = false and (
+                        (:typeDate = 'EFFET' and c.dateEffet >= :dateDu)
+                        or (:typeDate = 'ECHEANCE' and c.dateEcheance >= :dateDu)
+                   ))
+                   or :includeLinkedAssistance = true)
+              and (:dateAu is null
+                   or (:includeLinkedAssistance = false and (
+                        (:typeDate = 'EFFET' and c.dateEffet <= :dateAu)
+                        or (:typeDate = 'ECHEANCE' and c.dateEcheance <= :dateAu)
+                   ))
+                   or :includeLinkedAssistance = true)
             order by c.createdAt desc, c.id desc
             """,
             countQuery = """
@@ -189,7 +216,26 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and renewal.agence.id = :agenceId
                       and renewal.prospection = false
               )
-              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:brancheId is null
+                   or (:includeLinkedAssistance = false and c.brancheAssurance.id = :brancheId)
+                   or (:includeLinkedAssistance = true and exists (
+                        select linkedAssistance.id from AssistanceContrat linkedAssistance
+                        where linkedAssistance.contrat = c
+                          and linkedAssistance.actif = true
+                          and linkedAssistance.brancheAssurance.id = :brancheId
+                          and (:compagnieAssistanceId is null
+                               or linkedAssistance.compagnieAssistance.id = :compagnieAssistanceId)
+                          and (:produitAssistanceId is null
+                               or linkedAssistance.produitAssistance.id = :produitAssistanceId)
+                          and (:numeroPolice is null
+                               or lower(coalesce(linkedAssistance.numeroContratOuQuittance, '')) like concat('%', :numeroPolice, '%'))
+                          and (:dateDu is null
+                               or (:typeDate = 'EFFET' and linkedAssistance.dateEffet >= :dateDu)
+                               or (:typeDate = 'ECHEANCE' and linkedAssistance.dateEcheance >= :dateDu))
+                          and (:dateAu is null
+                               or (:typeDate = 'EFFET' and linkedAssistance.dateEffet <= :dateAu)
+                               or (:typeDate = 'ECHEANCE' and linkedAssistance.dateEcheance <= :dateAu))
+                   )))
               and (:typeContrat is null or (
                     c.typeContrat = :typeContrat
                     and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
@@ -208,7 +254,9 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                       and assistance.produitAssistance.id = :produitAssistanceId
               ))
               and (:contratId is null or c.id = :contratId)
-              and (:numeroPolice is null or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
+              and (:numeroPolice is null
+                   or :includeLinkedAssistance = true
+                   or lower(coalesce(c.numeroPolice, '')) like concat('%', :numeroPolice, '%'))
               and (:clientId is null or exists (
                     select 1 from ContratClient cc
                     where cc.contrat = c and cc.client.id = :clientId
@@ -253,16 +301,23 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                           )
                     )
               )
-              and (:dateDu is null or
-                    (:typeDate = 'EFFET' and c.dateEffet >= :dateDu) or
-                    (:typeDate = 'ECHEANCE' and c.dateEcheance >= :dateDu))
-              and (:dateAu is null or
-                    (:typeDate = 'EFFET' and c.dateEffet <= :dateAu) or
-                    (:typeDate = 'ECHEANCE' and c.dateEcheance <= :dateAu))
+              and (:dateDu is null
+                   or (:includeLinkedAssistance = false and (
+                        (:typeDate = 'EFFET' and c.dateEffet >= :dateDu)
+                        or (:typeDate = 'ECHEANCE' and c.dateEcheance >= :dateDu)
+                   ))
+                   or :includeLinkedAssistance = true)
+              and (:dateAu is null
+                   or (:includeLinkedAssistance = false and (
+                        (:typeDate = 'EFFET' and c.dateEffet <= :dateAu)
+                        or (:typeDate = 'ECHEANCE' and c.dateEcheance <= :dateAu)
+                   ))
+                   or :includeLinkedAssistance = true)
             """)
     Page<Long> searchCurrentContractIds(
             @Param("agenceId") Long agenceId,
             @Param("brancheId") Long brancheId,
+            @Param("includeLinkedAssistance") boolean includeLinkedAssistance,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("typeDate") String typeDate,
             @Param("dateDu") LocalDate dateDu,

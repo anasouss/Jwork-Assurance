@@ -25,6 +25,7 @@ import java.util.List;
 @Entity
 @Table(name = "assistances_contrat", indexes = {
         @Index(name = "idx_assistance_contrat", columnList = "contrat_id"),
+        @Index(name = "idx_assistance_branche", columnList = "branche_assurance_id"),
         @Index(name = "idx_assistance_mouvement", columnList = "mouvement_contrat_id"),
         @Index(name = "idx_assistance_vehicule", columnList = "vehicule_id")
 })
@@ -34,6 +35,10 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AssistanceContrat extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branche_assurance_id", nullable = false)
+    private BrancheAssurance brancheAssurance;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contrat_id", nullable = false)

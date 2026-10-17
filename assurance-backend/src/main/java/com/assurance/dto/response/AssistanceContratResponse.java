@@ -10,6 +10,10 @@ import java.util.List;
 @Data
 @Builder
 public class AssistanceContratResponse {
+    private Long brancheAssuranceId;
+    private String brancheAssuranceCode;
+    private String brancheAssuranceLibelle;
+    private String typeAssistance;
     private Long id;
     private Long contratId;
     private Long mouvementContratId;

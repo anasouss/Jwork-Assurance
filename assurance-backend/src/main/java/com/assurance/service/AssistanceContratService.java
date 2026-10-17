@@ -4,6 +4,7 @@ import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.entity.AssistanceContrat;
+import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.CategorieClient;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.Contrat;
@@ -23,6 +24,7 @@ import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AssistanceContratRepository;
+import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.CompagnieAssistanceRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.ElementFacturableRepository;
@@ -49,6 +51,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AssistanceContratService {
 
+    private static final String TYPE_ASSISTANCE_AUTOMOBILE = "Assistance Automobile";
+
     private final ContratRepository contratRepository;
     private final VehiculeRepository vehiculeRepository;
     private final MouvementContratRepository mouvementContratRepository;
@@ -57,6 +61,7 @@ public class AssistanceContratService {
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final SousClasseRepository sousClasseRepository;
     private final AssistanceContratRepository assistanceContratRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final TarifProduitAssistanceService tarifProduitAssistanceService;
     private final EcheanceService echeanceService;
@@ -89,6 +94,7 @@ public class AssistanceContratService {
                 .collect(Collectors.toSet());
         List<AssistanceContratContextResponse.ProduitAssistanceOption> produits = produitAssistanceRepository.findAll().stream()
                 .filter(produit -> Boolean.TRUE.equals(produit.getActif()))
+                .filter(produit -> TYPE_ASSISTANCE_AUTOMOBILE.equalsIgnoreCase(produit.getType()))
                 .filter(produit -> produit.getCategorieClient() == null
                         || produit.getCategorieClient().getId().equals(categorieClientId))
                 .filter(produit -> produit.getUsages() == null
@@ -159,6 +165,8 @@ public class AssistanceContratService {
         if (assistance == null) {
             assistance = new AssistanceContrat();
         }
+        assistance.setBrancheAssurance(brancheAssuranceRepository.findByCodeIgnoreCase("ASSISTANCE")
+                .orElseThrow(() -> new BadRequestException("La branche Assistance n'est pas configurée")));
         assistance.setContrat(contrat);
         assistance.setMouvementContrat(mouvement);
         assistance.setVehicule(vehicule);
@@ -219,7 +227,13 @@ public class AssistanceContratService {
             UpsertAssistanceContratRequest request
     ) {
         AssistancePricing pricing = resolvePricing(contrat, vehicule, request);
+        BrancheAssurance brancheAssistance = brancheAssuranceRepository.findByCodeIgnoreCase("ASSISTANCE")
+                .orElseThrow(() -> new BadRequestException("La branche Assistance n'est pas configurée"));
         return AssistanceContratResponse.builder()
+                .brancheAssuranceId(brancheAssistance.getId())
+                .brancheAssuranceCode(brancheAssistance.getCode())
+                .brancheAssuranceLibelle(brancheAssistance.getLibelle())
+                .typeAssistance(TYPE_ASSISTANCE_AUTOMOBILE)
                 .contratId(contrat.getId())
                 .vehiculeId(vehicule.getId())
                 .vehiculeImmatriculation(vehicule.getImmatriculation())
@@ -261,6 +275,9 @@ public class AssistanceContratService {
         if (produit.getCompagnieAssistance() == null
                 || !produit.getCompagnieAssistance().getId().equals(compagnie.getId())) {
             throw new BadRequestException("Le produit d'assistance ne correspond pas a la compagnie selectionnee");
+        }
+        if (!TYPE_ASSISTANCE_AUTOMOBILE.equalsIgnoreCase(produit.getType())) {
+            throw new BadRequestException("Le produit sélectionné n'est pas un produit Assistance Automobile");
         }
         if (produit.getUsages() != null && !produit.getUsages().isEmpty()
                 && (vehicule.getUsage() == null
@@ -351,6 +368,15 @@ public class AssistanceContratService {
 
     private AssistanceContratResponse toResponse(AssistanceContrat assistance, int trimestres, BigDecimal prorata) {
         return AssistanceContratResponse.builder()
+                .brancheAssuranceId(assistance.getBrancheAssurance() == null
+                        ? null : assistance.getBrancheAssurance().getId())
+                .brancheAssuranceCode(assistance.getBrancheAssurance() == null
+                        ? "ASSISTANCE" : assistance.getBrancheAssurance().getCode())
+                .brancheAssuranceLibelle(assistance.getBrancheAssurance() == null
+                        ? "Assistance" : assistance.getBrancheAssurance().getLibelle())
+                .typeAssistance(assistance.getProduitAssistance() != null
+                        ? assistance.getProduitAssistance().getType()
+                        : TYPE_ASSISTANCE_AUTOMOBILE)
                 .id(assistance.getId())
                 .contratId(assistance.getContrat() != null ? assistance.getContrat().getId() : null)
                 .mouvementContratId(assistance.getMouvementContrat() != null ? assistance.getMouvementContrat().getId() : null)

@@ -83,11 +83,9 @@ export default function ContratsPage() {
   const assistanceProducts = useQuery({
     queryKey: referenceKeys.list("produits-assistance", {
       compagnieAssistanceId: assistanceBranch && filters.compagnieId !== "ALL" ? filters.compagnieId : undefined,
-      type: "Assistance Voyage",
     }),
     queryFn: () => referenceApi.list("produits-assistance", {
       compagnieAssistanceId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
-      type: "Assistance Voyage",
     }),
     enabled: assistanceBranch,
   });
@@ -291,7 +289,7 @@ export default function ContratsPage() {
                   <TableHeaderCell>Branche</TableHeaderCell>
                   <TableHeaderCell>Produit</TableHeaderCell>
                   <TableHeaderCell>Mouvement N°</TableHeaderCell>
-                  <TableHeaderCell>Police N°</TableHeaderCell>
+                  <TableHeaderCell>{appliedAssistanceBranch ? "Contrat assistance N°" : "Police N°"}</TableHeaderCell>
                   <TableHeaderCell>Compagnie</TableHeaderCell>
                   <TableHeaderCell>Événement</TableHeaderCell>
                   <TableHeaderCell>Date d'effet</TableHeaderCell>
@@ -410,7 +408,7 @@ function ContratRow({
       <TableCell className="text-center"><StatusBadge statut={statusLabel(contrat, movement)} /></TableCell>
       <td className="px-2 py-2">
         <div className="flex items-center justify-center gap-2">
-          {canViewContrat ? (
+          {canViewContrat && !contrat.assistanceLiee ? (
             <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Ouvrir le PDF">
               <Link
                 to={showContratPath(contrat, movement)}
@@ -444,7 +442,9 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const [blockedEditOpen, setBlockedEditOpen] = useState(false);
   const [renewalTerm, setRenewalTerm] = useState<"CABINET" | "COMPAGNIE">("CABINET");
   const isFlotte = contrat.typeContrat === "FLOTTE";
-  const isTravelAssistance = normalize(contrat.brancheAssuranceCode) === "ASSISTANCE";
+  const isAssistanceRecord = normalize(contrat.brancheAssuranceCode) === "ASSISTANCE";
+  const isTravelAssistance = normalize(contrat.typeAssistance) === "ASSISTANCE VOYAGE";
+  const isLinkedAutomobileAssistance = Boolean(contrat.assistanceLiee);
   const piecesPath = `/app/production/contrats/${contrat.id}/pieces-jointes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const assistancePath = `/app/production/contrats/${contrat.id}/assistance${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
   const carteVertePath = `/app/production/contrats/${contrat.id}/cartes-vertes${movement.mouvementId && !movement.isSynthetic ? `?mouvementId=${movement.mouvementId}` : ""}`;
@@ -462,6 +462,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const canViewContrat = permissions.includes("contrat:view");
   const canViewPieces = permissions.includes("piece-jointe:view") || permissions.includes("contrat:view");
   const canRecalculateFinancialHistory = permissions.includes("contrat:recalculate-financial-history")
+    && !isAssistanceRecord
     && !child
     && isActiveContrat(contrat)
     && contrat.modeSaisieGaranties === "AUTOMATIQUE_GRILLE";
@@ -469,17 +470,22 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     const statut = String(item.statut ?? "").trim().toUpperCase();
     return !isInitialContractMovement(item) && statut !== "ANNULE";
   });
-  const canCreateMovement = !isTravelAssistance
+  const canCreateMovement = !isAssistanceRecord
     && canCreateAvenant && !child && !terminal && !contrat.renouvele && isActiveContrat(contrat);
   const canRenew = canRenewContrat && !child && !terminal && !contrat.renouvele
+    && !isAssistanceRecord
     && isActiveContrat(contrat) && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
-  const canEditDirectly = contrat.modificationDirecteAutorisee !== false
-    && (isDirectlyEditable(contrat) || isActiveContrat(contrat))
-    && (canUpdateContrat || canCreateContrat)
-    && !child
-    && !terminal
-    && !hasActiveAvenants;
-  const canShowEdit = (canUpdateContrat || (!isTravelAssistance && canCreateContrat)) && !child;
+  const canEditDirectly = isLinkedAutomobileAssistance
+    ? canManageAssistance && !child && !terminal
+    : contrat.modificationDirecteAutorisee !== false
+      && (isDirectlyEditable(contrat) || isActiveContrat(contrat))
+      && (canUpdateContrat || canCreateContrat)
+      && !child
+      && !terminal
+      && !hasActiveAvenants;
+  const canShowEdit = isLinkedAutomobileAssistance
+    ? canManageAssistance && !child
+    : (canUpdateContrat || (!isTravelAssistance && canCreateContrat)) && !child;
   const blockedEditReason = contrat.motifBlocageModificationDirecte
     ?? fallbackDirectEditBlockReason(contrat, movement, hasActiveAvenants);
   const rectificationPath = movement.mouvementId && movement.code
@@ -494,14 +500,14 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && !movement.isSynthetic
     && !isInitialContractMovement(movement)
     && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";
-  const canDownload = canViewContrat && !isTerminalMovementCode(movement.code);
+  const canDownload = canViewContrat && !isLinkedAutomobileAssistance && !isTerminalMovementCode(movement.code);
   const canOpenAssistance = canManageAssistance
-    && !isTravelAssistance
+    && !isAssistanceRecord
     && !terminal
     && !movement.isSynthetic
     && movement.autoriseAssistance === true;
   const canOpenCarteVerte = canManageCarteVerte
-    && !isTravelAssistance
+    && !isAssistanceRecord
     && !terminal
     && !movement.isSynthetic
     && movement.autoriseCarteVerte === true;
@@ -765,7 +771,10 @@ function showContratPath(contrat: ContratListItem, movement: MovementLine) {
 }
 
 function editContratPath(contrat: ContratListItem) {
-  if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
+  if (contrat.assistanceLiee) {
+    return `/app/production/contrats/${contrat.id}/assistance`;
+  }
+  if (normalize(contrat.typeAssistance) === "ASSISTANCE VOYAGE") {
     return `/app/production/contrats/${contrat.id}/assistance-voyage/modifier`;
   }
   if (contrat.contratOrigineId) return renewalDraftPath(contrat);
@@ -869,6 +878,19 @@ function TableCellStrong({ children }: { children?: React.ReactNode }) {
 }
 
 function movementLines(contrat: ContratListItem): MovementLine[] {
+  if (contrat.assistanceLiee) {
+    return [{
+      key: `${contrat.id}-assistance-automobile`,
+      numeroMouvement: "1",
+      code: "ASSISTANCE_AUTO",
+      libelle: "Assistance automobile",
+      categorie: "ASSISTANCE",
+      statut: contrat.statut,
+      dateEffet: contrat.dateEffet,
+      dateEcheance: contrat.dateEcheance,
+      isSynthetic: true,
+    }];
+  }
   const sorted = sortedMouvements(contrat);
   if (sorted.length) {
     return sorted.map((movement) => ({
@@ -944,7 +966,7 @@ function branchLabel(contrat: ContratListItem) {
 
 function productLabel(contrat: ContratListItem) {
   if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
-    return contrat.produitAssistanceLibelle ?? "Assistance voyage";
+    return contrat.produitAssistanceLibelle ?? contrat.typeAssistance ?? "Assistance";
   }
   if (contrat.typeContrat === "PARTICULIER") return "Mono";
   if (contrat.typeContrat === "FLOTTE") return "Flotte";
@@ -952,6 +974,14 @@ function productLabel(contrat: ContratListItem) {
 }
 
 function companyLabel(contrat: ContratListItem) {
+  if (contrat.assistanceLiee) {
+    return String(
+      contrat.compagnieAssistanceCode
+      ?? contrat.compagnieAssistanceLibelle
+      ?? contrat.compagnieAssistanceId
+      ?? "-"
+    );
+  }
   return String(
     contrat.compagnieCode
     ?? contrat.compagnieLibelle
@@ -981,7 +1011,15 @@ function statusLabel(contrat: ContratListItem, movement: MovementLine) {
 
 function TypeBadge({ contrat }: { contrat: ContratListItem }) {
   if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
-    return <Badge className="min-w-5 justify-center rounded bg-cyan-700 px-1.5 py-0.5 text-white hover:bg-cyan-700">V</Badge>;
+    const travel = normalize(contrat.typeAssistance) === "ASSISTANCE VOYAGE";
+    return (
+      <Badge
+        className="min-w-5 justify-center rounded bg-cyan-700 px-1.5 py-0.5 text-white hover:bg-cyan-700"
+        title={travel ? "Assistance voyage" : "Assistance automobile"}
+      >
+        {travel ? "V" : "A"}
+      </Badge>
+    );
   }
   const { typeContrat: type } = contrat;
   const label = type === "PARTICULIER" ? "P" : type === "FLOTTE" ? "F" : "C";

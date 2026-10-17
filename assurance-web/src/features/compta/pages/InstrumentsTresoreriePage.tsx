@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, Plus, RotateCcw, Search } from "lucide-react";
+import { Eye, RotateCcw, Search } from "lucide-react";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toDateOnly } from "@/features/production/date";
-import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import type { RemittanceSlipStatus, RemittanceSlipType } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, TREASURY_PAGE_SIZE } from "./treasury-format";
@@ -34,8 +33,6 @@ const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
 
 export default function InstrumentsTresoreriePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("tresorerie:manage");
   const type = parseTypeFilter(searchParams.get("type"));
   const status = parseStatusFilter(searchParams.get("statut"));
   const appliedSearch = searchParams.get("search") ?? "";
@@ -85,9 +82,6 @@ export default function InstrumentsTresoreriePage() {
           <h1 className="mt-1 text-xl font-semibold">Bordereaux bancaires</h1>
           <p className="text-sm text-muted-foreground">Suivi des remises de chèques, effets et versements d’espèces.</p>
         </div>
-        {canManage ? <Button asChild>
-          <Link to="/app/compta/tresorerie/bordereaux-remise/nouveau"><Plus className="size-4" /> Nouveau bordereau</Link>
-        </Button> : <Button disabled><Plus className="size-4" /> Nouveau bordereau</Button>}
       </header>
 
       <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[190px_210px_1fr_170px_170px_auto]">

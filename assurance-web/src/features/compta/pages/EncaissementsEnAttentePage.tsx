@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, ArrowRightLeft, Banknote, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +39,6 @@ type InstrumentSortBy = "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" 
 type SortDirection = "ASC" | "DESC";
 
 export default function EncaissementsEnAttentePage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlState = collectionQueueStateFromParams(searchParams);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
@@ -52,6 +51,10 @@ export default function EncaissementsEnAttentePage() {
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacementDate, setReplacementDate] = useState(TODAY);
   const [replacementReason, setReplacementReason] = useState("");
+  const [slipDialogOpen, setSlipDialogOpen] = useState(false);
+  const [destinationAccountId, setDestinationAccountId] = useState("");
+  const [slipDate, setSlipDate] = useState(TODAY);
+  const [slipNotes, setSlipNotes] = useState("");
 
   useEffect(() => {
     setSearch(appliedSearch);
@@ -83,8 +86,19 @@ export default function EncaissementsEnAttentePage() {
   const accounts = useQuery({
     queryKey: ["compta", "treasury-accounts"],
     queryFn: comptaApi.treasuryAccounts,
-    enabled: mode === "ALL" || mode === "ESPECES",
   });
+  const bankAccounts = useMemo(
+    () => (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "BANQUE"),
+    [accounts.data],
+  );
+
+  useEffect(() => {
+    if (bankAccounts.length === 1) {
+      setDestinationAccountId(bankAccounts[0].id);
+    } else if (destinationAccountId && !bankAccounts.some((account) => account.id === destinationAccountId)) {
+      setDestinationAccountId("");
+    }
+  }, [bankAccounts, destinationAccountId]);
 
   const replaceWithCash = useMutation({
     mutationFn: () => comptaApi.replacePaymentInstrument(instrumentToReplace!.id, {
@@ -105,6 +119,38 @@ export default function EncaissementsEnAttentePage() {
     onError: (error) => toast.error(
       error instanceof Error ? error.message : "Remplacement impossible"
     ),
+  });
+
+  const createRemittanceSlip = useMutation({
+    mutationFn: () => {
+      if (selectedMode !== "CHEQUE" && selectedMode !== "EFFET") {
+        throw new Error("La sélection doit contenir uniquement des chèques ou uniquement des effets");
+      }
+      if (!destinationAccountId) {
+        throw new Error("Sélectionnez le compte bancaire de destination");
+      }
+      return comptaApi.createRemittanceSlip({
+        type: selectedMode,
+        dateBordereau: slipDate,
+        compteDestinationId: destinationAccountId,
+        notes: slipNotes.trim() || undefined,
+        instrumentIds: selectedInstruments.map((instrument) => instrument.id),
+      });
+    },
+    onSuccess: async (created) => {
+      setSlipDialogOpen(false);
+      setSelectedInstruments([]);
+      setSlipNotes("");
+      toast.success(`Bordereau provisoire ${created.numero} créé`);
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] });
+      try {
+        const pdf = await comptaApi.remittanceSlipPdf(created.id);
+        window.location.assign(URL.createObjectURL(pdf));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Prévisualisation du PDF impossible");
+      }
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Création du bordereau impossible"),
   });
 
   function applyFilters() {
@@ -186,8 +232,7 @@ export default function EncaissementsEnAttentePage() {
 
   function createSlip() {
     if (!selectedMode || (selectedMode !== "CHEQUE" && selectedMode !== "EFFET")) return;
-    const ids = selectedInstruments.map((instrument) => instrument.id).join(",");
-    navigate(`/app/compta/tresorerie/bordereaux-remise/nouveau?type=${selectedMode}&instrumentIds=${ids}`);
+    setSlipDialogOpen(true);
   }
 
   return (
@@ -393,6 +438,51 @@ export default function EncaissementsEnAttentePage() {
         </div>
         {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={(nextPage) => updateUrl({ page: nextPage })} />}
       </section>}
+
+      <Dialog open={slipDialogOpen} onOpenChange={setSlipDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Créer le bordereau provisoire</DialogTitle>
+            <DialogDescription>
+              {selectedInstruments.length} {selectedMode === "EFFET" ? "effet(s)" : "chèque(s)"} sélectionné(s), pour un total de {formatTreasuryMoney(selectedTotal)}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Compte bancaire de destination</Label>
+              {accounts.isLoading ? (
+                <div className="flex min-h-9 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">Chargement...</div>
+              ) : bankAccounts.length === 1 ? (
+                <Input readOnly value={bankAccounts[0].libelle} />
+              ) : (
+                <Select value={destinationAccountId} onValueChange={setDestinationAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Choisir un compte bancaire" /></SelectTrigger>
+                  <SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+              {!accounts.isLoading && bankAccounts.length === 0 ? <p className="text-sm text-destructive">Aucun compte bancaire actif n’est configuré.</p> : null}
+            </div>
+            <div className="grid gap-2">
+              <Label>Date du bordereau</Label>
+              <DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="remittance-notes">Notes <span className="font-normal text-muted-foreground">(facultatif)</span></Label>
+              <Textarea id="remittance-notes" value={slipNotes} onChange={(event) => setSlipNotes(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={createRemittanceSlip.isPending} onClick={() => setSlipDialogOpen(false)}>Annuler</Button>
+            <Button
+              disabled={!destinationAccountId || !slipDate || selectedInstruments.length === 0 || createRemittanceSlip.isPending}
+              onClick={() => createRemittanceSlip.mutate()}
+            >
+              <Plus className="size-4" />
+              {createRemittanceSlip.isPending ? "Création..." : "Créer le bordereau"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(instrumentToReplace)} onOpenChange={(open) => !open && setInstrumentToReplace(undefined)}>
         <DialogContent>

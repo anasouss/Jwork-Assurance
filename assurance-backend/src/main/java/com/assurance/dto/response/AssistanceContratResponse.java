@@ -16,6 +16,7 @@ public class AssistanceContratResponse {
     private String typeAssistance;
     private Long id;
     private Long contratId;
+    private Long assistanceOrigineId;
     private Long mouvementContratId;
     private Long vehiculeId;
     private String vehiculeImmatriculation;

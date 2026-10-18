@@ -62,8 +62,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -111,6 +113,28 @@ public class AssistanceAutomobileService {
             Long agenceId,
             CreateAssistanceAutomobileRequest request
     ) {
+        return createInternal(agenceId, request, null, null);
+    }
+
+    @Transactional
+    public AssistanceAutomobileCreationResponse renew(
+            Long agenceId,
+            Long contratOrigineId,
+            CreateAssistanceAutomobileRequest request
+    ) {
+        Contrat source = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, contratOrigineId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratOrigineId));
+        AssistanceContrat sourceAssistance = requireRenewableAssistance(source);
+        validateRenewalPeriod(sourceAssistance, request.getDateEffet());
+        return createInternal(agenceId, request, source, sourceAssistance);
+    }
+
+    private AssistanceAutomobileCreationResponse createInternal(
+            Long agenceId,
+            CreateAssistanceAutomobileRequest request,
+            Contrat source,
+            AssistanceContrat sourceAssistance
+    ) {
         validateContractNumber(agenceId, null, request.getNumeroContrat());
         Agence agence = agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
@@ -130,6 +154,7 @@ public class AssistanceAutomobileService {
 
         Contrat contrat = contratRepository.save(Contrat.builder()
                 .agence(agence)
+                .contratOrigine(source)
                 .brancheAssurance(branche)
                 .categorieClient(categorie)
                 .usage(usage)
@@ -161,12 +186,18 @@ public class AssistanceAutomobileService {
         linkClient(contrat, souscripteur, RoleClientContrat.SOUSCRIPTEUR);
         linkClient(contrat, assure, RoleClientContrat.PROPRIETAIRE);
         Vehicule vehicule = saveVehicle(contrat, null, request.getVehicule(), usage, pricing.dateEcheance());
-        MouvementContrat mouvement = saveMovement(contrat, null, pricing);
+        MouvementContrat mouvement = saveMovement(contrat, null, pricing, source);
         saveVehicleSnapshot(mouvement, vehicule);
         AssistanceContrat assistance = saveAssistance(
-                contrat, mouvement, vehicule, branche, compagnie, produit, null, request, pricing
+                contrat, mouvement, vehicule, branche, compagnie, produit, null, request, pricing,
+                sourceAssistance
         );
         saveBillableElement(contrat, mouvement, assistance, null, produit, pricing);
+        if (source != null) {
+            source.setRenouvele(true);
+            source.setStatut(StatutContrat.RENEWED);
+            contratRepository.save(source);
+        }
         return toCreationResponse(contrat, assistance, pricing);
     }
 
@@ -228,13 +259,13 @@ public class AssistanceAutomobileService {
         Vehicule existingVehicle = vehiculeRepository.findActiveByContratIdOrderByCreatedAtAsc(contratId)
                 .stream().findFirst().orElse(null);
         Vehicule vehicule = saveVehicle(contrat, existingVehicle, request.getVehicule(), usage, pricing.dateEcheance());
-        MouvementContrat mouvement = saveMovement(contrat, assistance.getMouvementContrat(), pricing);
+        MouvementContrat mouvement = saveMovement(contrat, assistance.getMouvementContrat(), pricing, null);
         mouvementVehiculeRepository.deleteByMouvementContratId(mouvement.getId());
         mouvementVehiculeRepository.flush();
         saveVehicleSnapshot(mouvement, vehicule);
         assistance = saveAssistance(
                 contrat, mouvement, vehicule, contrat.getBrancheAssurance(), compagnie, produit,
-                assistance, request, pricing
+                assistance, request, pricing, null
         );
         saveBillableElement(contrat, mouvement, assistance, element, produit, pricing);
         return toCreationResponse(contrat, assistance, pricing);
@@ -331,19 +362,31 @@ public class AssistanceAutomobileService {
         return vehiculeRepository.save(vehicule);
     }
 
-    private MouvementContrat saveMovement(Contrat contrat, MouvementContrat target, Pricing pricing) {
+    private MouvementContrat saveMovement(
+            Contrat contrat,
+            MouvementContrat target,
+            Pricing pricing,
+            Contrat source
+    ) {
         MouvementContrat mouvement = target == null ? new MouvementContrat() : target;
         if (target == null) {
+            boolean renewal = source != null;
+            String movementCode = renewal
+                    ? MouvementContratService.CODE_RENOUVELLEMENT
+                    : MouvementContratService.CODE_AFFAIRE_NOUVELLE;
             TypeMouvementContrat type = typeMouvementContratRepository
-                    .findByCodeIgnoreCase(MouvementContratService.CODE_AFFAIRE_NOUVELLE)
-                    .orElseThrow(() -> new BadRequestException("Le mouvement Affaire nouvelle n'est pas configuré"));
+                    .findByCodeIgnoreCase(movementCode)
+                    .orElseThrow(() -> new BadRequestException("Le type de mouvement " + movementCode + " n'est pas configuré"));
             mouvement.setAgence(contrat.getAgence());
             mouvement.setContrat(contrat);
+            mouvement.setContratOrigine(source);
             mouvement.setTypeMouvement(type);
             mouvement.setStatut(StatutMouvementContrat.VALIDE);
-            mouvement.setNumeroMouvement("1");
+            mouvement.setNumeroMouvement(renewal ? nextMovementNumber(source) : "1");
             mouvement.setDateValidation(LocalDate.now());
-            mouvement.setNotes("Création d'une assistance automobile autonome");
+            mouvement.setNotes(renewal
+                    ? "Renouvellement d'une assistance automobile autonome"
+                    : "Création d'une assistance automobile autonome");
             mouvement.setPrimeNette(ZERO);
             mouvement.setTaxe(ZERO);
             mouvement.setTaxeParafiscale(ZERO);
@@ -386,11 +429,15 @@ public class AssistanceAutomobileService {
             ProduitAssistance produit,
             AssistanceContrat target,
             CreateAssistanceAutomobileRequest request,
-            Pricing pricing
+            Pricing pricing,
+            AssistanceContrat sourceAssistance
     ) {
         AssistanceContrat assistance = target == null ? new AssistanceContrat() : target;
         assistance.setBrancheAssurance(branche);
         assistance.setContrat(contrat);
+        if (target == null) {
+            assistance.setAssistanceOrigine(sourceAssistance);
+        }
         assistance.setMouvementContrat(mouvement);
         assistance.setVehicule(vehicule);
         assistance.setCompagnieAssistance(compagnie);
@@ -407,7 +454,7 @@ public class AssistanceAutomobileService {
         assistance.setNumeroDossier(contrat.getNumeroDossier());
         assistance.setNumeroPoliceContrat(request.getNumeroContrat().trim());
         assistance.setNumeroContratOuQuittance(request.getNumeroContrat().trim());
-        assistance.setTypeQuittance("AFFAIRE_NOUVELLE");
+        assistance.setTypeQuittance(sourceAssistance != null ? "RENOUVELLEMENT" : "AFFAIRE_NOUVELLE");
         assistance.setCodePromo(normalizedPromo(request.getCodePromo()));
         assistance.setMontantReduction(pricing.reduction());
         assistance.setPrimeNette(pricing.net());
@@ -598,6 +645,62 @@ public class AssistanceAutomobileService {
         if (contrat.getBrancheAssurance() == null
                 || !"ASSISTANCE".equalsIgnoreCase(contrat.getBrancheAssurance().getCode())) {
             throw new BadRequestException("Ce dossier n'est pas une assistance autonome");
+        }
+    }
+
+    private AssistanceContrat requireRenewableAssistance(Contrat source) {
+        assertStandaloneAutomobileAssistance(source);
+        if (source.getStatut() != StatutContrat.ACTIVE || Boolean.TRUE.equals(source.getRenouvele())) {
+            throw new BadRequestException("Cette assistance a déjà été renouvelée ou n'est plus active");
+        }
+        return assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(source.getId())
+                .stream()
+                .filter(item -> item.getProduitAssistance() != null
+                        && TYPE_ASSISTANCE.equalsIgnoreCase(item.getProduitAssistance().getType()))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException(
+                        "Aucune assistance automobile active n'est liée à ce dossier"
+                ));
+    }
+
+    private void validateRenewalPeriod(AssistanceContrat source, LocalDate newEffectiveDate) {
+        if (source.getDateEcheance() == null) {
+            throw new BadRequestException("La date d'échéance de l'assistance d'origine est manquante");
+        }
+        if (newEffectiveDate == null || !newEffectiveDate.isAfter(source.getDateEcheance())) {
+            throw new BadRequestException("La nouvelle date d'effet doit être postérieure à l'échéance actuelle");
+        }
+    }
+
+    private String nextMovementNumber(Contrat source) {
+        int highest = 0;
+        int count = 0;
+        Set<Long> visited = new HashSet<>();
+        Contrat current = source;
+        while (current != null && current.getId() != null && visited.add(current.getId())) {
+            List<MouvementContrat> movements = mouvementContratRepository
+                    .findByContratIdOrderByCreatedAtDesc(current.getId()).stream()
+                    .filter(item -> item.getStatut() != StatutMouvementContrat.ANNULE)
+                    .toList();
+            count += movements.size();
+            highest = Math.max(highest, movements.stream()
+                    .map(MouvementContrat::getNumeroMouvement)
+                    .map(this::positiveMovementNumber)
+                    .max(Integer::compareTo)
+                    .orElse(0));
+            current = current.getContratOrigine();
+        }
+        return String.valueOf(Math.max(highest, count) + 1);
+    }
+
+    private int positiveMovementNumber(String value) {
+        if (value == null || !value.trim().matches("\\d+")) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(value.trim()));
+        } catch (NumberFormatException ignored) {
+            return 0;
         }
     }
 

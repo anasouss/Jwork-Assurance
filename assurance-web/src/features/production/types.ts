@@ -843,6 +843,7 @@ export type AssistanceContrat = {
   typeAssistance?: string | null;
   id: string;
   contratId: string;
+  assistanceOrigineId?: string | null;
   mouvementContratId?: string | null;
   vehiculeId?: string | null;
   vehiculeImmatriculation?: string | null;
@@ -1155,6 +1156,8 @@ export type EcheanceAssistanceRow = {
   dateEcheance?: string | null;
   telephone?: string | null;
   assistanceLiee: boolean;
+  typeContrat: TypeContrat;
+  preTermeDraftId?: string | null;
 };
 
 export type EcheanceAssistanceResponse = {

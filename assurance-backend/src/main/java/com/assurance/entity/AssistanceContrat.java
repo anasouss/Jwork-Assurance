@@ -11,6 +11,7 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,7 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "assistances_contrat", indexes = {
+@Table(name = "assistances_contrat", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_assistance_origine", columnNames = "assistance_origine_id")
+}, indexes = {
         @Index(name = "idx_assistance_contrat", columnList = "contrat_id"),
         @Index(name = "idx_assistance_branche", columnList = "branche_assurance_id"),
         @Index(name = "idx_assistance_mouvement", columnList = "mouvement_contrat_id"),
@@ -43,6 +46,10 @@ public class AssistanceContrat extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contrat_id", nullable = false)
     private Contrat contrat;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assistance_origine_id")
+    private AssistanceContrat assistanceOrigine;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mouvement_contrat_id")

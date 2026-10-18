@@ -122,8 +122,20 @@ public class ContratController {
         ));
     }
 
+    @PostMapping("/{id}/assistance-voyage/renouvellements")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceVoyageCreationResponse>> renewTravelAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateAssistanceVoyageRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceVoyageService.renew(TenantContext.getCurrentAgence(), id, request),
+                "Assistance voyage renouvelée"
+        ));
+    }
+
     @PostMapping("/assistance-voyage/tarification")
-    @PreAuthorize("hasAuthority('PERM_contrat:create')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<AssistanceVoyageQuoteResponse>> quoteTravelAssistance(
             @Valid @RequestBody QuoteAssistanceVoyageRequest request
     ) {
@@ -153,8 +165,20 @@ public class ContratController {
         ));
     }
 
+    @PostMapping("/{id}/assistance-automobile/renouvellements")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceAutomobileCreationResponse>> renewAutomobileAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateAssistanceAutomobileRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceAutomobileService.renew(TenantContext.getCurrentAgence(), id, request),
+                "Assistance automobile renouvelée"
+        ));
+    }
+
     @PostMapping("/assistance-automobile/tarification")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<AssistanceAutomobileQuoteResponse>> quoteAutomobileAssistance(
             @Valid @RequestBody QuoteAssistanceAutomobileRequest request
     ) {

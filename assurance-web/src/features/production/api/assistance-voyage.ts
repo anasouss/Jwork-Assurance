@@ -41,4 +41,14 @@ export const assistanceVoyageApi = {
       }
     ));
   },
+
+  async renew(contratId: string, request: CreateAssistanceVoyageRequest) {
+    return unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
+      `/api/v1/contrats/${contratId}/assistance-voyage/renouvellements`,
+      {
+        method: "POST",
+        body: JSON.stringify(request),
+      }
+    ));
+  },
 };

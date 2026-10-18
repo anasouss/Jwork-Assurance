@@ -167,7 +167,7 @@ public class ContratService {
             return toResponse(existingDraft);
         }
 
-        List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(source);
+        List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(source, true);
         CreateContratRequest request = buildRenewalDraftRequest(source, modeTerme);
         Contrat draft = Contrat.builder()
                 .agence(source.getAgence())
@@ -1261,7 +1261,7 @@ public class ContratService {
         for (ContratClient link : contrat.getClients()) {
             existingClients.put(clientDraftKey(link.getRole(), Boolean.TRUE.equals(link.getPrincipalPourRole())), link.getClient());
         }
-        List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(contrat);
+        List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(contrat, false);
         clearDraftChildren(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
@@ -1385,7 +1385,10 @@ public class ContratService {
         contrat.getElementsFacturables().removeAll(assistanceElements);
     }
 
-    private List<DraftAssistanceSnapshot> snapshotDraftAssistances(Contrat contrat) {
+    private List<DraftAssistanceSnapshot> snapshotDraftAssistances(
+            Contrat contrat,
+            boolean establishRenewalOrigin
+    ) {
         List<Vehicule> vehicules = activeVehicules(contrat);
         Map<Long, Integer> vehiculeIndexById = new HashMap<>();
         for (int index = 0; index < vehicules.size(); index++) {
@@ -1401,6 +1404,7 @@ public class ContratService {
             }
             snapshots.add(new DraftAssistanceSnapshot(
                     vehiculeIndex,
+                    establishRenewalOrigin ? assistance : assistance.getAssistanceOrigine(),
                     assistance.getCompagnieAssuranceContrat(),
                     assistance.getCompagnieAssistance(),
                     assistance.getProduitAssistance(),
@@ -1437,6 +1441,7 @@ public class ContratService {
             AssistanceContrat assistance = AssistanceContrat.builder()
                     .brancheAssurance(brancheAssistance)
                     .contrat(contrat)
+                    .assistanceOrigine(snapshot.assistanceOrigine())
                     .vehicule(vehicule)
                     .compagnieAssuranceContrat(firstNonNull(snapshot.compagnieAssuranceContrat(), contrat.getCompagnieAssurance()))
                     .compagnieAssistance(snapshot.compagnieAssistance())
@@ -1508,8 +1513,16 @@ public class ContratService {
             request.setDateEffet(contrat.getDateEffet());
             request.setEcheanceCode(contrat.getEcheance());
             request.setNumeroContratOuQuittance(snapshot.numeroContratOuQuittance());
-            request.setTypeQuittance(snapshot.typeQuittance());
-            assistanceContratService.upsert(contrat.getAgence().getId(), contrat.getId(), request);
+            request.setTypeQuittance("RENOUVELLEMENT");
+            AssistanceContratResponse restored = assistanceContratService.upsert(
+                    contrat.getAgence().getId(),
+                    contrat.getId(),
+                    request
+            );
+            AssistanceContrat assistance = assistanceContratRepository.findById(restored.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("AssistanceContrat", restored.getId()));
+            assistance.setAssistanceOrigine(snapshot.assistanceOrigine());
+            assistanceContratRepository.save(assistance);
         }
     }
 
@@ -7499,6 +7512,7 @@ public class ContratService {
 
     private record DraftAssistanceSnapshot(
             int vehiculeIndex,
+            AssistanceContrat assistanceOrigine,
             CompagnieAssurance compagnieAssuranceContrat,
             CompagnieAssistance compagnieAssistance,
             ProduitAssistance produitAssistance,

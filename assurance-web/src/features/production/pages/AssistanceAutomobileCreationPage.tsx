@@ -35,8 +35,10 @@ export default function AssistanceAutomobileCreationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { contratId } = useParams<{ contratId: string }>();
-  const editing = Boolean(contratId);
   const [searchParams] = useSearchParams();
+  const renewing = Boolean(contratId) && searchParams.get("action") === "renouveler";
+  const editing = Boolean(contratId) && !renewing;
+  const loadingExisting = Boolean(contratId);
   const [compagnieId, setCompagnieId] = useState(searchParams.get("compagnieId") ?? "");
   const [produitId, setProduitId] = useState(searchParams.get("produitId") ?? "");
   const [clients, setClients] = useState<ClientInput[]>(initialClients);
@@ -52,7 +54,7 @@ export default function AssistanceAutomobileCreationPage() {
   const existingContract = useQuery({
     queryKey: contractKeys.detail(contratId ?? ""),
     queryFn: () => contractApi.getContrat(contratId!),
-    enabled: editing,
+    enabled: loadingExisting,
   });
   const companies = useReference("compagnies-assistance");
   const cities = useReference("villes");
@@ -133,22 +135,25 @@ export default function AssistanceAutomobileCreationPage() {
 
   useEffect(() => {
     const contract = existingContract.data;
-    if (!contratId || !contract || hydratedRef.current === contratId) return;
+    const hydrationKey = `${contratId}:${renewing ? "renew" : "edit"}`;
+    if (!contratId || !contract || hydratedRef.current === hydrationKey) return;
     const assistance = contract.assistances?.find((item) => normalize(item.typeAssistance) === "ASSISTANCE AUTOMOBILE")
       ?? contract.assistances?.[0];
     if (!assistance) return;
     setCompagnieId(assistance.compagnieAssistanceId ?? "");
     setProduitId(assistance.produitAssistanceId ?? "");
-    setNumeroContrat(contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
-    setDateEffet(assistance.dateEffet ?? contract.dateEffet ?? today);
+    setNumeroContrat(renewing ? "" : contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
+    setDateEffet(renewing
+      ? dayAfter(assistance.dateEcheance ?? contract.dateEcheance)
+      : assistance.dateEffet ?? contract.dateEffet ?? today);
     setDureeMois(String(assistance.duree ?? ""));
-    setCodePromo(assistance.codePromo ?? "");
+    setCodePromo(renewing ? "" : assistance.codePromo ?? "");
     setClients(hydrateClients(contract.clients ?? []));
     setVehicule(hydrateVehicle(contract.vehicules?.[0]));
     const insuredLink = contract.clients?.find((link) => link.role === "PROPRIETAIRE");
     setAssurePayeur(Boolean(contract.payeurPrimeClientId && contract.payeurPrimeClientId === insuredLink?.clientId));
-    hydratedRef.current = contratId;
-  }, [contratId, existingContract.data]);
+    hydratedRef.current = hydrationKey;
+  }, [contratId, existingContract.data, renewing]);
 
   const quote = useQuery({
     queryKey: ["assistance-automobile", "quote", compagnieId, produitId, categorieClientId, vehicule.usageId, dateEffet, dureeMois, codePromo.trim()],
@@ -180,13 +185,17 @@ export default function AssistanceAutomobileCreationPage() {
         assurePayeur,
         vehicule,
       });
-      return contratId
-        ? assistanceAutomobileApi.update(contratId, request)
-        : assistanceAutomobileApi.create(request);
+      if (renewing && contratId) return assistanceAutomobileApi.renew(contratId, request);
+      if (editing && contratId) return assistanceAutomobileApi.update(contratId, request);
+      return assistanceAutomobileApi.create(request);
     },
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      toast.success(editing ? `Dossier ${saved.numeroDossier} modifié` : `Dossier ${saved.numeroDossier} créé`);
+      toast.success(renewing
+        ? `Dossier ${saved.numeroDossier} renouvelé`
+        : editing
+          ? `Dossier ${saved.numeroDossier} modifié`
+          : `Dossier ${saved.numeroDossier} créé`);
       navigate(editing
         ? "/app/production/contrats"
         : `/app/production/contrats/${saved.contratId}/pieces-jointes`);
@@ -201,10 +210,10 @@ export default function AssistanceAutomobileCreationPage() {
     && quote.isSuccess,
   );
 
-  if (editing && existingContract.isLoading) {
+  if (loadingExisting && existingContract.isLoading) {
     return <div className="flex min-h-48 items-center justify-center"><Loader2 className="size-6 animate-spin" /></div>;
   }
-  if (editing && existingContract.isError) {
+  if (loadingExisting && existingContract.isError) {
     return <p className="text-sm font-medium text-destructive">Chargement du dossier impossible.</p>;
   }
 
@@ -213,10 +222,17 @@ export default function AssistanceAutomobileCreationPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Production</p>
-          <h1 className="text-xl font-semibold">{editing ? "Modifier l’assistance automobile" : "Nouvelle assistance automobile"}</h1>
+          <h1 className="text-xl font-semibold">
+            {renewing ? "Renouveler l’assistance automobile" : editing ? "Modifier l’assistance automobile" : "Nouvelle assistance automobile"}
+          </h1>
         </div>
         <Button asChild variant="outline">
-          <Link to={editing ? "/app/production/contrats" : "/app/production/ajouter-dossier"}>
+          <Link to={renewing
+            ? "/app/production/echeances"
+            : editing
+              ? "/app/production/contrats"
+              : "/app/production/ajouter-dossier"}
+          >
             <ArrowLeft className="size-4" /> Retour
           </Link>
         </Button>
@@ -286,7 +302,9 @@ export default function AssistanceAutomobileCreationPage() {
               </p>
             ) : null}
           </Field>
-          <Field label="N° de contrat" required><Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} /></Field>
+          <Field label={renewing ? "N° du nouveau contrat" : "N° de contrat"} required>
+            <Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} />
+          </Field>
           <Field label="Durée" required>
             <Select value={dureeMois} onValueChange={setDureeMois} disabled={durationOptions.length === 0}>
               <SelectTrigger><SelectValue placeholder="Choisir une durée" /></SelectTrigger>
@@ -319,7 +337,13 @@ export default function AssistanceAutomobileCreationPage() {
       <div className="flex justify-end">
         <Button disabled={!canSubmit || save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          {save.isPending ? "Enregistrement..." : editing ? "Enregistrer les modifications" : "Créer le dossier"}
+          {save.isPending
+            ? "Enregistrement..."
+            : renewing
+              ? "Renouveler l’assistance"
+              : editing
+                ? "Enregistrer les modifications"
+                : "Créer le dossier"}
         </Button>
       </div>
     </div>
@@ -512,6 +536,14 @@ function money(value: number) {
 function formatDate(value: string) {
   const [year, month, day] = value.split("-");
   return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function dayAfter(value?: string | null) {
+  if (!value) return today;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return today;
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function Summary({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {

@@ -387,6 +387,11 @@ export default function EcheancesPage() {
                   loading={assistanceEcheances.isLoading}
                   error={assistanceEcheances.isError}
                   canEdit={canEditAssistance}
+                  canRenew={canRenew}
+                  preparingContractId={preTermeActions.prepareMutation.isPending
+                    ? preTermeActions.prepareMutation.variables
+                    : undefined}
+                  onRenewLinked={(row) => preTermeActions.edit(row)}
                 />
               ) : (
                 <table className="w-full min-w-[1260px] border-collapse text-sm">
@@ -569,11 +574,17 @@ function AssistanceEcheanceTable({
   loading,
   error,
   canEdit,
+  canRenew,
+  preparingContractId,
+  onRenewLinked,
 }: {
   rows: EcheanceAssistanceRow[];
   loading: boolean;
   error: boolean;
   canEdit: boolean;
+  canRenew: boolean;
+  preparingContractId?: string;
+  onRenewLinked: (row: EcheanceAssistanceRow) => void;
 }) {
   return (
     <table className="w-full min-w-[1180px] border-collapse text-sm">
@@ -625,6 +636,22 @@ function AssistanceEcheanceTable({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {canRenew ? row.assistanceLiee ? (
+                      <DropdownMenuItem
+                        disabled={preparingContractId === row.contratId}
+                        onSelect={() => onRenewLinked(row)}
+                      >
+                        <RefreshCw className="size-4" />
+                        Renouveler le contrat et l’assistance
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem asChild>
+                        <Link to={`${assistanceEditPath(row)}?action=renouveler`}>
+                          <RefreshCw className="size-4" />
+                          Renouveler l’assistance
+                        </Link>
+                      </DropdownMenuItem>
+                    ) : null}
                     {canEdit ? (
                       <DropdownMenuItem asChild>
                         <Link to={assistanceEditPath(row)}>

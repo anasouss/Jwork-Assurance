@@ -6,6 +6,8 @@ import { contractApi } from "../../api/contracts";
 import { renewalDraftPath } from "../../renewals/navigation";
 import type { EcheanceAutomobileRow } from "../../types";
 
+type RenewableContractRow = Pick<EcheanceAutomobileRow, "contratId" | "preTermeDraftId" | "typeContrat">;
+
 export function usePreTermeActions() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,7 +29,7 @@ export function usePreTermeActions() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Renouvellement impossible"),
   });
 
-  function edit(row: EcheanceAutomobileRow) {
+  function edit(row: RenewableContractRow) {
     if (row.preTermeDraftId) {
       navigate(renewalDraftPath(
         { id: row.preTermeDraftId, typeContrat: row.typeContrat },

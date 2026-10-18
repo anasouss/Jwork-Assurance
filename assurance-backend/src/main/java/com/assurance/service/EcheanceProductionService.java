@@ -538,19 +538,38 @@ public class EcheanceProductionService {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
         }
+        List<AssistanceContrat> assistances = assistanceContratRepository
+                .findEcheancesByAgenceIdAndIdIn(agenceId, ids);
         Map<Long, AssistanceContrat> byId = new HashMap<>();
-        for (AssistanceContrat assistance
-                : assistanceContratRepository.findEcheancesByAgenceIdAndIdIn(agenceId, ids)) {
+        for (AssistanceContrat assistance : assistances) {
             byId.put(assistance.getId(), assistance);
+        }
+        List<Long> contractIds = assistances.stream()
+                .map(AssistanceContrat::getContrat)
+                .map(Contrat::getId)
+                .distinct()
+                .toList();
+        Map<Long, Contrat> draftsBySourceId = new HashMap<>();
+        if (!contractIds.isEmpty()) {
+            for (Contrat draft : contratRepository.findByAgenceIdAndContratOrigineIdIn(agenceId, contractIds)) {
+                if (draft.getContratOrigine() != null
+                        && draft.getStatut() == StatutContrat.DRAFT
+                        && Boolean.TRUE.equals(draft.getBrouillon())) {
+                    draftsBySourceId.put(draft.getContratOrigine().getId(), draft);
+                }
+            }
         }
         return ids.stream()
                 .map(byId::get)
                 .filter(assistance -> assistance != null)
-                .map(this::toAssistanceRow)
+                .map(assistance -> toAssistanceRow(
+                        assistance,
+                        draftsBySourceId.get(assistance.getContrat().getId())
+                ))
                 .toList();
     }
 
-    private EcheanceAssistanceResponse.Row toAssistanceRow(AssistanceContrat assistance) {
+    private EcheanceAssistanceResponse.Row toAssistanceRow(AssistanceContrat assistance, Contrat preTermeDraft) {
         Contrat contrat = assistance.getContrat();
         ContratClient link = souscripteur(contrat);
         Client client = link == null ? null : link.getClient();
@@ -611,6 +630,8 @@ public class EcheanceProductionService {
                 .dateEcheance(assistance.getDateEcheance())
                 .telephone(primaryPhone(client))
                 .assistanceLiee(assistanceLiee)
+                .typeContrat(contrat.getTypeContrat())
+                .preTermeDraftId(preTermeDraft == null ? null : preTermeDraft.getId())
                 .build();
     }
 

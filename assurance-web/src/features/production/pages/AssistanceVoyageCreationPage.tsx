@@ -55,8 +55,10 @@ export default function AssistanceVoyageCreationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { contratId } = useParams<{ contratId: string }>();
-  const editing = Boolean(contratId);
   const [searchParams] = useSearchParams();
+  const renewing = Boolean(contratId) && searchParams.get("action") === "renouveler";
+  const editing = Boolean(contratId) && !renewing;
+  const loadingExisting = Boolean(contratId);
   const [compagnieId, setCompagnieId] = useState(searchParams.get("compagnieId") ?? "");
   const [produitId, setProduitId] = useState(searchParams.get("produitId") ?? "");
   const [subscriber, setSubscriber] = useState(emptyPerson());
@@ -72,7 +74,7 @@ export default function AssistanceVoyageCreationPage() {
   const existingContract = useQuery({
     queryKey: contractKeys.detail(contratId ?? ""),
     queryFn: () => contractApi.getContrat(contratId!),
-    enabled: editing,
+    enabled: loadingExisting,
   });
 
   const companies = useQuery({
@@ -106,7 +108,8 @@ export default function AssistanceVoyageCreationPage() {
 
   useEffect(() => {
     const contract = existingContract.data;
-    if (!contratId || !contract || hydratedContractRef.current === contratId) return;
+    const hydrationKey = `${contratId}:${renewing ? "renew" : "edit"}`;
+    if (!contratId || !contract || hydratedContractRef.current === hydrationKey) return;
     const assistance = contract.assistances?.[0];
     const subscriberLink = contract.clients?.find((link) => link.role === "SOUSCRIPTEUR");
     const subscriberClient = subscriberLink?.client;
@@ -123,17 +126,19 @@ export default function AssistanceVoyageCreationPage() {
       : insuredClients.map((client) => personFromClient(client, identityTypeFor(client))));
     setCompagnieId(assistance.compagnieAssistanceId ?? "");
     setProduitId(assistance.produitAssistanceId ?? "");
-    setNumeroContrat(contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
-    setDateEffet(assistance.dateEffet ?? contract.dateEffet ?? today);
+    setNumeroContrat(renewing ? "" : contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
+    setDateEffet(renewing
+      ? dayAfter(assistance.dateEcheance ?? contract.dateEcheance)
+      : assistance.dateEffet ?? contract.dateEffet ?? today);
     setDureeMois(String(assistance.duree ?? 12));
-    setCodePromo(assistance.codePromo ?? "");
+    setCodePromo(renewing ? "" : assistance.codePromo ?? "");
     const payerClientId = contract.payeurPrimeClientId;
     const payerIndex = payerClientId
       ? insuredClients.findIndex((client) => client.id === payerClientId)
       : -1;
     setPayer(payerIndex >= 0 && !subscriberIsInsured ? `insured-${payerIndex}` : "subscriber");
-    hydratedContractRef.current = contratId;
-  }, [contratId, existingContract.data]);
+    hydratedContractRef.current = hydrationKey;
+  }, [contratId, existingContract.data, renewing]);
 
   useEffect(() => {
     if (selectedProduct && !durationOptions.some((option) => option.value === dureeMois)) {
@@ -174,13 +179,17 @@ export default function AssistanceVoyageCreationPage() {
         assureIdentiqueSouscripteur: subscriberIsInsured,
         payeurIndex: payer === "subscriber" ? -1 : Number(payer.replace("insured-", "")),
       };
-      return contratId
-        ? assistanceVoyageApi.update(contratId, request)
-        : assistanceVoyageApi.create(request);
+      if (renewing && contratId) return assistanceVoyageApi.renew(contratId, request);
+      if (editing && contratId) return assistanceVoyageApi.update(contratId, request);
+      return assistanceVoyageApi.create(request);
     },
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      toast.success(editing ? `Dossier ${saved.numeroDossier} modifié` : `Dossier ${saved.numeroDossier} créé`);
+      toast.success(renewing
+        ? `Dossier ${saved.numeroDossier} renouvelé`
+        : editing
+          ? `Dossier ${saved.numeroDossier} modifié`
+          : `Dossier ${saved.numeroDossier} créé`);
       navigate(editing
         ? `/app/production/contrats/${saved.contratId}`
         : `/app/production/contrats/${saved.contratId}/pieces-jointes`);
@@ -188,7 +197,9 @@ export default function AssistanceVoyageCreationPage() {
     onError: (error) => toast.error(
       error instanceof Error
         ? error.message
-        : editing
+        : renewing
+          ? "Renouvellement de l’assistance voyage impossible"
+          : editing
           ? "Modification de l’assistance voyage impossible"
           : "Création de l’assistance voyage impossible"
     ),
@@ -205,11 +216,11 @@ export default function AssistanceVoyageCreationPage() {
     && effectiveInsured.every(validPerson)
   );
 
-  if (editing && existingContract.isLoading) {
+  if (loadingExisting && existingContract.isLoading) {
     return <div className="flex min-h-48 items-center justify-center"><Loader2 className="size-6 animate-spin" /></div>;
   }
 
-  if (editing && existingContract.isError) {
+  if (loadingExisting && existingContract.isError) {
     return <p className="text-sm font-medium text-destructive">Chargement du dossier impossible.</p>;
   }
 
@@ -218,10 +229,17 @@ export default function AssistanceVoyageCreationPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Production</p>
-          <h1 className="text-xl font-semibold">{editing ? "Modifier l’assistance voyage" : "Nouvelle assistance voyage"}</h1>
+          <h1 className="text-xl font-semibold">
+            {renewing ? "Renouveler l’assistance voyage" : editing ? "Modifier l’assistance voyage" : "Nouvelle assistance voyage"}
+          </h1>
         </div>
         <Button asChild variant="outline">
-          <Link to={editing ? "/app/production/contrats" : "/app/production/ajouter-dossier"}>
+          <Link to={renewing
+            ? "/app/production/echeances"
+            : editing
+              ? "/app/production/contrats"
+              : "/app/production/ajouter-dossier"}
+          >
             <ArrowLeft className="size-4" />
             Retour
           </Link>
@@ -314,7 +332,7 @@ export default function AssistanceVoyageCreationPage() {
           <Field label="Produit d’assistance" required>
             <Input className="bg-muted/50" value={selectedProduct?.libelle ?? ""} readOnly />
           </Field>
-          <Field label="N° de contrat" required>
+          <Field label={renewing ? "N° du nouveau contrat" : "N° de contrat"} required>
             <Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} />
           </Field>
           <Field label="Durée" required>
@@ -382,7 +400,7 @@ export default function AssistanceVoyageCreationPage() {
 
       <footer className="flex justify-end gap-2 border-t py-4">
         <Button asChild variant="outline">
-          <Link to={editing && contratId ? `/app/production/contrats/${contratId}` : "/app/production/ajouter-dossier"}>Annuler</Link>
+          <Link to={loadingExisting && contratId ? `/app/production/contrats/${contratId}` : "/app/production/ajouter-dossier"}>Annuler</Link>
         </Button>
         <Button
           type="button"
@@ -391,7 +409,13 @@ export default function AssistanceVoyageCreationPage() {
           className="bg-emerald-600 text-white hover:bg-emerald-700"
         >
           <Plane className="size-4" />
-          {save.isPending ? "Enregistrement..." : editing ? "Enregistrer les modifications" : "Créer le dossier"}
+          {save.isPending
+            ? "Enregistrement..."
+            : renewing
+              ? "Renouveler l’assistance"
+              : editing
+                ? "Enregistrer les modifications"
+                : "Créer le dossier"}
         </Button>
       </footer>
     </div>
@@ -734,6 +758,14 @@ function calculateExpiryDate(start: string, months: number) {
   const expiration = new Date(Date.UTC(targetYear, normalizedMonth, Math.min(day, lastDay)));
   expiration.setUTCDate(expiration.getUTCDate() - 1);
   return expiration.toISOString().slice(0, 10);
+}
+
+function dayAfter(value?: string | null) {
+  if (!value) return today;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return today;
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function travelDurationOptions(product?: ReferenceOption) {

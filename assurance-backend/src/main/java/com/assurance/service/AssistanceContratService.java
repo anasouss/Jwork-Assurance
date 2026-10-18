@@ -379,6 +379,8 @@ public class AssistanceContratService {
                         : TYPE_ASSISTANCE_AUTOMOBILE)
                 .id(assistance.getId())
                 .contratId(assistance.getContrat() != null ? assistance.getContrat().getId() : null)
+                .assistanceOrigineId(assistance.getAssistanceOrigine() != null
+                        ? assistance.getAssistanceOrigine().getId() : null)
                 .mouvementContratId(assistance.getMouvementContrat() != null ? assistance.getMouvementContrat().getId() : null)
                 .vehiculeId(assistance.getVehicule() != null ? assistance.getVehicule().getId() : null)
                 .vehiculeImmatriculation(assistance.getVehicule() != null ? assistance.getVehicule().getImmatriculation() : null)

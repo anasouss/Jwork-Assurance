@@ -475,6 +475,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const canRenew = canRenewContrat && !child && !terminal && !contrat.renouvele
     && !isAssistanceRecord
     && isActiveContrat(contrat) && normalize(contrat.typeRenouvellement) === "RENOUVELABLE";
+  const canRenewAssistance = canRenewContrat && isAssistanceRecord && !child && !terminal
+    && !contrat.renouvele && isActiveContrat(contrat);
+  const assistanceRenewalPath = isTravelAssistance
+    ? `/app/production/contrats/${contrat.id}/assistance-voyage/modifier?action=renouveler`
+    : `/app/production/contrats/${contrat.id}/assistance-automobile/modifier?action=renouveler`;
   const canEditDirectly = isLinkedAutomobileAssistance
     ? canManageAssistance && !child && !terminal
     : contrat.modificationDirecteAutorisee !== false
@@ -629,6 +634,11 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
           ) : canShowEdit ? (
             <DropdownMenuItem onSelect={() => setBlockedEditOpen(true)}>
               Modifier
+            </DropdownMenuItem>
+          ) : null}
+          {canRenewAssistance ? (
+            <DropdownMenuItem asChild>
+              <Link to={assistanceRenewalPath}>Renouveler l’assistance</Link>
             </DropdownMenuItem>
           ) : null}
           {canCreateMovement ? (

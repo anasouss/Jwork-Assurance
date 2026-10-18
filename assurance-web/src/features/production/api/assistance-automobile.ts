@@ -36,4 +36,11 @@ export const assistanceAutomobileApi = {
       { method: "PUT", body: JSON.stringify(request) },
     ));
   },
+
+  async renew(contratId: string, request: CreateAssistanceAutomobileRequest) {
+    return unwrap(await apiFetch<ApiResponse<AssistanceAutomobileCreationResponse>>(
+      `/api/v1/contrats/${contratId}/assistance-automobile/renouvellements`,
+      { method: "POST", body: JSON.stringify(request) },
+    ));
+  },
 };

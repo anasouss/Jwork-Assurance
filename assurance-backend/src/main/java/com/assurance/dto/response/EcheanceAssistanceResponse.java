@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.TypeContrat;
 import lombok.Builder;
 import lombok.Data;
 
@@ -55,5 +56,7 @@ public class EcheanceAssistanceResponse {
         private LocalDate dateEcheance;
         private String telephone;
         private boolean assistanceLiee;
+        private TypeContrat typeContrat;
+        private Long preTermeDraftId;
     }
 }

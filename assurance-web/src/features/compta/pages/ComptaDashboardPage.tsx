@@ -88,7 +88,7 @@ const groups: ComptaGroup[] = [
         permission: "tresorerie:view",
       },
       {
-        title: "Impayés clients",
+        title: "Rejets bancaires",
         icon: CircleAlert,
         href: "/app/compta/tresorerie/impayes-clients",
         permission: "tresorerie:view",

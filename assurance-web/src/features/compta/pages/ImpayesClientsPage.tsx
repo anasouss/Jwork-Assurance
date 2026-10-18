@@ -107,7 +107,7 @@ export default function ImpayesClientsPage() {
     <div className="grid gap-5">
       <header>
         <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-        <h1 className="mt-1 text-xl font-semibold">Impayés clients</h1>
+        <h1 className="mt-1 text-xl font-semibold">Rejets bancaires</h1>
         <p className="text-sm text-muted-foreground">Suivi des chèques et effets rejetés par la banque.</p>
       </header>
 

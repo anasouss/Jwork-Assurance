@@ -296,7 +296,7 @@ export default function EncaissementsEnAttentePage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
-            <Link to="/app/compta/tresorerie/impayes-clients"><CircleAlert className="size-4" /> Impayés clients</Link>
+            <Link to="/app/compta/tresorerie/impayes-clients"><CircleAlert className="size-4" /> Rejets bancaires</Link>
           </Button>
           <Button asChild variant="outline">
             <Link to="/app/compta/tresorerie/bordereaux-remise"><Eye className="size-4" /> Bordereaux bancaires</Link>

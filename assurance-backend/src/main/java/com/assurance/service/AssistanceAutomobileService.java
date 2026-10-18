@@ -177,7 +177,7 @@ public class AssistanceAutomobileService {
                 .build());
         contrat.setNumeroDossier(String.format(
                 Locale.ROOT,
-                "AA-%02d-%06d",
+                "AST-%02d-%06d",
                 Math.floorMod(request.getDateEffet().getYear(), 100),
                 contrat.getId()
         ));

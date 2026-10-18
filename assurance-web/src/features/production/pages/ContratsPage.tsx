@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Eye, FilePlus2, Loader2, MoreHorizontal, Search, X } from "lucide-react";
+import { Car, ChevronDown, Eye, FilePlus2, Loader2, MoreHorizontal, Plane, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { amendmentKeys, contractKeys, referenceKeys } from "@/lib/query-keys";
 import { FilterField as SharedFilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { avenantApi } from "../api/avenants";
@@ -1025,13 +1026,20 @@ function statusLabel(contrat: ContratListItem, movement: MovementLine) {
 function TypeBadge({ contrat }: { contrat: ContratListItem }) {
   if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
     const travel = normalize(contrat.typeAssistance) === "ASSISTANCE VOYAGE";
+    const label = travel ? "Assistance voyage" : "Assistance automobile";
+    const Icon = travel ? Plane : Car;
     return (
-      <Badge
-        className="min-w-5 justify-center rounded bg-cyan-700 px-1.5 py-0.5 text-white hover:bg-cyan-700"
-        title={travel ? "Assistance voyage" : "Assistance automobile"}
-      >
-        {travel ? "V" : "A"}
-      </Badge>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            aria-label={label}
+            className="size-6 justify-center rounded bg-cyan-700 p-0 text-white hover:bg-cyan-700"
+          >
+            <Icon aria-hidden="true" className="size-3.5" />
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top">{label}</TooltipContent>
+      </Tooltip>
     );
   }
   const { typeContrat: type } = contrat;

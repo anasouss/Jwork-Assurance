@@ -204,7 +204,7 @@ public class AssistanceVoyageService {
         contrat = contratRepository.save(contrat);
         contrat.setNumeroDossier(String.format(
                 Locale.ROOT,
-                "AV-%02d-%06d",
+                "AST-%02d-%06d",
                 Math.floorMod(request.getDateEffet().getYear(), 100),
                 contrat.getId()
         ));

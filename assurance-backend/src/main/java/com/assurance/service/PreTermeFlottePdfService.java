@@ -415,6 +415,8 @@ public class PreTermeFlottePdfService {
                 .filter(code -> !"ASSISTANCE".equals(code))
                 .filter(code -> usages.stream().anyMatch(usage -> hasFranchise(usage, code, vehicules, garantiesByVehicule)))
                 .toList();
+        usages.removeIf(usage -> codesWithFranchise.stream()
+                .noneMatch(code -> hasFranchise(usage, code, vehicules, garantiesByVehicule)));
         if (usages.isEmpty() || codesWithFranchise.isEmpty()) {
             return false;
         }
@@ -426,7 +428,6 @@ public class PreTermeFlottePdfService {
         widths[0] = 0.65f;
         Table table = new Table(widths)
                 .setWidth(UnitValue.createPercentValue(Math.min(100f, 20f + usages.size() * 18f)))
-                .setHorizontalAlignment(HorizontalAlignment.CENTER)
                 .setKeepTogether(true);
         table.addCell(headerCell("Garanties", 1, 1));
         for (Usage usage : usages) {

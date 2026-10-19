@@ -51,5 +51,6 @@ public class SourceDocumentClientResponse {
         private com.assurance.enums.TypeDocumentClient type;
         private String numero;
         private LocalDate dateEmission;
+        private boolean signatureDisponible;
     }
 }

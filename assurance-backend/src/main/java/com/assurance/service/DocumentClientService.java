@@ -1022,6 +1022,8 @@ public class DocumentClientService {
                                         .type(line.getDocument().getTypeDocument())
                                         .numero(line.getDocument().getNumero())
                                         .dateEmission(line.getDocument().getDateEmission())
+                                        .signatureDisponible(line.getDocument().getAgence().getSignatureCheminStockage() != null
+                                                && !line.getDocument().getAgence().getSignatureCheminStockage().isBlank())
                                         .build(),
                                 Collectors.toList()
                         )

@@ -302,6 +302,7 @@ export type ClientDocumentSource = {
     type: ClientDocumentType;
     numero: string;
     dateEmission: string;
+    signatureDisponible: boolean;
   }>;
 };
 

@@ -46,7 +46,7 @@ public interface LigneDocumentClientRepository extends JpaRepository<LigneDocume
             @Param("statut") StatutDocumentClient statut
     );
 
-    @EntityGraph(attributePaths = "document")
+    @EntityGraph(attributePaths = {"document", "document.agence"})
     @Query("""
             select l
             from LigneDocumentClient l

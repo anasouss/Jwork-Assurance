@@ -565,7 +565,11 @@ export default function RelevesFacturesPage() {
                           <DocumentTypeBadges documents={row.documents} />
                         </td>
                         <td className="px-3 py-3">
-                          <DocumentReferences documents={row.documents} onOpen={setDetailId} />
+                          <DocumentReferences
+                            documents={row.documents}
+                            onOpen={setDetailId}
+                            onInvoice={canIssue ? setInvoiceFromStatementId : undefined}
+                          />
                         </td>
                         <td className="px-3 py-3 text-center">
                           <SourceActionsMenu row={row} />
@@ -1931,7 +1935,9 @@ function CancelDocumentDialog(props: {
   );
 }
 
-function useDocumentPdfPreview(document: ClientDocument) {
+type DocumentPdfTarget = Pick<ClientDocument, "id" | "typeDocument" | "signatureDisponible">;
+
+function useDocumentPdfPreview(document: DocumentPdfTarget) {
   const [loading, setLoading] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
 
@@ -2008,10 +2014,12 @@ function DocumentTypeBadges(props: { documents: ClientDocumentSource["documents"
 function DocumentReferences(props: {
   documents: ClientDocumentSource["documents"];
   onOpen: (id: string) => void;
+  onInvoice?: (id: string) => void;
 }) {
   if (!props.documents.length) {
     return <span className="text-muted-foreground">-</span>;
   }
+  const hasInvoice = props.documents.some((document) => document.type === "FACTURE");
   return (
     <div className="grid justify-items-start gap-1">
       {props.documents.map((document) => (
@@ -2028,31 +2036,74 @@ function DocumentReferences(props: {
               {formatDate(document.dateEmission)}
             </span>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7 shrink-0"
-                title={`Actions pour ${document.numero}`}
-                aria-label={`Actions pour ${document.numero}`}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onSelect={() => props.onOpen(document.id)}>
-                {document.type === "FACTURE"
-                  ? <ReceiptText className="size-4" />
-                  : <FileText className="size-4" />}
-                Voir / imprimer
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <SourceDocumentActionsMenu
+            document={document}
+            onOpen={() => props.onOpen(document.id)}
+            onInvoice={props.onInvoice && document.type === "RELEVE" && !hasInvoice
+              ? () => props.onInvoice?.(document.id)
+              : undefined}
+          />
         </div>
       ))}
     </div>
+  );
+}
+
+function SourceDocumentActionsMenu(props: {
+  document: ClientDocumentSource["documents"][number];
+  onOpen: () => void;
+  onInvoice?: () => void;
+}) {
+  const pdf = useDocumentPdfPreview({
+    id: props.document.id,
+    typeDocument: props.document.type,
+    signatureDisponible: props.document.signatureDisponible,
+  });
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            title={`Actions pour ${props.document.numero}`}
+            aria-label={`Actions pour ${props.document.numero}`}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onSelect={props.onOpen}>
+            <Eye className="size-4" />
+            Voir le document
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
+            <FileDown className="size-4 text-sky-700 dark:text-sky-400" />
+            {pdf.loading ? "Ouverture..." : "Prévisualiser le PDF"}
+          </DropdownMenuItem>
+          {props.onInvoice ? (
+            <DropdownMenuItem
+              className="bg-emerald-50 font-medium text-emerald-900 focus:bg-emerald-100 focus:text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-200 dark:focus:bg-emerald-950/60 dark:focus:text-emerald-100"
+              onSelect={props.onInvoice}
+            >
+              <ReceiptText className="size-4 text-emerald-700 dark:text-emerald-400" />
+              Créer une facture
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DocumentPdfOptionsDialog
+        open={pdf.optionsOpen}
+        loading={pdf.loading}
+        documentType={props.document.type}
+        signatureAvailable={props.document.signatureDisponible}
+        onOpenChange={pdf.setOptionsOpen}
+        onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
+      />
+    </>
   );
 }
 

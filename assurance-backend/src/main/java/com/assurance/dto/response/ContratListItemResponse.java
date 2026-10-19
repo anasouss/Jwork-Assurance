@@ -40,6 +40,7 @@ public class ContratListItemResponse {
     private String conventionCode;
     private String conventionLibelle;
     private Long contratOrigineId;
+    private String contratOrigineNumeroDossier;
     private Boolean renouvele;
     private ModeTermeRenouvellement modeTermeRenouvellement;
     private Boolean renouvellementTermeCompagnieEligible;

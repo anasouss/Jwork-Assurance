@@ -98,7 +98,8 @@ public class EcheanceProductionService {
         html.append("<!doctype html><html><head><meta charset=\"utf-8\"></head><body><table>");
         appendRow(html, List.of(
                 "Dossier", "Client", "Code client", "N contrat assistance", "Type assistance",
-                "Produit", "Compagnie", "Immatriculation", "Date effet", "Date echeance", "Telephone"
+                "Produit", "Compagnie", "Immatriculation", "Date effet", "Date echeance", "Telephone",
+                "Observation"
         ), true);
         int page = 0;
         Page<Long> idsPage;
@@ -125,7 +126,8 @@ public class EcheanceProductionService {
                         safe(row.getImmatriculation()),
                         formatDate(row.getDateEffet()),
                         formatDate(row.getDateEcheance()),
-                        safe(row.getTelephone())
+                        safe(row.getTelephone()),
+                        safe(row.getObservation())
                 ), false);
             }
             page++;
@@ -578,6 +580,9 @@ public class EcheanceProductionService {
                 : assistance.getProduitAssistance().getType();
         boolean assistanceLiee = contrat.getBrancheAssurance() == null
                 || !"ASSISTANCE".equalsIgnoreCase(contrat.getBrancheAssurance().getCode());
+        ObservationResult observation = assistanceLiee
+                ? observation(contrat, client)
+                : standaloneAssistanceObservation(assistance);
         return EcheanceAssistanceResponse.Row.builder()
                 .assistanceId(assistance.getId())
                 .contratId(contrat.getId())
@@ -629,10 +634,72 @@ public class EcheanceProductionService {
                 .dateEffet(assistance.getDateEffet())
                 .dateEcheance(assistance.getDateEcheance())
                 .telephone(primaryPhone(client))
+                .observation(observation.message())
+                .observationNiveau(observation.level())
                 .assistanceLiee(assistanceLiee)
                 .typeContrat(contrat.getTypeContrat())
                 .preTermeDraftId(preTermeDraft == null ? null : preTermeDraft.getId())
                 .build();
+    }
+
+    private ObservationResult standaloneAssistanceObservation(AssistanceContrat assistance) {
+        LocalDate today = LocalDate.now();
+        LocalDate renewalDate = assistance.getDateEcheance();
+        Set<String> messages = new LinkedHashSet<>();
+        Set<Long> inspectedClientIds = new LinkedHashSet<>();
+        AlertAccumulator alerts = new AlertAccumulator();
+
+        for (ContratClient link : assistance.getContrat().getClients()) {
+            Client person = link.getClient();
+            if (person == null
+                    || person.getId() == null
+                    || !inspectedClientIds.add(person.getId())
+                    || person.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE) {
+                continue;
+            }
+            String document = hasText(person.getCin())
+                    ? "CIN"
+                    : hasText(person.getPassport()) ? "Passeport" : null;
+            if (document == null) {
+                continue;
+            }
+            addDocumentAlert(
+                    messages,
+                    alerts,
+                    firstNonBlank(person.getNomAffichage(), person.getCodeClient(), "Personne assurée"),
+                    person.getCinValidite(),
+                    today,
+                    renewalDate,
+                    document + " expiré",
+                    document + " expirant avant l’échéance",
+                    "CIN".equals(document)
+                            ? "Validité de la CIN manquante"
+                            : "Validité du passeport manquante"
+            );
+        }
+
+        Vehicule vehicle = assistance.getVehicule();
+        if (vehicle != null) {
+            addDocumentAlert(
+                    messages,
+                    alerts,
+                    vehicleObservationLabel(vehicle),
+                    vehicle.getDateExpirationCarteGrise(),
+                    today,
+                    renewalDate,
+                    "Carte grise expirée",
+                    "Carte grise expirant avant l’échéance",
+                    "Validité de la carte grise manquante"
+            );
+        }
+
+        if (messages.isEmpty()) {
+            return new ObservationResult("", "AUCUNE");
+        }
+        return new ObservationResult(
+                String.join(" · ", messages),
+                alerts.expired ? "BLOQUANT" : "AVERTISSEMENT"
+        );
     }
 
     private EcheanceAssistanceResponse.Summary assistanceSummary(

@@ -1155,6 +1155,8 @@ export type EcheanceAssistanceRow = {
   dateEffet?: string | null;
   dateEcheance?: string | null;
   telephone?: string | null;
+  observation?: string | null;
+  observationNiveau?: "AUCUNE" | "AVERTISSEMENT" | "BLOQUANT" | null;
   assistanceLiee: boolean;
   typeContrat: TypeContrat;
   preTermeDraftId?: string | null;
@@ -1675,6 +1677,7 @@ export type ContratListItem = {
   conventionCode?: string | null;
   conventionLibelle?: string | null;
   contratOrigineId?: string | null;
+  contratOrigineNumeroDossier?: string | null;
   renouvele?: boolean | null;
   modeTermeRenouvellement?: "CABINET" | "COMPAGNIE" | null;
   renouvellementTermeCompagnieEligible?: boolean | null;

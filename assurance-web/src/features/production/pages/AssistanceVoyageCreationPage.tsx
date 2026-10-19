@@ -677,7 +677,7 @@ function personRequest(person: PersonDraft): AssistanceVoyagePersonRequest {
       prenom: person.prenom.trim(),
       nom: person.nom.trim(),
       cin: person.documentType === "CIN" ? person.documentNumber.trim() : undefined,
-      cinValidite: person.documentType === "CIN" ? person.documentValidity : undefined,
+      cinValidite: person.documentValidity,
       passport: person.documentType === "PASSEPORT" ? person.documentNumber.trim() : undefined,
       dateNaissance: person.dateNaissance,
       nationalite: person.nationalite.trim(),

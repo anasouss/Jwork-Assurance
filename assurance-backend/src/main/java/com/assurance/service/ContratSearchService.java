@@ -314,6 +314,8 @@ public class ContratSearchService {
                 && firstAssistance != null
                 && (contract.getBrancheAssurance() == null
                     || !"ASSISTANCE".equalsIgnoreCase(contract.getBrancheAssurance().getCode()));
+        boolean standaloneAssistance = contract.getBrancheAssurance() != null
+                && "ASSISTANCE".equalsIgnoreCase(contract.getBrancheAssurance().getCode());
 
         return ContratListItemResponse.builder()
                 .id(contract.getId())
@@ -347,13 +349,15 @@ public class ContratSearchService {
                 .produitAssistanceLibelle(firstAssistance == null ? null : firstAssistance.getProduit())
                 .typeAssistance(linkedAssistanceView
                         ? "Assistance Automobile"
-                        : firstAssistance == null || firstAssistance.getProduitAssistance() == null
+                        : !standaloneAssistance || firstAssistance == null || firstAssistance.getProduitAssistance() == null
                                 ? null : firstAssistance.getProduitAssistance().getType())
                 .assistanceLiee(linkedAssistanceView)
                 .conventionId(contract.getConvention() == null ? null : contract.getConvention().getId())
                 .conventionCode(contract.getConvention() == null ? null : contract.getConvention().getCode())
                 .conventionLibelle(contract.getConvention() == null ? null : contract.getConvention().getIntitule())
                 .contratOrigineId(contract.getContratOrigine() == null ? null : contract.getContratOrigine().getId())
+                .contratOrigineNumeroDossier(contract.getContratOrigine() == null
+                        ? null : contract.getContratOrigine().getNumeroDossier())
                 .renouvele(contract.getRenouvele())
                 .modeTermeRenouvellement(contract.getModeTermeRenouvellement())
                 .renouvellementTermeCompagnieEligible(renewalPolicy.isCompanyTermEligible(contract))

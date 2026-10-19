@@ -214,7 +214,7 @@ function EcheanceNatureCard({
       disabled={disabled}
       onClick={onSelect}
       className={cn(
-        "flex min-h-24 items-center justify-between gap-3 rounded-md border p-4 text-left transition-colors",
+        "flex min-h-24 cursor-pointer items-center justify-between gap-3 rounded-md border p-4 text-left transition-colors",
         active && "border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100",
         !active && !disabled && "hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20",
         disabled && "cursor-not-allowed border-dashed bg-muted/20 text-muted-foreground dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400"

@@ -55,6 +55,8 @@ public class EcheanceAssistanceResponse {
         private LocalDate dateEffet;
         private LocalDate dateEcheance;
         private String telephone;
+        private String observation;
+        private String observationNiveau;
         private boolean assistanceLiee;
         private TypeContrat typeContrat;
         private Long preTermeDraftId;

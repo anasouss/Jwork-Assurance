@@ -782,16 +782,16 @@ function showContratPath(contrat: ContratListItem, movement: MovementLine) {
 }
 
 function editContratPath(contrat: ContratListItem) {
+  if (contrat.contratOrigineId) return renewalDraftPath(contrat);
   if (contrat.assistanceLiee) {
     return `/app/production/contrats/${contrat.id}/assistance`;
   }
-  if (normalize(contrat.typeAssistance) === "ASSISTANCE VOYAGE") {
-    return `/app/production/contrats/${contrat.id}/assistance-voyage/modifier`;
-  }
-  if (normalize(contrat.typeAssistance) === "ASSISTANCE AUTOMOBILE") {
+  if (normalize(contrat.brancheAssuranceCode) === "ASSISTANCE") {
+    if (normalize(contrat.typeAssistance) === "ASSISTANCE VOYAGE") {
+      return `/app/production/contrats/${contrat.id}/assistance-voyage/modifier`;
+    }
     return `/app/production/contrats/${contrat.id}/assistance-automobile/modifier`;
   }
-  if (contrat.contratOrigineId) return renewalDraftPath(contrat);
   if (contrat.prospection && contrat.typeContrat === "FLOTTE") return `/app/production/prospection/devis/flotte/${contrat.id}`;
   if (contrat.typeContrat === "FLOTTE") return `/app/production/ajouter-dossier/flotte/${contrat.id}`;
   if (contrat.typeContrat === "CONVENTION") return `/app/production/ajouter-dossier/convention/${contrat.id}`;
@@ -958,6 +958,11 @@ function movementStatusRank(statut?: string | null) {
 }
 
 function dossierNumber(contrat: ContratListItem) {
+  if (contrat.contratOrigineId && contrat.brouillon) {
+    return contrat.contratOrigineNumeroDossier
+      ? `Pré-terme · ${contrat.contratOrigineNumeroDossier}`
+      : `Pré-terme #${contrat.id}`;
+  }
   return contrat.numeroDossier ?? contrat.numeroContrat ?? contrat.numeroPolice ?? `#${contrat.id}`;
 }
 
@@ -1013,6 +1018,7 @@ function conventionLabel(contrat: ContratListItem) {
 }
 
 function eventLabel(contrat: ContratListItem, movement: MovementLine) {
+  if (contrat.contratOrigineId && movement.isSynthetic) return "Renouvellement";
   if (movement.libelle) return titleCaseMovement(movement.libelle);
   if (contrat.contratOrigineId) return "Renouvellement";
   return "Affaire nouvelle";

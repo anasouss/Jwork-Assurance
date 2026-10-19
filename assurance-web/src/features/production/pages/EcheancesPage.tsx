@@ -587,7 +587,7 @@ function AssistanceEcheanceTable({
   onRenewLinked: (row: EcheanceAssistanceRow) => void;
 }) {
   return (
-    <table className="w-full min-w-[1180px] border-collapse text-sm">
+    <table className="w-full min-w-[1320px] border-collapse text-sm">
       <thead className="bg-emerald-700 text-xs uppercase text-white">
         <tr>
           <th className="px-3 py-3 text-left font-bold">Dossier</th>
@@ -600,15 +600,16 @@ function AssistanceEcheanceTable({
           <th className="px-3 py-3 text-left font-bold">Date d’effet</th>
           <th className="px-3 py-3 text-left font-bold">Échéance</th>
           <th className="px-3 py-3 text-left font-bold">Téléphone</th>
+          <th className="px-3 py-3 text-left font-bold">Observation</th>
           <th className="px-3 py-3 text-center font-bold">Action</th>
         </tr>
       </thead>
       <tbody>
         {loading ? (
-          <TableRowsSkeleton rows={8} colSpan={11} />
+          <TableRowsSkeleton rows={8} colSpan={12} />
         ) : error ? (
           <tr>
-            <td colSpan={11} className="px-3 py-8 text-center text-red-600">
+            <td colSpan={12} className="px-3 py-8 text-center text-red-600">
               Impossible de charger les échéances assistance.
             </td>
           </tr>
@@ -628,6 +629,9 @@ function AssistanceEcheanceTable({
               <td className="px-3 py-2">{formatDate(row.dateEffet)}</td>
               <td className="px-3 py-2 font-semibold">{formatDate(row.dateEcheance)}</td>
               <td className="px-3 py-2">{text(row.telephone)}</td>
+              <td className="w-48 px-3 py-2">
+                <ObservationStatus row={row} />
+              </td>
               <td className="px-3 py-2 text-center">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -638,6 +642,7 @@ function AssistanceEcheanceTable({
                   <DropdownMenuContent align="end">
                     {canRenew ? row.assistanceLiee ? (
                       <DropdownMenuItem
+                        className="text-emerald-700 focus:bg-emerald-50 focus:text-emerald-800 dark:text-emerald-300 dark:focus:bg-emerald-950/50 dark:focus:text-emerald-200"
                         disabled={preparingContractId === row.contratId}
                         onSelect={() => onRenewLinked(row)}
                       >
@@ -645,7 +650,7 @@ function AssistanceEcheanceTable({
                         Renouveler le contrat et l’assistance
                       </DropdownMenuItem>
                     ) : (
-                      <DropdownMenuItem asChild>
+                      <DropdownMenuItem asChild className="text-emerald-700 focus:bg-emerald-50 focus:text-emerald-800 dark:text-emerald-300 dark:focus:bg-emerald-950/50 dark:focus:text-emerald-200">
                         <Link to={`${assistanceEditPath(row)}?action=renouveler`}>
                           <RefreshCw className="size-4" />
                           Renouveler l’assistance
@@ -653,14 +658,14 @@ function AssistanceEcheanceTable({
                       </DropdownMenuItem>
                     ) : null}
                     {canEdit ? (
-                      <DropdownMenuItem asChild>
+                      <DropdownMenuItem asChild className="text-blue-700 focus:bg-blue-50 focus:text-blue-800 dark:text-blue-300 dark:focus:bg-blue-950/50 dark:focus:text-blue-200">
                         <Link to={assistanceEditPath(row)}>
                           <FilePenLine className="size-4" />
                           Modifier
                         </Link>
                       </DropdownMenuItem>
                     ) : null}
-                    <DropdownMenuItem asChild>
+                    <DropdownMenuItem asChild className="text-slate-700 focus:bg-slate-100 focus:text-slate-900 dark:text-slate-300 dark:focus:bg-slate-800 dark:focus:text-slate-100">
                       <Link to={`/app/production/contrats/${row.contratId}/pieces-jointes`}>
                         <FileText className="size-4" />
                         Pièces jointes
@@ -673,7 +678,7 @@ function AssistanceEcheanceTable({
           ))
         ) : (
           <tr>
-            <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
+            <td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
               Aucun contrat assistance ne correspond aux filtres.
             </td>
           </tr>
@@ -693,7 +698,7 @@ function assistanceEditPath(row: EcheanceAssistanceRow) {
     : `/app/production/contrats/${row.contratId}/assistance-automobile/modifier`;
 }
 
-function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
+function ObservationStatus({ row }: { row: Pick<EcheanceAutomobileRow, "dateEcheance" | "observation" | "observationNiveau"> }) {
   const message = text(row.observation);
   const normalizedMessage = message
     .normalize("NFD")
@@ -775,7 +780,7 @@ function ObservationStatus({ row }: { row: EcheanceAutomobileRow }) {
           ))}
         </div>
         <div className="border-t px-4 py-2 text-xs text-muted-foreground">
-          Échéance du contrat : {formatDate(row.dateEcheance)}
+          Échéance : {formatDate(row.dateEcheance)}
         </div>
       </PopoverContent>
     </Popover>

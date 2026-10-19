@@ -1023,8 +1023,10 @@ export function useContratCreationForm(
         requireField(`vehicules.${index}.immatriculation`, vehicule.immatriculation, "Immatriculation obligatoire.");
         requireField(`vehicules.${index}.marqueId`, vehicule.marqueId || vehicule.marqueLibelle, "Marque obligatoire.");
         requireField(`vehicules.${index}.carrosserieId`, vehicule.carrosserieId || vehicule.carrosserieLibelle, "Carrosserie obligatoire.");
-        if (vehiculeUsage?.byCarburantAndPf) {
+        if (vehiculeUsage?.byCarburant) {
           requireField(`vehicules.${index}.carburant`, vehicule.carburant, "Carburant obligatoire.");
+        }
+        if (vehiculeUsage?.byPuissanceFiscale) {
           requireField(`vehicules.${index}.puissanceFiscale`, vehicule.puissanceFiscale, "Puissance fiscale obligatoire.");
         }
         if (vehiculeUsage?.bySousClasse) {
@@ -1132,8 +1134,10 @@ export function useContratCreationForm(
         requireField(`vehicules.${target.index}.immatriculation`, vehicule.immatriculation, "Immatriculation obligatoire.");
         requireField(`vehicules.${target.index}.marqueId`, vehicule.marqueId || vehicule.marqueLibelle, "Marque obligatoire.");
         requireField(`vehicules.${target.index}.carrosserieId`, vehicule.carrosserieId || vehicule.carrosserieLibelle, "Carrosserie obligatoire.");
-        if (vehiculeUsage?.byCarburantAndPf) {
+        if (vehiculeUsage?.byCarburant) {
           requireField(`vehicules.${target.index}.carburant`, vehicule.carburant, "Carburant obligatoire.");
+        }
+        if (vehiculeUsage?.byPuissanceFiscale) {
           requireField(`vehicules.${target.index}.puissanceFiscale`, vehicule.puissanceFiscale, "Puissance fiscale obligatoire.");
         }
         if (vehiculeUsage?.bySousClasse) {

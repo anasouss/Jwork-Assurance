@@ -45,8 +45,12 @@ public class Usage extends BaseEntity {
     private Boolean consommeAttestation = true;
 
     @Builder.Default
-    @Column(name = "by_carburant_and_pf", nullable = false)
-    private Boolean byCarburantAndPf = false;
+    @Column(name = "by_carburant", nullable = false)
+    private Boolean byCarburant = false;
+
+    @Builder.Default
+    @Column(name = "by_puissance_fiscale", nullable = false)
+    private Boolean byPuissanceFiscale = false;
 
     @Builder.Default
     @Column(name = "by_sous_classe", nullable = false)

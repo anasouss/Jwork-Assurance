@@ -1596,9 +1596,11 @@ public class ContratService {
             throw new BadRequestException("Usage vehicule obligatoire");
         }
         validateUsageForClientCategory(contrat, usage);
-        if (Boolean.TRUE.equals(usage.getByCarburantAndPf())
-                && (!hasText(input.getCarburant()) || !hasText(input.getPuissanceFiscale()))) {
-            throw new BadRequestException("Carburant et puissance fiscale obligatoires pour cet usage");
+        if (Boolean.TRUE.equals(usage.getByCarburant()) && !hasText(input.getCarburant())) {
+            throw new BadRequestException("Carburant obligatoire pour cet usage");
+        }
+        if (Boolean.TRUE.equals(usage.getByPuissanceFiscale()) && !hasText(input.getPuissanceFiscale())) {
+            throw new BadRequestException("Puissance fiscale obligatoire pour cet usage");
         }
         if (Boolean.TRUE.equals(usage.getBySousClasse())) {
             if (!hasText(input.getSousClasse())) {

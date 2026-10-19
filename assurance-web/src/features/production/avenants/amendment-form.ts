@@ -179,8 +179,9 @@ export function vehicleValidationMessage(vehicle: VehiculeInput | undefined, usa
   if (!vehicle.nombrePlaces?.trim()) return "Le nombre de places est obligatoire pour chaque véhicule";
   if (!vehicle.crm?.trim()) return "Le CRM est obligatoire pour chaque véhicule";
   const usage = usages.find((item) => item.id === vehicle.usageId);
-  if (Boolean(usage?.byCarburantAndPf) && (!vehicle.carburant?.trim() || !vehicle.puissanceFiscale?.trim())) {
-    return "Le carburant et la puissance fiscale sont obligatoires pour cet usage";
+  if (Boolean(usage?.byCarburant) && !vehicle.carburant?.trim()) return "Le carburant est obligatoire pour cet usage";
+  if (Boolean(usage?.byPuissanceFiscale) && !vehicle.puissanceFiscale?.trim()) {
+    return "La puissance fiscale est obligatoire pour cet usage";
   }
   if (Boolean(usage?.bySousClasse) && !vehicle.sousClasse?.trim()) return "La sous-classe est obligatoire pour cet usage";
   if (Boolean(usage?.byPtc) && !vehicle.ptc?.trim()) return "Le PTC est obligatoire pour cet usage";

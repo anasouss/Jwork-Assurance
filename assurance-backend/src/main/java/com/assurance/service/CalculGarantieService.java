@@ -404,21 +404,25 @@ public class CalculGarantieService {
             return false;
         }
         if (Boolean.TRUE.equals(usage.getBySousClasse())) {
-            return tarif.getSousClasse() != null
-                    && equalsIgnoreCase(tarif.getSousClasse().getCode(), vehicule.getSousClasse())
-                    && matchesCarburant(tarif.getCarburants(), vehicule.getCarburant());
+            if (tarif.getSousClasse() == null
+                    || !equalsIgnoreCase(tarif.getSousClasse().getCode(), vehicule.getSousClasse())) {
+                return false;
+            }
         }
-        if (Boolean.TRUE.equals(usage.getByPtc())) {
-            return inRange(parsePositiveDecimal(vehicule.getPtc()), tarif.getPtcMin(), tarif.getPtcMax());
+        if (Boolean.TRUE.equals(usage.getByPtc())
+                && !inRange(parsePositiveDecimal(vehicule.getPtc()), tarif.getPtcMin(), tarif.getPtcMax())) {
+            return false;
         }
-        if (Boolean.TRUE.equals(usage.getByCarburantAndPf())) {
-            return inRange(parsePositiveDecimal(vehicule.getPuissanceFiscale()), tarif.getPuissanceFiscaleMin(), tarif.getPuissanceFiscaleMax())
-                    && matchesCarburant(tarif.getCarburants(), vehicule.getCarburant());
+        if (Boolean.TRUE.equals(usage.getByPuissanceFiscale())
+                && !inRange(parsePositiveDecimal(vehicule.getPuissanceFiscale()), tarif.getPuissanceFiscaleMin(), tarif.getPuissanceFiscaleMax())) {
+            return false;
         }
-        if (Boolean.TRUE.equals(usage.getByPrime())) {
-            return inRange(parsePositiveDecimal(vehicule.getNombrePlaces()), tarif.getNombrePlacesMin(), tarif.getNombrePlacesMax());
+        if (Boolean.TRUE.equals(usage.getByCarburant())
+                && !matchesCarburant(tarif.getCarburants(), vehicule.getCarburant())) {
+            return false;
         }
-        return true;
+        return !Boolean.TRUE.equals(usage.getByPrime())
+                || inRange(parsePositiveDecimal(vehicule.getNombrePlaces()), tarif.getNombrePlacesMin(), tarif.getNombrePlacesMax());
     }
 
     private boolean matchesCarburant(Set<Carburant> tarifCarburants, String vehiculeCarburant) {

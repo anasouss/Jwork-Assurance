@@ -300,7 +300,7 @@ export default function TarifUsageSettingsPage() {
                 </Select>
               </Field>
             ) : null}
-            {selectedUsage?.byCarburantAndPf ? (
+            {selectedUsage?.byCarburant ? (
               <Field label="Carburant" required>
                 <FuelMultiSelect
                   carburants={carburants.data ?? []}
@@ -309,7 +309,7 @@ export default function TarifUsageSettingsPage() {
                 />
               </Field>
             ) : null}
-            {selectedUsage?.byCarburantAndPf ? (
+            {selectedUsage?.byPuissanceFiscale ? (
               <>
                 <NumberField label="PF min" value={payload.puissanceFiscaleMin} onChange={(value) => update({ puissanceFiscaleMin: value })} />
                 <NumberField label="PF max" value={payload.puissanceFiscaleMax} onChange={(value) => update({ puissanceFiscaleMax: value })} />
@@ -355,7 +355,7 @@ export default function TarifUsageSettingsPage() {
                   editing,
                   payload,
                   Boolean(selectedUsage?.bySousClasse),
-                  Boolean(selectedUsage?.byCarburantAndPf),
+                  Boolean(selectedUsage?.byCarburant),
                   save.mutate
                 )}
               >

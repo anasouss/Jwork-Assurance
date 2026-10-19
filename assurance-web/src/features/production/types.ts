@@ -16,6 +16,12 @@ export type ReferenceOption = {
   champMoteur?: "CYLINDREE" | "PUISSANCE_FISCALE" | null;
   conducteurPermisRequis?: boolean | null;
   assistanceAutorisee?: boolean | null;
+  byCarburant?: boolean | null;
+  byPuissanceFiscale?: boolean | null;
+  bySousClasse?: boolean | null;
+  byPtc?: boolean | null;
+  byPrime?: boolean | null;
+  byCategorieTransport?: boolean | null;
   tauxExtensionRemorque?: number | null;
   [key: string]: unknown;
 };
@@ -1267,7 +1273,8 @@ export type UpsertUsageRequest = {
   criteria?: string;
   groupeUsageAttestationId?: string;
   consommeAttestation?: boolean;
-  byCarburantAndPf?: boolean;
+  byCarburant?: boolean;
+  byPuissanceFiscale?: boolean;
   bySousClasse?: boolean;
   byPtc?: boolean;
   byPrime?: boolean;

@@ -140,7 +140,8 @@ public class ReferentielController {
         return ResponseEntity.ok(ApiResponse.success(usageRepository.findAll(Sort.by("code")).stream()
                 .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
                 .map(usage -> option(usage.getId(), usage.getCode(), usage.getLibelle())
-                        .putValue("byCarburantAndPf", usage.getByCarburantAndPf())
+                        .putValue("byCarburant", usage.getByCarburant())
+                        .putValue("byPuissanceFiscale", usage.getByPuissanceFiscale())
                         .putValue("bySousClasse", usage.getBySousClasse())
                         .putValue("byPtc", usage.getByPtc())
                         .putValue("byPrime", usage.getByPrime())
@@ -1725,7 +1726,8 @@ public class ReferentielController {
         usage.setCriteria(request.getCriteria());
         usage.setGroupeUsageAttestation(groupe);
         usage.setConsommeAttestation(request.getConsommeAttestation() == null ? true : request.getConsommeAttestation());
-        usage.setByCarburantAndPf(Boolean.TRUE.equals(request.getByCarburantAndPf()));
+        usage.setByCarburant(Boolean.TRUE.equals(request.getByCarburant()));
+        usage.setByPuissanceFiscale(Boolean.TRUE.equals(request.getByPuissanceFiscale()));
         usage.setBySousClasse(Boolean.TRUE.equals(request.getBySousClasse()));
         usage.setByPtc(Boolean.TRUE.equals(request.getByPtc()));
         usage.setByPrime(Boolean.TRUE.equals(request.getByPrime()));
@@ -1740,7 +1742,8 @@ public class ReferentielController {
     private Map<String, Object> toUsageResponse(Usage usage) {
         return option(usage.getId(), usage.getCode(), usage.getLibelle())
                 .putValue("criteria", usage.getCriteria())
-                .putValue("byCarburantAndPf", usage.getByCarburantAndPf())
+                .putValue("byCarburant", usage.getByCarburant())
+                .putValue("byPuissanceFiscale", usage.getByPuissanceFiscale())
                 .putValue("bySousClasse", usage.getBySousClasse())
                 .putValue("byPtc", usage.getByPtc())
                 .putValue("byPrime", usage.getByPrime())
@@ -1806,13 +1809,16 @@ public class ReferentielController {
             sousClasse = null;
         }
         Set<Carburant> carburants = resolveTarifUsageCarburants(request);
-        if (Boolean.TRUE.equals(usage.getByCarburantAndPf()) && carburants.isEmpty()) {
+        if (Boolean.TRUE.equals(usage.getByCarburant()) && carburants.isEmpty()) {
             throw new BadRequestException("Au moins un carburant est obligatoire pour cet usage");
+        }
+        if (!Boolean.TRUE.equals(usage.getByCarburant())) {
+            carburants = Set.of();
         }
         tarif.setUsage(usage);
         tarif.setCategorieTransport(categorieTransport);
-        tarif.setPuissanceFiscaleMin(request.getPuissanceFiscaleMin());
-        tarif.setPuissanceFiscaleMax(request.getPuissanceFiscaleMax());
+        tarif.setPuissanceFiscaleMin(Boolean.TRUE.equals(usage.getByPuissanceFiscale()) ? request.getPuissanceFiscaleMin() : null);
+        tarif.setPuissanceFiscaleMax(Boolean.TRUE.equals(usage.getByPuissanceFiscale()) ? request.getPuissanceFiscaleMax() : null);
         tarif.setNombrePlacesMin(request.getNombrePlacesMin());
         tarif.setNombrePlacesMax(request.getNombrePlacesMax());
         tarif.setPtcMin(request.getPtcMin());
@@ -1840,7 +1846,8 @@ public class ReferentielController {
                 .putValue("usageId", usage != null ? usage.getId() : null)
                 .putValue("usageCode", usage != null ? usage.getCode() : null)
                 .putValue("usageLibelle", usage != null ? usage.getLibelle() : null)
-                .putValue("byCarburantAndPf", usage != null ? usage.getByCarburantAndPf() : null)
+                .putValue("byCarburant", usage != null ? usage.getByCarburant() : null)
+                .putValue("byPuissanceFiscale", usage != null ? usage.getByPuissanceFiscale() : null)
                 .putValue("bySousClasse", usage != null ? usage.getBySousClasse() : null)
                 .putValue("byPtc", usage != null ? usage.getByPtc() : null)
                 .putValue("byPrime", usage != null ? usage.getByPrime() : null)

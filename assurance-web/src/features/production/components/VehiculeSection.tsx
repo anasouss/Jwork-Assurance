@@ -149,19 +149,16 @@ export function VehiculeSection({
       <div className="grid gap-4">
         {vehicules.map((vehicule, index) => {
           const usage = usages.find((item) => item.id === vehicule.usageId);
-          const needsCarburantAndPf = Boolean(usage?.byCarburantAndPf);
+          const needsCarburant = Boolean(usage?.byCarburant);
+          const needsPuissanceFiscale = Boolean(usage?.byPuissanceFiscale);
           const needsSousClasse = Boolean(usage?.bySousClasse);
           const availableSousClasses = tariffedSousClasses(sousClasses, tarifsUsage, vehicule.usageId);
           const selectedSousClasse = sousClasses.find(
             (item) => (item.code ?? item.libelle) === vehicule.sousClasse
           );
-          const needsMotorField = needsCarburantAndPf || Boolean(needsSousClasse && selectedSousClasse);
-          const motorFieldLabel = selectedSousClasse?.champMoteur === "CYLINDREE"
-            ? "Cylindrée"
-            : "Puissance fiscale";
-          const motorFieldError = selectedSousClasse?.champMoteur === "CYLINDREE"
-            ? errors[`vehicules.${index}.cylindree`]
-            : errors[`vehicules.${index}.puissanceFiscale`];
+          const needsCylindree = needsSousClasse && selectedSousClasse?.champMoteur === "CYLINDREE";
+          const needsPuissanceFiscaleField = needsPuissanceFiscale
+            || (needsSousClasse && selectedSousClasse?.champMoteur === "PUISSANCE_FISCALE");
           const needsPtc = Boolean(usage?.byPtc);
           const needsCategorieTransport = Boolean(usage?.byCategorieTransport);
           return (
@@ -232,7 +229,7 @@ export function VehiculeSection({
                     onCustomValueChange={(value) => update(index, { carrosserieId: undefined, carrosserieLibelle: value })}
                   />
                 </Field>
-                {needsCarburantAndPf ? (
+                {needsCarburant ? (
                   <Field label="Carburant" required error={errors[`vehicules.${index}.carburant`]}>
                     <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update(index, { carburant: value })}>
                       <SelectTrigger><SelectValue placeholder="Carburant" /></SelectTrigger>
@@ -246,13 +243,19 @@ export function VehiculeSection({
                     </Select>
                   </Field>
                 ) : null}
-                {needsMotorField ? (
-                  <Field label={motorFieldLabel} required error={motorFieldError}>
+                {needsPuissanceFiscaleField ? (
+                  <Field label="Puissance fiscale" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
                     <Input
-                      value={selectedSousClasse?.champMoteur === "CYLINDREE" ? vehicule.cylindree ?? "" : vehicule.puissanceFiscale ?? ""}
-                      onChange={(event) => update(index, selectedSousClasse?.champMoteur === "CYLINDREE"
-                        ? { cylindree: event.target.value }
-                        : { puissanceFiscale: event.target.value })}
+                      value={vehicule.puissanceFiscale ?? ""}
+                      onChange={(event) => update(index, { puissanceFiscale: event.target.value })}
+                    />
+                  </Field>
+                ) : null}
+                {needsCylindree ? (
+                  <Field label="Cylindrée" required error={errors[`vehicules.${index}.cylindree`]}>
+                    <Input
+                      value={vehicule.cylindree ?? ""}
+                      onChange={(event) => update(index, { cylindree: event.target.value })}
                     />
                   </Field>
                 ) : null}

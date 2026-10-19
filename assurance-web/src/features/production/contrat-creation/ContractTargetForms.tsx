@@ -61,12 +61,14 @@ export function VehicleForm({
   errors,
 }: VehicleFormProps) {
   const usage = usages.find((item) => item.id === vehicule.usageId);
-  const needsCarburantAndPf = Boolean(usage?.byCarburantAndPf);
+  const needsCarburant = Boolean(usage?.byCarburant);
+  const needsPuissanceFiscale = Boolean(usage?.byPuissanceFiscale);
   const needsSousClasse = Boolean(usage?.bySousClasse);
   const availableSousClasses = tariffedSousClasses(sousClasses, tarifsUsage, vehicule.usageId);
   const selectedSousClasse = sousClasses.find((item) => item.code === vehicule.sousClasse);
-  const usesCylindree = needsSousClasse && selectedSousClasse?.champMoteur === "CYLINDREE";
-  const needsMotorField = needsCarburantAndPf || (needsSousClasse && Boolean(selectedSousClasse));
+  const needsCylindree = needsSousClasse && selectedSousClasse?.champMoteur === "CYLINDREE";
+  const needsPuissanceFiscaleField = needsPuissanceFiscale
+    || (needsSousClasse && selectedSousClasse?.champMoteur === "PUISSANCE_FISCALE");
   const needsPtc = Boolean(usage?.byPtc);
   const needsCategorieTransport = Boolean(usage?.byCategorieTransport);
   const update = (patch: Partial<VehiculeInput>) => {
@@ -158,22 +160,25 @@ export function VehicleForm({
         <Field label="Nombre de places" required error={errors[`vehicules.${index}.nombrePlaces`]}>
           <Input className="text-right" value={vehicule.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} />
         </Field>
-        {needsMotorField ? (
-          <Field
-            label={usesCylindree ? "Cylindrée" : "Puissance fiscale"}
-            required
-            error={errors[`vehicules.${index}.${usesCylindree ? "cylindree" : "puissanceFiscale"}`]}
-          >
+        {needsPuissanceFiscaleField ? (
+          <Field label="Puissance fiscale" required error={errors[`vehicules.${index}.puissanceFiscale`]}>
             <Input
               className="text-right"
-              value={usesCylindree ? vehicule.cylindree ?? "" : vehicule.puissanceFiscale ?? ""}
-              onChange={(event) => update(usesCylindree
-                ? { cylindree: event.target.value }
-                : { puissanceFiscale: event.target.value })}
+              value={vehicule.puissanceFiscale ?? ""}
+              onChange={(event) => update({ puissanceFiscale: event.target.value })}
             />
           </Field>
         ) : null}
-        {needsCarburantAndPf ? (
+        {needsCylindree ? (
+          <Field label="Cylindrée" required error={errors[`vehicules.${index}.cylindree`]}>
+            <Input
+              className="text-right"
+              value={vehicule.cylindree ?? ""}
+              onChange={(event) => update({ cylindree: event.target.value })}
+            />
+          </Field>
+        ) : null}
+        {needsCarburant ? (
           <Field label="Carburant" required error={errors[`vehicules.${index}.carburant`]}>
             <Select value={vehicule.carburant ?? ""} onValueChange={(value) => update({ carburant: value })}>
               <SelectTrigger><SelectValue placeholder="Carburant" /></SelectTrigger>

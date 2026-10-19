@@ -663,7 +663,8 @@ export function UsagesSettingsPage() {
       criteria: String(editing.criteria ?? ""),
       groupeUsageAttestationId: String(editing.groupeUsageAttestationId ?? ""),
       consommeAttestation: editing.consommeAttestation !== false,
-      byCarburantAndPf: Boolean(editing.byCarburantAndPf),
+      byCarburant: Boolean(editing.byCarburant),
+      byPuissanceFiscale: Boolean(editing.byPuissanceFiscale),
       bySousClasse: Boolean(editing.bySousClasse),
       byPtc: Boolean(editing.byPtc),
       byPrime: Boolean(editing.byPrime),
@@ -726,7 +727,8 @@ export function UsagesSettingsPage() {
           </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <Flag label="Consomme attestation" checked={payload.consommeAttestation} onChange={(value) => setPayload((current) => ({ ...current, consommeAttestation: value }))} />
-            <Flag label="Carburant + PF" checked={payload.byCarburantAndPf} onChange={(value) => setPayload((current) => ({ ...current, byCarburantAndPf: value }))} />
+            <Flag label="Carburant" checked={payload.byCarburant} onChange={(value) => setPayload((current) => ({ ...current, byCarburant: value }))} />
+            <Flag label="Puissance fiscale" checked={payload.byPuissanceFiscale} onChange={(value) => setPayload((current) => ({ ...current, byPuissanceFiscale: value }))} />
             <Flag label="Sous-classe" checked={payload.bySousClasse} onChange={(value) => setPayload((current) => ({ ...current, bySousClasse: value }))} />
             <Flag label="PTC" checked={payload.byPtc} onChange={(value) => setPayload((current) => ({ ...current, byPtc: value }))} />
             <Flag label="Places / prime" checked={payload.byPrime} onChange={(value) => setPayload((current) => ({ ...current, byPrime: value }))} />
@@ -2091,7 +2093,8 @@ function emptyUsage(): UpsertUsageRequest {
     criteria: "",
     groupeUsageAttestationId: undefined,
     consommeAttestation: true,
-    byCarburantAndPf: false,
+    byCarburant: false,
+    byPuissanceFiscale: false,
     bySousClasse: false,
     byPtc: false,
     byPrime: false,
@@ -2345,7 +2348,8 @@ function sourceChoiceLabel(source: string) {
 
 function usageCriteria(usage: ReferenceOption) {
   const flags = [
-    usage.byCarburantAndPf ? "Carburant+PF" : null,
+    usage.byCarburant ? "Carburant" : null,
+    usage.byPuissanceFiscale ? "PF" : null,
     usage.bySousClasse ? "Sous-classe" : null,
     usage.byPtc ? "PTC" : null,
     usage.byPrime ? "Places" : null,

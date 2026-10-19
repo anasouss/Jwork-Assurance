@@ -18,7 +18,8 @@ public class UpsertUsageRequest {
     private String criteria;
     private Long groupeUsageAttestationId;
     private Boolean consommeAttestation;
-    private Boolean byCarburantAndPf;
+    private Boolean byCarburant;
+    private Boolean byPuissanceFiscale;
     private Boolean bySousClasse;
     private Boolean byPtc;
     private Boolean byPrime;

@@ -154,7 +154,7 @@ export function LigneGrilleTarifaireDialog({
               <Badge variant="outline">optionnels</Badge>
             </div>
             <div className="grid gap-3 md:grid-cols-4">
-              {selectedUsage?.byCarburantAndPf ? <>
+              {selectedUsage?.byPuissanceFiscale ? <>
                 <NumberField label="PF min" value={payload.puissanceFiscaleMin} onChange={(value) => update({ puissanceFiscaleMin: value })} />
                 <NumberField label="PF max" value={payload.puissanceFiscaleMax} onChange={(value) => update({ puissanceFiscaleMax: value })} />
               </> : null}
@@ -182,7 +182,7 @@ export function LigneGrilleTarifaireDialog({
                   </SelectContent>
                 </Select>
               </Field> : null}
-              {selectedUsage?.byCarburantAndPf ? <Field label="Carburant">
+              {selectedUsage?.byCarburant ? <Field label="Carburant">
                 <Input value={payload.carburant ?? ""} onChange={(event) => update({ carburant: event.target.value })} />
               </Field> : null}
             </div>

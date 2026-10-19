@@ -192,33 +192,33 @@ public class DataSeeder implements CommandLineRunner {
         GroupeUsageAttestation groupeB = seedGroupeUsageAttestation("B", "TPV", null, matu);
         GroupeUsageAttestation groupeF = seedGroupeUsageAttestation("F", "FRONTIERE", "#f58ac3", matu);
 
-        Usage usageA = seedUsage("A", "TOURISME", "Tourisme", groupeA, true, true, false, false, false, berline);
-        Usage usageC1 = seedUsage("C1", "C1", "Commerce C1", groupeC, true, true, false, false, false, utilitaire);
-        Usage usageC2 = seedUsage("C2", "C2", "Commerce C2", groupeC, true, true, false, false, false, utilitaire);
-        Usage usageCyclos = seedUsage("CYCLOS", "CYCLOS", "Cyclos et motocycles", groupeE, true, false, true, false, false, moto);
-        seedUsage("D1", "TRANSPORT DE MATIERE INFLAMMABLE <= 3,5T", "Divers", groupeD, true, true, false, true, false, utilitaire);
-        seedUsage("D2", "TRANSPORT DE MATIERE INFLAMMABLE > 3,5T", "Divers", groupeD, true, false, false, true, false, camion);
-        seedUsage("D3", "AMBULANCE", "Divers", groupeD, true, true, false, false, false, utilitaire);
-        seedUsage("D4_SC1", "VEHICULE DE SERVICE <= 3,5T", "Divers", groupeD, true, true, false, false, false, utilitaire);
-        seedUsage("D4_SC2", "VEHICULE DE SERVICE > 3,5T", "Divers", groupeD, true, false, false, true, false, camion);
-        seedUsage("D5_SC1", "VEHICULE DE DEPANNAGE <= 3,5T", "Divers", groupeD, true, true, false, false, false, utilitaire);
-        seedUsage("D5_SC2", "VEHICULE DE DEPANNAGE > 3,5T", "Divers", groupeD, true, false, false, true, false, camion);
-        seedUsage("D6_SC1", "AUTO ECOLE CYCLO A 2 OU 3 ROUES", "Divers", groupeD, true, true, false, false, false, moto);
-        seedUsage("D6_SC2", "AUTO ECOLE TOURISME", "Divers", groupeD, true, true, false, false, false, berline);
-        seedUsage("D6_SC3", "AUTO ECOLE UTILITAIRES ET AUTOCARS C1", "Divers", groupeD, true, true, false, false, false, utilitaire);
-        seedUsage("D6_SC4", "AUTO ECOLE UTILITAIRES ET AUTOCARS C2", "Divers", groupeD, true, true, false, false, false, utilitaire, camion);
-        seedUsage("D7", "ENGIN DE CHANTIER", "Divers", groupeD, true, false, false, true, false, camion);
-        seedUsage("D8", "VEHICULE DE CONSTRUCTEUR/GARAGISTE", "Divers", groupeD, true, true, false, false, false, berline, utilitaire);
-        seedUsage("D9", "VEHICULE DE LOCATION AVEC OU SANS CHAUFFEUR", "Divers", groupeD, true, true, false, false, false, berline, utilitaire);
-        seedUsage("D10", "TRACTEUR AGRICOLE ET FORESTIER", "Divers", groupeD, true, false, false, true, false, camion);
-        seedUsage("D11", "TRANSPORT DE PERSONNEL COMPTE PROPRE <= 3,5T", "Divers", groupeD, true, true, false, false, false, utilitaire);
-        seedUsage("D12", "TRANSPORT DE PERSONNEL COMPTE PROPRE > 3,5T", "Divers", groupeD, true, false, false, true, false, camion);
-        seedUsage("TRS D'ECOLIERS", "TRANSPORT D'ECOLIERS", "Divers", groupeD, true, false, false, false, false, utilitaire, camion);
-        seedUsage("REMORQUE", "REMORQUE", "Remorque rattachee a un contrat automobile", null, false, false, false, true, false, carrosserieRemorque);
-        Usage usageB1 = seedUsage("B1", "CARS ET TAXIS", "Transport public de voyageurs", groupeB, true, false, false, false, false, true, berline, utilitaire, camion);
-        Usage usageB2 = seedUsage("B2", "BUS DE TRANSPORT URBAIN", "Transport public de voyageurs", groupeB, true, false, false, false, false, camion);
-        seedUsage("P", "PROVISOIRE", "Attestation provisoire", groupeP, true, false, false, false, true, berline, utilitaire);
-        seedUsage("F", "FRONTIERE", "Attestation frontiere", groupeF, true, false, false, false, true, berline, utilitaire);
+        Usage usageA = seedUsage("A", "TOURISME", "Tourisme", groupeA, true, true, true, false, false, false, berline);
+        Usage usageC1 = seedUsage("C1", "C1", "Commerce C1", groupeC, true, true, true, false, false, false, utilitaire);
+        Usage usageC2 = seedUsage("C2", "C2", "Commerce C2", groupeC, true, true, false, false, true, false, utilitaire);
+        Usage usageCyclos = seedUsage("CYCLOS", "CYCLOS", "Cyclos et motocycles", groupeE, true, true, false, true, false, false, moto);
+        seedUsage("D1", "TRANSPORT DE MATIERE INFLAMMABLE <= 3,5T", "Divers", groupeD, true, true, true, false, true, false, utilitaire);
+        seedUsage("D2", "TRANSPORT DE MATIERE INFLAMMABLE > 3,5T", "Divers", groupeD, true, false, false, false, true, false, camion);
+        seedUsage("D3", "AMBULANCE", "Divers", groupeD, true, true, true, false, false, false, utilitaire);
+        seedUsage("D4_SC1", "VEHICULE DE SERVICE <= 3,5T", "Divers", groupeD, true, true, true, false, false, false, utilitaire);
+        seedUsage("D4_SC2", "VEHICULE DE SERVICE > 3,5T", "Divers", groupeD, true, false, false, false, true, false, camion);
+        seedUsage("D5_SC1", "VEHICULE DE DEPANNAGE <= 3,5T", "Divers", groupeD, true, true, true, false, false, false, utilitaire);
+        seedUsage("D5_SC2", "VEHICULE DE DEPANNAGE > 3,5T", "Divers", groupeD, true, false, false, false, true, false, camion);
+        seedUsage("D6_SC1", "AUTO ECOLE CYCLO A 2 OU 3 ROUES", "Divers", groupeD, true, true, true, false, false, false, moto);
+        seedUsage("D6_SC2", "AUTO ECOLE TOURISME", "Divers", groupeD, true, true, true, false, false, false, berline);
+        seedUsage("D6_SC3", "AUTO ECOLE UTILITAIRES ET AUTOCARS C1", "Divers", groupeD, true, true, true, false, false, false, utilitaire);
+        seedUsage("D6_SC4", "AUTO ECOLE UTILITAIRES ET AUTOCARS C2", "Divers", groupeD, true, true, true, false, false, false, utilitaire, camion);
+        seedUsage("D7", "ENGIN DE CHANTIER", "Divers", groupeD, true, false, false, false, true, false, camion);
+        seedUsage("D8", "VEHICULE DE CONSTRUCTEUR/GARAGISTE", "Divers", groupeD, true, true, true, false, false, false, berline, utilitaire);
+        seedUsage("D9", "VEHICULE DE LOCATION AVEC OU SANS CHAUFFEUR", "Divers", groupeD, true, true, true, false, false, false, berline, utilitaire);
+        seedUsage("D10", "TRACTEUR AGRICOLE ET FORESTIER", "Divers", groupeD, true, false, false, false, true, false, camion);
+        seedUsage("D11", "TRANSPORT DE PERSONNEL COMPTE PROPRE <= 3,5T", "Divers", groupeD, true, true, true, false, false, false, utilitaire);
+        seedUsage("D12", "TRANSPORT DE PERSONNEL COMPTE PROPRE > 3,5T", "Divers", groupeD, true, false, false, false, true, false, camion);
+        seedUsage("TRS D'ECOLIERS", "TRANSPORT D'ECOLIERS", "Divers", groupeD, true, false, false, false, false, false, utilitaire, camion);
+        seedUsage("REMORQUE", "REMORQUE", "Remorque rattachee a un contrat automobile", null, false, false, false, false, true, false, carrosserieRemorque);
+        Usage usageB1 = seedUsage("B1", "CARS ET TAXIS", "Transport public de voyageurs", groupeB, true, false, false, false, false, false, true, berline, utilitaire, camion);
+        Usage usageB2 = seedUsage("B2", "BUS DE TRANSPORT URBAIN", "Transport public de voyageurs", groupeB, true, false, false, false, false, false, camion);
+        seedUsage("P", "PROVISOIRE", "Attestation provisoire", groupeP, true, false, false, false, false, true, berline, utilitaire);
+        seedUsage("F", "FRONTIERE", "Attestation frontiere", groupeF, true, false, false, false, false, true, berline, utilitaire);
 
         seedCapitalResponsabiliteCivile("DEFAULT", BigDecimal.valueOf(50_000_000L));
         seedCapitalResponsabiliteCivile("CYCLOS", BigDecimal.valueOf(5_000_000L));
@@ -815,13 +815,14 @@ public class DataSeeder implements CommandLineRunner {
             String criteria,
             GroupeUsageAttestation groupeUsageAttestation,
             boolean consommeAttestation,
-            boolean byCarburantAndPf,
+            boolean byCarburant,
+            boolean byPuissanceFiscale,
             boolean bySousClasse,
             boolean byPtc,
             boolean byPrime,
             Carrosserie... carrosseries
     ) {
-        return seedUsage(code, libelle, criteria, groupeUsageAttestation, consommeAttestation, byCarburantAndPf, bySousClasse, byPtc, byPrime, false, carrosseries);
+        return seedUsage(code, libelle, criteria, groupeUsageAttestation, consommeAttestation, byCarburant, byPuissanceFiscale, bySousClasse, byPtc, byPrime, false, carrosseries);
     }
 
     private Usage seedUsage(
@@ -830,7 +831,8 @@ public class DataSeeder implements CommandLineRunner {
             String criteria,
             GroupeUsageAttestation groupeUsageAttestation,
             boolean consommeAttestation,
-            boolean byCarburantAndPf,
+            boolean byCarburant,
+            boolean byPuissanceFiscale,
             boolean bySousClasse,
             boolean byPtc,
             boolean byPrime,
@@ -845,7 +847,8 @@ public class DataSeeder implements CommandLineRunner {
                         .criteria(criteria)
                         .groupeUsageAttestation(groupeUsageAttestation)
                         .consommeAttestation(consommeAttestation)
-                        .byCarburantAndPf(byCarburantAndPf)
+                        .byCarburant(byCarburant)
+                        .byPuissanceFiscale(byPuissanceFiscale)
                         .bySousClasse(bySousClasse)
                         .byPtc(byPtc)
                         .byPrime(byPrime)
@@ -859,7 +862,8 @@ public class DataSeeder implements CommandLineRunner {
         usage.setGroupeUsageAttestation(groupeUsageAttestation);
         usage.setConsommeAttestation(consommeAttestation);
         usage.setCriteria(criteria);
-        usage.setByCarburantAndPf(byCarburantAndPf);
+        usage.setByCarburant(byCarburant);
+        usage.setByPuissanceFiscale(byPuissanceFiscale);
         usage.setBySousClasse(bySousClasse);
         usage.setByPtc(byPtc);
         usage.setByPrime(byPrime);

@@ -568,7 +568,7 @@ export default function RelevesFacturesPage() {
                           <DocumentReferences documents={row.documents} onOpen={setDetailId} />
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <SourceActionsMenu row={row} onOpenDocument={setDetailId} />
+                          <SourceActionsMenu row={row} />
                         </td>
                       </tr>
                     ))}
@@ -985,7 +985,6 @@ function DocumentActionsMenu(props: {
 
 function SourceActionsMenu(props: {
   row: ClientDocumentSource;
-  onOpenDocument: (id: string) => void;
 }) {
   const contractPdfUrl = `/app/production/contrats/${props.row.contratId}/pdf${
     props.row.mouvementId ? `?mouvementId=${props.row.mouvementId}` : ""
@@ -1015,17 +1014,6 @@ function SourceActionsMenu(props: {
             Prévisualiser la police
           </Link>
         </DropdownMenuItem>
-        {props.row.documents.length ? <DropdownMenuSeparator /> : null}
-        {props.row.documents.map((document) => (
-          <DropdownMenuItem key={document.id} onSelect={() => props.onOpenDocument(document.id)}>
-            {document.type === "FACTURE"
-              ? <ReceiptText className="size-4" />
-              : <FileText className="size-4" />}
-            <span className="min-w-0 truncate">
-              Voir / imprimer {document.type === "FACTURE" ? "la facture" : "le relevé"} {document.numero}
-            </span>
-          </DropdownMenuItem>
-        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -2027,17 +2015,41 @@ function DocumentReferences(props: {
   return (
     <div className="grid justify-items-start gap-1">
       {props.documents.map((document) => (
-        <div key={document.id} className="grid gap-0.5">
-          <button
-            type="button"
-            className="cursor-pointer rounded-sm text-left text-xs font-medium text-amber-800 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:text-amber-300"
-            onClick={() => props.onOpen(document.id)}
-          >
-            {document.numero}
-          </button>
-          <span className="text-xs text-muted-foreground">
-            {formatDate(document.dateEmission)}
-          </span>
+        <div key={document.id} className="flex items-start gap-1">
+          <div className="grid gap-0.5">
+            <button
+              type="button"
+              className="cursor-pointer rounded-sm text-left text-xs font-medium text-amber-800 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:text-amber-300"
+              onClick={() => props.onOpen(document.id)}
+            >
+              {document.numero}
+            </button>
+            <span className="text-xs text-muted-foreground">
+              {formatDate(document.dateEmission)}
+            </span>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0"
+                title={`Actions pour ${document.numero}`}
+                aria-label={`Actions pour ${document.numero}`}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => props.onOpen(document.id)}>
+                {document.type === "FACTURE"
+                  ? <ReceiptText className="size-4" />
+                  : <FileText className="size-4" />}
+                Voir / imprimer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ))}
     </div>

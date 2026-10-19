@@ -80,6 +80,7 @@ public class AssistanceAutomobileService {
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final TarifProduitAssistanceService tarifProduitAssistanceService;
     private final CodePromoAssistanceService codePromoAssistanceService;
+    private final EcheanceService echeanceService;
     private final ContratRepository contratRepository;
     private final ContratClientRepository contratClientRepository;
     private final ClientRepository clientRepository;
@@ -141,6 +142,7 @@ public class AssistanceAutomobileService {
         BrancheAssurance branche = requireAssistanceBranch();
         CompagnieAssistance compagnie = requireCompany(request.getCompagnieAssistanceId());
         ProduitAssistance produit = requireProduct(compagnie, request.getProduitAssistanceId());
+        String echeanceCode = requireEcheanceCode(request.getEcheanceCode());
         Client souscripteur = resolvePerson(agenceId, request.getSouscripteur(), "souscripteur");
         Client assure = Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur())
                 ? souscripteur
@@ -164,6 +166,7 @@ public class AssistanceAutomobileService {
                 .numeroPolice(request.getNumeroContrat().trim())
                 .dateEffet(request.getDateEffet())
                 .dateEcheance(pricing.dateEcheance())
+                .echeance(echeanceCode)
                 .typeRenouvellement("ferme")
                 .periodicite(durationLabel(request.getDureeMois()))
                 .typePayeurPrime(payeur.getId().equals(souscripteur.getId())
@@ -227,6 +230,7 @@ public class AssistanceAutomobileService {
 
         CompagnieAssistance compagnie = requireCompany(request.getCompagnieAssistanceId());
         ProduitAssistance produit = requireProduct(compagnie, request.getProduitAssistanceId());
+        String echeanceCode = requireEcheanceCode(request.getEcheanceCode());
         Client souscripteur = resolvePerson(agenceId, request.getSouscripteur(), "souscripteur");
         Client assure = Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur())
                 ? souscripteur
@@ -244,6 +248,7 @@ public class AssistanceAutomobileService {
         contrat.setNumeroPolice(request.getNumeroContrat().trim());
         contrat.setDateEffet(request.getDateEffet());
         contrat.setDateEcheance(pricing.dateEcheance());
+        contrat.setEcheance(echeanceCode);
         contrat.setPeriodicite(durationLabel(request.getDureeMois()));
         contrat.setTypePayeurPrime(payeur.getId().equals(souscripteur.getId())
                 ? TypePayeurPrime.SOUSCRIPTEUR : TypePayeurPrime.TIERS_MANDATE);
@@ -446,6 +451,7 @@ public class AssistanceAutomobileService {
         }
         assistance.setDateEffet(request.getDateEffet());
         assistance.setDateEcheance(pricing.dateEcheance());
+        assistance.setEcheanceCode(requireEcheanceCode(request.getEcheanceCode()));
         assistance.setDuree(request.getDureeMois());
         assistance.setUnite("MOIS");
         assistance.setNumeroDossier(contrat.getNumeroDossier());
@@ -582,6 +588,14 @@ public class AssistanceAutomobileService {
         return categorieClientRepository.findByIdWithUsages(id)
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
                 .orElseThrow(() -> new BadRequestException("Catégorie client inactive ou introuvable"));
+    }
+
+    private String requireEcheanceCode(String value) {
+        String normalized = echeanceService.normalizeCode(value);
+        if (normalized == null) {
+            throw new BadRequestException("Échéance invalide. Format attendu : JJ/MM");
+        }
+        return normalized;
     }
 
     private Usage requireUsage(Long id) {

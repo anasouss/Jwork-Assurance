@@ -24,6 +24,9 @@ public class CreateAssistanceAutomobileRequest {
     @NotNull
     private LocalDate dateEffet;
 
+    @NotBlank
+    private String echeanceCode;
+
     @NotNull
     @Min(1)
     private Integer dureeMois;

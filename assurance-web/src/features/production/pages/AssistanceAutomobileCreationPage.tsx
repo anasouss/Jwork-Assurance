@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { EcheanceInput, isValidEcheance } from "@/components/ui/echeance-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { contractKeys } from "@/lib/query-keys";
@@ -46,6 +47,7 @@ export default function AssistanceAutomobileCreationPage() {
   const [vehicule, setVehicule] = useState<VehiculeInput>({ typeVehicule: "AUTOMOBILE" });
   const [numeroContrat, setNumeroContrat] = useState("");
   const [dateEffet, setDateEffet] = useState(today);
+  const [echeanceCode, setEcheanceCode] = useState<string | undefined>();
   const [dureeMois, setDureeMois] = useState("");
   const [codePromo, setCodePromo] = useState("");
   const [assurePayeur, setAssurePayeur] = useState(false);
@@ -148,6 +150,8 @@ export default function AssistanceAutomobileCreationPage() {
     setDateEffet(renewing
       ? dayAfter(assistance.dateEcheance ?? contract.dateEcheance)
       : assistance.dateEffet ?? contract.dateEffet ?? today);
+    setEcheanceCode(assistance.echeanceCode ?? contract.echeance
+      ?? toEcheanceCode(dayAfter(assistance.dateEcheance ?? contract.dateEcheance)));
     setDureeMois(String(assistance.duree ?? ""));
     setCodePromo(renewing ? "" : assistance.codePromo ?? "");
     setClients(hydrateClients(contract.clients ?? [], optionalString(contract.categorieClientId)));
@@ -172,12 +176,19 @@ export default function AssistanceAutomobileCreationPage() {
     retry: false,
   });
 
+  useEffect(() => {
+    if (!echeanceCode && quote.data?.dateEcheance) {
+      setEcheanceCode(toEcheanceCode(dayAfter(quote.data.dateEcheance)));
+    }
+  }, [echeanceCode, quote.data?.dateEcheance]);
+
   const save = useMutation({
     mutationFn: () => {
       const request = buildRequest({
         compagnieId,
         produitId,
         dateEffet,
+        echeanceCode: echeanceCode!,
         dureeMois,
         numeroContrat,
         codePromo,
@@ -267,7 +278,7 @@ export default function AssistanceAutomobileCreationPage() {
   };
 
   const canSubmit = Boolean(
-    compagnieId && produitId && numeroContrat.trim() && dateEffet && dureeMois
+    compagnieId && produitId && numeroContrat.trim() && dateEffet && isValidEcheance(echeanceCode) && dureeMois
     && subscriber && insured && validClient(subscriber, false) && validClient(insured, false) && categorieClientId
     && validVehicle(vehicule, Boolean(selectedUsage?.byCategorieTransport))
     && validatedSections.souscripteur && validatedSections.proprietaire && validatedSections.vehicule
@@ -351,6 +362,7 @@ export default function AssistanceAutomobileCreationPage() {
               onValueChange={(value) => {
                 setProduitId(value);
                 setDureeMois("");
+                setEcheanceCode(undefined);
               }}
               disabled={!categorieClientId || !vehicule.usageId || products.isLoading}
             >
@@ -376,12 +388,31 @@ export default function AssistanceAutomobileCreationPage() {
             <Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} />
           </Field>
           <Field label="Durée" required>
-            <Select value={dureeMois} onValueChange={setDureeMois} disabled={durationOptions.length === 0}>
+            <Select
+              value={dureeMois}
+              onValueChange={(value) => {
+                setDureeMois(value);
+                setEcheanceCode(undefined);
+              }}
+              disabled={durationOptions.length === 0}
+            >
               <SelectTrigger><SelectValue placeholder="Choisir une durée" /></SelectTrigger>
               <SelectContent>{durationOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Date d’effet" required><DatePicker date={dateEffet} onSelect={(date) => setDateEffet(toDateOnly(date) ?? "")} /></Field>
+          <Field label="Date d’effet" required>
+            <DatePicker
+              date={dateEffet}
+              onSelect={(date) => {
+                const nextDate = toDateOnly(date) ?? "";
+                setDateEffet(nextDate);
+                setEcheanceCode(undefined);
+              }}
+            />
+          </Field>
+          <Field label="Échéance" required>
+            <EcheanceInput value={echeanceCode} onValueChange={setEcheanceCode} />
+          </Field>
           <Field label="Date d’expiration"><Input readOnly value={quote.data?.dateEcheance ? formatDate(quote.data.dateEcheance) : "-"} /></Field>
           <Field label="Code promo"><Input value={codePromo} onChange={(event) => setCodePromo(event.target.value)} /></Field>
           <Field label="Payeur" required>
@@ -541,12 +572,12 @@ function hydrateVehicle(vehicle?: NonNullable<ContratSummary["vehicules"]>[numbe
 }
 
 function buildRequest(input: {
-  compagnieId: string; produitId: string; dateEffet: string; dureeMois: string; numeroContrat: string; codePromo: string;
+  compagnieId: string; produitId: string; dateEffet: string; echeanceCode: string; dureeMois: string; numeroContrat: string; codePromo: string;
   subscriber: ClientInput; insured: ClientInput; sameInsured: boolean; assurePayeur: boolean; vehicule: VehiculeInput;
 }): CreateAssistanceAutomobileRequest {
   return {
     compagnieAssistanceId: input.compagnieId, produitAssistanceId: input.produitId,
-    categorieClientId: input.insured.client.categorieClientId!, dateEffet: input.dateEffet,
+    categorieClientId: input.insured.client.categorieClientId!, dateEffet: input.dateEffet, echeanceCode: input.echeanceCode,
     dureeMois: Number(input.dureeMois), numeroContrat: input.numeroContrat.trim(), codePromo: input.codePromo.trim() || undefined,
     souscripteur: personRequest(input.subscriber), assure: input.sameInsured ? undefined : personRequest(input.insured),
     assureIdentiqueSouscripteur: input.sameInsured, assurePayeur: !input.sameInsured && input.assurePayeur,
@@ -622,6 +653,12 @@ function money(value: number) {
 function formatDate(value: string) {
   const [year, month, day] = value.split("-");
   return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function toEcheanceCode(value?: string | null) {
+  if (!value) return undefined;
+  const [, month, day] = value.split("-");
+  return day && month ? `${day}/${month}` : undefined;
 }
 
 function dayAfter(value?: string | null) {

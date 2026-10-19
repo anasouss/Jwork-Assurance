@@ -420,7 +420,7 @@ export function ContratFormLayout({
           <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Production</div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight">
-              {form.renewalMode ? "Modifier le pré-terme" : form.prospectionMode ? "Ajouter devis" : "Ajouter dossier"}
+              {form.renewalMode ? "Modifier le brouillon de renouvellement" : form.prospectionMode ? "Ajouter devis" : "Ajouter dossier"}
             </h1>
             {form.renewalMode ? (
               <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800">
@@ -514,7 +514,7 @@ export function ContratFormLayout({
           {form.createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
           {form.createMutation.isPending
             ? form.correctionMode ? "Enregistrement..." : form.renewalMode ? "Enregistrement..." : "Création..."
-            : form.correctionMode ? "Enregistrer" : form.renewalMode ? "Enregistrer le pré-terme" : form.prospectionMode ? "Créer devis" : "Créer contrat"}
+            : form.correctionMode ? "Enregistrer" : form.renewalMode ? "Enregistrer le brouillon" : form.prospectionMode ? "Créer devis" : "Créer contrat"}
         </Button>
       </div>
 

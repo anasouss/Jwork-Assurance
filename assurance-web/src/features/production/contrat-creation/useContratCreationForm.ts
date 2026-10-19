@@ -596,7 +596,7 @@ export function useContratCreationForm(
         return;
       }
       if (options?.renewalMode) {
-        toast.success("Pré-terme enregistré");
+        toast.success("Brouillon de renouvellement enregistré");
         navigate(renewalReturnPath(searchParams.get("returnTo")));
         return;
       }
@@ -610,7 +610,7 @@ export function useContratCreationForm(
       toast.error(error instanceof Error
       ? error.message
       : options?.renewalMode
-        ? "Enregistrement du pré-terme impossible"
+        ? "Enregistrement du brouillon de renouvellement impossible"
         : correctionMode
           ? "Modification impossible"
           : "Création impossible");

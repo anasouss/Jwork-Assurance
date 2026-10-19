@@ -960,8 +960,8 @@ function movementStatusRank(statut?: string | null) {
 function dossierNumber(contrat: ContratListItem) {
   if (contrat.contratOrigineId && contrat.brouillon) {
     return contrat.contratOrigineNumeroDossier
-      ? `Pré-terme · ${contrat.contratOrigineNumeroDossier}`
-      : `Pré-terme #${contrat.id}`;
+      ? `Brouillon · ${contrat.contratOrigineNumeroDossier}`
+      : `Brouillon #${contrat.id}`;
   }
   return contrat.numeroDossier ?? contrat.numeroContrat ?? contrat.numeroPolice ?? `#${contrat.id}`;
 }
@@ -1018,7 +1018,7 @@ function conventionLabel(contrat: ContratListItem) {
 }
 
 function eventLabel(contrat: ContratListItem, movement: MovementLine) {
-  if (contrat.contratOrigineId && movement.isSynthetic) return "Renouvellement";
+  if (contrat.contratOrigineId && movement.isSynthetic) return "Renouvellement en préparation";
   if (movement.libelle) return titleCaseMovement(movement.libelle);
   if (contrat.contratOrigineId) return "Renouvellement";
   return "Affaire nouvelle";

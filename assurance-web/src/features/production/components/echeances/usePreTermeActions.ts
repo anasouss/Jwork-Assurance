@@ -16,7 +16,7 @@ export function usePreTermeActions() {
   const prepareMutation = useMutation({
     mutationFn: (contratId: string) => contractApi.createRenouvellementDraft(contratId, "CABINET"),
     onSuccess: (draft) => navigate(renewalDraftPath(draft, `${location.pathname}${location.search}`)),
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Création du pré-terme impossible"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Création du brouillon de renouvellement impossible"),
   });
 
   const finalizeMutation = useMutation({

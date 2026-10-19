@@ -58,8 +58,8 @@ export function PreTermePdfDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Éditer le pré-terme</DialogTitle>
-          <DialogDescription>Le document utilise la dernière version enregistrée du brouillon.</DialogDescription>
+          <DialogTitle>Générer le pré-terme</DialogTitle>
+          <DialogDescription>Le document utilise la dernière version enregistrée du brouillon de renouvellement.</DialogDescription>
         </DialogHeader>
         <RadioGroup value={avecPrime ? "WITH" : "WITHOUT"} onValueChange={(value) => setAvecPrime(value === "WITH")}>
           <RadioChoice value="WITHOUT" label="Sans prime" />
@@ -103,7 +103,7 @@ export function FinalizeRenewalDialog({
         <DialogHeader>
           <DialogTitle>Renouveler le contrat</DialogTitle>
           <DialogDescription>
-            Le renouvellement sera créé à partir du pré-terme enregistré. Cette opération consomme le stock requis et ne peut pas être annulée depuis ce formulaire.
+            Le renouvellement sera créé à partir du brouillon enregistré. Cette opération consomme le stock requis et ne peut pas être annulée depuis ce formulaire.
           </DialogDescription>
         </DialogHeader>
         {companyTermEligible ? (

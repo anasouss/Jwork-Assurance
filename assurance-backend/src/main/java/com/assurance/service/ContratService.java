@@ -195,7 +195,7 @@ public class ContratService {
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", draftId));
         Contrat sourceReference = draftReference.getContratOrigine();
         if (sourceReference == null) {
-            throw new BadRequestException("Ce brouillon n'est pas un pré-terme");
+            throw new BadRequestException("Ce contrat n'est pas un brouillon de renouvellement");
         }
         Contrat source = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, sourceReference.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", sourceReference.getId()));
@@ -208,7 +208,7 @@ public class ContratService {
             return toResponse(draft);
         }
         if (draft.getStatut() != StatutContrat.DRAFT || !Boolean.TRUE.equals(draft.getBrouillon())) {
-            throw new BadRequestException("Le pré-terme a déjà été finalisé ou n'est plus modifiable");
+            throw new BadRequestException("Le brouillon de renouvellement a déjà été finalisé ou n'est plus modifiable");
         }
 
         ModeTermeRenouvellement resolvedMode = modeTerme == null
@@ -238,22 +238,22 @@ public class ContratService {
 
     private void validatePersistedRenewalDraft(Contrat draft) {
         if (draft.getCompagnieAssurance() == null) {
-            throw new BadRequestException("La compagnie est obligatoire dans le pré-terme");
+            throw new BadRequestException("La compagnie est obligatoire dans le brouillon de renouvellement");
         }
         if (draft.getDateEffet() == null || draft.getDateEcheance() == null) {
-            throw new BadRequestException("La période du pré-terme est incomplète");
+            throw new BadRequestException("La période du brouillon de renouvellement est incomplète");
         }
         if (draft.getDateEffet().isAfter(draft.getDateEcheance())) {
-            throw new BadRequestException("La période du pré-terme est invalide");
+            throw new BadRequestException("La période du brouillon de renouvellement est invalide");
         }
         if (draft.getClients() == null || draft.getClients().isEmpty()) {
-            throw new BadRequestException("Le pré-terme doit contenir au moins un client");
+            throw new BadRequestException("Le brouillon de renouvellement doit contenir au moins un client");
         }
         if (activeVehicules(draft).isEmpty()) {
-            throw new BadRequestException("Le pré-terme doit contenir au moins un véhicule");
+            throw new BadRequestException("Le brouillon de renouvellement doit contenir au moins un véhicule");
         }
         if (activeGaranties(draft).isEmpty()) {
-            throw new BadRequestException("Le pré-terme doit contenir au moins une garantie");
+            throw new BadRequestException("Le brouillon de renouvellement doit contenir au moins une garantie");
         }
     }
 

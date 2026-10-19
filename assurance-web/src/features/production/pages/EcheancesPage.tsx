@@ -550,11 +550,11 @@ function EcheanceTableRow({
               <>
                 <DropdownMenuItem onSelect={onEditPreTerme} disabled={preparing}>
                   <FilePenLine className="size-4" />
-                  Modifier pré-terme
+                  {row.preTermeDraftId ? "Modifier le brouillon" : "Préparer le renouvellement"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onPdf} disabled={!row.preTermeDraftId}>
                   <FileText className="size-4" />
-                  Éditer pré-terme
+                  Générer le pré-terme
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onRenew} disabled={!row.preTermeDraftId}>
                   <RefreshCw className="size-4" />

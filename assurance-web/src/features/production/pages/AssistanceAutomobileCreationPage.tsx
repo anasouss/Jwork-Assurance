@@ -30,6 +30,7 @@ import type {
 } from "../types";
 
 const today = new Date().toISOString().slice(0, 10);
+type AssistanceSection = "souscripteur" | "proprietaire" | "vehicule" | "contrat";
 
 export default function AssistanceAutomobileCreationPage() {
   const navigate = useNavigate();
@@ -49,6 +50,7 @@ export default function AssistanceAutomobileCreationPage() {
   const [codePromo, setCodePromo] = useState("");
   const [assurePayeur, setAssurePayeur] = useState(false);
   const [openSection, setOpenSection] = useState<ContratSectionKey>("souscripteur");
+  const [validatedSections, setValidatedSections] = useState<Partial<Record<AssistanceSection, boolean>>>({});
   const hydratedRef = useRef<string | null>(null);
 
   const existingContract = useQuery({
@@ -148,7 +150,7 @@ export default function AssistanceAutomobileCreationPage() {
       : assistance.dateEffet ?? contract.dateEffet ?? today);
     setDureeMois(String(assistance.duree ?? ""));
     setCodePromo(renewing ? "" : assistance.codePromo ?? "");
-    setClients(hydrateClients(contract.clients ?? []));
+    setClients(hydrateClients(contract.clients ?? [], optionalString(contract.categorieClientId)));
     setVehicule(hydrateVehicle(contract.vehicules?.[0]));
     const insuredLink = contract.clients?.find((link) => link.role === "PROPRIETAIRE");
     setAssurePayeur(Boolean(contract.payeurPrimeClientId && contract.payeurPrimeClientId === insuredLink?.clientId));
@@ -203,10 +205,72 @@ export default function AssistanceAutomobileCreationPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
 
+  const invalidateFrom = (section: AssistanceSection) => {
+    const order: AssistanceSection[] = ["souscripteur", "proprietaire", "vehicule", "contrat"];
+    const sectionIndex = order.indexOf(section);
+    setValidatedSections((current) => {
+      const next = { ...current };
+      order.slice(sectionIndex).forEach((key) => delete next[key]);
+      return next;
+    });
+  };
+
+  const updateClients = (next: ClientInput[]) => {
+    setClients(next);
+    invalidateFrom(openSection === "souscripteur" ? "souscripteur" : "proprietaire");
+  };
+
+  const updateVehicle = (next: VehiculeInput) => {
+    setVehicule(next);
+    invalidateFrom("vehicule");
+  };
+
+  const updateInsuredCategory = (value: string) => {
+    setClients((current) => current.map((item) => {
+      const sharedPerson = sameInsured && item.role === "SOUSCRIPTEUR";
+      if (item.role !== "PROPRIETAIRE" && !sharedPerson) return item;
+      return { ...item, client: { ...item.client, categorieClientId: value } };
+    }));
+    setVehicule((current) => ({ ...current, usageId: undefined, categorieTransportId: undefined }));
+    setProduitId("");
+    setDureeMois("");
+    invalidateFrom("vehicule");
+  };
+
+  const validateAndContinue = (section: Exclude<AssistanceSection, "contrat">) => {
+    const valid = section === "souscripteur"
+      ? Boolean(subscriber && validClient(subscriber, false))
+      : section === "proprietaire"
+        ? Boolean(insured && validClient(insured, false))
+        : Boolean(categorieClientId && validVehicle(vehicule, Boolean(selectedUsage?.byCategorieTransport)));
+    if (!valid) {
+      toast.error(section === "vehicule"
+        ? "Complétez les informations obligatoires du véhicule."
+        : `Complétez les informations obligatoires de ${section === "souscripteur" ? "souscription" : "l’assuré"}.`);
+      return;
+    }
+    setValidatedSections((current) => ({ ...current, [section]: true }));
+    setOpenSection(section === "souscripteur" ? "proprietaire" : section === "proprietaire" ? "vehicule" : "contrat");
+  };
+
+  const handleSectionOpenChange = (section: AssistanceSection, open: boolean) => {
+    if (!open) return;
+    const order: AssistanceSection[] = ["souscripteur", "proprietaire", "vehicule", "contrat"];
+    const targetIndex = order.indexOf(section);
+    const firstIncomplete = order.slice(0, targetIndex).find((item) => !validatedSections[item]);
+    if (firstIncomplete) {
+      setOpenSection(firstIncomplete);
+      toast.error("Validez la section en cours avant de continuer.");
+      return;
+    }
+    setOpenSection(section);
+  };
+
   const canSubmit = Boolean(
     compagnieId && produitId && numeroContrat.trim() && dateEffet && dureeMois
-    && subscriber && insured && validClient(subscriber) && validClient(insured)
+    && subscriber && insured && validClient(subscriber, false) && validClient(insured, false) && categorieClientId
     && validVehicle(vehicule, Boolean(selectedUsage?.byCategorieTransport))
+    && validatedSections.souscripteur && validatedSections.proprietaire && validatedSections.vehicule
     && quote.isSuccess,
   );
 
@@ -240,30 +304,36 @@ export default function AssistanceAutomobileCreationPage() {
 
       <ClientSection
         clients={clients}
-        setClients={setClients}
+        setClients={updateClients}
         villes={cities.data ?? []}
-        categoriesClient={availableCategories}
         groupesClients={groups.data ?? []}
-        showProprietaireCategorie
         requireDriverDetails={false}
         requireDriverPermitValidity={false}
         secondaryTitle="Assuré"
         secondaryIdentityLabel="Identité de l’assuré"
         sameAsSubscriberLabel="L’assuré est le souscripteur"
+        onSaveSection={validateAndContinue}
+        savedSections={validatedSections}
+        saveActionLabel="Valider et continuer"
         openSection={openSection}
-        onSectionOpenChange={(section, open) => open && setOpenSection(section)}
+        onSectionOpenChange={(section, open) => handleSectionOpenChange(section as AssistanceSection, open)}
       />
 
       <VehicleSection
         vehicle={vehicule}
-        setVehicle={setVehicule}
+        setVehicle={updateVehicle}
+        categorieClientId={categorieClientId}
+        categoriesClient={availableCategories}
+        onCategoryChange={updateInsuredCategory}
         usages={availableUsages}
         marques={marques.data ?? []}
         carrosseries={carrosseries.data ?? []}
         categoriesTransport={transportCategories.data ?? []}
         needsTransportCategory={Boolean(selectedUsage?.byCategorieTransport)}
+        validated={Boolean(validatedSections.vehicule)}
+        onContinue={() => validateAndContinue("vehicule")}
         open={openSection === "vehicule"}
-        onOpenChange={(open) => open && setOpenSection("vehicule")}
+        onOpenChange={(open) => handleSectionOpenChange("vehicule", open)}
       />
 
       <SectionCard
@@ -271,7 +341,7 @@ export default function AssistanceAutomobileCreationPage() {
         badge={quote.isSuccess ? "Tarif calculé" : "À compléter"}
         tone="production"
         open={openSection === "contrat"}
-        onOpenChange={(open) => open && setOpenSection("contrat")}
+        onOpenChange={(open) => handleSectionOpenChange("contrat", open)}
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Compagnie d’assistance" required><Input readOnly value={selectedCompany?.libelle ?? ""} /></Field>
@@ -332,20 +402,19 @@ export default function AssistanceAutomobileCreationPage() {
             <Summary label="TTC" value={money(quote.data.primeTotale)} strong />
           </div>
         ) : null}
+        <div className="mt-4 flex justify-end border-t pt-4">
+          <Button disabled={!canSubmit || save.isPending} onClick={() => save.mutate()}>
+            {save.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {save.isPending
+              ? "Enregistrement..."
+              : renewing
+                ? "Renouveler l’assistance"
+                : editing
+                  ? "Enregistrer les modifications"
+                  : "Créer le dossier"}
+          </Button>
+        </div>
       </SectionCard>
-
-      <div className="flex justify-end">
-        <Button disabled={!canSubmit || save.isPending} onClick={() => save.mutate()}>
-          {save.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          {save.isPending
-            ? "Enregistrement..."
-            : renewing
-              ? "Renouveler l’assistance"
-              : editing
-                ? "Enregistrer les modifications"
-                : "Créer le dossier"}
-        </Button>
-      </div>
     </div>
   );
 }
@@ -353,11 +422,16 @@ export default function AssistanceAutomobileCreationPage() {
 function VehicleSection(props: {
   vehicle: VehiculeInput;
   setVehicle: (vehicle: VehiculeInput) => void;
+  categorieClientId: string;
+  categoriesClient: ReferenceOption[];
+  onCategoryChange: (value: string) => void;
   usages: ReferenceOption[];
   marques: ReferenceOption[];
   carrosseries: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
   needsTransportCategory: boolean;
+  validated: boolean;
+  onContinue: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -372,20 +446,21 @@ function VehicleSection(props: {
     categorieTransportId: found.categorieTransportId ? String(found.categorieTransportId) : undefined,
     datePremiereCirculation: found.datePremiereCirculation ?? undefined,
     dateExpirationCarteGrise: found.dateExpirationCarteGrise ?? undefined,
-    nombrePlaces: found.nombrePlaces ?? undefined,
   });
   return (
-    <SectionCard title="Véhicule assuré" badge="Obligatoire" tone="production" open={props.open} onOpenChange={props.onOpenChange}>
+    <SectionCard title="Véhicule assuré" badge={props.validated ? "Validé" : "Obligatoire"} tone="production" open={props.open} onOpenChange={props.onOpenChange}>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Type de véhicule" required>
-          <Select value={props.vehicle.typeVehicule} onValueChange={(value) => update({ typeVehicule: value as VehiculeInput["typeVehicule"] })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="AUTOMOBILE">Automobile</SelectItem><SelectItem value="CAMION">Camion</SelectItem>
-              <SelectItem value="MOTO">Moto</SelectItem><SelectItem value="BUS">Bus</SelectItem>
-              <SelectItem value="TRACTEUR">Tracteur</SelectItem><SelectItem value="AUTRE">Autre</SelectItem>
-            </SelectContent>
-          </Select>
+        <Field label="Catégorie client" required>
+          <AutocompleteSelect
+            value={props.categorieClientId}
+            placeholder="Choisir une catégorie"
+            emptyText="Aucune catégorie disponible"
+            options={props.categoriesClient.map((item) => ({
+              value: item.id,
+              label: item.code ? `${item.code} - ${item.libelle}` : item.libelle,
+            }))}
+            onValueChange={props.onCategoryChange}
+          />
         </Field>
         <Field label="Usage" required>
           <AutocompleteSelect value={props.vehicle.usageId ?? ""} placeholder="Choisir un usage" emptyText="Aucun usage compatible"
@@ -401,7 +476,7 @@ function VehicleSection(props: {
             onValueChange={(value) => update({ marqueId: value || undefined, marqueLibelle: undefined })}
             onCustomValueChange={(value) => update({ marqueId: undefined, marqueLibelle: value })} />
         </Field>
-        <Field label="Carrosserie" required>
+        <Field label="Carrosserie">
           <AutocompleteSelect value={props.vehicle.carrosserieId ?? ""} customValue={props.vehicle.carrosserieLibelle} allowCustomValue placeholder="Carrosserie" emptyText="Aucune carrosserie trouvée"
             options={props.carrosseries.map((item) => ({ value: item.id, label: item.libelle }))}
             onValueChange={(value) => update({ carrosserieId: value || undefined, carrosserieLibelle: undefined })}
@@ -417,7 +492,12 @@ function VehicleSection(props: {
         ) : null}
         <Field label="Mise en circulation"><DatePicker date={props.vehicle.datePremiereCirculation} onSelect={(date) => update({ datePremiereCirculation: toDateOnly(date) })} /></Field>
         <Field label="Validité de la carte grise" required><DatePicker date={props.vehicle.dateExpirationCarteGrise} onSelect={(date) => update({ dateExpirationCarteGrise: toDateOnly(date) })} /></Field>
-        <Field label="Nombre de places" required><Input value={props.vehicle.nombrePlaces ?? ""} onChange={(event) => update({ nombrePlaces: event.target.value })} /></Field>
+      </div>
+      <div className="mt-4 flex justify-end border-t pt-3">
+        <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={props.onContinue}>
+          <Save className="size-4" />
+          Valider et continuer
+        </Button>
       </div>
     </SectionCard>
   );
@@ -431,7 +511,10 @@ function initialClients() {
   return [subscriber, insured];
 }
 
-function hydrateClients(links: Array<{ clientId: string; role: string; principalPourRole: boolean; client?: ClientInput["client"] }>) {
+function hydrateClients(
+  links: Array<{ clientId: string; role: string; principalPourRole: boolean; client?: ClientInput["client"] }>,
+  contractCategoryId?: string,
+) {
   const result = links.filter((link) => link.role === "SOUSCRIPTEUR" || link.role === "PROPRIETAIRE").map((link) => ({
     clientId: link.clientId,
     role: link.role as ClientInput["role"],
@@ -440,6 +523,7 @@ function hydrateClients(links: Array<{ clientId: string; role: string; principal
   }));
   const subscriber = result.find((item) => item.role === "SOUSCRIPTEUR") ?? emptyClient("SOUSCRIPTEUR");
   let insured = result.find((item) => item.role === "PROPRIETAIRE") ?? emptyClient("PROPRIETAIRE");
+  insured = { ...insured, client: { ...insured.client, categorieClientId: insured.client.categorieClientId ?? contractCategoryId } };
   if (subscriber.clientId && subscriber.clientId === insured.clientId) insured = { ...insured, sameAsRole: "SOUSCRIPTEUR" };
   return [subscriber, insured];
 }
@@ -461,7 +545,8 @@ function buildRequest(input: {
   subscriber: ClientInput; insured: ClientInput; sameInsured: boolean; assurePayeur: boolean; vehicule: VehiculeInput;
 }): CreateAssistanceAutomobileRequest {
   return {
-    compagnieAssistanceId: input.compagnieId, produitAssistanceId: input.produitId, dateEffet: input.dateEffet,
+    compagnieAssistanceId: input.compagnieId, produitAssistanceId: input.produitId,
+    categorieClientId: input.insured.client.categorieClientId!, dateEffet: input.dateEffet,
     dureeMois: Number(input.dureeMois), numeroContrat: input.numeroContrat.trim(), codePromo: input.codePromo.trim() || undefined,
     souscripteur: personRequest(input.subscriber), assure: input.sameInsured ? undefined : personRequest(input.insured),
     assureIdentiqueSouscripteur: input.sameInsured, assurePayeur: !input.sameInsured && input.assurePayeur,
@@ -470,7 +555,8 @@ function buildRequest(input: {
       marqueLibelle: input.vehicule.marqueLibelle, carrosserieId: input.vehicule.carrosserieId,
       carrosserieLibelle: input.vehicule.carrosserieLibelle, categorieTransportId: input.vehicule.categorieTransportId,
       immatriculation: input.vehicule.immatriculation!.trim(), datePremiereCirculation: input.vehicule.datePremiereCirculation,
-      dateExpirationCarteGrise: input.vehicule.dateExpirationCarteGrise!, nombrePlaces: input.vehicule.nombrePlaces!.trim(),
+      dateExpirationCarteGrise: input.vehicule.dateExpirationCarteGrise!,
+      nombrePlaces: input.vehicule.nombrePlaces?.trim() || undefined,
     },
   };
 }
@@ -479,19 +565,19 @@ function personRequest(input: ClientInput) {
   return input.clientId ? { clientId: input.clientId } : { client: input.client };
 }
 
-function validClient(input: ClientInput) {
-  if (input.clientId) return Boolean(input.client.categorieClientId || input.role === "SOUSCRIPTEUR");
+function validClient(input: ClientInput, requireCategory = true) {
+  if (input.clientId) return Boolean(!requireCategory || input.client.categorieClientId || input.role === "SOUSCRIPTEUR");
   const common = Boolean(input.client.adresse && input.client.villeId && input.client.telephone);
   return input.client.typeClient === "PERSONNE_MORALE"
-    ? common && Boolean(input.client.raisonSociale && input.client.rc && (input.role !== "PROPRIETAIRE" || input.client.categorieClientId))
+    ? common && Boolean(input.client.raisonSociale && input.client.rc
+      && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId))
     : common && Boolean(input.client.prenom && input.client.nom && (input.client.cin || input.client.passport) && input.client.dateNaissance
-      && input.client.nationalite && (input.role !== "PROPRIETAIRE" || input.client.categorieClientId));
+      && input.client.nationalite && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId));
 }
 
 function validVehicle(vehicle: VehiculeInput, categoryRequired: boolean) {
   return Boolean(vehicle.usageId && vehicle.immatriculation?.trim() && (vehicle.marqueId || vehicle.marqueLibelle?.trim())
-    && (vehicle.carrosserieId || vehicle.carrosserieLibelle?.trim()) && vehicle.dateExpirationCarteGrise
-    && vehicle.nombrePlaces?.trim() && (!categoryRequired || vehicle.categorieTransportId));
+    && vehicle.dateExpirationCarteGrise && (!categoryRequired || vehicle.categorieTransportId));
 }
 
 function assistanceDurationOptions(tariffs: ReferenceOption[], effectiveDate: string) {

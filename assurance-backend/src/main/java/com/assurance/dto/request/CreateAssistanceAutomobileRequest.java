@@ -19,6 +19,9 @@ public class CreateAssistanceAutomobileRequest {
     private Long produitAssistanceId;
 
     @NotNull
+    private Long categorieClientId;
+
+    @NotNull
     private LocalDate dateEffet;
 
     @NotNull
@@ -75,7 +78,6 @@ public class CreateAssistanceAutomobileRequest {
         @NotNull
         private LocalDate dateExpirationCarteGrise;
 
-        @NotBlank
         private String nombrePlaces;
     }
 }

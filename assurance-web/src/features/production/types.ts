@@ -520,12 +520,13 @@ export type AssistanceAutomobileVehicleRequest = {
   immatriculation: string;
   datePremiereCirculation?: string;
   dateExpirationCarteGrise: string;
-  nombrePlaces: string;
+  nombrePlaces?: string;
 };
 
 export type CreateAssistanceAutomobileRequest = {
   compagnieAssistanceId: string;
   produitAssistanceId: string;
+  categorieClientId: string;
   dateEffet: string;
   dureeMois: number;
   numeroContrat: string;

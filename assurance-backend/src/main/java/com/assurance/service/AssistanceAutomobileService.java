@@ -145,7 +145,7 @@ public class AssistanceAutomobileService {
         Client assure = Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur())
                 ? souscripteur
                 : resolvePerson(agenceId, request.getAssure(), "assuré");
-        CategorieClient categorie = requireInsuredCategory(assure);
+        CategorieClient categorie = requireCategory(request.getCategorieClientId());
         Usage usage = requireUsage(request.getVehicule().getUsageId());
         validateEligibility(produit, categorie, usage);
         validateVehicle(request.getVehicule(), request.getDateEffet(), categorie, usage);
@@ -231,7 +231,7 @@ public class AssistanceAutomobileService {
         Client assure = Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur())
                 ? souscripteur
                 : resolvePerson(agenceId, request.getAssure(), "assuré");
-        CategorieClient categorie = requireInsuredCategory(assure);
+        CategorieClient categorie = requireCategory(request.getCategorieClientId());
         Usage usage = requireUsage(request.getVehicule().getUsageId());
         validateEligibility(produit, categorie, usage);
         validateVehicle(request.getVehicule(), request.getDateEffet(), categorie, usage);
@@ -317,9 +317,6 @@ public class AssistanceAutomobileService {
         if (input.getMarqueId() == null && !hasText(input.getMarqueLibelle())) {
             throw new BadRequestException("Marque du véhicule obligatoire");
         }
-        if (input.getCarrosserieId() == null && !hasText(input.getCarrosserieLibelle())) {
-            throw new BadRequestException("Carrosserie du véhicule obligatoire");
-        }
         if (input.getDateExpirationCarteGrise().isBefore(dateEffet)) {
             throw new BadRequestException("La carte grise doit être valide à la date d'effet");
         }
@@ -353,7 +350,7 @@ public class AssistanceAutomobileService {
         vehicule.setImmatriculation(input.getImmatriculation().trim());
         vehicule.setDatePremiereCirculation(input.getDatePremiereCirculation());
         vehicule.setDateExpirationCarteGrise(input.getDateExpirationCarteGrise());
-        vehicule.setNombrePlaces(input.getNombrePlaces().trim());
+        vehicule.setNombrePlaces(hasText(input.getNombrePlaces()) ? input.getNombrePlaces().trim() : null);
         vehicule.setDateEffet(contrat.getDateEffet());
         vehicule.setDateEcheance(dateEcheance);
         vehicule.setActif(true);
@@ -587,13 +584,6 @@ public class AssistanceAutomobileService {
                 .orElseThrow(() -> new BadRequestException("Catégorie client inactive ou introuvable"));
     }
 
-    private CategorieClient requireInsuredCategory(Client assure) {
-        if (assure.getCategorieClient() == null) {
-            throw new BadRequestException("La catégorie de l'assuré est obligatoire");
-        }
-        return requireCategory(assure.getCategorieClient().getId());
-    }
-
     private Usage requireUsage(Long id) {
         return usageRepository.findById(id)
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
@@ -617,7 +607,10 @@ public class AssistanceAutomobileService {
                     .filter(item -> Boolean.TRUE.equals(item.getActif()))
                     .orElseThrow(() -> new BadRequestException("Carrosserie inactive ou introuvable"));
         }
-        String label = customLabel == null ? "" : customLabel.trim();
+        if (!hasText(customLabel)) {
+            return null;
+        }
+        String label = customLabel.trim();
         return carrosserieRepository.findByLibelleIgnoreCase(label)
                 .orElseGet(() -> carrosserieRepository.save(Carrosserie.builder().libelle(label).actif(true).build()));
     }

@@ -53,6 +53,7 @@ export function ClientSection({
   onSaveSection,
   savedSections = {},
   saving = false,
+  saveActionLabel,
   openSection,
   onSectionOpenChange,
 }: {
@@ -73,6 +74,7 @@ export function ClientSection({
   onSaveSection?: (section: "souscripteur" | "proprietaire") => void;
   savedSections?: Partial<Record<"souscripteur" | "proprietaire", boolean>>;
   saving?: boolean;
+  saveActionLabel?: string;
   openSection?: ContratSectionKey;
   onSectionOpenChange?: (section: ContratSectionKey, open: boolean) => void;
 }) {
@@ -306,7 +308,7 @@ export function ClientSection({
       setClients(
         clients.map((client) =>
           client.role === "PROPRIETAIRE"
-            ? { ...client, clientId: undefined, sameAsRole: undefined }
+            ? emptyClient("PROPRIETAIRE")
             : client
         )
       );
@@ -693,7 +695,7 @@ export function ClientSection({
         {renderClients(["SOUSCRIPTEUR"])}
         {onSaveSection ? (
           <div className="mt-4 flex justify-end border-t pt-3">
-            <SaveSectionButton saving={saving} onClick={() => onSaveSection("souscripteur")} />
+            <SaveSectionButton saving={saving} label={saveActionLabel} onClick={() => onSaveSection("souscripteur")} />
           </div>
         ) : null}
       </SectionCard>
@@ -709,7 +711,7 @@ export function ClientSection({
         {renderClients(["PROPRIETAIRE"])}
         {onSaveSection ? (
           <div className="mt-4 flex justify-end border-t pt-3">
-            <SaveSectionButton saving={saving} onClick={() => onSaveSection("proprietaire")} />
+            <SaveSectionButton saving={saving} label={saveActionLabel} onClick={() => onSaveSection("proprietaire")} />
           </div>
         ) : null}
       </SectionCard>
@@ -745,11 +747,11 @@ function formatGroupContext(groupe?: GroupeClient) {
   return `${treasury} · ${billing}`;
 }
 
-function SaveSectionButton({ saving, onClick }: { saving?: boolean; onClick: () => void }) {
+function SaveSectionButton({ saving, label, onClick }: { saving?: boolean; label?: string; onClick: () => void }) {
   return (
     <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={saving} onClick={onClick}>
       {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-      {saving ? "Enregistrement..." : "Enregistrer"}
+      {saving ? "Enregistrement..." : label ?? "Enregistrer"}
     </Button>
   );
 }

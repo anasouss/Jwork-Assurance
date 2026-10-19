@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -50,7 +50,9 @@ export default function AssistanceAutomobileCreationPage() {
   const [echeanceCode, setEcheanceCode] = useState<string | undefined>();
   const [dureeMois, setDureeMois] = useState("");
   const [codePromo, setCodePromo] = useState("");
-  const [assurePayeur, setAssurePayeur] = useState(false);
+  const [typePayeurPrime, setTypePayeurPrime] = useState<"SOUSCRIPTEUR" | "TIERS_MANDATE">("SOUSCRIPTEUR");
+  const [payeurPrimeClientId, setPayeurPrimeClientId] = useState("");
+  const [payerSearch, setPayerSearch] = useState("");
   const [openSection, setOpenSection] = useState<ContratSectionKey>("souscripteur");
   const [validatedSections, setValidatedSections] = useState<Partial<Record<AssistanceSection, boolean>>>({});
   const hydratedRef = useRef<string | null>(null);
@@ -71,6 +73,13 @@ export default function AssistanceAutomobileCreationPage() {
     queryKey: ["groupes-clients"],
     queryFn: clientApi.listGroupesClients,
     staleTime: 60_000,
+  });
+  const deferredPayerSearch = useDeferredValue(payerSearch.trim());
+  const payerClients = useQuery({
+    queryKey: ["clients", "assistance-payer-search", deferredPayerSearch],
+    queryFn: () => clientApi.listClients({ query: deferredPayerSearch, size: 25 }),
+    enabled: typePayeurPrime === "TIERS_MANDATE" && deferredPayerSearch.length >= 2,
+    staleTime: 30_000,
   });
   const selectedCompany = (companies.data ?? []).find((item) => item.id === compagnieId);
   const insured = clients.find((item) => item.role === "PROPRIETAIRE");
@@ -105,6 +114,30 @@ export default function AssistanceAutomobileCreationPage() {
     staleTime: 60_000,
   });
   const selectedProduct = (products.data ?? []).find((item) => item.id === produitId);
+  const payerOptions = useMemo(() => {
+    const linked = clients.filter((item) => item.clientId).map((item) => ({
+      id: item.clientId!,
+      nomAffichage: item.client.raisonSociale
+        || [item.client.prenom, item.client.nom].filter(Boolean).join(" ")
+        || item.clientId!,
+      rc: item.client.rc,
+      cin: item.client.cin,
+    }));
+    const persisted = existingContract.data?.payeurPrimeClientId && existingContract.data.payeurPrimeNom
+      ? [{
+          id: existingContract.data.payeurPrimeClientId,
+          nomAffichage: existingContract.data.payeurPrimeNom,
+          rc: undefined,
+          cin: undefined,
+        }]
+      : [];
+    const byId = new Map([...linked, ...persisted, ...(payerClients.data?.items ?? [])].map((item) => [item.id, item]));
+    return [...byId.values()].map((item) => ({
+      value: item.id,
+      label: item.nomAffichage ?? item.id,
+      keywords: [item.rc, item.cin].filter(Boolean).join(" "),
+    }));
+  }, [clients, existingContract.data?.payeurPrimeClientId, existingContract.data?.payeurPrimeNom, payerClients.data?.items]);
   const tariffs = useQuery({
     queryKey: ["referentiel", "produits-assistance", produitId, "tarifs", "automobile-contract"],
     queryFn: () => assistanceProductApi.listProductRates(produitId),
@@ -156,8 +189,9 @@ export default function AssistanceAutomobileCreationPage() {
     setCodePromo(renewing ? "" : assistance.codePromo ?? "");
     setClients(hydrateClients(contract.clients ?? [], optionalString(contract.categorieClientId)));
     setVehicule(hydrateVehicle(contract.vehicules?.[0]));
-    const insuredLink = contract.clients?.find((link) => link.role === "PROPRIETAIRE");
-    setAssurePayeur(Boolean(contract.payeurPrimeClientId && contract.payeurPrimeClientId === insuredLink?.clientId));
+    const payerType = contract.typePayeurPrime === "TIERS_MANDATE" ? "TIERS_MANDATE" : "SOUSCRIPTEUR";
+    setTypePayeurPrime(payerType);
+    setPayeurPrimeClientId(payerType === "TIERS_MANDATE" ? contract.payeurPrimeClientId ?? "" : "");
     hydratedRef.current = hydrationKey;
   }, [contratId, existingContract.data, renewing]);
 
@@ -195,7 +229,8 @@ export default function AssistanceAutomobileCreationPage() {
         subscriber: subscriber!,
         insured: insured!,
         sameInsured,
-        assurePayeur,
+        typePayeurPrime,
+        payeurPrimeClientId,
         vehicule,
       });
       if (renewing && contratId) return assistanceAutomobileApi.renew(contratId, request);
@@ -279,6 +314,7 @@ export default function AssistanceAutomobileCreationPage() {
 
   const canSubmit = Boolean(
     compagnieId && produitId && numeroContrat.trim() && dateEffet && isValidEcheance(echeanceCode) && dureeMois
+    && (typePayeurPrime !== "TIERS_MANDATE" || payeurPrimeClientId)
     && subscriber && insured && validClient(subscriber, false) && validClient(insured, false) && categorieClientId
     && validVehicle(vehicule, Boolean(selectedUsage?.byCategorieTransport))
     && validatedSections.souscripteur && validatedSections.proprietaire && validatedSections.vehicule
@@ -415,15 +451,34 @@ export default function AssistanceAutomobileCreationPage() {
           </Field>
           <Field label="Date d’expiration"><Input readOnly value={quote.data?.dateEcheance ? formatDate(quote.data.dateEcheance) : "-"} /></Field>
           <Field label="Code promo"><Input value={codePromo} onChange={(event) => setCodePromo(event.target.value)} /></Field>
-          <Field label="Payeur" required>
-            <Select value={assurePayeur ? "insured" : "subscriber"} onValueChange={(value) => setAssurePayeur(value === "insured")}>
+          <Field label="Payeur des primes" required>
+            <Select
+              value={typePayeurPrime}
+              onValueChange={(value) => {
+                setTypePayeurPrime(value as "SOUSCRIPTEUR" | "TIERS_MANDATE");
+                setPayeurPrimeClientId("");
+              }}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="subscriber">Souscripteur</SelectItem>
-                {!sameInsured ? <SelectItem value="insured">Assuré</SelectItem> : null}
+                <SelectItem value="SOUSCRIPTEUR">Lui-même</SelectItem>
+                <SelectItem value="TIERS_MANDATE">Autre personne</SelectItem>
               </SelectContent>
             </Select>
           </Field>
+          {typePayeurPrime === "TIERS_MANDATE" ? (
+            <Field label="Autre payeur" required>
+              <AutocompleteSelect
+                value={payeurPrimeClientId}
+                onValueChange={setPayeurPrimeClientId}
+                onQueryChange={setPayerSearch}
+                options={payerOptions}
+                placeholder="RC, CIN ou nom"
+                emptyText="Aucun client trouvé"
+                invalidText="Sélectionnez un client existant."
+              />
+            </Field>
+          ) : null}
         </div>
         {quote.isError ? <p className="mt-3 text-sm text-destructive">{quote.error instanceof Error ? quote.error.message : "Tarif indisponible."}</p> : null}
         {quote.data ? (
@@ -573,14 +628,16 @@ function hydrateVehicle(vehicle?: NonNullable<ContratSummary["vehicules"]>[numbe
 
 function buildRequest(input: {
   compagnieId: string; produitId: string; dateEffet: string; echeanceCode: string; dureeMois: string; numeroContrat: string; codePromo: string;
-  subscriber: ClientInput; insured: ClientInput; sameInsured: boolean; assurePayeur: boolean; vehicule: VehiculeInput;
+  subscriber: ClientInput; insured: ClientInput; sameInsured: boolean;
+  typePayeurPrime: "SOUSCRIPTEUR" | "TIERS_MANDATE"; payeurPrimeClientId: string; vehicule: VehiculeInput;
 }): CreateAssistanceAutomobileRequest {
   return {
     compagnieAssistanceId: input.compagnieId, produitAssistanceId: input.produitId,
     categorieClientId: input.insured.client.categorieClientId!, dateEffet: input.dateEffet, echeanceCode: input.echeanceCode,
     dureeMois: Number(input.dureeMois), numeroContrat: input.numeroContrat.trim(), codePromo: input.codePromo.trim() || undefined,
     souscripteur: personRequest(input.subscriber), assure: input.sameInsured ? undefined : personRequest(input.insured),
-    assureIdentiqueSouscripteur: input.sameInsured, assurePayeur: !input.sameInsured && input.assurePayeur,
+    assureIdentiqueSouscripteur: input.sameInsured, typePayeurPrime: input.typePayeurPrime,
+    payeurPrimeClientId: input.typePayeurPrime === "TIERS_MANDATE" ? input.payeurPrimeClientId : undefined,
     vehicule: {
       typeVehicule: input.vehicule.typeVehicule, usageId: input.vehicule.usageId!, marqueId: input.vehicule.marqueId,
       marqueLibelle: input.vehicule.marqueLibelle, carrosserieId: input.vehicule.carrosserieId,

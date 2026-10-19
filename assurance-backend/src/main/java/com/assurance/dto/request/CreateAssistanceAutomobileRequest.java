@@ -1,6 +1,7 @@
 package com.assurance.dto.request;
 
 import com.assurance.enums.TypeVehiculeContrat;
+import com.assurance.enums.TypePayeurPrime;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -46,6 +47,10 @@ public class CreateAssistanceAutomobileRequest {
     private Boolean assureIdentiqueSouscripteur;
 
     private Boolean assurePayeur;
+
+    private TypePayeurPrime typePayeurPrime;
+
+    private Long payeurPrimeClientId;
 
     @Valid
     @NotNull

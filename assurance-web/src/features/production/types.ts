@@ -535,7 +535,8 @@ export type CreateAssistanceAutomobileRequest = {
   souscripteur: AssistanceVoyagePersonRequest;
   assure?: AssistanceVoyagePersonRequest;
   assureIdentiqueSouscripteur?: boolean;
-  assurePayeur?: boolean;
+  typePayeurPrime: "SOUSCRIPTEUR" | "TIERS_MANDATE";
+  payeurPrimeClientId?: string;
   vehicule: AssistanceAutomobileVehicleRequest;
 };
 

@@ -152,7 +152,8 @@ public class AssistanceAutomobileService {
         validateEligibility(produit, categorie, usage);
         validateVehicle(request.getVehicule(), request.getDateEffet(), categorie, usage);
         Pricing pricing = price(produit, request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
-        Client payeur = Boolean.TRUE.equals(request.getAssurePayeur()) ? assure : souscripteur;
+        TypePayeurPrime typePayeur = resolvePayerType(request);
+        Client payeur = resolvePayer(agenceId, request, typePayeur, souscripteur, assure);
 
         Contrat contrat = contratRepository.save(Contrat.builder()
                 .agence(agence)
@@ -169,9 +170,8 @@ public class AssistanceAutomobileService {
                 .echeance(echeanceCode)
                 .typeRenouvellement("ferme")
                 .periodicite(durationLabel(request.getDureeMois()))
-                .typePayeurPrime(payeur.getId().equals(souscripteur.getId())
-                        ? TypePayeurPrime.SOUSCRIPTEUR : TypePayeurPrime.TIERS_MANDATE)
-                .payeurPrime(payeur.getId().equals(souscripteur.getId()) ? null : payeur)
+                .typePayeurPrime(typePayeur)
+                .payeurPrime(payeur)
                 .modeFacturation(ModeFacturationContrat.DIRECTE)
                 .nombreVehicules(1)
                 .nombreRemorques(0)
@@ -240,7 +240,8 @@ public class AssistanceAutomobileService {
         validateEligibility(produit, categorie, usage);
         validateVehicle(request.getVehicule(), request.getDateEffet(), categorie, usage);
         Pricing pricing = price(produit, request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
-        Client payeur = Boolean.TRUE.equals(request.getAssurePayeur()) ? assure : souscripteur;
+        TypePayeurPrime typePayeur = resolvePayerType(request);
+        Client payeur = resolvePayer(agenceId, request, typePayeur, souscripteur, assure);
 
         contrat.setCategorieClient(categorie);
         contrat.setUsage(usage);
@@ -250,9 +251,8 @@ public class AssistanceAutomobileService {
         contrat.setDateEcheance(pricing.dateEcheance());
         contrat.setEcheance(echeanceCode);
         contrat.setPeriodicite(durationLabel(request.getDureeMois()));
-        contrat.setTypePayeurPrime(payeur.getId().equals(souscripteur.getId())
-                ? TypePayeurPrime.SOUSCRIPTEUR : TypePayeurPrime.TIERS_MANDATE);
-        contrat.setPayeurPrime(payeur.getId().equals(souscripteur.getId()) ? null : payeur);
+        contrat.setTypePayeurPrime(typePayeur);
+        contrat.setPayeurPrime(payeur);
         contratRepository.save(contrat);
 
         contratClientRepository.deleteByContratId(contratId);
@@ -596,6 +596,39 @@ public class AssistanceAutomobileService {
             throw new BadRequestException("Échéance invalide. Format attendu : JJ/MM");
         }
         return normalized;
+    }
+
+    private TypePayeurPrime resolvePayerType(CreateAssistanceAutomobileRequest request) {
+        if (request.getTypePayeurPrime() == null) {
+            return Boolean.TRUE.equals(request.getAssurePayeur())
+                    ? TypePayeurPrime.TIERS_MANDATE
+                    : TypePayeurPrime.SOUSCRIPTEUR;
+        }
+        if (request.getTypePayeurPrime() != TypePayeurPrime.SOUSCRIPTEUR
+                && request.getTypePayeurPrime() != TypePayeurPrime.TIERS_MANDATE) {
+            throw new BadRequestException("Type de payeur non supporté pour une assistance automobile");
+        }
+        return request.getTypePayeurPrime();
+    }
+
+    private Client resolvePayer(
+            Long agenceId,
+            CreateAssistanceAutomobileRequest request,
+            TypePayeurPrime typePayeur,
+            Client souscripteur,
+            Client assure
+    ) {
+        if (typePayeur == TypePayeurPrime.SOUSCRIPTEUR) {
+            return souscripteur;
+        }
+        if (request.getPayeurPrimeClientId() != null) {
+            return clientRepository.findByAgenceIdAndId(agenceId, request.getPayeurPrimeClientId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Client payeur", request.getPayeurPrimeClientId()));
+        }
+        if (Boolean.TRUE.equals(request.getAssurePayeur())) {
+            return assure;
+        }
+        throw new BadRequestException("Le payeur est obligatoire");
     }
 
     private Usage requireUsage(Long id) {

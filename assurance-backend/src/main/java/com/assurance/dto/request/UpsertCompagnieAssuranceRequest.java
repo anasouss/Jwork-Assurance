@@ -1,16 +1,17 @@
 package com.assurance.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class UpsertCompagnieAssuranceRequest {
     @NotBlank
-    private String code;
-
-    @NotBlank
     private String nom;
+
+    @Size(max = 80)
+    private String codeIntermediaire;
 
     private String adresse;
     private String ville;

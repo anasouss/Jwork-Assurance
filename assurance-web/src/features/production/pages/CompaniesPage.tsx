@@ -26,7 +26,7 @@ import { compagnieAssuranceSchema } from "../schemas";
 import type { ReferenceOption, UpsertCompagnieAssuranceRequest } from "../types";
 import { useAuthStore } from "@/store/auth-store";
 
-type CompanySortColumn = "code" | "company" | "order" | "city" | "phone" | "rc" | "ice" | "attestation" | "greenCard" | "dossier" | "active";
+type CompanySortColumn = "intermediaryCode" | "company" | "order" | "city" | "phone" | "rc" | "ice" | "attestation" | "greenCard" | "dossier" | "active";
 
 export default function CompaniesPage() {
   const queryClient = useQueryClient();
@@ -61,6 +61,7 @@ export default function CompaniesPage() {
       if (!term) return true;
       return [
         compagnie.code,
+        companyField(compagnie, "codeIntermediaire"),
         compagnie.libelle,
         companyField(compagnie, "ville"),
         companyField(compagnie, "rc"),
@@ -109,7 +110,7 @@ export default function CompaniesPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder="Filtrer par nom, code, ville, RC ou ICE"
+              placeholder="Filtrer par nom, code intermédiaire, ville, RC ou ICE"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -130,7 +131,7 @@ export default function CompaniesPage() {
           <Table>
             <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
               <TableRow className="hover:bg-amber-600">
-                <SortableTableHead column="code" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Code</SortableTableHead>
+                <SortableTableHead column="intermediaryCode" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Code intermédiaire</SortableTableHead>
                 <SortableTableHead column="company" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Compagnie</SortableTableHead>
                 <SortableTableHead column="order" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))} align="right">Ordre</SortableTableHead>
                 <SortableTableHead column="city" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Ville</SortableTableHead>
@@ -147,7 +148,7 @@ export default function CompaniesPage() {
             <TableBody>
               {filtered.map((compagnie) => (
                 <TableRow key={compagnie.id}>
-                  <TableCell className="font-medium">{compagnie.code ?? "-"}</TableCell>
+                  <TableCell className="font-medium">{companyField(compagnie, "codeIntermediaire") || "-"}</TableCell>
                   <TableCell>
                     <div className="font-medium">{compagnie.libelle}</div>
                     <div className="text-xs text-muted-foreground">{companyField(compagnie, "adresse") || "-"}</div>
@@ -206,8 +207,12 @@ export default function CompaniesPage() {
           </DialogHeader>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Code" required>
-              <Input value={payload.code} onChange={(event) => update(setPayload, { code: event.target.value })} />
+            <Field label="Code intermédiaire">
+              <Input
+                value={payload.codeIntermediaire ?? ""}
+                maxLength={80}
+                onChange={(event) => update(setPayload, { codeIntermediaire: event.target.value })}
+              />
             </Field>
             <Field label="Nom" required>
               <Input value={payload.nom} onChange={(event) => update(setPayload, { nom: event.target.value })} />
@@ -282,13 +287,13 @@ function saveCompany(
 }
 
 function emptyCompany(): UpsertCompagnieAssuranceRequest {
-  return { code: "", nom: "", ordreAffichage: 100, actif: true };
+  return { nom: "", ordreAffichage: 100, actif: true };
 }
 
 function companyPayload(compagnie: ReferenceOption): UpsertCompagnieAssuranceRequest {
   return {
-    code: compagnie.code ?? "",
     nom: companyField(compagnie, "nom") || compagnie.libelle,
+    codeIntermediaire: companyField(compagnie, "codeIntermediaire"),
     adresse: companyField(compagnie, "adresse"),
     ville: companyField(compagnie, "ville"),
     email: companyField(compagnie, "email"),
@@ -320,7 +325,7 @@ function companyNumber(compagnie: ReferenceOption, key: string) {
 
 function companySortValue(compagnie: ReferenceOption, column: CompanySortColumn) {
   switch (column) {
-    case "code": return compagnie.code;
+    case "intermediaryCode": return companyField(compagnie, "codeIntermediaire");
     case "company": return compagnie.libelle;
     case "order": return companyNumber(compagnie, "ordreAffichage");
     case "city": return companyField(compagnie, "ville");

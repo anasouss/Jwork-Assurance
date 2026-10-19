@@ -34,6 +34,7 @@ import com.assurance.entity.Carburant;
 import com.assurance.entity.Carrosserie;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.CompagnieAssurance;
+import com.assurance.entity.AgenceCompagnieAssurance;
 import com.assurance.entity.CompagnieGarantie;
 import com.assurance.entity.Convention;
 import com.assurance.entity.Agence;
@@ -78,6 +79,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -103,6 +105,7 @@ public class ReferentielController {
     private final SousClasseRepository sousClasseRepository;
     private final GarantieRepository garantieRepository;
     private final CompagnieAssuranceRepository compagnieAssuranceRepository;
+    private final AgenceCompagnieAssuranceRepository agenceCompagnieAssuranceRepository;
     private final CompagnieGarantieRepository compagnieGarantieRepository;
     private final GrilleTarifaireRepository grilleTarifaireRepository;
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
@@ -355,44 +358,51 @@ public class ReferentielController {
     }
 
     @GetMapping("/compagnies-assurance")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> compagniesAssurance() {
+        Long agenceId = TenantContext.getCurrentAgence();
+        Map<Long, String> codesIntermediaires = agenceCompagnieAssuranceRepository.findByAgenceId(agenceId).stream()
+                .filter(configuration -> configuration.getCodeIntermediaire() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        configuration -> configuration.getCompagnieAssurance().getId(),
+                        AgenceCompagnieAssurance::getCodeIntermediaire
+                ));
         return ResponseEntity.ok(ApiResponse.success(compagnieAssuranceRepository.findAll(Sort.by("ordreAffichage").ascending().and(Sort.by("nom").ascending())).stream()
-                .map(this::toCompagnieAssuranceResponse)
+                .map(compagnie -> toCompagnieAssuranceResponse(compagnie, codesIntermediaires.get(compagnie.getId())))
                 .toList()));
     }
 
     @PostMapping("/compagnies-assurance")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssurance(
             @Valid @RequestBody UpsertCompagnieAssuranceRequest request
     ) {
-        compagnieAssuranceRepository.findByCode(request.getCode()).ifPresent(existing -> {
-            throw new BadRequestException("Code compagnie deja utilise");
-        });
         validateCompagnieDossierPrefix(request.getPrefixeDossier(), null);
         CompagnieAssurance compagnie = new CompagnieAssurance();
+        compagnie.setCode(nextCompagnieAssuranceCode(request.getNom()));
         applyCompagnieAssuranceRequest(compagnie, request);
+        compagnie = compagnieAssuranceRepository.save(compagnie);
+        String codeIntermediaire = saveCodeIntermediaire(compagnie, request.getCodeIntermediaire());
         return ResponseEntity.ok(ApiResponse.success(
-                toCompagnieAssuranceResponse(compagnieAssuranceRepository.save(compagnie)),
+                toCompagnieAssuranceResponse(compagnie, codeIntermediaire),
                 "Compagnie creee"
         ));
     }
 
     @PutMapping("/compagnies-assurance/{id}")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssurance(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCompagnieAssuranceRequest request
     ) {
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", id));
-        compagnieAssuranceRepository.findByCode(request.getCode())
-                .filter(existing -> !existing.getId().equals(id))
-                .ifPresent(existing -> {
-                    throw new BadRequestException("Code compagnie deja utilise");
-                });
         validateCompagnieDossierPrefix(request.getPrefixeDossier(), id);
         applyCompagnieAssuranceRequest(compagnie, request);
+        compagnie = compagnieAssuranceRepository.save(compagnie);
+        String codeIntermediaire = saveCodeIntermediaire(compagnie, request.getCodeIntermediaire());
         return ResponseEntity.ok(ApiResponse.success(
-                toCompagnieAssuranceResponse(compagnieAssuranceRepository.save(compagnie)),
+                toCompagnieAssuranceResponse(compagnie, codeIntermediaire),
                 "Compagnie modifiee"
         ));
     }
@@ -1369,8 +1379,7 @@ public class ReferentielController {
     }
 
     private void applyCompagnieAssuranceRequest(CompagnieAssurance compagnie, UpsertCompagnieAssuranceRequest request) {
-        compagnie.setCode(request.getCode());
-        compagnie.setNom(request.getNom());
+        compagnie.setNom(request.getNom().trim());
         compagnie.setAdresse(blankToNull(request.getAdresse()));
         compagnie.setVille(blankToNull(request.getVille()));
         compagnie.setEmail(blankToNull(request.getEmail()));
@@ -1384,9 +1393,13 @@ public class ReferentielController {
         compagnie.setActif(request.getActif() == null ? true : request.getActif());
     }
 
-    private Map<String, Object> toCompagnieAssuranceResponse(CompagnieAssurance compagnie) {
+    private Map<String, Object> toCompagnieAssuranceResponse(
+            CompagnieAssurance compagnie,
+            String codeIntermediaire
+    ) {
         return option(compagnie.getId(), compagnie.getCode(), compagnie.getNom())
                 .putValue("nom", compagnie.getNom())
+                .putValue("codeIntermediaire", codeIntermediaire)
                 .putValue("adresse", compagnie.getAdresse())
                 .putValue("ville", compagnie.getVille())
                 .putValue("email", compagnie.getEmail())
@@ -1399,6 +1412,44 @@ public class ReferentielController {
                 .putValue("ordreAffichage", compagnie.getOrdreAffichage())
                 .putValue("actif", compagnie.getActif())
                 .map();
+    }
+
+    private String saveCodeIntermediaire(CompagnieAssurance compagnie, String value) {
+        Long agenceId = TenantContext.getCurrentAgence();
+        String codeIntermediaire = blankToNull(value);
+        var existing = agenceCompagnieAssuranceRepository
+                .findByAgenceIdAndCompagnieAssuranceId(agenceId, compagnie.getId());
+        if (codeIntermediaire == null) {
+            existing.ifPresent(agenceCompagnieAssuranceRepository::delete);
+            return null;
+        }
+        AgenceCompagnieAssurance configuration = existing
+                .orElseGet(() -> AgenceCompagnieAssurance.builder()
+                        .agence(agenceRepository.findById(agenceId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId)))
+                        .compagnieAssurance(compagnie)
+                        .build());
+        configuration.setCodeIntermediaire(codeIntermediaire);
+        agenceCompagnieAssuranceRepository.save(configuration);
+        return codeIntermediaire;
+    }
+
+    private String nextCompagnieAssuranceCode(String name) {
+        String base = Normalizer.normalize(name == null ? "" : name.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        if (base.isBlank()) {
+            base = "COMPAGNIE";
+        }
+        base = base.substring(0, Math.min(base.length(), 70));
+        String candidate = base;
+        int suffix = 2;
+        while (compagnieAssuranceRepository.findByCodeIgnoreCase(candidate).isPresent()) {
+            candidate = base + "_" + suffix++;
+        }
+        return candidate;
     }
 
     private void validateCompagnieDossierPrefix(String value, Long currentCompanyId) {

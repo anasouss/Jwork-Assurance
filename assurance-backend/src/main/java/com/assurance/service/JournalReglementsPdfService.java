@@ -94,7 +94,7 @@ public class JournalReglementsPdfService {
                 dateDu.atStartOfDay(),
                 dateAu.plusDays(1).atStartOfDay(),
                 utilisateurId,
-                mode,
+                mode == null ? List.of(ModeReglementClient.values()) : List.of(mode),
                 statutReglement
         );
 

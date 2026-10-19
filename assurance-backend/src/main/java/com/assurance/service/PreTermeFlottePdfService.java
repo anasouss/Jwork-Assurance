@@ -323,11 +323,11 @@ public class PreTermeFlottePdfService {
             table.addCell(valueCell(formatDate(vehicule.getDatePremiereCirculation()), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(pfOrPtc(vehicule), TextAlignment.CENTER, rowBackground));
             table.addCell(valueCell(value(vehicule.getCarburant(), ""), TextAlignment.CENTER, rowBackground));
-            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurNeuf()), TextAlignment.RIGHT, rowBackground));
-            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurVenale()), TextAlignment.RIGHT, rowBackground));
-            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurGlace()), TextAlignment.RIGHT, rowBackground));
+            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurNeuf()), TextAlignment.CENTER, rowBackground));
+            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurVenale()), TextAlignment.CENTER, rowBackground));
+            table.addCell(valueCell(formatMoneyOrEmpty(vehicule.getValeurGlace()), TextAlignment.CENTER, rowBackground));
             if (hasDcCapitalColumn) {
-                table.addCell(valueCell(formatMoneyOrEmpty(capitalFor(byCode.get("DC"))), TextAlignment.RIGHT, rowBackground));
+                table.addCell(valueCell(formatMoneyOrEmpty(capitalFor(byCode.get("DC"))), TextAlignment.CENTER, rowBackground));
             }
 
             if (garantieCodes.isEmpty()) {
@@ -423,9 +423,10 @@ public class PreTermeFlottePdfService {
                 .setBold().setFontSize(11).setKeepWithNext(true));
         float[] widths = new float[1 + usages.size()];
         Arrays.fill(widths, 1.0f);
-        widths[0] = 1.5f;
+        widths[0] = 0.65f;
         Table table = new Table(widths)
-                .setWidth(UnitValue.createPercentValue(35))
+                .setWidth(UnitValue.createPercentValue(Math.min(100f, 20f + usages.size() * 18f)))
+                .setHorizontalAlignment(HorizontalAlignment.CENTER)
                 .setKeepTogether(true);
         table.addCell(headerCell("Garanties", 1, 1));
         for (Usage usage : usages) {
@@ -437,7 +438,7 @@ public class PreTermeFlottePdfService {
         for (int rowIndex = 0; rowIndex < codesWithFranchise.size(); rowIndex++) {
             String code = codesWithFranchise.get(rowIndex);
             DeviceRgb rowBackground = rowIndex % 2 == 0 ? null : TABLE_ROW_ALT_BG;
-            table.addCell(valueCell(code, TextAlignment.LEFT, rowBackground).setBold());
+            table.addCell(valueCell(code, TextAlignment.CENTER, rowBackground).setBold());
             for (Usage usage : usages) {
                 String franchise = franchiseFor(usage, code, vehicules, garantiesByVehicule);
                 table.addCell(valueCell(franchise.isEmpty() ? "-" : franchise, TextAlignment.CENTER, rowBackground));

@@ -1400,6 +1400,7 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
 
 function AuditContractWorkflowResult({ operation }: { operation: AuditOperation }) {
   const showGuaranteeDetails = isGuaranteeSaveOperation(operation);
+  const workflowDetails = auditContractWorkflowDetails(operation);
   const guaranteeRows = auditGuaranteeApplications(operation);
   const targetKinds = new Set(guaranteeRows.map((row) => row.target.split(" ", 1)[0]?.toLocaleLowerCase("fr")));
   const targetColumnLabel = targetKinds.size === 1
@@ -1444,6 +1445,24 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
           <dd className="mt-1 font-medium">{auditOperationContextLabel(operation)}</dd>
         </div>
       </dl>
+      {!showGuaranteeDetails && workflowDetails.length ? (
+        <div>
+          <h4 className="mb-2 text-sm font-semibold">Détails enregistrés</h4>
+          <dl className="grid overflow-hidden rounded-md border sm:grid-cols-2">
+            {workflowDetails.map(({ field, value }) => (
+              <div
+                key={field}
+                className="min-w-0 border-b px-3 py-2 last:border-b-0 sm:odd:border-r"
+              >
+                <dt className="text-xs font-medium uppercase text-muted-foreground">{auditFieldLabel(field)}</dt>
+                <dd className="mt-1 whitespace-normal font-medium [overflow-wrap:anywhere]">
+                  {formatAuditFieldValue(field, value)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
       {showGuaranteeDetails && multipleTargets ? (
         <div className="overflow-x-auto rounded-md border">
           <Table>
@@ -1489,6 +1508,107 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
       ) : null}
     </section>
   );
+}
+
+const CONTRACT_WORKFLOW_DETAIL_CONFIG: Record<string, { entityType: string; fields: string[] }> = {
+  CONTRACT_DRAFT_CREATED: {
+    entityType: "Contrat",
+    fields: ["typeContrat", "brancheAssurance", "categorieClient", "convention", "prospection"],
+  },
+  CONTRACT_SUBSCRIBER_SAVED: {
+    entityType: "ContratClient",
+    fields: ["client", "role", "principalPourRole"],
+  },
+  CONTRACT_OWNER_SAVED: {
+    entityType: "ContratClient",
+    fields: ["client", "role", "principalPourRole"],
+  },
+  CONTRACT_DETAILS_SAVED: {
+    entityType: "Contrat",
+    fields: [
+      "compagnieAssurance",
+      "convention",
+      "categorieClient",
+      "numeroContrat",
+      "numeroPolice",
+      "dateEffet",
+      "echeance",
+      "dateEcheance",
+      "periodicite",
+      "fractionnement",
+      "typePayeurPrime",
+      "payeurPrime",
+      "groupeFacturation",
+      "modeFacturation",
+      "modeSaisieGaranties",
+      "saisiePrimeNette",
+      "assistance",
+    ],
+  },
+  CONTRACT_TARIFF_GRID_SELECTED: {
+    entityType: "Contrat",
+    fields: ["grilleTarifaire"],
+  },
+  CONTRACT_VEHICLE_SAVED: {
+    entityType: "Vehicule",
+    fields: [
+      "immatriculation",
+      "immatriculationProvisoire",
+      "usage",
+      "marque",
+      "carrosserie",
+      "categorieTransport",
+      "carburant",
+      "puissanceFiscale",
+      "cylindree",
+      "nombrePlaces",
+      "sousClasse",
+      "ptc",
+      "datePremiereCirculation",
+      "dateEffet",
+      "dateEcheance",
+      "crm",
+      "valeurVenale",
+      "valeurNeuf",
+      "valeurGlace",
+    ],
+  },
+  CONTRACT_TRAILER_SAVED: {
+    entityType: "Remorque",
+    fields: [
+      "immatriculation",
+      "usage",
+      "marque",
+      "ptc",
+      "dateMiseEnCirculation",
+      "dateEffet",
+      "dateEcheance",
+      "crm",
+      "valeurAssuree",
+    ],
+  },
+  CONTRACT_FINALIZED: {
+    entityType: "Contrat",
+    fields: ["statut", "numeroContrat", "numeroPolice", "dateEffet", "dateEcheance"],
+  },
+};
+
+function auditContractWorkflowDetails(operation: AuditOperation) {
+  if (!operation.operationCode) return [];
+  const config = CONTRACT_WORKFLOW_DETAIL_CONFIG[operation.operationCode];
+  if (!config) return [];
+  const matchingEvents = operation.events.filter((candidate) => candidate.entityType === config.entityType);
+  const event = matchingEvents.find((candidate) => candidate.action !== "DELETED" && candidate.afterData)
+    ?? matchingEvents[0];
+  if (!event) return [];
+  const snapshot = auditSnapshot(event);
+  const recordedFields = new Set([
+    ...Object.keys(event.beforeData ?? {}),
+    ...Object.keys(event.afterData ?? {}),
+  ]);
+  return config.fields
+    .filter((field) => recordedFields.has(field) && snapshot[field] !== null && snapshot[field] !== undefined && snapshot[field] !== "")
+    .map((field) => ({ field, value: snapshot[field] }));
 }
 
 function AuditGuaranteeTargetRow({ row }: {
@@ -2183,6 +2303,7 @@ function auditFieldLabel(field: string) {
     actif: "Actif",
     agence: "Agence",
     role: "Rôle",
+    principalPourRole: "Titulaire principal",
     permissions: "Permissions",
     aliases: "Alias",
     usages: "Usages autorisés",
@@ -2212,6 +2333,8 @@ function auditFieldLabel(field: string) {
     dateMiseEnCirculation: "Date de mise en circulation",
     dateExpirationCarteGrise: "Expiration de la carte grise",
     numeroDossier: "N° dossier",
+    numeroContrat: "N° contrat",
+    numeroDevis: "N° devis",
     numeroPolice: "N° police",
     numeroSinistre: "N° sinistre",
     numeroAttestation: "N° attestation",
@@ -2243,6 +2366,9 @@ function auditFieldLabel(field: string) {
     crmPartage: "CRM partagé",
     crmPartageValeur: "Valeur du CRM partagé",
     fractionnement: "Fractionnement",
+    echeance: "Échéance annuelle",
+    modePaiement: "Mode de paiement",
+    modeReglement: "Mode de règlement",
     modeFacturation: "Mode de facturation",
     modeSaisieGaranties: "Mode de saisie des garanties",
     modeSelectionne: "Mode de tarification",
@@ -2356,7 +2482,7 @@ function formatAuditFieldValue(field: string, value: unknown, entityType?: strin
       ANNULE: "Annulé",
     } as Record<string, string>)[value] ?? formatAuditValue(value);
   }
-  if (["prime", "capital", "franchiseMinimale", "montant", "montantTotal", "montantNonAffecte", "montantTtc", "primeTtc", "primeNette", "taxes", "accessoires", "debit", "credit", "totalDebit", "totalCredit", "totalDocument"].includes(field)
+  if (["prime", "capital", "franchiseMinimale", "montant", "montantTotal", "montantNonAffecte", "montantTtc", "primeTtc", "primeNette", "taxes", "accessoires", "debit", "credit", "totalDebit", "totalCredit", "totalDocument", "valeurVenale", "valeurNeuf", "valeurGlace", "valeurAssuree", "montantCredit", "montantBulletin"].includes(field)
       && typeof value === "number") {
     return formatAuditMoney(value);
   }

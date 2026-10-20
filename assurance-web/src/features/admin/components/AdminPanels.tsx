@@ -1510,7 +1510,11 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
   );
 }
 
-const CONTRACT_WORKFLOW_DETAIL_CONFIG: Record<string, { entityType: string; fields: string[] }> = {
+const CONTRACT_WORKFLOW_DETAIL_CONFIG: Record<string, {
+  entityType: string;
+  fields: string[];
+  role?: string;
+}> = {
   CONTRACT_DRAFT_CREATED: {
     entityType: "Contrat",
     fields: ["typeContrat", "brancheAssurance", "categorieClient", "convention", "prospection"],
@@ -1518,10 +1522,12 @@ const CONTRACT_WORKFLOW_DETAIL_CONFIG: Record<string, { entityType: string; fiel
   CONTRACT_SUBSCRIBER_SAVED: {
     entityType: "ContratClient",
     fields: ["client", "role", "principalPourRole"],
+    role: "SOUSCRIPTEUR",
   },
   CONTRACT_OWNER_SAVED: {
     entityType: "ContratClient",
     fields: ["client", "role", "principalPourRole"],
+    role: "PROPRIETAIRE",
   },
   CONTRACT_DETAILS_SAVED: {
     entityType: "Contrat",
@@ -1597,7 +1603,11 @@ function auditContractWorkflowDetails(operation: AuditOperation) {
   if (!operation.operationCode) return [];
   const config = CONTRACT_WORKFLOW_DETAIL_CONFIG[operation.operationCode];
   if (!config) return [];
-  const matchingEvents = operation.events.filter((candidate) => candidate.entityType === config.entityType);
+  const matchingEvents = operation.events.filter((candidate) => {
+    if (candidate.entityType !== config.entityType) return false;
+    if (!config.role) return true;
+    return auditSnapshot(candidate).role === config.role;
+  });
   const event = matchingEvents.find((candidate) => candidate.action !== "DELETED" && candidate.afterData)
     ?? matchingEvents[0];
   if (!event) return [];

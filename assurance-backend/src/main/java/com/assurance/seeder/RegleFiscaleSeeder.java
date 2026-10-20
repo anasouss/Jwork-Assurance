@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
 
 @Component
 @Order(10)
@@ -106,7 +107,7 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
                     .code("EVCAT_RC_TPV").libelle("EVCAT RC - catégorie TPV")
                     .nature(NatureRegleFiscale.EVCAT).modeCalcul(ModeCalculRegleFiscale.TAUX)
                     .valeur(new BigDecimal(value)).baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
-                    .categorieResultat(CategorieQuittance.EVCAT).garantie(rc).categorieClient(tpv)
+                    .categorieResultat(CategorieQuittance.EVCAT).garanties(Set.of(rc)).categorieClient(tpv)
                     .brancheAssurance(automobileBranch())
                     .dateDebut(INITIAL_DATE).applicable(true).priorite(200).actif(true).build());
         }
@@ -174,7 +175,8 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
         if (repository.findByCodeIgnoreCaseAndDateDebut(code, INITIAL_DATE).isPresent()) return;
         repository.save(RegleFiscale.builder()
                 .code(code).libelle(label).nature(nature).modeCalcul(mode).valeur(new BigDecimal(value))
-                .baseCalcul(base).categorieResultat(resultCategory).garantie(guarantee)
+                .baseCalcul(base).categorieResultat(resultCategory)
+                .garanties(guarantee == null ? Set.of() : Set.of(guarantee))
                 .brancheAssurance(automobileBranch())
                 .typeGarantie(guaranteeType).usage(usage).dateDebut(INITIAL_DATE)
                 .applicable(true).priorite(priority).actif(true).build());

@@ -15,6 +15,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -39,6 +40,8 @@ public class UpsertRegleFiscaleRequest {
     private Long compagnieAssuranceId;
     private Long categorieClientId;
     private Long garantieId;
+    @Size(max = 200)
+    private List<Long> garantieIds;
     private TypeGarantie typeGarantie;
     private Long usageId;
     private Long groupeUsageAttestationId;

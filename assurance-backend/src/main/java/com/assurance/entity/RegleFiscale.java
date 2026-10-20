@@ -13,7 +13,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -24,6 +26,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "regles_fiscales",
@@ -36,8 +40,7 @@ import java.time.LocalDate;
                 @Index(name = "idx_regle_fiscale_nature", columnList = "nature"),
                 @Index(name = "idx_regle_fiscale_compagnie", columnList = "compagnie_assurance_id"),
                 @Index(name = "idx_regle_fiscale_branche", columnList = "branche_assurance_id"),
-                @Index(name = "idx_regle_fiscale_categorie_client", columnList = "categorie_client_id"),
-                @Index(name = "idx_regle_fiscale_garantie", columnList = "garantie_id")
+                @Index(name = "idx_regle_fiscale_categorie_client", columnList = "categorie_client_id")
         })
 @Getter
 @Setter
@@ -87,9 +90,14 @@ public class RegleFiscale extends BaseEntity {
     @JoinColumn(name = "categorie_client_id")
     private CategorieClient categorieClient;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "garantie_id")
-    private Garantie garantie;
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "regle_fiscale_garanties",
+            joinColumns = @JoinColumn(name = "regle_fiscale_id"),
+            inverseJoinColumns = @JoinColumn(name = "garantie_id")
+    )
+    private Set<Garantie> garanties = new LinkedHashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type_garantie", length = 30)

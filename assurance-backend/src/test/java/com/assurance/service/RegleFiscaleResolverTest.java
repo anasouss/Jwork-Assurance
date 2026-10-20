@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -94,6 +95,34 @@ class RegleFiscaleResolverTest {
     }
 
     @Test
+    void multiGuaranteeRuleMatchesEverySelectedGuaranteeOnly() {
+        LocalDate effectDate = LocalDate.of(2026, 8, 4);
+        Garantie dr = guarantee(7L, "DR", TypeGarantie.VEHICULE);
+        Garantie bg = guarantee(8L, "BG", TypeGarantie.VEHICULE);
+        Garantie vol = guarantee(9L, "V", TypeGarantie.VEHICULE);
+        Contrat contract = Contrat.builder()
+                .brancheAssurance(branch(1L, "AUTOMOBILE"))
+                .typeContrat(TypeContrat.FLOTTE)
+                .build();
+        RegleFiscale general = guaranteeRule(1L, "GENERAL", null, null, null, "0.015", true, 0);
+        RegleFiscale exclusion = guaranteeRule(2L, "EXCLUSION", null, null, null, "0", false, 100);
+        exclusion.setGaranties(Set.of(dr, bg));
+        when(repository.findActiveAt(effectDate)).thenReturn(List.of(general, exclusion));
+
+        RegleFiscale drRule = resolver.catalogue(effectDate)
+                .forGuarantee(NatureRegleFiscale.TAXE_ASSURANCE, contract,
+                        ContratGarantie.builder().garantie(dr).build())
+                .orElseThrow();
+        RegleFiscale volRule = resolver.catalogue(effectDate)
+                .forGuarantee(NatureRegleFiscale.TAXE_ASSURANCE, contract,
+                        ContratGarantie.builder().garantie(vol).build())
+                .orElseThrow();
+
+        assertThat(drRule.getCode()).isEqualTo("EXCLUSION");
+        assertThat(volRule.getCode()).isEqualTo("GENERAL");
+    }
+
+    @Test
     void repositoryIsQueriedWithMovementEffectiveDate() {
         LocalDate effectDate = LocalDate.of(2027, 1, 1);
         when(repository.findActiveAt(effectDate)).thenReturn(List.of());
@@ -134,7 +163,9 @@ class RegleFiscaleResolverTest {
                 .baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
                 .categorieResultat(CategorieQuittance.AUTOMOBILE)
                 .brancheAssurance(branch(1L, "AUTOMOBILE"))
-                .compagnieAssurance(company).garantie(guarantee).usage(usage)
+                .compagnieAssurance(company)
+                .garanties(guarantee == null ? Set.of() : Set.of(guarantee))
+                .usage(usage)
                 .dateDebut(LocalDate.of(2000, 1, 1)).applicable(applicable)
                 .priorite(priority).actif(true).build();
         rule.setId(id);

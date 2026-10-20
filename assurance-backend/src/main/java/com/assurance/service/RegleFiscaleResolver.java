@@ -73,7 +73,8 @@ public class RegleFiscaleResolver {
             if (rule.getCompagnieAssurance() != null && !sameId(rule.getCompagnieAssurance(), contrat.getCompagnieAssurance())) return false;
             if (rule.getCategorieClient() != null && !sameId(rule.getCategorieClient(), contrat.getCategorieClient())) return false;
             if (rule.getTypeContrat() != null && rule.getTypeContrat() != contrat.getTypeContrat()) return false;
-            if (rule.getGarantie() != null && (guarantee == null || !sameId(rule.getGarantie(), guarantee.getGarantie()))) return false;
+            if (!rule.getGaranties().isEmpty() && (guarantee == null || guarantee.getGarantie() == null
+                    || rule.getGaranties().stream().noneMatch(item -> sameId(item, guarantee.getGarantie())))) return false;
             if (rule.getTypeGarantie() != null && (guarantee == null || guarantee.getGarantie() == null
                     || rule.getTypeGarantie() != guarantee.getGarantie().getTypeGarantie())) return false;
             Usage usage = usage(contrat, guarantee);
@@ -90,7 +91,7 @@ public class RegleFiscaleResolver {
 
         private static int specificity(RegleFiscale rule) {
             int score = 0;
-            if (rule.getGarantie() != null) score += 64;
+            if (!rule.getGaranties().isEmpty()) score += 64;
             if (rule.getBrancheAssurance() != null) score += 48;
             if (rule.getCompagnieAssurance() != null) score += 32;
             if (rule.getCategorieClient() != null) score += 24;

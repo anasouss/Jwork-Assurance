@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Save } from "lucide-react";
+import { Check, ChevronsUpDown, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { Field } from "./Field";
 import { referenceApi } from "../api/references";
 import type { FiscalRule, FiscalRuleBase, FiscalRuleMode, FiscalRuleNature, QuittanceCategory, UpsertFiscalRule } from "../api/fiscal-rules";
@@ -97,7 +100,7 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
           </Field>
           <Field label="Branche" required>
               <RequiredReferenceSelect value={form.brancheAssuranceId} items={branches.data ?? []}
-              onChange={(brancheAssuranceId) => setForm({ ...form, brancheAssuranceId, garantieId: null })} />
+              onChange={(brancheAssuranceId) => setForm({ ...form, brancheAssuranceId, garantieId: null, garantieIds: [] })} />
           </Field>
           <Field label="Compagnie">
             <ReferenceSelect value={form.compagnieAssuranceId} items={compagnies.data ?? []} onChange={(compagnieAssuranceId) => setForm({ ...form, compagnieAssuranceId })} />
@@ -110,11 +113,15 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
           </Field>
 
           {form.baseCalcul === "PRIME_GARANTIE" ? <>
-            <Field label="Garantie">
-              <ReferenceSelect value={form.garantieId} items={(garanties.data ?? []).filter((item) => item.brancheAssuranceId === form.brancheAssuranceId)} onChange={(garantieId) => setForm({ ...form, garantieId, typeGarantie: null })} />
+            <Field label="Garanties">
+              <GuaranteeMultiSelect
+                value={form.garantieIds}
+                items={(garanties.data ?? []).filter((item) => item.brancheAssuranceId === form.brancheAssuranceId)}
+                onChange={(garantieIds) => setForm({ ...form, garantieId: null, garantieIds, typeGarantie: null })}
+              />
             </Field>
             <Field label="Type de garantie">
-              <EnumSelect nullable value={form.typeGarantie ?? NONE} onChange={(value) => setForm({ ...form, typeGarantie: value === NONE ? null : value as UpsertFiscalRule["typeGarantie"], garantieId: null })} options={guaranteeTypeOptions} />
+              <EnumSelect nullable value={form.typeGarantie ?? NONE} onChange={(value) => setForm({ ...form, typeGarantie: value === NONE ? null : value as UpsertFiscalRule["typeGarantie"], garantieId: null, garantieIds: [] })} options={guaranteeTypeOptions} />
             </Field>
             <Field label="Usage">
               <ReferenceSelect value={form.usageId} items={usages.data ?? []} onChange={(usageId) => setForm({ ...form, usageId })} />
@@ -184,6 +191,69 @@ function RequiredReferenceSelect({ value, items, onChange }: { value: string; it
   </SelectContent></Select>;
 }
 
+function GuaranteeMultiSelect({
+  value,
+  items,
+  onChange,
+}: {
+  value: string[];
+  items: { id: string; code?: string | null; libelle: string }[];
+  onChange: (value: string[]) => void;
+}) {
+  const selected = items.filter((item) => value.includes(item.id));
+  const label = selected.length === 0
+    ? "Aucune garantie précise"
+    : selected.length === 1
+      ? referenceLabel(selected[0])
+      : `${selected.length} garanties sélectionnées`;
+
+  function toggle(id: string) {
+    const next = new Set(value);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange(Array.from(next));
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" className="h-9 w-full min-w-0 justify-between px-3 font-normal">
+          <span className={cn("truncate", selected.length === 0 && "text-muted-foreground")}>{label}</span>
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder="Rechercher une garantie..." />
+          <CommandList className="max-h-72">
+            <CommandEmpty>Aucune garantie.</CommandEmpty>
+            <CommandGroup>
+              {items.map((item) => {
+                const checked = value.includes(item.id);
+                return (
+                  <CommandItem
+                    key={item.id}
+                    value={referenceLabel(item)}
+                    className="cursor-pointer"
+                    onSelect={() => toggle(item.id)}
+                  >
+                    <Check className={cn("size-4", checked ? "opacity-100" : "opacity-0")} />
+                    <span className="truncate">{referenceLabel(item)}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function referenceLabel(item: { code?: string | null; libelle: string }) {
+  return item.code ? `${item.code} - ${item.libelle}` : item.libelle;
+}
+
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return <div className="flex h-9 items-center justify-between rounded-md border px-3"><span className="text-sm font-medium">{label}</span><Switch checked={checked} onCheckedChange={onChange} /></div>;
 }
@@ -191,7 +261,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 function emptyRule(): UpsertFiscalRule {
   return { code: "", libelle: "", nature: "TAXE_ASSURANCE", modeCalcul: "TAUX", valeur: 0,
     baseCalcul: "PRIME_GARANTIE", categorieBase: null, categorieResultat: "AUTOMOBILE",
-    brancheAssuranceId: "", compagnieAssuranceId: null, categorieClientId: null, garantieId: null, typeGarantie: null, usageId: null,
+    brancheAssuranceId: "", compagnieAssuranceId: null, categorieClientId: null, garantieId: null, garantieIds: [], typeGarantie: null, usageId: null,
     groupeUsageAttestationId: null, typeContrat: null, dateDebut: toDateOnly(new Date()), dateFin: null,
     applicable: true, priorite: 0, actif: true, description: null, referenceReglementaire: null };
 }
@@ -210,6 +280,7 @@ function fromRule(rule: FiscalRule): UpsertFiscalRule {
     compagnieAssuranceId: rule.compagnieAssuranceId,
     categorieClientId: rule.categorieClientId,
     garantieId: rule.garantieId,
+    garantieIds: rule.garanties.map((garantie) => garantie.id),
     typeGarantie: rule.typeGarantie,
     usageId: rule.usageId,
     groupeUsageAttestationId: rule.groupeUsageAttestationId,
@@ -225,8 +296,8 @@ function fromRule(rule: FiscalRule): UpsertFiscalRule {
 }
 
 function defaultsForNature(nature: FiscalRuleNature): Partial<UpsertFiscalRule> {
-  if (nature === "CNPAC") return { modeCalcul: "MONTANT_FIXE", baseCalcul: "UNITE_ASSUREE", categorieBase: null, categorieResultat: "AUTOMOBILE", garantieId: null, typeGarantie: null, usageId: null, groupeUsageAttestationId: null };
-  if (nature === "TPF") return { modeCalcul: "TAUX", baseCalcul: "PRIME_CATEGORIE", categorieBase: "AUTOMOBILE", categorieResultat: "AUTOMOBILE", garantieId: null, typeGarantie: null, usageId: null, groupeUsageAttestationId: null };
+  if (nature === "CNPAC") return { modeCalcul: "MONTANT_FIXE", baseCalcul: "UNITE_ASSUREE", categorieBase: null, categorieResultat: "AUTOMOBILE", garantieId: null, garantieIds: [], typeGarantie: null, usageId: null, groupeUsageAttestationId: null };
+  if (nature === "TPF") return { modeCalcul: "TAUX", baseCalcul: "PRIME_CATEGORIE", categorieBase: "AUTOMOBILE", categorieResultat: "AUTOMOBILE", garantieId: null, garantieIds: [], typeGarantie: null, usageId: null, groupeUsageAttestationId: null };
   if (nature === "EVCAT") return { modeCalcul: "TAUX", baseCalcul: "PRIME_GARANTIE", categorieBase: null, categorieResultat: "EVCAT" };
   return { modeCalcul: "TAUX", baseCalcul: "PRIME_GARANTIE", categorieBase: null, categorieResultat: "AUTOMOBILE" };
 }
@@ -237,7 +308,7 @@ function changeBase(form: UpsertFiscalRule, baseCalcul: FiscalRuleBase): UpsertF
   }
   const categorieBase = defaultCategoryBase(form.nature);
   return { ...form, baseCalcul, categorieBase, categorieResultat: categorieBase,
-    garantieId: null, typeGarantie: null, usageId: null, groupeUsageAttestationId: null };
+    garantieId: null, garantieIds: [], typeGarantie: null, usageId: null, groupeUsageAttestationId: null };
 }
 
 function isValid(form: UpsertFiscalRule) {

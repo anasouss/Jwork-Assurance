@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -95,7 +96,8 @@ class RegleFiscaleQuittanceEngineTest {
         return RegleFiscale.builder().code(code).libelle(code).nature(nature)
                 .modeCalcul(ModeCalculRegleFiscale.TAUX).valeur(new BigDecimal(value))
                 .baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE).categorieResultat(result)
-                .garantie(guarantee).typeGarantie(type).dateDebut(LocalDate.of(2000, 1, 1))
+                .garanties(guarantee == null ? Set.of() : Set.of(guarantee))
+                .typeGarantie(type).dateDebut(LocalDate.of(2000, 1, 1))
                 .applicable(true).priorite(priority).actif(true).build();
     }
 

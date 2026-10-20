@@ -23,9 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -107,13 +110,17 @@ public class RegleFiscaleService {
         rule.setCategorieClient(request.getCategorieClientId() == null ? null
                 : categorieClientRepository.findById(request.getCategorieClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId())));
-        rule.setGarantie(request.getGarantieId() == null ? null
-                : garantieRepository.findById(request.getGarantieId())
-                .orElseThrow(() -> new ResourceNotFoundException("Garantie", request.getGarantieId())));
-        if (rule.getGarantie() != null && (rule.getGarantie().getBrancheAssurance() == null
-                || !Objects.equals(rule.getGarantie().getBrancheAssurance().getId(), rule.getBrancheAssurance().getId()))) {
-            throw new BadRequestException("La garantie ne correspond pas à la branche de la règle fiscale");
+        Set<Long> requestedGuaranteeIds = requestedGuaranteeIds(request);
+        var garanties = garantieRepository.findAllById(requestedGuaranteeIds);
+        if (garanties.size() != requestedGuaranteeIds.size()) {
+            throw new BadRequestException("Une ou plusieurs garanties sélectionnées sont introuvables");
         }
+        if (garanties.stream().anyMatch(garantie -> garantie.getBrancheAssurance() == null
+                || !Objects.equals(garantie.getBrancheAssurance().getId(), rule.getBrancheAssurance().getId()))) {
+            throw new BadRequestException("Toutes les garanties doivent correspondre à la branche de la règle fiscale");
+        }
+        rule.getGaranties().clear();
+        rule.getGaranties().addAll(garanties);
         rule.setTypeGarantie(request.getTypeGarantie());
         rule.setUsage(request.getUsageId() == null ? null
                 : usageRepository.findById(request.getUsageId())
@@ -161,12 +168,12 @@ public class RegleFiscaleService {
             throw new BadRequestException("Une règle calculée par garantie ne doit pas définir de catégorie de base");
         }
         if (request.getBaseCalcul() != BaseCalculRegleFiscale.PRIME_GARANTIE
-                && (request.getGarantieId() != null || request.getTypeGarantie() != null
+                && (hasGuarantees(request) || request.getTypeGarantie() != null
                 || request.getUsageId() != null || request.getGroupeUsageAttestationId() != null)) {
             throw new BadRequestException("Les périmètres garantie et usage ne s'appliquent qu'aux règles calculées par garantie");
         }
-        if (request.getGarantieId() != null && request.getTypeGarantie() != null) {
-            throw new BadRequestException("Choisissez une garantie précise ou un type de garantie, pas les deux");
+        if (hasGuarantees(request) && request.getTypeGarantie() != null) {
+            throw new BadRequestException("Choisissez des garanties précises ou un type de garantie, pas les deux");
         }
         if (request.getNature() == NatureRegleFiscale.CNPAC
                 && (request.getBaseCalcul() != BaseCalculRegleFiscale.UNITE_ASSUREE
@@ -212,21 +219,21 @@ public class RegleFiscaleService {
         boolean overlap = regleFiscaleRepository.findAll().stream()
                 .filter(existing -> !Objects.equals(existing.getId(), candidate.getId()))
                 .filter(existing -> Boolean.TRUE.equals(existing.getActif()) && Boolean.TRUE.equals(candidate.getActif()))
-                .filter(existing -> sameScope(existing, candidate))
+                .filter(existing -> scopesConflict(existing, candidate))
                 .anyMatch(existing -> periodsOverlap(existing, candidate));
         if (overlap) {
-            throw new BadRequestException("La période chevauche une règle active ayant exactement le même périmètre");
+            throw new BadRequestException("La période chevauche une règle active ayant un périmètre concurrent");
         }
     }
 
-    private boolean sameScope(RegleFiscale left, RegleFiscale right) {
+    private boolean scopesConflict(RegleFiscale left, RegleFiscale right) {
         return left.getNature() == right.getNature()
                 && left.getBaseCalcul() == right.getBaseCalcul()
                 && left.getCategorieBase() == right.getCategorieBase()
                 && Objects.equals(id(left.getBrancheAssurance()), id(right.getBrancheAssurance()))
                 && Objects.equals(id(left.getCompagnieAssurance()), id(right.getCompagnieAssurance()))
                 && Objects.equals(id(left.getCategorieClient()), id(right.getCategorieClient()))
-                && Objects.equals(id(left.getGarantie()), id(right.getGarantie()))
+                && guaranteeScopesConflict(left, right)
                 && left.getTypeGarantie() == right.getTypeGarantie()
                 && Objects.equals(id(left.getUsage()), id(right.getUsage()))
                 && Objects.equals(id(left.getGroupeUsageAttestation()), id(right.getGroupeUsageAttestation()))
@@ -250,7 +257,7 @@ public class RegleFiscaleService {
                 || !Objects.equals(id(rule.getBrancheAssurance()), request.getBrancheAssuranceId())
                 || !Objects.equals(id(rule.getCompagnieAssurance()), request.getCompagnieAssuranceId())
                 || !Objects.equals(id(rule.getCategorieClient()), request.getCategorieClientId())
-                || !Objects.equals(id(rule.getGarantie()), request.getGarantieId())
+                || !guaranteeIds(rule).equals(requestedGuaranteeIds(request))
                 || rule.getTypeGarantie() != request.getTypeGarantie()
                 || !Objects.equals(id(rule.getUsage()), request.getUsageId())
                 || !Objects.equals(id(rule.getGroupeUsageAttestation()), request.getGroupeUsageAttestationId())
@@ -258,6 +265,34 @@ public class RegleFiscaleService {
                 || !rule.getDateDebut().equals(request.getDateDebut())
                 || !Objects.equals(rule.getApplicable(), request.getApplicable() == null || request.getApplicable())
                 || !Objects.equals(rule.getPriorite(), request.getPriorite() == null ? 0 : request.getPriorite());
+    }
+
+    private boolean guaranteeScopesConflict(RegleFiscale left, RegleFiscale right) {
+        Set<Long> leftIds = guaranteeIds(left);
+        Set<Long> rightIds = guaranteeIds(right);
+        if (leftIds.isEmpty() || rightIds.isEmpty()) {
+            return leftIds.isEmpty() && rightIds.isEmpty();
+        }
+        return leftIds.stream().anyMatch(rightIds::contains);
+    }
+
+    private Set<Long> guaranteeIds(RegleFiscale rule) {
+        return rule.getGaranties().stream().map(this::id).collect(Collectors.toSet());
+    }
+
+    private Set<Long> requestedGuaranteeIds(UpsertRegleFiscaleRequest request) {
+        LinkedHashSet<Long> ids = new LinkedHashSet<>();
+        if (request.getGarantieIds() != null) {
+            request.getGarantieIds().stream().filter(Objects::nonNull).forEach(ids::add);
+        }
+        if (ids.isEmpty() && request.getGarantieId() != null) {
+            ids.add(request.getGarantieId());
+        }
+        return ids;
+    }
+
+    private boolean hasGuarantees(UpsertRegleFiscaleRequest request) {
+        return !requestedGuaranteeIds(request).isEmpty();
     }
 
     private Long id(Object entity) {

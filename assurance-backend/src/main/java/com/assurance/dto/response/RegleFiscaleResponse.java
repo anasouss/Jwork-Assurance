@@ -12,6 +12,8 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
 
 @Getter
 @Builder
@@ -36,6 +38,7 @@ public class RegleFiscaleResponse {
     private Long garantieId;
     private String garantieCode;
     private String garantieLibelle;
+    private List<GarantieReference> garanties;
     private TypeGarantie typeGarantie;
     private Long usageId;
     private String usageCode;
@@ -51,7 +54,24 @@ public class RegleFiscaleResponse {
     private String description;
     private String referenceReglementaire;
 
+    @Getter
+    @Builder
+    public static class GarantieReference {
+        private Long id;
+        private String code;
+        private String libelle;
+    }
+
     public static RegleFiscaleResponse from(RegleFiscale rule) {
+        List<GarantieReference> garanties = rule.getGaranties().stream()
+                .sorted(Comparator.comparing(garantie -> garantie.getCode() == null ? "" : garantie.getCode()))
+                .map(garantie -> GarantieReference.builder()
+                        .id(garantie.getId())
+                        .code(garantie.getCode())
+                        .libelle(garantie.getLibelle())
+                        .build())
+                .toList();
+        GarantieReference singleGarantie = garanties.size() == 1 ? garanties.get(0) : null;
         return RegleFiscaleResponse.builder()
                 .id(rule.getId()).code(rule.getCode()).libelle(rule.getLibelle())
                 .nature(rule.getNature()).modeCalcul(rule.getModeCalcul()).valeur(rule.getValeur())
@@ -65,9 +85,10 @@ public class RegleFiscaleResponse {
                 .categorieClientId(rule.getCategorieClient() == null ? null : rule.getCategorieClient().getId())
                 .categorieClientCode(rule.getCategorieClient() == null ? null : rule.getCategorieClient().getCode())
                 .categorieClientLibelle(rule.getCategorieClient() == null ? null : rule.getCategorieClient().getLibelle())
-                .garantieId(rule.getGarantie() == null ? null : rule.getGarantie().getId())
-                .garantieCode(rule.getGarantie() == null ? null : rule.getGarantie().getCode())
-                .garantieLibelle(rule.getGarantie() == null ? null : rule.getGarantie().getLibelle())
+                .garantieId(singleGarantie == null ? null : singleGarantie.getId())
+                .garantieCode(singleGarantie == null ? null : singleGarantie.getCode())
+                .garantieLibelle(singleGarantie == null ? null : singleGarantie.getLibelle())
+                .garanties(garanties)
                 .typeGarantie(rule.getTypeGarantie())
                 .usageId(rule.getUsage() == null ? null : rule.getUsage().getId())
                 .usageCode(rule.getUsage() == null ? null : rule.getUsage().getCode())

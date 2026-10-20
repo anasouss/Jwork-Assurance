@@ -117,9 +117,12 @@ export default function FiscalRulesSettingsPage() {
 }
 
 function scopeLabel(rule: FiscalRule) {
+  const guaranteeScope = rule.garanties.length > 0
+    ? `Garanties ${rule.garanties.map((garantie) => garantie.code ?? garantie.libelle).join(", ")}`
+    : null;
   const parts = [rule.brancheAssuranceLibelle, rule.compagnieAssuranceLibelle, rule.categorieClientCode ? `Catégorie ${rule.categorieClientCode}` : null,
     rule.typeContrat ? contractLabels[rule.typeContrat] : null,
-    rule.garantieCode ? `Garantie ${rule.garantieCode}` : null, rule.typeGarantie ? `Garanties ${rule.typeGarantie === "PERSONNE" ? "personne" : "véhicule"}` : null,
+    guaranteeScope, rule.typeGarantie ? `Garanties ${rule.typeGarantie === "PERSONNE" ? "personne" : "véhicule"}` : null,
     rule.usageCode ? `Usage ${rule.usageCode}` : null, rule.groupeUsageAttestationCode ? `Groupe ${rule.groupeUsageAttestationCode}` : null].filter(Boolean);
   return parts.length ? parts.join(" · ") : "Général";
 }

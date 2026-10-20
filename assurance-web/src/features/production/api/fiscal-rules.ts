@@ -8,6 +8,7 @@ export type FiscalRuleBase = "PRIME_GARANTIE" | "PRIME_CATEGORIE" | "UNITE_ASSUR
 export type QuittanceCategory = "AUTOMOBILE" | "CORPOREL" | "EVCAT" | "ASSISTANCE";
 export type GuaranteeType = "VEHICULE" | "PERSONNE";
 export type ContractType = "PARTICULIER" | "CONVENTION" | "FLOTTE";
+export type FiscalRuleGuarantee = { id: string; code?: string | null; libelle: string };
 
 export type FiscalRule = {
   id: string;
@@ -30,6 +31,7 @@ export type FiscalRule = {
   garantieId?: string | null;
   garantieCode?: string | null;
   garantieLibelle?: string | null;
+  garanties: FiscalRuleGuarantee[];
   typeGarantie?: GuaranteeType | null;
   usageId?: string | null;
   usageCode?: string | null;
@@ -56,10 +58,11 @@ export type UpsertFiscalRule = Omit<
   | "categorieClientLibelle"
   | "garantieCode"
   | "garantieLibelle"
+  | "garanties"
   | "usageCode"
   | "usageLibelle"
   | "groupeUsageAttestationCode"
->;
+> & { garantieIds: string[] };
 
 export const fiscalRulesApi = {
   list: async () => normalizeRules(
@@ -84,6 +87,11 @@ function normalizeRules(rules: FiscalRule[]) {
 }
 
 function normalizeRule(rule: FiscalRule): FiscalRule {
+  const legacyGuarantee = rule.garantieId == null ? [] : [{
+    id: String(rule.garantieId),
+    code: rule.garantieCode,
+    libelle: rule.garantieLibelle ?? rule.garantieCode ?? String(rule.garantieId),
+  }];
   return {
     ...rule,
     id: String(rule.id),
@@ -91,6 +99,10 @@ function normalizeRule(rule: FiscalRule): FiscalRule {
     compagnieAssuranceId: normalizeId(rule.compagnieAssuranceId),
     categorieClientId: normalizeId(rule.categorieClientId),
     garantieId: normalizeId(rule.garantieId),
+    garanties: (rule.garanties ?? legacyGuarantee).map((garantie) => ({
+      ...garantie,
+      id: String(garantie.id),
+    })),
     usageId: normalizeId(rule.usageId),
     groupeUsageAttestationId: normalizeId(rule.groupeUsageAttestationId),
   };

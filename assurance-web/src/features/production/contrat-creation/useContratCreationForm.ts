@@ -1815,7 +1815,7 @@ function auditOperationForSection(section: SavableContratSectionKey): ContractDr
     case "vehicule":
       return "CONTRACT_VEHICLE_SAVED";
     case "garanties":
-      return "CONTRACT_VEHICLE_GUARANTEES_SAVED";
+      return "CONTRACT_GUARANTEES_SAVED";
   }
 }
 

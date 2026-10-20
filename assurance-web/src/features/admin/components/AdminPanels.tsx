@@ -1030,13 +1030,13 @@ function auditContractWorkflowSummary(operation: AuditOperation) {
       ? `Grille « ${grid} » sélectionnée pour le calcul des garanties`
       : "Grille tarifaire sélectionnée pour le calcul des garanties";
   }
-  if (operation.operationCode?.endsWith("GUARANTEES_SAVED")) {
-    const guarantees = operation.events.filter(
-      (event) => event.entityType === "ContratGarantie" && event.action === "CREATED"
-    );
-    const count = new Set(guarantees.map((event) => auditReferenceLabel(auditSnapshot(event).garantie) ?? event.entityId)).size;
-    return count
-      ? `${count} garantie${count > 1 ? "s" : ""} appliquée${count > 1 ? "s" : ""} et tarifée${count > 1 ? "s" : ""}`
+  if (isGuaranteeSaveOperation(operation)) {
+    const applications = auditGuaranteeApplications(operation);
+    const targetCount = auditGuaranteeTargets(operation).length;
+    return applications.length
+      ? targetCount > 1
+        ? `${applications.length} affectations de garanties appliquées sur ${auditOperationContextLabel(operation).toLocaleLowerCase("fr")}`
+        : `${applications.length} garantie${applications.length > 1 ? "s" : ""} appliquée${applications.length > 1 ? "s" : ""} et tarifée${applications.length > 1 ? "s" : ""}`
       : "Garanties enregistrées et tarification mise à jour";
   }
   if (operation.operationCode === "CONTRACT_TARIFFS_RECALCULATED") {
@@ -1142,6 +1142,7 @@ const CONTRACT_WORKFLOW_OPERATION_LABELS: Record<string, string> = {
   CONTRACT_OWNER_SAVED: "Propriétaire enregistré",
   CONTRACT_DETAILS_SAVED: "Contrat enregistré",
   CONTRACT_TARIFF_GRID_SELECTED: "Grille sélectionnée",
+  CONTRACT_GUARANTEES_SAVED: "Garanties enregistrées",
   CONTRACT_VEHICLE_SAVED: "Véhicule enregistré",
   CONTRACT_VEHICLE_GUARANTEES_SAVED: "Garanties enregistrées",
   CONTRACT_TRAILER_SAVED: "Remorque enregistrée",
@@ -1158,6 +1159,7 @@ const CONTRACT_WORKFLOW_STEP_LABELS: Record<string, string> = {
   CONTRACT_OWNER_SAVED: "Dossier contrat · Propriétaire",
   CONTRACT_DETAILS_SAVED: "Dossier contrat · Informations du contrat",
   CONTRACT_TARIFF_GRID_SELECTED: "Dossier contrat · Grille tarifaire",
+  CONTRACT_GUARANTEES_SAVED: "Dossier contrat · Garanties",
   CONTRACT_VEHICLE_SAVED: "Dossier contrat · Véhicule",
   CONTRACT_VEHICLE_GUARANTEES_SAVED: "Dossier contrat · Garanties du véhicule",
   CONTRACT_TRAILER_SAVED: "Dossier contrat · Remorque",
@@ -1177,13 +1179,26 @@ function auditOperationActionLabel(operation: AuditOperation) {
 }
 
 function auditOperationStepLabel(operation: AuditOperation) {
+  const targets = auditGuaranteeTargets(operation);
+  if (isGuaranteeSaveOperation(operation) && targets.length > 1) {
+    return "Dossier contrat · Garanties du parc automobile";
+  }
   return operation.operationCode
     ? CONTRACT_WORKFLOW_STEP_LABELS[operation.operationCode] ?? auditOperationReference(operation)
     : auditOperationReference(operation);
 }
 
 function auditOperationContextLabel(operation: AuditOperation) {
-  if (operation.operationCode?.includes("VEHICLE_GUARANTEES")) {
+  const targets = auditGuaranteeTargets(operation);
+  if (isGuaranteeSaveOperation(operation) && targets.length > 1) {
+    const vehicleCount = targets.filter((target) => target.startsWith("véhicule ")).length;
+    const trailerCount = targets.length - vehicleCount;
+    return [
+      vehicleCount ? `${vehicleCount} véhicule${vehicleCount > 1 ? "s" : ""}` : null,
+      trailerCount ? `${trailerCount} remorque${trailerCount > 1 ? "s" : ""}` : null,
+    ].filter((part): part is string => Boolean(part)).join(" · ");
+  }
+  if (operation.operationCode?.includes("VEHICLE_GUARANTEES") || operation.operationCode === "CONTRACT_GUARANTEES_SAVED") {
     return auditContractGuaranteeTarget(operation, "Véhicule");
   }
   if (operation.operationCode?.includes("TRAILER_GUARANTEES")) {
@@ -1219,6 +1234,29 @@ function auditContractGuaranteeTarget(operation: AuditOperation, fallback: strin
   if (!guarantee) return fallback;
   const target = auditGuaranteeTarget(auditSnapshot(guarantee));
   return target.charAt(0).toLocaleUpperCase("fr") + target.slice(1);
+}
+
+function isGuaranteeSaveOperation(operation: AuditOperation) {
+  return Boolean(operation.operationCode?.endsWith("GUARANTEES_SAVED"));
+}
+
+function auditGuaranteeApplications(operation: AuditOperation) {
+  return Array.from(
+    operation.events
+      .filter((event) => event.entityType === "ContratGarantie" && event.action === "CREATED")
+      .reduce((rows, event) => {
+        const snapshot = auditSnapshot(event);
+        const label = auditReferenceLabel(snapshot.garantie) ?? `Garantie #${event.entityId}`;
+        const target = auditGuaranteeTarget(snapshot);
+        rows.set(`${label}:${target}`, { label, target, premium: snapshot.prime });
+        return rows;
+      }, new Map<string, { label: string; target: string; premium: unknown }>())
+      .values()
+  );
+}
+
+function auditGuaranteeTargets(operation: AuditOperation) {
+  return Array.from(new Set(auditGuaranteeApplications(operation).map((row) => row.target)));
 }
 
 function auditActionVariant(action: AdminAuditEvent["action"]): "success" | "info" | "red" {
@@ -1360,21 +1398,29 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
 }
 
 function AuditContractWorkflowResult({ operation }: { operation: AuditOperation }) {
-  const guaranteeRows = Array.from(
-    operation.events
-      .filter((event) => event.entityType === "ContratGarantie" && event.action === "CREATED")
-      .reduce((rows, event) => {
-        const snapshot = auditSnapshot(event);
-        const label = auditReferenceLabel(snapshot.garantie) ?? `Garantie #${event.entityId}`;
-        rows.set(`${label}:${auditGuaranteeTarget(snapshot)}`, {
-          label,
-          target: auditGuaranteeTarget(snapshot),
-          premium: snapshot.prime,
-        });
-        return rows;
-      }, new Map<string, { label: string; target: string; premium: unknown }>())
-      .values()
-  );
+  const guaranteeRows = auditGuaranteeApplications(operation);
+  const targetRows = Array.from(guaranteeRows.reduce((rows, guarantee) => {
+    const current = rows.get(guarantee.target) ?? {
+      target: guarantee.target,
+      guaranteeCount: 0,
+      calculatedTotal: 0,
+      uncalculatedCount: 0,
+    };
+    current.guaranteeCount += 1;
+    if (typeof guarantee.premium === "number") {
+      current.calculatedTotal += guarantee.premium;
+    } else {
+      current.uncalculatedCount += 1;
+    }
+    rows.set(guarantee.target, current);
+    return rows;
+  }, new Map<string, {
+    target: string;
+    guaranteeCount: number;
+    calculatedTotal: number;
+    uncalculatedCount: number;
+  }>()).values());
+  const multipleTargets = targetRows.length > 1;
 
   return (
     <section className="grid gap-2" aria-labelledby="audit-business-result">
@@ -1393,7 +1439,30 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
           <dd className="mt-1">{auditContractWorkflowSummary(operation)}</dd>
         </div>
       </dl>
-      {guaranteeRows.length ? (
+      {multipleTargets ? (
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
+              <TableRow>
+                <TableHead>Véhicule ou remorque</TableHead>
+                <TableHead className="text-center">Garanties</TableHead>
+                <TableHead className="text-right">Prime nette enregistrée</TableHead>
+                <TableHead className="text-center">À calculer</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {targetRows.map((row) => (
+                <TableRow key={row.target}>
+                  <TableCell className="font-medium">{row.target}</TableCell>
+                  <TableCell className="text-center">{row.guaranteeCount}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatAuditMoney(row.calculatedTotal)}</TableCell>
+                  <TableCell className="text-center">{row.uncalculatedCount || "-"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : guaranteeRows.length ? (
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
@@ -1408,8 +1477,8 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
                 <TableRow key={`${row.label}:${row.target}`}>
                   <TableCell className="font-medium">{row.label}</TableCell>
                   <TableCell>{row.target}</TableCell>
-                  <TableCell className="text-right">
-                    {typeof row.premium === "number" ? formatAuditFieldValue("prime", row.premium) : "Non calculée"}
+                  <TableCell className="text-right tabular-nums">
+                    {typeof row.premium === "number" ? formatAuditMoney(row.premium) : "Non calculée"}
                   </TableCell>
                 </TableRow>
               ))}
@@ -2225,9 +2294,15 @@ function formatAuditFieldValue(field: string, value: unknown, entityType?: strin
   }
   if (["prime", "capital", "franchiseMinimale", "montant", "montantTotal", "montantNonAffecte", "montantTtc", "primeTtc", "primeNette", "taxes", "accessoires", "debit", "credit", "totalDebit", "totalCredit", "totalDocument"].includes(field)
       && typeof value === "number") {
-    return `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} MAD`;
+    return formatAuditMoney(value);
   }
   return formatAuditValue(value);
+}
+
+function formatAuditMoney(value: number) {
+  const [integer, decimals] = (Number.isFinite(value) ? value : 0).toFixed(2).split(".");
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${grouped},${decimals} MAD`;
 }
 
 function auditEntityUrl(event: AdminAuditEvent) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
@@ -1035,7 +1035,7 @@ function auditContractWorkflowSummary(operation: AuditOperation) {
     const targetCount = auditGuaranteeTargets(operation).length;
     return applications.length
       ? targetCount > 1
-        ? `${applications.length} affectations de garanties appliquées sur ${auditOperationContextLabel(operation).toLocaleLowerCase("fr")}`
+        ? `${applications.length} garanties enregistrées sur ${auditOperationContextLabel(operation).toLocaleLowerCase("fr")}`
         : `${applications.length} garantie${applications.length > 1 ? "s" : ""} appliquée${applications.length > 1 ? "s" : ""} et tarifée${applications.length > 1 ? "s" : ""}`
       : "Garanties enregistrées et tarification mise à jour";
   }
@@ -1399,14 +1399,20 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
 
 function AuditContractWorkflowResult({ operation }: { operation: AuditOperation }) {
   const guaranteeRows = auditGuaranteeApplications(operation);
+  const targetKinds = new Set(guaranteeRows.map((row) => row.target.split(" ", 1)[0]?.toLocaleLowerCase("fr")));
+  const targetColumnLabel = targetKinds.size === 1
+    ? targetKinds.has("véhicule") ? "Véhicule" : targetKinds.has("remorque") ? "Remorque" : "Cible"
+    : "Véhicule ou remorque";
   const targetRows = Array.from(guaranteeRows.reduce((rows, guarantee) => {
     const current = rows.get(guarantee.target) ?? {
       target: guarantee.target,
       guaranteeCount: 0,
       calculatedTotal: 0,
       uncalculatedCount: 0,
+      guarantees: [],
     };
     current.guaranteeCount += 1;
+    current.guarantees.push(guarantee);
     if (typeof guarantee.premium === "number") {
       current.calculatedTotal += guarantee.premium;
     } else {
@@ -1419,6 +1425,7 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
     guaranteeCount: number;
     calculatedTotal: number;
     uncalculatedCount: number;
+    guarantees: Array<{ label: string; target: string; premium: unknown }>;
   }>()).values());
   const multipleTargets = targetRows.length > 1;
 
@@ -1434,30 +1441,22 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
           <dt className="text-xs font-medium uppercase text-muted-foreground">Cible</dt>
           <dd className="mt-1 font-medium">{auditOperationContextLabel(operation)}</dd>
         </div>
-        <div className="sm:col-span-2">
-          <dt className="text-xs font-medium uppercase text-muted-foreground">Résultat</dt>
-          <dd className="mt-1">{auditContractWorkflowSummary(operation)}</dd>
-        </div>
       </dl>
       {multipleTargets ? (
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
               <TableRow>
-                <TableHead>Véhicule ou remorque</TableHead>
+                <TableHead>{targetColumnLabel}</TableHead>
                 <TableHead className="text-center">Garanties</TableHead>
                 <TableHead className="text-right">Prime nette enregistrée</TableHead>
-                <TableHead className="text-center">À calculer</TableHead>
+                <TableHead className="text-center">Sans prime nette</TableHead>
+                <TableHead className="w-12"><span className="sr-only">Détails</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {targetRows.map((row) => (
-                <TableRow key={row.target}>
-                  <TableCell className="font-medium">{row.target}</TableCell>
-                  <TableCell className="text-center">{row.guaranteeCount}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatAuditMoney(row.calculatedTotal)}</TableCell>
-                  <TableCell className="text-center">{row.uncalculatedCount || "-"}</TableCell>
-                </TableRow>
+                <AuditGuaranteeTargetRow key={row.target} row={row} />
               ))}
             </TableBody>
           </Table>
@@ -1478,7 +1477,7 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
                   <TableCell className="font-medium">{row.label}</TableCell>
                   <TableCell>{row.target}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {typeof row.premium === "number" ? formatAuditMoney(row.premium) : "Non calculée"}
+                    {typeof row.premium === "number" ? formatAuditMoney(row.premium) : "Sans prime nette"}
                   </TableCell>
                 </TableRow>
               ))}
@@ -1487,6 +1486,66 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
         </div>
       ) : null}
     </section>
+  );
+}
+
+function AuditGuaranteeTargetRow({ row }: {
+  row: {
+    target: string;
+    guaranteeCount: number;
+    calculatedTotal: number;
+    uncalculatedCount: number;
+    guarantees: Array<{ label: string; target: string; premium: unknown }>;
+  };
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Fragment>
+      <TableRow>
+        <TableCell className="font-medium">{row.target}</TableCell>
+        <TableCell className="text-center">{row.guaranteeCount}</TableCell>
+        <TableCell className="text-right tabular-nums">{formatAuditMoney(row.calculatedTotal)}</TableCell>
+        <TableCell className="text-center">{row.uncalculatedCount || "-"}</TableCell>
+        <TableCell className="text-right">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            aria-expanded={open}
+            aria-label={`${open ? "Masquer" : "Afficher"} les garanties de ${row.target}`}
+            title={`${open ? "Masquer" : "Afficher"} les garanties`}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+          </Button>
+        </TableCell>
+      </TableRow>
+      {open ? (
+        <TableRow className="hover:bg-transparent">
+          <TableCell colSpan={5} className="bg-muted/30 px-4 py-3">
+            <div className="overflow-hidden rounded-md border bg-background">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 border-b bg-muted/50 px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
+                <span>Garantie</span>
+                <span>Prime nette</span>
+              </div>
+              {row.guarantees.map((guarantee) => (
+                <div
+                  key={`${guarantee.label}:${guarantee.target}`}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b px-3 py-2 text-sm last:border-b-0"
+                >
+                  <span className="font-medium">{guarantee.label}</span>
+                  <span className="tabular-nums text-right">
+                    {typeof guarantee.premium === "number" ? formatAuditMoney(guarantee.premium) : "Sans prime nette"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </Fragment>
   );
 }
 

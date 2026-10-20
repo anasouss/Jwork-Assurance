@@ -23,7 +23,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_audit_agence_date", columnList = "agence_id,occurred_at"),
         @Index(name = "idx_audit_entity", columnList = "entity_type,entity_id"),
         @Index(name = "idx_audit_actor_date", columnList = "actor_user_id,occurred_at"),
-        @Index(name = "idx_audit_request", columnList = "request_id")
+        @Index(name = "idx_audit_request", columnList = "request_id"),
+        @Index(name = "idx_audit_operation_code", columnList = "operation_code")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -38,7 +39,8 @@ public class AuditEvent {
             String beforeData,
             String afterData,
             String requestId,
-            String source
+            String source,
+            String operationCode
     ) {
         return new AuditEvent(
                 null,
@@ -53,7 +55,8 @@ public class AuditEvent {
                 beforeData,
                 afterData,
                 requestId,
-                source
+                source,
+                operationCode
         );
     }
 
@@ -98,4 +101,7 @@ public class AuditEvent {
 
     @Column(nullable = false, length = 30)
     private String source;
+
+    @Column(name = "operation_code", length = 80)
+    private String operationCode;
 }

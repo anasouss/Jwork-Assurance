@@ -61,6 +61,7 @@ export type AdminAuditEvent = {
   afterData?: Record<string, unknown> | null;
   requestId?: string | null;
   source?: string | null;
+  operationCode?: string | null;
 };
 
 export type AdminAuditPage = {

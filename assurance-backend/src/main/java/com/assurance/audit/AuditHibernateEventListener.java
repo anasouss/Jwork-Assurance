@@ -104,8 +104,9 @@ public class AuditHibernateEventListener implements
                 before_data,
                 after_data,
                 request_id,
-                source
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source,
+                operation_code
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
     private static final Set<String> TECHNICAL_PROPERTIES = Set.of(
             "createdAt",
@@ -280,6 +281,7 @@ public class AuditHibernateEventListener implements
                 statement.setString(10, afterJson);
                 statement.setString(11, AuditRequestContext.getRequestId());
                 statement.setString(12, source);
+                statement.setString(13, AuditRequestContext.getOperationCode());
                 statement.executeUpdate();
             }
         });

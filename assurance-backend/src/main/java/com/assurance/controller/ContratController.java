@@ -34,8 +34,10 @@ import com.assurance.dto.response.RecalculHistoriqueFinancierResponse;
 import com.assurance.dto.response.RecalculTarifsBrouillonResponse;
 import com.assurance.dto.response.RegistreProductionResponse;
 import com.assurance.enums.CategorieMouvementContrat;
+import com.assurance.enums.AuditOperationCode;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.security.AuditRequestContext;
 import com.assurance.security.TenantContext;
 import com.assurance.service.AssistanceContratService;
 import com.assurance.service.AssistanceAutomobileService;
@@ -63,6 +65,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -93,6 +96,7 @@ public class ContratController {
     @PostMapping
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<ContratResponse>> create(@Valid @RequestBody CreateContratRequest request) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_CREATED);
         return ResponseEntity.ok(ApiResponse.success(
                 contratService.create(TenantContext.getCurrentAgence(), request),
                 "Contrat cree"
@@ -188,6 +192,7 @@ public class ContratController {
     @PostMapping("/drafts")
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
     public ResponseEntity<ApiResponse<ContratResponse>> createDraft(@RequestBody CreateContratRequest request) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_DRAFT_CREATED);
         return ResponseEntity.ok(ApiResponse.success(
                 contratService.createDraft(TenantContext.getCurrentAgence(), request),
                 "Brouillon cree"
@@ -202,7 +207,12 @@ public class ContratController {
 
     @PutMapping("/drafts/{id}")
     @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
-    public ResponseEntity<ApiResponse<ContratResponse>> updateDraft(@PathVariable Long id, @RequestBody CreateContratRequest request) {
+    public ResponseEntity<ApiResponse<ContratResponse>> updateDraft(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Audit-Operation", required = false) String auditOperation,
+            @RequestBody CreateContratRequest request
+    ) {
+        AuditRequestContext.setOperation(AuditOperationCode.draftSection(auditOperation));
         return ResponseEntity.ok(ApiResponse.success(contratService.updateDraft(TenantContext.getCurrentAgence(), id, request), "Brouillon enregistre"));
     }
 
@@ -213,6 +223,7 @@ public class ContratController {
             @PathVariable Integer index,
             @RequestBody CreateContratRequest.VehiculeInput request
     ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_VEHICLE_SAVED);
         return ResponseEntity.ok(ApiResponse.success(contratService.saveDraftVehicule(TenantContext.getCurrentAgence(), id, index, request), "Vehicule enregistre"));
     }
 
@@ -223,6 +234,7 @@ public class ContratController {
             @PathVariable Integer index,
             @RequestBody(required = false) List<CreateContratRequest.GarantieInput> request
     ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_VEHICLE_GUARANTEES_SAVED);
         return ResponseEntity.ok(ApiResponse.success(contratService.saveDraftVehiculeGaranties(TenantContext.getCurrentAgence(), id, index, request), "Garanties vehicule enregistrees"));
     }
 
@@ -233,6 +245,7 @@ public class ContratController {
             @PathVariable Integer index,
             @RequestBody CreateContratRequest.RemorqueInput request
     ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_TRAILER_SAVED);
         return ResponseEntity.ok(ApiResponse.success(contratService.saveDraftRemorque(TenantContext.getCurrentAgence(), id, index, request), "Remorque enregistree"));
     }
 
@@ -243,6 +256,7 @@ public class ContratController {
             @PathVariable Integer index,
             @RequestBody(required = false) List<CreateContratRequest.GarantieInput> request
     ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_TRAILER_GUARANTEES_SAVED);
         return ResponseEntity.ok(ApiResponse.success(contratService.saveDraftRemorqueGaranties(TenantContext.getCurrentAgence(), id, index, request), "Garanties remorque enregistrees"));
     }
 
@@ -259,6 +273,7 @@ public class ContratController {
     @PostMapping("/drafts/{id}/recalcul-tarifs")
     @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> applyDraftTariffRecalculation(@PathVariable Long id) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_TARIFFS_RECALCULATED);
         return ResponseEntity.ok(ApiResponse.success(
                 contratService.applyDraftTariffRecalculation(TenantContext.getCurrentAgence(), id),
                 "Tarifs du brouillon recalcules"
@@ -268,6 +283,7 @@ public class ContratController {
     @PostMapping("/drafts/{id}/finaliser")
     @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> finalizeDraft(@PathVariable Long id, @Valid @RequestBody CreateContratRequest request) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_FINALIZED);
         return ResponseEntity.ok(ApiResponse.success(contratService.finalizeDraft(TenantContext.getCurrentAgence(), id, request), "Contrat cree"));
     }
 

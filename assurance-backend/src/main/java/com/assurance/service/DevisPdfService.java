@@ -303,14 +303,14 @@ public class DevisPdfService {
                 boolean selected = guaranteeDetails != null && !guaranteeDetails.isEmpty();
                 table.addCell(guaranteeStateCell(selected ? markerFor(code, guaranteeDetails) : "", rowBackground));
             }
-            table.addCell(valueCell(formatMoney(vehicleTotal), TextAlignment.RIGHT, rowBackground).setBold());
+            table.addCell(valueCell(formatPremiumAmount(vehicleTotal), TextAlignment.RIGHT, rowBackground).setBold());
         }
 
         table.addCell(new Cell(1, totalColumns - 1)
                 .add(new Paragraph("TOTAL").setBold())
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBorder(new SolidBorder(TABLE_BORDER, 1.2f)));
-        table.addCell(valueCell(formatMoney(grandTotal), TextAlignment.RIGHT, null).setBold());
+        table.addCell(valueCell(formatPremiumAmount(grandTotal), TextAlignment.RIGHT, null).setBold());
         document.add(table);
         document.add(new Paragraph(" "));
     }
@@ -862,6 +862,12 @@ public class DevisPdfService {
 
     private static String formatMoney(BigDecimal value) {
         DecimalFormat format = decimalFormat();
+        return format.format(value == null ? BigDecimal.ZERO : value);
+    }
+
+    private static String formatPremiumAmount(BigDecimal value) {
+        DecimalFormat format = decimalFormat();
+        format.applyPattern("#,##0.00");
         return format.format(value == null ? BigDecimal.ZERO : value);
     }
 

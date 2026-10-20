@@ -346,7 +346,7 @@ public class PreTermeFlottePdfService {
                 }
             }
             if (avecPrime) {
-                table.addCell(valueCell(formatMoney(vehicleTotal), TextAlignment.RIGHT, rowBackground));
+                table.addCell(valueCell(formatPremiumAmount(vehicleTotal), TextAlignment.RIGHT, rowBackground));
             }
         }
 
@@ -355,7 +355,7 @@ public class PreTermeFlottePdfService {
                     .add(new Paragraph("TOTAL").setBold())
                     .setTextAlignment(TextAlignment.CENTER)
                     .setBorder(new SolidBorder(TABLE_BORDER, 1.2f)));
-            table.addCell(valueCell(formatMoney(grandTotal), TextAlignment.RIGHT, null).setBold());
+            table.addCell(valueCell(formatPremiumAmount(grandTotal), TextAlignment.RIGHT, null).setBold());
         }
         document.add(table);
         document.add(new Paragraph(" "));
@@ -853,6 +853,13 @@ public class PreTermeFlottePdfService {
         symbols.setGroupingSeparator(' ');
         symbols.setDecimalSeparator(',');
         return new DecimalFormat("#,##0.##", symbols).format(value == null ? BigDecimal.ZERO : value);
+    }
+
+    private static String formatPremiumAmount(BigDecimal value) {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.FRANCE);
+        symbols.setGroupingSeparator(' ');
+        symbols.setDecimalSeparator(',');
+        return new DecimalFormat("#,##0.00", symbols).format(value == null ? BigDecimal.ZERO : value);
     }
 
     private static String formatPercent(BigDecimal value) {

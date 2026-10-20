@@ -817,8 +817,8 @@ export function AuditPanel() {
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Utilisateur</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Objet</TableHead>
+              <TableHead>Activité</TableHead>
+              <TableHead>Contexte</TableHead>
               <TableHead>Résumé</TableHead>
               <TableHead className="w-16 text-right">Détails</TableHead>
             </TableRow>
@@ -835,10 +835,12 @@ export function AuditPanel() {
                     <div className="text-xs text-muted-foreground">{operation.actorEmail}</div>
                   ) : null}
                 </TableCell>
-                <TableCell><Badge variant={auditActionVariant(operation.action)}>{auditActionLabel(operation.action)}</Badge></TableCell>
                 <TableCell>
-                  <div className="font-medium">{auditOperationEntityLabel(operation)}</div>
-                  <div className="text-xs text-muted-foreground">{auditOperationReference(operation)}</div>
+                  <Badge variant={auditActionVariant(operation.action)}>{auditOperationActionLabel(operation)}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="font-medium">{auditOperationContextLabel(operation)}</div>
+                  <div className="text-xs text-muted-foreground">{auditOperationStepLabel(operation)}</div>
                 </TableCell>
                 <TableCell className="max-w-md">{auditOperationSummary(operation)}</TableCell>
                 <TableCell className="text-right">
@@ -889,6 +891,7 @@ type AuditOperation = {
   actorEmail?: string | null;
   actorType: AdminAuditEvent["actorType"];
   action: AdminAuditEvent["action"];
+  operationCode?: string | null;
   primary: AdminAuditEvent;
   events: AdminAuditEvent[];
 };
@@ -940,9 +943,29 @@ function toAuditOperation(group: AdminAuditOperation): AuditOperation {
     actorEmail: latest.actorEmail,
     actorType: latest.actorType,
     action: primary.action,
+    operationCode: resolveAuditOperationCode(group.events),
     primary,
     events: group.events,
   };
+}
+
+function resolveAuditOperationCode(events: AdminAuditEvent[]) {
+  const explicit = events.find((event) => event.operationCode)?.operationCode;
+  if (explicit) return explicit;
+
+  const guarantees = events.filter((event) => event.entityType === "ContratGarantie");
+  if (guarantees.some((event) => event.action === "CREATED")
+      && guarantees.some((event) => event.action === "DELETED")) {
+    const target = auditSnapshot(guarantees.find((event) => event.action === "CREATED") ?? guarantees[0]);
+    if (target.remorque) return "CONTRACT_TRAILER_GUARANTEES_SAVED";
+    if (target.vehicule) return "CONTRACT_VEHICLE_GUARANTEES_SAVED";
+  }
+
+  const contract = events.find((event) => event.entityType === "Contrat" && event.action === "UPDATED");
+  if (contract && auditChangedFields(contract).includes("grilleTarifaire")) {
+    return "CONTRACT_TARIFF_GRID_SELECTED";
+  }
+  return null;
 }
 
 function auditOperationPrimaryScore(event: AdminAuditEvent, operationEvents: AdminAuditEvent[]) {
@@ -960,6 +983,9 @@ function auditOperationPrimaryScore(event: AdminAuditEvent, operationEvents: Adm
 }
 
 function auditOperationSummary(operation: AuditOperation) {
+  if (isContractWorkflowOperation(operation)) {
+    return auditContractWorkflowSummary(operation);
+  }
   if (operation.events.length === 1) return auditEventSummary(operation.primary);
   const businessItems = groupAuditBusinessItems(operation);
   if (isInvoiceCreatedFromPayment(operation)) {
@@ -994,6 +1020,33 @@ function auditOperationSummary(operation: AuditOperation) {
   return relatedCount > 0
     ? `${auditEventSummary(operation.primary)} · ${relatedCount} élément${relatedCount > 1 ? "s" : ""} lié${relatedCount > 1 ? "s" : ""}`
     : auditEventSummary(operation.primary);
+}
+
+function auditContractWorkflowSummary(operation: AuditOperation) {
+  if (operation.operationCode === "CONTRACT_TARIFF_GRID_SELECTED") {
+    const contract = operation.events.find((event) => event.entityType === "Contrat");
+    const grid = contract ? auditReferenceLabel(auditSnapshot(contract).grilleTarifaire) : null;
+    return grid
+      ? `Grille « ${grid} » sélectionnée pour le calcul des garanties`
+      : "Grille tarifaire sélectionnée pour le calcul des garanties";
+  }
+  if (operation.operationCode?.endsWith("GUARANTEES_SAVED")) {
+    const guarantees = operation.events.filter(
+      (event) => event.entityType === "ContratGarantie" && event.action === "CREATED"
+    );
+    const count = new Set(guarantees.map((event) => auditReferenceLabel(auditSnapshot(event).garantie) ?? event.entityId)).size;
+    return count
+      ? `${count} garantie${count > 1 ? "s" : ""} appliquée${count > 1 ? "s" : ""} et tarifée${count > 1 ? "s" : ""}`
+      : "Garanties enregistrées et tarification mise à jour";
+  }
+  if (operation.operationCode === "CONTRACT_TARIFFS_RECALCULATED") {
+    const changed = operation.events.filter((event) => event.entityType === "ContratGarantie" && event.action === "UPDATED").length;
+    return changed
+      ? `${changed} garantie${changed > 1 ? "s" : ""} recalculée${changed > 1 ? "s" : ""}`
+      : "Tarification vérifiée, aucune valeur modifiée";
+  }
+  if (operation.operationCode === "CONTRACT_FINALIZED") return "Brouillon validé et contrat finalisé";
+  return `${auditOperationActionLabel(operation)} · ${auditOperationContextLabel(operation)}`;
 }
 
 function groupAuditBusinessItems(operation: AuditOperation): AuditBusinessItem[] {
@@ -1081,6 +1134,93 @@ function auditActionLabel(action: AdminAuditEvent["action"]) {
   return ({ CREATED: "Création", UPDATED: "Modification", DELETED: "Suppression" })[action] ?? action;
 }
 
+const CONTRACT_WORKFLOW_OPERATION_LABELS: Record<string, string> = {
+  CONTRACT_CREATED: "Contrat créé",
+  CONTRACT_DRAFT_CREATED: "Brouillon créé",
+  CONTRACT_DRAFT_UPDATED: "Brouillon enregistré",
+  CONTRACT_SUBSCRIBER_SAVED: "Souscripteur enregistré",
+  CONTRACT_OWNER_SAVED: "Propriétaire enregistré",
+  CONTRACT_DETAILS_SAVED: "Contrat enregistré",
+  CONTRACT_TARIFF_GRID_SELECTED: "Grille sélectionnée",
+  CONTRACT_VEHICLE_SAVED: "Véhicule enregistré",
+  CONTRACT_VEHICLE_GUARANTEES_SAVED: "Garanties enregistrées",
+  CONTRACT_TRAILER_SAVED: "Remorque enregistrée",
+  CONTRACT_TRAILER_GUARANTEES_SAVED: "Garanties enregistrées",
+  CONTRACT_TARIFFS_RECALCULATED: "Tarifs recalculés",
+  CONTRACT_FINALIZED: "Contrat finalisé",
+};
+
+const CONTRACT_WORKFLOW_STEP_LABELS: Record<string, string> = {
+  CONTRACT_CREATED: "Dossier contrat · Création",
+  CONTRACT_DRAFT_CREATED: "Dossier contrat · Initialisation",
+  CONTRACT_DRAFT_UPDATED: "Dossier contrat · Brouillon",
+  CONTRACT_SUBSCRIBER_SAVED: "Dossier contrat · Souscripteur",
+  CONTRACT_OWNER_SAVED: "Dossier contrat · Propriétaire",
+  CONTRACT_DETAILS_SAVED: "Dossier contrat · Informations du contrat",
+  CONTRACT_TARIFF_GRID_SELECTED: "Dossier contrat · Grille tarifaire",
+  CONTRACT_VEHICLE_SAVED: "Dossier contrat · Véhicule",
+  CONTRACT_VEHICLE_GUARANTEES_SAVED: "Dossier contrat · Garanties du véhicule",
+  CONTRACT_TRAILER_SAVED: "Dossier contrat · Remorque",
+  CONTRACT_TRAILER_GUARANTEES_SAVED: "Dossier contrat · Garanties de la remorque",
+  CONTRACT_TARIFFS_RECALCULATED: "Dossier contrat · Tarification",
+  CONTRACT_FINALIZED: "Dossier contrat · Validation finale",
+};
+
+function isContractWorkflowOperation(operation: AuditOperation) {
+  return Boolean(operation.operationCode && CONTRACT_WORKFLOW_OPERATION_LABELS[operation.operationCode]);
+}
+
+function auditOperationActionLabel(operation: AuditOperation) {
+  return operation.operationCode
+    ? CONTRACT_WORKFLOW_OPERATION_LABELS[operation.operationCode] ?? auditActionLabel(operation.action)
+    : auditActionLabel(operation.action);
+}
+
+function auditOperationStepLabel(operation: AuditOperation) {
+  return operation.operationCode
+    ? CONTRACT_WORKFLOW_STEP_LABELS[operation.operationCode] ?? auditOperationReference(operation)
+    : auditOperationReference(operation);
+}
+
+function auditOperationContextLabel(operation: AuditOperation) {
+  if (operation.operationCode?.includes("VEHICLE_GUARANTEES")) {
+    return auditContractGuaranteeTarget(operation, "Véhicule");
+  }
+  if (operation.operationCode?.includes("TRAILER_GUARANTEES")) {
+    return auditContractGuaranteeTarget(operation, "Remorque");
+  }
+  if (operation.operationCode === "CONTRACT_VEHICLE_SAVED") {
+    const vehicle = operation.events.find((event) => event.entityType === "Vehicule");
+    return vehicle ? `Véhicule ${auditEntityReference(vehicle)}` : "Véhicule";
+  }
+  if (operation.operationCode === "CONTRACT_TRAILER_SAVED") {
+    const trailer = operation.events.find((event) => event.entityType === "Remorque");
+    return trailer ? `Remorque ${auditEntityReference(trailer)}` : "Remorque";
+  }
+  const contract = auditOperationContract(operation);
+  return contract ? `Contrat ${contract.label}` : auditOperationEntityLabel(operation);
+}
+
+function auditOperationContract(operation: AuditOperation) {
+  for (const event of operation.events) {
+    const parent = auditParentContract(event);
+    if (parent) return parent;
+    if (event.entityType === "Contrat" && event.entityId) {
+      return { id: event.entityId, label: auditEntityReference(event) };
+    }
+  }
+  return null;
+}
+
+function auditContractGuaranteeTarget(operation: AuditOperation, fallback: string) {
+  const guarantee = operation.events.find(
+    (event) => event.entityType === "ContratGarantie" && event.action === "CREATED"
+  ) ?? operation.events.find((event) => event.entityType === "ContratGarantie");
+  if (!guarantee) return fallback;
+  const target = auditGuaranteeTarget(auditSnapshot(guarantee));
+  return target.charAt(0).toLocaleUpperCase("fr") + target.slice(1);
+}
+
 function auditActionVariant(action: AdminAuditEvent["action"]): "success" | "info" | "red" {
   if (action === "CREATED") return "success";
   if (action === "DELETED") return "red";
@@ -1091,7 +1231,7 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
   const [technicalOpen, setTechnicalOpen] = useState(false);
   const businessItems = useMemo(() => operation ? groupAuditBusinessItems(operation) : [], [operation]);
   const timelineEntries = useMemo(() => groupAuditTimelineEntries(businessItems), [businessItems]);
-  const entityUrl = operation ? auditEntityUrl(operation.primary) : null;
+  const entityUrl = operation ? auditOperationEntityUrl(operation) : null;
   useEffect(() => {
     setTechnicalOpen(false);
   }, [operation?.key]);
@@ -1110,28 +1250,28 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
             <div className="grid max-h-[65vh] gap-4 overflow-y-auto pr-1">
               <div className="rounded-md border-l-4 border-l-amber-500 bg-amber-500/10 px-3 py-2">
                 <div className="font-medium text-foreground">{auditOperationDescription(operation, businessItems)}</div>
-                <div className="text-sm text-muted-foreground">Les étapes ci-dessous sont présentées dans leur ordre d’enregistrement.</div>
+                <div className="text-sm text-muted-foreground">{auditOperationStepLabel(operation)}</div>
               </div>
-              <section className="grid gap-2" aria-labelledby="audit-operation-timeline">
-                <h3 id="audit-operation-timeline" className="text-sm font-semibold">Déroulement de l’opération</h3>
-                <div className="border-y">
-                  {timelineEntries.map((entry, index) => entry.kind === "document-lines" ? (
-                    <AuditDocumentLinesTimelineItem
-                      key={entry.key}
-                      items={entry.items}
-                      index={index}
-                    />
-                  ) : (
-                    <AuditTimelineItem
-                      key={entry.key}
-                      item={entry.item}
-                      operation={operation}
-                      index={index}
-                      defaultOpen={entry.item.event.entityType === operation.primary.entityType && entry.item.event.entityId === operation.primary.entityId}
-                    />
-                  ))}
-                </div>
-              </section>
+              {isContractWorkflowOperation(operation) ? (
+                <AuditContractWorkflowResult operation={operation} />
+              ) : (
+                <section className="grid gap-2" aria-labelledby="audit-operation-timeline">
+                  <h3 id="audit-operation-timeline" className="text-sm font-semibold">Déroulement de l’opération</h3>
+                  <div className="border-y">
+                    {timelineEntries.map((entry, index) => entry.kind === "document-lines" ? (
+                      <AuditDocumentLinesTimelineItem key={entry.key} items={entry.items} index={index} />
+                    ) : (
+                      <AuditTimelineItem
+                        key={entry.key}
+                        item={entry.item}
+                        operation={operation}
+                        index={index}
+                        defaultOpen={entry.item.event.entityType === operation.primary.entityType && entry.item.event.entityId === operation.primary.entityId}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
               <Collapsible open={technicalOpen} onOpenChange={setTechnicalOpen} className="rounded-md border bg-muted/20">
                 <CollapsibleTrigger asChild>
                   <Button type="button" variant="ghost" className="w-full justify-between rounded-md px-3">
@@ -1140,11 +1280,30 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="border-t px-3 py-3">
+                  {isContractWorkflowOperation(operation) ? (
+                    <div className="mb-3 border-b pb-3">
+                      <div className="mb-2 text-xs font-medium text-foreground">Modifications techniques</div>
+                      <div className="border-y">
+                        {timelineEntries.map((entry, index) => entry.kind === "document-lines" ? (
+                          <AuditDocumentLinesTimelineItem key={entry.key} items={entry.items} index={index} />
+                        ) : (
+                          <AuditTimelineItem
+                            key={entry.key}
+                            item={entry.item}
+                            operation={operation}
+                            index={index}
+                            defaultOpen={false}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <dl className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
                     <div><dt className="font-medium text-foreground">Source</dt><dd>{auditSourceLabel(operation.primary.source)}</dd></div>
                     <div><dt className="font-medium text-foreground">ID utilisateur</dt><dd>{operation.primary.actorUserId || "-"}</dd></div>
                     <div><dt className="font-medium text-foreground">Éléments métier</dt><dd>{businessItems.length}</dd></div>
                     <div><dt className="font-medium text-foreground">Événements techniques</dt><dd>{operation.events.length}</dd></div>
+                    <div><dt className="font-medium text-foreground">Code opération</dt><dd className="font-mono">{operation.operationCode || "-"}</dd></div>
                     <div className="sm:col-span-2">
                       <dt className="font-medium text-foreground">Identifiant de requête</dt>
                       <dd className="mt-1 flex items-center gap-2">
@@ -1197,6 +1356,68 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AuditContractWorkflowResult({ operation }: { operation: AuditOperation }) {
+  const guaranteeRows = Array.from(
+    operation.events
+      .filter((event) => event.entityType === "ContratGarantie" && event.action === "CREATED")
+      .reduce((rows, event) => {
+        const snapshot = auditSnapshot(event);
+        const label = auditReferenceLabel(snapshot.garantie) ?? `Garantie #${event.entityId}`;
+        rows.set(`${label}:${auditGuaranteeTarget(snapshot)}`, {
+          label,
+          target: auditGuaranteeTarget(snapshot),
+          premium: snapshot.prime,
+        });
+        return rows;
+      }, new Map<string, { label: string; target: string; premium: unknown }>())
+      .values()
+  );
+
+  return (
+    <section className="grid gap-2" aria-labelledby="audit-business-result">
+      <h3 id="audit-business-result" className="text-sm font-semibold">Résultat de l’action</h3>
+      <dl className="grid gap-x-6 gap-y-3 border-y py-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-medium uppercase text-muted-foreground">Étape</dt>
+          <dd className="mt-1 font-medium">{auditOperationStepLabel(operation)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase text-muted-foreground">Cible</dt>
+          <dd className="mt-1 font-medium">{auditOperationContextLabel(operation)}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-xs font-medium uppercase text-muted-foreground">Résultat</dt>
+          <dd className="mt-1">{auditContractWorkflowSummary(operation)}</dd>
+        </div>
+      </dl>
+      {guaranteeRows.length ? (
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
+              <TableRow>
+                <TableHead>Garantie appliquée</TableHead>
+                <TableHead>Cible</TableHead>
+                <TableHead className="text-right">Prime nette</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {guaranteeRows.map((row) => (
+                <TableRow key={`${row.label}:${row.target}`}>
+                  <TableCell className="font-medium">{row.label}</TableCell>
+                  <TableCell>{row.target}</TableCell>
+                  <TableCell className="text-right">
+                    {typeof row.premium === "number" ? formatAuditFieldValue("prime", row.premium) : "Non calculée"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -1330,7 +1551,7 @@ function AuditTimelineItem({
           <span className="flex size-7 items-center justify-center rounded-full border bg-background text-xs font-semibold">{index + 1}</span>
           <span className="grid min-w-0 gap-1">
             <span className="flex flex-wrap items-center gap-2">
-              <Badge variant={auditActionVariant(item.event.action)}>{auditTimelineActionLabel(item.event, operation)}</Badge>
+              <Badge variant={auditTimelineActionVariant(item.event, operation)}>{auditTimelineActionLabel(item.event, operation)}</Badge>
               <span className="font-medium">
                 {auditTimelineObjectLabel(item.event, operation)}
               </span>
@@ -1375,6 +1596,9 @@ function AuditTimelineItem({
 }
 
 function auditOperationTitle(operation: AuditOperation) {
+  if (isContractWorkflowOperation(operation)) {
+    return `${auditOperationActionLabel(operation)} · ${auditOperationContextLabel(operation)}`;
+  }
   if (isInvoiceCreatedFromPayment(operation)) {
     return `Création de la facture · ${auditEntityReference(operation.primary)}`;
   }
@@ -1393,6 +1617,9 @@ function auditOperationTitle(operation: AuditOperation) {
 }
 
 function auditOperationDescription(operation: AuditOperation, items: AuditBusinessItem[]) {
+  if (isContractWorkflowOperation(operation)) {
+    return auditContractWorkflowSummary(operation);
+  }
   if (isInvoiceCreatedFromPayment(operation)) {
     const lines = items.filter((item) => item.event.entityType === "LigneDocumentClient");
     const replacedAllocations = items.filter((item) => isTransferredDirectAllocation(item.event, operation));
@@ -1462,6 +1689,11 @@ function auditBusinessItemSummary(item: AuditBusinessItem, operation: AuditOpera
   }
   if (item.event.entityType === "ContratGarantie") {
     const target = auditGuaranteeTarget(snapshot);
+    if (item.event.action === "DELETED") {
+      return hasReplacementGuarantee(item.event, operation)
+        ? `Ancienne valeur remplacée lors du recalcul de ${target}`
+        : `Retirée de ${target}`;
+    }
     const automatic = isAutomaticRcGuarantee(item.event);
     const assignment = `${automatic ? "Affectée automatiquement" : "Ajoutée"} à ${target}`;
     return snapshot.prime == null
@@ -1483,6 +1715,14 @@ function isAutomaticRcGuarantee(event: AdminAuditEvent) {
 function auditTimelineActionLabel(event: AdminAuditEvent, operation: AuditOperation) {
   if (isTransferredDirectAllocation(event, operation)) return "Transfert";
   if (isQuittanceMarkedPaid(event, operation)) return "Mise à jour automatique";
+  if (event.entityType === "ContratGarantie" && event.action === "DELETED" && hasReplacementGuarantee(event, operation)) {
+    return "Ancienne valeur";
+  }
+  if (event.entityType === "ContratGarantie" && event.action === "CREATED"
+      && operation.events.some((candidate) => candidate.action === "DELETED"
+        && auditGuaranteeBusinessKey(candidate) === auditGuaranteeBusinessKey(event))) {
+    return "Valeur appliquée";
+  }
   if (event.entityType === "LigneDocumentClient" && event.action === "CREATED") return "Ajout";
   const isAddedContractElement = event.action === "CREATED"
     && ["ContratClient", "ContratGarantie", "Vehicule", "Remorque", "AssistanceContrat"].includes(event.entityType);
@@ -1491,6 +1731,25 @@ function auditTimelineActionLabel(event: AdminAuditEvent, operation: AuditOperat
     return "Retrait";
   }
   return auditActionLabel(event.action);
+}
+
+function auditTimelineActionVariant(event: AdminAuditEvent, operation: AuditOperation): "success" | "info" | "red" {
+  if (event.entityType === "ContratGarantie" && hasReplacementGuarantee(event, operation)) {
+    return event.action === "CREATED" ? "success" : "info";
+  }
+  return auditActionVariant(event.action);
+}
+
+function hasReplacementGuarantee(event: AdminAuditEvent, operation: AuditOperation) {
+  const key = auditGuaranteeBusinessKey(event);
+  return operation.events.some((candidate) => candidate.entityType === "ContratGarantie"
+    && candidate.action === "CREATED"
+    && auditGuaranteeBusinessKey(candidate) === key);
+}
+
+function auditGuaranteeBusinessKey(event: AdminAuditEvent) {
+  const snapshot = auditSnapshot(event);
+  return `${auditReferenceLabel(snapshot.garantie) ?? ""}:${auditGuaranteeTarget(snapshot)}`;
 }
 
 function auditTimelineObjectLabel(event: AdminAuditEvent, operation: AuditOperation) {
@@ -1986,6 +2245,12 @@ function auditEntityUrl(event: AdminAuditEvent) {
     BordereauCompagnie: `/app/compta/bordereaux-compagnies/${event.entityId}`,
     CompteTresorerie: `/app/compta/tresorerie/comptes/${event.entityId}`,
   } as Record<string, string>)[event.entityType] ?? null;
+}
+
+function auditOperationEntityUrl(operation: AuditOperation) {
+  const contract = auditOperationContract(operation);
+  if (contract?.id) return `/app/production/contrats/${contract.id}`;
+  return auditEntityUrl(operation.primary);
 }
 
 function isLegacyContractCountEvent(event: AdminAuditEvent, fields: string[]) {

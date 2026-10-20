@@ -5,7 +5,10 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api/base";
 import { attestationStockKeys, contractKeys } from "@/lib/query-keys";
 import { clientApi } from "../api/clients";
-import { contractCreationApi } from "../api/contract-creation";
+import {
+  contractCreationApi,
+  type ContractDraftAuditOperation,
+} from "../api/contract-creation";
 import { contractServiceApi } from "../api/contract-services";
 import { referenceApi } from "../api/references";
 import { computeDateEcheanceFromCode, computeDateEcheanceFromMonths } from "../date";
@@ -618,11 +621,17 @@ export function useContratCreationForm(
   });
 
   const saveDraftMutation = useMutation({
-    mutationFn: async (payload: CreateContratRequest) => {
+    mutationFn: async ({
+      payload,
+      auditOperation = "CONTRACT_DRAFT_UPDATED",
+    }: {
+      payload: CreateContratRequest;
+      auditOperation?: ContractDraftAuditOperation;
+    }) => {
       if (!draftId) {
         throw new Error("Brouillon introuvable pour enregistrer cette section");
       }
-      const draft = await contractCreationApi.updateContratDraft(draftId, payload);
+      const draft = await contractCreationApi.updateContratDraft(draftId, payload, auditOperation);
       if (typeContrat === "FLOTTE") {
         return draft;
       }
@@ -1105,7 +1114,10 @@ export function useContratCreationForm(
     if (!validateSection(section)) {
       return;
     }
-    saveDraftMutation.mutate(request, {
+    saveDraftMutation.mutate({
+      payload: request,
+      auditOperation: auditOperationForSection(section),
+    }, {
       onSuccess: () => {
         setSavedSections((current) => ({ ...current, [section]: true }));
         onSuccess?.();
@@ -1228,7 +1240,7 @@ export function useContratCreationForm(
   };
 
   const handleSaveDraft = (label: string, onSuccess?: () => void) => {
-    saveDraftMutation.mutate(request, {
+    saveDraftMutation.mutate({ payload: request }, {
       onSuccess: () => {
         onSuccess?.();
         toast.success(`${label} enregistré`);
@@ -1260,8 +1272,11 @@ export function useContratCreationForm(
     }
     saveDraftMutation.mutate(
       {
-        ...request,
-        grilleTarifaireId: typeContrat === "PARTICULIER" ? undefined : emptyToUndefined(value),
+        payload: {
+          ...request,
+          grilleTarifaireId: typeContrat === "PARTICULIER" ? undefined : emptyToUndefined(value),
+        },
+        auditOperation: "CONTRACT_TARIFF_GRID_SELECTED",
       },
       {
         onSuccess: () => {
@@ -1784,6 +1799,23 @@ function sectionLabel(section: SavableContratSectionKey) {
       return "Véhicule";
     case "garanties":
       return "Garanties";
+  }
+}
+
+function auditOperationForSection(section: SavableContratSectionKey): ContractDraftAuditOperation {
+  switch (section) {
+    case "souscripteur":
+      return "CONTRACT_SUBSCRIBER_SAVED";
+    case "proprietaire":
+      return "CONTRACT_OWNER_SAVED";
+    case "contrat":
+      return "CONTRACT_DETAILS_SAVED";
+    case "grille":
+      return "CONTRACT_TARIFF_GRID_SELECTED";
+    case "vehicule":
+      return "CONTRACT_VEHICLE_SAVED";
+    case "garanties":
+      return "CONTRACT_VEHICLE_GUARANTEES_SAVED";
   }
 }
 

@@ -9,6 +9,15 @@ import type {
 
 import { unwrapApiResponse as unwrap } from "./response";
 
+export type ContractDraftAuditOperation =
+  | "CONTRACT_DRAFT_UPDATED"
+  | "CONTRACT_SUBSCRIBER_SAVED"
+  | "CONTRACT_OWNER_SAVED"
+  | "CONTRACT_DETAILS_SAVED"
+  | "CONTRACT_TARIFF_GRID_SELECTED"
+  | "CONTRACT_VEHICLE_SAVED"
+  | "CONTRACT_VEHICLE_GUARANTEES_SAVED";
+
 export const contractCreationApi = {
   async createContrat(request: CreateContratRequest) {
     return unwrap(
@@ -34,10 +43,15 @@ export const contractCreationApi = {
     );
   },
 
-  async updateContratDraft(id: string, request: CreateContratRequest) {
+  async updateContratDraft(
+    id: string,
+    request: CreateContratRequest,
+    auditOperation: ContractDraftAuditOperation = "CONTRACT_DRAFT_UPDATED"
+  ) {
     return unwrap(
       await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}`, {
         method: "PUT",
+        headers: { "X-Audit-Operation": auditOperation },
         body: JSON.stringify(request),
       })
     );

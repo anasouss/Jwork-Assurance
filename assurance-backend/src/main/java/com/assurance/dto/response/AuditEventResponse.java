@@ -25,4 +25,5 @@ public class AuditEventResponse {
     private JsonNode afterData;
     private String requestId;
     private String source;
+    private String operationCode;
 }

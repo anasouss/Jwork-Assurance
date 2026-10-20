@@ -56,7 +56,8 @@ public class AuditEventService {
                 contextJson(before),
                 contextJson(after),
                 AuditRequestContext.getRequestId(),
-                AuditRequestContext.getSource()
+                AuditRequestContext.getSource(),
+                AuditRequestContext.getOperationCode()
         ));
     }
 
@@ -204,6 +205,7 @@ public class AuditEventService {
                 .afterData(readJson(event.getAfterData()))
                 .requestId(event.getRequestId())
                 .source(event.getSource())
+                .operationCode(event.getOperationCode())
                 .build();
     }
 

@@ -1140,7 +1140,7 @@ const CONTRACT_WORKFLOW_OPERATION_LABELS: Record<string, string> = {
   CONTRACT_DRAFT_UPDATED: "Brouillon enregistré",
   CONTRACT_SUBSCRIBER_SAVED: "Souscripteur enregistré",
   CONTRACT_OWNER_SAVED: "Propriétaire enregistré",
-  CONTRACT_DETAILS_SAVED: "Contrat enregistré",
+  CONTRACT_DETAILS_SAVED: "Informations du contrat enregistrées",
   CONTRACT_TARIFF_GRID_SELECTED: "Grille sélectionnée",
   CONTRACT_GUARANTEES_SAVED: "Garanties enregistrées",
   CONTRACT_VEHICLE_SAVED: "Véhicule enregistré",
@@ -1217,12 +1217,13 @@ function auditOperationContextLabel(operation: AuditOperation) {
 }
 
 function auditOperationContract(operation: AuditOperation) {
+  const contractEvent = operation.events.find((event) => event.entityType === "Contrat" && event.entityId);
+  if (contractEvent) {
+    return { id: String(contractEvent.entityId), label: auditEntityReference(contractEvent) };
+  }
   for (const event of operation.events) {
     const parent = auditParentContract(event);
     if (parent) return parent;
-    if (event.entityType === "Contrat" && event.entityId) {
-      return { id: event.entityId, label: auditEntityReference(event) };
-    }
   }
   return null;
 }
@@ -1398,6 +1399,7 @@ function AuditOperationDialog({ operation, onOpenChange }: { operation: AuditOpe
 }
 
 function AuditContractWorkflowResult({ operation }: { operation: AuditOperation }) {
+  const showGuaranteeDetails = isGuaranteeSaveOperation(operation);
   const guaranteeRows = auditGuaranteeApplications(operation);
   const targetKinds = new Set(guaranteeRows.map((row) => row.target.split(" ", 1)[0]?.toLocaleLowerCase("fr")));
   const targetColumnLabel = targetKinds.size === 1
@@ -1442,7 +1444,7 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
           <dd className="mt-1 font-medium">{auditOperationContextLabel(operation)}</dd>
         </div>
       </dl>
-      {multipleTargets ? (
+      {showGuaranteeDetails && multipleTargets ? (
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
@@ -1461,7 +1463,7 @@ function AuditContractWorkflowResult({ operation }: { operation: AuditOperation 
             </TableBody>
           </Table>
         </div>
-      ) : guaranteeRows.length ? (
+      ) : showGuaranteeDetails && guaranteeRows.length ? (
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
@@ -1691,20 +1693,20 @@ function AuditTimelineItem({
       </CollapsibleTrigger>
       <CollapsibleContent className="pb-3 pl-[3.25rem] pr-2">
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
               <TableRow>
-                <TableHead>Champ</TableHead>
-                <TableHead>Avant</TableHead>
-                <TableHead>Après</TableHead>
+                <TableHead className="w-[22%]">Champ</TableHead>
+                <TableHead className="w-[39%]">Avant</TableHead>
+                <TableHead className="w-[39%]">Après</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {visibleFields.map((field) => (
                 <TableRow key={field}>
                   <TableCell className="font-medium">{auditFieldLabel(field)}</TableCell>
-                  <TableCell className="max-w-72 break-words text-muted-foreground">{formatAuditFieldValue(field, item.event.beforeData?.[field], item.event.entityType)}</TableCell>
-                  <TableCell className="max-w-72 break-words">{formatAuditFieldValue(field, item.event.afterData?.[field], item.event.entityType)}</TableCell>
+                  <TableCell className="whitespace-normal [overflow-wrap:anywhere] text-muted-foreground">{formatAuditFieldValue(field, item.event.beforeData?.[field], item.event.entityType)}</TableCell>
+                  <TableCell className="whitespace-normal [overflow-wrap:anywhere]">{formatAuditFieldValue(field, item.event.afterData?.[field], item.event.entityType)}</TableCell>
                 </TableRow>
               ))}
               {!fields.length ? (
@@ -2297,6 +2299,9 @@ function auditFieldLabel(field: string) {
     logoCheminStockage: "Fichier du logo",
     logoTypeMime: "Format du logo",
     logoNomFichier: "Nom du logo",
+    banqueReference: "Banque",
+    libelle: "Libellé",
+    rib: "RIB",
     signatureCheminStockage: "Fichier de signature",
     signatureTypeMime: "Format de signature",
     signatureNomFichier: "Nom de la signature",
@@ -2355,6 +2360,23 @@ function formatAuditFieldValue(field: string, value: unknown, entityType?: strin
       && typeof value === "number") {
     return formatAuditMoney(value);
   }
+  if (field === "banqueReference") {
+    const reference = auditReferenceLabel(value) ?? (typeof value === "string" ? value : null);
+    if (reference) {
+      const legacyLabel = reference.replace(/^LEGACY_[A-F0-9-]+\s*-\s*/i, "").trim();
+      return legacyLabel !== reference
+        ? legacyLabel ? `Ancienne référence · ${legacyLabel.replaceAll("_", " ")}` : "Ancienne banque non référencée"
+        : reference;
+    }
+  }
+  if (field === "rib" && typeof value === "string") {
+    const compact = value.replaceAll(" ", "");
+    if (/^\d{24}$/.test(compact)) {
+      return `${compact.slice(0, 3)} ${compact.slice(3, 6)} ${compact.slice(6, 22)} ${compact.slice(22)}`;
+    }
+  }
+  const reference = auditReferenceLabel(value);
+  if (reference) return reference;
   return formatAuditValue(value);
 }
 

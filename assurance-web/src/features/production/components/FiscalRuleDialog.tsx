@@ -113,10 +113,15 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
           </Field>
 
           {form.baseCalcul === "PRIME_GARANTIE" ? <>
-            <Field label="Garanties">
+            <Field label="Garanties précises">
               <GuaranteeMultiSelect
                 value={form.garantieIds}
                 items={(garanties.data ?? []).filter((item) => item.brancheAssuranceId === form.brancheAssuranceId)}
+                emptyLabel={form.typeGarantie === "VEHICULE"
+                  ? "Toutes les garanties véhicule"
+                  : form.typeGarantie === "PERSONNE"
+                    ? "Toutes les garanties personne"
+                    : "Toutes les garanties"}
                 onChange={(garantieIds) => setForm({ ...form, garantieId: null, garantieIds, typeGarantie: null })}
               />
             </Field>
@@ -194,15 +199,17 @@ function RequiredReferenceSelect({ value, items, onChange }: { value: string; it
 function GuaranteeMultiSelect({
   value,
   items,
+  emptyLabel,
   onChange,
 }: {
   value: string[];
   items: { id: string; code?: string | null; libelle: string }[];
+  emptyLabel: string;
   onChange: (value: string[]) => void;
 }) {
   const selected = items.filter((item) => value.includes(item.id));
   const label = selected.length === 0
-    ? "Aucune garantie précise"
+    ? emptyLabel
     : selected.length === 1
       ? referenceLabel(selected[0])
       : `${selected.length} garanties sélectionnées`;

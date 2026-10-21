@@ -30,6 +30,7 @@ import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
@@ -150,26 +151,26 @@ public class BordereauRemisePdfService {
     private void writeOverview(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
         Table overview = new Table(new float[]{1, 1, 1, 1.15f})
                 .setWidth(UnitValue.createPercentValue(100))
-                .setMarginBottom(7);
-        overview.addCell(infoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
-        overview.addCell(infoCell("DATE DE REMISE",
+                .setMarginBottom(4);
+        overview.addCell(compactInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
+        overview.addCell(compactInfoCell("DATE DE REMISE",
                 slip.getDateDepot() == null ? "À confirmer" : date(slip.getDateDepot()), regular, bold));
-        overview.addCell(infoCell("NOMBRE DE PIÈCES",
+        overview.addCell(compactInfoCell("NOMBRE DE PIÈCES",
                 slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
                         ? "-" : String.valueOf(slip.getLignes().size()), regular, bold));
-        overview.addCell(infoCell("MONTANT TOTAL", amount(slip.getMontantTotal()) + " "
-                + slip.getCompteDestination().getDevise(), regular, bold).setBackgroundColor(SOFT_ACCENT));
+        overview.addCell(compactInfoCell("MONTANT TOTAL", amount(slip.getMontantTotal()) + " "
+                + slip.getCompteDestination().getDevise(), bold, bold).setBackgroundColor(SOFT_ACCENT));
         document.add(overview);
 
         CompteTresorerie destination = slip.getCompteDestination();
-        Table bank = new Table(new float[]{1.25f, 1.35f, 1.2f, 2.2f})
+        Table bank = new Table(new float[]{1.5f, 1.3f, 1.2f, 2.4f})
                 .setWidth(UnitValue.createPercentValue(100))
-                .setMarginBottom(10);
-        bank.addCell(infoCell("REMETTANT", slip.getAgence().getNom(), regular, bold));
-        bank.addCell(infoCell("COMPTE À CRÉDITER", destination.getLibelle(), regular, bold));
-        bank.addCell(infoCell("BANQUE DESTINATAIRE", destination.getBanqueReference() == null
+                .setMarginBottom(8);
+        bank.addCell(compactInfoCell("REMETTANT", slip.getAgence().getNom(), regular, bold));
+        bank.addCell(compactInfoCell("COMPTE À CRÉDITER", destination.getLibelle(), regular, bold));
+        bank.addCell(compactInfoCell("BANQUE DESTINATAIRE", destination.getBanqueReference() == null
                 ? null : destination.getBanqueReference().getLibelle(), regular, bold));
-        bank.addCell(infoCell("RIB", formatRib(destination.getRib()), regular, bold));
+        bank.addCell(compactInfoCell("RIB", formatRib(destination.getRib()), regular, bold));
         document.add(bank);
     }
 
@@ -312,6 +313,19 @@ public class BordereauRemisePdfService {
         cell.add(new Paragraph(value(content)).setFont(regular).setFontSize(9)
                 .setFontColor(INK).setMarginTop(4).setMarginBottom(0));
         return cell;
+    }
+
+    private Cell compactInfoCell(String label, String content, PdfFont valueFont, PdfFont bold) {
+        Paragraph line = new Paragraph()
+                .add(new Text(label + " :  ").setFont(bold).setFontSize(6.2f).setFontColor(MUTED))
+                .add(new Text(value(content)).setFont(valueFont).setFontSize(8.2f).setFontColor(INK))
+                .setMargin(0)
+                .setMultipliedLeading(1);
+        return new Cell()
+                .add(line)
+                .setBorder(new SolidBorder(BORDER, 0.6f))
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setPadding(5);
     }
 
     private void addHeader(Table table, String text, PdfFont bold, TextAlignment alignment) {

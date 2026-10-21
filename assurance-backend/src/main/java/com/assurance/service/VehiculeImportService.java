@@ -27,6 +27,7 @@ import com.assurance.repository.TarifUsageRepository;
 import com.assurance.repository.UsageRepository;
 import com.assurance.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
@@ -36,15 +37,18 @@ import org.apache.poi.ss.usermodel.DataValidationConstraint;
 import org.apache.poi.ss.usermodel.DataValidationHelper;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Name;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.ss.util.CellAddress;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -71,6 +75,7 @@ public class VehiculeImportService {
 
     private static final long MAX_FILE_SIZE = 5L * 1024 * 1024;
     private static final int MAX_ROWS = 1_000;
+    private static final int STYLED_TEMPLATE_ROWS = 100;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Set<Integer> DROPDOWN_COLUMNS = Set.of(0, 3, 4, 5, 8, 10);
     private static final List<String> TEMPLATE_HEADERS = List.of(
@@ -180,15 +185,18 @@ public class VehiculeImportService {
         }
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Véhicules");
-            CellStyle headerStyle = workbook.createCellStyle();
-            var font = workbook.createFont();
-            font.setBold(true);
-            headerStyle.setFont(font);
-            CellStyle dropdownHeaderStyle = workbook.createCellStyle();
-            dropdownHeaderStyle.cloneStyleFrom(headerStyle);
-            dropdownHeaderStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-            dropdownHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            CellStyle headerStyle = createHeaderStyle(workbook, IndexedColors.DARK_GREEN);
+            CellStyle dropdownHeaderStyle = createHeaderStyle(workbook, IndexedColors.TEAL);
+            CellStyle inputStyle = createInputStyle(workbook);
+            CellStyle dropdownInputStyle = workbook.createCellStyle();
+            dropdownInputStyle.cloneStyleFrom(inputStyle);
+            dropdownInputStyle.setFillForegroundColor(IndexedColors.LIGHT_TURQUOISE.getIndex());
+            dropdownInputStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            CellStyle amountStyle = workbook.createCellStyle();
+            amountStyle.cloneStyleFrom(inputStyle);
+            amountStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
             Row header = sheet.createRow(0);
+            header.setHeightInPoints(32);
             for (int index = 0; index < TEMPLATE_HEADERS.size(); index++) {
                 Cell cell = header.createCell(index);
                 cell.setCellValue(TEMPLATE_HEADERS.get(index));
@@ -229,9 +237,10 @@ public class VehiculeImportService {
             for (int index = 0; index < vehicles.size(); index++) {
                 writeVehicleRow(sheet.createRow(index + 1), vehicles.get(index), fuelCodes);
             }
-            if (vehicles.isEmpty()) {
-                sheet.createRow(1).createCell(0);
-            }
+            styleInputRows(sheet, inputStyle, dropdownInputStyle, amountStyle,
+                    Math.max(STYLED_TEMPLATE_ROWS, vehicles.size()));
+            sheet.setDisplayGridlines(false);
+            sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TEMPLATE_HEADERS.size() - 1));
             sheet.createFreezePane(0, 1);
             sheet.setActiveCell(new CellAddress(1, 0));
             workbook.setSheetHidden(workbook.getSheetIndex(references), true);
@@ -239,6 +248,65 @@ public class VehiculeImportService {
             return output.toByteArray();
         } catch (Exception exception) {
             throw new BadRequestException(errorMessage);
+        }
+    }
+
+    private CellStyle createHeaderStyle(Workbook workbook, IndexedColors fillColor) {
+        CellStyle style = workbook.createCellStyle();
+        var font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.WHITE.getIndex());
+        style.setFont(font);
+        style.setFillForegroundColor(fillColor.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setWrapText(true);
+        applyBorders(style, IndexedColors.WHITE.getIndex());
+        return style;
+    }
+
+    private CellStyle createInputStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        applyBorders(style, IndexedColors.GREY_40_PERCENT.getIndex());
+        return style;
+    }
+
+    private void applyBorders(CellStyle style, short color) {
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setTopBorderColor(color);
+        style.setRightBorderColor(color);
+        style.setBottomBorderColor(color);
+        style.setLeftBorderColor(color);
+    }
+
+    private void styleInputRows(
+            Sheet sheet,
+            CellStyle inputStyle,
+            CellStyle dropdownInputStyle,
+            CellStyle amountStyle,
+            int rowCount
+    ) {
+        for (int rowIndex = 1; rowIndex <= rowCount; rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) {
+                row = sheet.createRow(rowIndex);
+            }
+            row.setHeightInPoints(22);
+            for (int column = 0; column < TEMPLATE_HEADERS.size(); column++) {
+                Cell cell = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+                if (DROPDOWN_COLUMNS.contains(column)) {
+                    cell.setCellStyle(dropdownInputStyle);
+                } else if (column >= 14 && column <= 16) {
+                    cell.setCellStyle(amountStyle);
+                } else {
+                    cell.setCellStyle(inputStyle);
+                }
+            }
         }
     }
 

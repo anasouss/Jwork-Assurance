@@ -103,11 +103,11 @@ public class BordereauRemisePdfService {
     private void writeHeader(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
         Table header = new Table(new float[]{1, 2.4f})
                 .setWidth(UnitValue.createPercentValue(100));
-        Cell identity = cell().setMinHeight(48).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        Cell identity = cell().setMinHeight(52).setVerticalAlignment(VerticalAlignment.MIDDLE);
         byte[] logo = agencyLogoStorageService.loadBytesIfPresent(slip.getAgence().getLogoCheminStockage());
         if (logo != null && logo.length > 0) {
             Image image = new Image(ImageDataFactory.create(logo));
-            image.scaleToFit(130, 44);
+            image.scaleToFit(150, 50);
             identity.add(image);
         } else {
             identity.add(new Paragraph(slip.getAgence().getNom()).setFont(bold).setFontSize(15));
@@ -297,13 +297,11 @@ public class BordereauRemisePdfService {
         footer.add(new Paragraph(agencyLine(slip.getAgence()))
                 .setFont(regular).setFontSize(6.4f).setFontColor(MUTED)
                 .setTextAlignment(TextAlignment.CENTER).setMargin(0).setMultipliedLeading(1));
-        String documentReference = "Bordereau " + slip.getNumero();
         if (pageCount > 1) {
-            documentReference += "  ·  Page " + pageNumber + " / " + pageCount;
+            footer.add(new Paragraph("Page " + pageNumber + " / " + pageCount)
+                    .setFont(regular).setFontSize(6.4f).setFontColor(MUTED)
+                    .setTextAlignment(TextAlignment.CENTER).setMargin(0));
         }
-        footer.add(new Paragraph(documentReference)
-                .setFont(regular).setFontSize(6.4f).setFontColor(MUTED)
-                .setTextAlignment(TextAlignment.CENTER).setMargin(0));
         footer.close();
     }
 

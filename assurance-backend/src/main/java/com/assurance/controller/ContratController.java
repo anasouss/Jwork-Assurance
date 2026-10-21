@@ -218,6 +218,15 @@ public class ContratController {
                 .body(vehiculeImportService.template(TenantContext.getCurrentAgence(), id));
     }
 
+    @GetMapping("/drafts/{id}/vehicules/export")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<byte[]> exportSubmittedVehicles(@PathVariable Long id) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=vehicules-flotte.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(vehiculeImportService.exportSubmittedVehicles(TenantContext.getCurrentAgence(), id));
+    }
+
     @PostMapping(value = "/drafts/{id}/vehicules/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<VehiculeImportPreviewResponse>> previewVehicleImport(

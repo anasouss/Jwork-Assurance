@@ -60,6 +60,10 @@ export const contractCreationApi = {
     return apiFetchBlob(`/api/v1/contrats/drafts/${id}/vehicules/import-modele`);
   },
 
+  async exportSubmittedVehicles(id: string) {
+    return apiFetchBlob(`/api/v1/contrats/drafts/${id}/vehicules/export`);
+  },
+
   async updateContratDraft(
     id: string,
     request: CreateContratRequest,

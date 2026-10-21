@@ -7,6 +7,7 @@ import com.assurance.entity.CategorieTransport;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.SousClasse;
 import com.assurance.entity.Usage;
+import com.assurance.entity.Vehicule;
 import com.assurance.enums.ChampMoteurSousClasse;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeVehiculeContrat;
@@ -144,6 +145,20 @@ public class VehiculeImportService {
     @Transactional(readOnly = true)
     public byte[] template(Long agenceId, Long contratId) {
         Contrat contrat = requireFleetDraft(agenceId, contratId);
+        return createWorkbook(contrat, List.of(), "Génération du modèle Excel impossible");
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportSubmittedVehicles(Long agenceId, Long contratId) {
+        Contrat contrat = requireFleetDraft(agenceId, contratId);
+        List<Vehicule> vehicles = vehiculeRepository.findForExportByContratIdOrderByCreatedAtAsc(contratId);
+        if (vehicles.isEmpty()) {
+            throw new BadRequestException("Aucun véhicule enregistré à exporter");
+        }
+        return createWorkbook(contrat, vehicles, "Export des véhicules impossible");
+    }
+
+    private byte[] createWorkbook(Contrat contrat, List<Vehicule> vehicles, String errorMessage) {
         List<Usage> usages = allowedTemplateUsages(contrat);
         if (usages.isEmpty()) {
             throw new BadRequestException("Aucun usage n'est disponible pour la grille tarifaire et la catégorie client");
@@ -191,12 +206,70 @@ public class VehiculeImportService {
             addListValidation(sheet, 4, "CARBURANTS", "Sélectionnez un carburant proposé");
             addListValidation(sheet, 7, "SOUS_CLASSES", "Sélectionnez une sous-classe proposée");
             addListValidation(sheet, 9, "CATEGORIES_TRANSPORT", "Sélectionnez une catégorie proposée");
+            Map<String, String> fuelCodes = fuelCodesByValue();
+            for (int index = 0; index < vehicles.size(); index++) {
+                writeVehicleRow(sheet.createRow(index + 1), vehicles.get(index), fuelCodes);
+            }
             sheet.createFreezePane(0, 1);
             workbook.setSheetHidden(workbook.getSheetIndex(references), true);
             workbook.write(output);
             return output.toByteArray();
         } catch (Exception exception) {
-            throw new BadRequestException("Génération du modèle Excel impossible");
+            throw new BadRequestException(errorMessage);
+        }
+    }
+
+    private void writeVehicleRow(Row row, Vehicule vehicle, Map<String, String> fuelCodes) {
+        setText(row, 0, vehicle.getUsage() == null ? null : vehicle.getUsage().getCode());
+        setText(row, 1, vehicle.getImmatriculation());
+        setText(row, 2, vehicle.getMarque() == null ? null : vehicle.getMarque().getLibelle());
+        setText(row, 3, vehicle.getCarrosserie() == null ? null : vehicle.getCarrosserie().getLibelle());
+        setText(row, 4, exportFuel(vehicle.getCarburant(), fuelCodes));
+        setText(row, 5, vehicle.getPuissanceFiscale());
+        setText(row, 6, vehicle.getCylindree());
+        setText(row, 7, vehicle.getSousClasse());
+        setText(row, 8, vehicle.getPtc());
+        setText(row, 9, vehicle.getCategorieTransport() == null ? null : vehicle.getCategorieTransport().getCode());
+        setDate(row, 10, vehicle.getDatePremiereCirculation());
+        setDate(row, 11, vehicle.getDateExpirationCarteGrise());
+        setText(row, 12, vehicle.getNombrePlaces());
+        setNumber(row, 13, vehicle.getValeurNeuf());
+        setNumber(row, 14, vehicle.getValeurVenale());
+        setNumber(row, 15, vehicle.getValeurGlace());
+        setText(row, 16, vehicle.getCrm());
+    }
+
+    private Map<String, String> fuelCodesByValue() {
+        Map<String, String> fuelCodes = new LinkedHashMap<>();
+        for (Carburant fuel : carburantRepository.findAll()) {
+            fuelCodes.putIfAbsent(normalize(fuel.getCode()), fuel.getCode());
+            fuelCodes.putIfAbsent(normalize(fuel.getLibelle()), fuel.getCode());
+        }
+        return fuelCodes;
+    }
+
+    private String exportFuel(String value, Map<String, String> fuelCodes) {
+        if (blank(value)) {
+            return null;
+        }
+        return fuelCodes.getOrDefault(normalize(value), value);
+    }
+
+    private void setText(Row row, int column, String value) {
+        if (!blank(value)) {
+            row.createCell(column).setCellValue(value);
+        }
+    }
+
+    private void setDate(Row row, int column, LocalDate value) {
+        if (value != null) {
+            row.createCell(column).setCellValue(value.format(DATE_FORMAT));
+        }
+    }
+
+    private void setNumber(Row row, int column, BigDecimal value) {
+        if (value != null) {
+            row.createCell(column).setCellValue(value.doubleValue());
         }
     }
 
@@ -204,7 +277,7 @@ public class VehiculeImportService {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         if (contrat.getTypeContrat() != TypeContrat.FLOTTE || !Boolean.TRUE.equals(contrat.getBrouillon())) {
-            throw new BadRequestException("L'import est disponible uniquement pour un brouillon flotte");
+            throw new BadRequestException("Cette opération est disponible uniquement pour un brouillon flotte");
         }
         return contrat;
     }

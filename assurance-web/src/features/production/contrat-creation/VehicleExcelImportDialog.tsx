@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, FileDown, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,12 +23,14 @@ export function VehicleExcelImportDialog({
   existingVehicles: VehiculeInput[];
   onApply: (vehicles: VehiculeInput[]) => void;
 }) {
+  const hasSubmittedVehicles = existingVehicles.some((vehicle) => vehicle.vehiculeId != null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<VehicleImportPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const reset = () => {
     setFile(null);
@@ -67,6 +69,19 @@ export function VehicleExcelImportDialog({
     }
   };
 
+  const exportVehicles = async () => {
+    if (!draftId) return;
+    setExporting(true);
+    try {
+      const blob = await contractCreationApi.exportSubmittedVehicles(draftId);
+      downloadBlob(blob, "vehicules-flotte.xlsx");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export Excel impossible");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const apply = () => {
     if (!preview || preview.lignesEnErreur > 0) return;
     const imported = preview.lignes.flatMap((row) => row.vehicule ? [row.vehicule] : []);
@@ -78,10 +93,23 @@ export function VehicleExcelImportDialog({
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" disabled={!draftId} onClick={() => setOpen(true)}>
-        <FileSpreadsheet className="size-4" />
-        Importer Excel
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={!draftId} onClick={() => setOpen(true)}>
+          <FileSpreadsheet className="size-4" />
+          Importer Excel
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          title={hasSubmittedVehicles ? "Exporter les véhicules enregistrés" : "Enregistrez d’abord les véhicules"}
+          disabled={!draftId || !hasSubmittedVehicles || exporting}
+          onClick={exportVehicles}
+        >
+          {exporting ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
+          Exporter Excel
+        </Button>
+      </div>
       <Dialog open={open} onOpenChange={(next) => {
         setOpen(next);
         if (!next) reset();
@@ -174,6 +202,15 @@ export function VehicleExcelImportDialog({
       </Dialog>
     </>
   );
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function Metric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "success" | "danger" }) {

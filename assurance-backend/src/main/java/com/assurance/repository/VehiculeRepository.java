@@ -15,6 +15,16 @@ public interface VehiculeRepository extends JpaRepository<Vehicule, Long> {
 
     List<Vehicule> findByContratIdOrderByCreatedAtAsc(Long contratId);
 
+    @Query("""
+            select v
+            from Vehicule v
+            where v.contrat.id = :contratId
+              and (v.actif is null or v.actif = true)
+            order by v.createdAt asc
+            """)
+    @EntityGraph(attributePaths = {"usage", "marque", "carrosserie", "categorieTransport"})
+    List<Vehicule> findForExportByContratIdOrderByCreatedAtAsc(@Param("contratId") Long contratId);
+
     List<Vehicule> findByContratIdInOrderByCreatedAtAsc(Collection<Long> contratIds);
 
     @Query("""

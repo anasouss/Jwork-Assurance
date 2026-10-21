@@ -283,12 +283,15 @@ public class BordereauRemisePdfService {
         Rectangle pageSize = page.getPageSize();
         PdfCanvas canvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdf);
         canvas.setStrokeColor(FOOTER_ACCENT).setLineWidth(0.5f)
-                .moveTo(PAGE_MARGIN, 25).lineTo(pageSize.getWidth() - PAGE_MARGIN, 25).stroke();
+                .moveTo(PAGE_MARGIN, 28).lineTo(pageSize.getWidth() - PAGE_MARGIN, 28).stroke();
         Canvas footer = new Canvas(canvas, pdf, new Rectangle(
-                PAGE_MARGIN, 8, pageSize.getWidth() - PAGE_MARGIN * 2, 13));
-        footer.add(new Paragraph(agencyLine(slip.getAgence()) + "  ·  " + slip.getNumero()
+                PAGE_MARGIN, 5, pageSize.getWidth() - PAGE_MARGIN * 2, 20));
+        footer.add(new Paragraph(agencyLine(slip.getAgence()))
+                .setFont(regular).setFontSize(6.4f).setFontColor(MUTED)
+                .setTextAlignment(TextAlignment.CENTER).setMargin(0).setMultipliedLeading(1));
+        footer.add(new Paragraph("Bordereau " + slip.getNumero()
                         + "  ·  Page " + pdf.getPageNumber(page))
-                .setFont(regular).setFontSize(7).setFontColor(MUTED)
+                .setFont(regular).setFontSize(6.4f).setFontColor(MUTED)
                 .setTextAlignment(TextAlignment.CENTER).setMargin(0));
         footer.close();
     }

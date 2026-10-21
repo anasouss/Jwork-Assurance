@@ -19,6 +19,7 @@ public class VehiculeImportPreviewResponse {
     public static class Ligne {
         private int numeroLigne;
         private String immatriculation;
+        private String numeroAttestation;
         private String usage;
         private String marque;
         private CreateContratRequest.VehiculeInput vehicule;

@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.dto.response.AttestationNumeroValidationResponse;
 import com.assurance.dto.response.VehiculeImportPreviewResponse;
 import com.assurance.entity.Carburant;
 import com.assurance.entity.CategorieTransport;
@@ -9,6 +10,7 @@ import com.assurance.entity.SousClasse;
 import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.ChampMoteurSousClasse;
+import com.assurance.enums.ModeTermeRenouvellement;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeVehiculeContrat;
 import com.assurance.exception.BadRequestException;
@@ -70,9 +72,9 @@ public class VehiculeImportService {
     private static final long MAX_FILE_SIZE = 5L * 1024 * 1024;
     private static final int MAX_ROWS = 1_000;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final Set<Integer> DROPDOWN_COLUMNS = Set.of(0, 2, 3, 4, 7, 9);
+    private static final Set<Integer> DROPDOWN_COLUMNS = Set.of(0, 3, 4, 5, 8, 10);
     private static final List<String> TEMPLATE_HEADERS = List.of(
-            "Usage", "Immatriculation", "Marque", "Carrosserie", "Carburant",
+            "Usage", "Immatriculation", "N° attestation", "Marque", "Carrosserie", "Carburant",
             "Puissance fiscale", "Cylindrée", "Sous-classe", "PTC", "Catégorie transport",
             "Date mise en circulation", "Date validité CG", "Nombre de places",
             "Valeur à neuf", "Valeur vénale", "Valeur glace", "CRM"
@@ -89,6 +91,7 @@ public class VehiculeImportService {
     private final TarifUsageRepository tarifUsageRepository;
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
     private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
+    private final AttestationStockService attestationStockService;
 
     @Transactional(readOnly = true)
     public VehiculeImportPreviewResponse preview(Long agenceId, Long contratId, MultipartFile file) {
@@ -108,12 +111,20 @@ public class VehiculeImportService {
             requireColumns(columns, "usage", "immatriculation", "marque", "carrosserie",
                     "datevaliditecg", "nombredeplaces", "crm");
 
+            List<Vehicule> existingVehicles = vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contratId);
             Set<String> existingRegistrations = new HashSet<>();
-            vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contratId).stream()
+            existingVehicles.stream()
                     .map(item -> normalizedRegistration(item.getImmatriculation()))
                     .filter(value -> !value.isBlank())
                     .forEach(existingRegistrations::add);
+            Set<String> existingAttestations = new HashSet<>();
+            existingVehicles.stream()
+                    .map(Vehicule::getNumeroAttestation)
+                    .filter(value -> !blank(value))
+                    .map(this::normalize)
+                    .forEach(existingAttestations::add);
             Set<String> fileRegistrations = new HashSet<>();
+            Set<String> fileAttestations = new HashSet<>();
             List<VehiculeImportPreviewResponse.Ligne> rows = new ArrayList<>();
             DataFormatter formatter = new DataFormatter(Locale.FRANCE);
             int firstDataRow = sheet.getFirstRowNum() + 1;
@@ -123,8 +134,8 @@ public class VehiculeImportService {
                 if (isBlank(row, formatter)) {
                     continue;
                 }
-                rows.add(parseRow(contrat, row, rowIndex + 1, columns, formatter,
-                        existingRegistrations, fileRegistrations));
+                rows.add(parseRow(agenceId, contrat, row, rowIndex + 1, columns, formatter,
+                        existingRegistrations, fileRegistrations, existingAttestations, fileAttestations));
             }
             if (sheet.getLastRowNum() >= firstDataRow + MAX_ROWS) {
                 throw new BadRequestException("Le fichier dépasse la limite de " + MAX_ROWS + " véhicules");
@@ -148,26 +159,24 @@ public class VehiculeImportService {
 
     @Transactional(readOnly = true)
     public byte[] template(Long agenceId, Long contratId) {
-        Contrat contrat = requireFleetContract(agenceId, contratId);
-        return createWorkbook(contrat, List.of(), "Génération du modèle Excel impossible");
+        requireFleetContract(agenceId, contratId);
+        return createWorkbook(List.of(), "Génération du modèle Excel impossible");
     }
 
     @Transactional(readOnly = true)
     public byte[] exportSubmittedVehicles(Long agenceId, Long contratId) {
-        Contrat contrat = requireFleetContract(agenceId, contratId);
+        requireFleetContract(agenceId, contratId);
         List<Vehicule> vehicles = vehiculeRepository.findForExportByContratIdOrderByCreatedAtAsc(contratId);
         if (vehicles.isEmpty()) {
             throw new BadRequestException("Aucun véhicule enregistré à exporter");
         }
-        return createWorkbook(contrat, vehicles, "Export des véhicules impossible");
+        return createWorkbook(vehicles, "Export des véhicules impossible");
     }
 
-    private byte[] createWorkbook(Contrat contrat, List<Vehicule> vehicles, String errorMessage) {
-        List<Usage> usages = vehicles.isEmpty()
-                ? allowedTemplateUsages(contrat)
-                : exportWorkbookUsages(contrat, vehicles);
-        if (vehicles.isEmpty() && usages.isEmpty()) {
-            throw new BadRequestException("Aucun usage n'est disponible pour la grille tarifaire et la catégorie client");
+    private byte[] createWorkbook(List<Vehicule> vehicles, String errorMessage) {
+        List<Usage> usages = generalWorkbookUsages(vehicles);
+        if (usages.isEmpty()) {
+            throw new BadRequestException("Aucun usage actif n'est disponible");
         }
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Véhicules");
@@ -205,17 +214,17 @@ public class VehiculeImportService {
                             .map(Carburant::getCode)
                             .distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList());
             addReferenceList(workbook, references, 4, "SOUS_CLASSES", "Sous-classes",
-                    allowedTemplateSubclasses(usages));
+                    generalWorkbookSubclasses(vehicles));
             addReferenceList(workbook, references, 5, "CATEGORIES_TRANSPORT", "Catégories transport",
                     categorieTransportRepository.findByActifTrueOrderByLibelleAsc().stream()
                             .map(CategorieTransport::getCode).distinct().toList());
 
             addListValidation(sheet, 0, "USAGES", "Sélectionnez un usage proposé");
-            addListValidation(sheet, 2, "MARQUES", "Sélectionnez une marque proposée");
-            addListValidation(sheet, 3, "CARROSSERIES", "Sélectionnez une carrosserie proposée");
-            addListValidation(sheet, 4, "CARBURANTS", "Sélectionnez un carburant proposé");
-            addListValidation(sheet, 7, "SOUS_CLASSES", "Sélectionnez une sous-classe proposée");
-            addListValidation(sheet, 9, "CATEGORIES_TRANSPORT", "Sélectionnez une catégorie proposée");
+            addListValidation(sheet, 3, "MARQUES", "Sélectionnez une marque proposée");
+            addListValidation(sheet, 4, "CARROSSERIES", "Sélectionnez une carrosserie proposée");
+            addListValidation(sheet, 5, "CARBURANTS", "Sélectionnez un carburant proposé");
+            addListValidation(sheet, 8, "SOUS_CLASSES", "Sélectionnez une sous-classe proposée");
+            addListValidation(sheet, 10, "CATEGORIES_TRANSPORT", "Sélectionnez une catégorie proposée");
             Map<String, String> fuelCodes = fuelCodesByValue();
             for (int index = 0; index < vehicles.size(); index++) {
                 writeVehicleRow(sheet.createRow(index + 1), vehicles.get(index), fuelCodes);
@@ -236,21 +245,22 @@ public class VehiculeImportService {
     private void writeVehicleRow(Row row, Vehicule vehicle, Map<String, String> fuelCodes) {
         setText(row, 0, vehicle.getUsage() == null ? null : vehicle.getUsage().getCode());
         setText(row, 1, vehicle.getImmatriculation());
-        setText(row, 2, vehicle.getMarque() == null ? null : vehicle.getMarque().getLibelle());
-        setText(row, 3, vehicle.getCarrosserie() == null ? null : vehicle.getCarrosserie().getLibelle());
-        setText(row, 4, exportFuel(vehicle.getCarburant(), fuelCodes));
-        setText(row, 5, vehicle.getPuissanceFiscale());
-        setText(row, 6, vehicle.getCylindree());
-        setText(row, 7, vehicle.getSousClasse());
-        setText(row, 8, vehicle.getPtc());
-        setText(row, 9, vehicle.getCategorieTransport() == null ? null : vehicle.getCategorieTransport().getCode());
-        setDate(row, 10, vehicle.getDatePremiereCirculation());
-        setDate(row, 11, vehicle.getDateExpirationCarteGrise());
-        setText(row, 12, vehicle.getNombrePlaces());
-        setNumber(row, 13, vehicle.getValeurNeuf());
-        setNumber(row, 14, vehicle.getValeurVenale());
-        setNumber(row, 15, vehicle.getValeurGlace());
-        setText(row, 16, vehicle.getCrm());
+        setText(row, 2, vehicle.getNumeroAttestation());
+        setText(row, 3, vehicle.getMarque() == null ? null : vehicle.getMarque().getLibelle());
+        setText(row, 4, vehicle.getCarrosserie() == null ? null : vehicle.getCarrosserie().getLibelle());
+        setText(row, 5, exportFuel(vehicle.getCarburant(), fuelCodes));
+        setText(row, 6, vehicle.getPuissanceFiscale());
+        setText(row, 7, vehicle.getCylindree());
+        setText(row, 8, vehicle.getSousClasse());
+        setText(row, 9, vehicle.getPtc());
+        setText(row, 10, vehicle.getCategorieTransport() == null ? null : vehicle.getCategorieTransport().getCode());
+        setDate(row, 11, vehicle.getDatePremiereCirculation());
+        setDate(row, 12, vehicle.getDateExpirationCarteGrise());
+        setText(row, 13, vehicle.getNombrePlaces());
+        setNumber(row, 14, vehicle.getValeurNeuf());
+        setNumber(row, 15, vehicle.getValeurVenale());
+        setNumber(row, 16, vehicle.getValeurGlace());
+        setText(row, 17, vehicle.getCrm());
     }
 
     private Map<String, String> fuelCodesByValue() {
@@ -304,58 +314,32 @@ public class VehiculeImportService {
         return contrat;
     }
 
-    private List<Usage> exportWorkbookUsages(Contrat contrat, List<Vehicule> vehicles) {
+    private List<Usage> generalWorkbookUsages(List<Vehicule> vehicles) {
         Map<Long, Usage> usagesById = new LinkedHashMap<>();
+        usageRepository.findAll().stream()
+                .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
+                .forEach(usage -> usagesById.putIfAbsent(usage.getId(), usage));
         vehicles.stream()
                 .map(Vehicule::getUsage)
                 .filter(java.util.Objects::nonNull)
                 .forEach(usage -> usagesById.putIfAbsent(usage.getId(), usage));
-        if (contrat.getCategorieClient() != null && contrat.getGrilleTarifaire() != null) {
-            allowedTemplateUsages(contrat)
-                    .forEach(usage -> usagesById.putIfAbsent(usage.getId(), usage));
-        }
         return usagesById.values().stream()
                 .sorted(Comparator.comparing(Usage::getCode, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
-    private List<Usage> allowedTemplateUsages(Contrat contrat) {
-        if (contrat.getCategorieClient() == null) {
-            throw new BadRequestException("Enregistrez la catégorie client avant de télécharger le modèle");
-        }
-        if (contrat.getGrilleTarifaire() == null) {
-            throw new BadRequestException("Enregistrez la grille tarifaire avant de télécharger le modèle");
-        }
-        Long gridId = contrat.getGrilleTarifaire().getId();
-        Set<Long> tariffedUsageIds = new HashSet<>();
-        ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndActifTrue(gridId).stream()
-                .filter(item -> item.getUsage() != null)
-                .map(item -> item.getUsage().getId())
-                .forEach(tariffedUsageIds::add);
-        formuleGarantiePersonneRepository.findByGrilleTarifaireIdInAndActifTrue(Set.of(gridId)).stream()
-                .filter(item -> item.getUsage() != null)
-                .map(item -> item.getUsage().getId())
-                .forEach(tariffedUsageIds::add);
-        Set<Long> categoryUsageIds = contrat.getCategorieClient().getUsages() == null
-                ? Set.of()
-                : contrat.getCategorieClient().getUsages().stream().map(Usage::getId).collect(java.util.stream.Collectors.toSet());
-        return usageRepository.findAll().stream()
-                .filter(item -> Boolean.TRUE.equals(item.getActif()))
-                .filter(item -> tariffedUsageIds.contains(item.getId()))
-                .filter(item -> categoryUsageIds.isEmpty() || categoryUsageIds.contains(item.getId()))
-                .sorted(Comparator.comparing(Usage::getCode, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-    }
-
-    private List<String> allowedTemplateSubclasses(List<Usage> usages) {
-        Set<Long> usageIds = usages.stream().map(Usage::getId).collect(java.util.stream.Collectors.toSet());
-        return usageIds.stream()
-                .flatMap(usageId -> tarifUsageRepository.findByUsage_IdAndActifTrue(usageId).stream())
-                .map(item -> item.getSousClasse())
-                .filter(java.util.Objects::nonNull)
+    private List<String> generalWorkbookSubclasses(List<Vehicule> vehicles) {
+        Set<String> codes = new HashSet<>();
+        sousClasseRepository.findAll().stream()
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
                 .map(SousClasse::getCode)
-                .distinct()
+                .filter(code -> !blank(code))
+                .forEach(codes::add);
+        vehicles.stream()
+                .map(Vehicule::getSousClasse)
+                .filter(code -> !blank(code))
+                .forEach(codes::add);
+        return codes.stream()
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
     }
@@ -408,13 +392,16 @@ public class VehiculeImportService {
     }
 
     private VehiculeImportPreviewResponse.Ligne parseRow(
+            Long agenceId,
             Contrat contrat,
             Row row,
             int rowNumber,
             Map<String, Integer> columns,
             DataFormatter formatter,
             Set<String> existingRegistrations,
-            Set<String> fileRegistrations
+            Set<String> fileRegistrations,
+            Set<String> existingAttestations,
+            Set<String> fileAttestations
     ) {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
@@ -426,6 +413,10 @@ public class VehiculeImportService {
         input.setImmatriculation(registration);
         input.setNombrePlaces(text(row, columns, "nombredeplaces", formatter));
         input.setCrm(text(row, columns, "crm", formatter));
+        String attestation = optionalText(row, columns, "nattestation", formatter);
+        input.setNumeroAttestation(attestation != null
+                ? attestation
+                : optionalText(row, columns, "numeroattestation", formatter));
         input.setPuissanceFiscale(optionalText(row, columns, "puissancefiscale", formatter));
         input.setCylindree(optionalText(row, columns, "cylindree", formatter));
         input.setPtc(optionalText(row, columns, "ptc", formatter));
@@ -454,6 +445,7 @@ public class VehiculeImportService {
 
         resolveConditionalReferences(input, usage, row, columns, formatter, errors);
         validateRequired(input, usage, errors);
+        validateAttestationStock(agenceId, contrat, usage, input, existingAttestations, fileAttestations, errors);
         String normalized = normalizedRegistration(registration);
         if (normalized.isBlank()) {
             errors.add("Immatriculation obligatoire");
@@ -469,12 +461,64 @@ public class VehiculeImportService {
         return VehiculeImportPreviewResponse.Ligne.builder()
                 .numeroLigne(rowNumber)
                 .immatriculation(registration)
+                .numeroAttestation(input.getNumeroAttestation())
                 .usage(usage == null ? usageValue : usage.getCode() + " - " + usage.getLibelle())
                 .marque(brandValue)
                 .vehicule(errors.isEmpty() ? input : null)
                 .erreurs(errors)
                 .avertissements(warnings)
                 .build();
+    }
+
+    private void validateAttestationStock(
+            Long agenceId,
+            Contrat contrat,
+            Usage usage,
+            CreateContratRequest.VehiculeInput input,
+            Set<String> existingAttestations,
+            Set<String> fileAttestations,
+            List<String> errors
+    ) {
+        if (usage == null
+                || Boolean.TRUE.equals(contrat.getProspection())
+                || contrat.getModeTermeRenouvellement() == ModeTermeRenouvellement.COMPAGNIE) {
+            return;
+        }
+        Long compagnieId = contrat.getCompagnieAssurance() == null
+                ? null
+                : contrat.getCompagnieAssurance().getId();
+        Long categorieClientId = contrat.getCategorieClient() == null
+                ? null
+                : contrat.getCategorieClient().getId();
+        try {
+            AttestationNumeroValidationResponse validation = attestationStockService.validerNumero(
+                    agenceId,
+                    compagnieId,
+                    usage.getId(),
+                    categorieClientId,
+                    input.getNumeroAttestation(),
+                    null
+            );
+            if (!blank(validation.getNumeroNormalise())) {
+                input.setNumeroAttestation(validation.getNumeroNormalise());
+            }
+            if (!Boolean.TRUE.equals(validation.getValidationRequise())) {
+                return;
+            }
+            if (!Boolean.TRUE.equals(validation.getDisponible())) {
+                errors.add(blank(validation.getMessage())
+                        ? "Numéro d'attestation indisponible en stock"
+                        : validation.getMessage());
+            }
+            String normalized = normalize(validation.getNumeroNormalise());
+            if (!normalized.isBlank() && existingAttestations.contains(normalized)) {
+                errors.add("Numéro d'attestation déjà utilisé par un véhicule du brouillon");
+            } else if (!normalized.isBlank() && !fileAttestations.add(normalized)) {
+                errors.add("Numéro d'attestation en double dans le fichier");
+            }
+        } catch (BadRequestException exception) {
+            errors.add(exception.getMessage());
+        }
     }
 
     private void resolveConditionalReferences(CreateContratRequest.VehiculeInput input, Usage usage, Row row,

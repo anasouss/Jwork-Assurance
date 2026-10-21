@@ -780,6 +780,7 @@ export type VehicleImportPreview = {
 export type VehicleImportPreviewRow = {
   numeroLigne: number;
   immatriculation: string;
+  numeroAttestation?: string;
   usage: string;
   marque: string;
   vehicule?: VehiculeInput | null;

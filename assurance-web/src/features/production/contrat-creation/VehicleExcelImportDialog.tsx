@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { AlertCircle, CheckCircle2, Download, FileDown, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { contractCreationApi } from "../api/contract-creation";
 import type { VehicleImportPreview, VehiculeInput } from "../types";
+
+const MAX_IMPORT_SIZE = 5 * 1024 * 1024;
 
 export function VehicleExcelImportDialog({
   draftId,
@@ -24,7 +26,6 @@ export function VehicleExcelImportDialog({
   onApply: (vehicles: VehiculeInput[]) => void;
 }) {
   const hasSubmittedVehicles = existingVehicles.some((vehicle) => vehicle.vehiculeId != null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<VehicleImportPreview | null>(null);
@@ -35,7 +36,25 @@ export function VehicleExcelImportDialog({
   const reset = () => {
     setFile(null);
     setPreview(null);
-    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const selectFile = (selected: File | null) => {
+    setPreview(null);
+    if (!selected) {
+      setFile(null);
+      return;
+    }
+    if (!/\.(xlsx|xls)$/i.test(selected.name)) {
+      setFile(null);
+      toast.error("Sélectionnez un fichier Excel au format XLSX ou XLS");
+      return;
+    }
+    if (selected.size > MAX_IMPORT_SIZE) {
+      setFile(null);
+      toast.error("Le fichier Excel ne doit pas dépasser 5 Mo");
+      return;
+    }
+    setFile(selected);
   };
 
   const previewFile = async () => {
@@ -131,28 +150,25 @@ export function VehicleExcelImportDialog({
           </DialogHeader>
 
           <div className="grid min-h-0 gap-4 overflow-y-auto pr-1">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="grid min-w-[280px] flex-1 gap-1.5">
-                <label htmlFor="vehicle-import-file" className="text-sm font-medium">Fichier Excel</label>
-                <Input
-                  ref={inputRef}
-                  id="vehicle-import-file"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(event) => {
-                    setFile(event.target.files?.[0] ?? null);
-                    setPreview(null);
-                  }}
-                />
+            <div className="grid gap-3">
+              <FileDropzone
+                file={file}
+                onFileChange={selectFile}
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                disabled={loading}
+                title="Glissez votre fichier Excel ici"
+                description="ou cliquez pour le sélectionner · XLSX ou XLS · 5 Mo maximum"
+              />
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button type="button" variant="outline" disabled={downloading || loading} onClick={downloadTemplate}>
+                  {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                  Modèle Excel
+                </Button>
+                <Button type="button" disabled={!file || loading} onClick={previewFile}>
+                  {loading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                  Analyser le fichier
+                </Button>
               </div>
-              <Button type="button" variant="outline" disabled={downloading} onClick={downloadTemplate}>
-                {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                Modèle Excel
-              </Button>
-              <Button type="button" disabled={!file || loading} onClick={previewFile}>
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                Analyser
-              </Button>
             </div>
 
             {preview ? (
@@ -168,6 +184,7 @@ export function VehicleExcelImportDialog({
                       <tr>
                         <th className="px-3 py-2.5 text-left">Ligne</th>
                         <th className="px-3 py-2.5 text-left">Immatriculation</th>
+                        <th className="px-3 py-2.5 text-left">N° attestation</th>
                         <th className="px-3 py-2.5 text-left">Usage</th>
                         <th className="px-3 py-2.5 text-left">Marque</th>
                         <th className="px-3 py-2.5 text-left">Résultat</th>
@@ -178,6 +195,7 @@ export function VehicleExcelImportDialog({
                         <tr key={row.numeroLigne} className={row.erreurs.length ? "bg-red-50/60 dark:bg-red-950/20" : undefined}>
                           <td className="px-3 py-2.5 font-medium">{row.numeroLigne}</td>
                           <td className="px-3 py-2.5">{row.immatriculation || "-"}</td>
+                          <td className="px-3 py-2.5">{row.numeroAttestation || "-"}</td>
                           <td className="px-3 py-2.5">{row.usage || "-"}</td>
                           <td className="px-3 py-2.5">{row.marque || "-"}</td>
                           <td className="px-3 py-2.5">

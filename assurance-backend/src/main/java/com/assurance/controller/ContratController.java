@@ -33,6 +33,7 @@ import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.dto.response.RecalculHistoriqueFinancierResponse;
 import com.assurance.dto.response.RecalculTarifsBrouillonResponse;
 import com.assurance.dto.response.RegistreProductionResponse;
+import com.assurance.dto.response.VehiculeImportPreviewResponse;
 import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.AuditOperationCode;
 import com.assurance.enums.StatutMouvementContrat;
@@ -52,6 +53,7 @@ import com.assurance.service.PreTermeFlottePdfService;
 import com.assurance.service.EcheanceProductionService;
 import com.assurance.service.MouvementContratService;
 import com.assurance.service.RegistreProductionService;
+import com.assurance.service.VehiculeImportService;
 import com.assurance.service.HistoriqueFinancierRecalculService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -69,6 +71,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -92,6 +95,7 @@ public class ContratController {
     private final EcheanceProductionService echeanceProductionService;
     private final HistoriqueFinancierRecalculService historiqueFinancierRecalculService;
     private final RegistreProductionService registreProductionService;
+    private final VehiculeImportService vehiculeImportService;
 
     @PostMapping
     @PreAuthorize("hasAuthority('PERM_contrat:create')")
@@ -203,6 +207,26 @@ public class ContratController {
     @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<ContratResponse>> getDraft(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(contratService.getDraft(TenantContext.getCurrentAgence(), id)));
+    }
+
+    @GetMapping("/drafts/{id}/vehicules/import-modele")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<byte[]> downloadVehicleImportTemplate(@PathVariable Long id) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=modele-import-vehicules.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(vehiculeImportService.template(TenantContext.getCurrentAgence(), id));
+    }
+
+    @PostMapping(value = "/drafts/{id}/vehicules/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<VehiculeImportPreviewResponse>> previewVehicleImport(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                vehiculeImportService.preview(TenantContext.getCurrentAgence(), id, file)
+        ));
     }
 
     @PutMapping("/drafts/{id}")

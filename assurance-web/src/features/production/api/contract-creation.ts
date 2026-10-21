@@ -1,10 +1,11 @@
-import { apiFetch } from "@/lib/api/base";
+import { apiFetch, apiFetchBlob, apiUpload } from "@/lib/api/base";
 import type {
   ApiResponse,
   ContratSummary,
   CreateContratRequest,
   DraftTariffRecalculation,
   QuittancePreview,
+  VehicleImportPreview,
 } from "../types";
 
 import { unwrapApiResponse as unwrap } from "./response";
@@ -42,6 +43,21 @@ export const contractCreationApi = {
     return unwrap(
       await apiFetch<ApiResponse<ContratSummary>>(`/api/v1/contrats/drafts/${id}`)
     );
+  },
+
+  async previewVehicleImport(id: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return unwrap(
+      await apiUpload<ApiResponse<VehicleImportPreview>>(
+        `/api/v1/contrats/drafts/${id}/vehicules/import-preview`,
+        formData
+      )
+    );
+  },
+
+  async downloadVehicleImportTemplate(id: string) {
+    return apiFetchBlob(`/api/v1/contrats/drafts/${id}/vehicules/import-modele`);
   },
 
   async updateContratDraft(

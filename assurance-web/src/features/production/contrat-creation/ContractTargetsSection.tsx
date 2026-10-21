@@ -82,6 +82,7 @@ export type ContractTargetsSectionProps = {
   onVehiculesCompleted?: () => void;
   onRemorquesCompleted?: () => void;
   garantiesExtraAction?: ReactNode;
+  vehicleExtraAction?: ReactNode;
   targetActionMode?: "save" | "calculate";
   previewAfterInfoSave?: boolean;
   targetAssistances?: Record<string, AssistanceDraft>;
@@ -152,6 +153,7 @@ export function ContractTargetsSection({
   onVehiculesCompleted,
   onRemorquesCompleted,
   garantiesExtraAction,
+  vehicleExtraAction,
   targetActionMode = "save",
   previewAfterInfoSave = true,
   targetAssistances,
@@ -425,6 +427,7 @@ export function ContractTargetsSection({
           tone="production"
           open={openSection === undefined ? undefined : openSection === "flotteTargets"}
           onOpenChange={(open) => onSectionOpenChange?.("flotteTargets", open)}
+          action={allowTargetChanges ? vehicleExtraAction : undefined}
         >
           <div className={cn("grid gap-4", !singleVehicleLayout && "lg:grid-cols-[230px_1fr]")}>
             {!singleVehicleLayout ? (

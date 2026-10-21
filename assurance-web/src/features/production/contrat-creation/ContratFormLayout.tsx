@@ -18,6 +18,7 @@ import { Field } from "../components/Field";
 import { ContractInfoSection } from "./ContractInfoSection";
 import { FlotteTargetsSection } from "./FlotteTargetsSection";
 import { TariffGridSection } from "./TariffGridSection";
+import { VehicleExcelImportDialog } from "./VehicleExcelImportDialog";
 import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
 
 type Props = {
@@ -352,6 +353,16 @@ export function ContratFormLayout({
       maxRemorques={maxRemorques}
       showRemorqueSection={showFlotteRemorques}
       separateGuaranteeNavigation
+      vehicleExtraAction={form.draftId ? (
+        <VehicleExcelImportDialog
+          draftId={form.draftId}
+          existingVehicles={form.vehicules}
+          onApply={(imported) => form.setVehicules((current) => [
+            ...current.filter((vehicle) => vehicle.vehiculeId != null || Boolean(vehicle.immatriculation?.trim())),
+            ...imported,
+          ])}
+        />
+      ) : null}
       errors={form.validationErrors}
       openSection={activeSection}
       onSectionOpenChange={handleSectionOpenChange}

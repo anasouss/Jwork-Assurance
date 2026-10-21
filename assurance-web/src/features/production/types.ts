@@ -770,6 +770,23 @@ export type VehiculeResponse = VehiculeInput & {
   categorieTransportLibelle?: string | null;
 };
 
+export type VehicleImportPreview = {
+  totalLignes: number;
+  lignesValides: number;
+  lignesEnErreur: number;
+  lignes: VehicleImportPreviewRow[];
+};
+
+export type VehicleImportPreviewRow = {
+  numeroLigne: number;
+  immatriculation: string;
+  usage: string;
+  marque: string;
+  vehicule?: VehiculeInput | null;
+  erreurs: string[];
+  avertissements: string[];
+};
+
 export type RemorqueInput = {
   remorqueId?: string | number;
   usageId?: string;

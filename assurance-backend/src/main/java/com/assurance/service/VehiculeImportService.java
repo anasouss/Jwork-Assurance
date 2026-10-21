@@ -144,7 +144,7 @@ public class VehiculeImportService {
 
     @Transactional(readOnly = true)
     public byte[] template(Long agenceId, Long contratId) {
-        Contrat contrat = requireFleetDraft(agenceId, contratId);
+        Contrat contrat = requireFleetContract(agenceId, contratId);
         return createWorkbook(contrat, List.of(), "Génération du modèle Excel impossible");
     }
 
@@ -278,7 +278,7 @@ public class VehiculeImportService {
     private Contrat requireFleetDraft(Long agenceId, Long contratId) {
         Contrat contrat = requireFleetContract(agenceId, contratId);
         if (!Boolean.TRUE.equals(contrat.getBrouillon()) && !Boolean.TRUE.equals(contrat.getProspection())) {
-            throw new BadRequestException("L'import est disponible uniquement pendant la préparation d'un contrat flotte");
+            throw new BadRequestException("L'analyse et l'import sont disponibles uniquement pendant la préparation d'un contrat flotte");
         }
         return contrat;
     }

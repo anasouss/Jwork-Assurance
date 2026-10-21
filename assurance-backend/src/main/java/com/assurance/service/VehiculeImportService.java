@@ -77,7 +77,6 @@ public class VehiculeImportService {
     private static final int MAX_ROWS = 1_000;
     private static final int STYLED_TEMPLATE_ROWS = 100;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final Set<Integer> DROPDOWN_COLUMNS = Set.of(0, 3, 4, 5, 8, 10);
     private static final List<String> TEMPLATE_HEADERS = List.of(
             "Usage", "Immatriculation", "N° attestation", "Marque", "Carrosserie", "Carburant",
             "Puissance fiscale", "Cylindrée", "Sous-classe", "PTC", "Catégorie transport",
@@ -186,12 +185,7 @@ public class VehiculeImportService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Véhicules");
             CellStyle headerStyle = createHeaderStyle(workbook, IndexedColors.DARK_GREEN);
-            CellStyle dropdownHeaderStyle = createHeaderStyle(workbook, IndexedColors.TEAL);
             CellStyle inputStyle = createInputStyle(workbook);
-            CellStyle dropdownInputStyle = workbook.createCellStyle();
-            dropdownInputStyle.cloneStyleFrom(inputStyle);
-            dropdownInputStyle.setFillForegroundColor(IndexedColors.LIGHT_TURQUOISE.getIndex());
-            dropdownInputStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
             CellStyle amountStyle = workbook.createCellStyle();
             amountStyle.cloneStyleFrom(inputStyle);
             amountStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
@@ -200,7 +194,7 @@ public class VehiculeImportService {
             for (int index = 0; index < TEMPLATE_HEADERS.size(); index++) {
                 Cell cell = header.createCell(index);
                 cell.setCellValue(TEMPLATE_HEADERS.get(index));
-                cell.setCellStyle(DROPDOWN_COLUMNS.contains(index) ? dropdownHeaderStyle : headerStyle);
+                cell.setCellStyle(headerStyle);
                 sheet.setColumnWidth(index, Math.min(32, Math.max(14, TEMPLATE_HEADERS.get(index).length() + 4)) * 256);
             }
             Sheet references = workbook.createSheet("Références");
@@ -237,7 +231,7 @@ public class VehiculeImportService {
             for (int index = 0; index < vehicles.size(); index++) {
                 writeVehicleRow(sheet.createRow(index + 1), vehicles.get(index), fuelCodes);
             }
-            styleInputRows(sheet, inputStyle, dropdownInputStyle, amountStyle,
+            styleInputRows(sheet, inputStyle, amountStyle,
                     Math.max(STYLED_TEMPLATE_ROWS, vehicles.size()));
             sheet.setDisplayGridlines(false);
             sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TEMPLATE_HEADERS.size() - 1));
@@ -287,7 +281,6 @@ public class VehiculeImportService {
     private void styleInputRows(
             Sheet sheet,
             CellStyle inputStyle,
-            CellStyle dropdownInputStyle,
             CellStyle amountStyle,
             int rowCount
     ) {
@@ -299,9 +292,7 @@ public class VehiculeImportService {
             row.setHeightInPoints(22);
             for (int column = 0; column < TEMPLATE_HEADERS.size(); column++) {
                 Cell cell = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
-                if (DROPDOWN_COLUMNS.contains(column)) {
-                    cell.setCellStyle(dropdownInputStyle);
-                } else if (column >= 14 && column <= 16) {
+                if (column >= 14 && column <= 16) {
                     cell.setCellStyle(amountStyle);
                 } else {
                     cell.setCellStyle(inputStyle);

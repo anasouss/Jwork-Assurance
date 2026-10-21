@@ -94,7 +94,14 @@ export function VehicleExcelImportDialog({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={!draftId} onClick={() => setOpen(true)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="bg-background text-foreground hover:bg-muted disabled:text-muted-foreground"
+          disabled={!draftId}
+          onClick={() => setOpen(true)}
+        >
           <FileSpreadsheet className="size-4" />
           Importer Excel
         </Button>
@@ -102,6 +109,7 @@ export function VehicleExcelImportDialog({
           type="button"
           variant="outline"
           size="sm"
+          className="bg-background text-foreground hover:bg-muted disabled:text-muted-foreground"
           title={hasSubmittedVehicles ? "Exporter les véhicules enregistrés" : "Enregistrez d’abord les véhicules"}
           disabled={!draftId || !hasSubmittedVehicles || exporting}
           onClick={exportVehicles}

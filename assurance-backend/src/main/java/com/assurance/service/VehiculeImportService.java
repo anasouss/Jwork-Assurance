@@ -150,7 +150,7 @@ public class VehiculeImportService {
 
     @Transactional(readOnly = true)
     public byte[] exportSubmittedVehicles(Long agenceId, Long contratId) {
-        Contrat contrat = requireFleetDraft(agenceId, contratId);
+        Contrat contrat = requireFleetContract(agenceId, contratId);
         List<Vehicule> vehicles = vehiculeRepository.findForExportByContratIdOrderByCreatedAtAsc(contratId);
         if (vehicles.isEmpty()) {
             throw new BadRequestException("Aucun véhicule enregistré à exporter");
@@ -159,8 +159,10 @@ public class VehiculeImportService {
     }
 
     private byte[] createWorkbook(Contrat contrat, List<Vehicule> vehicles, String errorMessage) {
-        List<Usage> usages = allowedTemplateUsages(contrat);
-        if (usages.isEmpty()) {
+        List<Usage> usages = vehicles.isEmpty()
+                ? allowedTemplateUsages(contrat)
+                : exportWorkbookUsages(contrat, vehicles);
+        if (vehicles.isEmpty() && usages.isEmpty()) {
             throw new BadRequestException("Aucun usage n'est disponible pour la grille tarifaire et la catégorie client");
         }
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
@@ -274,12 +276,35 @@ public class VehiculeImportService {
     }
 
     private Contrat requireFleetDraft(Long agenceId, Long contratId) {
-        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
-                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
-        if (contrat.getTypeContrat() != TypeContrat.FLOTTE || !Boolean.TRUE.equals(contrat.getBrouillon())) {
-            throw new BadRequestException("Cette opération est disponible uniquement pour un brouillon flotte");
+        Contrat contrat = requireFleetContract(agenceId, contratId);
+        if (!Boolean.TRUE.equals(contrat.getBrouillon()) && !Boolean.TRUE.equals(contrat.getProspection())) {
+            throw new BadRequestException("L'import est disponible uniquement pendant la préparation d'un contrat flotte");
         }
         return contrat;
+    }
+
+    private Contrat requireFleetContract(Long agenceId, Long contratId) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
+            throw new BadRequestException("Cette opération est disponible uniquement pour un contrat flotte");
+        }
+        return contrat;
+    }
+
+    private List<Usage> exportWorkbookUsages(Contrat contrat, List<Vehicule> vehicles) {
+        Map<Long, Usage> usagesById = new LinkedHashMap<>();
+        vehicles.stream()
+                .map(Vehicule::getUsage)
+                .filter(java.util.Objects::nonNull)
+                .forEach(usage -> usagesById.putIfAbsent(usage.getId(), usage));
+        if (contrat.getCategorieClient() != null && contrat.getGrilleTarifaire() != null) {
+            allowedTemplateUsages(contrat)
+                    .forEach(usage -> usagesById.putIfAbsent(usage.getId(), usage));
+        }
+        return usagesById.values().stream()
+                .sorted(Comparator.comparing(Usage::getCode, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     private List<Usage> allowedTemplateUsages(Contrat contrat) {

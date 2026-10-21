@@ -166,11 +166,11 @@ public class BordereauRemisePdfService {
         Table bank = new Table(new float[]{1.5f, 1.3f, 1.2f, 2.4f})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(8);
-        bank.addCell(compactInfoCell("REMETTANT", slip.getAgence().getNom(), regular, bold));
-        bank.addCell(compactInfoCell("COMPTE À CRÉDITER", destination.getLibelle(), regular, bold));
-        bank.addCell(compactInfoCell("BANQUE DESTINATAIRE", destination.getBanqueReference() == null
+        bank.addCell(compactStackedInfoCell("REMETTANT", slip.getAgence().getNom(), regular, bold));
+        bank.addCell(compactStackedInfoCell("COMPTE À CRÉDITER", destination.getLibelle(), regular, bold));
+        bank.addCell(compactStackedInfoCell("BANQUE DESTINATAIRE", destination.getBanqueReference() == null
                 ? null : destination.getBanqueReference().getLibelle(), regular, bold));
-        bank.addCell(compactInfoCell("RIB", formatRib(destination.getRib()), regular, bold));
+        bank.addCell(compactStackedInfoCell("RIB", formatRib(destination.getRib()), regular, bold));
         document.add(bank);
     }
 
@@ -318,7 +318,7 @@ public class BordereauRemisePdfService {
     private Cell compactInfoCell(String label, String content, PdfFont valueFont, PdfFont bold) {
         Paragraph line = new Paragraph()
                 .add(new Text(label + " :  ").setFont(bold).setFontSize(6.2f).setFontColor(MUTED))
-                .add(new Text(value(content)).setFont(valueFont).setFontSize(8.2f).setFontColor(INK))
+                .add(new Text(value(content)).setFont(valueFont).setFontSize(7.2f).setFontColor(INK))
                 .setMargin(0)
                 .setMultipliedLeading(1);
         return new Cell()
@@ -326,6 +326,26 @@ public class BordereauRemisePdfService {
                 .setBorder(new SolidBorder(BORDER, 0.6f))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setPadding(5);
+    }
+
+    private Cell compactStackedInfoCell(String label, String content, PdfFont regular, PdfFont bold) {
+        return new Cell()
+                .add(new Paragraph(label)
+                        .setFont(bold)
+                        .setFontSize(6.2f)
+                        .setFontColor(MUTED)
+                        .setMargin(0)
+                        .setMultipliedLeading(1))
+                .add(new Paragraph(value(content))
+                        .setFont(regular)
+                        .setFontSize(7.2f)
+                        .setFontColor(INK)
+                        .setMarginTop(1)
+                        .setMarginBottom(0)
+                        .setMultipliedLeading(1))
+                .setBorder(new SolidBorder(BORDER, 0.6f))
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setPadding(4);
     }
 
     private void addHeader(Table table, String text, PdfFont bold, TextAlignment alignment) {

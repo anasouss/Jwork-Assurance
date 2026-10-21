@@ -79,8 +79,6 @@ public class BordereauRemisePdfService {
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             document.setFont(regular).setFontSize(9).setFontColor(INK);
-            pdf.addEventHandler(com.itextpdf.kernel.events.PdfDocumentEvent.END_PAGE,
-                    event -> writeFooter((com.itextpdf.kernel.events.PdfDocumentEvent) event, slip, regular));
 
             writeHeader(document, slip, regular, bold);
             writeOverview(document, slip, regular, bold);
@@ -91,6 +89,7 @@ public class BordereauRemisePdfService {
             }
             writeNotes(document, slip, regular, bold);
             writeStateNotice(document, slip, bold);
+            writeFooters(pdf, slip, regular);
 
             document.close();
             return output.toByteArray();
@@ -200,7 +199,7 @@ public class BordereauRemisePdfService {
             InstrumentReglementClient instrument = line.getInstrument();
             DeviceRgb background = index % 2 == 0 ? SOFT_BLUE : null;
             addBody(table, String.valueOf(index), regular, TextAlignment.CENTER, background);
-            addInstrumentReference(table, instrument, regular, bold, background);
+            addBody(table, instrument.getReferenceInstrument(), bold, TextAlignment.LEFT, background);
             addBody(table, instrument.getReglement().getPayeurNom(), regular, TextAlignment.LEFT, background);
             addBody(table, value(instrument.getBanqueEmettriceReference() == null
                     ? null : instrument.getBanqueEmettriceReference().getLibelle()), regular, TextAlignment.LEFT, background);
@@ -273,13 +272,21 @@ public class BordereauRemisePdfService {
         }
     }
 
+    private void writeFooters(PdfDocument pdf, BordereauRemise slip, PdfFont regular) {
+        int pageCount = pdf.getNumberOfPages();
+        for (int pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
+            writeFooter(pdf, pdf.getPage(pageNumber), slip, regular, pageNumber, pageCount);
+        }
+    }
+
     private void writeFooter(
-            com.itextpdf.kernel.events.PdfDocumentEvent event,
+            PdfDocument pdf,
+            PdfPage page,
             BordereauRemise slip,
-            PdfFont regular
+            PdfFont regular,
+            int pageNumber,
+            int pageCount
     ) {
-        PdfDocument pdf = event.getDocument();
-        PdfPage page = event.getPage();
         Rectangle pageSize = page.getPageSize();
         PdfCanvas canvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdf);
         canvas.setStrokeColor(FOOTER_ACCENT).setLineWidth(0.5f)
@@ -289,8 +296,11 @@ public class BordereauRemisePdfService {
         footer.add(new Paragraph(agencyLine(slip.getAgence()))
                 .setFont(regular).setFontSize(6.4f).setFontColor(MUTED)
                 .setTextAlignment(TextAlignment.CENTER).setMargin(0).setMultipliedLeading(1));
-        footer.add(new Paragraph("Bordereau " + slip.getNumero()
-                        + "  ·  Page " + pdf.getPageNumber(page))
+        String documentReference = "Bordereau " + slip.getNumero();
+        if (pageCount > 1) {
+            documentReference += "  ·  Page " + pageNumber + " / " + pageCount;
+        }
+        footer.add(new Paragraph(documentReference)
                 .setFont(regular).setFontSize(6.4f).setFontColor(MUTED)
                 .setTextAlignment(TextAlignment.CENTER).setMargin(0));
         footer.close();
@@ -321,33 +331,6 @@ public class BordereauRemisePdfService {
         Cell cell = new Cell().add(new Paragraph(value(text)).setFont(font).setFontSize(7).setMargin(0))
                 .setTextAlignment(alignment).setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(new SolidBorder(BORDER, 0.45f)).setPadding(5);
-        if (background != null) {
-            cell.setBackgroundColor(background);
-        }
-        table.addCell(cell);
-    }
-
-    private void addInstrumentReference(
-            Table table,
-            InstrumentReglementClient instrument,
-            PdfFont regular,
-            PdfFont bold,
-            DeviceRgb background
-    ) {
-        Cell cell = new Cell()
-                .setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .setBorder(new SolidBorder(BORDER, 0.45f))
-                .setPadding(5);
-        cell.add(new Paragraph(value(instrument.getReferenceInstrument()))
-                .setFont(bold)
-                .setFontSize(7.5f)
-                .setMargin(0));
-        cell.add(new Paragraph("Règlement " + instrument.getReglement().getNumero())
-                .setFont(regular)
-                .setFontSize(6.2f)
-                .setFontColor(MUTED)
-                .setMarginTop(2)
-                .setMarginBottom(0));
         if (background != null) {
             cell.setBackgroundColor(background);
         }

@@ -35,7 +35,7 @@ export function ProspectionConversionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="max-h-[92vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Convertir en contrat</DialogTitle>
         </DialogHeader>
@@ -105,39 +105,41 @@ function ConversionForm({
   });
 
   return (
-    <>
-      <div className="grid gap-4">
-        <div className="grid gap-3 md:grid-cols-2">
-          <Field label="N° devis">
-            <Input value={contrat.numeroDevis ?? contrat.numeroPolice ?? ""} readOnly />
-          </Field>
-          <Field label="N° police" required>
-            <Input value={numeroPolice} onChange={(event) => setNumeroPolice(event.target.value)} />
-          </Field>
-        </div>
-        {(assistanceContext.data?.assistances ?? []).length ? (
-          <div className="grid gap-2">
-            <div className="text-sm font-semibold uppercase text-blue-700">Contrats assistance</div>
-            {(assistanceContext.data?.assistances ?? []).map((assistance) => (
-              <Field key={assistance.id} label={assistanceLabel(assistance)} required>
-                <Input
-                  value={assistanceRefs[assistance.id] ?? assistance.numeroContratOuQuittance ?? ""}
-                  onChange={(event) => setAssistanceRefs((current) => ({ ...current, [assistance.id]: event.target.value }))}
-                  placeholder="N° contrat assistance"
-                />
-              </Field>
-            ))}
+    <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
+      <div className="min-h-0 overflow-y-auto pr-1">
+        <div className="grid gap-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="N° devis">
+              <Input value={contrat.numeroDevis ?? contrat.numeroPolice ?? ""} readOnly />
+            </Field>
+            <Field label="N° police" required>
+              <Input value={numeroPolice} onChange={(event) => setNumeroPolice(event.target.value)} />
+            </Field>
           </div>
-        ) : null}
-        <div className="grid gap-2">
-          <div className="text-sm font-semibold uppercase text-blue-700">Numéros d'attestation par véhicule</div>
-          <AttestationInputs
-            contrat={contrat}
-            values={attestations}
-            onChange={setAttestations}
-            compagnies={compagnies}
-            usages={usages}
-          />
+          {(assistanceContext.data?.assistances ?? []).length ? (
+            <div className="grid gap-2">
+              <div className="text-sm font-semibold uppercase text-blue-700">Contrats assistance</div>
+              {(assistanceContext.data?.assistances ?? []).map((assistance) => (
+                <Field key={assistance.id} label={assistanceLabel(assistance)} required>
+                  <Input
+                    value={assistanceRefs[assistance.id] ?? assistance.numeroContratOuQuittance ?? ""}
+                    onChange={(event) => setAssistanceRefs((current) => ({ ...current, [assistance.id]: event.target.value }))}
+                    placeholder="N° contrat assistance"
+                  />
+                </Field>
+              ))}
+            </div>
+          ) : null}
+          <div className="grid gap-2">
+            <div className="text-sm font-semibold uppercase text-blue-700">Numéros d'attestation par véhicule</div>
+            <AttestationInputs
+              contrat={contrat}
+              values={attestations}
+              onChange={setAttestations}
+              compagnies={compagnies}
+              usages={usages}
+            />
+          </div>
         </div>
       </div>
       <DialogFooter>
@@ -150,7 +152,7 @@ function ConversionForm({
           {convertMutation.isPending ? "Conversion..." : "Convertir"}
         </Button>
       </DialogFooter>
-    </>
+    </div>
   );
 }
 
@@ -193,7 +195,7 @@ function AttestationInputs({
     return map;
   }, new Map());
   return (
-    <div className="grid max-h-[340px] gap-4 overflow-y-auto rounded-md border p-3">
+    <div className="grid gap-4 rounded-md border p-3">
       {[...grouped.entries()].map(([usage, usageRows]) => (
         <Fragment key={usage}>
           <div className="text-xs font-bold uppercase text-slate-700">{usage}</div>

@@ -105,6 +105,7 @@ public class ContratService {
     private final AvenantExtensionGuaranteeValidator avenantExtensionGuaranteeValidator;
     private final RenewalPolicy renewalPolicy;
     private final ContractDirectModificationPolicy directModificationPolicy;
+    private final AuditEventService auditEventService;
 
     private void bindAgence(CreateContratRequest request, Long agenceId) {
         if (agenceId == null) {
@@ -313,7 +314,8 @@ public class ContratService {
         if (index > existing.size()) {
             throw new BadRequestException("Enregistrez les vehicules dans l'ordre");
         }
-        Vehicule vehicule = index < existing.size() ? existing.get(index) : new Vehicule();
+        boolean created = index >= existing.size();
+        Vehicule vehicule = created ? new Vehicule() : existing.get(index);
         vehicule.setContrat(contrat);
         applyVehiculeInput(contrat, vehicule, input);
         vehicule.setActif(true);
@@ -324,6 +326,7 @@ public class ContratService {
         contrat.setNombreVehicules(Math.max(contrat.getNombreVehicules() == null ? 0 : contrat.getNombreVehicules(), index + 1));
         contratRepository.save(contrat);
         recalculateAutomaticVehicleGuarantees(contrat, vehicule);
+        auditEventService.recordContractVehicleSaved(contrat.getAgence().getId(), vehicule, created);
         return toResponse(contrat);
     }
 
@@ -404,7 +407,8 @@ public class ContratService {
         if (index > existing.size()) {
             throw new BadRequestException("Enregistrez les remorques dans l'ordre");
         }
-        Remorque remorque = index < existing.size() ? existing.get(index) : new Remorque();
+        boolean created = index >= existing.size();
+        Remorque remorque = created ? new Remorque() : existing.get(index);
         remorque.setContrat(contrat);
         applyRemorqueInput(contrat, remorque, input);
         remorque.setActif(true);
@@ -414,6 +418,7 @@ public class ContratService {
         }
         contrat.setNombreRemorques(Math.max(contrat.getNombreRemorques() == null ? 0 : contrat.getNombreRemorques(), index + 1));
         contratRepository.save(contrat);
+        auditEventService.recordContractTrailerSaved(contrat.getAgence().getId(), remorque, created);
         return toResponse(contrat);
     }
 

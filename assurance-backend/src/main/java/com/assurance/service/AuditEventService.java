@@ -6,11 +6,17 @@ import com.assurance.dto.response.PageMetadata;
 import com.assurance.dto.response.PagedResponse;
 import com.assurance.entity.AuditEvent;
 import com.assurance.entity.Agence;
+import com.assurance.entity.BaseEntity;
+import com.assurance.entity.Contrat;
+import com.assurance.entity.Remorque;
 import com.assurance.entity.Utilisateur;
+import com.assurance.entity.Vehicule;
 import com.assurance.enums.AuditAction;
+import com.assurance.enums.AuditActorType;
 import com.assurance.repository.AuditEventRepository;
 import com.assurance.repository.UtilisateurRepository;
 import com.assurance.security.AuditRequestContext;
+import com.assurance.security.TenantContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,6 +65,131 @@ public class AuditEventService {
                 AuditRequestContext.getSource(),
                 AuditRequestContext.getOperationCode()
         ));
+    }
+
+    @Transactional
+    public void recordContractVehicleSaved(Long agenceId, Vehicule vehicule, boolean created) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("contrat", contractReference(vehicule.getContrat()));
+        snapshot.put("immatriculation", vehicule.getImmatriculation());
+        snapshot.put("immatriculationProvisoire", vehicule.getImmatriculationProvisoire());
+        snapshot.put("usage", reference("Usage", vehicule.getUsage(),
+                vehicule.getUsage() == null ? null : joinReference(vehicule.getUsage().getCode(), vehicule.getUsage().getLibelle())));
+        snapshot.put("marque", reference("Marque", vehicule.getMarque(),
+                vehicule.getMarque() == null ? null : vehicule.getMarque().getLibelle()));
+        snapshot.put("carrosserie", reference("Carrosserie", vehicule.getCarrosserie(),
+                vehicule.getCarrosserie() == null ? null : vehicule.getCarrosserie().getLibelle()));
+        snapshot.put("categorieTransport", reference("CategorieTransport", vehicule.getCategorieTransport(),
+                vehicule.getCategorieTransport() == null ? null : joinReference(
+                        vehicule.getCategorieTransport().getCode(),
+                        vehicule.getCategorieTransport().getLibelle()
+                )));
+        snapshot.put("carburant", vehicule.getCarburant());
+        snapshot.put("puissanceFiscale", vehicule.getPuissanceFiscale());
+        snapshot.put("cylindree", vehicule.getCylindree());
+        snapshot.put("nombrePlaces", vehicule.getNombrePlaces());
+        snapshot.put("sousClasse", vehicule.getSousClasse());
+        snapshot.put("ptc", vehicule.getPtc());
+        snapshot.put("datePremiereCirculation", vehicule.getDatePremiereCirculation());
+        snapshot.put("dateEffet", vehicule.getDateEffet());
+        snapshot.put("dateEcheance", vehicule.getDateEcheance());
+        snapshot.put("crm", vehicule.getCrm());
+        snapshot.put("numeroAttestation", vehicule.getNumeroAttestation());
+        snapshot.put("valeurVenale", vehicule.getValeurVenale());
+        snapshot.put("valeurNeuf", vehicule.getValeurNeuf());
+        snapshot.put("valeurGlace", vehicule.getValeurGlace());
+        recordOperationSnapshot(agenceId, "Vehicule", vehicule.getId(), created, snapshot);
+    }
+
+    @Transactional
+    public void recordContractTrailerSaved(Long agenceId, Remorque remorque, boolean created) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("contrat", contractReference(remorque.getContrat()));
+        snapshot.put("immatriculation", remorque.getImmatriculation());
+        snapshot.put("usage", reference("Usage", remorque.getUsage(),
+                remorque.getUsage() == null ? null : joinReference(remorque.getUsage().getCode(), remorque.getUsage().getLibelle())));
+        snapshot.put("marque", reference("Marque", remorque.getMarque(),
+                remorque.getMarque() == null ? null : remorque.getMarque().getLibelle()));
+        snapshot.put("ptc", remorque.getPtc());
+        snapshot.put("dateMiseEnCirculation", remorque.getDateMiseEnCirculation());
+        snapshot.put("dateEffet", remorque.getDateEffet());
+        snapshot.put("dateEcheance", remorque.getDateEcheance());
+        snapshot.put("crm", remorque.getCrm());
+        snapshot.put("numeroAttestation", remorque.getNumeroAttestation());
+        snapshot.put("valeurAssuree", remorque.getValeurAssuree());
+        recordOperationSnapshot(agenceId, "Remorque", remorque.getId(), created, snapshot);
+    }
+
+    private void recordOperationSnapshot(
+            Long agenceId,
+            String entityType,
+            Long entityId,
+            boolean created,
+            Map<String, Object> snapshot
+    ) {
+        Long actorUserId = TenantContext.getCurrentUser();
+        String source = AuditRequestContext.getSource();
+        auditEventRepository.save(AuditEvent.operationSnapshot(
+                agenceId,
+                actorUserId,
+                TenantContext.getCurrentUsername(),
+                actorUserId == null
+                        ? "IMPORT".equalsIgnoreCase(source) ? AuditActorType.IMPORT : AuditActorType.SYSTEM
+                        : AuditActorType.USER,
+                entityType,
+                String.valueOf(entityId),
+                created ? AuditAction.CREATED : AuditAction.UPDATED,
+                toJson(snapshot),
+                AuditRequestContext.getRequestId(),
+                source,
+                AuditRequestContext.getOperationCode()
+        ));
+    }
+
+    private Map<String, Object> contractReference(Contrat contrat) {
+        if (contrat == null) {
+            return null;
+        }
+        return reference("Contrat", contrat, firstNotBlank(
+                contrat.getNumeroPolice(),
+                contrat.getNumeroDossier(),
+                contrat.getNumeroContrat(),
+                contrat.getNumeroDevis()
+        ));
+    }
+
+    private Map<String, Object> reference(String type, BaseEntity entity, String label) {
+        if (entity == null) {
+            return null;
+        }
+        Map<String, Object> reference = new LinkedHashMap<>();
+        reference.put("type", type);
+        reference.put("id", entity.getId());
+        if (StringUtils.hasText(label)) {
+            reference.put("label", label);
+        }
+        return reference;
+    }
+
+    private String joinReference(String code, String label) {
+        if (!StringUtils.hasText(code)) return label;
+        if (!StringUtils.hasText(label) || code.equalsIgnoreCase(label)) return code;
+        return code + " - " + label;
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) return value;
+        }
+        return null;
+    }
+
+    private String toJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Impossible de sérialiser la trace d'audit", exception);
+        }
     }
 
     @Transactional(readOnly = true)

@@ -1205,11 +1205,13 @@ function auditOperationContextLabel(operation: AuditOperation) {
     return auditContractGuaranteeTarget(operation, "Remorque");
   }
   if (operation.operationCode === "CONTRACT_VEHICLE_SAVED") {
-    const vehicle = operation.events.find((event) => event.entityType === "Vehicule");
+    const vehicleEvents = operation.events.filter((event) => event.entityType === "Vehicule");
+    const vehicle = vehicleEvents.length ? mergeAuditEvents(vehicleEvents) : null;
     return vehicle ? `Véhicule ${auditEntityReference(vehicle)}` : "Véhicule";
   }
   if (operation.operationCode === "CONTRACT_TRAILER_SAVED") {
-    const trailer = operation.events.find((event) => event.entityType === "Remorque");
+    const trailerEvents = operation.events.filter((event) => event.entityType === "Remorque");
+    const trailer = trailerEvents.length ? mergeAuditEvents(trailerEvents) : null;
     return trailer ? `Remorque ${auditEntityReference(trailer)}` : "Remorque";
   }
   const contract = auditOperationContract(operation);
@@ -1608,8 +1610,7 @@ function auditContractWorkflowDetails(operation: AuditOperation) {
     if (!config.role) return true;
     return auditSnapshot(candidate).role === config.role;
   });
-  const event = matchingEvents.find((candidate) => candidate.action !== "DELETED" && candidate.afterData)
-    ?? matchingEvents[0];
+  const event = matchingEvents.length ? mergeAuditEvents(matchingEvents) : null;
   if (!event) return [];
   const snapshot = auditSnapshot(event);
   const recordedFields = new Set([
@@ -2995,6 +2996,7 @@ export function AgenciesPanel({
   canManage,
   canCreate,
   canEditPlatformFields,
+  singleAgency = false,
   onChanged,
 }: {
   agencies: AdminAgency[];
@@ -3002,6 +3004,7 @@ export function AgenciesPanel({
   canManage: boolean;
   canCreate: boolean;
   canEditPlatformFields: boolean;
+  singleAgency?: boolean;
   onChanged: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -3067,7 +3070,24 @@ export function AgenciesPanel({
           Ajouter agence
         </Button>
       </div> : null}
-      <div className="overflow-x-auto rounded-md border">
+      {singleAgency ? (
+        loading ? (
+          <div className="h-52 animate-pulse rounded-md bg-muted" />
+        ) : agencies[0] ? (
+          <AgencyProfile
+            agency={agencies[0]}
+            canManage={canManage}
+            onEdit={() => {
+              setEditing(agencies[0]);
+              setDialogOpen(true);
+            }}
+          />
+        ) : (
+          <div className="grid h-40 place-items-center text-sm text-muted-foreground">
+            Aucune agence trouvée
+          </div>
+        )
+      ) : <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader className={ADMIN_TABLE_HEADER_CLASS}>
             <TableRow>
@@ -3113,7 +3133,7 @@ export function AgenciesPanel({
             )}
           </TableBody>
         </Table>
-      </div>
+      </div>}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
@@ -3213,6 +3233,68 @@ export function AgenciesPanel({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function AgencyProfile({
+  agency,
+  canManage,
+  onEdit,
+}: {
+  agency: AdminAgency;
+  canManage: boolean;
+  onEdit: () => void;
+}) {
+  const details = [
+    ["Ville", agency.ville],
+    ["Adresse", agency.adresse],
+    ["Téléphone", agency.telephone],
+    ["Fax", agency.fax],
+    ["Email", agency.email],
+    ["Identifiant fiscal", agency.identifiantFiscal],
+    ["Patente", agency.patente],
+    ["ICE", agency.ice],
+    ["N° d’agrément", agency.numeroAgrement],
+    ["Date d’agrément", formatDateOnly(agency.dateAgrement)],
+    ["Banque", agency.banque],
+    ["RIB / N° de compte", agency.rib],
+  ] as const;
+
+  return (
+    <section aria-labelledby="agency-profile-title">
+      <header className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <AgencyLogoImage agency={agency} className="size-16 shrink-0 rounded-md border bg-white object-contain p-2" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="agency-profile-title" className="text-lg font-semibold">{agency.nom}</h2>
+              <Badge variant={agency.statut === "ACTIVE" ? "default" : "outline"}>
+                {agency.statut === "ACTIVE" ? "Active" : agency.statut === "SUSPENDED" ? "Suspendue" : "Archivée"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Code agence : {agency.code}</p>
+          </div>
+        </div>
+        <Button variant="outline" disabled={!canManage} onClick={onEdit}>
+          <Edit className="size-4" />
+          Modifier
+        </Button>
+      </header>
+
+      <dl className="grid sm:grid-cols-2 xl:grid-cols-3">
+        {details.map(([label, value]) => (
+          <div key={label} className="min-w-0 border-b px-1 py-4 sm:px-3">
+            <dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt>
+            <dd className="mt-1 break-words text-sm font-medium">{value || "-"}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="flex flex-wrap gap-x-6 gap-y-2 pt-4 text-sm text-muted-foreground">
+        <span>Logo : {agency.logoDisponible ? "configuré" : "non configuré"}</span>
+        <span>Signature et cachet : {agency.signatureDisponible ? "configurés" : "non configurés"}</span>
+      </div>
+    </section>
   );
 }
 
@@ -3522,6 +3604,12 @@ function resourceLabel(resource: string) {
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatDateOnly(value?: string | null) {
+  if (!value) return "-";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
 function formatAuditDateTime(value?: string | null) {

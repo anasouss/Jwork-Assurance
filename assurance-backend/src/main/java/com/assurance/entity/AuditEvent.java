@@ -60,6 +60,37 @@ public class AuditEvent {
         );
     }
 
+    public static AuditEvent operationSnapshot(
+            Long agenceId,
+            Long actorUserId,
+            String actorName,
+            AuditActorType actorType,
+            String entityType,
+            String entityId,
+            AuditAction action,
+            String afterData,
+            String requestId,
+            String source,
+            String operationCode
+    ) {
+        return new AuditEvent(
+                null,
+                agenceId,
+                actorUserId,
+                actorName,
+                actorType,
+                entityType,
+                entityId,
+                action,
+                LocalDateTime.now(),
+                null,
+                afterData,
+                requestId,
+                source,
+                operationCode
+        );
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

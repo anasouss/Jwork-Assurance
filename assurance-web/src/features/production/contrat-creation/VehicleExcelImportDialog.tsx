@@ -124,18 +124,20 @@ export function VehicleExcelImportDialog({
           <FileSpreadsheet className="size-4" />
           Importer Excel
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="bg-background text-foreground hover:bg-muted disabled:text-muted-foreground"
-          title={hasSubmittedVehicles ? "Exporter les véhicules enregistrés" : "Enregistrez d’abord les véhicules"}
-          disabled={!draftId || !hasSubmittedVehicles || exporting}
-          onClick={exportVehicles}
-        >
-          {exporting ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
-          Exporter Excel
-        </Button>
+        {hasSubmittedVehicles ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="bg-background text-foreground hover:bg-muted disabled:text-muted-foreground"
+            title="Exporter les véhicules enregistrés"
+            disabled={!draftId || exporting}
+            onClick={exportVehicles}
+          >
+            {exporting ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
+            Exporter Excel
+          </Button>
+        ) : null}
       </div>
       <Dialog open={open} onOpenChange={(next) => {
         setOpen(next);
@@ -159,14 +161,10 @@ export function VehicleExcelImportDialog({
                 title="Glissez votre fichier Excel ici"
                 description="ou cliquez pour le sélectionner · XLSX ou XLS · 5 Mo maximum"
               />
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex items-center">
                 <Button type="button" variant="outline" disabled={downloading || loading} onClick={downloadTemplate}>
                   {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                  Modèle Excel
-                </Button>
-                <Button type="button" disabled={!file || loading} onClick={previewFile}>
-                  {loading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                  Analyser le fichier
+                  Télécharger le modèle
                 </Button>
               </div>
             </div>
@@ -220,8 +218,15 @@ export function VehicleExcelImportDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
-            <Button type="button" disabled={!preview || preview.lignesEnErreur > 0 || preview.lignesValides === 0} onClick={apply}>
-              Ajouter les véhicules
+            <Button
+              type="button"
+              disabled={preview
+                ? preview.lignesEnErreur > 0 || preview.lignesValides === 0
+                : !file || loading}
+              onClick={preview ? apply : previewFile}
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : preview ? <CheckCircle2 className="size-4" /> : <Upload className="size-4" />}
+              {preview ? "Ajouter les véhicules" : "Analyser le fichier"}
             </Button>
           </DialogFooter>
         </DialogContent>

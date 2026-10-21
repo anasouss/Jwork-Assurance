@@ -132,6 +132,11 @@ export function AutocompleteSelect({
 
     const exact = options.find((option) => normalize(option.label) === normalize(trimmed));
     if (exact) {
+      if (exact.value === value) {
+        setQuery(exact.label);
+        setInvalid(false);
+        return;
+      }
       selectOption(exact);
       return;
     }

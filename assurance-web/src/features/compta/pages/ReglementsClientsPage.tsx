@@ -254,6 +254,10 @@ export default function ReglementsClientsPage() {
 
   function selectPayer(value: string) {
     const payer = payerSearch.resolve(value);
+    const payerChanged = payer?.id !== selectedPayer?.id || payer?.type !== selectedPayer?.type;
+    if (!payerChanged) {
+      return;
+    }
     setSelectedPayer(payer);
     setSelected({});
     setPage(0);

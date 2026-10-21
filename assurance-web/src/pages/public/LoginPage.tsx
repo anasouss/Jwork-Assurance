@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, PasswordInput } from "@/components/ui/input";
+import { DeveloperCredit } from "@/components/shared/developer-credit";
 import skayLogo from "@/assets/logo.webp";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -33,7 +34,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.14),_transparent_34%),linear-gradient(135deg,_#f8fafc_0%,_#eef2f7_48%,_#f9fafb_100%)] px-4 py-8 dark:bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_32%),linear-gradient(135deg,_#09090b_0%,_#111827_52%,_#0a0a0a_100%)]">
+    <main className="relative grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.14),_transparent_34%),linear-gradient(135deg,_#f8fafc_0%,_#eef2f7_48%,_#f9fafb_100%)] px-4 py-12 dark:bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_32%),linear-gradient(135deg,_#09090b_0%,_#111827_52%,_#0a0a0a_100%)]">
       <div className="w-full max-w-md">
         <Card className="w-full border-border/70 bg-background/92 shadow-lg shadow-slate-900/5 backdrop-blur dark:bg-neutral-950/88 dark:shadow-black/30">
           <CardHeader>
@@ -79,6 +80,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
       </div>
+      <DeveloperCredit className="absolute bottom-4 right-4" />
     </main>
   );
 }

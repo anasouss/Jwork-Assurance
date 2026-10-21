@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/app-header";
 import { moduleForPath, routeRequiresAgencyContext } from "@/components/app-navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AccessDenied, LoadingPage } from "@/components/shared";
+import { DeveloperCredit } from "@/components/shared/developer-credit";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
 import { useAuthStore } from "@/store/auth-store";
@@ -57,6 +58,9 @@ export default function AppLayout() {
             <AccessDenied />
           )}
         </main>
+        <footer className="shrink-0 px-4 pb-3 text-right">
+          <DeveloperCredit />
+        </footer>
       </SidebarInset>
     </SidebarProvider>
   );

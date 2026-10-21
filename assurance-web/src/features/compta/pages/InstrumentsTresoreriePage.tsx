@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Download, Eye, FileDown, MoreHorizontal, RotateCcw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import {
@@ -17,6 +17,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,6 +63,7 @@ export default function InstrumentsTresoreriePage() {
   const page = parsePage(searchParams.get("page"));
   const [search, setSearch] = useState(appliedSearch);
   const [deleteTarget, setDeleteTarget] = useState<RemittanceSlip>();
+  const [pdfAction, setPdfAction] = useState<{ id: string; type: "preview" | "download" }>();
 
   useEffect(() => {
     setSearch(appliedSearch);
@@ -97,6 +105,46 @@ export default function InstrumentsTresoreriePage() {
     else next.set(name, value);
     if (resetPage) next.delete("page");
     setSearchParams(next, { replace: true });
+  }
+
+  async function previewPdf(slip: RemittanceSlip) {
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      return;
+    }
+    previewWindow.opener = null;
+    setPdfAction({ id: slip.id, type: "preview" });
+    try {
+      const blob = await comptaApi.remittanceSlipPdf(slip.id);
+      const url = URL.createObjectURL(blob);
+      previewWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      previewWindow.close();
+      toast.error(error instanceof Error ? error.message : "Prévisualisation impossible");
+    } finally {
+      setPdfAction(undefined);
+    }
+  }
+
+  async function downloadPdf(slip: RemittanceSlip) {
+    setPdfAction({ id: slip.id, type: "download" });
+    try {
+      const blob = await comptaApi.remittanceSlipPdf(slip.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${slip.numero}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Téléchargement impossible");
+    } finally {
+      setPdfAction(undefined);
+    }
   }
 
   return (
@@ -144,21 +192,40 @@ export default function InstrumentsTresoreriePage() {
               <td className="px-4 py-3">{formatTreasuryDate(slip.dateBordereau)}</td><td className="px-4 py-3">{formatTreasuryDate(slip.dateDepot)}</td>
               <td className="px-4 py-3">{slip.compteDestination}</td><td className="px-4 py-3 text-center">{slip.type === "VERSEMENT_ESPECES" ? "-" : slip.nombreLignes}</td>
               <td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(slip.montantTotal)}</td><td className="px-4 py-3"><StatusBadge status={slip.statut} /></td>
-              <td className="px-4 py-3"><div className="flex justify-end gap-1">
-                <Button asChild size="icon" variant="ghost" title="Voir le bordereau"><Link to={`/app/compta/tresorerie/bordereaux-remise/${slip.id}`}><Eye className="size-4" /></Link></Button>
-                {slip.statut === "BROUILLON" ? (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    title="Supprimer le bordereau provisoire"
-                    disabled={!canManage || deleteDraft.isPending}
-                    onClick={() => setDeleteTarget(slip)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                ) : null}
-              </div></td>
+              <td className="px-4 py-3 text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" size="icon" variant="ghost" title="Actions" aria-label={`Actions pour le bordereau ${slip.numero}`}>
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-56">
+                    <DropdownMenuItem asChild>
+                      <Link to={`/app/compta/tresorerie/bordereaux-remise/${slip.id}`}>
+                        <Eye className="size-4" /> Voir le détail
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void previewPdf(slip)}>
+                      <FileDown className="size-4" />
+                      {pdfAction?.id === slip.id && pdfAction.type === "preview" ? "Ouverture..." : "Prévisualiser le PDF"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void downloadPdf(slip)}>
+                      <Download className="size-4" />
+                      {pdfAction?.id === slip.id && pdfAction.type === "download" ? "Téléchargement..." : "Télécharger le PDF"}
+                    </DropdownMenuItem>
+                    {slip.statut === "BROUILLON" && canManage ? <DropdownMenuSeparator /> : null}
+                    {slip.statut === "BROUILLON" && canManage ? (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        disabled={deleteDraft.isPending}
+                        onSelect={() => setDeleteTarget(slip)}
+                      >
+                        <Trash2 className="size-4" /> Supprimer le bordereau
+                      </DropdownMenuItem>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </td>
             </tr>)}
             {!slips.isLoading && (slips.data?.rows.length ?? 0) === 0 && <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Aucun bordereau ne correspond aux filtres.</td></tr>}
           </tbody>

@@ -117,9 +117,16 @@ export default function BordereauRemiseDetailPage() {
 
   const data = slip.data;
   const instrumentSlip = data.type !== "VERSEMENT_ESPECES";
+  const statusTone: SummaryTone = data.statut === "ANNULE"
+    ? "danger"
+    : data.statut === "CLOTURE"
+      ? "success"
+      : data.statut === "BROUILLON"
+        ? "muted"
+        : "info";
 
   return (
-    <div className="grid gap-5">
+    <div className="mx-auto grid w-full max-w-7xl gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Button asChild variant="ghost" className="mb-2 -ml-3"><Link to="/app/compta/tresorerie/bordereaux-remise"><ArrowLeft className="size-4" /> Retour aux bordereaux</Link></Button>
@@ -129,7 +136,7 @@ export default function BordereauRemiseDetailPage() {
             {data.type === "CHEQUE" ? "Bordereau de chèques" : data.type === "EFFET" ? "Bordereau d’effets" : "Versement d’espèces"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" disabled={pdfLoading} onClick={previewPdf}>
             <FileDown className="size-4" />
             {pdfLoading ? "Génération..." : "Prévisualiser le PDF"}
@@ -153,11 +160,11 @@ export default function BordereauRemiseDetailPage() {
       </header>
 
       <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 lg:grid-cols-5">
-        <Summary label="Statut" value={STATUS_LABELS[data.statut]} />
+        <Summary label="Statut" value={STATUS_LABELS[data.statut]} tone={statusTone} />
         <Summary label="Date" value={formatTreasuryDate(data.dateBordereau)} />
         <Summary label="Remis le" value={formatTreasuryDate(data.dateDepot)} />
-        <Summary label="Destination" value={data.compteDestination} />
-        <Summary label="Montant total" value={formatTreasuryMoney(data.montantTotal)} strong />
+        <Summary label="Destination" value={data.compteDestination} tone="info" />
+        <Summary label="Montant total" value={formatTreasuryMoney(data.montantTotal)} strong tone="success" />
       </section>
 
       {(data.referenceBancaire || data.notes) && <section className="grid gap-3 rounded-md border bg-card p-4 sm:grid-cols-2">
@@ -166,7 +173,7 @@ export default function BordereauRemiseDetailPage() {
       </section>}
 
       {instrumentSlip && <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Instruments du bordereau</h2><p className="text-sm text-muted-foreground">Chaque ligne conserve son état de remise et son résultat bancaire. Le traitement s’effectue depuis les encaissements en attente.</p></div>
+        <div className="border-b bg-muted/30 px-4 py-3"><h2 className="font-semibold">Instruments du bordereau</h2><p className="text-sm text-muted-foreground">Chaque ligne conserve son état de remise et son résultat bancaire. Le traitement s’effectue depuis les encaissements en attente.</p></div>
         <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-sm">
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
             <th className="px-4 py-3 text-left">Référence</th><th className="px-4 py-3 text-left">Payeur</th>
@@ -225,8 +232,28 @@ export default function BordereauRemiseDetailPage() {
   );
 }
 
-function Summary({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return <div className="min-w-0 border-b p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><div className="text-xs uppercase text-muted-foreground">{label}</div><div className={`mt-1 truncate ${strong ? "text-lg font-semibold" : "font-medium"}`}>{value}</div></div>;
+type SummaryTone = "default" | "muted" | "info" | "success" | "danger";
+
+const SUMMARY_TONE_CLASSES: Record<SummaryTone, string> = {
+  default: "",
+  muted: "bg-slate-50/80 dark:bg-slate-900/40",
+  info: "bg-sky-50/70 dark:bg-sky-950/25",
+  success: "bg-emerald-50/70 dark:bg-emerald-950/25",
+  danger: "bg-red-50/70 dark:bg-red-950/25",
+};
+
+function Summary({
+  label,
+  value,
+  strong = false,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  tone?: SummaryTone;
+}) {
+  return <div className={`min-w-0 border-b p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 ${SUMMARY_TONE_CLASSES[tone]}`}><div className="text-xs uppercase text-muted-foreground">{label}</div><div className={`mt-1 truncate ${strong ? "text-lg font-semibold" : "font-medium"}`}>{value}</div></div>;
 }
 
 function showError(error: unknown) {

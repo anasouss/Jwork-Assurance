@@ -211,7 +211,7 @@ export function AutocompleteSelect({
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       {open && !disabled && menuPosition && typeof document !== "undefined" ? createPortal(
         <div
-          className="fixed z-[100] overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg"
+          className="pointer-events-auto fixed z-[100] overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg"
           style={menuPosition}
         >
           {filtered.length === 0 ? (

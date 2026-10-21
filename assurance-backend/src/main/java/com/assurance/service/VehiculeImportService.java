@@ -402,7 +402,8 @@ public class VehiculeImportService {
         validation.createPromptBox("Liste de valeurs", errorMessage);
         validation.setShowErrorBox(true);
         validation.setShowPromptBox(true);
-        validation.setSuppressDropDownArrow(false);
+        // For XSSF, true writes showDropDown="false"; Excel uses that value to display the arrow.
+        validation.setSuppressDropDownArrow(true);
         sheet.addValidationData(validation);
     }
 

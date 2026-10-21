@@ -8,6 +8,7 @@ import com.assurance.enums.CritereSelectionTarif;
 import com.assurance.enums.ModeTarificationGarantie;
 import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.SourceValeurGarantie;
+import com.assurance.enums.StatutAgence;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.repository.*;
@@ -89,6 +90,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ParametreApplicationRepository parametreApplicationRepository;
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
     private final RegleAffectationQuittanceRepository regleAffectationQuittanceRepository;
+    private final AgenceCompagnieAssuranceRepository agenceCompagnieAssuranceRepository;
 
     @Value("${app.seed.admin-email:admin@jway.ma}")
     private String adminEmail;
@@ -112,10 +114,9 @@ public class DataSeeder implements CommandLineRunner {
         );
         grantReferentielPermissionsToAdministrators(referentielView, referentielManage);
         grantOperationalPermissionsToAdministrators();
-        if (hasBootstrapData()) {
+        if (!isBusinessBootstrapEmpty()) {
             return;
         }
-
         Permission contratView = seedPermission("contrat:view", "Consulter les contrats", "contrat");
         Permission contratCreate = seedPermission("contrat:create", "Creer un contrat", "contrat");
         Permission contratUpdate = seedPermission("contrat:update", "Modifier un contrat", "contrat");
@@ -143,10 +144,22 @@ public class DataSeeder implements CommandLineRunner {
                         .nom("Ambition Ibtissam Assurances")
                         .adresse("Bureau n° 28, 3e étage, Immeuble Rimal 02, Founty Haut")
                         .ville("Agadir")
+                        .telephone("0528 39 0439")
+                        .fax("0528 82 2814")
+                        .email("contact@ambitionibtissamassurances.com")
+                        .identifiantFiscal("14498873")
+                        .patente("55002484")
+                        .ice("00052639000082")
+                        .numeroAgrement("C2910CA2021")
+                        .dateAgrement(LocalDate.of(2012, 12, 10))
+                        .banque("CIH BANK")
+                        .rib("230 010 4117341221023600 37")
+                        .statut(StatutAgence.ACTIVE)
                         .build()
         ));
 
         List<CompagnieAssurance> compagniesAssurance = seedCompagniesAssurance();
+        seedAgenceCompagnies(agenceDefaut, compagniesAssurance);
         seedReglesAffectationQuittance(agenceDefaut, compagniesAssurance);
         seedCompagniesAssistance();
 
@@ -217,6 +230,7 @@ public class DataSeeder implements CommandLineRunner {
         seedUsage("REMORQUE", "REMORQUE", "Remorque rattachee a un contrat automobile", null, false, false, false, false, true, false, carrosserieRemorque);
         Usage usageB1 = seedUsage("B1", "CARS ET TAXIS", "Transport public de voyageurs", groupeB, true, false, false, false, false, false, true, berline, utilitaire, camion);
         Usage usageB2 = seedUsage("B2", "BUS DE TRANSPORT URBAIN", "Transport public de voyageurs", groupeB, true, false, false, false, false, false, camion);
+        Usage usageB5 = seedUsage("B5", "TRANSPORT TOURISTIQUE", "Transport public de voyageurs", groupeB, true, false, false, false, false, true, camion);
         seedUsage("P", "PROVISOIRE", "Attestation provisoire", groupeP, true, false, false, false, false, true, berline, utilitaire);
         seedUsage("F", "FRONTIERE", "Attestation frontiere", groupeF, true, false, false, false, false, true, berline, utilitaire);
 
@@ -238,13 +252,16 @@ public class DataSeeder implements CommandLineRunner {
         seedParametreApplication("RVE_TAUX_ZERO_AUTORISE", "BOOLEAN", "false", "Autorise les lignes RVE a taux zero");
         seedParametreApplication("ENABLE_ATTESTATION_STOCK_CHECK", "BOOLEAN", "1", "Active le controle du stock des attestations pendant la production");
 
-        seedCategorieClient("GRAND_PUBLIC", "GRAND PUBLIC");
+        CategorieClient grandPublic = seedCategorieClient("GRAND_PUBLIC", "GRAND PUBLIC");
         CategorieClient location = seedCategorieClient("LOCATION", "LOCATION");
         CategorieClient tpv = seedCategorieClient("TPV", "TPV");
         location.setGroupeUsageAttestation(groupeD);
         categorieClientRepository.save(location);
         attachUsages(location, usageA, usageC1, usageC2, usageCyclos);
-        attachUsages(tpv, usageB1, usageB2);
+        attachUsages(tpv, usageB1, usageB2, usageB5);
+        attachUsagesByCode(grandPublic, "A", "C1", "C2", "CYCLOS", "D1", "D2", "D3", "D4_SC1",
+                "D4_SC2", "D5_SC1", "D5_SC2", "D6_SC1", "D6_SC2", "D6_SC3", "D6_SC4", "D7", "D8",
+                "D10", "D11", "TRS D'ECOLIERS", "REMORQUE", "P");
 
         Role superAdmin = roleRepository.findByAgenceIsNullAndCode("SUPER_ADMIN").orElseGet(() -> roleRepository.save(
                 Role.builder()
@@ -276,37 +293,44 @@ public class DataSeeder implements CommandLineRunner {
         ));
 
         GroupeExclusionGarantie dommagesVehicule = seedGroupeExclusionGarantie("DOMMAGES_VEHICULE", "Dommages véhicule", TypeGarantie.VEHICULE);
+        Garantie rc = seedGarantie("RC", "Responsabilite Civile", TypeGarantie.VEHICULE, true, true, false, false, false, false, false, false, false, 0,
+                ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, true, null);
+        Garantie defenseRecoursLocation = seedGarantie("DR_LOC", "Défense et Recours", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, true, 150,
+                ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null);
+        defenseRecoursLocation.setGarantieReferencePrime(rc);
+        garantieRepository.save(defenseRecoursLocation);
+
         List<Garantie> garanties = List.of(
-                seedGarantie("RC", "Responsabilite Civile", TypeGarantie.VEHICULE, true, true, false, false, false, false, false, false, false, 0,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, true, null),
+                rc,
                 seedGarantie("V", "Vol", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, false, 10,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE), false, false, null),
                 seedGarantie("I", "Incendie", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, false, 20,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE), false, false, null),
                 seedGarantie("BG", "Bris de Glace", TypeGarantie.VEHICULE, false, false, false, false, false, true, false, true, false, 30,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.GLACE, List.of(SourceValeurGarantie.GLACE), false, false, null),
-                seedGarantie("DC", "Dommages Collision", TypeGarantie.VEHICULE, false, false, false, true, false, false, true, true, true, 40,
-                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE), false, false, dommagesVehicule),
+                seedGarantie("DC", "Dommages Collision", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, true, true, 40,
+                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.AUCUNE, List.of(), false, false, dommagesVehicule),
                 seedGarantie("DV", "Dommages au Vehicule", TypeGarantie.VEHICULE, false, false, false, true, true, false, true, true, true, 50,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.VENALE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.NEUF), false, false, dommagesVehicule),
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(SourceValeurGarantie.VENALE, SourceValeurGarantie.NEUF), false, false, dommagesVehicule),
                 seedGarantie("DR", "Defense et Recours", TypeGarantie.VEHICULE, false, false, true, false, false, false, false, false, true, 60,
                         ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
-                seedGarantie("RVE", "Rachat Vetuste", TypeGarantie.VEHICULE, false, false, false, false, false, false, false, false, false, 70,
+                seedGarantie("RVE", "Rachat Vetuste", TypeGarantie.VEHICULE, false, false, false, true, true, false, false, false, false, 70,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
                 seedGarantie("BOR", "Bris optique et retroviseur", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, true, true, 80,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
-                seedGarantie("BTP", "Bris de toit panoramique", TypeGarantie.VEHICULE, false, false, false, false, false, false, false, true, false, 90,
-                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
+                seedGarantie("BTP", "Bris de toit panoramique", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, true, false, 90,
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(SourceValeurGarantie.MANUEL), true, false, null),
                 seedGarantie("VOR", "Vol optique et retroviseur", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, true, true, 100,
                         ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
-                seedGarantie("RF", "Risque Financier", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, true, 110,
-                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
-                seedGarantie("PF", "Perte Financiere", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, false, 120,
-                        ModeTarificationGarantie.CAPITAL, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
+                seedGarantie("RF", "Rachat Franchise", TypeGarantie.VEHICULE, false, false, false, false, false, false, true, false, true, 110,
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX, ModeTarificationGarantie.CAPITAL), SourceValeurGarantie.MANUEL, List.of(SourceValeurGarantie.MANUEL), true, false, null),
+                seedGarantie("PF", "Perte Financiere", TypeGarantie.VEHICULE, false, false, false, false, true, false, true, false, false, 120,
+                        ModeTarificationGarantie.TAUX, List.of(ModeTarificationGarantie.TAUX), SourceValeurGarantie.AUCUNE, List.of(SourceValeurGarantie.NEUF), false, false, null),
                 seedGarantie("PP", "Protection Passagers", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, true, 130,
                         ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
                 seedGarantie("PC", "Protection Conducteur", TypeGarantie.PERSONNE, false, false, false, false, false, false, true, false, true, 140,
-                        ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false, null)
+                        ModeTarificationGarantie.PROTECTION, List.of(ModeTarificationGarantie.PROTECTION), SourceValeurGarantie.AUCUNE, List.of(), false, false, null),
+                defenseRecoursLocation
         );
         compagniesAssurance.forEach(compagnieAssurance ->
                 garanties.forEach(garantie -> seedCompagnieGarantie(compagnieAssurance, garantie)));
@@ -323,6 +347,18 @@ public class DataSeeder implements CommandLineRunner {
                         .build()
         ));
         grantOperationalPermissionsToAdministrators();
+    }
+
+    private boolean isBusinessBootstrapEmpty() {
+        return roleRepository.count() == 0
+                && agenceRepository.count() == 0
+                && compagnieAssuranceRepository.count() == 0
+                && compagnieAssistanceRepository.count() == 0
+                && userRepository.count() == 0
+                && usageRepository.count() == 0
+                && garantieRepository.count() == 0
+                && categorieClientRepository.count() == 0
+                && parametreApplicationRepository.count() == 0;
     }
 
     private void normalizePlatformAdministrators() {
@@ -377,17 +413,6 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    private boolean hasBootstrapData() {
-        return permissionRepository.count() > 0
-                && roleRepository.count() > 0
-                && agenceRepository.count() > 0
-                && compagnieAssuranceRepository.count() > 0
-                && userRepository.count() > 0
-                && usageRepository.count() > 0
-                && garantieRepository.count() > 0
-                && categorieClientRepository.count() > 0;
-    }
-
     private void seedReglesAffectationQuittance(
             Agence agence,
             List<CompagnieAssurance> compagnies
@@ -397,7 +422,7 @@ public class DataSeeder implements CommandLineRunner {
             ModeVentilationQuittance modeVentilation = "ATLANTA_SANAD".equalsIgnoreCase(compagnie.getCode())
                     ? ModeVentilationQuittance.PAR_CATEGORIE
                     : ModeVentilationQuittance.GLOBALE;
-            regleAffectationQuittanceRepository.save(buildRegleAffectation(
+            seedRegleAffectation(buildRegleAffectation(
                     agence,
                     compagnie,
                     TypeContrat.PARTICULIER,
@@ -410,7 +435,7 @@ public class DataSeeder implements CommandLineRunner {
                     "9.0911",
                     dateDebut
             ));
-            regleAffectationQuittanceRepository.save(buildRegleAffectation(
+            seedRegleAffectation(buildRegleAffectation(
                     agence,
                     compagnie,
                     TypeContrat.CONVENTION,
@@ -423,7 +448,7 @@ public class DataSeeder implements CommandLineRunner {
                     "9.0911",
                     dateDebut
             ));
-            regleAffectationQuittanceRepository.save(buildRegleAffectation(
+            seedRegleAffectation(buildRegleAffectation(
                     agence,
                     compagnie,
                     TypeContrat.FLOTTE,
@@ -436,6 +461,20 @@ public class DataSeeder implements CommandLineRunner {
                     "0",
                     dateDebut
             ));
+        }
+    }
+
+    private void seedRegleAffectation(RegleAffectationQuittance candidate) {
+        boolean exists = regleAffectationQuittanceRepository
+                .findByAgenceIdAndCompagnieAssuranceIdAndTypeContratAndDateDebut(
+                        candidate.getAgence().getId(),
+                        candidate.getCompagnieAssurance().getId(),
+                        candidate.getTypeContrat(),
+                        candidate.getDateDebut()
+                )
+                .isPresent();
+        if (!exists) {
+            regleAffectationQuittanceRepository.save(candidate);
         }
     }
 
@@ -505,7 +544,7 @@ public class DataSeeder implements CommandLineRunner {
         List<CompagnieAssurance> compagnies = List.of(
                 seedCompagnieAssurance(
                         "SANLAM",
-                        "SANLAM MAROC",
+                        "SANLAMALLIANZ MAROC",
                         "216, Boulevard Zerktouni",
                         "Casablanca",
                         null,
@@ -513,7 +552,8 @@ public class DataSeeder implements CommandLineRunner {
                         "22341",
                         null,
                         "05",
-                        "SANLAM"
+                        "MA/05/",
+                        "SLM"
                 ),
                 seedCompagnieAssurance(
                         "AXA",
@@ -525,11 +565,12 @@ public class DataSeeder implements CommandLineRunner {
                         "34221",
                         null,
                         "38",
+                        "MA/38/",
                         "AXA"
                 ),
                 seedCompagnieAssurance(
                         "ATLANTA_SANAD",
-                        "ATLANTA SANAD",
+                        "ATLANTASANAD",
                         "181, Boulevard d'Anfa",
                         "Casablanca",
                         null,
@@ -537,7 +578,8 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         null,
                         "01",
-                        "ATLANTA"
+                        "MA/01/",
+                        "ATS"
                 ),
                 seedCompagnieAssurance(
                         "MATU",
@@ -549,14 +591,10 @@ public class DataSeeder implements CommandLineRunner {
                         null,
                         null,
                         "90",
+                        "MA/90/",
                         "MATU"
                 )
         );
-        for (int index = 0; index < compagnies.size(); index++) {
-            CompagnieAssurance compagnie = compagnies.get(index);
-            compagnie.setOrdreAffichage((index + 1) * 10);
-            compagnieAssuranceRepository.save(compagnie);
-        }
         return compagnies;
     }
 
@@ -570,29 +608,53 @@ public class DataSeeder implements CommandLineRunner {
             String rc,
             String ice,
             String prefixeAttestation,
-            String prefixeCarteVerte
+            String prefixeCarteVerte,
+            String prefixeDossier
     ) {
-        CompagnieAssurance compagnie = compagnieAssuranceRepository.findByCode(code).orElseGet(() ->
+        return compagnieAssuranceRepository.findByCode(code).orElseGet(() ->
                 compagnieAssuranceRepository.save(CompagnieAssurance.builder()
                         .code(code)
                         .nom(nom)
+                        .adresse(adresse)
+                        .ville(ville)
+                        .email(email)
+                        .telephone(telephone)
+                        .rc(rc)
+                        .ice(ice)
+                        .prefixeAttestation(prefixeAttestation)
+                        .prefixeCarteVerte(prefixeCarteVerte)
+                        .prefixeDossier(prefixeDossier)
+                        .ordreAffichage(switch (code) {
+                            case "SANLAM" -> 10;
+                            case "AXA" -> 20;
+                            case "ATLANTA_SANAD" -> 30;
+                            case "MATU" -> 40;
+                            default -> 100;
+                        })
                         .actif(true)
                         .build())
         );
-        compagnie.setNom(nom);
-        compagnie.setAdresse(adresse);
-        compagnie.setVille(ville);
-        compagnie.setEmail(email);
-        compagnie.setTelephone(telephone);
-        compagnie.setRc(rc);
-        compagnie.setIce(ice);
-        compagnie.setPrefixeAttestation(prefixeAttestation);
-        compagnie.setPrefixeCarteVerte(prefixeCarteVerte);
-        if (compagnie.getOrdreAffichage() == null) {
-            compagnie.setOrdreAffichage(100);
+    }
+
+    private void seedAgenceCompagnies(Agence agence, List<CompagnieAssurance> compagnies) {
+        var intermediaryCodes = java.util.Map.of(
+                "SANLAM", "40658",
+                "AXA", "1956",
+                "ATLANTA_SANAD", "334",
+                "MATU", "500"
+        );
+        for (CompagnieAssurance compagnie : compagnies) {
+            AgenceCompagnieAssurance relation = agenceCompagnieAssuranceRepository
+                    .findByAgenceIdAndCompagnieAssuranceId(agence.getId(), compagnie.getId())
+                    .orElseGet(() -> AgenceCompagnieAssurance.builder()
+                            .agence(agence)
+                            .compagnieAssurance(compagnie)
+                            .build());
+            if (relation.getId() == null) {
+                relation.setCodeIntermediaire(intermediaryCodes.get(compagnie.getCode()));
+                agenceCompagnieAssuranceRepository.save(relation);
+            }
         }
-        compagnie.setActif(true);
-        return compagnieAssuranceRepository.save(compagnie);
     }
 
     private void seedCompagniesAssistance() {
@@ -604,18 +666,15 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private CompagnieAssistance seedCompagnieAssistanceProvider(String code, String nom, String email, String telephone) {
-        CompagnieAssistance compagnie = compagnieAssistanceRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+        return compagnieAssistanceRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 compagnieAssistanceRepository.save(CompagnieAssistance.builder()
                         .code(code)
                         .nom(nom)
+                        .email(email)
+                        .telephone(telephone)
                         .actif(true)
                         .build())
         );
-        compagnie.setNom(nom);
-        compagnie.setEmail(email);
-        compagnie.setTelephone(telephone);
-        compagnie.setActif(true);
-        return compagnieAssistanceRepository.save(compagnie);
     }
 
     private Garantie seedGarantie(
@@ -642,8 +701,11 @@ public class DataSeeder implements CommandLineRunner {
     ) {
         BrancheAssurance brancheAutomobile = brancheAssuranceRepository.findByCodeIgnoreCase("AUTOMOBILE")
                 .orElseThrow(() -> new IllegalStateException("La branche Automobile doit être initialisée avant les garanties"));
-        Garantie garantie = garantieRepository.findByCode(code).orElseGet(() ->
-                Garantie.builder()
+        Garantie existing = garantieRepository.findByCode(code).orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+        Garantie garantie = Garantie.builder()
                         .code(code)
                         .libelle(libelle)
                         .brancheAssurance(brancheAutomobile)
@@ -661,8 +723,7 @@ public class DataSeeder implements CommandLineRunner {
                         .tarificationMultiple(tarificationMultiple)
                         .ordreAffichage(ordreAffichage)
                         .actif(true)
-                        .build()
-        );
+                        .build();
         garantie.setLibelle(libelle);
         garantie.setBrancheAssurance(brancheAutomobile);
         garantie.setTypeGarantie(typeGarantie);
@@ -711,19 +772,14 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private GroupeExclusionGarantie seedGroupeExclusionGarantie(String code, String libelle, TypeGarantie typeGarantie) {
-        GroupeExclusionGarantie groupe = groupeExclusionGarantieRepository.findByCodeIgnoreCase(code).orElseGet(() ->
-                GroupeExclusionGarantie.builder()
+        return groupeExclusionGarantieRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+                groupeExclusionGarantieRepository.save(GroupeExclusionGarantie.builder()
                         .code(code)
                         .libelle(libelle)
                         .typeGarantie(typeGarantie)
                         .actif(true)
-                        .build()
+                        .build())
         );
-        groupe.setCode(code);
-        groupe.setLibelle(libelle);
-        groupe.setTypeGarantie(typeGarantie);
-        groupe.setActif(true);
-        return groupeExclusionGarantieRepository.save(groupe);
     }
 
     private Set<ModeTarificationGarantie> defaultModesTarificationMultiple(String code, boolean tarificationMultiple, ModeTarificationGarantie modeParDefaut) {
@@ -774,15 +830,13 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private Carburant seedCarburant(String code, String libelle) {
-        Carburant carburant = carburantRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+        return carburantRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 carburantRepository.save(Carburant.builder()
                         .code(code)
                         .libelle(libelle)
                         .actif(true)
                         .build())
         );
-        carburant.setLibelle(libelle);
-        return carburantRepository.save(carburant);
     }
 
     private SousClasse seedSousClasse(
@@ -792,7 +846,7 @@ public class DataSeeder implements CommandLineRunner {
             boolean conducteurPermisRequis,
             boolean assistanceAutorisee
     ) {
-        SousClasse sousClasse = sousClasseRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+        return sousClasseRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 sousClasseRepository.save(SousClasse.builder()
                         .code(code)
                         .libelle(libelle)
@@ -802,11 +856,6 @@ public class DataSeeder implements CommandLineRunner {
                         .actif(true)
                         .build())
         );
-        sousClasse.setLibelle(libelle);
-        sousClasse.setChampMoteur(champMoteur);
-        sousClasse.setConducteurPermisRequis(conducteurPermisRequis);
-        sousClasse.setActif(true);
-        return sousClasseRepository.save(sousClasse);
     }
 
     private Usage seedUsage(
@@ -840,8 +889,11 @@ public class DataSeeder implements CommandLineRunner {
             Carrosserie... carrosseries
     ) {
         boolean garantiesPersonne = "A".equalsIgnoreCase(code) || "C1".equalsIgnoreCase(code);
-        Usage usage = usageRepository.findByCodeIgnoreCase(code).orElseGet(() ->
-                usageRepository.save(Usage.builder()
+        Usage existing = usageRepository.findByCodeIgnoreCase(code).orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+        Usage usage = usageRepository.save(Usage.builder()
                         .code(code)
                         .libelle(libelle)
                         .criteria(criteria)
@@ -856,8 +908,7 @@ public class DataSeeder implements CommandLineRunner {
                         .garantiesPersonne(garantiesPersonne)
                         .tauxExtensionRemorque(defaultTauxExtensionRemorque(code))
                         .actif(true)
-                        .build())
-        );
+                        .build());
         usage.getCarrosseries().addAll(List.of(carrosseries));
         usage.setGroupeUsageAttestation(groupeUsageAttestation);
         usage.setConsommeAttestation(consommeAttestation);
@@ -877,13 +928,13 @@ public class DataSeeder implements CommandLineRunner {
     private BigDecimal defaultTauxExtensionRemorque(String code) {
         return switch (code == null ? "" : code.toUpperCase(Locale.ROOT)) {
             case "A" -> BigDecimal.valueOf(10);
-            case "C2" -> BigDecimal.valueOf(30);
-            default -> BigDecimal.valueOf(20);
+            case "REMORQUE" -> BigDecimal.valueOf(20);
+            default -> BigDecimal.ZERO;
         };
     }
 
     private CategorieTransport seedCategorieTransport(String code, String libelle, String description) {
-        CategorieTransport categorie = categorieTransportRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+        return categorieTransportRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 categorieTransportRepository.save(CategorieTransport.builder()
                         .code(code)
                         .libelle(libelle)
@@ -891,22 +942,20 @@ public class DataSeeder implements CommandLineRunner {
                         .actif(true)
                         .build())
         );
-        categorie.setLibelle(libelle);
-        categorie.setDescription(description);
-        categorie.setActif(true);
-        return categorieTransportRepository.save(categorie);
     }
 
     private GroupeUsageAttestation seedGroupeUsageAttestation(String code, String libelle, String couleur, CompagnieAssurance... compagniesRestreintes) {
-        GroupeUsageAttestation groupe = groupeUsageAttestationRepository.findByCodeIgnoreCase(code).orElseGet(() ->
-                groupeUsageAttestationRepository.save(GroupeUsageAttestation.builder()
+        GroupeUsageAttestation existing = groupeUsageAttestationRepository.findByCodeIgnoreCase(code).orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+        GroupeUsageAttestation groupe = groupeUsageAttestationRepository.save(GroupeUsageAttestation.builder()
                         .code(code)
                         .libelle(libelle)
                         .couleur(couleur)
                         .visibleStock(true)
                         .actif(true)
-                        .build())
-        );
+                        .build());
         groupe.setLibelle(libelle);
         groupe.setCouleur(couleur);
         groupe.getCompagniesRestreintes().clear();
@@ -921,16 +970,13 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private CategorieClient seedCategorieClient(String code, String libelle) {
-        CategorieClient categorieClient = categorieClientRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+        return categorieClientRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 categorieClientRepository.save(CategorieClient.builder()
                         .code(code)
                         .libelle(libelle)
                         .actif(true)
                         .build())
         );
-        categorieClient.setLibelle(libelle);
-        categorieClient.setActif(true);
-        return categorieClientRepository.save(categorieClient);
     }
 
     private void attachUsages(CategorieClient categorieClient, Usage... usages) {
@@ -938,8 +984,16 @@ public class DataSeeder implements CommandLineRunner {
         categorieClientRepository.save(categorieClient);
     }
 
+    private void attachUsagesByCode(CategorieClient categorieClient, String... usageCodes) {
+        for (String usageCode : usageCodes) {
+            usageRepository.findByCodeIgnoreCase(usageCode)
+                    .ifPresent(categorieClient.getUsages()::add);
+        }
+        categorieClientRepository.save(categorieClient);
+    }
+
     private ParametreApplication seedParametreApplication(String code, String type, String valeur, String description) {
-        ParametreApplication parametre = parametreApplicationRepository
+        return parametreApplicationRepository
                 .findByAgenceIsNullAndCodeIgnoreCaseAndActifTrue(code)
                 .orElseGet(() -> parametreApplicationRepository.save(ParametreApplication.builder()
                         .code(code)
@@ -948,24 +1002,16 @@ public class DataSeeder implements CommandLineRunner {
                         .description(description)
                         .actif(true)
                         .build()));
-        parametre.setType(type);
-        parametre.setValeur(valeur);
-        parametre.setDescription(description);
-        parametre.setActif(true);
-        return parametreApplicationRepository.save(parametre);
     }
 
     private CapitalResponsabiliteCivile seedCapitalResponsabiliteCivile(String usageCode, BigDecimal capital) {
-        CapitalResponsabiliteCivile capitalRc = capitalResponsabiliteCivileRepository
+        return capitalResponsabiliteCivileRepository
                 .findByUsageCodeIgnoreCaseAndActifTrue(usageCode)
                 .orElseGet(() -> capitalResponsabiliteCivileRepository.save(CapitalResponsabiliteCivile.builder()
                         .usageCode(usageCode)
                         .capital(capital)
                         .actif(true)
                         .build()));
-        capitalRc.setCapital(capital);
-        capitalRc.setActif(true);
-        return capitalResponsabiliteCivileRepository.save(capitalRc);
     }
 
 }

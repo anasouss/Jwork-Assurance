@@ -29,6 +29,13 @@ public interface RegleAffectationQuittanceRepository extends JpaRepository<Regle
     @EntityGraph(attributePaths = {"compagnieAssurance", "agence"})
     Optional<RegleAffectationQuittance> findByAgenceIdAndId(Long agenceId, Long id);
 
+    Optional<RegleAffectationQuittance> findByAgenceIdAndCompagnieAssuranceIdAndTypeContratAndDateDebut(
+            Long agenceId,
+            Long compagnieAssuranceId,
+            TypeContrat typeContrat,
+            LocalDate dateDebut
+    );
+
     @EntityGraph(attributePaths = {"compagnieAssurance", "agence"})
     @Query("""
             select r

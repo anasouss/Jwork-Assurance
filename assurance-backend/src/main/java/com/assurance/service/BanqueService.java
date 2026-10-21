@@ -105,6 +105,14 @@ public class BanqueService {
     }
 
     private void ensureDefaults(Long agenceId) {
+        if (banqueRepository.countByAgenceId(agenceId) > 0) {
+            return;
+        }
+        initializeDefaults(agenceId);
+    }
+
+    @Transactional
+    public void initializeDefaults(Long agenceId) {
         Agence agence = agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         for (DefaultBank value : DEFAULT_BANKS) {

@@ -2,6 +2,7 @@ package com.assurance.seeder;
 
 import com.assurance.entity.CategorieClient;
 import com.assurance.entity.BrancheAssurance;
+import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Garantie;
 import com.assurance.entity.RegleFiscale;
 import com.assurance.entity.Usage;
@@ -12,6 +13,7 @@ import com.assurance.enums.NatureRegleFiscale;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.repository.CategorieClientRepository;
 import com.assurance.repository.BrancheAssuranceRepository;
+import com.assurance.repository.CompagnieAssuranceRepository;
 import com.assurance.repository.GarantieRepository;
 import com.assurance.repository.RegleFiscaleRepository;
 import com.assurance.service.ParametreApplicationService;
@@ -36,11 +38,15 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
     private final GarantieRepository garantieRepository;
     private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final CategorieClientRepository categorieClientRepository;
+    private final CompagnieAssuranceRepository compagnieAssuranceRepository;
     private final ParametreApplicationService parametreApplicationService;
 
     @Override
     @Transactional
     public void run(String... args) {
+        if (repository.count() > 0) {
+            return;
+        }
         Garantie rc = garantieRepository.findByCode("RC").orElse(null);
         if (rc == null) return;
 
@@ -82,6 +88,52 @@ public class RegleFiscaleSeeder implements CommandLineRunner {
         seed("CNPAC_UNITAIRE", "CNPAC par unité assurée", NatureRegleFiscale.CNPAC,
                 BaseCalculRegleFiscale.UNITE_ASSUREE, cnpac, CategorieQuittance.AUTOMOBILE,
                 null, null, null, 0, ModeCalculRegleFiscale.MONTANT_FIXE);
+
+        seedDumpOverrides();
+    }
+
+    private void seedDumpOverrides() {
+        CompagnieAssurance matu = compagnieAssuranceRepository.findByCode("MATU").orElse(null);
+        Garantie defenseRecours = garantieRepository.findByCode("DR").orElse(null);
+        Garantie defenseRecoursLocation = garantieRepository.findByCode("DR_LOC").orElse(null);
+        CategorieClient location = categorieClientRepository.findByCodeIgnoreCase("LOCATION").orElse(null);
+        if (matu == null || defenseRecours == null || defenseRecoursLocation == null || location == null) {
+            return;
+        }
+
+        repository.save(RegleFiscale.builder()
+                .code("EVCAT_DR")
+                .libelle("Exclusion EVCAT - Défense et Recours")
+                .nature(NatureRegleFiscale.EVCAT)
+                .modeCalcul(ModeCalculRegleFiscale.TAUX)
+                .valeur(BigDecimal.ZERO)
+                .baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
+                .categorieResultat(CategorieQuittance.EVCAT)
+                .compagnieAssurance(matu)
+                .garanties(Set.of(defenseRecours))
+                .brancheAssurance(automobileBranch())
+                .dateDebut(LocalDate.of(2026, 9, 16))
+                .applicable(true)
+                .priorite(0)
+                .actif(true)
+                .build());
+        repository.save(RegleFiscale.builder()
+                .code("EXCLU_DR_LOC")
+                .libelle("Exclusion taxe - Défense et Recours location")
+                .nature(NatureRegleFiscale.TAXE_ASSURANCE)
+                .modeCalcul(ModeCalculRegleFiscale.TAUX)
+                .valeur(BigDecimal.ZERO)
+                .baseCalcul(BaseCalculRegleFiscale.PRIME_GARANTIE)
+                .categorieResultat(CategorieQuittance.AUTOMOBILE)
+                .compagnieAssurance(matu)
+                .categorieClient(location)
+                .garanties(Set.of(defenseRecoursLocation))
+                .brancheAssurance(automobileBranch())
+                .dateDebut(LocalDate.of(2026, 10, 8))
+                .applicable(true)
+                .priorite(0)
+                .actif(true)
+                .build());
     }
 
     private void seedTpv(Garantie rc, String value) {

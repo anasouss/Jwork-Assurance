@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BanqueRepository extends JpaRepository<Banque, Long> {
+    long countByAgenceId(Long agenceId);
+
     List<Banque> findByAgenceIdOrderByOrdreAscLibelleAsc(Long agenceId);
 
     Optional<Banque> findByAgenceIdAndId(Long agenceId, Long id);

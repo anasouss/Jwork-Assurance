@@ -33,12 +33,15 @@ import org.apache.poi.ss.usermodel.DataValidation;
 import org.apache.poi.ss.usermodel.DataValidationConstraint;
 import org.apache.poi.ss.usermodel.DataValidationHelper;
 import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Name;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.util.CellAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +70,7 @@ public class VehiculeImportService {
     private static final long MAX_FILE_SIZE = 5L * 1024 * 1024;
     private static final int MAX_ROWS = 1_000;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Set<Integer> DROPDOWN_COLUMNS = Set.of(0, 2, 3, 4, 7, 9);
     private static final List<String> TEMPLATE_HEADERS = List.of(
             "Usage", "Immatriculation", "Marque", "Carrosserie", "Carburant",
             "Puissance fiscale", "Cylindrée", "Sous-classe", "PTC", "Catégorie transport",
@@ -171,11 +175,15 @@ public class VehiculeImportService {
             var font = workbook.createFont();
             font.setBold(true);
             headerStyle.setFont(font);
+            CellStyle dropdownHeaderStyle = workbook.createCellStyle();
+            dropdownHeaderStyle.cloneStyleFrom(headerStyle);
+            dropdownHeaderStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+            dropdownHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
             Row header = sheet.createRow(0);
             for (int index = 0; index < TEMPLATE_HEADERS.size(); index++) {
                 Cell cell = header.createCell(index);
                 cell.setCellValue(TEMPLATE_HEADERS.get(index));
-                cell.setCellStyle(headerStyle);
+                cell.setCellStyle(DROPDOWN_COLUMNS.contains(index) ? dropdownHeaderStyle : headerStyle);
                 sheet.setColumnWidth(index, Math.min(32, Math.max(14, TEMPLATE_HEADERS.get(index).length() + 4)) * 256);
             }
             Sheet references = workbook.createSheet("Références");
@@ -212,7 +220,11 @@ public class VehiculeImportService {
             for (int index = 0; index < vehicles.size(); index++) {
                 writeVehicleRow(sheet.createRow(index + 1), vehicles.get(index), fuelCodes);
             }
+            if (vehicles.isEmpty()) {
+                sheet.createRow(1).createCell(0);
+            }
             sheet.createFreezePane(0, 1);
+            sheet.setActiveCell(new CellAddress(1, 0));
             workbook.setSheetHidden(workbook.getSheetIndex(references), true);
             workbook.write(output);
             return output.toByteArray();
@@ -387,7 +399,9 @@ public class VehiculeImportService {
         );
         validation.setErrorStyle(DataValidation.ErrorStyle.STOP);
         validation.createErrorBox("Valeur invalide", errorMessage);
+        validation.createPromptBox("Liste de valeurs", errorMessage);
         validation.setShowErrorBox(true);
+        validation.setShowPromptBox(true);
         validation.setSuppressDropDownArrow(false);
         sheet.addValidationData(validation);
     }

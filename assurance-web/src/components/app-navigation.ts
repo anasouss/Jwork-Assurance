@@ -35,7 +35,7 @@ export type AppModule = {
 };
 
 export type AppNavigationItem = AppModule & {
-  module: "dashboard" | "production" | "sinistre" | "companies" | "crm" | "compta" | "admin";
+  module: "dashboard" | "production" | "sinistre" | "companies" | "crm" | "compta" | "admin" | "help";
 };
 
 export const appModules: AppModule[] = [
@@ -143,6 +143,9 @@ export function routeRequiresAgencyContext(pathname: string) {
 }
 
 export function moduleForPath(pathname: string): AppNavigationItem["module"] {
+  if (pathname.startsWith("/app/aide")) {
+    return "help";
+  }
   if (pathname.startsWith("/app/compta")) {
     return "compta";
   }
@@ -165,6 +168,7 @@ export function moduleForPath(pathname: string): AppNavigationItem["module"] {
 }
 
 export function moduleTitle(module: AppNavigationItem["module"]) {
+  if (module === "help") return "Aide";
   return appModules.find((item) => moduleForPath(item.url) === module)?.title ?? "Module";
 }
 
@@ -184,6 +188,8 @@ export function moduleActiveClass(module: AppNavigationItem["module"]) {
       return "bg-orange-600 text-white";
     case "admin":
       return "bg-fuchsia-700 text-white";
+    case "help":
+      return "bg-teal-700 text-white";
     default:
       return "bg-blue-600 text-white";
   }

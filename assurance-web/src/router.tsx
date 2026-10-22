@@ -20,6 +20,7 @@ export const router = createBrowserRouter([
     lazy: lazyRoute(() => import("@/layouts/AppLayout")),
     children: [
       { index: true, lazy: lazyRoute(() => import("@/pages/app/AppIndexPage")) },
+      { path: "aide", lazy: lazyRoute(() => import("@/features/help/pages/HelpPage")) },
       { path: "platform", lazy: lazyRoute(() => import("@/features/dashboard/pages/PlatformDashboardPage")) },
       { path: "profile", lazy: lazyRoute(() => import("@/pages/app/ProfilePage")) },
       {

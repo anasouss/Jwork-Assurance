@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Bell, Building2, Download, Globe2, KeyRound, LogOut, RotateCcw, User, UserRound } from "lucide-react";
+import { Bell, Building2, CircleHelp, Download, Globe2, KeyRound, LogOut, RotateCcw, User, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,11 @@ export function AppHeader() {
               <Download className="size-4" />
             </Button>
           ) : null}
+          <Button asChild type="button" variant="ghost" size="icon" title="Guide d’utilisation">
+            <Link to={`/app/aide?from=${encodeURIComponent(pathname)}`} aria-label="Ouvrir le guide d’utilisation">
+              <CircleHelp className="size-4" />
+            </Link>
+          </Button>
           <Button type="button" variant="ghost" size="icon" className="relative">
             <Bell className="size-4" />
             <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500" />

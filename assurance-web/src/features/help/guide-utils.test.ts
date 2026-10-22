@@ -18,15 +18,38 @@ describe("guide utilities", () => {
     ["/app/production/contrats/12", "detail-contrat"],
     ["/app/production/contrats/12/pdf", "detail-contrat"],
     ["/app/production/contrats/12/avenants/RESILIATION", "avenants-renouvellements"],
-    ["/app/production/contrats/12/pieces-jointes", "documents-assistance"],
-    ["/app/production/contrats/12/assistance", "documents-assistance"],
-    ["/app/production/contrats/12/cartes-vertes", "documents-assistance"],
+    ["/app/production/contrats/12/pieces-jointes", "pieces-jointes-contrat"],
+    ["/app/production/contrats/12/assistance", "assistance-contrat"],
+    ["/app/production/contrats/12/cartes-vertes", "cartes-vertes-contrat"],
     ["/app/production/ajouter-dossier/assistance-voyage", "assistance-voyage"],
     ["/app/production/ajouter-dossier/assistance-automobile", "assistance-automobile"],
     ["/app/production/contrats/12/assistance-voyage/modifier", "assistance-voyage"],
     ["/app/production/contrats/12/assistance-automobile/modifier", "assistance-automobile"],
+    ["/app/production/echeances", "echeances-production"],
+    ["/app/production/registre", "registre-production"],
+    ["/app/production/portefeuille-clients/12", "portefeuille-client-production"],
+    ["/app/production/parametres/tarifs-usage", "tarifs-usage"],
+    ["/app/production/parametres/usages", "usages-production"],
+    ["/app/production/parametres/groupes-stock-attestations", "groupes-stock-production"],
+    ["/app/production/parametres/categories-client", "categories-client-production"],
+    ["/app/production/parametres/garanties", "garanties-production"],
+    ["/app/production/parametres/carrosseries", "referentiels-vehicule-production"],
+    ["/app/production/parametres/sous-classes", "sous-classes-production"],
+    ["/app/production/parametres/categories-transport", "categories-transport-production"],
+    ["/app/production/parametres/pieces-jointes", "pieces-jointes-production"],
+    ["/app/production/attestations-stock/commandes", "commandes-attestations"],
+    ["/app/production/attestations-stock/receptions", "receptions-attestations"],
     ["/app/sinistre/dossiers/12", "gestion-sinistre"],
+    ["/app/sinistre/dossiers", "liste-sinistres"],
     ["/app/companies", "companies-navigation"],
+    ["/app/companies/contacts", "contacts-compagnies"],
+    ["/app/companies/assistance/produits", "produits-assistance-parametres"],
+    ["/app/compta/reglements/etat-encaissements", "etat-encaissements"],
+    ["/app/compta/tresorerie/impayes-clients", "impayes-clients"],
+    ["/app/compta/tresorerie/journal", "journal-tresorerie"],
+    ["/app/compta/tresorerie/operations", "operations-tresorerie"],
+    ["/app/compta/parametres/banques", "banques-compta"],
+    ["/app/compta/parametres/reglements-clients", "reglages-reglements-clients"],
   ])("maps %s to the specific topic %s", (route, topicId) => {
     expect(findContextualGuideTopic(guideModules, route)?.id).toBe(topicId);
   });
@@ -34,6 +57,19 @@ describe("guide utilities", () => {
   it("searches accents and procedural content", () => {
     const modules = searchGuideModules(guideModules, "regle deja appliquee");
     expect(modules.flatMap((module) => module.topics).map((topic) => topic.id)).toContain("regles-fiscales");
+  });
+
+  it("searches alternative contract paths", () => {
+    const modules = searchGuideModules(guideModules, "flotte entreprise");
+    expect(modules.flatMap((module) => module.topics).map((topic) => topic.id)).toContain("creation-contrat");
+  });
+
+  it("links every alternative path to an existing topic", () => {
+    const topics = guideModules.flatMap((module) => module.topics);
+    const topicIds = new Set(topics.map((topic) => topic.id));
+    topics.flatMap((topic) => topic.paths ?? []).forEach((path) => {
+      if (path.topicId) expect(topicIds.has(path.topicId), path.topicId).toBe(true);
+    });
   });
 
   it.each([
@@ -47,6 +83,10 @@ describe("guide utilities", () => {
     ["companies-navigation", ["Liste des compagnies", "Conventions", "Grilles tarifaires", "Assistance", "Produits assistance", "Contacts"]],
     ["compta-navigation", ["Affectation des quittances", "Relevés et factures", "Facturation conventions", "Règlements clients", "Encaissements en attente", "Bordereaux bancaires", "Journal de trésorerie", "Rejets bancaires", "Bordereaux compagnies"]],
     ["sinistres-liste", ["Dossiers ouverts", "Actions en retard", "En expertise", "En attente de règlement", "Provisions ouvertes", "Recours de l’année", "Voir les dossiers", "Déclarer", "Experts & garages"]],
+    ["tarifs-usage", ["Ajouter tarif usage", "Ajuster les tarifs", "Réinitialiser", "Paramétrer par usage", "Historique", "Prime nette", "Prime par place"]],
+    ["usages-production", ["Code", "Libellé", "Critère", "Groupe attestation", "Consomme attestation", "Carburant", "Puissance fiscale", "Sous-classe", "PTC", "Places / prime", "Catégorie transport", "Garanties personne"]],
+    ["garanties-production", ["Groupe d’exclusion", "Branche", "Type", "Traitement métier", "Modes", "Valeur assurée", "Prorata"]],
+    ["stock-attestations", ["Total validé", "Disponible", "Réservée", "Utilisée", "Alertes seuil", "Contrôle à la saisie"]],
   ])("documents every visible entry action in %s", (topicId, labels) => {
     const topic = guideModules.flatMap((module) => module.topics).find((item) => item.id === topicId);
     const documentation = JSON.stringify(topic);

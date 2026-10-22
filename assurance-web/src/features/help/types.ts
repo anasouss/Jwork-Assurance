@@ -9,6 +9,13 @@ export type GuideError = {
   resolution: string;
 };
 
+export type GuidePath = {
+  title: string;
+  description: string;
+  topicId?: string;
+  tone?: "emerald" | "blue" | "amber" | "sky" | "violet";
+};
+
 export type GuideTopic = {
   id: string;
   title: string;
@@ -18,6 +25,7 @@ export type GuideTopic = {
   routePatterns?: string[];
   permissions?: string[];
   prerequisites?: string[];
+  paths?: GuidePath[];
   steps: GuideStep[];
   results?: string[];
   warnings?: string[];

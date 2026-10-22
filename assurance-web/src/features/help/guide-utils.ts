@@ -43,6 +43,7 @@ export function searchGuideModules(modules: GuideModule[], query: string) {
         topic.title,
         topic.summary,
         ...(topic.prerequisites ?? []),
+        ...(topic.paths ?? []).flatMap((path) => [path.title, path.description]),
         ...topic.steps.flatMap((step) => [step.title, step.description, step.action ?? ""]),
         ...(topic.results ?? []),
         ...(topic.warnings ?? []),

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowRight,
   BadgeCheck,
   Building2,
   Calculator,
@@ -127,7 +128,14 @@ export default function HelpPage() {
             ))}
           </aside>
           <main className="min-w-0 p-4 sm:p-6 lg:p-8">
-            {topic && activeModule ? <GuideArticle module={activeModule} topic={topic} /> : null}
+            {topic && activeModule ? (
+              <GuideArticle
+                module={activeModule}
+                topic={topic}
+                topics={allTopics}
+                onSelect={selectTopic}
+              />
+            ) : null}
           </main>
         </div>
       )}
@@ -167,7 +175,25 @@ function GuideModuleNavigation({
   );
 }
 
-function GuideArticle({ module, topic }: { module: GuideModule; topic: GuideTopic }) {
+const pathTone = {
+  emerald: "border-emerald-500 bg-emerald-50/60 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300",
+  blue: "border-blue-500 bg-blue-50/60 text-blue-800 dark:bg-blue-950/20 dark:text-blue-300",
+  amber: "border-amber-500 bg-amber-50/60 text-amber-900 dark:bg-amber-950/20 dark:text-amber-300",
+  sky: "border-sky-500 bg-sky-50/60 text-sky-800 dark:bg-sky-950/20 dark:text-sky-300",
+  violet: "border-violet-500 bg-violet-50/60 text-violet-800 dark:bg-violet-950/20 dark:text-violet-300",
+} as const;
+
+function GuideArticle({
+  module,
+  topic,
+  topics,
+  onSelect,
+}: {
+  module: GuideModule;
+  topic: GuideTopic;
+  topics: GuideTopic[];
+  onSelect: (topic: GuideTopic) => void;
+}) {
   return (
     <article className="mx-auto max-w-4xl">
       <div className="border-b pb-4">
@@ -199,6 +225,38 @@ function GuideArticle({ module, topic }: { module: GuideModule; topic: GuideTopi
           <ul className="grid gap-2 text-sm leading-6">
             {topic.prerequisites.map((item) => <li key={item}>- {item}</li>)}
           </ul>
+        </GuideSection>
+      ) : null}
+
+      {topic.paths?.length ? (
+        <GuideSection title="Parcours disponibles">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {topic.paths.map((path) => {
+              const linkedTopic = path.topicId ? topics.find((item) => item.id === path.topicId) : undefined;
+              return (
+                <div key={path.title} className={`border-l-4 px-4 py-3 ${pathTone[path.tone ?? "emerald"]}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-semibold">{path.title}</h4>
+                      <p className="mt-1 text-sm leading-6 text-foreground/75">{path.description}</p>
+                    </div>
+                    {linkedTopic ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="shrink-0"
+                        title={`Voir le guide ${path.title}`}
+                        onClick={() => onSelect(linkedTopic)}
+                      >
+                        <ArrowRight className="size-4" />
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </GuideSection>
       ) : null}
 

@@ -74,6 +74,13 @@ export async function createGuidePdf(modules: GuideModule[]) {
         paragraph("Prérequis", { size: 10, bold: true, gap: 1 });
         topic.prerequisites.forEach((item) => paragraph(`- ${item}`, { size: 9, indent: 3, gap: 1 }));
       }
+      if (topic.paths?.length) {
+        paragraph("Parcours disponibles", { size: 10, bold: true, color: [7, 79, 65], gap: 1 });
+        topic.paths.forEach((path) => {
+          paragraph(path.title, { size: 9.5, bold: true, indent: 3, gap: 0.5 });
+          paragraph(path.description, { size: 9, indent: 7, color: [55, 65, 81], gap: 1.5 });
+        });
+      }
       paragraph("Procédure", { size: 10, bold: true, gap: 1 });
       topic.steps.forEach((step, index) => {
         paragraph(`${index + 1}. ${step.title}${step.action ? ` - bouton « ${step.action} »` : ""}`, { size: 9.5, bold: true, indent: 3, gap: 0.5 });

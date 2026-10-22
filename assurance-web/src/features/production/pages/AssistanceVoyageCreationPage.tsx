@@ -345,7 +345,7 @@ export default function AssistanceVoyageCreationPage() {
           cities={cities.data ?? []}
           allowLegalEntity
         />
-        <SectionContinueButton onClick={() => validateAndContinue("souscripteur")} />
+        <SectionSaveButton onClick={() => validateAndContinue("souscripteur")} />
       </SectionCard>
 
       <SectionCard
@@ -417,7 +417,7 @@ export default function AssistanceVoyageCreationPage() {
               Ajouter un assuré
             </Button>
           ) : null}
-          <SectionContinueButton onClick={() => validateAndContinue("assures")} />
+          <SectionSaveButton onClick={() => validateAndContinue("assures")} />
         </div>
       </SectionCard>
 
@@ -539,7 +539,7 @@ export default function AssistanceVoyageCreationPage() {
   );
 }
 
-function SectionContinueButton({ onClick }: { onClick: () => void }) {
+function SectionSaveButton({ onClick }: { onClick: () => void }) {
   return (
     <div className="mt-4 flex justify-end border-t pt-3">
       <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={onClick}>

@@ -95,6 +95,7 @@ describe("guide utilities", () => {
 
   it.each([
     "/app",
+    "/app/aide",
     "/app/platform",
     "/app/profile",
     "/app/production",

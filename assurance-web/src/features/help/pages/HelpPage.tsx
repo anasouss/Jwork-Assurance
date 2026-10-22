@@ -40,9 +40,54 @@ const moduleAccent = {
   production: "text-emerald-700 border-emerald-600",
   sinistre: "text-sky-700 border-sky-700",
   companies: "text-amber-700 border-amber-600",
-  crm: "text-blue-700 border-blue-600",
+  crm: "text-cyan-700 border-cyan-600",
   compta: "text-orange-700 border-orange-600",
   admin: "text-fuchsia-700 border-fuchsia-700",
+} as const;
+
+const moduleTheme = {
+  dashboard: {
+    header: "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300",
+    active: "border-blue-500 bg-blue-50 text-blue-950 dark:bg-blue-950/35 dark:text-blue-100",
+    step: "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/35 dark:text-blue-300",
+    badge: "border-blue-200 bg-blue-100 text-blue-900 dark:border-blue-800 dark:bg-blue-950/45 dark:text-blue-200",
+  },
+  production: {
+    header: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300",
+    active: "border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-950/35 dark:text-emerald-100",
+    step: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-300",
+    badge: "border-emerald-200 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/45 dark:text-emerald-200",
+  },
+  sinistre: {
+    header: "bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-300",
+    active: "border-sky-500 bg-sky-50 text-sky-950 dark:bg-sky-950/35 dark:text-sky-100",
+    step: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950/35 dark:text-sky-300",
+    badge: "border-sky-200 bg-sky-100 text-sky-900 dark:border-sky-800 dark:bg-sky-950/45 dark:text-sky-200",
+  },
+  companies: {
+    header: "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-300",
+    active: "border-amber-500 bg-amber-50 text-amber-950 dark:bg-amber-950/35 dark:text-amber-100",
+    step: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-300",
+    badge: "border-amber-200 bg-amber-100 text-amber-950 dark:border-amber-800 dark:bg-amber-950/45 dark:text-amber-200",
+  },
+  crm: {
+    header: "bg-cyan-50 text-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300",
+    active: "border-cyan-500 bg-cyan-50 text-cyan-950 dark:bg-cyan-950/35 dark:text-cyan-100",
+    step: "border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/35 dark:text-cyan-300",
+    badge: "border-cyan-200 bg-cyan-100 text-cyan-900 dark:border-cyan-800 dark:bg-cyan-950/45 dark:text-cyan-200",
+  },
+  compta: {
+    header: "bg-orange-50 text-orange-800 dark:bg-orange-950/30 dark:text-orange-300",
+    active: "border-orange-500 bg-orange-50 text-orange-950 dark:bg-orange-950/35 dark:text-orange-100",
+    step: "border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/35 dark:text-orange-300",
+    badge: "border-orange-200 bg-orange-100 text-orange-950 dark:border-orange-800 dark:bg-orange-950/45 dark:text-orange-200",
+  },
+  admin: {
+    header: "bg-fuchsia-50 text-fuchsia-800 dark:bg-fuchsia-950/30 dark:text-fuchsia-300",
+    active: "border-fuchsia-500 bg-fuchsia-50 text-fuchsia-950 dark:bg-fuchsia-950/35 dark:text-fuchsia-100",
+    step: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/35 dark:text-fuchsia-300",
+    badge: "border-fuchsia-200 bg-fuchsia-100 text-fuchsia-950 dark:border-fuchsia-800 dark:bg-fuchsia-950/45 dark:text-fuchsia-200",
+  },
 } as const;
 
 export default function HelpPage() {
@@ -117,7 +162,7 @@ export default function HelpPage() {
         </div>
       ) : (
         <div className="grid min-w-0 overflow-hidden rounded-md border bg-card lg:grid-cols-[290px_minmax(0,1fr)]">
-          <aside className="max-h-[calc(100vh-13rem)] overflow-y-auto border-b bg-muted/20 p-2 lg:border-b-0 lg:border-r" aria-label="Sommaire du guide">
+          <aside className="max-h-[calc(100vh-13rem)] overflow-y-auto border-b bg-muted/15 p-2.5 lg:border-b-0 lg:border-r" aria-label="Sommaire du guide">
             {visibleModules.map((module) => (
               <GuideModuleNavigation
                 key={module.id}
@@ -153,18 +198,19 @@ function GuideModuleNavigation({
   onSelect: (topic: GuideTopic) => void;
 }) {
   const Icon = moduleIcons[module.id];
+  const theme = moduleTheme[module.id];
   return (
-    <section className="mb-2 last:mb-0">
-      <div className={`flex items-center gap-2 border-l-2 px-3 py-2 text-sm font-semibold ${moduleAccent[module.id]}`}>
-        <Icon className="size-4" />
+    <section className="mb-3 last:mb-0">
+      <div className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold ${theme.header}`}>
+        <Icon className="size-4 shrink-0" />
         {module.title}
       </div>
-      <div className="grid gap-0.5 py-1">
+      <div className="grid gap-1 py-1.5 pl-2">
         {module.topics.map((topic) => (
           <button
             key={topic.id}
             type="button"
-            className={`min-h-9 rounded px-3 py-2 text-left text-sm transition-colors ${selectedTopicId === topic.id ? "bg-background font-medium text-foreground shadow-sm" : "text-muted-foreground hover:bg-background/70 hover:text-foreground"}`}
+            className={`min-h-9 border-l-2 px-3 py-2 text-left text-sm transition-colors ${selectedTopicId === topic.id ? `${theme.active} font-semibold` : "border-transparent text-muted-foreground hover:border-border hover:bg-background/70 hover:text-foreground"}`}
             onClick={() => onSelect(topic)}
           >
             {topic.title}
@@ -194,6 +240,7 @@ function GuideArticle({
   topics: GuideTopic[];
   onSelect: (topic: GuideTopic) => void;
 }) {
+  const theme = moduleTheme[module.id];
   return (
     <article className="mx-auto max-w-4xl">
       <div className="border-b pb-4">
@@ -247,6 +294,7 @@ function GuideArticle({
                         size="icon-sm"
                         className="shrink-0"
                         title={`Voir le guide ${path.title}`}
+                        aria-label={`Voir le guide ${path.title}`}
                         onClick={() => onSelect(linkedTopic)}
                       >
                         <ArrowRight className="size-4" />
@@ -264,11 +312,11 @@ function GuideArticle({
         <ol className="grid gap-4">
           {topic.steps.map((step, index) => (
             <li key={`${step.title}-${index}`} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
-              <span className="grid size-8 place-items-center rounded-full border bg-muted/30 text-sm font-semibold">{index + 1}</span>
+              <span className={`grid size-8 place-items-center rounded-full border text-sm font-semibold ${theme.step}`}>{index + 1}</span>
               <div className="min-w-0 pt-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-sm font-semibold">{step.title}</h4>
-                  {step.action ? <Badge variant="secondary">{step.action}</Badge> : null}
+                  {step.action ? <Badge variant="outline" className={theme.badge}>{step.action}</Badge> : null}
                 </div>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.description}</p>
               </div>

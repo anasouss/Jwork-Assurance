@@ -361,7 +361,7 @@ export default function AssistanceAutomobileCreationPage() {
         sameAsSubscriberLabel="L’assuré est le souscripteur"
         onSaveSection={validateAndContinue}
         savedSections={validatedSections}
-        saveActionLabel="Valider et continuer"
+        saveActionLabel="Enregistrer"
         openSection={openSection}
         onSectionOpenChange={(section, open) => handleSectionOpenChange(section as AssistanceSection, open)}
       />
@@ -582,7 +582,7 @@ function VehicleSection(props: {
       <div className="mt-4 flex justify-end border-t pt-3">
         <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={props.onContinue}>
           <Save className="size-4" />
-          Valider et continuer
+          Enregistrer
         </Button>
       </div>
     </SectionCard>

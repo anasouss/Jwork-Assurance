@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Plane, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Plane, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
@@ -24,6 +24,7 @@ import type {
 } from "../types";
 
 type IdentityType = "CIN" | "PASSEPORT";
+type VoyageSection = "souscripteur" | "assures" | "contrat";
 type LookupState = {
   status: "idle" | "loading" | "found" | "new" | "error";
   message?: string;
@@ -68,7 +69,11 @@ export default function AssistanceVoyageCreationPage() {
   const [dateEffet, setDateEffet] = useState(today);
   const [dureeMois, setDureeMois] = useState("12");
   const [codePromo, setCodePromo] = useState("");
-  const [payer, setPayer] = useState("subscriber");
+  const [typePayeurPrime, setTypePayeurPrime] = useState<"SOUSCRIPTEUR" | "TIERS_MANDATE">("SOUSCRIPTEUR");
+  const [payeurPrimeClientId, setPayeurPrimeClientId] = useState("");
+  const [payerSearch, setPayerSearch] = useState("");
+  const [openSection, setOpenSection] = useState<VoyageSection>("souscripteur");
+  const [validatedSections, setValidatedSections] = useState<Partial<Record<VoyageSection, boolean>>>({});
   const hydratedContractRef = useRef<string | null>(null);
 
   const existingContract = useQuery({
@@ -96,15 +101,51 @@ export default function AssistanceVoyageCreationPage() {
     queryFn: () => referenceApi.list("villes"),
     staleTime: 60_000,
   });
+  const deferredPayerSearch = useDeferredValue(payerSearch.trim());
+  const payerClients = useQuery({
+    queryKey: ["clients", "assistance-voyage-payer-search", deferredPayerSearch],
+    queryFn: () => clientApi.listClients({ query: deferredPayerSearch, size: 25 }),
+    enabled: typePayeurPrime === "TIERS_MANDATE" && deferredPayerSearch.length >= 2,
+    staleTime: 30_000,
+  });
 
   const subscriberCanBeInsured = subscriber.typeClient === "PERSONNE_PHYSIQUE";
   const subscriberIsInsured = sameInsured && subscriberCanBeInsured;
-  const effectiveInsured = subscriberIsInsured ? [subscriber] : insuredPeople;
+  const effectiveInsured = useMemo(
+    () => subscriberIsInsured ? [subscriber] : insuredPeople,
+    [insuredPeople, subscriber, subscriberIsInsured],
+  );
   const insuredBirthDates = effectiveInsured.map((person) => person.dateNaissance).filter(Boolean);
   const selectedCompany = (companies.data ?? []).find((company) => company.id === compagnieId);
   const selectedProduct = (products.data ?? []).find((product) => product.id === produitId);
   const durationOptions = travelDurationOptions(selectedProduct);
   const expiryDate = calculateExpiryDate(dateEffet, Number(dureeMois));
+  const payerOptions = useMemo(() => {
+    const linkedPeople = [subscriber, ...effectiveInsured]
+      .filter((person) => person.clientId)
+      .map((person) => ({
+        id: person.clientId!,
+        nomAffichage: personName(person) || person.clientId!,
+        rc: person.rc || undefined,
+        cin: person.documentType === "CIN" ? person.documentNumber || undefined : undefined,
+      }));
+    const persisted = existingContract.data?.payeurPrimeClientId && existingContract.data.payeurPrimeNom
+      ? [{
+          id: existingContract.data.payeurPrimeClientId,
+          nomAffichage: existingContract.data.payeurPrimeNom,
+          rc: undefined,
+          cin: undefined,
+        }]
+      : [];
+    const byId = new Map(
+      [...linkedPeople, ...persisted, ...(payerClients.data?.items ?? [])].map((client) => [client.id, client]),
+    );
+    return [...byId.values()].map((client) => ({
+      value: client.id,
+      label: client.nomAffichage ?? client.id,
+      keywords: [client.rc, client.cin].filter(Boolean).join(" "),
+    }));
+  }, [effectiveInsured, existingContract.data?.payeurPrimeClientId, existingContract.data?.payeurPrimeNom, payerClients.data?.items, subscriber]);
 
   useEffect(() => {
     const contract = existingContract.data;
@@ -132,11 +173,9 @@ export default function AssistanceVoyageCreationPage() {
       : assistance.dateEffet ?? contract.dateEffet ?? today);
     setDureeMois(String(assistance.duree ?? 12));
     setCodePromo(renewing ? "" : assistance.codePromo ?? "");
-    const payerClientId = contract.payeurPrimeClientId;
-    const payerIndex = payerClientId
-      ? insuredClients.findIndex((client) => client.id === payerClientId)
-      : -1;
-    setPayer(payerIndex >= 0 && !subscriberIsInsured ? `insured-${payerIndex}` : "subscriber");
+    const payerType = contract.typePayeurPrime === "TIERS_MANDATE" ? "TIERS_MANDATE" : "SOUSCRIPTEUR";
+    setTypePayeurPrime(payerType);
+    setPayeurPrimeClientId(payerType === "TIERS_MANDATE" ? contract.payeurPrimeClientId ?? "" : "");
     hydratedContractRef.current = hydrationKey;
   }, [contratId, existingContract.data, renewing]);
 
@@ -177,7 +216,8 @@ export default function AssistanceVoyageCreationPage() {
         souscripteur: personRequest(subscriber),
         assures: subscriberIsInsured ? [] : insuredPeople.map(personRequest),
         assureIdentiqueSouscripteur: subscriberIsInsured,
-        payeurIndex: payer === "subscriber" ? -1 : Number(payer.replace("insured-", "")),
+        typePayeurPrime,
+        payeurPrimeClientId: typePayeurPrime === "TIERS_MANDATE" ? payeurPrimeClientId : undefined,
       };
       if (renewing && contratId) return assistanceVoyageApi.renew(contratId, request);
       if (editing && contratId) return assistanceVoyageApi.update(contratId, request);
@@ -214,7 +254,47 @@ export default function AssistanceVoyageCreationPage() {
     && quote.isSuccess
     && validPerson(subscriber)
     && effectiveInsured.every(validPerson)
+    && (typePayeurPrime !== "TIERS_MANDATE" || payeurPrimeClientId)
+    && validatedSections.souscripteur
+    && validatedSections.assures
   );
+
+  const invalidateFrom = (section: VoyageSection) => {
+    const order: VoyageSection[] = ["souscripteur", "assures", "contrat"];
+    const sectionIndex = order.indexOf(section);
+    setValidatedSections((current) => {
+      const next = { ...current };
+      order.slice(sectionIndex).forEach((key) => delete next[key]);
+      return next;
+    });
+  };
+
+  const validateAndContinue = (section: Exclude<VoyageSection, "contrat">) => {
+    const valid = section === "souscripteur"
+      ? validPerson(subscriber)
+      : effectiveInsured.length > 0 && effectiveInsured.every(validPerson);
+    if (!valid) {
+      toast.error(section === "souscripteur"
+        ? "Complétez les informations obligatoires du souscripteur."
+        : "Complétez les informations obligatoires de chaque personne assurée.");
+      return;
+    }
+    setValidatedSections((current) => ({ ...current, [section]: true }));
+    setOpenSection(section === "souscripteur" ? "assures" : "contrat");
+  };
+
+  const handleSectionOpenChange = (section: VoyageSection, open: boolean) => {
+    if (!open) return;
+    const order: VoyageSection[] = ["souscripteur", "assures", "contrat"];
+    const targetIndex = order.indexOf(section);
+    const firstIncomplete = order.slice(0, targetIndex).find((item) => !validatedSections[item]);
+    if (firstIncomplete) {
+      setOpenSection(firstIncomplete);
+      toast.error("Validez la section en cours avant de continuer.");
+      return;
+    }
+    setOpenSection(section);
+  };
 
   if (loadingExisting && existingContract.isLoading) {
     return <div className="flex min-h-48 items-center justify-center"><Loader2 className="size-6 animate-spin" /></div>;
@@ -246,32 +326,42 @@ export default function AssistanceVoyageCreationPage() {
         </Button>
       </header>
 
-      <SectionCard title="Souscripteur" badge={personBadge(subscriber)} tone="production" defaultOpen>
+      <SectionCard
+        title="Souscripteur"
+        badge={validatedSections.souscripteur ? "Validé" : personBadge(subscriber)}
+        tone="production"
+        open={openSection === "souscripteur"}
+        onOpenChange={(open) => handleSectionOpenChange("souscripteur", open)}
+      >
         <PersonEditor
           value={subscriber}
           onChange={(next) => {
             setSubscriber(next);
+            invalidateFrom("souscripteur");
             if (next.typeClient === "PERSONNE_MORALE") {
               setSameInsured(false);
-              setPayer("subscriber");
             }
           }}
           cities={cities.data ?? []}
           allowLegalEntity
         />
+        <SectionContinueButton onClick={() => validateAndContinue("souscripteur")} />
       </SectionCard>
 
       <SectionCard
         title="Personnes assurées"
-        badge={subscriberIsInsured ? "Souscripteur" : `${insuredPeople.length} assuré${insuredPeople.length > 1 ? "s" : ""}`}
+        badge={validatedSections.assures
+          ? "Validé"
+          : subscriberIsInsured ? "Souscripteur" : `${insuredPeople.length} assuré${insuredPeople.length > 1 ? "s" : ""}`}
         tone="production"
-        defaultOpen
+        open={openSection === "assures"}
+        onOpenChange={(open) => handleSectionOpenChange("assures", open)}
       >
         <div className="grid gap-4">
           <label className="flex min-h-10 items-center gap-3 rounded-md border px-3 py-2">
             <Switch disabled={!subscriberCanBeInsured} checked={subscriberIsInsured} onCheckedChange={(checked) => {
               setSameInsured(checked);
-              setPayer("subscriber");
+              invalidateFrom("assures");
             }} />
             <span className="text-sm font-medium">L’assuré est le souscripteur</span>
             {!subscriberCanBeInsured ? (
@@ -292,7 +382,7 @@ export default function AssistanceVoyageCreationPage() {
                     title="Retirer cette personne"
                     onClick={() => {
                       setInsuredPeople((current) => current.filter((_, currentIndex) => currentIndex !== index));
-                      setPayer("subscriber");
+                      invalidateFrom("assures");
                     }}
                   >
                     <Trash2 className="size-4" />
@@ -301,9 +391,12 @@ export default function AssistanceVoyageCreationPage() {
               </div>
               <PersonEditor
                 value={person}
-                onChange={(next) => setInsuredPeople((current) => current.map(
-                  (item, currentIndex) => currentIndex === index ? next : item
-                ))}
+                onChange={(next) => {
+                  setInsuredPeople((current) => current.map(
+                    (item, currentIndex) => currentIndex === index ? next : item
+                  ));
+                  invalidateFrom("assures");
+                }}
                 cities={cities.data ?? []}
                 allowLegalEntity={false}
               />
@@ -315,16 +408,26 @@ export default function AssistanceVoyageCreationPage() {
               type="button"
               variant="outline"
               className="w-fit"
-              onClick={() => setInsuredPeople((current) => [...current, emptyPerson()])}
+              onClick={() => {
+                setInsuredPeople((current) => [...current, emptyPerson()]);
+                invalidateFrom("assures");
+              }}
             >
               <Plus className="size-4" />
               Ajouter un assuré
             </Button>
           ) : null}
+          <SectionContinueButton onClick={() => validateAndContinue("assures")} />
         </div>
       </SectionCard>
 
-      <SectionCard title="Contrat" badge={numeroContrat.trim() ? "Renseigné" : "À compléter"} tone="production" defaultOpen>
+      <SectionCard
+        title="Contrat"
+        badge={quote.isSuccess ? "Tarif calculé" : numeroContrat.trim() ? "Renseigné" : "À compléter"}
+        tone="production"
+        open={openSection === "contrat"}
+        onOpenChange={(open) => handleSectionOpenChange("contrat", open)}
+      >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Compagnie d’assistance" required>
             <Input className="bg-muted/50" value={selectedCompany?.libelle ?? ""} readOnly />
@@ -354,19 +457,34 @@ export default function AssistanceVoyageCreationPage() {
           <Field label="Code promo">
             <Input value={codePromo} onChange={(event) => setCodePromo(event.target.value.toUpperCase())} />
           </Field>
-          <Field label="Payeur" required>
-            <Select value={payer} onValueChange={setPayer}>
+          <Field label="Payeur des primes" required>
+            <Select
+              value={typePayeurPrime}
+              onValueChange={(value) => {
+                setTypePayeurPrime(value as "SOUSCRIPTEUR" | "TIERS_MANDATE");
+                setPayeurPrimeClientId("");
+              }}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="subscriber">Souscripteur</SelectItem>
-                {!subscriberIsInsured ? insuredPeople.map((person, index) => (
-                  <SelectItem key={index} value={`insured-${index}`}>
-                    {personName(person) || `Assuré ${index + 1}`}
-                  </SelectItem>
-                )) : null}
+                <SelectItem value="SOUSCRIPTEUR">Lui-même</SelectItem>
+                <SelectItem value="TIERS_MANDATE">Autre personne</SelectItem>
               </SelectContent>
             </Select>
           </Field>
+          {typePayeurPrime === "TIERS_MANDATE" ? (
+            <Field label="Autre payeur" required>
+              <AutocompleteSelect
+                value={payeurPrimeClientId}
+                onValueChange={setPayeurPrimeClientId}
+                onQueryChange={setPayerSearch}
+                options={payerOptions}
+                placeholder="RC, CIN ou nom"
+                emptyText="Aucun client trouvé"
+                invalidText="Sélectionnez un client existant."
+              />
+            </Field>
+          ) : null}
         </div>
 
         {quote.data ? (
@@ -396,28 +514,38 @@ export default function AssistanceVoyageCreationPage() {
             {quote.error instanceof Error ? quote.error.message : "Tarification impossible"}
           </p>
         ) : null}
+        <div className="mt-4 flex justify-end gap-2 border-t pt-4">
+          <Button asChild variant="outline">
+            <Link to={loadingExisting && contratId ? `/app/production/contrats/${contratId}` : "/app/production/ajouter-dossier"}>Annuler</Link>
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSubmit || save.isPending}
+            onClick={() => save.mutate()}
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            {save.isPending ? <Loader2 className="size-4 animate-spin" /> : <Plane className="size-4" />}
+            {save.isPending
+              ? "Enregistrement..."
+              : renewing
+                ? "Renouveler l’assistance"
+                : editing
+                  ? "Enregistrer les modifications"
+                  : "Créer le dossier"}
+          </Button>
+        </div>
       </SectionCard>
+    </div>
+  );
+}
 
-      <footer className="flex justify-end gap-2 border-t py-4">
-        <Button asChild variant="outline">
-          <Link to={loadingExisting && contratId ? `/app/production/contrats/${contratId}` : "/app/production/ajouter-dossier"}>Annuler</Link>
-        </Button>
-        <Button
-          type="button"
-          disabled={!canSubmit || save.isPending}
-          onClick={() => save.mutate()}
-          className="bg-emerald-600 text-white hover:bg-emerald-700"
-        >
-          <Plane className="size-4" />
-          {save.isPending
-            ? "Enregistrement..."
-            : renewing
-              ? "Renouveler l’assistance"
-              : editing
-                ? "Enregistrer les modifications"
-                : "Créer le dossier"}
-        </Button>
-      </footer>
+function SectionContinueButton({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="mt-4 flex justify-end border-t pt-3">
+      <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={onClick}>
+        <Save className="size-4" />
+        Enregistrer
+      </Button>
     </div>
   );
 }

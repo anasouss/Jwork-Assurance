@@ -1,5 +1,6 @@
 package com.assurance.dto.request;
 
+import com.assurance.enums.TypePayeurPrime;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -40,6 +41,12 @@ public class CreateAssistanceVoyageRequest {
 
     private Boolean assureIdentiqueSouscripteur;
 
+    private TypePayeurPrime typePayeurPrime;
+
+    private Long payeurPrimeClientId;
+
+    /** @deprecated Kept temporarily for clients using the original insured-person index contract. */
+    @Deprecated
     private Integer payeurIndex;
 
     @Data

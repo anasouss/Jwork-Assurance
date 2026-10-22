@@ -1,6 +1,6 @@
 import type { GuideModule } from "./types";
 
-export const GUIDE_VERSION = "1.2";
+export const GUIDE_VERSION = "2.0";
 export const GUIDE_UPDATED_AT = "22/10/2026";
 
 export const guideModules: GuideModule[] = [
@@ -9,6 +9,21 @@ export const guideModules: GuideModule[] = [
     title: "Dashboard et compte",
     description: "Prise en main, indicateurs, contexte d’agence et sécurité du compte.",
     topics: [
+      {
+        id: "utiliser-aide",
+        title: "Utiliser le centre d’aide",
+        summary: "Trouver la procédure liée à l’écran courant, rechercher une erreur et télécharger le guide PDF.",
+        route: "/app/aide",
+        steps: [
+          { title: "Ouvrir l’aide contextuelle", description: "Cliquez sur l’icône Aide dans l’en-tête. Le guide sélectionne automatiquement l’article le plus précis pour l’écran d’origine." },
+          { title: "Parcourir les modules", description: "Dans le sommaire coloré, choisissez Dashboard, Production, Sinistre, Compagnies, CRM, Compta ou Administration, puis un écran." },
+          { title: "Rechercher", description: "Saisissez une fonctionnalité, un bouton, un champ ou le texte d’une erreur. La recherche couvre procédures, parcours alternatifs et solutions." },
+          { title: "Ouvrir l’écran", description: "Cliquez sur Ouvrir l’écran pour revenir directement à la page documentée lorsque ce raccourci est disponible." },
+          { title: "Suivre un parcours alternatif", description: "Dans Parcours disponibles, choisissez une seule option puis cliquez sur sa flèche pour ouvrir ses sections détaillées." },
+          { title: "Télécharger", description: "Cliquez sur Télécharger le PDF pour générer le guide correspondant aux modules accessibles avec vos permissions.", action: "Télécharger le PDF" },
+        ],
+        warnings: ["Le guide masque les rubriques pour lesquelles votre compte ne possède aucune permission correspondante."],
+      },
       {
         id: "dashboard-agence",
         title: "Tableau de bord de l’agence",
@@ -262,14 +277,16 @@ export const guideModules: GuideModule[] = [
         permissions: ["contrat:create", "contrat:update"],
         prerequisites: ["Une compagnie d’assistance et un produit Voyage actifs doivent être sélectionnés dans Ajouter un dossier."],
         steps: [
-          { title: "Renseigner Souscripteur", description: "Choisissez Personne physique ou Personne morale, saisissez CIN/passeport ou RC, puis complétez identité, ville, adresse et coordonnées. Une recherche reprend la fiche existante lorsqu’elle est trouvée." },
-          { title: "Définir Personnes assurées", description: "Activez L’assuré est le souscripteur pour une personne physique, ou désactivez-le et complétez chaque assuré. Utilisez Ajouter un assuré ou l’icône de retrait pour gérer la liste." },
-          { title: "Compléter Contrat", description: "Vérifiez compagnie et produit en lecture seule. Renseignez N° de contrat, durée, date d’effet, code promo éventuel et payeur. La date d’expiration est calculée." },
+          { title: "Enregistrer Souscripteur", description: "Choisissez Personne physique ou Personne morale, saisissez CIN/passeport ou RC, puis complétez identité, ville, adresse et coordonnées. Une recherche reprend la fiche existante lorsqu’elle est trouvée. Cliquez sur Enregistrer pour ouvrir la section suivante.", action: "Enregistrer" },
+          { title: "Enregistrer Personnes assurées", description: "Activez L’assuré est le souscripteur pour une personne physique, ou désactivez-le et complétez chaque assuré. Utilisez Ajouter un assuré ou l’icône de retrait, puis cliquez sur Enregistrer.", action: "Enregistrer" },
+          { title: "Compléter Contrat", description: "Vérifiez compagnie et produit en lecture seule. Renseignez N° de contrat, durée, date d’effet et code promo éventuel. Pour le payeur, choisissez Lui-même ou Autre personne; dans ce dernier cas, recherchez un client existant. La date d’expiration est calculée." },
           { title: "Contrôler la tarification", description: "Vérifiez Prime nette, Réduction et Prime TTC ainsi que le détail par assuré lorsqu’il y en a plusieurs." },
           { title: "Créer ou enregistrer", description: "Cliquez sur Créer le dossier. En modification, utilisez Enregistrer les modifications; au renouvellement, Renouveler l’assistance.", action: "Créer le dossier" },
         ],
         errors: [
-          { message: "Créer le dossier reste désactivé", resolution: "Complétez l’identité du souscripteur, chaque personne assurée, le N° contrat, la durée, la date d’effet, le payeur et attendez une tarification valide." },
+          { message: "Validez la section en cours avant de continuer", resolution: "Complétez les champs obligatoires de la section ouverte puis cliquez sur Enregistrer." },
+          { message: "Sélectionnez un client existant", resolution: "Pour un autre payeur, saisissez au moins deux caractères puis choisissez réellement une option de la liste." },
+          { message: "Créer le dossier reste désactivé", resolution: "Enregistrez Souscripteur et Personnes assurées, complétez le N° contrat, la durée, la date d’effet et le payeur, puis attendez une tarification valide." },
           { message: "Tarification impossible", resolution: "Vérifiez le produit, les âges/dates de naissance, la durée, la période tarifaire et le code promo." },
         ],
       },
@@ -282,9 +299,9 @@ export const guideModules: GuideModule[] = [
         permissions: ["contrat:create", "contrat:update"],
         prerequisites: ["Une compagnie d’assistance active doit être sélectionnée dans Ajouter un dossier."],
         steps: [
-          { title: "Valider Souscripteur", description: "Recherchez ou saisissez le souscripteur puis cliquez sur Valider et continuer.", action: "Valider et continuer" },
-          { title: "Valider Assuré", description: "Indiquez si l’assuré est le souscripteur. Sinon, recherchez ou saisissez sa fiche et sa catégorie client.", action: "Valider et continuer" },
-          { title: "Valider Véhicule assuré", description: "Sélectionnez Catégorie client et Usage, recherchez l’immatriculation, puis complétez marque, carrosserie, catégorie transport si requise, mise en circulation et validité de la carte grise.", action: "Valider et continuer" },
+          { title: "Enregistrer Souscripteur", description: "Recherchez ou saisissez le souscripteur puis cliquez sur Enregistrer pour ouvrir la section suivante.", action: "Enregistrer" },
+          { title: "Enregistrer Assuré", description: "Indiquez si l’assuré est le souscripteur. Sinon, recherchez ou saisissez sa fiche et sa catégorie client, puis cliquez sur Enregistrer.", action: "Enregistrer" },
+          { title: "Enregistrer Véhicule assuré", description: "Sélectionnez Catégorie client et Usage, recherchez l’immatriculation, puis complétez marque, carrosserie, catégorie transport si requise, mise en circulation et validité de la carte grise. Cliquez ensuite sur Enregistrer.", action: "Enregistrer" },
           { title: "Choisir le produit", description: "Dans Contrat, sélectionnez un Produit d’assistance compatible avec la catégorie et l’usage. S’il n’y en a aucun, corrigez les paramètres ou configurez le produit." },
           { title: "Compléter Contrat", description: "Renseignez N° contrat, durée, date d’effet, échéance, code promo et payeur. Pour Autre personne, recherchez et sélectionnez un client existant." },
           { title: "Contrôler le tarif", description: "Vérifiez Prime nette, Réduction, TTC et Date d’expiration calculée." },
@@ -606,7 +623,7 @@ export const guideModules: GuideModule[] = [
           { title: "Identifier la garantie", description: "Cliquez sur Ajouter garantie puis renseignez Code, Libellé, Branche, Type, Ordre, Description et Groupe d’exclusion éventuel." },
           { title: "Définir son comportement", description: "Réglez Obligatoire, Traitement métier Standard/Responsabilité civile/Défense et recours, Capital, Franchise, Saisie manuelle, Verrouillée et Active selon la garantie." },
           { title: "Configurer la tarification", description: "Dans Modes de tarification, choisissez TAUX, CAPITAL, PRIME FIXE ou PROTECTION, le mode par défaut et, si nécessaire, la base de calcul, la garantie de référence et le critère du sélecteur tarifaire." },
-          { title: "Configurer la valeur assurée", description: "Pour une garantie véhicule avec capital, autorisez Valeur vénale, Valeur à neuf, Valeur glace ou Manuelle et choisissez la source par défaut." },
+          { title: "Configurer la valeur assurée", description: "Dans Valeur assurée, pour une garantie véhicule avec capital, autorisez Valeur vénale, Valeur à neuf, Valeur glace ou Manuelle et choisissez la source par défaut." },
           { title: "Régler le prorata", description: "Contrôlez Prorata appliqué par compagnie et désactivez-le seulement pour les compagnies dont les règles le prévoient." },
           { title: "Enregistrer", description: "Relisez l’aperçu de grille tarifaire puis cliquez sur Ajouter ou Modifier." },
         ],

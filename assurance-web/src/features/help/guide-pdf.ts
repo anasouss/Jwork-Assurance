@@ -33,6 +33,11 @@ export async function createGuidePdf(modules: GuideModule[]) {
     if (y + height > PAGE_HEIGHT - 18) nextPage();
   };
 
+  const textHeight = (text: string, size: number, indent = 0, gap = 2) => {
+    const lines = pdf.splitTextToSize(text, CONTENT_WIDTH - indent);
+    return lines.length * size * 0.43 + gap;
+  };
+
   const paragraph = (text: string, options?: { size?: number; bold?: boolean; color?: [number, number, number]; indent?: number; gap?: number }) => {
     const size = options?.size ?? 10;
     const indent = options?.indent ?? 0;
@@ -67,7 +72,7 @@ export async function createGuidePdf(modules: GuideModule[]) {
     paragraph(`${moduleIndex + 1}. ${module.title}`, { size: 19, bold: true, color: [7, 79, 65], gap: 2 });
     paragraph(module.description, { size: 10, color: [70, 80, 96], gap: 6 });
     module.topics.forEach((topic, topicIndex) => {
-      ensureSpace(35);
+      ensureSpace(65);
       paragraph(`${moduleIndex + 1}.${topicIndex + 1} ${topic.title}`, { size: 14, bold: true, color: [13, 54, 88], gap: 1.5 });
       paragraph(topic.summary, { size: 9.5, color: [70, 80, 96], gap: 3 });
       if (topic.prerequisites?.length) {
@@ -77,13 +82,16 @@ export async function createGuidePdf(modules: GuideModule[]) {
       if (topic.paths?.length) {
         paragraph("Parcours disponibles", { size: 10, bold: true, color: [7, 79, 65], gap: 1 });
         topic.paths.forEach((path) => {
+          ensureSpace(textHeight(path.title, 9.5, 3, 0.5) + textHeight(path.description, 9, 7, 1.5));
           paragraph(path.title, { size: 9.5, bold: true, indent: 3, gap: 0.5 });
           paragraph(path.description, { size: 9, indent: 7, color: [55, 65, 81], gap: 1.5 });
         });
       }
       paragraph("Procédure", { size: 10, bold: true, gap: 1 });
       topic.steps.forEach((step, index) => {
-        paragraph(`${index + 1}. ${step.title}${step.action ? ` - bouton « ${step.action} »` : ""}`, { size: 9.5, bold: true, indent: 3, gap: 0.5 });
+        const title = `${index + 1}. ${step.title}${step.action ? ` - bouton « ${step.action} »` : ""}`;
+        ensureSpace(textHeight(title, 9.5, 3, 0.5) + textHeight(step.description, 9, 7, 1.5));
+        paragraph(title, { size: 9.5, bold: true, indent: 3, gap: 0.5 });
         paragraph(step.description, { size: 9, indent: 7, color: [55, 65, 81], gap: 1.5 });
       });
       if (topic.results?.length) {

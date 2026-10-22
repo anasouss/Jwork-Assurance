@@ -485,6 +485,9 @@ export type CreateAssistanceVoyageRequest = {
   souscripteur: AssistanceVoyagePersonRequest;
   assures: AssistanceVoyagePersonRequest[];
   assureIdentiqueSouscripteur?: boolean;
+  typePayeurPrime?: "SOUSCRIPTEUR" | "TIERS_MANDATE";
+  payeurPrimeClientId?: string;
+  /** @deprecated Compatibility with the original assistance-voyage API. */
   payeurIndex?: number;
 };
 

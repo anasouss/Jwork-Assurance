@@ -177,7 +177,7 @@ public class AssistanceVoyageService {
                 assures.stream().map(Client::getDateNaissance).toList(),
                 request.getCodePromo()
         );
-        Client payeur = resolvePayer(request.getPayeurIndex(), souscripteur, assures);
+        Client payeur = resolvePayer(agenceId, request, souscripteur, assures);
 
         Contrat contrat = Contrat.builder()
                 .agence(agence)
@@ -435,7 +435,7 @@ public class AssistanceVoyageService {
                 assures.stream().map(Client::getDateNaissance).toList(),
                 request.getCodePromo()
         );
-        Client payeur = resolvePayer(request.getPayeurIndex(), souscripteur, assures);
+        Client payeur = resolvePayer(agenceId, request, souscripteur, assures);
         LocalDate dateEcheance = request.getDateEffet().plusMonths(request.getDureeMois()).minusDays(1);
 
         contrat.setNumeroContrat(request.getNumeroContrat().trim());
@@ -628,7 +628,27 @@ public class AssistanceVoyageService {
         }
     }
 
-    private Client resolvePayer(Integer payerIndex, Client subscriber, List<Client> insuredPeople) {
+    private Client resolvePayer(
+            Long agenceId,
+            CreateAssistanceVoyageRequest request,
+            Client subscriber,
+            List<Client> insuredPeople
+    ) {
+        if (request.getTypePayeurPrime() != null) {
+            if (request.getTypePayeurPrime() == TypePayeurPrime.SOUSCRIPTEUR) {
+                return subscriber;
+            }
+            if (request.getTypePayeurPrime() != TypePayeurPrime.TIERS_MANDATE) {
+                throw new BadRequestException("Le type de payeur sélectionné n'est pas autorisé");
+            }
+            if (request.getPayeurPrimeClientId() == null) {
+                throw new BadRequestException("Sélectionnez l'autre payeur");
+            }
+            return clientRepository.findByAgenceIdAndId(agenceId, request.getPayeurPrimeClientId())
+                    .orElseThrow(() -> new BadRequestException("Le payeur sélectionné est introuvable"));
+        }
+
+        Integer payerIndex = request.getPayeurIndex();
         if (payerIndex == null || payerIndex < 0) {
             return subscriber;
         }

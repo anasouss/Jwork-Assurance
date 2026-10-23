@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote,
-  BookOpenText,
   Eye,
-  History,
   Landmark,
   RotateCcw,
   Search,
+  Trash2,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
@@ -33,6 +32,7 @@ import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
 import {
   usePayerSearch,
   type PayerSelection,
@@ -59,6 +59,8 @@ export default function ReglementsClientsPage() {
   const canCreate = permissions.includes("reglement-client:create")
     || permissions.includes("reglement-client:manage");
   const navigate = useNavigate();
+  const location = useLocation();
+  const multiClientDeposit = location.pathname.endsWith("/versement-multi-clients");
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedPayerId = searchParams.get("payeurId") || "";
   const requestedPayerType: PayerScope = searchParams.get("cible") === "GROUPE"
@@ -81,7 +83,34 @@ export default function ReglementsClientsPage() {
     () => searchParams.get("ordre") === "ASC" ? "ASC" : "DESC"
   );
   const [detailDocumentId, setDetailDocumentId] = useState<string>();
-  const [multiClientDeposit, setMultiClientDeposit] = useState(false);
+  const selectedDraft = useQuery({
+    queryKey: [
+      "compta",
+      "multi-client-deposit-draft",
+      searchParams.getAll("selectionElement"),
+      searchParams.getAll("selectionDocument"),
+    ],
+    queryFn: () => comptaApi.selectedClientReceivables({
+      elementFacturableIds: searchParams.getAll("selectionElement"),
+      documentClientIds: searchParams.getAll("selectionDocument"),
+      multiPayeur: true,
+    }),
+    enabled: multiClientDeposit && (
+      searchParams.has("selectionElement") || searchParams.has("selectionDocument")
+    ),
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (!multiClientDeposit || !selectedDraft.data) return;
+    setSelected((current) => {
+      const next = { ...current };
+      selectedDraft.data.forEach((row) => {
+        next[receivableTargetKey(row)] = row;
+      });
+      return next;
+    });
+  }, [multiClientDeposit, selectedDraft.data]);
   useEffect(() => {
     setPage(urlPage(searchParams.get("page")));
     setReference(searchParams.get("search") || "");
@@ -252,8 +281,11 @@ export default function ReglementsClientsPage() {
       dateTo: "",
     });
     setPage(0);
-    setSelected({});
-    setSearchParams(new URLSearchParams(), { replace: true });
+    if (!multiClientDeposit) setSelected({});
+    setSearchParams(
+      multiClientDeposit ? selectionSearchParams(selectedRows) : new URLSearchParams(),
+      { replace: true }
+    );
   }
 
   function selectPayer(value: string) {
@@ -300,33 +332,36 @@ export default function ReglementsClientsPage() {
     updateUrl({ page: nextPage > 0 ? nextPage : undefined });
   }
 
+  useEffect(() => {
+    if (!multiClientDeposit) return;
+    if (selectedDraft.isLoading || selectedDraft.isError) return;
+    const next = new URLSearchParams(searchParams);
+    const currentElements = next.getAll("selectionElement").sort().join(",");
+    const currentDocuments = next.getAll("selectionDocument").sort().join(",");
+    const selectedElements = selectedRows
+      .flatMap((row) => row.source.documentClientId ? [] : row.source.elementFacturableId ?? [])
+      .sort();
+    const selectedDocuments = selectedRows
+      .flatMap((row) => row.source.documentClientId ?? [])
+      .sort();
+    if (currentElements === selectedElements.join(",")
+      && currentDocuments === selectedDocuments.join(",")) return;
+    next.delete("selectionElement");
+    next.delete("selectionDocument");
+    selectedElements.forEach((id) => next.append("selectionElement", id));
+    selectedDocuments.forEach((id) => next.append("selectionDocument", id));
+    setSearchParams(next, { replace: true });
+  }, [multiClientDeposit, searchParams, selectedDraft.isError, selectedDraft.isLoading, selectedRows, setSearchParams]);
+
   return (
     <div className="grid gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium text-orange-700 dark:text-orange-400">
-            Comptabilité
-          </div>
-          <h1 className="mt-1 text-xl font-semibold">Règlements clients</h1>
-          <p className="text-sm text-muted-foreground">
-            Montants à encaisser, paiements partiels et moyens de règlement.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link to="/app/compta/reglements/historique?journal=1">
-              <BookOpenText className="size-4" />
-              Journal des règlements
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/app/compta/reglements/historique">
-              <History className="size-4" />
-              Règlements enregistrés
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <ClientPaymentsWorkspaceHeader
+        title={multiClientDeposit ? "Nouveau versement multi-clients" : "Règlements clients"}
+        description={multiClientDeposit
+          ? "Recherchez plusieurs clients, conservez leurs créances dans la sélection puis enregistrez le bordereau bancaire."
+          : "Montants à encaisser, paiements partiels et moyens de règlement."}
+        canCreate={canCreate && !multiClientDeposit}
+      />
 
       <section className="grid gap-4 rounded-md border bg-card p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[220px_minmax(280px,1.4fr)_minmax(240px,1fr)_170px_170px_auto] xl:items-end">
@@ -421,6 +456,16 @@ export default function ReglementsClientsPage() {
         )}
       </section>
 
+      {multiClientDeposit ? (
+        <MultiClientSelection
+          rows={selectedRows}
+          total={selectedTotal}
+          onRemove={(row) => toggle(row, false)}
+          onContinue={() => navigate(paymentPath(selectedRows, true))}
+          canContinue={canCreate && selectedRows.length > 0}
+        />
+      ) : null}
+
       <section className="overflow-hidden rounded-md border bg-card">
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div>
@@ -432,23 +477,15 @@ export default function ReglementsClientsPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant={multiClientDeposit ? "default" : "outline"}
-                  onClick={() => {
-                    setMultiClientDeposit((current) => !current);
-                    setSelected({});
-                  }}
-                >
-                  <Landmark className="size-4" /> Versement multi-clients
-                </Button>
+                {!multiClientDeposit ? (
                 <Button
                   disabled={!canCreate || !selectedRows.length}
-                  onClick={() => navigate(paymentPath(selectedRows, multiClientDeposit))}
+                  onClick={() => navigate(paymentPath(selectedRows, false))}
                 >
-                  {multiClientDeposit ? <Landmark className="size-4" /> : <Banknote className="size-4" />}
-                  {multiClientDeposit ? "Encaisser le versement" : "Encaisser"} ({selectedRows.length})
+                  <Banknote className="size-4" />
+                  Encaisser ({selectedRows.length})
                 </Button>
+                ) : null}
               </div>
             </div>
             <div className="grid border-y bg-muted/25 sm:grid-cols-4">
@@ -580,6 +617,102 @@ export default function ReglementsClientsPage() {
 
     </div>
   );
+}
+
+function MultiClientSelection({
+  rows,
+  total,
+  onRemove,
+  onContinue,
+  canContinue,
+}: {
+  rows: ClientReceivable[];
+  total: number;
+  onRemove: (row: ClientReceivable) => void;
+  onContinue: () => void;
+  canContinue: boolean;
+}) {
+  const groups = groupSelectedReceivables(rows);
+  return (
+    <section className="overflow-hidden rounded-md border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+        <div>
+          <h2 className="font-semibold">Sélection du versement</h2>
+          <p className="text-sm text-muted-foreground">
+            Cette sélection reste visible lorsque vous recherchez un autre client.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-xs uppercase text-muted-foreground">Total sélectionné</div>
+            <div className="font-semibold tabular-nums">{money(total)}</div>
+          </div>
+          <Button disabled={!canContinue} onClick={onContinue}>
+            <Landmark className="size-4" />
+            Renseigner le versement ({rows.length})
+          </Button>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+          Recherchez un client puis cochez les créances couvertes par le bordereau bancaire.
+        </div>
+      ) : (
+        <div className="divide-y">
+          {groups.map((group) => (
+            <div key={group.key} className="grid gap-2 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <strong>{group.name}</strong>
+                <span className="text-sm font-semibold tabular-nums">{money(group.total)}</span>
+              </div>
+              <div className="grid gap-1">
+                {group.rows.map((row) => (
+                  <div
+                    key={receivableTargetKey(row)}
+                    className="flex items-center justify-between gap-3 rounded-sm bg-muted/35 px-3 py-2 text-sm"
+                  >
+                    <span className="min-w-0 truncate">
+                      {receivableDocumentReference(row)} · {receivableCoverageReference(row)}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="font-medium tabular-nums">{money(row.soldeOuvert)}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        title="Retirer de la sélection"
+                        aria-label={`Retirer ${receivableDocumentReference(row)} de la sélection`}
+                        onClick={() => onRemove(row)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function groupSelectedReceivables(rows: ClientReceivable[]) {
+  const groups = new Map<string, { key: string; name: string; rows: ClientReceivable[]; total: number }>();
+  rows.forEach((row) => {
+    const key = sourcePayerKey(row);
+    const existing = groups.get(key) ?? {
+      key,
+      name: row.source.payeurNom,
+      rows: [],
+      total: 0,
+    };
+    existing.rows.push(row);
+    existing.total += row.soldeOuvert;
+    groups.set(key, existing);
+  });
+  return Array.from(groups.values());
 }
 
 function InvoiceDetailDialog(props: {
@@ -878,4 +1011,16 @@ function paymentPath(rows: ClientReceivable[], multiClientDeposit = false) {
     }
   });
   return `/app/compta/reglements/nouveau?${params.toString()}`;
+}
+
+function selectionSearchParams(rows: ClientReceivable[]) {
+  const params = new URLSearchParams();
+  rows.forEach((row) => {
+    if (row.source.documentClientId) {
+      params.append("selectionDocument", row.source.documentClientId);
+    } else if (row.source.elementFacturableId) {
+      params.append("selectionElement", row.source.elementFacturableId);
+    }
+  });
+  return params;
 }

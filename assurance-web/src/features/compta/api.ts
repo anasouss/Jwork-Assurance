@@ -554,6 +554,8 @@ export const comptaApi = {
     dateAu?: string;
     search?: string;
     statut?: ClientPayment["statut"];
+    mode?: PaymentInstrument["mode"];
+    statutInstrument?: PaymentInstrument["statut"];
     sortBy?: "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
     sortDirection?: "asc" | "desc";
     page: number;

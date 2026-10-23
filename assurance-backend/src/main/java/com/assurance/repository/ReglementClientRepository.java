@@ -26,6 +26,18 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
               and (:dateDu is null or r.dateReglement >= :dateDu)
               and (:dateAu is null or r.dateReglement <= :dateAu)
               and (:statut is null or r.statut = :statut)
+              and (:mode is null or exists (
+                  select modeInstrument.id
+                  from InstrumentReglementClient modeInstrument
+                  where modeInstrument.reglement = r
+                    and modeInstrument.mode = :mode
+              ))
+              and (:statutInstrument is null or exists (
+                  select statusInstrument.id
+                  from InstrumentReglementClient statusInstrument
+                  where statusInstrument.reglement = r
+                    and statusInstrument.statut = :statutInstrument
+              ))
               and (:search is null
                    or lower(r.numero) like concat('%', :search, '%')
                    or lower(r.payeurNom) like concat('%', :search, '%')
@@ -43,6 +55,8 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("statut") com.assurance.enums.StatutReglementClient statut,
+            @Param("mode") com.assurance.enums.ModeReglementClient mode,
+            @Param("statutInstrument") com.assurance.enums.StatutInstrumentReglement statutInstrument,
             @Param("search") String search,
             Pageable pageable
     );

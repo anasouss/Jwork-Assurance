@@ -6,15 +6,12 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import {
-  BookOpenText,
   Eye,
   FileText,
   MoreHorizontal,
   Pencil,
-  ReceiptText,
   RotateCcw,
   Search,
-  ShieldCheck,
   XCircle,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -54,6 +51,7 @@ import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { BankSelect } from "../components/BankSelect";
+import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
 import {
   requiresBankAccountAtEntry,
   requiresPaymentReference,
@@ -97,7 +95,6 @@ export default function ReglementsEnregistresPage() {
   const currentUserId = useAuthStore((state) => state.user?.id);
   const canManage = permissions.includes("reglement-client:manage");
   const canCreate = permissions.includes("reglement-client:create") || canManage;
-  const canValidate = permissions.includes("reglement-client:validate");
   const canIssueInvoice = permissions.includes("quittance:create")
     || permissions.includes("quittance:manage");
   const queryClient = useQueryClient();
@@ -106,10 +103,26 @@ export default function ReglementsEnregistresPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState(initialSearch);
   const [appliedSearch, setAppliedSearch] = useState(initialSearch);
+  const [dateFrom, setDateFrom] = useState(searchParams.get("dateDu") ?? "");
+  const [dateTo, setDateTo] = useState(searchParams.get("dateAu") ?? "");
+  const [appliedDateFrom, setAppliedDateFrom] = useState(searchParams.get("dateDu") ?? "");
+  const [appliedDateTo, setAppliedDateTo] = useState(searchParams.get("dateAu") ?? "");
+  const [paymentStatus, setPaymentStatus] = useState<ClientPayment["statut"] | "ALL">(
+    (searchParams.get("statut") as ClientPayment["statut"] | null) ?? "ALL"
+  );
+  const [paymentMode, setPaymentMode] = useState<ClientPaymentMode | "ALL">(
+    (searchParams.get("mode") as ClientPaymentMode | null) ?? "ALL"
+  );
+  const [instrumentStatus, setInstrumentStatus] = useState<PaymentInstrument["statut"] | "ALL">(
+    (searchParams.get("statutInstrument") as PaymentInstrument["statut"] | null) ?? "ALL"
+  );
+  const [appliedPaymentStatus, setAppliedPaymentStatus] = useState(paymentStatus);
+  const [appliedPaymentMode, setAppliedPaymentMode] = useState(paymentMode);
+  const [appliedInstrumentStatus, setAppliedInstrumentStatus] = useState(instrumentStatus);
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
-  const [journalOpen, setJournalOpen] = useState(searchParams.get("journal") === "1");
+  const journalView = searchParams.get("vue") === "journal" || searchParams.get("journal") === "1";
   const [journalDateFrom, setJournalDateFrom] = useState(TODAY);
   const [journalDateTo, setJournalDateTo] = useState(TODAY);
   const [journalUserId, setJournalUserId] = useState("ALL");
@@ -121,9 +134,18 @@ export default function ReglementsEnregistresPage() {
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
   const replacementTargetId = searchParams.get("remplacer");
   const payments = useQuery({
-    queryKey: ["compta", "client-payments", appliedSearch, sortBy, sortDirection, page],
+    queryKey: [
+      "compta", "client-payments", appliedSearch, appliedDateFrom, appliedDateTo,
+      appliedPaymentStatus, appliedPaymentMode, appliedInstrumentStatus,
+      sortBy, sortDirection, page,
+    ],
     queryFn: () => comptaApi.clientPayments({
       search: appliedSearch || undefined,
+      dateDu: appliedDateFrom || undefined,
+      dateAu: appliedDateTo || undefined,
+      statut: appliedPaymentStatus === "ALL" ? undefined : appliedPaymentStatus,
+      mode: appliedPaymentMode === "ALL" ? undefined : appliedPaymentMode,
+      statutInstrument: appliedInstrumentStatus === "ALL" ? undefined : appliedInstrumentStatus,
       sortBy,
       sortDirection,
       page,
@@ -157,7 +179,7 @@ export default function ReglementsEnregistresPage() {
   const journalUsers = useQuery({
     queryKey: ["compta", "client-payment-journal-users"],
     queryFn: comptaApi.clientPaymentJournalUsers,
-    enabled: journalOpen,
+    enabled: journalView,
   });
 
   const cancelPayment = useMutation({
@@ -229,6 +251,16 @@ export default function ReglementsEnregistresPage() {
   function resetFilters() {
     setSearch("");
     setAppliedSearch("");
+    setDateFrom("");
+    setDateTo("");
+    setAppliedDateFrom("");
+    setAppliedDateTo("");
+    setPaymentStatus("ALL");
+    setPaymentMode("ALL");
+    setInstrumentStatus("ALL");
+    setAppliedPaymentStatus("ALL");
+    setAppliedPaymentMode("ALL");
+    setAppliedInstrumentStatus("ALL");
     setSortBy("dateReglement");
     setSortDirection("desc");
     setPage(0);
@@ -236,11 +268,25 @@ export default function ReglementsEnregistresPage() {
   }
 
   function applyFilters() {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      toast.error("La date de début doit précéder la date de fin");
+      return;
+    }
     const nextSearch = search.trim();
     setAppliedSearch(nextSearch);
+    setAppliedDateFrom(dateFrom);
+    setAppliedDateTo(dateTo);
+    setAppliedPaymentStatus(paymentStatus);
+    setAppliedPaymentMode(paymentMode);
+    setAppliedInstrumentStatus(instrumentStatus);
     setPage(0);
     const next = new URLSearchParams();
     if (nextSearch) next.set("search", nextSearch);
+    if (dateFrom) next.set("dateDu", dateFrom);
+    if (dateTo) next.set("dateAu", dateTo);
+    if (paymentStatus !== "ALL") next.set("statut", paymentStatus);
+    if (paymentMode !== "ALL") next.set("mode", paymentMode);
+    if (instrumentStatus !== "ALL") next.set("statutInstrument", instrumentStatus);
     setSearchParams(next, { replace: true });
   }
 
@@ -308,42 +354,16 @@ export default function ReglementsEnregistresPage() {
 
   return (
     <div className="grid gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium text-orange-700 dark:text-orange-400">
-            Comptabilité
-          </div>
-          <h1 className="mt-1 text-xl font-semibold">Règlements enregistrés</h1>
-          <p className="text-sm text-muted-foreground">
-            Historique, annulations et remplacement des moyens de paiement impayés.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            className="bg-orange-600 text-white hover:bg-orange-700"
-            onClick={() => setJournalOpen(true)}
-          >
-            <BookOpenText className="size-4" />
-            Journal des règlements
-          </Button>
-          {(canValidate || canCreate) && (
-            <Button asChild variant="outline">
-              <Link to="/app/compta/reglements/etat-encaissements">
-                <ShieldCheck className="size-4" />
-                État des encaissements
-              </Link>
-            </Button>
-          )}
-          <Button asChild variant="outline">
-            <Link to="/app/compta/reglements">
-              <ReceiptText className="size-4" />
-              Créances ouvertes
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <ClientPaymentsWorkspaceHeader
+        title={journalView ? "Journal des règlements" : "Règlements enregistrés"}
+        description={journalView
+          ? "Générez le journal PDF selon la période, l’utilisateur, le moyen et le statut."
+          : "Recherchez les règlements et suivez chaque moyen de paiement jusqu’à son dénouement."}
+        canCreate={canCreate}
+      />
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_auto]">
+      {!journalView ? <>
+      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.5fr)_170px_170px_180px_190px_190px_auto] xl:items-end">
         <div className="grid gap-2">
           <Label htmlFor="payment-search">Payeur, numéro ou référence</Label>
           <Input
@@ -356,6 +376,52 @@ export default function ReglementsEnregistresPage() {
               }
             }}
           />
+        </div>
+        <div className="grid gap-2">
+          <Label>Date du</Label>
+          <DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} />
+        </div>
+        <div className="grid gap-2">
+          <Label>Date au</Label>
+          <DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} />
+        </div>
+        <div className="grid gap-2">
+          <Label>Statut du règlement</Label>
+          <Select value={paymentStatus} onValueChange={(value) => setPaymentStatus(value as ClientPayment["statut"] | "ALL")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tous les statuts</SelectItem>
+              <SelectItem value="A_VALIDER">À valider</SelectItem>
+              <SelectItem value="VALIDE">Validé</SelectItem>
+              <SelectItem value="ANNULE">Annulé</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label>Moyen</Label>
+          <Select value={paymentMode} onValueChange={(value) => setPaymentMode(value as ClientPaymentMode | "ALL")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tous les moyens</SelectItem>
+              {Object.entries(MODE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label>État du moyen</Label>
+          <Select value={instrumentStatus} onValueChange={(value) => setInstrumentStatus(value as PaymentInstrument["statut"] | "ALL")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tous les états</SelectItem>
+              <SelectItem value="EN_ATTENTE">En instance</SelectItem>
+              <SelectItem value="REMIS_EN_BANQUE">Remis en banque</SelectItem>
+              <SelectItem value="CONFIRME">Encaissé</SelectItem>
+              <SelectItem value="REJETE">Retourné / impayé</SelectItem>
+              <SelectItem value="REMPLACE">Remplacé</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-end gap-2">
           <Button
@@ -373,46 +439,44 @@ export default function ReglementsEnregistresPage() {
 
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm">
+          <table className="w-full min-w-[1480px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white">
               <tr>
                 <PaymentSortHeader column="numero" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>N° règlement</PaymentSortHeader>
                 <PaymentSortHeader column="dateReglement" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Date</PaymentSortHeader>
                 <PaymentSortHeader column="payeurNom" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Payeur</PaymentSortHeader>
-                <PaymentSortHeader column="montantTotal" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="right">Montant</PaymentSortHeader>
-                <th className="px-4 py-3 text-left">Moyens</th>
-                <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Statut</PaymentSortHeader>
+                <th className="px-4 py-3 text-left">Déposant</th>
+                <th className="px-4 py-3 text-right">Montant</th>
+                <th className="px-4 py-3 text-left">Moyen</th>
+                <th className="px-4 py-3 text-left">Référence</th>
+                <th className="px-4 py-3 text-left">Échéance</th>
+                <th className="px-4 py-3 text-left">Date de valeur</th>
+                <th className="px-4 py-3 text-center">État de valeur</th>
+                <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Règlement</PaymentSortHeader>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {payments.isLoading ? (
-                <TableRowsSkeleton colSpan={7} rows={8} />
-              ) : (payments.data?.rows ?? []).map((payment) => (
-                <tr key={payment.id} className="hover:bg-muted/30">
+                <TableRowsSkeleton colSpan={12} rows={8} />
+              ) : (payments.data?.rows ?? []).flatMap((payment) => visibleInstruments(
+                payment,
+                appliedPaymentMode,
+                appliedInstrumentStatus
+              ).map((instrument) => (
+                <tr key={instrument.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-semibold">{payment.numero}</td>
                   <td className="px-4 py-3">{formatDate(payment.dateReglement)}</td>
                   <td className="px-4 py-3">
-                    <div>{payment.payeurNom}</div>
-                    {payment.deposantNom && (
-                      <div className="text-xs text-muted-foreground">Déposant : {payment.deposantNom}</div>
-                    )}
+                    <div className="max-w-64">{instrumentPayerLabel(payment, instrument)}</div>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {formatAccountingAmount(payment.montantTotal)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {payment.instruments.map((instrument) => (
-                        <span key={instrument.id} className="inline-flex items-center gap-1.5">
-                          <Badge variant="outline">{MODE_LABELS[instrument.mode]}</Badge>
-                          {payment.statut === "VALIDE" && (
-                            <InstrumentStatusBadge value={instrument.statut} />
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
+                  <td className="px-4 py-3">{payment.deposantNom || "-"}</td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(instrument.montant)}</td>
+                  <td className="px-4 py-3"><Badge variant="outline">{MODE_LABELS[instrument.mode]}</Badge></td>
+                  <td className="px-4 py-3 font-medium">{instrument.referenceInstrument || "-"}</td>
+                  <td className="px-4 py-3">{formatDate(instrument.dateEcheance)}</td>
+                  <td className="px-4 py-3">{formatDate(instrument.dateStatut)}</td>
+                  <td className="px-4 py-3 text-center"><InstrumentStatusBadge value={instrument.statut} /></td>
                   <td className="px-4 py-3 text-center">
                     <PaymentStatusBadge value={payment.statut} />
                   </td>
@@ -435,10 +499,10 @@ export default function ReglementsEnregistresPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))) }
               {!payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun règlement ne correspond à la recherche.
                   </td>
                 </tr>
@@ -457,14 +521,16 @@ export default function ReglementsEnregistresPage() {
         )}
       </section>
 
-      <Dialog open={journalOpen} onOpenChange={setJournalOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Journal des règlements</DialogTitle>
-            <DialogDescription>
-              Générez un état des règlements saisis et des moyens de paiement pour une période.
-            </DialogDescription>
-          </DialogHeader>
+      </> : null}
+
+      {journalView ? (
+        <section className="grid gap-4 rounded-md border bg-card p-4">
+          <div>
+            <h2 className="font-semibold">Paramètres du journal</h2>
+            <p className="text-sm text-muted-foreground">
+              Le PDF reprend uniquement les règlements correspondant aux critères ci-dessous.
+            </p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label>Date du</Label>
@@ -528,20 +594,17 @@ export default function ReglementsEnregistresPage() {
           <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
             Les chèques et effets en attente restent distingués des montants définitivement encaissés.
           </div>
-          <DialogFooter>
-            <Button variant="outline" disabled={journalLoading} onClick={() => setJournalOpen(false)}>
-              Annuler
-            </Button>
+          <div className="flex justify-end">
             <Button
               disabled={journalLoading || !journalDateFrom || !journalDateTo}
               onClick={() => void previewJournal()}
             >
-              <Eye className="size-4" />
-              {journalLoading ? "Génération..." : "Prévisualiser le PDF"}
+              <FileText className="size-4" />
+              {journalLoading ? "Génération..." : "Prévisualiser le journal PDF"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </section>
+      ) : null}
 
       <Dialog
         open={Boolean(paymentToInvoice)}
@@ -865,10 +928,10 @@ function PaymentStatusBadge({ value }: { value: ClientPayment["statut"] }) {
 
 function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }) {
   const labels: Record<PaymentInstrument["statut"], string> = {
-    EN_ATTENTE: "En attente",
+    EN_ATTENTE: "En instance",
     REMIS_EN_BANQUE: "Remis en banque",
-    CONFIRME: "Confirmé",
-    REJETE: "Impayé",
+    CONFIRME: "Encaissé",
+    REJETE: "Retourné / impayé",
     REMPLACE: "Remplacé",
   };
   const variant = value === "REJETE"
@@ -910,6 +973,27 @@ function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
 
 function formatDate(value?: string | null) {
   return value ? value.split("-").reverse().join("/") : "-";
+}
+
+function instrumentPayerLabel(payment: ClientPayment, instrument: PaymentInstrument) {
+  if (!payment.multiPayeur) return payment.payeurNom;
+  const names = Array.from(new Set(
+    instrument.affectations
+      .map((allocation) => allocation.payeurNom?.trim())
+      .filter((name): name is string => Boolean(name))
+  ));
+  return names.length > 0 ? names.join(", ") : payment.payeurNom;
+}
+
+function visibleInstruments(
+  payment: ClientPayment,
+  mode: ClientPaymentMode | "ALL",
+  status: PaymentInstrument["statut"] | "ALL"
+) {
+  return payment.instruments.filter((instrument) =>
+    (mode === "ALL" || instrument.mode === mode)
+      && (status === "ALL" || instrument.statut === status)
+  );
 }
 
 function PaymentSortHeader(props: {

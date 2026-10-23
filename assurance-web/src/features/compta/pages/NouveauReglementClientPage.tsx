@@ -132,6 +132,9 @@ export default function NouveauReglementClientPage() {
   const selection = editing && payment.data
     ? selectionFromPayment(payment.data)
     : selectionFromParams(searchParams);
+  const returnPath = multiClientDeposit
+    ? multiClientSelectionPath(selection)
+    : "/app/compta/reglements";
   const hasSelection = selection.elementFacturableIds.length > 0
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
@@ -271,13 +274,20 @@ export default function NouveauReglementClientPage() {
     onSuccess: async (payment) => {
       toast.success(editing
         ? `Règlement ${payment.numero} modifié`
-        : `Règlement ${payment.numero} enregistré et envoyé pour validation`);
+        : multiClientDeposit
+          ? `Versement ${payment.numero} enregistré et comptabilisé`
+          : `Règlement ${payment.numero} enregistré et envoyé pour validation`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
       ]);
-      navigate(`/app/compta/reglements/etat-encaissements?date=${payment.dateReglement}`, { replace: true });
+      navigate(
+        multiClientDeposit
+          ? `/app/compta/reglements/historique?search=${encodeURIComponent(payment.numero)}`
+          : `/app/compta/reglements/etat-encaissements?date=${payment.dateReglement}`,
+        { replace: true }
+      );
     },
     onError: (error) => toast.error(
       error instanceof Error ? error.message : "Règlement impossible"
@@ -416,7 +426,7 @@ export default function NouveauReglementClientPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : "/app/compta/reglements"}>
+          <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : returnPath}>
             <ArrowLeft className="size-4" />
             {editing ? "Retour aux règlements à valider" : "Retour aux montants à encaisser"}
           </Link>
@@ -763,7 +773,7 @@ export default function NouveauReglementClientPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : "/app/compta/reglements"}>Annuler</Link>
+            <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : returnPath}>Annuler</Link>
           </Button>
           <Button
             disabled={!canSubmit || savePayment.isPending}
@@ -776,7 +786,11 @@ export default function NouveauReglementClientPage() {
             }}
           >
             <Banknote className="size-4" />
-            {editing ? "Enregistrer les modifications" : "Enregistrer pour validation"}
+            {editing
+              ? "Enregistrer les modifications"
+              : multiClientDeposit
+                ? "Enregistrer le versement"
+                : "Enregistrer pour validation"}
           </Button>
         </div>
       </footer>
@@ -1046,6 +1060,17 @@ function selectionFromParams(params: URLSearchParams) {
     elementFacturableIds: uniqueIds(params.getAll("element")),
     documentClientIds: uniqueIds(params.getAll("document")),
   };
+}
+
+function multiClientSelectionPath(selection: {
+  elementFacturableIds: string[];
+  documentClientIds: string[];
+}) {
+  const params = new URLSearchParams();
+  selection.elementFacturableIds.forEach((id) => params.append("selectionElement", id));
+  selection.documentClientIds.forEach((id) => params.append("selectionDocument", id));
+  const query = params.toString();
+  return `/app/compta/reglements/versement-multi-clients${query ? `?${query}` : ""}`;
 }
 
 function selectionFromPayment(payment: ClientPayment) {

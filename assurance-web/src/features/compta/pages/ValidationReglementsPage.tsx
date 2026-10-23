@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Eye, Pencil, Search, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, Pencil, Search, XCircle } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
 import { formatAccountingAmount } from "../format";
 import type { ClientPayment } from "../types";
 
@@ -101,21 +102,11 @@ export default function ValidationReglementsPage() {
 
   return (
     <div className="grid gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Comptabilité</div>
-          <h1 className="mt-1 text-xl font-semibold">État des encaissements</h1>
-          <p className="text-sm text-muted-foreground">
-            Contrôlez et validez les règlements saisis pour la journée sélectionnée.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link to="/app/compta/reglements/historique">
-            <ArrowLeft className="size-4" />
-            Règlements enregistrés
-          </Link>
-        </Button>
-      </header>
+      <ClientPaymentsWorkspaceHeader
+        title="Règlements à valider"
+        description="Contrôlez et validez les règlements saisis pour la journée sélectionnée."
+        canCreate={canEdit}
+      />
 
       <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[1fr_200px_auto]">
         <div className="grid gap-2">

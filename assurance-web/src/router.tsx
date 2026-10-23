@@ -208,6 +208,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/NouveauReglementClientPage")),
       },
       {
+        path: "compta/reglements/versement-multi-clients",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ReglementsClientsPage")),
+      },
+      {
         path: "compta/reglements/historique",
         lazy: lazyRoute(() => import("@/features/compta/pages/ReglementsEnregistresPage")),
       },

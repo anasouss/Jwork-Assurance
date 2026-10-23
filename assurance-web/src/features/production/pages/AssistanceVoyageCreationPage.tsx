@@ -176,6 +176,7 @@ export default function AssistanceVoyageCreationPage() {
     const payerType = contract.typePayeurPrime === "TIERS_MANDATE" ? "TIERS_MANDATE" : "SOUSCRIPTEUR";
     setTypePayeurPrime(payerType);
     setPayeurPrimeClientId(payerType === "TIERS_MANDATE" ? contract.payeurPrimeClientId ?? "" : "");
+    setValidatedSections({ souscripteur: true, assures: true });
     hydratedContractRef.current = hydrationKey;
   }, [contratId, existingContract.data, renewing]);
 

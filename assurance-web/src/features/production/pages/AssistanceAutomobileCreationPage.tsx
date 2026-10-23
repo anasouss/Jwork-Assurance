@@ -192,6 +192,7 @@ export default function AssistanceAutomobileCreationPage() {
     const payerType = contract.typePayeurPrime === "TIERS_MANDATE" ? "TIERS_MANDATE" : "SOUSCRIPTEUR";
     setTypePayeurPrime(payerType);
     setPayeurPrimeClientId(payerType === "TIERS_MANDATE" ? contract.payeurPrimeClientId ?? "" : "");
+    setValidatedSections({ souscripteur: true, proprietaire: true, vehicule: true });
     hydratedRef.current = hydrationKey;
   }, [contratId, existingContract.data, renewing]);
 

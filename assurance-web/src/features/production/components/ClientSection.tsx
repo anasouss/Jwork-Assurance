@@ -502,13 +502,6 @@ export function ClientSection({
                       onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })}
                     />
                   </Field>
-                  <Field label="Nationalité" required error={errors[`clients.${index}.client.nationalite`]}>
-                    <Input
-                      disabled={disabledByCopy}
-                      value={item.client.nationalite ?? ""}
-                      onChange={(event) => updateClient(index, { nationalite: event.target.value })}
-                    />
-                  </Field>
                 </div>
               ) : null}
               {requirePersonProfileDetails && !isProprietaire ? (

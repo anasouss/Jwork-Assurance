@@ -17,6 +17,8 @@ public class QuoteAssistanceAutomobileRequest {
     @NotNull
     private Long usageId;
     @NotNull
+    private LocalDate dateSouscription;
+    @NotNull
     private LocalDate dateEffet;
     @NotNull
     @Min(1)

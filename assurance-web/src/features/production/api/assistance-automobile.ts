@@ -13,6 +13,7 @@ export const assistanceAutomobileApi = {
     produitAssistanceId: string;
     categorieClientId: string;
     usageId: string;
+    dateSouscription: string;
     dateEffet: string;
     dureeMois: number;
     codePromo?: string;

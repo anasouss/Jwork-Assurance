@@ -100,12 +100,13 @@ public class AssistanceAutomobileService {
 
     @Transactional(readOnly = true)
     public AssistanceAutomobileQuoteResponse quote(QuoteAssistanceAutomobileRequest request) {
+        validateSubscriptionDate(request.getDateSouscription(), request.getDateEffet());
         CompagnieAssistance compagnie = requireCompany(request.getCompagnieAssistanceId());
         ProduitAssistance produit = requireProduct(compagnie, request.getProduitAssistanceId());
         CategorieClient categorie = requireCategory(request.getCategorieClientId());
         Usage usage = requireUsage(request.getUsageId());
         validateEligibility(produit, categorie, usage);
-        Pricing pricing = price(produit, request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
+        Pricing pricing = price(produit, request.getDateSouscription(), request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
         return toQuote(pricing);
     }
 
@@ -136,6 +137,7 @@ public class AssistanceAutomobileService {
             Contrat source,
             AssistanceContrat sourceAssistance
     ) {
+        validateSubscriptionDate(request.getDateSouscription(), request.getDateEffet());
         validateContractNumber(agenceId, null, request.getNumeroContrat());
         Agence agence = agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
@@ -151,7 +153,7 @@ public class AssistanceAutomobileService {
         Usage usage = requireUsage(request.getVehicule().getUsageId());
         validateEligibility(produit, categorie, usage);
         validateVehicle(request.getVehicule(), request.getDateEffet(), categorie, usage);
-        Pricing pricing = price(produit, request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
+        Pricing pricing = price(produit, request.getDateSouscription(), request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
         TypePayeurPrime typePayeur = resolvePayerType(request);
         Client payeur = resolvePayer(agenceId, request, typePayeur, souscripteur, assure);
 
@@ -210,6 +212,7 @@ public class AssistanceAutomobileService {
             Long contratId,
             CreateAssistanceAutomobileRequest request
     ) {
+        validateSubscriptionDate(request.getDateSouscription(), request.getDateEffet());
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         assertStandaloneAutomobileAssistance(contrat);
@@ -239,7 +242,7 @@ public class AssistanceAutomobileService {
         Usage usage = requireUsage(request.getVehicule().getUsageId());
         validateEligibility(produit, categorie, usage);
         validateVehicle(request.getVehicule(), request.getDateEffet(), categorie, usage);
-        Pricing pricing = price(produit, request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
+        Pricing pricing = price(produit, request.getDateSouscription(), request.getDateEffet(), request.getDureeMois(), request.getCodePromo());
         TypePayeurPrime typePayeur = resolvePayerType(request);
         Client payeur = resolvePayer(agenceId, request, typePayeur, souscripteur, assure);
 
@@ -276,14 +279,20 @@ public class AssistanceAutomobileService {
         return toCreationResponse(contrat, assistance, pricing);
     }
 
-    private Pricing price(ProduitAssistance produit, LocalDate dateEffet, int dureeMois, String codePromo) {
+    private Pricing price(
+            ProduitAssistance produit,
+            LocalDate dateSouscription,
+            LocalDate dateEffet,
+            int dureeMois,
+            String codePromo
+    ) {
         TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveAutomobileTarif(
-                produit, dateEffet, dureeMois
+                produit, dateSouscription, dureeMois
         );
         if (tarif == null) {
             throw new BadRequestException("Aucun tarif automobile actif pour la durée et la date sélectionnées");
         }
-        CodePromoAssistance promo = codePromoAssistanceService.resolve(produit, codePromo, dateEffet);
+        CodePromoAssistance promo = codePromoAssistanceService.resolve(produit, codePromo, dateSouscription);
         BigDecimal factor = promo == null ? BigDecimal.ONE : BigDecimal.ONE.subtract(
                 promo.getTauxReduction().divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
         );
@@ -329,6 +338,15 @@ public class AssistanceAutomobileService {
             throw new BadRequestException("Catégorie de transport obligatoire pour cet usage");
         }
         validateEligibilityCategory(categorie, usage);
+    }
+
+    private void validateSubscriptionDate(LocalDate subscriptionDate, LocalDate effectiveDate) {
+        if (subscriptionDate == null || effectiveDate == null) {
+            throw new BadRequestException("Les dates de souscription et d'effet sont obligatoires");
+        }
+        if (subscriptionDate.isAfter(effectiveDate)) {
+            throw new BadRequestException("La date de souscription ne peut pas être postérieure à la date d'effet");
+        }
     }
 
     private void validateEligibilityCategory(CategorieClient categorie, Usage usage) {
@@ -446,9 +464,7 @@ public class AssistanceAutomobileService {
         assistance.setProduitAssistance(produit);
         assistance.setTarifProduitAssistance(pricing.tarif());
         assistance.setProduit(produit.getLibelle());
-        if (assistance.getDateSouscription() == null) {
-            assistance.setDateSouscription(LocalDate.now());
-        }
+        assistance.setDateSouscription(request.getDateSouscription());
         assistance.setDateEffet(request.getDateEffet());
         assistance.setDateEcheance(pricing.dateEcheance());
         assistance.setEcheanceCode(requireEcheanceCode(request.getEcheanceCode()));
@@ -541,7 +557,7 @@ public class AssistanceAutomobileService {
         if (client.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE
                 || !hasText(client.getPrenom()) || !hasText(client.getNom())
                 || (!hasText(client.getCin()) && !hasText(client.getPassport()))
-                || client.getDateNaissance() == null || !hasText(client.getNationalite())
+                || client.getDateNaissance() == null
                 || !hasText(client.getAdresse()) || client.getVille() == null
                 || !hasText(client.getTelephone())) {
             throw new BadRequestException("Le profil du " + role

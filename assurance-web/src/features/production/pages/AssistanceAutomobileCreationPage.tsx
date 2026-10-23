@@ -46,6 +46,7 @@ export default function AssistanceAutomobileCreationPage() {
   const [clients, setClients] = useState<ClientInput[]>(initialClients);
   const [vehicule, setVehicule] = useState<VehiculeInput>({ typeVehicule: "AUTOMOBILE" });
   const [numeroContrat, setNumeroContrat] = useState("");
+  const [dateSouscription, setDateSouscription] = useState(today);
   const [dateEffet, setDateEffet] = useState(today);
   const [echeanceCode, setEcheanceCode] = useState<string | undefined>();
   const [dureeMois, setDureeMois] = useState("");
@@ -114,6 +115,7 @@ export default function AssistanceAutomobileCreationPage() {
     staleTime: 60_000,
   });
   const selectedProduct = (products.data ?? []).find((item) => item.id === produitId);
+  const hasPromoCodes = Number(selectedProduct?.nombreCodesPromo ?? 0) > 0;
   const payerOptions = useMemo(() => {
     const linked = clients.filter((item) => item.clientId).map((item) => ({
       id: item.clientId!,
@@ -145,8 +147,8 @@ export default function AssistanceAutomobileCreationPage() {
     staleTime: 30_000,
   });
   const durationOptions = useMemo(
-    () => assistanceDurationOptions(tariffs.data ?? [], dateEffet),
-    [dateEffet, tariffs.data],
+    () => assistanceDurationOptions(tariffs.data ?? [], dateSouscription),
+    [dateSouscription, tariffs.data],
   );
 
   useEffect(() => {
@@ -154,6 +156,10 @@ export default function AssistanceAutomobileCreationPage() {
       setDureeMois(durationOptions[0]?.value ?? "");
     }
   }, [dureeMois, durationOptions, selectedProduct, tariffs.isLoading]);
+
+  useEffect(() => {
+    if (selectedProduct && !hasPromoCodes && codePromo) setCodePromo("");
+  }, [codePromo, hasPromoCodes, selectedProduct]);
 
   useEffect(() => {
     if (vehicule.usageId && categorieClientId && usages.isSuccess
@@ -180,6 +186,7 @@ export default function AssistanceAutomobileCreationPage() {
     setCompagnieId(assistance.compagnieAssistanceId ?? "");
     setProduitId(assistance.produitAssistanceId ?? "");
     setNumeroContrat(renewing ? "" : contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
+    setDateSouscription(renewing ? today : assistance.dateSouscription ?? today);
     setDateEffet(renewing
       ? dayAfter(assistance.dateEcheance ?? contract.dateEcheance)
       : assistance.dateEffet ?? contract.dateEffet ?? today);
@@ -197,17 +204,19 @@ export default function AssistanceAutomobileCreationPage() {
   }, [contratId, existingContract.data, renewing]);
 
   const quote = useQuery({
-    queryKey: ["assistance-automobile", "quote", compagnieId, produitId, categorieClientId, vehicule.usageId, dateEffet, dureeMois, codePromo.trim()],
+    queryKey: ["assistance-automobile", "quote", compagnieId, produitId, categorieClientId, vehicule.usageId, dateSouscription, dateEffet, dureeMois, hasPromoCodes ? codePromo.trim() : ""],
     queryFn: () => assistanceAutomobileApi.quote({
       compagnieAssistanceId: compagnieId,
       produitAssistanceId: produitId,
       categorieClientId,
       usageId: vehicule.usageId!,
+      dateSouscription,
       dateEffet,
       dureeMois: Number(dureeMois),
-      codePromo: codePromo.trim() || undefined,
+      codePromo: hasPromoCodes ? codePromo.trim() || undefined : undefined,
     }),
-    enabled: Boolean(compagnieId && produitId && categorieClientId && vehicule.usageId && dateEffet && dureeMois),
+    enabled: Boolean(compagnieId && produitId && categorieClientId && vehicule.usageId
+      && dateSouscription && dateEffet && dateSouscription <= dateEffet && dureeMois),
     retry: false,
   });
 
@@ -222,11 +231,12 @@ export default function AssistanceAutomobileCreationPage() {
       const request = buildRequest({
         compagnieId,
         produitId,
+        dateSouscription,
         dateEffet,
         echeanceCode: echeanceCode!,
         dureeMois,
         numeroContrat,
-        codePromo,
+        codePromo: hasPromoCodes ? codePromo : "",
         subscriber: subscriber!,
         insured: insured!,
         sameInsured,
@@ -314,7 +324,8 @@ export default function AssistanceAutomobileCreationPage() {
   };
 
   const canSubmit = Boolean(
-    compagnieId && produitId && numeroContrat.trim() && dateEffet && isValidEcheance(echeanceCode) && dureeMois
+    compagnieId && produitId && numeroContrat.trim() && dateSouscription && dateEffet
+    && dateSouscription <= dateEffet && isValidEcheance(echeanceCode) && dureeMois
     && (typePayeurPrime !== "TIERS_MANDATE" || payeurPrimeClientId)
     && subscriber && insured && validClient(subscriber, false) && validClient(insured, false) && categorieClientId
     && validVehicle(vehicule, Boolean(selectedUsage?.byCategorieTransport))
@@ -438,6 +449,22 @@ export default function AssistanceAutomobileCreationPage() {
               <SelectContent>{durationOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
+          <Field
+            label="Date de souscription"
+            required
+            error={dateSouscription && dateEffet && dateSouscription > dateEffet
+              ? "La date de souscription doit précéder ou correspondre à la date d’effet."
+              : undefined}
+          >
+            <DatePicker
+              date={dateSouscription}
+              onSelect={(date) => {
+                setDateSouscription(toDateOnly(date) ?? "");
+                setDureeMois("");
+                setEcheanceCode(undefined);
+              }}
+            />
+          </Field>
           <Field label="Date d’effet" required>
             <DatePicker
               date={dateEffet}
@@ -452,7 +479,9 @@ export default function AssistanceAutomobileCreationPage() {
             <EcheanceInput value={echeanceCode} onValueChange={setEcheanceCode} />
           </Field>
           <Field label="Date d’expiration"><Input readOnly value={quote.data?.dateEcheance ? formatDate(quote.data.dateEcheance) : "-"} /></Field>
-          <Field label="Code promo"><Input value={codePromo} onChange={(event) => setCodePromo(event.target.value)} /></Field>
+          {hasPromoCodes ? (
+            <Field label="Code promo"><Input value={codePromo} onChange={(event) => setCodePromo(event.target.value)} /></Field>
+          ) : null}
           <Field label="Payeur des primes" required>
             <Select
               value={typePayeurPrime}
@@ -629,13 +658,14 @@ function hydrateVehicle(vehicle?: NonNullable<ContratSummary["vehicules"]>[numbe
 }
 
 function buildRequest(input: {
-  compagnieId: string; produitId: string; dateEffet: string; echeanceCode: string; dureeMois: string; numeroContrat: string; codePromo: string;
+  compagnieId: string; produitId: string; dateSouscription: string; dateEffet: string; echeanceCode: string; dureeMois: string; numeroContrat: string; codePromo: string;
   subscriber: ClientInput; insured: ClientInput; sameInsured: boolean;
   typePayeurPrime: "SOUSCRIPTEUR" | "TIERS_MANDATE"; payeurPrimeClientId: string; vehicule: VehiculeInput;
 }): CreateAssistanceAutomobileRequest {
   return {
     compagnieAssistanceId: input.compagnieId, produitAssistanceId: input.produitId,
-    categorieClientId: input.insured.client.categorieClientId!, dateEffet: input.dateEffet, echeanceCode: input.echeanceCode,
+    categorieClientId: input.insured.client.categorieClientId!, dateSouscription: input.dateSouscription,
+    dateEffet: input.dateEffet, echeanceCode: input.echeanceCode,
     dureeMois: Number(input.dureeMois), numeroContrat: input.numeroContrat.trim(), codePromo: input.codePromo.trim() || undefined,
     souscripteur: personRequest(input.subscriber), assure: input.sameInsured ? undefined : personRequest(input.insured),
     assureIdentiqueSouscripteur: input.sameInsured, typePayeurPrime: input.typePayeurPrime,
@@ -666,7 +696,7 @@ function validClient(input: ClientInput, requireCategory = true) {
     ? common && Boolean(input.client.raisonSociale && input.client.rc
       && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId))
     : common && Boolean(input.client.prenom && input.client.nom && (input.client.cin || input.client.passport) && input.client.dateNaissance
-      && input.client.nationalite && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId));
+      && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId));
 }
 
 function validVehicle(vehicle: VehiculeInput, categoryRequired: boolean) {

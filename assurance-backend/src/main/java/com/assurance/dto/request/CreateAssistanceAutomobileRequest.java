@@ -23,6 +23,9 @@ public class CreateAssistanceAutomobileRequest {
     private Long categorieClientId;
 
     @NotNull
+    private LocalDate dateSouscription;
+
+    @NotNull
     private LocalDate dateEffet;
 
     @NotBlank

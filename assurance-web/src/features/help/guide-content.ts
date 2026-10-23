@@ -279,7 +279,7 @@ export const guideModules: GuideModule[] = [
         steps: [
           { title: "Enregistrer Souscripteur", description: "Choisissez Personne physique ou Personne morale, saisissez CIN/passeport ou RC, puis complétez la date de validité du document, l’identité, la ville, l’adresse et les coordonnées. Une recherche reprend la fiche existante lorsqu’elle est trouvée. Cliquez sur Enregistrer pour ouvrir la section suivante.", action: "Enregistrer" },
           { title: "Enregistrer Personnes assurées", description: "Activez L’assuré est le souscripteur pour une personne physique, ou désactivez-le et complétez chaque assuré, notamment la validité de son CIN ou passeport. Utilisez Ajouter un assuré ou l’icône de retrait, puis cliquez sur Enregistrer.", action: "Enregistrer" },
-          { title: "Compléter Contrat", description: "Vérifiez compagnie et produit en lecture seule. Renseignez N° de contrat, durée, date d’effet et code promo éventuel. Pour le payeur, choisissez Lui-même ou Autre personne; dans ce dernier cas, recherchez un client existant. La date d’expiration est calculée." },
+          { title: "Compléter Contrat", description: "Vérifiez compagnie et produit en lecture seule. Renseignez N° de contrat, durée et date d’effet. Le champ Code promo apparaît uniquement lorsque le produit possède au moins un code actif. Pour le payeur, choisissez Lui-même ou Autre personne; dans ce dernier cas, recherchez un client existant. La date d’expiration est calculée." },
           { title: "Contrôler la tarification", description: "Vérifiez Prime nette, Réduction et Prime TTC ainsi que le détail par assuré lorsqu’il y en a plusieurs." },
           { title: "Créer ou enregistrer", description: "Cliquez sur Créer le dossier. En modification, utilisez Enregistrer les modifications; au renouvellement, Renouveler l’assistance.", action: "Créer le dossier" },
         ],
@@ -304,12 +304,13 @@ export const guideModules: GuideModule[] = [
           { title: "Enregistrer Assuré", description: "Indiquez si l’assuré est le souscripteur. Sinon, recherchez ou saisissez sa fiche et sa catégorie client, puis cliquez sur Enregistrer.", action: "Enregistrer" },
           { title: "Enregistrer Véhicule assuré", description: "Sélectionnez Catégorie client et Usage, recherchez l’immatriculation, puis complétez marque, carrosserie, catégorie transport si requise, mise en circulation et validité de la carte grise. Cliquez ensuite sur Enregistrer.", action: "Enregistrer" },
           { title: "Choisir le produit", description: "Dans Contrat, sélectionnez un Produit d’assistance compatible avec la catégorie et l’usage. S’il n’y en a aucun, corrigez les paramètres ou configurez le produit." },
-          { title: "Compléter Contrat", description: "Renseignez N° contrat, durée, date d’effet, échéance, code promo et payeur. Pour Autre personne, recherchez et sélectionnez un client existant." },
+          { title: "Compléter Contrat", description: "Renseignez N° contrat, durée, date de souscription, date d’effet, échéance et payeur. La souscription doit précéder ou correspondre à la prise d’effet; elle détermine la période tarifaire et la validité du code promo. Le champ Code promo apparaît uniquement lorsque le produit possède au moins un code actif. Pour Autre personne, recherchez et sélectionnez un client existant." },
           { title: "Contrôler le tarif", description: "Vérifiez Prime nette, Réduction, TTC et Date d’expiration calculée." },
           { title: "Créer ou enregistrer", description: "Cliquez sur Créer le dossier. Les modes modification et renouvellement affichent leur libellé spécifique.", action: "Créer le dossier" },
         ],
         errors: [
           { message: "Aucun produit compatible avec cette catégorie et cet usage", resolution: "Choisissez une combinaison éligible ou configurez les usages et tarifs du produit d’assistance." },
+          { message: "La date de souscription ne peut pas être postérieure à la date d’effet", resolution: "Choisissez une date de souscription antérieure ou égale à la date d’effet." },
           { message: "Sélectionnez un client existant", resolution: "Pour un autre payeur, saisissez au moins deux caractères puis choisissez réellement une option de la liste." },
           { message: "Créer le dossier reste désactivé", resolution: "Validez Souscripteur, Assuré et Véhicule, puis complétez tous les champs Contrat et attendez le tarif." },
         ],

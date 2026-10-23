@@ -538,6 +538,7 @@ export type CreateAssistanceAutomobileRequest = {
   compagnieAssistanceId: string;
   produitAssistanceId: string;
   categorieClientId: string;
+  dateSouscription: string;
   dateEffet: string;
   echeanceCode: string;
   dureeMois: number;

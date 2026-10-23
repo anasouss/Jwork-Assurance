@@ -118,6 +118,7 @@ export default function AssistanceVoyageCreationPage() {
   const insuredBirthDates = effectiveInsured.map((person) => person.dateNaissance).filter(Boolean);
   const selectedCompany = (companies.data ?? []).find((company) => company.id === compagnieId);
   const selectedProduct = (products.data ?? []).find((product) => product.id === produitId);
+  const hasPromoCodes = Number(selectedProduct?.nombreCodesPromo ?? 0) > 0;
   const durationOptions = travelDurationOptions(selectedProduct);
   const expiryDate = calculateExpiryDate(dateEffet, Number(dureeMois));
   const payerOptions = useMemo(() => {
@@ -185,14 +186,17 @@ export default function AssistanceVoyageCreationPage() {
       setDureeMois(durationOptions[0]?.value ?? "12");
     }
   }, [dureeMois, durationOptions, selectedProduct]);
+  useEffect(() => {
+    if (selectedProduct && !hasPromoCodes && codePromo) setCodePromo("");
+  }, [codePromo, hasPromoCodes, selectedProduct]);
   const quote = useQuery({
-    queryKey: ["assistance-voyage", "quote", compagnieId, produitId, dateEffet, dureeMois, codePromo.trim(), insuredBirthDates],
+    queryKey: ["assistance-voyage", "quote", compagnieId, produitId, dateEffet, dureeMois, hasPromoCodes ? codePromo.trim() : "", insuredBirthDates],
     queryFn: () => assistanceVoyageApi.quote({
       compagnieAssistanceId: compagnieId,
       produitAssistanceId: produitId,
       dateEffet,
       dureeMois: Number(dureeMois),
-      codePromo: codePromo.trim() || undefined,
+      codePromo: hasPromoCodes ? codePromo.trim() || undefined : undefined,
       datesNaissanceAssures: insuredBirthDates,
     }),
     enabled: Boolean(
@@ -213,7 +217,7 @@ export default function AssistanceVoyageCreationPage() {
         dateEffet,
         dureeMois: Number(dureeMois),
         numeroContrat: numeroContrat.trim(),
-        codePromo: codePromo.trim() || undefined,
+        codePromo: hasPromoCodes ? codePromo.trim() || undefined : undefined,
         souscripteur: personRequest(subscriber),
         assures: subscriberIsInsured ? [] : insuredPeople.map(personRequest),
         assureIdentiqueSouscripteur: subscriberIsInsured,
@@ -455,9 +459,11 @@ export default function AssistanceVoyageCreationPage() {
           <Field label="Date d’expiration">
             <Input value={expiryDate ? formatDate(expiryDate) : ""} readOnly />
           </Field>
-          <Field label="Code promo">
-            <Input value={codePromo} onChange={(event) => setCodePromo(event.target.value.toUpperCase())} />
-          </Field>
+          {hasPromoCodes ? (
+            <Field label="Code promo">
+              <Input value={codePromo} onChange={(event) => setCodePromo(event.target.value.toUpperCase())} />
+            </Field>
+          ) : null}
           <Field label="Payeur des primes" required>
             <Select
               value={typePayeurPrime}

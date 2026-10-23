@@ -91,6 +91,12 @@ export default function EncaissementsEnAttentePage() {
     queryKey: ["compta", "treasury-accounts"],
     queryFn: comptaApi.treasuryAccounts,
   });
+  const overviewAccounts = useQuery({
+    queryKey: ["compta", "treasury-accounts", { administration: canManage }],
+    queryFn: canManage
+      ? comptaApi.treasuryAdministrationAccounts
+      : comptaApi.treasuryAccounts,
+  });
   const bankAccounts = useMemo(
     () => (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "BANQUE"),
     [accounts.data],
@@ -234,7 +240,7 @@ export default function EncaissementsEnAttentePage() {
   }
 
   const cashSearch = appliedSearch.toLocaleLowerCase("fr");
-  const cashAccounts = (accounts.data ?? []).filter((account) => {
+  const cashAccounts = (overviewAccounts.data ?? []).filter((account) => {
     if (!account.actif || account.typeCompte !== "CAISSE" || account.soldeCourant <= 0) return false;
     if (!cashSearch) return true;
     return [account.code, account.libelle, account.utilisateurTitulaire]
@@ -366,8 +372,9 @@ export default function EncaissementsEnAttentePage() {
               <th className="w-64 px-4 py-3 text-right">Action suivante</th>
             </tr></thead>
             <tbody className="divide-y">
-              {accounts.isLoading ? <TableRowsSkeleton colSpan={5} rows={2} /> : cashAccounts.map((account) => {
+              {overviewAccounts.isLoading ? <TableRowsSkeleton colSpan={5} rows={2} /> : cashAccounts.map((account) => {
                 const central = account.natureCaisse === "CENTRALE";
+                const canOperateAccount = (accounts.data ?? []).some((visible) => visible.id === account.id);
                 return <tr key={account.id} className="hover:bg-muted/30">
                   <td className="px-4 py-2.5 font-semibold">{account.libelle}</td>
                   <td className="px-4 py-2.5">{account.utilisateurTitulaire || (central ? "Caisse centrale" : "-")}</td>
@@ -388,7 +395,7 @@ export default function EncaissementsEnAttentePage() {
                         </Button>
                       ) : <Button size="sm" disabled><Landmark className="size-4" /> Préparer le versement</Button>
                     ) : centralCashAccount ? (
-                      canManage ? (
+                      canManage && canOperateAccount ? (
                         <Button asChild size="sm" variant="outline">
                           <Link to={`/app/compta/tresorerie/operations?compteId=${account.id}&destinationType=CAISSE&destinationId=${centralCashAccount.id}`}>
                             <ArrowRightLeft className="size-4" /> Remettre à la caisse centrale
@@ -399,10 +406,10 @@ export default function EncaissementsEnAttentePage() {
                   </td>
                 </tr>;
               })}
-              {!accounts.isLoading && !accounts.isError && cashAccounts.length === 0 && (
+              {!overviewAccounts.isLoading && !overviewAccounts.isError && cashAccounts.length === 0 && (
                 <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">Aucune espèce en caisse.</td></tr>
               )}
-              {accounts.isError && (
+              {overviewAccounts.isError && (
                 <tr><td colSpan={5} className="px-4 py-10 text-center text-destructive">Chargement des caisses impossible.</td></tr>
               )}
             </tbody>

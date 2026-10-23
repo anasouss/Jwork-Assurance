@@ -466,6 +466,9 @@ public class ReglementClientPdfService {
     }
 
     private String payerIdentity(ReglementClient payment) {
+        if (Boolean.TRUE.equals(payment.getMultiPayeur())) {
+            return value(payment.getPayeurNom()) + "\nDéposant : " + value(payment.getDeposantNom());
+        }
         String address = payerAddress(payment);
         return address.equals("-")
                 ? value(payment.getPayeurNom())

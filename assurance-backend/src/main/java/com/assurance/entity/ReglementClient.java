@@ -67,6 +67,25 @@ public class ReglementClient extends AuditedEntity {
     @Column(name = "payeur_nom", nullable = false, length = 220)
     private String payeurNom;
 
+    @Column(name = "multi_payeur", nullable = false)
+    @Builder.Default
+    private Boolean multiPayeur = false;
+
+    @Column(name = "deposant_nom", length = 220)
+    private String deposantNom;
+
+    @Column(name = "bordereau_nom_fichier", length = 255)
+    private String bordereauNomFichier;
+
+    @Column(name = "bordereau_content_type", length = 120)
+    private String bordereauContentType;
+
+    @Column(name = "bordereau_chemin_stockage", length = 500)
+    private String bordereauCheminStockage;
+
+    @Column(name = "bordereau_taille_octets")
+    private Long bordereauTailleOctets;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

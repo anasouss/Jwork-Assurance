@@ -522,6 +522,7 @@ export const comptaApi = {
     elementFacturableIds: string[];
     documentClientIds: string[];
     reglementIdExclu?: string;
+    multiPayeur?: boolean;
   }) {
     return unwrap(await apiFetch<ApiResponse<ClientReceivable[]>>(
       "/api/v1/compta/reglements-clients/creances/selection",
@@ -596,6 +597,20 @@ export const comptaApi = {
       "/api/v1/compta/reglements-clients",
       { method: "POST", body: JSON.stringify(request) }
     )));
+  },
+
+  async createMultiClientBankDeposit(request: CreateClientPaymentRequest, receipt: File) {
+    const data = new FormData();
+    data.append("request", new Blob([JSON.stringify(request)], { type: "application/json" }));
+    data.append("bordereau", receipt);
+    return normalizeClientPayment(unwrap(await apiUpload<ApiResponse<ClientPayment>>(
+      "/api/v1/compta/reglements-clients/versements-bancaires",
+      data
+    )));
+  },
+
+  async clientPaymentReceipt(id: string) {
+    return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/bordereau`);
   },
 
   async updateClientPayment(id: string, request: CreateClientPaymentRequest) {
@@ -1286,6 +1301,7 @@ function normalizePaymentInstrument(instrument: PaymentInstrument): PaymentInstr
       documentClientId: allocation.documentClientId == null
         ? null
         : String(allocation.documentClientId),
+      payeurId: allocation.payeurId == null ? null : String(allocation.payeurId),
     })),
   };
 }

@@ -1060,14 +1060,18 @@ export const guideModules: GuideModule[] = [
         steps: [
           { title: "Choisir la cible", description: "Sélectionnez Client ou Groupe puis recherchez le payeur." },
           { title: "Sélectionner les créances", description: "Cochez les éléments à encaisser et cliquez sur Encaisser." },
+          { title: "Traiter un versement multi-clients", description: "Activez Versement multi-clients avant la sélection, recherchez successivement les clients concernés puis cochez leurs créances et cliquez sur Encaisser le versement." },
           { title: "Renseigner le règlement", description: "Saisissez la date, la référence et le montant reçu." },
           { title: "Ajouter les moyens", description: "Ajoutez espèces, chèque, effet ou virement avec les références, banque et échéance nécessaires." },
           { title: "Répartir", description: "Affectez le montant aux lignes. Une affectation peut être partielle et un règlement peut couvrir plusieurs lignes compatibles." },
           { title: "Confirmer le reste", description: "Si une partie du règlement reste non affectée, confirmez explicitement son enregistrement." },
           { title: "Enregistrer", description: "Contrôlez le total des instruments et des affectations puis enregistrez le règlement." },
+          { title: "Documenter le versement", description: "Pour un versement multi-clients, renseignez le déposant, le numéro du bordereau banque, le compte crédité et joignez le justificatif PDF, JPEG ou PNG. Le total doit être entièrement affecté." },
         ],
         errors: [
           { message: "Sélectionnez uniquement les éléments d’un même payeur", resolution: "Désélectionnez les créances des autres payeurs." },
+          { message: "Le justificatif du bordereau bancaire est obligatoire", resolution: "Joignez le bordereau remis par la banque avant l’enregistrement." },
+          { message: "Ce numéro de bordereau bancaire est déjà enregistré", resolution: "Vérifiez le compte bancaire et le numéro afin de ne pas comptabiliser deux fois le même versement." },
           { message: "Le total des instruments ne correspond pas au règlement", resolution: "Corrigez les montants des moyens de paiement avant l’enregistrement." },
           { message: "Montant supérieur au reste à affecter", resolution: "Réduisez l’affectation ou choisissez une autre créance compatible." },
         ],

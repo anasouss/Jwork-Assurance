@@ -463,6 +463,9 @@ export type PaymentAllocation = {
   id: string;
   elementFacturableId?: string | null;
   documentClientId?: string | null;
+  payeurType?: "CLIENT" | "GROUPE" | null;
+  payeurId?: string | null;
+  payeurNom?: string | null;
   montant: number;
   statut: PaymentAllocationStatus;
 };
@@ -570,6 +573,11 @@ export type ClientPayment = {
   clientPayeurId?: string | null;
   groupePayeurId?: string | null;
   payeurNom: string;
+  multiPayeur: boolean;
+  deposantNom?: string | null;
+  bordereauNomFichier?: string | null;
+  bordereauContentType?: string | null;
+  bordereauTailleOctets?: number | null;
   statut: ClientPaymentStatus;
   montantTotal: number;
   montantNonAffecte: number;
@@ -595,6 +603,8 @@ export type CreateClientPaymentRequest = {
   dateReglement: string;
   clientPayeurId?: string;
   groupePayeurId?: string;
+  multiPayeur?: boolean;
+  deposantNom?: string;
   notes?: string;
   instruments: Array<{
     mode: ClientPaymentMode;

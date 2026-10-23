@@ -16,4 +16,6 @@ public class SelectionCreancesClientRequest {
     private List<Long> documentClientIds = new ArrayList<>();
 
     private Long reglementIdExclu;
+
+    private Boolean multiPayeur = false;
 }

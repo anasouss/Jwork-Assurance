@@ -5,6 +5,7 @@ import {
   BookOpenText,
   Eye,
   History,
+  Landmark,
   RotateCcw,
   Search,
 } from "lucide-react";
@@ -80,6 +81,7 @@ export default function ReglementsClientsPage() {
     () => searchParams.get("ordre") === "ASC" ? "ASC" : "DESC"
   );
   const [detailDocumentId, setDetailDocumentId] = useState<string>();
+  const [multiClientDeposit, setMultiClientDeposit] = useState(false);
   useEffect(() => {
     setPage(urlPage(searchParams.get("page")));
     setReference(searchParams.get("search") || "");
@@ -168,11 +170,13 @@ export default function ReglementsClientsPage() {
   const result = showResults ? receivables.data : undefined;
   const selectedRows = Object.values(selected);
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
-  const payerKey = selectedRows[0] ? sourcePayerKey(selectedRows[0]) : null;
+  const payerKey = !multiClientDeposit && selectedRows[0] ? sourcePayerKey(selectedRows[0]) : null;
   const pageRows = result?.rows ?? [];
   const eligiblePageRows = pageRows.filter(isSelectableReceivable);
   const pagePayerKeys = new Set(eligiblePageRows.map(sourcePayerKey));
-  const selectablePageRows = payerKey
+  const selectablePageRows = multiClientDeposit
+    ? eligiblePageRows
+    : payerKey
     ? eligiblePageRows.filter((row) => sourcePayerKey(row) === payerKey)
     : pagePayerKeys.size === 1 ? eligiblePageRows : [];
   const selectedOnPage = selectablePageRows.filter(
@@ -185,7 +189,7 @@ export default function ReglementsClientsPage() {
     if (checked && !isSelectableReceivable(row)) {
       return;
     }
-    if (checked && payerKey && sourcePayerKey(row) !== payerKey) {
+    if (!multiClientDeposit && checked && payerKey && sourcePayerKey(row) !== payerKey) {
       toast.error("Sélectionnez uniquement les éléments d’un même payeur");
       return;
     }
@@ -202,7 +206,7 @@ export default function ReglementsClientsPage() {
   }
 
   function togglePage(checked: boolean) {
-    if (checked && selectablePageRows.length === 0) {
+    if (!multiClientDeposit && checked && selectablePageRows.length === 0) {
       toast.error("Les éléments visibles appartiennent à plusieurs payeurs");
       return;
     }
@@ -259,7 +263,7 @@ export default function ReglementsClientsPage() {
       return;
     }
     setSelectedPayer(payer);
-    setSelected({});
+    if (!multiClientDeposit) setSelected({});
     setPage(0);
     updateUrl({
       cible: payerScope,
@@ -342,7 +346,7 @@ export default function ReglementsClientsPage() {
                     setPayerScope(mode);
                     payerSearch.clearQuery();
                     setSelectedPayer(undefined);
-                    setSelected({});
+                    if (!multiClientDeposit) setSelected({});
                     setPage(0);
                     updateUrl({ cible: mode, payeurId: undefined, page: undefined });
                   }}
@@ -410,7 +414,9 @@ export default function ReglementsClientsPage() {
         {selectedRows.length > 0 && (
           <p className="text-sm text-muted-foreground">
             {selectedItemCount(selectedRows.length)}, pour {money(selectedTotal)}.
-            La sélection reste limitée à une même cible.
+            {multiClientDeposit
+              ? " Le versement peut être réparti entre plusieurs clients."
+              : " La sélection reste limitée à une même cible."}
           </p>
         )}
       </section>
@@ -425,12 +431,25 @@ export default function ReglementsClientsPage() {
                     : "Sélectionnez un client ou recherchez une référence."}
                 </p>
               </div>
-              <Button
-                disabled={!canCreate || !selectedRows.length}
-                onClick={() => navigate(paymentPath(selectedRows))}
-              >
-                <Banknote className="size-4" /> Encaisser ({selectedRows.length})
-              </Button>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant={multiClientDeposit ? "default" : "outline"}
+                  onClick={() => {
+                    setMultiClientDeposit((current) => !current);
+                    setSelected({});
+                  }}
+                >
+                  <Landmark className="size-4" /> Versement multi-clients
+                </Button>
+                <Button
+                  disabled={!canCreate || !selectedRows.length}
+                  onClick={() => navigate(paymentPath(selectedRows, multiClientDeposit))}
+                >
+                  {multiClientDeposit ? <Landmark className="size-4" /> : <Banknote className="size-4" />}
+                  {multiClientDeposit ? "Encaisser le versement" : "Encaisser"} ({selectedRows.length})
+                </Button>
+              </div>
             </div>
             <div className="grid border-y bg-muted/25 sm:grid-cols-4">
               <SummaryCell label="Éléments" value={String(result?.summary.total ?? 0)} />
@@ -848,8 +867,9 @@ function urlSortKey(value: string | null): SortKey {
     : "DATE";
 }
 
-function paymentPath(rows: ClientReceivable[]) {
+function paymentPath(rows: ClientReceivable[], multiClientDeposit = false) {
   const params = new URLSearchParams();
+  if (multiClientDeposit) params.set("multi", "1");
   rows.forEach((row) => {
     if (row.source.documentClientId) {
       params.append("document", row.source.documentClientId);

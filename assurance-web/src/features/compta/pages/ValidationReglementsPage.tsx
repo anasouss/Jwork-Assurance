@@ -160,7 +160,12 @@ export default function ValidationReglementsPage() {
                   <tr key={payment.id} className="hover:bg-muted/30">
                     <td className="px-4 py-2.5 font-semibold">{payment.numero}</td>
                     <td className="px-4 py-2.5">{formatDate(payment.dateReglement)}</td>
-                    <td className="px-4 py-2.5">{payment.payeurNom}</td>
+                    <td className="px-4 py-2.5">
+                      <div>{payment.payeurNom}</div>
+                      {payment.deposantNom && (
+                        <div className="text-xs text-muted-foreground">Déposant : {payment.deposantNom}</div>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5">{payment.creePar}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex flex-wrap gap-1">

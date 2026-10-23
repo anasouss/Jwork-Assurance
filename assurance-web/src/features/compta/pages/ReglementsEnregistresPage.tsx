@@ -392,7 +392,12 @@ export default function ReglementsEnregistresPage() {
                 <tr key={payment.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-semibold">{payment.numero}</td>
                   <td className="px-4 py-3">{formatDate(payment.dateReglement)}</td>
-                  <td className="px-4 py-3">{payment.payeurNom}</td>
+                  <td className="px-4 py-3">
+                    <div>{payment.payeurNom}</div>
+                    {payment.deposantNom && (
+                      <div className="text-xs text-muted-foreground">Déposant : {payment.deposantNom}</div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold">
                     {formatAccountingAmount(payment.montantTotal)}
                   </td>
@@ -786,11 +791,12 @@ function PaymentActionsMenu({
   onCancel: () => void;
   onReplace: (instrument: PaymentInstrument) => void;
 }) {
-  const rejectedInstruments = canManage
+  const rejectedInstruments = canManage && !payment.multiPayeur
     ? payment.instruments.filter((instrument) => instrument.statut === "REJETE")
     : [];
   const canCreateInvoice = payment.statut === "VALIDE"
     && canIssueInvoice
+    && !payment.multiPayeur
     && hasDirectActiveAllocations(payment);
   const canReplaceInstrument = rejectedInstruments.length > 0;
   const canModifyPayment = payment.statut === "A_VALIDER" && canEdit;

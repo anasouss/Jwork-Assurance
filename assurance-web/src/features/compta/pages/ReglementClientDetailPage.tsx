@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Download, Pencil } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth-store";
@@ -59,6 +60,20 @@ export default function ReglementClientDetailPage() {
     instrument.affectations.map((allocation) => ({ instrument, allocation }))
   );
 
+  async function downloadReceipt() {
+    try {
+      const blob = await comptaApi.clientPaymentReceipt(data.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = data.bordereauNomFichier || `bordereau-${data.numero}`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Téléchargement du bordereau impossible");
+    }
+  }
+
   return (
     <div className="grid gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -77,6 +92,11 @@ export default function ReglementClientDetailPage() {
           <p className="text-sm text-muted-foreground">Détail du règlement client.</p>
         </div>
         <div className="flex items-center gap-2">
+          {data.bordereauNomFichier && (
+            <Button variant="outline" onClick={() => void downloadReceipt()}>
+              <Download className="size-4" /> Bordereau banque
+            </Button>
+          )}
           {data.statut === "A_VALIDER" && data.creeParId === user?.id && canEdit && (
             <Button asChild variant="outline">
               <Link to={`/app/compta/reglements/${data.id}/modifier`}>
@@ -94,8 +114,9 @@ export default function ReglementClientDetailPage() {
         </div>
       </header>
 
-      <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 lg:grid-cols-6">
+      <section className={`grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 ${data.multiPayeur ? "lg:grid-cols-7" : "lg:grid-cols-6"}`}>
         <Summary label="Payeur" value={data.payeurNom} />
+        {data.multiPayeur && <Summary label="Déposant" value={data.deposantNom || "-"} />}
         <Summary label="Date" value={formatDate(data.dateReglement)} />
         <Summary label="Montant total" value={formatAccountingAmount(data.montantTotal)} strong />
         <Summary label="Non affecté" value={formatAccountingAmount(data.montantNonAffecte)} />
@@ -191,6 +212,7 @@ export default function ReglementClientDetailPage() {
               <tr>
                 <th className="px-4 py-3 text-left">Moyen</th>
                 <th className="px-4 py-3 text-left">Destination</th>
+                <th className="px-4 py-3 text-left">Client / groupe</th>
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3 text-center">Statut</th>
               </tr>
@@ -206,6 +228,7 @@ export default function ReglementClientDetailPage() {
                         ? `Créance #${allocation.elementFacturableId}`
                         : "-"}
                   </td>
+                  <td className="px-4 py-3">{allocation.payeurNom || "-"}</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(allocation.montant)}</td>
                   <td className="px-4 py-3 text-center">
                     <Badge variant="outline">
@@ -220,7 +243,7 @@ export default function ReglementClientDetailPage() {
               ))}
               {allocations.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">Aucune affectation.</td>
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">Aucune affectation.</td>
                 </tr>
               )}
             </tbody>

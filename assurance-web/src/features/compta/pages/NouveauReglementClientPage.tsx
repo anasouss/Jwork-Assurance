@@ -27,6 +27,7 @@ import {
   ChevronsUpDown,
   GripVertical,
   Landmark,
+  Paperclip,
   Plus,
   ReceiptText,
   Trash2,
@@ -126,6 +127,8 @@ export default function NouveauReglementClientPage() {
     queryFn: () => comptaApi.clientPayment(reglementId!),
     enabled: editing,
   });
+  const requestedMultiClientDeposit = searchParams.get("multi") === "1";
+  const multiClientDeposit = requestedMultiClientDeposit || Boolean(payment.data?.multiPayeur);
   const selection = editing && payment.data
     ? selectionFromPayment(payment.data)
     : selectionFromParams(searchParams);
@@ -133,6 +136,8 @@ export default function NouveauReglementClientPage() {
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
+  const [depositorName, setDepositorName] = useState("");
+  const [receipt, setReceipt] = useState<File>();
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([]);
   const [activePaymentMode, setActivePaymentMode] = useState<ClientPaymentMode | null>(null);
   const [creditConfirmationOpen, setCreditConfirmationOpen] = useState(false);
@@ -147,10 +152,11 @@ export default function NouveauReglementClientPage() {
   );
 
   const receivables = useQuery({
-    queryKey: ["compta", "client-receivable-selection", selection, reglementId],
+    queryKey: ["compta", "client-receivable-selection", selection, reglementId, multiClientDeposit],
     queryFn: () => comptaApi.selectedClientReceivables({
       ...selection,
       reglementIdExclu: reglementId,
+      multiPayeur: multiClientDeposit,
     }),
     enabled: hasSelection,
     staleTime: 0,
@@ -200,6 +206,7 @@ export default function NouveauReglementClientPage() {
     initializedPaymentId.current = payment.data.id;
     setDateReglement(payment.data.dateReglement);
     setNotes(payment.data.notes ?? "");
+    setDepositorName(payment.data.deposantNom ?? "");
     setMethods(payment.data.instruments.map((instrument) => ({
       key: instrument.id,
       mode: instrument.mode,
@@ -211,6 +218,26 @@ export default function NouveauReglementClientPage() {
       reglementBureau: Boolean(instrument.reglementBureau),
     })));
   }, [payment.data]);
+
+  useEffect(() => {
+    if (!editing && requestedMultiClientDeposit && methods.length === 0) {
+      setMethods([newPaymentMethod("VERSEMENT_BANCAIRE")]);
+      setActivePaymentMode("VERSEMENT_BANCAIRE");
+    }
+  }, [editing, methods.length, requestedMultiClientDeposit]);
+
+  useEffect(() => {
+    if (!editing
+      && multiClientDeposit
+      && selectedTotal > 0
+      && methods.length === 1
+      && !methods[0]?.montant) {
+      setMethods((current) => current.map((method) => ({
+        ...method,
+        montant: money(selectedTotal),
+      })));
+    }
+  }, [editing, methods, multiClientDeposit, selectedTotal]);
 
   useEffect(() => () => {
     if (movedHighlightTimer.current) clearTimeout(movedHighlightTimer.current);
@@ -226,7 +253,17 @@ export default function NouveauReglementClientPage() {
 
   const savePayment = useMutation({
     mutationFn: () => {
-      const request = buildRequest(rows, methods, dateReglement, notes);
+      const request = buildRequest(
+        rows,
+        methods,
+        dateReglement,
+        notes,
+        multiClientDeposit,
+        depositorName
+      );
+      if (!editing && multiClientDeposit && receipt) {
+        return comptaApi.createMultiClientBankDeposit(request, receipt);
+      }
       return editing
         ? comptaApi.updateClientPayment(reglementId!, request)
         : comptaApi.createClientPayment(request);
@@ -254,6 +291,13 @@ export default function NouveauReglementClientPage() {
     && paymentTotal > 0
     && paymentPolicy.isSuccess
     && !creditExceedsMaximum
+    && (!multiClientDeposit || (
+      remainingAmount >= -0.001
+      && Boolean(depositorName.trim())
+      && (editing ? Boolean(payment.data?.bordereauNomFichier) : Boolean(receipt))
+      && methods.length === 1
+      && methods[0]?.mode === "VERSEMENT_BANCAIRE"
+    ))
     && methods.every((method) => methodValid(method, accounts.data ?? []));
 
   function updateMethod(key: string, patch: Partial<PaymentMethodDraft>) {
@@ -366,7 +410,9 @@ export default function NouveauReglementClientPage() {
           <p className="text-sm text-muted-foreground">
             {receivables.isLoading
               ? "Chargement de la sélection..."
-              : `${rows[0]?.source.payeurNom ?? "Payeur"} · ${itemCount(rows.length)}`}
+              : multiClientDeposit
+                ? `Versement bancaire · ${itemCount(rows.length)}`
+                : `${rows[0]?.source.payeurNom ?? "Payeur"} · ${itemCount(rows.length)}`}
           </p>
         </div>
         <Button asChild variant="outline">
@@ -405,10 +451,11 @@ export default function NouveauReglementClientPage() {
       >
         <section className="overflow-hidden rounded-md border bg-card">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead className="bg-orange-600 text-xs uppercase text-white">
                 <tr>
                   <th className="w-28 px-4 py-3 text-left">Priorité</th>
+                  <th className="px-4 py-3 text-left">Payeur</th>
                   <th className="px-4 py-3 text-left">Référence</th>
                   <th className="px-4 py-3 text-left">Type</th>
                   <th className="px-4 py-3 text-left">Police / contrat</th>
@@ -439,7 +486,7 @@ export default function NouveauReglementClientPage() {
                 </SortableContext>
                 {receivables.isLoading ? (
                   <tr>
-                    <td colSpan={9} className="h-24 text-center text-muted-foreground">
+                    <td colSpan={10} className="h-24 text-center text-muted-foreground">
                       Chargement...
                     </td>
                   </tr>
@@ -458,18 +505,57 @@ export default function NouveauReglementClientPage() {
         <div className="grid gap-4 bg-muted/10 p-4">
           <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label>Date du règlement</Label>
+              <Label>{multiClientDeposit ? "Date du versement" : "Date du règlement"}</Label>
               <DatePicker
                 date={dateReglement}
                 onSelect={(value) => setDateReglement(toDateOnly(value) ?? "")}
               />
             </div>
 
-            <PaymentModesMultiSelect
-              selectedModes={selectedPaymentModes.map((option) => option.value)}
-              onToggle={togglePaymentMode}
-            />
+            {multiClientDeposit ? (
+              <div className="grid gap-2">
+                <Label>Mode de règlement</Label>
+                <div className="flex h-10 items-center gap-2 rounded-md border bg-muted/30 px-3 text-sm font-medium">
+                  <Landmark className="size-4 text-orange-700" /> Versement bancaire
+                </div>
+              </div>
+            ) : (
+              <PaymentModesMultiSelect
+                selectedModes={selectedPaymentModes.map((option) => option.value)}
+                onToggle={togglePaymentMode}
+              />
+            )}
           </div>
+
+          {multiClientDeposit ? (
+            <div className="grid gap-4 border-t pt-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="deposit-depositor">Déposant / collecteur</Label>
+                <Input
+                  id="deposit-depositor"
+                  value={depositorName}
+                  maxLength={220}
+                  onChange={(event) => setDepositorName(event.target.value)}
+                  placeholder="Nom de la personne ayant effectué le versement"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="deposit-receipt">Justificatif du bordereau bancaire</Label>
+                {editing && payment.data?.bordereauNomFichier ? (
+                  <div className="flex h-10 items-center gap-2 rounded-md border bg-muted/20 px-3 text-sm">
+                    <Paperclip className="size-4" /> {payment.data.bordereauNomFichier}
+                  </div>
+                ) : (
+                  <Input
+                    id="deposit-receipt"
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png"
+                    onChange={(event) => setReceipt(event.target.files?.[0])}
+                  />
+                )}
+              </div>
+            </div>
+          ) : null}
 
           {selectedPaymentModes.length > 1 && activePaymentMode ? (
             <Tabs
@@ -505,7 +591,7 @@ export default function NouveauReglementClientPage() {
 
                   {requiresPaymentReference(method.mode) ? (
                     <div className="grid gap-1.5">
-                      <Label>Référence</Label>
+                      <Label>{method.mode === "VERSEMENT_BANCAIRE" ? "N° bordereau banque" : "Référence"}</Label>
                       <Input
                         value={method.referenceInstrument}
                         onChange={(event) => updateMethod(
@@ -600,7 +686,7 @@ export default function NouveauReglementClientPage() {
                   ) : null}
 
                     <div className="flex h-10 items-center justify-end gap-1 md:col-span-2 xl:col-span-1 xl:col-start-6">
-                      {index === visibleMethods.length - 1 ? (
+                      {!multiClientDeposit && index === visibleMethods.length - 1 ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -612,7 +698,7 @@ export default function NouveauReglementClientPage() {
                           Ajouter
                         </Button>
                       ) : null}
-                      <Button
+                      {!multiClientDeposit && <Button
                         type="button"
                         variant="ghost"
                         size="icon"
@@ -621,7 +707,7 @@ export default function NouveauReglementClientPage() {
                         onClick={() => removePaymentMethod(method.key)}
                       >
                         <Trash2 className="size-4" />
-                      </Button>
+                      </Button>}
                     </div>
                   </div>
 
@@ -766,6 +852,12 @@ function SortableReceivableRow(props: {
           <span className="w-5 text-center text-sm font-semibold tabular-nums">
             {props.priority}
           </span>
+        </div>
+      </td>
+      <td className="px-4 py-1.5">
+        <div className="font-medium">{props.row.source.payeurNom}</div>
+        <div className="text-xs text-muted-foreground">
+          {props.row.source.payeurType === "GROUPE" ? "Groupe" : "Client"}
         </div>
       </td>
       <td className="px-4 py-1.5 font-medium">{receivableDocumentReference(props.row)}</td>
@@ -981,7 +1073,9 @@ function buildRequest(
   rows: ClientReceivable[],
   methods: PaymentMethodDraft[],
   dateReglement: string,
-  notes: string
+  notes: string,
+  multiPayeur = false,
+  deposantNom = ""
 ): CreateClientPaymentRequest {
   const remaining = rows.map((row) => ({
     elementFacturableId: row.source.elementFacturableId ?? undefined,
@@ -1021,8 +1115,10 @@ function buildRequest(
   const source = rows[0].source;
   return {
     dateReglement,
-    clientPayeurId: source.payeurType === "CLIENT" ? source.payeurId : undefined,
-    groupePayeurId: source.payeurType === "GROUPE" ? source.payeurId : undefined,
+    clientPayeurId: !multiPayeur && source.payeurType === "CLIENT" ? source.payeurId : undefined,
+    groupePayeurId: !multiPayeur && source.payeurType === "GROUPE" ? source.payeurId : undefined,
+    multiPayeur,
+    deposantNom: multiPayeur ? deposantNom.trim() : undefined,
     notes: notes.trim() || undefined,
     instruments,
   };

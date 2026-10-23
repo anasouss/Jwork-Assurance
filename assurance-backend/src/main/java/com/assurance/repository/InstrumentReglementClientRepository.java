@@ -21,6 +21,22 @@ import jakarta.persistence.LockModeType;
 
 public interface InstrumentReglementClientRepository extends JpaRepository<InstrumentReglementClient, Long> {
 
+    @Query("""
+            select count(instrument) > 0
+            from InstrumentReglementClient instrument
+            where instrument.agence.id = :agenceId
+              and instrument.mode = com.assurance.enums.ModeReglementClient.VERSEMENT_BANCAIRE
+              and instrument.compteTresorerie.id = :accountId
+              and lower(instrument.referenceInstrument) = lower(:reference)
+              and (:paymentId is null or instrument.reglement.id <> :paymentId)
+            """)
+    boolean existsDirectDepositReference(
+            @Param("agenceId") Long agenceId,
+            @Param("accountId") Long accountId,
+            @Param("reference") String reference,
+            @Param("paymentId") Long paymentId
+    );
+
     @EntityGraph(attributePaths = {
             "reglement",
             "compteTresorerie",

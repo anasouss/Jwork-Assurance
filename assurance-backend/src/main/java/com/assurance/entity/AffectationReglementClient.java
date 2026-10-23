@@ -69,6 +69,15 @@ public class AffectationReglementClient extends BaseEntity {
     @Column(nullable = false, precision = 16, scale = 2)
     private BigDecimal montant;
 
+    @Column(name = "payeur_type", length = 20)
+    private String payeurType;
+
+    @Column(name = "payeur_id")
+    private Long payeurId;
+
+    @Column(name = "payeur_nom", length = 220)
+    private String payeurNom;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private StatutAffectationReglement statut;

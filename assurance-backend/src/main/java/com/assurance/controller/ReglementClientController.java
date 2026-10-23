@@ -31,6 +31,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,7 +41,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -250,6 +254,36 @@ public class ReglementClientController {
                 TenantContext.getCurrentUser(),
                 request
         ), "Règlement client enregistré"));
+    }
+
+    @PostMapping(value = "/versements-bancaires", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<ReglementClientResponse>> createDirectDeposit(
+            @Valid @RequestPart("request") CreerReglementClientRequest request,
+            @RequestPart("bordereau") MultipartFile receipt
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.createDirectDeposit(
+                TenantContext.getCurrentAgence(),
+                TenantContext.getCurrentUser(),
+                request,
+                receipt
+        ), "Versement bancaire enregistré"));
+    }
+
+    @GetMapping("/{paymentId}/bordereau")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<Resource> downloadDirectDepositReceipt(@PathVariable Long paymentId) {
+        ReglementClientService.DownloadedReceipt download = reglementClientService.downloadReceipt(
+                TenantContext.getCurrentAgence(),
+                paymentId
+        );
+        return ResponseEntity.ok()
+                .contentType(download.mediaType())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(download.fileName())
+                        .build()
+                        .toString())
+                .body(download.resource());
     }
 
     @PutMapping("/{paymentId}")

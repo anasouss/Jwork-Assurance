@@ -21,6 +21,11 @@ public class ReglementClientResponse {
     private Long clientPayeurId;
     private Long groupePayeurId;
     private String payeurNom;
+    private Boolean multiPayeur;
+    private String deposantNom;
+    private String bordereauNomFichier;
+    private String bordereauContentType;
+    private Long bordereauTailleOctets;
     private StatutReglementClient statut;
     private BigDecimal montantTotal;
     private BigDecimal montantNonAffecte;
@@ -69,6 +74,9 @@ public class ReglementClientResponse {
         private Long id;
         private Long elementFacturableId;
         private Long documentClientId;
+        private String payeurType;
+        private Long payeurId;
+        private String payeurNom;
         private BigDecimal montant;
         private StatutAffectationReglement statut;
     }

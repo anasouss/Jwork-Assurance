@@ -28,7 +28,15 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
               and (:statut is null or r.statut = :statut)
               and (:search is null
                    or lower(r.numero) like concat('%', :search, '%')
-                   or lower(r.payeurNom) like concat('%', :search, '%'))
+                   or lower(r.payeurNom) like concat('%', :search, '%')
+                   or lower(coalesce(r.deposantNom, '')) like concat('%', :search, '%')
+                   or exists (
+                       select instrument.id
+                       from InstrumentReglementClient instrument
+                       where instrument.reglement = r
+                         and lower(coalesce(instrument.referenceInstrument, ''))
+                             like concat('%', :search, '%')
+                   ))
             """)
     Page<ReglementClient> search(
             @Param("agenceId") Long agenceId,

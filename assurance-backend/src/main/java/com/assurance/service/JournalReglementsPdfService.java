@@ -322,7 +322,10 @@ public class JournalReglementsPdfService {
             ReglementClient payment = instrument.getReglement();
             DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
             addBody(table, payment.getNumero(), bold, TextAlignment.LEFT, background);
-            addBody(table, payment.getPayeurNom(), regular, TextAlignment.LEFT, background);
+            String payer = Boolean.TRUE.equals(payment.getMultiPayeur())
+                    ? payment.getPayeurNom() + "\nDéposant : " + payment.getDeposantNom()
+                    : payment.getPayeurNom();
+            addBody(table, payer, regular, TextAlignment.LEFT, background);
             addBody(table, date(payment.getDateReglement()), regular, TextAlignment.CENTER, background);
             if (showUser) {
                 addBody(table, payment.getCreePar() == null ? "-" : payment.getCreePar().getFullName(), regular,

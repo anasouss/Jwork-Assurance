@@ -66,11 +66,22 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -83,6 +94,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -93,6 +105,12 @@ public class ReglementClientService {
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     private static final BigDecimal DEFAULT_MAX_UNALLOCATED_CREDIT = new BigDecimal("100.00");
     private static final String MAX_UNALLOCATED_CREDIT_PARAMETER = "REGLEMENT_CLIENT_CREDIT_NON_AFFECTE_MAX";
+    private static final long MAX_RECEIPT_SIZE = 30L * 1024L * 1024L;
+    private static final Set<String> RECEIPT_CONTENT_TYPES = Set.of(
+            MediaType.APPLICATION_PDF_VALUE,
+            MediaType.IMAGE_JPEG_VALUE,
+            MediaType.IMAGE_PNG_VALUE
+    );
     private static final Set<ModeReglementClient> BANK_ACCOUNT_REQUIRED_MODES = Set.of(
             ModeReglementClient.VIREMENT,
             ModeReglementClient.VERSEMENT_BANCAIRE,
@@ -102,8 +120,7 @@ public class ReglementClientService {
     private static final Set<ModeReglementClient> ORIGINATING_BANK_MODES = Set.of(
             ModeReglementClient.CHEQUE,
             ModeReglementClient.EFFET,
-            ModeReglementClient.VIREMENT,
-            ModeReglementClient.VERSEMENT_BANCAIRE
+            ModeReglementClient.VIREMENT
     );
 
     private final DocumentClientService documentClientService;
@@ -122,6 +139,7 @@ public class ReglementClientService {
     private final LigneBordereauRemiseRepository remittanceLineRepository;
     private final BanqueService banqueService;
     private final ParametreApplicationService parametreApplicationService;
+    private final StorageLayoutService storageLayoutService;
 
     @Transactional(readOnly = true)
     public ReglementClientPolicyResponse paymentPolicy(Long agenceId) {
@@ -336,6 +354,11 @@ public class ReglementClientService {
         if (payment.getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Seul un règlement valide peut être facturé");
         }
+        if (Boolean.TRUE.equals(payment.getMultiPayeur())) {
+            throw new BadRequestException(
+                    "Créez les factures séparément pour chaque client d'un versement multi-clients"
+            );
+        }
 
         Set<StatutAffectationReglement> activeStatuses = Set.of(
                 StatutAffectationReglement.EN_ATTENTE,
@@ -520,7 +543,7 @@ public class ReglementClientService {
         Set<String> payers = rows.stream()
                 .map(row -> row.getSource().getPayeurType() + ":" + row.getSource().getPayeurId())
                 .collect(Collectors.toSet());
-        if (payers.size() != 1) {
+        if (!Boolean.TRUE.equals(request.getMultiPayeur()) && payers.size() != 1) {
             throw new BadRequestException("Les créances sélectionnées doivent appartenir au même payeur");
         }
         return rows;
@@ -536,7 +559,53 @@ public class ReglementClientService {
             Long userId,
             CreerReglementClientRequest request
     ) {
+        if (Boolean.TRUE.equals(request.getMultiPayeur())) {
+            throw new BadRequestException(
+                    "Utilisez l'enregistrement de versement bancaire avec son justificatif"
+            );
+        }
         return savePending(agenceId, userId, request, null);
+    }
+
+    @Transactional
+    public ReglementClientResponse createDirectDeposit(
+            Long agenceId,
+            Long userId,
+            CreerReglementClientRequest request,
+            MultipartFile receipt
+    ) {
+        request.setMultiPayeur(true);
+        validateReceipt(receipt, true);
+        ReglementClientResponse created = savePending(agenceId, userId, request, null);
+        ReglementClient payment = findPayment(agenceId, created.getId());
+        storeReceipt(payment, receipt);
+        return toResponse(reglementRepository.save(payment));
+    }
+
+    @Transactional(readOnly = true)
+    public DownloadedReceipt downloadReceipt(Long agenceId, Long paymentId) {
+        ReglementClient payment = findPayment(agenceId, paymentId);
+        if (payment.getBordereauCheminStockage() == null) {
+            throw new ResourceNotFoundException("BordereauVersement", paymentId);
+        }
+        Path path = storageLayoutService.resolveClientPaymentReceipt(
+                agenceId,
+                payment.getBordereauCheminStockage()
+        );
+        if (!Files.isRegularFile(path)) {
+            throw new ResourceNotFoundException("BordereauVersement", paymentId);
+        }
+        MediaType mediaType;
+        try {
+            mediaType = MediaType.parseMediaType(payment.getBordereauContentType());
+        } catch (RuntimeException error) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+        return new DownloadedReceipt(
+                new FileSystemResource(path),
+                mediaType,
+                payment.getBordereauNomFichier()
+        );
     }
 
     @Transactional
@@ -550,6 +619,10 @@ public class ReglementClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
         loadPaymentInstruments(payment, agenceId);
         requirePending(payment);
+        if (Boolean.TRUE.equals(payment.getMultiPayeur())
+                != Boolean.TRUE.equals(request.getMultiPayeur())) {
+            throw new BadRequestException("Le type du règlement ne peut pas être modifié");
+        }
         if (!payment.getCreePar().getId().equals(userId)) {
             throw new BadRequestException("Seul le créateur peut modifier ce règlement à valider");
         }
@@ -633,8 +706,14 @@ public class ReglementClientService {
         Map<Long, DocumentClient> documentsById = documents.stream()
                 .collect(Collectors.toMap(DocumentClient::getId, Function.identity()));
         Map<Long, Client> subscribers = loadSubscribers(elements);
-        Payer payer = resolveCommonPayer(elements, documents, subscribers);
-        validateRequestedPayer(request, payer);
+        boolean multiPayer = Boolean.TRUE.equals(request.getMultiPayeur());
+        List<Payer> payers = resolvePayers(elements, documents, subscribers);
+        Payer payer = resolvePaymentPayer(payers, multiPayer);
+        if (multiPayer) {
+            validateMultiPayerDeposit(request);
+        } else {
+            validateRequestedPayer(request, payer);
+        }
         validateAllocations(requestedInstruments, elementsById, documentsById);
 
         Map<Long, AllocationAmounts> existingAmounts = loadAllocationAmounts(elementIds);
@@ -703,6 +782,11 @@ public class ReglementClientService {
         if (totalAllocated.compareTo(totalPayment) > 0) {
             throw new BadRequestException("Le montant affecté dépasse le total des moyens de règlement");
         }
+        if (multiPayer && totalAllocated.compareTo(totalPayment) != 0) {
+            throw new BadRequestException(
+                    "Le montant du versement bancaire doit être entièrement affecté aux créances sélectionnées"
+            );
+        }
         BigDecimal unallocatedCredit = money(totalPayment.subtract(totalAllocated));
         BigDecimal maximumUnallocatedCredit = maxUnallocatedCredit(agenceId);
         if (unallocatedCredit.compareTo(maximumUnallocatedCredit) > 0) {
@@ -727,6 +811,8 @@ public class ReglementClientService {
         payment.setClientPayeur(payer.client());
         payment.setGroupePayeur(payer.group());
         payment.setPayeurNom(payer.name());
+        payment.setMultiPayeur(multiPayer);
+        payment.setDeposantNom(multiPayer ? trimToNull(request.getDeposantNom()) : null);
         payment.setStatut(StatutReglementClient.A_VALIDER);
         payment.setMontantTotal(totalPayment);
         payment.setMontantNonAffecte(unallocatedCredit);
@@ -738,11 +824,22 @@ public class ReglementClientService {
             InstrumentReglementClient instrument = buildInstrument(agence, payment, requested, true);
             payment.getInstruments().add(instrument);
             for (CreerReglementClientRequest.Affectation requestedAllocation : requested.getAffectations()) {
+                Payer allocationPayer = resolveAllocationPayer(
+                        requestedAllocation,
+                        elementsById,
+                        documentsById,
+                        subscribers
+                );
                 AffectationReglementClient allocation = AffectationReglementClient.builder()
                         .instrument(instrument)
                         .elementFacturable(elementsById.get(requestedAllocation.getElementFacturableId()))
                         .documentClient(documentsById.get(requestedAllocation.getDocumentClientId()))
                         .montant(money(requestedAllocation.getMontant()))
+                        .payeurType(allocationPayer.group() == null ? "CLIENT" : "GROUPE")
+                        .payeurId(allocationPayer.group() == null
+                                ? allocationPayer.client().getId()
+                                : allocationPayer.group().getId())
+                        .payeurNom(allocationPayer.name())
                         .statut(StatutAffectationReglement.EN_ATTENTE)
                         .build();
                 instrument.getAffectations().add(allocation);
@@ -793,6 +890,10 @@ public class ReglementClientService {
         if (payment.getCreePar().getId().equals(validator.getId())) {
             throw new BadRequestException("Le créateur du règlement ne peut pas le valider");
         }
+        if (Boolean.TRUE.equals(payment.getMultiPayeur())
+                && payment.getBordereauCheminStockage() == null) {
+            throw new BadRequestException("Le justificatif du bordereau bancaire est obligatoire");
+        }
         LocalDate operationDate = LocalDate.now();
         List<Long> elementIds = new ArrayList<>();
         List<Long> documentIds = new ArrayList<>();
@@ -807,7 +908,8 @@ public class ReglementClientService {
                     .filter(Objects::nonNull)
                     .map(DocumentClient::getId)
                     .toList());
-            if (instrument.getMode() == ModeReglementClient.ESPECES) {
+            if (instrument.getMode() == ModeReglementClient.ESPECES
+                    || instrument.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE) {
                 instrument.setStatut(StatutInstrumentReglement.CONFIRME);
                 instrument.setDateStatut(operationDate);
                 instrument.getAffectations().forEach(allocation ->
@@ -950,6 +1052,11 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        if (Boolean.TRUE.equals(replaced.getReglement().getMultiPayeur())) {
+            throw new BadRequestException(
+                    "Annulez puis ressaisissez le versement multi-clients avec son nouveau bordereau"
+            );
+        }
         if (replaced.getReglement().getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement doit être validé avant de remplacer son moyen de paiement");
         }
@@ -1313,6 +1420,17 @@ public class ReglementClientService {
             throw new BadRequestException("Sélectionnez le compte bancaire crédité");
         }
         validateInstrumentReference(request);
+        if (request.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE
+                && instrumentRepository.existsDirectDepositReference(
+                        agence.getId(),
+                        account.getId(),
+                        request.getReferenceInstrument().trim(),
+                        payment.getId()
+                )) {
+            throw new BadRequestException(
+                    "Ce numéro de bordereau bancaire est déjà enregistré sur le compte sélectionné"
+            );
+        }
         Banque originatingBank = resolveOriginatingBank(agence.getId(), request);
         if (Boolean.TRUE.equals(request.getReglementBureau())
                 && request.getMode() != ModeReglementClient.CHEQUE
@@ -1709,16 +1827,94 @@ public class ReglementClientService {
     }
 
     private void validateInstrumentReference(CreerReglementClientRequest.Instrument request) {
-        if (Set.of(ModeReglementClient.CHEQUE, ModeReglementClient.EFFET)
+        if (Set.of(
+                ModeReglementClient.CHEQUE,
+                ModeReglementClient.EFFET,
+                ModeReglementClient.VERSEMENT_BANCAIRE
+        )
                 .contains(request.getMode())
                 && (request.getReferenceInstrument() == null || request.getReferenceInstrument().isBlank())) {
-            throw new BadRequestException("La référence du moyen de règlement est obligatoire");
+            throw new BadRequestException(request.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE
+                    ? "Le numéro du bordereau bancaire est obligatoire"
+                    : "La référence du moyen de règlement est obligatoire");
         }
         if (Set.of(ModeReglementClient.CHEQUE, ModeReglementClient.EFFET)
                 .contains(request.getMode())
                 && request.getDateEcheance() == null) {
             throw new BadRequestException("La date d'échéance est obligatoire");
         }
+    }
+
+    private void validateReceipt(MultipartFile receipt, boolean required) {
+        if (receipt == null || receipt.isEmpty()) {
+            if (required) {
+                throw new BadRequestException("Le justificatif du bordereau bancaire est obligatoire");
+            }
+            return;
+        }
+        if (receipt.getSize() > MAX_RECEIPT_SIZE) {
+            throw new BadRequestException("Le justificatif dépasse la taille maximale de 30 Mo");
+        }
+        String contentType = receipt.getContentType() == null
+                ? "" : receipt.getContentType().toLowerCase(Locale.ROOT);
+        if (!RECEIPT_CONTENT_TYPES.contains(contentType)) {
+            throw new BadRequestException("Le justificatif doit être un fichier PDF, JPEG ou PNG");
+        }
+        if (safeReceiptFileName(receipt).length() > 255) {
+            throw new BadRequestException("Le nom du justificatif ne doit pas dépasser 255 caractères");
+        }
+    }
+
+    private void storeReceipt(ReglementClient payment, MultipartFile receipt) {
+        String originalName = safeReceiptFileName(receipt);
+        String extension = originalName.lastIndexOf('.') >= 0
+                ? originalName.substring(originalName.lastIndexOf('.')).toLowerCase(Locale.ROOT)
+                : "";
+        String storageKey = payment.getAgence().getId() + "/" + payment.getId() + "/"
+                + UUID.randomUUID() + extension;
+        Path destination = storageLayoutService.resolveClientPaymentReceipt(
+                payment.getAgence().getId(),
+                storageKey
+        );
+        try {
+            Files.createDirectories(destination.getParent());
+            try (InputStream input = receipt.getInputStream();
+                 OutputStream output = Files.newOutputStream(destination)) {
+                input.transferTo(output);
+            }
+        } catch (IOException error) {
+            throw new IllegalStateException("Impossible d'enregistrer le bordereau bancaire", error);
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                        try {
+                            Files.deleteIfExists(destination);
+                        } catch (IOException ignored) {
+                            // The database remains authoritative; orphan cleanup can retry later.
+                        }
+                    }
+                }
+            });
+        }
+        payment.setBordereauNomFichier(originalName);
+        payment.setBordereauContentType(receipt.getContentType());
+        payment.setBordereauCheminStockage(storageKey);
+        payment.setBordereauTailleOctets(receipt.getSize());
+    }
+
+    private String safeReceiptFileName(MultipartFile receipt) {
+        String supplied = receipt.getOriginalFilename();
+        if (supplied == null || supplied.isBlank()) {
+            return "bordereau";
+        }
+        String normalized = supplied.replace('\\', '/');
+        String fileName = normalized.substring(normalized.lastIndexOf('/') + 1)
+                .replaceAll("[\\p{Cntrl}]", "")
+                .trim();
+        return fileName.isBlank() ? "bordereau" : fileName;
     }
 
     private Banque resolveOriginatingBank(
@@ -1800,7 +1996,7 @@ public class ReglementClientService {
         return "INVALID";
     }
 
-    private Payer resolveCommonPayer(
+    private List<Payer> resolvePayers(
             List<ElementFacturable> elements,
             List<DocumentClient> documents,
             Map<Long, Client> subscribers
@@ -1812,11 +2008,49 @@ public class ReglementClientService {
         documents.stream()
                 .map(this::resolvePayer)
                 .forEach(payers::add);
+        if (payers.isEmpty()) {
+            throw new BadRequestException("Aucun payeur n'est associé aux créances sélectionnées");
+        }
+        return payers;
+    }
+
+    private Payer resolvePaymentPayer(List<Payer> payers, boolean multiPayer) {
         Payer first = payers.get(0);
-        if (payers.stream().anyMatch(payer -> !payer.key().equals(first.key()))) {
+        boolean severalPayers = payers.stream().anyMatch(payer -> !payer.key().equals(first.key()));
+        if (!multiPayer && severalPayers) {
             throw new BadRequestException("Un règlement ne peut couvrir que les créances d'un même payeur");
         }
-        return first;
+        return severalPayers
+                ? new Payer("MULTI", null, null, "Plusieurs clients")
+                : first;
+    }
+
+    private void validateMultiPayerDeposit(CreerReglementClientRequest request) {
+        if (request.getClientPayeurId() != null || request.getGroupePayeurId() != null) {
+            throw new BadRequestException("Un versement multi-clients ne doit pas définir un payeur unique");
+        }
+        if (request.getDeposantNom() == null || request.getDeposantNom().isBlank()) {
+            throw new BadRequestException("Le déposant du versement bancaire est obligatoire");
+        }
+        if (request.getInstruments().size() != 1
+                || request.getInstruments().get(0).getMode() != ModeReglementClient.VERSEMENT_BANCAIRE) {
+            throw new BadRequestException(
+                    "Un versement multi-clients doit contenir un seul moyen de type versement bancaire"
+            );
+        }
+    }
+
+    private Payer resolveAllocationPayer(
+            CreerReglementClientRequest.Affectation allocation,
+            Map<Long, ElementFacturable> elements,
+            Map<Long, DocumentClient> documents,
+            Map<Long, Client> subscribers
+    ) {
+        if (allocation.getDocumentClientId() != null) {
+            return resolvePayer(documents.get(allocation.getDocumentClientId()));
+        }
+        ElementFacturable element = elements.get(allocation.getElementFacturableId());
+        return resolvePayer(element.getContrat(), subscribers);
     }
 
     private Payer resolvePayer(DocumentClient document) {
@@ -2239,6 +2473,11 @@ public class ReglementClientService {
                 .clientPayeurId(payment.getClientPayeur() == null ? null : payment.getClientPayeur().getId())
                 .groupePayeurId(payment.getGroupePayeur() == null ? null : payment.getGroupePayeur().getId())
                 .payeurNom(payment.getPayeurNom())
+                .multiPayeur(payment.getMultiPayeur())
+                .deposantNom(payment.getDeposantNom())
+                .bordereauNomFichier(payment.getBordereauNomFichier())
+                .bordereauContentType(payment.getBordereauContentType())
+                .bordereauTailleOctets(payment.getBordereauTailleOctets())
                 .statut(payment.getStatut())
                 .montantTotal(payment.getMontantTotal())
                 .montantNonAffecte(payment.getMontantNonAffecte())
@@ -2292,6 +2531,19 @@ public class ReglementClientService {
                                         ? null : allocation.getElementFacturable().getId())
                                 .documentClientId(allocation.getDocumentClient() == null
                                         ? null : allocation.getDocumentClient().getId())
+                                .payeurType(allocation.getPayeurType() == null
+                                        ? instrument.getReglement().getGroupePayeur() == null
+                                                ? "CLIENT" : "GROUPE"
+                                        : allocation.getPayeurType())
+                                .payeurId(allocation.getPayeurId() == null
+                                        ? instrument.getReglement().getGroupePayeur() == null
+                                                ? instrument.getReglement().getClientPayeur() == null
+                                                        ? null : instrument.getReglement().getClientPayeur().getId()
+                                                : instrument.getReglement().getGroupePayeur().getId()
+                                        : allocation.getPayeurId())
+                                .payeurNom(allocation.getPayeurNom() == null
+                                        ? instrument.getReglement().getPayeurNom()
+                                        : allocation.getPayeurNom())
                                 .montant(allocation.getMontant())
                                 .statut(allocation.getStatut())
                                 .build())
@@ -2347,5 +2599,8 @@ public class ReglementClientService {
     }
 
     private record Payer(String key, Client client, GroupeClient group, String name) {
+    }
+
+    public record DownloadedReceipt(Resource resource, MediaType mediaType, String fileName) {
     }
 }

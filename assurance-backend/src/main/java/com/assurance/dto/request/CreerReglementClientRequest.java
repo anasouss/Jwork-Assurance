@@ -21,6 +21,11 @@ public class CreerReglementClientRequest {
     private Long clientPayeurId;
     private Long groupePayeurId;
 
+    private Boolean multiPayeur = false;
+
+    @Size(max = 220)
+    private String deposantNom;
+
     @Size(max = 1000)
     private String notes;
 

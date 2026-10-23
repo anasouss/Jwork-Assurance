@@ -434,6 +434,9 @@ public class ReglementClientService {
             AffectationReglementClient invoiceAllocation = AffectationReglementClient.builder()
                     .instrument(instrument)
                     .documentClient(document)
+                    .clientPayeur(document.getGroupePayeur() == null ? document.getClientPayeur() : null)
+                    .groupePayeur(document.getGroupePayeur())
+                    .payeurNomSnapshot(document.getPayeurNom())
                     .montant(amount)
                     .statut(status)
                     .build();
@@ -835,11 +838,9 @@ public class ReglementClientService {
                         .elementFacturable(elementsById.get(requestedAllocation.getElementFacturableId()))
                         .documentClient(documentsById.get(requestedAllocation.getDocumentClientId()))
                         .montant(money(requestedAllocation.getMontant()))
-                        .payeurType(allocationPayer.group() == null ? "CLIENT" : "GROUPE")
-                        .payeurId(allocationPayer.group() == null
-                                ? allocationPayer.client().getId()
-                                : allocationPayer.group().getId())
-                        .payeurNom(allocationPayer.name())
+                        .clientPayeur(allocationPayer.group() == null ? allocationPayer.client() : null)
+                        .groupePayeur(allocationPayer.group())
+                        .payeurNomSnapshot(allocationPayer.name())
                         .statut(StatutAffectationReglement.EN_ATTENTE)
                         .build();
                 instrument.getAffectations().add(allocation);
@@ -1112,34 +1113,24 @@ public class ReglementClientService {
         );
         replacement.setInstrumentRemplace(replaced);
         replacement.setDateStatut(replacementDate);
-        replacementRequest.getAffectations().forEach(requestedAllocation ->
-                replacement.getAffectations().add(AffectationReglementClient.builder()
+        replacementRequest.getAffectations().forEach(requestedAllocation -> {
+            AffectationReglementClient sourceAllocation = replaced.getAffectations().stream()
+                    .filter(allocation -> matchesAllocationTarget(allocation, requestedAllocation))
+                    .findFirst()
+                    .orElseThrow();
+            replacement.getAffectations().add(AffectationReglementClient.builder()
                         .instrument(replacement)
-                        .elementFacturable(requestedAllocation.getElementFacturableId() == null
-                                ? null
-                                : replaced.getAffectations().stream()
-                                .map(AffectationReglementClient::getElementFacturable)
-                                .filter(Objects::nonNull)
-                                .filter(element -> element.getId().equals(
-                                        requestedAllocation.getElementFacturableId()
-                                ))
-                                .findFirst()
-                                .orElseThrow())
-                        .documentClient(requestedAllocation.getDocumentClientId() == null
-                                ? null
-                                : replaced.getAffectations().stream()
-                                .map(AffectationReglementClient::getDocumentClient)
-                                .filter(Objects::nonNull)
-                                .filter(document -> document.getId().equals(
-                                        requestedAllocation.getDocumentClientId()
-                                ))
-                                .findFirst()
-                                .orElseThrow())
+                        .elementFacturable(sourceAllocation.getElementFacturable())
+                        .documentClient(sourceAllocation.getDocumentClient())
+                        .clientPayeur(sourceAllocation.getClientPayeur())
+                        .groupePayeur(sourceAllocation.getGroupePayeur())
+                        .payeurNomSnapshot(sourceAllocation.getPayeurNomSnapshot())
                         .montant(money(requestedAllocation.getMontant()))
                         .statut(replacement.getStatut() == StatutInstrumentReglement.CONFIRME
                                 ? StatutAffectationReglement.CONFIRMEE
                                 : StatutAffectationReglement.EN_ATTENTE)
-                        .build()));
+                        .build());
+        });
 
         if (pendingReplacement) {
             replaced.getAffectations().forEach(allocation ->
@@ -1468,6 +1459,18 @@ public class ReglementClientService {
                 ? null : allocation.getDocumentClient().getId());
         copy.setMontant(allocation.getMontant());
         return copy;
+    }
+
+    private boolean matchesAllocationTarget(
+            AffectationReglementClient allocation,
+            CreerReglementClientRequest.Affectation requested
+    ) {
+        Long elementId = allocation.getElementFacturable() == null
+                ? null : allocation.getElementFacturable().getId();
+        Long documentId = allocation.getDocumentClient() == null
+                ? null : allocation.getDocumentClient().getId();
+        return Objects.equals(elementId, requested.getElementFacturableId())
+                && Objects.equals(documentId, requested.getDocumentClientId());
     }
 
     private void validateReplacementBalances(List<AffectationReglementClient> allocations) {
@@ -2531,19 +2534,12 @@ public class ReglementClientService {
                                         ? null : allocation.getElementFacturable().getId())
                                 .documentClientId(allocation.getDocumentClient() == null
                                         ? null : allocation.getDocumentClient().getId())
-                                .payeurType(allocation.getPayeurType() == null
-                                        ? instrument.getReglement().getGroupePayeur() == null
-                                                ? "CLIENT" : "GROUPE"
-                                        : allocation.getPayeurType())
-                                .payeurId(allocation.getPayeurId() == null
-                                        ? instrument.getReglement().getGroupePayeur() == null
-                                                ? instrument.getReglement().getClientPayeur() == null
-                                                        ? null : instrument.getReglement().getClientPayeur().getId()
-                                                : instrument.getReglement().getGroupePayeur().getId()
-                                        : allocation.getPayeurId())
-                                .payeurNom(allocation.getPayeurNom() == null
-                                        ? instrument.getReglement().getPayeurNom()
-                                        : allocation.getPayeurNom())
+                                .payeurType(allocation.getGroupePayeur() == null ? "CLIENT" : "GROUPE")
+                                .payeurId(allocation.getGroupePayeur() == null
+                                        ? allocation.getClientPayeur() == null
+                                                ? null : allocation.getClientPayeur().getId()
+                                        : allocation.getGroupePayeur().getId())
+                                .payeurNom(allocation.getPayeurNomSnapshot())
                                 .montant(allocation.getMontant())
                                 .statut(allocation.getStatut())
                                 .build())

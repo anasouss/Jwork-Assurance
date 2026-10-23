@@ -46,6 +46,7 @@ export function ClientSection({
   showProprietaireCategorie = false,
   requireDriverDetails = true,
   requireDriverPermitValidity = true,
+  requirePersonProfileDetails = false,
   secondaryTitle = "Propriétaire",
   secondaryIdentityLabel = "Identité propriétaire",
   sameAsSubscriberLabel = "Le propriétaire est-il lui-même le souscripteur ?",
@@ -67,6 +68,7 @@ export function ClientSection({
   showProprietaireCategorie?: boolean;
   requireDriverDetails?: boolean;
   requireDriverPermitValidity?: boolean;
+  requirePersonProfileDetails?: boolean;
   secondaryTitle?: string;
   secondaryIdentityLabel?: string;
   sameAsSubscriberLabel?: string;
@@ -491,6 +493,36 @@ export function ClientSection({
                   <Input disabled={disabledByCopy} value={item.client.adresse ?? ""} onChange={(event) => updateClient(index, { adresse: event.target.value })} />
                 </Field>
               </div>
+              {requirePersonProfileDetails && !morale ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Date de naissance" required error={errors[`clients.${index}.client.dateNaissance`]}>
+                    <DatePicker
+                      date={item.client.dateNaissance}
+                      disabled={disabledByCopy}
+                      onSelect={(date) => updateClient(index, { dateNaissance: toDateOnly(date) })}
+                    />
+                  </Field>
+                  <Field label="Nationalité" required error={errors[`clients.${index}.client.nationalite`]}>
+                    <Input
+                      disabled={disabledByCopy}
+                      value={item.client.nationalite ?? ""}
+                      onChange={(event) => updateClient(index, { nationalite: event.target.value })}
+                    />
+                  </Field>
+                </div>
+              ) : null}
+              {requirePersonProfileDetails && !isProprietaire ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                  <Field label="E-mail">
+                    <Input type="email" value={item.client.email ?? ""} onChange={(event) => updateClient(index, { email: event.target.value })} />
+                  </Field>
+                  <TelephoneList
+                    client={item}
+                    updateClient={(patch) => updateClient(index, patch)}
+                    error={errors[`clients.${index}.client.telephones`]}
+                  />
+                </div>
+              ) : null}
               {isProprietaire ? (
                 <>
                   <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">

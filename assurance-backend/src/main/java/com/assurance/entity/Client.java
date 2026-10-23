@@ -122,6 +122,9 @@ public class Client extends BaseEntity {
     @Column(length = 120)
     private String passport;
 
+    @Column(name = "passport_validite")
+    private LocalDate passportValidite;
+
     @Column(name = "carte_residence", length = 120)
     private String carteResidence;
 

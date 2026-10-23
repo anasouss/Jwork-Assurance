@@ -357,6 +357,7 @@ export default function AssistanceAutomobileCreationPage() {
         groupesClients={groups.data ?? []}
         requireDriverDetails={false}
         requireDriverPermitValidity={false}
+        requirePersonProfileDetails
         secondaryTitle="Assuré"
         secondaryIdentityLabel="Identité de l’assuré"
         sameAsSubscriberLabel="L’assuré est le souscripteur"
@@ -656,7 +657,11 @@ function personRequest(input: ClientInput) {
 
 function validClient(input: ClientInput, requireCategory = true) {
   if (input.clientId) return Boolean(!requireCategory || input.client.categorieClientId || input.role === "SOUSCRIPTEUR");
-  const common = Boolean(input.client.adresse && input.client.villeId && input.client.telephone);
+  const hasTelephone = Boolean(
+    input.client.telephone?.trim()
+    || input.client.telephones?.some((telephone) => telephone.numero.trim()),
+  );
+  const common = Boolean(input.client.adresse && input.client.villeId && hasTelephone);
   return input.client.typeClient === "PERSONNE_MORALE"
     ? common && Boolean(input.client.raisonSociale && input.client.rc
       && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId))

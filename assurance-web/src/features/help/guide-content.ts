@@ -277,14 +277,15 @@ export const guideModules: GuideModule[] = [
         permissions: ["contrat:create", "contrat:update"],
         prerequisites: ["Une compagnie d’assistance et un produit Voyage actifs doivent être sélectionnés dans Ajouter un dossier."],
         steps: [
-          { title: "Enregistrer Souscripteur", description: "Choisissez Personne physique ou Personne morale, saisissez CIN/passeport ou RC, puis complétez identité, ville, adresse et coordonnées. Une recherche reprend la fiche existante lorsqu’elle est trouvée. Cliquez sur Enregistrer pour ouvrir la section suivante.", action: "Enregistrer" },
-          { title: "Enregistrer Personnes assurées", description: "Activez L’assuré est le souscripteur pour une personne physique, ou désactivez-le et complétez chaque assuré. Utilisez Ajouter un assuré ou l’icône de retrait, puis cliquez sur Enregistrer.", action: "Enregistrer" },
+          { title: "Enregistrer Souscripteur", description: "Choisissez Personne physique ou Personne morale, saisissez CIN/passeport ou RC, puis complétez la date de validité du document, l’identité, la ville, l’adresse et les coordonnées. Une recherche reprend la fiche existante lorsqu’elle est trouvée. Cliquez sur Enregistrer pour ouvrir la section suivante.", action: "Enregistrer" },
+          { title: "Enregistrer Personnes assurées", description: "Activez L’assuré est le souscripteur pour une personne physique, ou désactivez-le et complétez chaque assuré, notamment la validité de son CIN ou passeport. Utilisez Ajouter un assuré ou l’icône de retrait, puis cliquez sur Enregistrer.", action: "Enregistrer" },
           { title: "Compléter Contrat", description: "Vérifiez compagnie et produit en lecture seule. Renseignez N° de contrat, durée, date d’effet et code promo éventuel. Pour le payeur, choisissez Lui-même ou Autre personne; dans ce dernier cas, recherchez un client existant. La date d’expiration est calculée." },
           { title: "Contrôler la tarification", description: "Vérifiez Prime nette, Réduction et Prime TTC ainsi que le détail par assuré lorsqu’il y en a plusieurs." },
           { title: "Créer ou enregistrer", description: "Cliquez sur Créer le dossier. En modification, utilisez Enregistrer les modifications; au renouvellement, Renouveler l’assistance.", action: "Créer le dossier" },
         ],
         errors: [
           { message: "Validez la section en cours avant de continuer", resolution: "Complétez les champs obligatoires de la section ouverte puis cliquez sur Enregistrer." },
+          { message: "Le CIN ou le passeport est expiré", resolution: "Renseignez une date de validité égale ou postérieure à la date du jour." },
           { message: "Sélectionnez un client existant", resolution: "Pour un autre payeur, saisissez au moins deux caractères puis choisissez réellement une option de la liste." },
           { message: "Créer le dossier reste désactivé", resolution: "Enregistrez Souscripteur et Personnes assurées, complétez le N° contrat, la durée, la date d’effet et le payeur, puis attendez une tarification valide." },
           { message: "Tarification impossible", resolution: "Vérifiez le produit, les âges/dates de naissance, la durée, la période tarifaire et le code promo." },

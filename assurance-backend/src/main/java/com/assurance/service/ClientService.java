@@ -132,6 +132,7 @@ public class ClientService {
                 .cinValidite(request.getCinValidite())
                 .nationalite(request.getNationalite())
                 .passport(request.getPassport())
+                .passportValidite(request.getPassportValidite())
                 .carteResidence(request.getCarteResidence())
                 .iff(request.getIff())
                 .patente(request.getPatente())
@@ -248,6 +249,7 @@ public class ClientService {
                 .email(client.getEmail())
                 .nationalite(client.getNationalite())
                 .passport(client.getPassport())
+                .passportValidite(client.getPassportValidite())
                 .carteResidence(client.getCarteResidence())
                 .iff(client.getIff())
                 .patente(client.getPatente())
@@ -300,6 +302,7 @@ public class ClientService {
         client.setCinValidite(request.getCinValidite());
         client.setNationalite(request.getNationalite());
         client.setPassport(request.getPassport());
+        client.setPassportValidite(request.getPassportValidite());
         client.setCarteResidence(request.getCarteResidence());
         client.setIff(request.getIff());
         client.setPatente(request.getPatente());

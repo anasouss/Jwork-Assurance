@@ -572,6 +572,14 @@ public class AssistanceVoyageService {
         if (person.getClientId() != null) {
             client = clientRepository.findByAgenceIdAndId(agenceId, person.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Client", person.getClientId()));
+            if (person.getDocumentValidite() != null) {
+                if (hasText(client.getPassport()) && !hasText(client.getCin())) {
+                    client.setPassportValidite(person.getDocumentValidite());
+                } else if (hasText(client.getCin())) {
+                    client.setCinValidite(person.getDocumentValidite());
+                }
+                client = clientRepository.save(client);
+            }
         } else {
             validateNewPerson(person.getClient(), role, allowLegalEntity);
             client = clientService.createEntity(agenceId, person.getClient());
@@ -599,6 +607,13 @@ public class AssistanceVoyageService {
         if (!hasText(request.getCin()) && !hasText(request.getPassport())) {
             throw new BadRequestException("Le CIN ou le passeport du " + role + " est obligatoire");
         }
+        validateIdentityValidity(
+                request.getCin(),
+                request.getCinValidite(),
+                request.getPassport(),
+                request.getPassportValidite(),
+                role
+        );
     }
 
     private void validatePersonProfile(Client client, String role, boolean allowLegalEntity) {
@@ -625,6 +640,30 @@ public class AssistanceVoyageService {
                 || !hasText(client.getTelephone())) {
             throw new BadRequestException("Le profil du " + role
                     + " doit contenir le nom, le document d'identité, la naissance, l'adresse et le téléphone");
+        }
+        validateIdentityValidity(
+                client.getCin(),
+                client.getCinValidite(),
+                client.getPassport(),
+                client.getPassportValidite(),
+                role
+        );
+    }
+
+    private void validateIdentityValidity(
+            String cin,
+            LocalDate cinValidite,
+            String passport,
+            LocalDate passportValidite,
+            String role
+    ) {
+        LocalDate validite = hasText(passport) && !hasText(cin) ? passportValidite : cinValidite;
+        String document = hasText(passport) && !hasText(cin) ? "passeport" : "CIN";
+        if (validite == null) {
+            throw new BadRequestException("La date de validité du " + document + " du " + role + " est obligatoire");
+        }
+        if (validite.isBefore(LocalDate.now())) {
+            throw new BadRequestException("Le " + document + " du " + role + " est expiré");
         }
     }
 

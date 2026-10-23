@@ -41,6 +41,7 @@ public class ClientResponse {
     private String email;
     private String nationalite;
     private String passport;
+    private LocalDate passportValidite;
     private String carteResidence;
     private String iff;
     private String patente;

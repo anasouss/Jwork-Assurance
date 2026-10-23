@@ -686,23 +686,21 @@ function PersonEditor(props: {
               onBlur={() => searchIdentity(props.value.documentNumber, true)}
             />
           </Field>
-          {props.value.documentType === "CIN" ? (
-            <Field label="Validité CIN" required>
-              <DatePicker
-                disabled={locked}
-                date={props.value.documentValidity}
-                onSelect={(date) => update({ documentValidity: toDateOnly(date) ?? "" })}
-              />
-            </Field>
-          ) : null}
+          <Field label={props.value.documentType === "CIN" ? "Validité CIN" : "Validité passeport"} required>
+            <DatePicker
+              disabled={locked && Boolean(props.value.documentValidity)}
+              date={props.value.documentValidity}
+              onSelect={(date) => update({ documentValidity: toDateOnly(date) ?? "" })}
+            />
+          </Field>
+          <Field label="Nom" required><Input readOnly={locked} value={props.value.nom} onChange={(event) => update({ nom: event.target.value })} /></Field>
+          <Field label="Prénom" required><Input readOnly={locked} value={props.value.prenom} onChange={(event) => update({ prenom: event.target.value })} /></Field>
           <Field label="Genre" required>
             <Select disabled={locked} value={props.value.genre} onValueChange={(value) => update({ genre: value as PersonDraft["genre"] })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="HOMME">Homme</SelectItem><SelectItem value="FEMME">Femme</SelectItem></SelectContent>
             </Select>
           </Field>
-          <Field label="Prénom" required><Input readOnly={locked} value={props.value.prenom} onChange={(event) => update({ prenom: event.target.value })} /></Field>
-          <Field label="Nom" required><Input readOnly={locked} value={props.value.nom} onChange={(event) => update({ nom: event.target.value })} /></Field>
           <Field label="Date de naissance" required>
             <DatePicker disabled={locked} date={props.value.dateNaissance} onSelect={(date) => update({ dateNaissance: toDateOnly(date) ?? "" })} />
           </Field>
@@ -784,7 +782,7 @@ function emptyPerson(typeClient: PersonDraft["typeClient"] = "PERSONNE_PHYSIQUE"
 }
 
 function personRequest(person: PersonDraft): AssistanceVoyagePersonRequest {
-  if (person.clientId) return { clientId: person.clientId };
+  if (person.clientId) return { clientId: person.clientId, documentValidite: person.documentValidity };
   if (person.typeClient === "PERSONNE_MORALE") {
     return {
       client: {
@@ -806,8 +804,9 @@ function personRequest(person: PersonDraft): AssistanceVoyagePersonRequest {
       prenom: person.prenom.trim(),
       nom: person.nom.trim(),
       cin: person.documentType === "CIN" ? person.documentNumber.trim() : undefined,
-      cinValidite: person.documentValidity,
+      cinValidite: person.documentType === "CIN" ? person.documentValidity : undefined,
       passport: person.documentType === "PASSEPORT" ? person.documentNumber.trim() : undefined,
+      passportValidite: person.documentType === "PASSEPORT" ? person.documentValidity : undefined,
       dateNaissance: person.dateNaissance,
       nationalite: person.nationalite.trim(),
       adresse: person.adresse.trim(),
@@ -825,7 +824,7 @@ function personFromClient(client: ClientResponse, documentType: IdentityType): P
     typeClient: legalEntity ? "PERSONNE_MORALE" : "PERSONNE_PHYSIQUE",
     documentType,
     documentNumber: documentType === "CIN" ? client.cin ?? "" : client.passport ?? "",
-    documentValidity: client.cinValidite ?? "",
+    documentValidity: documentType === "CIN" ? client.cinValidite ?? "" : client.passportValidite ?? "",
     genre: client.genre ?? "HOMME",
     prenom: client.prenom ?? "",
     nom: client.nom ?? "",
@@ -857,7 +856,8 @@ function validPerson(person: PersonDraft) {
   }
   return Boolean(
     person.documentNumber.trim()
-    && (person.documentType !== "CIN" || person.documentValidity)
+    && person.documentValidity
+    && person.documentValidity >= today
     && person.prenom.trim()
     && person.nom.trim()
     && person.dateNaissance

@@ -452,6 +452,7 @@ export type ClientInput = {
     cin?: string;
     cinValidite?: string;
     passport?: string;
+    passportValidite?: string;
     nationalite?: string;
     rc?: string;
     ice?: string;
@@ -472,6 +473,7 @@ export type ClientInput = {
 
 export type AssistanceVoyagePersonRequest = {
   clientId?: string;
+  documentValidite?: string;
   client?: ClientInput["client"];
 };
 

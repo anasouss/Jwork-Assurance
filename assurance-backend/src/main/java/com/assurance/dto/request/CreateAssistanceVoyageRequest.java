@@ -52,6 +52,7 @@ public class CreateAssistanceVoyageRequest {
     @Data
     public static class Personne {
         private Long clientId;
+        private LocalDate documentValidite;
         @Valid
         private CreateClientRequest client;
     }

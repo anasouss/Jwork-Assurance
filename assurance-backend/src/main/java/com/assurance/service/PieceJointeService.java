@@ -6,6 +6,7 @@ import com.assurance.dto.response.PiecesJointesContratResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.dto.response.TypePieceJointeResponse;
 import com.assurance.entity.Client;
+import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.MouvementContrat;
@@ -18,6 +19,7 @@ import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.AgenceRepository;
+import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.PieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
@@ -61,6 +63,7 @@ public class PieceJointeService {
     private final TypeMouvementContratRepository typeMouvementContratRepository;
     private final TypePieceJointeRepository typePieceJointeRepository;
     private final PieceJointeRepository pieceJointeRepository;
+    private final AssistanceContratRepository assistanceContratRepository;
     private final StorageLayoutService storageLayoutService;
 
     @Transactional(readOnly = true)
@@ -124,6 +127,7 @@ public class PieceJointeService {
         Contrat contrat = resolveContrat(agenceId, contratId);
         MouvementContrat mouvement = resolveMouvement(contrat, mouvementId);
         TypeClient typeClient = resolveTypeClient(contrat);
+        String typeAssistance = resolveStandaloneAssistanceType(contrat);
         List<TypePieceJointeResponse> types = eligibleTypes(agenceId, contrat, mouvement, typeClient).stream()
                 .map(this::toTypeResponse)
                 .toList();
@@ -135,6 +139,8 @@ public class PieceJointeService {
                 .numeroDossier(contrat.getNumeroDossier())
                 .numeroPolice(contrat.getNumeroPolice())
                 .typeContrat(contrat.getTypeContrat())
+                .brancheAssuranceCode(contrat.getBrancheAssurance() == null ? null : contrat.getBrancheAssurance().getCode())
+                .typeAssistance(typeAssistance)
                 .typeClient(typeClient)
                 .mouvementContratId(mouvement == null ? null : mouvement.getId())
                 .mouvementCode(mouvement == null ? null : mouvement.getTypeMouvement().getCode())
@@ -142,6 +148,21 @@ public class PieceJointeService {
                 .types(types)
                 .pieces(pieces.stream().map(this::toPieceResponse).toList())
                 .build();
+    }
+
+    private String resolveStandaloneAssistanceType(Contrat contrat) {
+        if (contrat.getBrancheAssurance() == null
+                || !"ASSISTANCE".equalsIgnoreCase(contrat.getBrancheAssurance().getCode())) {
+            return null;
+        }
+        return assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(contrat.getId())
+                .stream()
+                .map(AssistanceContrat::getProduitAssistance)
+                .filter(Objects::nonNull)
+                .map(produit -> produit.getType())
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse("Assistance");
     }
 
     @Transactional

@@ -1513,6 +1513,8 @@ export type PiecesJointesContrat = {
   numeroDossier?: string | null;
   numeroPolice?: string | null;
   typeContrat: TypeContrat;
+  brancheAssuranceCode?: string | null;
+  typeAssistance?: string | null;
   typeClient?: TypeClient | null;
   mouvementContratId?: string | null;
   mouvementCode?: string | null;

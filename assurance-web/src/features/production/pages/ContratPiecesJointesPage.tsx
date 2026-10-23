@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { attachmentApi } from "../api/attachments";
-import type { PieceJointe, TypeContrat, TypePieceJointe } from "../types";
+import type { PieceJointe, PiecesJointesContrat, TypeContrat, TypePieceJointe } from "../types";
 import {
   formatAttachmentSize,
   OTHER_ATTACHMENT_TYPE,
@@ -113,7 +113,7 @@ export default function ContratPiecesJointesPage() {
 
       <div className="grid gap-3 md:grid-cols-3">
         <InfoCell label="Police" value={data?.numeroPolice ?? "-"} />
-        <InfoCell label="Type contrat" value={contractTypeLabel(data?.typeContrat)} />
+        <InfoCell label="Type dossier" value={contractTypeLabel(data)} />
         <InfoCell label="Obligatoires" value={`${completedRequired}/${requiredCount}`} />
       </div>
 
@@ -244,7 +244,14 @@ function numericParam(value: string | null) {
   return value && /^\d+$/.test(value) ? value : null;
 }
 
-function contractTypeLabel(type?: TypeContrat | string | null) {
+function contractTypeLabel(data?: PiecesJointesContrat) {
+  if (data?.brancheAssuranceCode?.trim().toUpperCase() === "ASSISTANCE") {
+    const assistanceType = data.typeAssistance?.trim().toUpperCase();
+    if (assistanceType === "ASSISTANCE VOYAGE") return "Assistance voyage";
+    if (assistanceType === "ASSISTANCE AUTOMOBILE") return "Assistance automobile";
+    return "Assistance";
+  }
+  const type: TypeContrat | string | null | undefined = data?.typeContrat;
   if (type === "PARTICULIER") return "Mono";
   if (type === "CONVENTION") return "Convention";
   if (type === "FLOTTE") return "Flotte";

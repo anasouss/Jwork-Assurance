@@ -14,6 +14,8 @@ public class PiecesJointesContratResponse {
     private String numeroDossier;
     private String numeroPolice;
     private TypeContrat typeContrat;
+    private String brancheAssuranceCode;
+    private String typeAssistance;
     private TypeClient typeClient;
     private Long mouvementContratId;
     private String mouvementCode;

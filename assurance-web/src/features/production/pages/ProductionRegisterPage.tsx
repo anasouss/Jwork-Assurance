@@ -26,6 +26,8 @@ type RegisterFilters = {
   dateAu: string;
   brancheId: string;
   compagnieId: string;
+  typeAssistance: "ALL" | "Assistance Automobile" | "Assistance Voyage";
+  produitAssistanceId: string;
   categorie: string;
   typeContrat: string;
   statut: string;
@@ -51,18 +53,44 @@ export default function ProductionRegisterPage() {
     queryKey: referenceKeys.list("branches-assurance"),
     queryFn: () => referenceApi.list("branches-assurance"),
   });
-  const companies = useQuery({
+  const insuranceCompanies = useQuery({
     queryKey: referenceKeys.list("compagnies-assurance"),
     queryFn: () => referenceApi.list("compagnies-assurance"),
   });
+  const assistanceCompanies = useQuery({
+    queryKey: referenceKeys.list("compagnies-assistance"),
+    queryFn: () => referenceApi.list("compagnies-assistance"),
+  });
+  const selectedBranch = (branches.data ?? []).find((branch) => branch.id === filters.brancheId);
+  const selectedAppliedBranch = (branches.data ?? []).find((branch) => branch.id === appliedFilters.brancheId);
+  const assistanceBranch = selectedBranch?.code?.trim().toUpperCase() === "ASSISTANCE";
+  const appliedAssistanceBranch = selectedAppliedBranch?.code?.trim().toUpperCase() === "ASSISTANCE";
+  const assistanceProducts = useQuery({
+    queryKey: referenceKeys.list("produits-assistance", {
+      type: assistanceBranch && filters.typeAssistance !== "ALL" ? filters.typeAssistance : undefined,
+    }),
+    queryFn: () => referenceApi.list("produits-assistance", {
+      type: filters.typeAssistance === "ALL" ? undefined : filters.typeAssistance,
+    }),
+    enabled: assistanceBranch,
+  });
+  const assistanceCompanyIds = new Set(
+    (assistanceProducts.data ?? []).map((product) => String(product.compagnieAssistanceId ?? "")),
+  );
+  const companyOptions = assistanceBranch
+    ? (assistanceCompanies.data ?? []).filter((company) => assistanceCompanyIds.has(company.id))
+    : insuranceCompanies.data ?? [];
+  const productOptions = (assistanceProducts.data ?? []).filter((product) =>
+    filters.compagnieId === "ALL" || String(product.compagnieAssistanceId ?? "") === filters.compagnieId
+  );
 
   const params = useMemo<ProductionRegisterParams>(() => ({
-    ...toApiFilters(appliedFilters),
+    ...toApiFilters(appliedFilters, appliedAssistanceBranch),
     sortBy: sort.column,
     sortDirection: sort.direction,
     page,
     size: PAGE_SIZE,
-  }), [appliedFilters, page, sort]);
+  }), [appliedAssistanceBranch, appliedFilters, page, sort]);
 
   const register = useQuery({
     queryKey: contractKeys.productionRegister(params),
@@ -77,7 +105,7 @@ export default function ProductionRegisterPage() {
     if (invalidPeriod) return;
     setAppliedFilters(filters);
     setPage(0);
-    setUrlParams(toUrlParams(filters, sort, 0), { replace: true });
+    setUrlParams(toUrlParams(filters, sort, 0, assistanceBranch), { replace: true });
   }
 
   function resetFilters() {
@@ -87,7 +115,7 @@ export default function ProductionRegisterPage() {
     setAppliedFilters(defaults);
     setSort(defaultSort);
     setPage(0);
-    setUrlParams(toUrlParams(defaults, defaultSort, 0), { replace: true });
+    setUrlParams(toUrlParams(defaults, defaultSort, 0, false), { replace: true });
   }
 
   function changeSort(column: SortColumn) {
@@ -97,19 +125,19 @@ export default function ProductionRegisterPage() {
     };
     setSort(next);
     setPage(0);
-    setUrlParams(toUrlParams(appliedFilters, next, 0), { replace: true });
+    setUrlParams(toUrlParams(appliedFilters, next, 0, appliedAssistanceBranch), { replace: true });
   }
 
   function changePage(nextPage: number) {
     setPage(nextPage);
-    setUrlParams(toUrlParams(appliedFilters, sort, nextPage), { replace: true });
+    setUrlParams(toUrlParams(appliedFilters, sort, nextPage, appliedAssistanceBranch), { replace: true });
   }
 
   async function exportExcel() {
     setExporting(true);
     try {
       const blob = await contractApi.exportProductionRegister({
-        ...toApiFilters(appliedFilters),
+        ...toApiFilters(appliedFilters, appliedAssistanceBranch),
         sortBy: sort.column,
         sortDirection: sort.direction,
       });
@@ -132,6 +160,61 @@ export default function ProductionRegisterPage() {
       <Card className="border-border/70 shadow-none">
         <CardContent className="grid gap-4 p-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <ReferenceSelect
+              label="Branche"
+              value={filters.brancheId}
+              allLabel="Toutes les branches"
+              items={branches.data ?? []}
+              onChange={(value) => setFilters((current) => ({
+                ...current,
+                brancheId: value,
+                compagnieId: "ALL",
+                typeAssistance: "ALL",
+                produitAssistanceId: "ALL",
+                typeContrat: "ALL",
+              }))}
+            />
+            {assistanceBranch ? (
+              <FilterField label="Type d’assistance" tone="emerald">
+                <Select
+                  value={filters.typeAssistance}
+                  onValueChange={(value) => setFilters((current) => ({
+                    ...current,
+                    typeAssistance: value as RegisterFilters["typeAssistance"],
+                    compagnieId: "ALL",
+                    produitAssistanceId: "ALL",
+                  }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les types</SelectItem>
+                    <SelectItem value="Assistance Automobile">Assistance automobile</SelectItem>
+                    <SelectItem value="Assistance Voyage">Assistance voyage</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            ) : null}
+            <ReferenceSelect
+              label={filters.brancheId === "ALL" ? "Compagnie" : assistanceBranch ? "Compagnie d’assistance" : "Compagnie d’assurance"}
+              value={filters.compagnieId}
+              allLabel={filters.brancheId === "ALL" ? "Sélectionnez une branche" : "Toutes les compagnies"}
+              items={filters.brancheId === "ALL" ? [] : companyOptions}
+              disabled={filters.brancheId === "ALL"}
+              onChange={(value) => setFilters((current) => ({
+                ...current,
+                compagnieId: value,
+                produitAssistanceId: "ALL",
+              }))}
+            />
+            {assistanceBranch ? (
+              <ReferenceSelect
+                label="Produit d’assistance"
+                value={filters.produitAssistanceId}
+                allLabel="Tous les produits"
+                items={productOptions}
+                onChange={(value) => setFilters((current) => ({ ...current, produitAssistanceId: value }))}
+              />
+            ) : null}
             <FilterField label="Date de référence" tone="emerald">
               <Select value={filters.typeDate} onValueChange={(value) => setFilters((current) => ({ ...current, typeDate: value as RegisterFilters["typeDate"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -147,8 +230,6 @@ export default function ProductionRegisterPage() {
             <FilterField label="Au" tone="emerald">
               <DatePicker date={filters.dateAu} onSelect={(date) => { const value = toDateOnly(date); if (value) setFilters((current) => ({ ...current, dateAu: value })); }} />
             </FilterField>
-            <ReferenceSelect label="Branche" value={filters.brancheId} allLabel="Toutes les branches" items={branches.data ?? []} onChange={(value) => setFilters((current) => ({ ...current, brancheId: value }))} />
-            <ReferenceSelect label="Compagnie" value={filters.compagnieId} allLabel="Toutes les compagnies" items={companies.data ?? []} onChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))} />
             <FilterField label="Catégorie" tone="emerald">
               <Select value={filters.categorie} onValueChange={(value) => setFilters((current) => ({ ...current, categorie: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -283,8 +364,8 @@ function RegisterRow({ row }: { row: ProductionRegisterRow }) {
   );
 }
 
-function ReferenceSelect({ label, value, allLabel, items, onChange }: { label: string; value: string; allLabel: string; items: Array<{ id: string; libelle: string; code?: string | null }>; onChange: (value: string) => void }) {
-  return <FilterField label={label} tone="emerald"><Select value={value} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">{allLabel}</SelectItem>{items.map((item) => <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>)}</SelectContent></Select></FilterField>;
+function ReferenceSelect({ label, value, allLabel, items, disabled = false, onChange }: { label: string; value: string; allLabel: string; items: Array<{ id: string; libelle: string; code?: string | null }>; disabled?: boolean; onChange: (value: string) => void }) {
+  return <FilterField label={label} tone="emerald"><Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">{allLabel}</SelectItem>{items.map((item) => <SelectItem key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.libelle}</SelectItem>)}</SelectContent></Select></FilterField>;
 }
 
 function Metric({ label, value, money = false, tone }: { label: string; value: string; money?: boolean; tone: "blue" | "red" | "green" | "amber" | "cyan" }) {
@@ -306,6 +387,8 @@ function defaultFilters(): RegisterFilters {
     dateAu: toDateOnly(new Date(now.getFullYear(), now.getMonth() + 1, 0)) ?? "",
     brancheId: "ALL",
     compagnieId: "ALL",
+    typeAssistance: "ALL",
+    produitAssistanceId: "ALL",
     categorie: "ALL",
     typeContrat: "ALL",
     statut: "ALL",
@@ -320,7 +403,9 @@ function filtersFromUrl(params: URLSearchParams): RegisterFilters {
     dateDu: params.get("dateDu") || defaults.dateDu,
     dateAu: params.get("dateAu") || defaults.dateAu,
     brancheId: params.get("brancheId") || "ALL",
-    compagnieId: params.get("compagnieId") || "ALL",
+    compagnieId: params.get("compagnieAssistanceId") || params.get("compagnieId") || "ALL",
+    typeAssistance: toAssistanceType(params.get("typeAssistance")),
+    produitAssistanceId: params.get("produitAssistanceId") || "ALL",
     categorie: params.get("categorie") || "ALL",
     typeContrat: params.get("typeContrat") || "ALL",
     statut: params.get("statut") || "ALL",
@@ -328,13 +413,18 @@ function filtersFromUrl(params: URLSearchParams): RegisterFilters {
   };
 }
 
-function toApiFilters(filters: RegisterFilters): Omit<ProductionRegisterParams, "page" | "size" | "sortBy" | "sortDirection"> {
+function toApiFilters(filters: RegisterFilters, assistanceBranch: boolean): Omit<ProductionRegisterParams, "page" | "size" | "sortBy" | "sortDirection"> {
   return {
     typeDate: filters.typeDate,
     dateDu: filters.dateDu,
     dateAu: filters.dateAu,
     brancheId: filters.brancheId === "ALL" ? undefined : filters.brancheId,
-    compagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+    compagnieId: !assistanceBranch && filters.compagnieId !== "ALL" ? filters.compagnieId : undefined,
+    compagnieAssistanceId: assistanceBranch && filters.compagnieId !== "ALL" ? filters.compagnieId : undefined,
+    typeAssistance: assistanceBranch && filters.typeAssistance !== "ALL" ? filters.typeAssistance : undefined,
+    produitAssistanceId: assistanceBranch && filters.produitAssistanceId !== "ALL"
+      ? filters.produitAssistanceId
+      : undefined,
     categorie: filters.categorie === "ALL" ? undefined : filters.categorie,
     typeContrat: filters.typeContrat === "ALL" ? undefined : filters.typeContrat as TypeContrat,
     statut: filters.statut === "ALL" ? undefined : filters.statut as "VALIDE" | "ANNULE",
@@ -342,9 +432,9 @@ function toApiFilters(filters: RegisterFilters): Omit<ProductionRegisterParams, 
   };
 }
 
-function toUrlParams(filters: RegisterFilters, sort: { column: SortColumn; direction: TableSortDirection }, page: number) {
+function toUrlParams(filters: RegisterFilters, sort: { column: SortColumn; direction: TableSortDirection }, page: number, assistanceBranch: boolean) {
   const params = new URLSearchParams();
-  Object.entries(toApiFilters(filters)).forEach(([key, value]) => { if (value) params.set(key, String(value)); });
+  Object.entries(toApiFilters(filters, assistanceBranch)).forEach(([key, value]) => { if (value) params.set(key, String(value)); });
   params.set("sortBy", sort.column);
   params.set("sortDirection", sort.direction);
   if (page) params.set("page", String(page));
@@ -355,6 +445,10 @@ function formatDate(value?: string | null) {
   if (!value) return "-";
   const [year, month, day] = value.split("-");
   return `${day}/${month}/${year}`;
+}
+
+function toAssistanceType(value: string | null): RegisterFilters["typeAssistance"] {
+  return value === "Assistance Automobile" || value === "Assistance Voyage" ? value : "ALL";
 }
 
 function contractTypeLabel(value: TypeContrat) {

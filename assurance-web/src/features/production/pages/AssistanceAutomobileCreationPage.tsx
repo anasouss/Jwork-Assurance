@@ -116,6 +116,7 @@ export default function AssistanceAutomobileCreationPage() {
   });
   const selectedProduct = (products.data ?? []).find((item) => item.id === produitId);
   const hasPromoCodes = Number(selectedProduct?.nombreCodesPromo ?? 0) > 0;
+  const draftMode = Boolean(existingContract.data?.brouillon);
   const payerOptions = useMemo(() => {
     const linked = clients.filter((item) => item.clientId).map((item) => ({
       id: item.clientId!,
@@ -199,7 +200,17 @@ export default function AssistanceAutomobileCreationPage() {
     const payerType = contract.typePayeurPrime === "TIERS_MANDATE" ? "TIERS_MANDATE" : "SOUSCRIPTEUR";
     setTypePayeurPrime(payerType);
     setPayeurPrimeClientId(payerType === "TIERS_MANDATE" ? contract.payeurPrimeClientId ?? "" : "");
-    setValidatedSections({ souscripteur: true, proprietaire: true, vehicule: true });
+    const hasSubscriber = Boolean(contract.clients?.some((link) => link.role === "SOUSCRIPTEUR"));
+    const hasInsured = Boolean(contract.clients?.some((link) => link.role === "PROPRIETAIRE"));
+    const hasVehicle = Boolean(contract.vehicules?.length);
+    setValidatedSections({ souscripteur: hasSubscriber, proprietaire: hasInsured, vehicule: hasVehicle });
+    setOpenSection(!hasSubscriber
+      ? "souscripteur"
+      : !hasInsured
+        ? "proprietaire"
+        : !hasVehicle
+          ? "vehicule"
+          : "contrat");
     hydratedRef.current = hydrationKey;
   }, [contratId, existingContract.data, renewing]);
 
@@ -226,6 +237,50 @@ export default function AssistanceAutomobileCreationPage() {
     }
   }, [echeanceCode, quote.data?.dateEcheance]);
 
+  const draftSave = useMutation({
+    mutationFn: ({ section }: { section: Exclude<AssistanceSection, "contrat"> }) =>
+      assistanceAutomobileApi.saveDraftSection(contratId, section, {
+        compagnieAssistanceId: compagnieId,
+        personne: section === "souscripteur"
+          ? personRequest(subscriber!)
+          : section === "proprietaire"
+            ? sameInsured && subscriber?.clientId
+              ? { clientId: subscriber.clientId }
+              : personRequest(insured!)
+            : undefined,
+        categorieClientId: section === "proprietaire" || section === "vehicule"
+          ? categorieClientId
+          : undefined,
+        vehicule: section === "vehicule" ? vehicleRequest(vehicule) : undefined,
+      }),
+    onSuccess: async (saved, variables) => {
+      const role = variables.section === "souscripteur"
+        ? "SOUSCRIPTEUR"
+        : variables.section === "proprietaire"
+          ? "PROPRIETAIRE"
+          : null;
+      if (role && saved.clientIds[0]) {
+        setClients((current) => current.map((client) => client.role === role
+          ? { ...client, clientId: saved.clientIds[0] }
+          : client));
+      }
+      setValidatedSections((current) => ({ ...current, [variables.section]: true }));
+      setOpenSection(variables.section === "souscripteur"
+        ? "proprietaire"
+        : variables.section === "proprietaire"
+          ? "vehicule"
+          : "contrat");
+      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      toast.success("Section enregistrée dans le brouillon");
+      if (!contratId) {
+        navigate(`/app/production/contrats/${saved.contratId}/assistance-automobile/modifier`, { replace: true });
+      }
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Enregistrement du brouillon impossible",
+    ),
+  });
+
   const save = useMutation({
     mutationFn: () => {
       const request = buildRequest({
@@ -245,6 +300,7 @@ export default function AssistanceAutomobileCreationPage() {
         vehicule,
       });
       if (renewing && contratId) return assistanceAutomobileApi.renew(contratId, request);
+      if (draftMode && contratId) return assistanceAutomobileApi.finalizeDraft(contratId, request);
       if (editing && contratId) return assistanceAutomobileApi.update(contratId, request);
       return assistanceAutomobileApi.create(request);
     },
@@ -252,7 +308,9 @@ export default function AssistanceAutomobileCreationPage() {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
       toast.success(renewing
         ? `Dossier ${saved.numeroDossier} renouvelé`
-        : editing
+        : draftMode
+          ? `Brouillon finalisé sous le dossier ${saved.numeroDossier}`
+          : editing
           ? `Dossier ${saved.numeroDossier} modifié`
           : `Dossier ${saved.numeroDossier} créé`);
       navigate(editing
@@ -306,6 +364,10 @@ export default function AssistanceAutomobileCreationPage() {
         : `Complétez les informations obligatoires de ${section === "souscripteur" ? "souscription" : "l’assuré"}.`);
       return;
     }
+    if (!contratId || draftMode) {
+      draftSave.mutate({ section });
+      return;
+    }
     setValidatedSections((current) => ({ ...current, [section]: true }));
     setOpenSection(section === "souscripteur" ? "proprietaire" : section === "proprietaire" ? "vehicule" : "contrat");
   };
@@ -346,7 +408,13 @@ export default function AssistanceAutomobileCreationPage() {
         <div>
           <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Production</p>
           <h1 className="text-xl font-semibold">
-            {renewing ? "Renouveler l’assistance automobile" : editing ? "Modifier l’assistance automobile" : "Nouvelle assistance automobile"}
+            {renewing
+              ? "Renouveler l’assistance automobile"
+              : draftMode
+                ? "Reprendre le brouillon d’assistance automobile"
+                : editing
+                  ? "Modifier l’assistance automobile"
+                  : "Nouvelle assistance automobile"}
           </h1>
         </div>
         <Button asChild variant="outline">
@@ -374,6 +442,7 @@ export default function AssistanceAutomobileCreationPage() {
         sameAsSubscriberLabel="L’assuré est le souscripteur"
         onSaveSection={validateAndContinue}
         savedSections={validatedSections}
+        saving={draftSave.isPending}
         saveActionLabel="Enregistrer"
         openSection={openSection}
         onSectionOpenChange={(section, open) => handleSectionOpenChange(section as AssistanceSection, open)}
@@ -391,6 +460,7 @@ export default function AssistanceAutomobileCreationPage() {
         categoriesTransport={transportCategories.data ?? []}
         needsTransportCategory={Boolean(selectedUsage?.byCategorieTransport)}
         validated={Boolean(validatedSections.vehicule)}
+        saving={draftSave.isPending}
         onContinue={() => validateAndContinue("vehicule")}
         open={openSection === "vehicule"}
         onOpenChange={(open) => handleSectionOpenChange("vehicule", open)}
@@ -526,9 +596,11 @@ export default function AssistanceAutomobileCreationPage() {
               ? "Enregistrement..."
               : renewing
                 ? "Renouveler l’assistance"
-                : editing
-                  ? "Enregistrer les modifications"
-                  : "Créer le dossier"}
+                : draftMode
+                  ? "Finaliser le dossier"
+                  : editing
+                    ? "Enregistrer les modifications"
+                    : "Créer le dossier"}
           </Button>
         </div>
       </SectionCard>
@@ -548,6 +620,7 @@ function VehicleSection(props: {
   categoriesTransport: ReferenceOption[];
   needsTransportCategory: boolean;
   validated: boolean;
+  saving?: boolean;
   onContinue: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -611,9 +684,9 @@ function VehicleSection(props: {
         <Field label="Validité de la carte grise" required><DatePicker date={props.vehicle.dateExpirationCarteGrise} onSelect={(date) => update({ dateExpirationCarteGrise: toDateOnly(date) })} /></Field>
       </div>
       <div className="mt-4 flex justify-end border-t pt-3">
-        <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={props.onContinue}>
-          <Save className="size-4" />
-          Enregistrer
+        <Button type="button" size="sm" disabled={props.saving} className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={props.onContinue}>
+          {props.saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          {props.saving ? "Enregistrement..." : "Enregistrer"}
         </Button>
       </div>
     </SectionCard>
@@ -657,6 +730,22 @@ function hydrateVehicle(vehicle?: NonNullable<ContratSummary["vehicules"]>[numbe
   };
 }
 
+function vehicleRequest(vehicle: VehiculeInput): CreateAssistanceAutomobileRequest["vehicule"] {
+  return {
+    typeVehicule: vehicle.typeVehicule,
+    usageId: vehicle.usageId!,
+    marqueId: vehicle.marqueId,
+    marqueLibelle: vehicle.marqueLibelle,
+    carrosserieId: vehicle.carrosserieId,
+    carrosserieLibelle: vehicle.carrosserieLibelle,
+    categorieTransportId: vehicle.categorieTransportId,
+    immatriculation: vehicle.immatriculation!.trim(),
+    datePremiereCirculation: vehicle.datePremiereCirculation,
+    dateExpirationCarteGrise: vehicle.dateExpirationCarteGrise!,
+    nombrePlaces: vehicle.nombrePlaces?.trim() || undefined,
+  };
+}
+
 function buildRequest(input: {
   compagnieId: string; produitId: string; dateSouscription: string; dateEffet: string; echeanceCode: string; dureeMois: string; numeroContrat: string; codePromo: string;
   subscriber: ClientInput; insured: ClientInput; sameInsured: boolean;
@@ -670,14 +759,7 @@ function buildRequest(input: {
     souscripteur: personRequest(input.subscriber), assure: input.sameInsured ? undefined : personRequest(input.insured),
     assureIdentiqueSouscripteur: input.sameInsured, typePayeurPrime: input.typePayeurPrime,
     payeurPrimeClientId: input.typePayeurPrime === "TIERS_MANDATE" ? input.payeurPrimeClientId : undefined,
-    vehicule: {
-      typeVehicule: input.vehicule.typeVehicule, usageId: input.vehicule.usageId!, marqueId: input.vehicule.marqueId,
-      marqueLibelle: input.vehicule.marqueLibelle, carrosserieId: input.vehicule.carrosserieId,
-      carrosserieLibelle: input.vehicule.carrosserieLibelle, categorieTransportId: input.vehicule.categorieTransportId,
-      immatriculation: input.vehicule.immatriculation!.trim(), datePremiereCirculation: input.vehicule.datePremiereCirculation,
-      dateExpirationCarteGrise: input.vehicule.dateExpirationCarteGrise!,
-      nombrePlaces: input.vehicule.nombrePlaces?.trim() || undefined,
-    },
+    vehicule: vehicleRequest(input.vehicule),
   };
 }
 

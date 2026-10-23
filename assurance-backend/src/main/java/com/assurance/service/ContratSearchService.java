@@ -11,6 +11,8 @@ import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.Vehicule;
+import com.assurance.enums.RoleClientContrat;
+import com.assurance.enums.StatutContrat;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.repository.ContratClientRepository;
@@ -349,8 +351,11 @@ public class ContratSearchService {
                 .produitAssistanceLibelle(firstAssistance == null ? null : firstAssistance.getProduit())
                 .typeAssistance(linkedAssistanceView
                         ? "Assistance Automobile"
-                        : !standaloneAssistance || firstAssistance == null || firstAssistance.getProduitAssistance() == null
-                                ? null : firstAssistance.getProduitAssistance().getType())
+                        : !standaloneAssistance || firstAssistance == null
+                                ? null
+                                : firstAssistance.getProduitAssistance() == null
+                                        ? firstAssistance.getProduit()
+                                        : firstAssistance.getProduitAssistance().getType())
                 .assistanceLiee(linkedAssistanceView)
                 .conventionId(contract.getConvention() == null ? null : contract.getConvention().getId())
                 .conventionCode(contract.getConvention() == null ? null : contract.getConvention().getCode())
@@ -366,6 +371,7 @@ public class ContratSearchService {
                 .typeRenouvellement(contract.getTypeRenouvellement())
                 .modeSaisieGaranties(contract.getModeSaisieGaranties())
                 .brouillon(contract.getBrouillon())
+                .progressionBrouillon(draftProgress(contract, clients, firstVehicle, firstAssistance))
                 .prospection(contract.getProspection())
                 .premierTypeVehicule(firstVehicle == null ? null : firstVehicle.getTypeVehicule().name())
                 .modificationDirecteAutorisee(modificationPolicy != null && modificationPolicy.allowed())
@@ -374,6 +380,30 @@ public class ContratSearchService {
                 .mouvements(movementViews)
                 .avenantDrafts(drafts)
                 .build();
+    }
+
+    private String draftProgress(
+            Contrat contract,
+            List<ContratClient> clients,
+            Vehicule vehicle,
+            AssistanceContrat assistance
+    ) {
+        if (contract.getStatut() != StatutContrat.DRAFT || !Boolean.TRUE.equals(contract.getBrouillon())
+                || contract.getBrancheAssurance() == null
+                || !"ASSISTANCE".equalsIgnoreCase(contract.getBrancheAssurance().getCode())
+                || assistance == null) {
+            return null;
+        }
+        boolean voyage = assistance.getProduitAssistance() != null
+                && "Assistance Voyage".equalsIgnoreCase(assistance.getProduitAssistance().getType());
+        int completed = clients.stream().anyMatch(link -> link.getRole() == RoleClientContrat.SOUSCRIPTEUR) ? 1 : 0;
+        if (voyage) {
+            completed += clients.stream().anyMatch(link -> link.getRole() == RoleClientContrat.BENEFICIAIRE) ? 1 : 0;
+            return completed + "/3";
+        }
+        completed += clients.stream().anyMatch(link -> link.getRole() == RoleClientContrat.PROPRIETAIRE) ? 1 : 0;
+        completed += vehicle == null ? 0 : 1;
+        return completed + "/4";
     }
 
     private ContratListItemResponse.ClientLink toClientLink(ContratClient link) {

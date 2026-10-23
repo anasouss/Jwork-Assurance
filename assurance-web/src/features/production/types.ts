@@ -477,6 +477,13 @@ export type AssistanceVoyagePersonRequest = {
   client?: ClientInput["client"];
 };
 
+export type AssistanceDraftResponse = {
+  contratId: string;
+  numeroDossier?: string | null;
+  sectionEnregistree: string;
+  clientIds: string[];
+};
+
 export type CreateAssistanceVoyageRequest = {
   compagnieAssistanceId: string;
   produitAssistanceId: string;
@@ -1720,6 +1727,7 @@ export type ContratListItem = {
   typeRenouvellement?: string | null;
   modeSaisieGaranties?: ModeSaisieGaranties | null;
   brouillon?: boolean | null;
+  progressionBrouillon?: string | null;
   prospection?: boolean | null;
   premierTypeVehicule?: string | null;
   modificationDirecteAutorisee?: boolean | null;

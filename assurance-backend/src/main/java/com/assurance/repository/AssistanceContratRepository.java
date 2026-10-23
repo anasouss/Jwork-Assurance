@@ -116,6 +116,9 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
                    or (:typeDate = 'VALIDATION' and m.dateValidation between :dateDu and :dateAu))
               and (:brancheId is null or m.contrat.brancheAssurance.id = :brancheId)
               and (:compagnieId is null or m.contrat.compagnieAssurance.id = :compagnieId)
+              and (:compagnieAssistanceId is null or a.compagnieAssistance.id = :compagnieAssistanceId)
+              and (:typeAssistance is null or lower(a.produitAssistance.type) = lower(:typeAssistance))
+              and (:produitAssistanceId is null or a.produitAssistance.id = :produitAssistanceId)
               and (:categorie is null or m.typeMouvement.categorie = :categorie)
               and (:typeContrat is null or m.contrat.typeContrat = :typeContrat)
               and (:search is null or :search = ''
@@ -136,6 +139,9 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
             @Param("dateAu") LocalDate dateAu,
             @Param("brancheId") Long brancheId,
             @Param("compagnieId") Long compagnieId,
+            @Param("compagnieAssistanceId") Long compagnieAssistanceId,
+            @Param("typeAssistance") String typeAssistance,
+            @Param("produitAssistanceId") Long produitAssistanceId,
             @Param("categorie") CategorieMouvementContrat categorie,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("statut") StatutMouvementContrat statut,
@@ -148,6 +154,9 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
 
     @EntityGraph(attributePaths = {"brancheAssurance", "compagnieAssistance", "produitAssistance"})
     List<AssistanceContrat> findByContratIdInAndActifTrueOrderByCreatedAtDesc(Collection<Long> contratIds);
+
+    @EntityGraph(attributePaths = {"compagnieAssistance"})
+    List<AssistanceContrat> findByMouvementContratIdInAndActifTrueOrderByCreatedAtDesc(Collection<Long> mouvementIds);
 
     List<AssistanceContrat> findByMouvementContratIdOrderByCreatedAtDesc(Long mouvementContratId);
 

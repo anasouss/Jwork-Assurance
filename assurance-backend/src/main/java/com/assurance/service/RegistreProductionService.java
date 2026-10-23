@@ -4,6 +4,7 @@ import com.assurance.dto.request.RegistreProductionFilter;
 import com.assurance.dto.response.PageMetadata;
 import com.assurance.dto.response.RegistreProductionResponse;
 import com.assurance.entity.Client;
+import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.MouvementContrat;
@@ -68,12 +69,14 @@ public class RegistreProductionService {
         List<RegistreProductionResponse.Ligne> rows = mapRows(result.getContent());
         MouvementContratRepository.RegistreProductionTotals values = mouvementContratRepository.summarizeRegistre(
                 agenceId, filter.getTypeDate(), filter.getDateDu(), filter.getDateAu(),
-                filter.getBrancheId(), filter.getCompagnieId(), filter.getCategorie(),
+                filter.getBrancheId(), filter.getCompagnieId(), filter.getCompagnieAssistanceId(),
+                normalizedSearch(filter.getTypeAssistance()), filter.getProduitAssistanceId(), filter.getCategorie(),
                 filter.getTypeContrat(), filter.getStatut(), normalizedSearch(filter.getSearch())
         );
         BigDecimal assistanceTtc = assistanceContratRepository.sumRegistreTtc(
                 agenceId, filter.getTypeDate(), filter.getDateDu(), filter.getDateAu(),
-                filter.getBrancheId(), filter.getCompagnieId(), filter.getCategorie(),
+                filter.getBrancheId(), filter.getCompagnieId(), filter.getCompagnieAssistanceId(),
+                normalizedSearch(filter.getTypeAssistance()), filter.getProduitAssistanceId(), filter.getCategorie(),
                 filter.getTypeContrat(), filter.getStatut(), normalizedSearch(filter.getSearch())
         );
 
@@ -109,7 +112,8 @@ public class RegistreProductionService {
                 .and(Sort.by(Sort.Direction.DESC, "id"));
         return mouvementContratRepository.searchRegistre(
                 agenceId, filter.getTypeDate(), filter.getDateDu(), filter.getDateAu(),
-                filter.getBrancheId(), filter.getCompagnieId(), filter.getCategorie(),
+                filter.getBrancheId(), filter.getCompagnieId(), filter.getCompagnieAssistanceId(),
+                normalizedSearch(filter.getTypeAssistance()), filter.getProduitAssistanceId(), filter.getCategorie(),
                 filter.getTypeContrat(), filter.getStatut(), normalizedSearch(filter.getSearch()),
                 PageRequest.of(Math.max(page, 0), size, sort)
         );
@@ -123,12 +127,28 @@ public class RegistreProductionService {
         Map<Long, BigDecimal> assistanceByMovement = assistanceTotals(
                 movements.stream().map(MouvementContrat::getId).toList()
         );
+        Map<Long, AssistanceContrat> assistanceDetailsByMovement = assistanceContratRepository
+                .findByMouvementContratIdInAndActifTrueOrderByCreatedAtDesc(
+                        movements.stream().map(MouvementContrat::getId).toList()
+                )
+                .stream()
+                .collect(Collectors.toMap(
+                        item -> item.getMouvementContrat().getId(),
+                        item -> item,
+                        (first, ignored) -> first
+                ));
 
         return movements.stream().map(movement -> {
             Contrat contract = movement.getContrat();
             List<ContratClient> clients = clientsByContract.getOrDefault(contract.getId(), List.of());
             String subscriber = clientName(selectClient(clients, item -> item.getRole() == RoleClientContrat.SOUSCRIPTEUR));
             Client insured = selectClient(clients, item -> item.getRole() == RoleClientContrat.PROPRIETAIRE);
+            AssistanceContrat assistance = assistanceDetailsByMovement.get(movement.getId());
+            String company = contract.getCompagnieAssurance() != null
+                    ? contract.getCompagnieAssurance().getNom()
+                    : assistance == null || assistance.getCompagnieAssistance() == null
+                            ? null
+                            : assistance.getCompagnieAssistance().getNom();
             return RegistreProductionResponse.Ligne.builder()
                     .mouvementId(movement.getId())
                     .contratId(contract.getId())
@@ -145,7 +165,7 @@ public class RegistreProductionService {
                     .souscripteur(subscriber)
                     .assure(insured == null ? subscriber : clientName(insured))
                     .branche(contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getLibelle())
-                    .compagnie(contract.getCompagnieAssurance() == null ? null : contract.getCompagnieAssurance().getNom())
+                    .compagnie(company)
                     .primeNette(money(movement.getPrimeNette()))
                     .taxesEtFrais(taxesAndFees(movement))
                     .primeTotale(money(movement.getPrimeTotale()))

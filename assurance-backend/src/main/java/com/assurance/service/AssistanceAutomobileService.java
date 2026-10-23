@@ -3,6 +3,8 @@ package com.assurance.service;
 import com.assurance.dto.request.CreateAssistanceAutomobileRequest;
 import com.assurance.dto.request.CreateClientRequest;
 import com.assurance.dto.request.QuoteAssistanceAutomobileRequest;
+import com.assurance.dto.request.SaveAssistanceAutomobileDraftSectionRequest;
+import com.assurance.dto.response.AssistanceDraftResponse;
 import com.assurance.dto.response.AssistanceAutomobileCreationResponse;
 import com.assurance.dto.response.AssistanceAutomobileQuoteResponse;
 import com.assurance.entity.Agence;
@@ -116,6 +118,92 @@ public class AssistanceAutomobileService {
             CreateAssistanceAutomobileRequest request
     ) {
         return createInternal(agenceId, request, null, null);
+    }
+
+    @Transactional
+    public AssistanceDraftResponse saveDraftSection(
+            Long agenceId,
+            Long contratId,
+            String section,
+            SaveAssistanceAutomobileDraftSectionRequest request
+    ) {
+        CompagnieAssistance compagnie = requireCompany(request.getCompagnieAssistanceId());
+        Contrat draft = contratId == null
+                ? createDraftContract(agenceId)
+                : requireDraftContract(agenceId, contratId);
+        upsertDraftAssistance(draft, compagnie);
+
+        String normalizedSection = section == null ? "" : section.trim().toLowerCase(Locale.ROOT);
+        List<Long> savedClientIds = List.of();
+        if ("souscripteur".equals(normalizedSection)) {
+            Client subscriber = resolvePerson(agenceId, request.getPersonne(), "souscripteur");
+            replaceClientRole(draft, RoleClientContrat.SOUSCRIPTEUR, subscriber);
+            savedClientIds = List.of(subscriber.getId());
+        } else if ("proprietaire".equals(normalizedSection)) {
+            requireDraftClient(draft, RoleClientContrat.SOUSCRIPTEUR, "souscripteur");
+            Client insured = resolvePerson(agenceId, request.getPersonne(), "assuré");
+            CategorieClient categorie = requireCategory(request.getCategorieClientId());
+            replaceClientRole(draft, RoleClientContrat.PROPRIETAIRE, insured);
+            savedClientIds = List.of(insured.getId());
+            draft.setCategorieClient(categorie);
+            contratRepository.save(draft);
+        } else if ("vehicule".equals(normalizedSection)) {
+            requireDraftClient(draft, RoleClientContrat.PROPRIETAIRE, "assuré");
+            CategorieClient categorie = requireCategory(request.getCategorieClientId());
+            if (request.getVehicule() == null || request.getVehicule().getUsageId() == null) {
+                throw new BadRequestException("Les informations du véhicule sont obligatoires");
+            }
+            Usage usage = requireUsage(request.getVehicule().getUsageId());
+            // The effective date belongs to the later contract section. Validate it authoritatively at finalization.
+            validateVehicle(request.getVehicule(), null, categorie, usage);
+            Vehicule existing = vehiculeRepository.findActiveByContratIdOrderByCreatedAtAsc(draft.getId())
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+            saveVehicle(draft, existing, request.getVehicule(), usage, null);
+            draft.setCategorieClient(categorie);
+            draft.setUsage(usage);
+            draft.setNombreVehicules(1);
+            contratRepository.save(draft);
+        } else {
+            throw new BadRequestException("Section de brouillon d'assistance automobile inconnue");
+        }
+
+        return AssistanceDraftResponse.builder()
+                .contratId(draft.getId())
+                .numeroDossier(draft.getNumeroDossier())
+                .sectionEnregistree(normalizedSection)
+                .clientIds(savedClientIds)
+                .build();
+    }
+
+    @Transactional
+    public AssistanceAutomobileCreationResponse finalizeDraft(
+            Long agenceId,
+            Long contratId,
+            CreateAssistanceAutomobileRequest request
+    ) {
+        Contrat draft = requireDraftContract(agenceId, contratId);
+        requireDraftClient(draft, RoleClientContrat.SOUSCRIPTEUR, "souscripteur");
+        requireDraftClient(draft, RoleClientContrat.PROPRIETAIRE, "assuré");
+        if (vehiculeRepository.findActiveByContratIdOrderByCreatedAtAsc(draft.getId()).isEmpty()) {
+            throw new BadRequestException("Enregistrez d'abord le véhicule assuré");
+        }
+        AssistanceAutomobileCreationResponse response = createInternal(agenceId, request, null, null);
+        assistanceContratRepository.deleteAll(
+                assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(draft.getId())
+        );
+        assistanceContratRepository.flush();
+        vehiculeRepository.deleteByContratId(draft.getId());
+        vehiculeRepository.flush();
+        contratClientRepository.deleteByContratId(draft.getId());
+        contratClientRepository.flush();
+        draft.getAssistances().clear();
+        draft.getVehicules().clear();
+        draft.getClients().clear();
+        contratRepository.delete(draft);
+        contratRepository.flush();
+        return response;
     }
 
     @Transactional
@@ -331,7 +419,7 @@ public class AssistanceAutomobileService {
         if (input.getMarqueId() == null && !hasText(input.getMarqueLibelle())) {
             throw new BadRequestException("Marque du véhicule obligatoire");
         }
-        if (input.getDateExpirationCarteGrise().isBefore(dateEffet)) {
+        if (dateEffet != null && input.getDateExpirationCarteGrise().isBefore(dateEffet)) {
             throw new BadRequestException("La carte grise doit être valide à la date d'effet");
         }
         if (Boolean.TRUE.equals(usage.getByCategorieTransport()) && input.getCategorieTransportId() == null) {
@@ -573,6 +661,77 @@ public class AssistanceAutomobileService {
                 .principalPourRole(true)
                 .build());
         contrat.getClients().add(link);
+    }
+
+    private Contrat createDraftContract(Long agenceId) {
+        Agence agence = agenceRepository.findById(agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+        BrancheAssurance branche = requireAssistanceBranch();
+        return contratRepository.save(Contrat.builder()
+                .agence(agence)
+                .brancheAssurance(branche)
+                .typeContrat(TypeContrat.PARTICULIER)
+                .statut(StatutContrat.DRAFT)
+                .nombreVehicules(0)
+                .nombreRemorques(0)
+                .assistance(true)
+                .brouillon(true)
+                .prospection(false)
+                .build());
+    }
+
+    private Contrat requireDraftContract(Long agenceId, Long contratId) {
+        Contrat draft = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (draft.getStatut() != StatutContrat.DRAFT || !Boolean.TRUE.equals(draft.getBrouillon())
+                || draft.getBrancheAssurance() == null
+                || !"ASSISTANCE".equalsIgnoreCase(draft.getBrancheAssurance().getCode())) {
+            throw new BadRequestException("Ce dossier n'est pas un brouillon d'assistance modifiable");
+        }
+        AssistanceContrat assistance = assistanceContratRepository
+                .findByContratIdAndActifTrueOrderByCreatedAtDesc(contratId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Le contexte du brouillon d'assistance est introuvable"));
+        String type = assistance.getProduitAssistance() == null
+                ? assistance.getProduit()
+                : assistance.getProduitAssistance().getType();
+        if (!"Assistance Automobile".equalsIgnoreCase(type)) {
+            throw new BadRequestException("Le type du brouillon d'assistance ne correspond pas à cet écran");
+        }
+        return draft;
+    }
+
+    private void upsertDraftAssistance(Contrat draft, CompagnieAssistance compagnie) {
+        AssistanceContrat assistance = assistanceContratRepository
+                .findByContratIdAndActifTrueOrderByCreatedAtDesc(draft.getId())
+                .stream()
+                .findFirst()
+                .orElseGet(() -> AssistanceContrat.builder()
+                        .brancheAssurance(draft.getBrancheAssurance())
+                        .contrat(draft)
+                        .produit("Assistance Automobile")
+                        .actif(true)
+                        .build());
+        assistance.setCompagnieAssistance(compagnie);
+        assistanceContratRepository.save(assistance);
+    }
+
+    private Client requireDraftClient(Contrat draft, RoleClientContrat role, String label) {
+        return contratClientRepository.findByContratIdAndRole(draft.getId(), role)
+                .stream()
+                .filter(link -> Boolean.TRUE.equals(link.getPrincipalPourRole()))
+                .map(ContratClient::getClient)
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Enregistrez d'abord le " + label));
+    }
+
+    private void replaceClientRole(Contrat draft, RoleClientContrat role, Client client) {
+        List<ContratClient> existing = contratClientRepository.findByContratIdAndRole(draft.getId(), role);
+        contratClientRepository.deleteAll(existing);
+        contratClientRepository.flush();
+        draft.getClients().removeIf(link -> link.getRole() == role);
+        linkClient(draft, client, role);
     }
 
     private CompagnieAssistance requireCompany(Long id) {

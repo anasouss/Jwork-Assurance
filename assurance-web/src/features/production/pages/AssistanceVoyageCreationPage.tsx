@@ -119,6 +119,7 @@ export default function AssistanceVoyageCreationPage() {
   const selectedCompany = (companies.data ?? []).find((company) => company.id === compagnieId);
   const selectedProduct = (products.data ?? []).find((product) => product.id === produitId);
   const hasPromoCodes = Number(selectedProduct?.nombreCodesPromo ?? 0) > 0;
+  const draftMode = Boolean(existingContract.data?.brouillon);
   const durationOptions = travelDurationOptions(selectedProduct);
   const expiryDate = calculateExpiryDate(dateEffet, Number(dureeMois));
   const payerOptions = useMemo(() => {
@@ -157,15 +158,19 @@ export default function AssistanceVoyageCreationPage() {
     const subscriberClient = subscriberLink?.client;
     const insuredLinks = (contract.clients ?? []).filter((link) => link.role === "BENEFICIAIRE");
     const insuredClients = insuredLinks.flatMap((link) => link.client ? [link.client] : []);
-    if (!assistance || !subscriberClient || insuredClients.length === 0) return;
+    if (!assistance) return;
 
-    const subscriberDraft = personFromClient(subscriberClient, identityTypeFor(subscriberClient));
-    const subscriberIsInsured = insuredClients.some((client) => client.id === subscriberClient.id);
-    setSubscriber(subscriberDraft);
-    setSameInsured(subscriberIsInsured);
-    setInsuredPeople(subscriberIsInsured
-      ? [emptyPerson()]
-      : insuredClients.map((client) => personFromClient(client, identityTypeFor(client))));
+    const subscriberIsInsured = Boolean(subscriberClient)
+      && insuredClients.some((client) => client.id === subscriberClient?.id);
+    if (subscriberClient) {
+      setSubscriber(personFromClient(subscriberClient, identityTypeFor(subscriberClient)));
+    }
+    if (insuredClients.length > 0) {
+      setSameInsured(subscriberIsInsured);
+      setInsuredPeople(subscriberIsInsured
+        ? [emptyPerson()]
+        : insuredClients.map((client) => personFromClient(client, identityTypeFor(client))));
+    }
     setCompagnieId(assistance.compagnieAssistanceId ?? "");
     setProduitId(assistance.produitAssistanceId ?? "");
     setNumeroContrat(renewing ? "" : contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
@@ -177,7 +182,8 @@ export default function AssistanceVoyageCreationPage() {
     const payerType = contract.typePayeurPrime === "TIERS_MANDATE" ? "TIERS_MANDATE" : "SOUSCRIPTEUR";
     setTypePayeurPrime(payerType);
     setPayeurPrimeClientId(payerType === "TIERS_MANDATE" ? contract.payeurPrimeClientId ?? "" : "");
-    setValidatedSections({ souscripteur: true, assures: true });
+    setValidatedSections({ souscripteur: Boolean(subscriberClient), assures: insuredClients.length > 0 });
+    setOpenSection(!subscriberClient ? "souscripteur" : insuredClients.length === 0 ? "assures" : "contrat");
     hydratedContractRef.current = hydrationKey;
   }, [contratId, existingContract.data, renewing]);
 
@@ -209,6 +215,40 @@ export default function AssistanceVoyageCreationPage() {
     retry: false,
   });
 
+  const draftSave = useMutation({
+    mutationFn: ({ section }: { section: Exclude<VoyageSection, "contrat"> }) =>
+      assistanceVoyageApi.saveDraftSection(contratId, section, {
+        compagnieAssistanceId: compagnieId,
+        produitAssistanceId: produitId,
+        souscripteur: section === "souscripteur" ? personRequest(subscriber) : undefined,
+        assures: section === "assures" && !subscriberIsInsured
+          ? insuredPeople.map(personRequest)
+          : undefined,
+        assureIdentiqueSouscripteur: section === "assures" ? subscriberIsInsured : undefined,
+      }),
+    onSuccess: async (saved, variables) => {
+      if (variables.section === "souscripteur" && saved.clientIds[0]) {
+        setSubscriber((current) => ({ ...current, clientId: saved.clientIds[0] }));
+      }
+      if (variables.section === "assures" && !subscriberIsInsured) {
+        setInsuredPeople((current) => current.map((person, index) => ({
+          ...person,
+          clientId: saved.clientIds[index] ?? person.clientId,
+        })));
+      }
+      setValidatedSections((current) => ({ ...current, [variables.section]: true }));
+      setOpenSection(variables.section === "souscripteur" ? "assures" : "contrat");
+      await queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      toast.success("Section enregistrée dans le brouillon");
+      if (!contratId) {
+        navigate(`/app/production/contrats/${saved.contratId}/assistance-voyage/modifier`, { replace: true });
+      }
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Enregistrement du brouillon impossible",
+    ),
+  });
+
   const save = useMutation({
     mutationFn: () => {
       const request = {
@@ -225,6 +265,7 @@ export default function AssistanceVoyageCreationPage() {
         payeurPrimeClientId: typePayeurPrime === "TIERS_MANDATE" ? payeurPrimeClientId : undefined,
       };
       if (renewing && contratId) return assistanceVoyageApi.renew(contratId, request);
+      if (draftMode && contratId) return assistanceVoyageApi.finalizeDraft(contratId, request);
       if (editing && contratId) return assistanceVoyageApi.update(contratId, request);
       return assistanceVoyageApi.create(request);
     },
@@ -232,7 +273,9 @@ export default function AssistanceVoyageCreationPage() {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
       toast.success(renewing
         ? `Dossier ${saved.numeroDossier} renouvelé`
-        : editing
+        : draftMode
+          ? `Brouillon finalisé sous le dossier ${saved.numeroDossier}`
+          : editing
           ? `Dossier ${saved.numeroDossier} modifié`
           : `Dossier ${saved.numeroDossier} créé`);
       navigate(editing
@@ -284,6 +327,10 @@ export default function AssistanceVoyageCreationPage() {
         : "Complétez les informations obligatoires de chaque personne assurée.");
       return;
     }
+    if (!contratId || draftMode) {
+      draftSave.mutate({ section });
+      return;
+    }
     setValidatedSections((current) => ({ ...current, [section]: true }));
     setOpenSection(section === "souscripteur" ? "assures" : "contrat");
   };
@@ -315,7 +362,13 @@ export default function AssistanceVoyageCreationPage() {
         <div>
           <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Production</p>
           <h1 className="text-xl font-semibold">
-            {renewing ? "Renouveler l’assistance voyage" : editing ? "Modifier l’assistance voyage" : "Nouvelle assistance voyage"}
+            {renewing
+              ? "Renouveler l’assistance voyage"
+              : draftMode
+                ? "Reprendre le brouillon d’assistance voyage"
+                : editing
+                  ? "Modifier l’assistance voyage"
+                  : "Nouvelle assistance voyage"}
           </h1>
         </div>
         <Button asChild variant="outline">
@@ -350,7 +403,7 @@ export default function AssistanceVoyageCreationPage() {
           cities={cities.data ?? []}
           allowLegalEntity
         />
-        <SectionSaveButton onClick={() => validateAndContinue("souscripteur")} />
+        <SectionSaveButton saving={draftSave.isPending} onClick={() => validateAndContinue("souscripteur")} />
       </SectionCard>
 
       <SectionCard
@@ -422,7 +475,7 @@ export default function AssistanceVoyageCreationPage() {
               Ajouter un assuré
             </Button>
           ) : null}
-          <SectionSaveButton onClick={() => validateAndContinue("assures")} />
+          <SectionSaveButton saving={draftSave.isPending} onClick={() => validateAndContinue("assures")} />
         </div>
       </SectionCard>
 
@@ -536,9 +589,11 @@ export default function AssistanceVoyageCreationPage() {
               ? "Enregistrement..."
               : renewing
                 ? "Renouveler l’assistance"
-                : editing
-                  ? "Enregistrer les modifications"
-                  : "Créer le dossier"}
+                : draftMode
+                  ? "Finaliser le dossier"
+                  : editing
+                    ? "Enregistrer les modifications"
+                    : "Créer le dossier"}
           </Button>
         </div>
       </SectionCard>
@@ -546,12 +601,12 @@ export default function AssistanceVoyageCreationPage() {
   );
 }
 
-function SectionSaveButton({ onClick }: { onClick: () => void }) {
+function SectionSaveButton({ onClick, saving = false }: { onClick: () => void; saving?: boolean }) {
   return (
     <div className="mt-4 flex justify-end border-t pt-3">
-      <Button type="button" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={onClick}>
-        <Save className="size-4" />
-        Enregistrer
+      <Button type="button" size="sm" disabled={saving} className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={onClick}>
+        {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+        {saving ? "Enregistrement..." : "Enregistrer"}
       </Button>
     </div>
   );

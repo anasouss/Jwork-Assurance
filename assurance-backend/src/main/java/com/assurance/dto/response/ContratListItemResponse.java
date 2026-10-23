@@ -49,6 +49,7 @@ public class ContratListItemResponse {
     private String typeRenouvellement;
     private ModeSaisieGarantieContrat modeSaisieGaranties;
     private Boolean brouillon;
+    private String progressionBrouillon;
     private Boolean prospection;
     private String premierTypeVehicule;
     private Boolean modificationDirecteAutorisee;

@@ -5,6 +5,8 @@ import com.assurance.dto.request.CreateAssistanceVoyageRequest;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.dto.request.QuoteAssistanceAutomobileRequest;
 import com.assurance.dto.request.QuoteAssistanceVoyageRequest;
+import com.assurance.dto.request.SaveAssistanceAutomobileDraftSectionRequest;
+import com.assurance.dto.request.SaveAssistanceVoyageDraftSectionRequest;
 import com.assurance.dto.request.CreateRenouvellementDraftRequest;
 import com.assurance.dto.request.FinalizeRenouvellementRequest;
 import com.assurance.dto.request.ConvertirProspectionRequest;
@@ -16,6 +18,7 @@ import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AssistanceAutomobileCreationResponse;
 import com.assurance.dto.response.AssistanceAutomobileQuoteResponse;
+import com.assurance.dto.response.AssistanceDraftResponse;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
 import com.assurance.dto.response.AssistanceVoyageCreationResponse;
@@ -118,6 +121,46 @@ public class ContratController {
         ));
     }
 
+    @PostMapping("/assistance-voyage/brouillons/{section}")
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
+    public ResponseEntity<ApiResponse<AssistanceDraftResponse>> createTravelAssistanceDraftSection(
+            @PathVariable String section,
+            @Valid @RequestBody SaveAssistanceVoyageDraftSectionRequest request
+    ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_DRAFT_CREATED);
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceVoyageService.saveDraftSection(TenantContext.getCurrentAgence(), null, section, request),
+                "Section du brouillon enregistrée"
+        ));
+    }
+
+    @PutMapping("/drafts/{id}/assistance-voyage/{section}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceDraftResponse>> updateTravelAssistanceDraftSection(
+            @PathVariable Long id,
+            @PathVariable String section,
+            @Valid @RequestBody SaveAssistanceVoyageDraftSectionRequest request
+    ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_DRAFT_UPDATED);
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceVoyageService.saveDraftSection(TenantContext.getCurrentAgence(), id, section, request),
+                "Section du brouillon enregistrée"
+        ));
+    }
+
+    @PostMapping("/drafts/{id}/assistance-voyage/finaliser")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceVoyageCreationResponse>> finalizeTravelAssistanceDraft(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateAssistanceVoyageRequest request
+    ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_FINALIZED);
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceVoyageService.finalizeDraft(TenantContext.getCurrentAgence(), id, request),
+                "Assistance voyage créée"
+        ));
+    }
+
     @PutMapping("/{id}/assistance-voyage")
     @PreAuthorize("hasAuthority('PERM_contrat:update')")
     public ResponseEntity<ApiResponse<AssistanceVoyageCreationResponse>> updateTravelAssistance(
@@ -157,6 +200,46 @@ public class ContratController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 assistanceAutomobileService.create(TenantContext.getCurrentAgence(), request),
+                "Assistance automobile créée"
+        ));
+    }
+
+    @PostMapping("/assistance-automobile/brouillons/{section}")
+    @PreAuthorize("hasAuthority('PERM_contrat:create')")
+    public ResponseEntity<ApiResponse<AssistanceDraftResponse>> createAutomobileAssistanceDraftSection(
+            @PathVariable String section,
+            @Valid @RequestBody SaveAssistanceAutomobileDraftSectionRequest request
+    ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_DRAFT_CREATED);
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceAutomobileService.saveDraftSection(TenantContext.getCurrentAgence(), null, section, request),
+                "Section du brouillon enregistrée"
+        ));
+    }
+
+    @PutMapping("/drafts/{id}/assistance-automobile/{section}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceDraftResponse>> updateAutomobileAssistanceDraftSection(
+            @PathVariable Long id,
+            @PathVariable String section,
+            @Valid @RequestBody SaveAssistanceAutomobileDraftSectionRequest request
+    ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_DRAFT_UPDATED);
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceAutomobileService.saveDraftSection(TenantContext.getCurrentAgence(), id, section, request),
+                "Section du brouillon enregistrée"
+        ));
+    }
+
+    @PostMapping("/drafts/{id}/assistance-automobile/finaliser")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<AssistanceAutomobileCreationResponse>> finalizeAutomobileAssistanceDraft(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateAssistanceAutomobileRequest request
+    ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_FINALIZED);
+        return ResponseEntity.ok(ApiResponse.success(
+                assistanceAutomobileService.finalizeDraft(TenantContext.getCurrentAgence(), id, request),
                 "Assistance automobile créée"
         ));
     }
@@ -405,6 +488,9 @@ public class ContratController {
             @RequestParam LocalDate dateAu,
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long compagnieAssistanceId,
+            @RequestParam(required = false) String typeAssistance,
+            @RequestParam(required = false) Long produitAssistanceId,
             @RequestParam(required = false) CategorieMouvementContrat categorie,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) StatutMouvementContrat statut,
@@ -416,7 +502,8 @@ public class ContratController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(registreProductionService.search(
                 TenantContext.getCurrentAgence(),
-                registreFilter(typeDate, dateDu, dateAu, brancheId, compagnieId, categorie,
+                registreFilter(typeDate, dateDu, dateAu, brancheId, compagnieId, compagnieAssistanceId,
+                        typeAssistance, produitAssistanceId, categorie,
                         typeContrat, statut, search, sortBy, sortDirection),
                 page,
                 size
@@ -431,6 +518,9 @@ public class ContratController {
             @RequestParam LocalDate dateAu,
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long compagnieAssistanceId,
+            @RequestParam(required = false) String typeAssistance,
+            @RequestParam(required = false) Long produitAssistanceId,
             @RequestParam(required = false) CategorieMouvementContrat categorie,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) StatutMouvementContrat statut,
@@ -440,7 +530,8 @@ public class ContratController {
     ) {
         byte[] content = registreProductionService.export(
                 TenantContext.getCurrentAgence(),
-                registreFilter(typeDate, dateDu, dateAu, brancheId, compagnieId, categorie,
+                registreFilter(typeDate, dateDu, dateAu, brancheId, compagnieId, compagnieAssistanceId,
+                        typeAssistance, produitAssistanceId, categorie,
                         typeContrat, statut, search, sortBy, sortDirection)
         );
         return ResponseEntity.ok()
@@ -455,6 +546,9 @@ public class ContratController {
             LocalDate dateAu,
             Long brancheId,
             Long compagnieId,
+            Long compagnieAssistanceId,
+            String typeAssistance,
+            Long produitAssistanceId,
             CategorieMouvementContrat categorie,
             TypeContrat typeContrat,
             StatutMouvementContrat statut,
@@ -468,6 +562,9 @@ public class ContratController {
                 .dateAu(dateAu)
                 .brancheId(brancheId)
                 .compagnieId(compagnieId)
+                .compagnieAssistanceId(compagnieAssistanceId)
+                .typeAssistance(typeAssistance)
+                .produitAssistanceId(produitAssistanceId)
                 .categorie(categorie)
                 .typeContrat(typeContrat)
                 .statut(statut)

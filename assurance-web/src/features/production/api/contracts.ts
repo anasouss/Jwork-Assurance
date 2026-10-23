@@ -47,6 +47,9 @@ export type ProductionRegisterParams = {
   dateAu: string;
   brancheId?: string;
   compagnieId?: string;
+  compagnieAssistanceId?: string;
+  typeAssistance?: string;
+  produitAssistanceId?: string;
   categorie?: string;
   typeContrat?: TypeContrat;
   statut?: "VALIDE" | "ANNULE";

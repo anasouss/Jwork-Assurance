@@ -16,6 +16,9 @@ public class RegistreProductionFilter {
     private LocalDate dateAu;
     private Long brancheId;
     private Long compagnieId;
+    private Long compagnieAssistanceId;
+    private String typeAssistance;
+    private Long produitAssistanceId;
     private CategorieMouvementContrat categorie;
     private TypeContrat typeContrat;
     private StatutMouvementContrat statut;

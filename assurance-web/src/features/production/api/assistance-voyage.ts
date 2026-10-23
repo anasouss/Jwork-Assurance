@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api/base";
 import type {
   ApiResponse,
+  AssistanceDraftResponse,
   AssistanceVoyageCreationResponse,
   AssistanceVoyageQuote,
   CreateAssistanceVoyageRequest,
@@ -8,6 +9,26 @@ import type {
 import { unwrapApiResponse as unwrap } from "./response";
 
 export const assistanceVoyageApi = {
+  async saveDraftSection(
+    contratId: string | undefined,
+    section: "souscripteur" | "assures",
+    request: {
+      compagnieAssistanceId: string;
+      produitAssistanceId: string;
+      souscripteur?: CreateAssistanceVoyageRequest["souscripteur"];
+      assures?: CreateAssistanceVoyageRequest["assures"];
+      assureIdentiqueSouscripteur?: boolean;
+    },
+  ) {
+    const path = contratId
+      ? `/api/v1/contrats/drafts/${contratId}/assistance-voyage/${section}`
+      : `/api/v1/contrats/assistance-voyage/brouillons/${section}`;
+    return unwrap(await apiFetch<ApiResponse<AssistanceDraftResponse>>(path, {
+      method: contratId ? "PUT" : "POST",
+      body: JSON.stringify(request),
+    }));
+  },
+
   async quote(request: {
     compagnieAssistanceId: string;
     produitAssistanceId: string;
@@ -29,6 +50,13 @@ export const assistanceVoyageApi = {
         method: "POST",
         body: JSON.stringify(request),
       }
+    ));
+  },
+
+  async finalizeDraft(contratId: string, request: CreateAssistanceVoyageRequest) {
+    return unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
+      `/api/v1/contrats/drafts/${contratId}/assistance-voyage/finaliser`,
+      { method: "POST", body: JSON.stringify(request) },
     ));
   },
 

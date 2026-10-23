@@ -215,16 +215,22 @@ export default function ContratsPage() {
             <FilterField label="Client / dossier">
               <Input value={filters.codeClient} onChange={(event) => setFilters((current) => ({ ...current, codeClient: event.target.value, clientId: "" }))} />
             </FilterField>
-            <FilterField label={assistanceBranch ? "Compagnie d’assistance" : "Compagnie d’assurance"}>
-              <Select value={filters.compagnieId} onValueChange={(value) => setFilters((current) => ({
+            <FilterField label={filters.brancheId === "ALL" ? "Compagnie" : assistanceBranch ? "Compagnie d’assistance" : "Compagnie d’assurance"}>
+              <Select
+                value={filters.compagnieId}
+                disabled={filters.brancheId === "ALL"}
+                onValueChange={(value) => setFilters((current) => ({
                 ...current,
                 compagnieId: value,
                 produitAssistanceId: "ALL",
-              }))}>
+                }))}
+              >
                 <SelectTrigger><SelectValue placeholder="Toutes" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">Toutes</SelectItem>
-                  {(assistanceBranch ? assistanceCompanies.data ?? [] : insuranceCompanies.data ?? []).map((company) => (
+                  <SelectItem value="ALL">{filters.brancheId === "ALL" ? "Sélectionnez une branche" : "Toutes"}</SelectItem>
+                  {(filters.brancheId === "ALL"
+                    ? []
+                    : assistanceBranch ? assistanceCompanies.data ?? [] : insuranceCompanies.data ?? []).map((company) => (
                     <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
                   ))}
                 </SelectContent>
@@ -406,7 +412,9 @@ function ContratRow({
       </TableCell>
       <TableCell className="text-center">{formatDate(movement.dateEffet ?? contrat.dateEffet)}</TableCell>
       <TableCell className="text-center">{formatDate(movement.dateEcheance ?? contrat.dateEcheance)}</TableCell>
-      <TableCell className="text-center"><StatusBadge statut={statusLabel(contrat, movement)} /></TableCell>
+      <TableCell className="text-center">
+        <StatusBadge statut={statusLabel(contrat, movement)} progression={contrat.progressionBrouillon} />
+      </TableCell>
       <td className="px-2 py-2">
         <div className="flex items-center justify-center gap-2">
           {canViewContrat && !contrat.assistanceLiee ? (
@@ -462,6 +470,8 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const canManageCarteVerte = permissions.includes("carte-verte:manage") || canUpdateContrat;
   const canViewContrat = permissions.includes("contrat:view");
   const canViewPieces = permissions.includes("piece-jointe:view") || permissions.includes("contrat:view");
+  const isDraftContract = Boolean(contrat.brouillon)
+    && String(contrat.statut ?? "").toUpperCase().includes("DRAFT");
   const canRecalculateFinancialHistory = permissions.includes("contrat:recalculate-financial-history")
     && !isAssistanceRecord
     && !child
@@ -491,7 +501,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
       && !hasActiveAvenants;
   const canShowEdit = isLinkedAutomobileAssistance
     ? canManageAssistance && !child
-    : (canUpdateContrat || (!isTravelAssistance && canCreateContrat)) && !child;
+    : (canUpdateContrat || (isDraftContract && canCreateContrat) || (!isTravelAssistance && canCreateContrat)) && !child;
   const blockedEditReason = contrat.motifBlocageModificationDirecte
     ?? fallbackDirectEditBlockReason(contrat, movement, hasActiveAvenants);
   const rectificationPath = movement.mouvementId && movement.code
@@ -630,7 +640,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
             </DropdownMenuItem>
           ) : canShowEdit && canEditDirectly ? (
             <DropdownMenuItem asChild>
-              <Link to={editPath}>Modifier</Link>
+              <Link to={editPath}>{isDraftContract ? "Reprendre le brouillon" : "Modifier"}</Link>
             </DropdownMenuItem>
           ) : canShowEdit ? (
             <DropdownMenuItem onSelect={() => setBlockedEditOpen(true)}>
@@ -1058,14 +1068,19 @@ function TypeBadge({ contrat }: { contrat: ContratListItem }) {
   return <Badge className={cn("min-w-5 justify-center rounded px-1.5 py-0.5", className)}>{label}</Badge>;
 }
 
-function StatusBadge({ statut }: { statut?: string | null }) {
+function StatusBadge({ statut, progression }: { statut?: string | null; progression?: string | null }) {
   const normalized = normalize(statut);
   const className = normalized.includes("RESIL")
     ? "bg-red-600 text-white hover:bg-red-600"
     : normalized.includes("DRAFT") || normalized.includes("BROUILLON")
       ? "bg-amber-500 text-white hover:bg-amber-500"
       : "bg-green-600 text-white hover:bg-green-600";
-  return <Badge className={cn("rounded px-2 py-0.5 text-[11px]", className)}>{statusText(statut)}</Badge>;
+  const label = statusText(statut);
+  return (
+    <Badge className={cn("rounded px-2 py-0.5 text-[11px]", className)}>
+      {progression && label === "Brouillon" ? `${label} · ${progression}` : label}
+    </Badge>
+  );
 }
 
 function statusText(statut?: string | null) {

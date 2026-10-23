@@ -3,6 +3,8 @@ package com.assurance.service;
 import com.assurance.dto.request.CreateAssistanceVoyageRequest;
 import com.assurance.dto.request.CreateClientRequest;
 import com.assurance.dto.request.QuoteAssistanceVoyageRequest;
+import com.assurance.dto.request.SaveAssistanceVoyageDraftSectionRequest;
+import com.assurance.dto.response.AssistanceDraftResponse;
 import com.assurance.dto.response.AssistanceVoyageCreationResponse;
 import com.assurance.dto.response.AssistanceVoyageQuoteResponse;
 import com.assurance.entity.Agence;
@@ -122,6 +124,80 @@ public class AssistanceVoyageService {
     @Transactional
     public AssistanceVoyageCreationResponse create(Long agenceId, CreateAssistanceVoyageRequest request) {
         return createInternal(agenceId, request, null, null);
+    }
+
+    @Transactional
+    public AssistanceDraftResponse saveDraftSection(
+            Long agenceId,
+            Long contratId,
+            String section,
+            SaveAssistanceVoyageDraftSectionRequest request
+    ) {
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
+                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                .orElseThrow(() -> new BadRequestException("Compagnie d'assistance inactive ou introuvable"));
+        ProduitAssistance produit = produitAssistanceRepository.findById(request.getProduitAssistanceId())
+                .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                .orElseThrow(() -> new BadRequestException("Produit d'assistance inactif ou introuvable"));
+        validateProduct(compagnie, produit);
+
+        Contrat draft = contratId == null
+                ? createDraftContract(agenceId)
+                : requireDraftContract(agenceId, contratId, "Assistance Voyage");
+        upsertDraftAssistance(draft, compagnie, produit, "Assistance Voyage");
+
+        String normalizedSection = section == null ? "" : section.trim().toLowerCase(Locale.ROOT);
+        List<Client> savedClients;
+        if ("souscripteur".equals(normalizedSection)) {
+            Client subscriber = resolvePerson(agenceId, request.getSouscripteur(), "souscripteur", true);
+            replaceClientRole(draft, RoleClientContrat.SOUSCRIPTEUR, List.of(subscriber));
+            savedClients = List.of(subscriber);
+        } else if ("assures".equals(normalizedSection)) {
+            Client subscriber = requireDraftClient(draft, RoleClientContrat.SOUSCRIPTEUR, "souscripteur");
+            List<Client> insuredPeople;
+            if (Boolean.TRUE.equals(request.getAssureIdentiqueSouscripteur())) {
+                if (subscriber.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE) {
+                    throw new BadRequestException("Une personne morale ne peut pas être une personne assurée");
+                }
+                insuredPeople = List.of(subscriber);
+            } else {
+                insuredPeople = resolveInsuredPeople(agenceId, request.getAssures());
+            }
+            replaceClientRole(draft, RoleClientContrat.BENEFICIAIRE, insuredPeople);
+            savedClients = insuredPeople;
+        } else {
+            throw new BadRequestException("Section de brouillon d'assistance voyage inconnue");
+        }
+
+        return AssistanceDraftResponse.builder()
+                .contratId(draft.getId())
+                .numeroDossier(draft.getNumeroDossier())
+                .sectionEnregistree(normalizedSection)
+                .clientIds(savedClients.stream().map(Client::getId).toList())
+                .build();
+    }
+
+    @Transactional
+    public AssistanceVoyageCreationResponse finalizeDraft(
+            Long agenceId,
+            Long contratId,
+            CreateAssistanceVoyageRequest request
+    ) {
+        Contrat draft = requireDraftContract(agenceId, contratId, "Assistance Voyage");
+        requireDraftClient(draft, RoleClientContrat.SOUSCRIPTEUR, "souscripteur");
+        requireDraftClient(draft, RoleClientContrat.BENEFICIAIRE, "personne assurée");
+        AssistanceVoyageCreationResponse response = createInternal(agenceId, request, null, null);
+        assistanceContratRepository.deleteAll(
+                assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(draft.getId())
+        );
+        assistanceContratRepository.flush();
+        contratClientRepository.deleteByContratId(draft.getId());
+        contratClientRepository.flush();
+        draft.getAssistances().clear();
+        draft.getClients().clear();
+        contratRepository.delete(draft);
+        contratRepository.flush();
+        return response;
     }
 
     @Transactional
@@ -705,6 +781,86 @@ public class AssistanceVoyageService {
                 .principalPourRole(principal)
                 .build());
         contrat.getClients().add(link);
+    }
+
+    private Contrat createDraftContract(Long agenceId) {
+        Agence agence = agenceRepository.findById(agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+        BrancheAssurance branche = brancheAssuranceRepository.findByCodeIgnoreCase("ASSISTANCE")
+                .orElseThrow(() -> new BadRequestException("La branche Assistance n'est pas configurée"));
+        return contratRepository.save(Contrat.builder()
+                .agence(agence)
+                .brancheAssurance(branche)
+                .typeContrat(TypeContrat.PARTICULIER)
+                .statut(StatutContrat.DRAFT)
+                .nombreVehicules(0)
+                .nombreRemorques(0)
+                .assistance(true)
+                .brouillon(true)
+                .prospection(false)
+                .build());
+    }
+
+    private Contrat requireDraftContract(Long agenceId, Long contratId, String expectedType) {
+        Contrat draft = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        if (draft.getStatut() != StatutContrat.DRAFT || !Boolean.TRUE.equals(draft.getBrouillon())
+                || draft.getBrancheAssurance() == null
+                || !"ASSISTANCE".equalsIgnoreCase(draft.getBrancheAssurance().getCode())) {
+            throw new BadRequestException("Ce dossier n'est pas un brouillon d'assistance modifiable");
+        }
+        AssistanceContrat assistance = assistanceContratRepository
+                .findByContratIdAndActifTrueOrderByCreatedAtDesc(contratId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Le contexte du brouillon d'assistance est introuvable"));
+        String type = assistance.getProduitAssistance() == null
+                ? assistance.getProduit()
+                : assistance.getProduitAssistance().getType();
+        if (!expectedType.equalsIgnoreCase(type)) {
+            throw new BadRequestException("Le type du brouillon d'assistance ne correspond pas à cet écran");
+        }
+        return draft;
+    }
+
+    private void upsertDraftAssistance(
+            Contrat draft,
+            CompagnieAssistance compagnie,
+            ProduitAssistance produit,
+            String type
+    ) {
+        AssistanceContrat assistance = assistanceContratRepository
+                .findByContratIdAndActifTrueOrderByCreatedAtDesc(draft.getId())
+                .stream()
+                .findFirst()
+                .orElseGet(() -> AssistanceContrat.builder()
+                        .brancheAssurance(draft.getBrancheAssurance())
+                        .contrat(draft)
+                        .actif(true)
+                        .build());
+        assistance.setCompagnieAssistance(compagnie);
+        assistance.setProduitAssistance(produit);
+        assistance.setProduit(produit == null ? type : produit.getLibelle());
+        assistanceContratRepository.save(assistance);
+    }
+
+    private Client requireDraftClient(Contrat draft, RoleClientContrat role, String label) {
+        return contratClientRepository.findByContratIdAndRole(draft.getId(), role)
+                .stream()
+                .filter(link -> Boolean.TRUE.equals(link.getPrincipalPourRole()))
+                .map(ContratClient::getClient)
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Enregistrez d'abord le " + label));
+    }
+
+    private void replaceClientRole(Contrat draft, RoleClientContrat role, List<Client> clients) {
+        List<ContratClient> existing = contratClientRepository.findByContratIdAndRole(draft.getId(), role);
+        contratClientRepository.deleteAll(existing);
+        contratClientRepository.flush();
+        draft.getClients().removeIf(link -> link.getRole() == role);
+        for (int index = 0; index < clients.size(); index++) {
+            linkClient(draft, clients.get(index), role, index == 0);
+        }
     }
 
     private Pricing price(

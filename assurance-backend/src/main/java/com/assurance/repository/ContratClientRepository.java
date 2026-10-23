@@ -11,6 +11,8 @@ import java.util.List;
 public interface ContratClientRepository extends JpaRepository<ContratClient, Long> {
     void deleteByContratId(Long contratId);
 
+    List<ContratClient> findByContratIdAndRole(Long contratId, RoleClientContrat role);
+
     @EntityGraph(attributePaths = {"client"})
     List<ContratClient> findByContratIdInAndRole(Collection<Long> contratIds, RoleClientContrat role);
 
